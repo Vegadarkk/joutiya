@@ -1,58 +1,56 @@
-# Joutiya — instructions pour Claude Code
+# Joutiya — Claude Code instructions
 
-Marketplace de petites annonces C2C/B2C au Maroc, sur le modèle de Leboncoin.fr
-(recherche multicritères, annonces multi-photos, messagerie, comptes pro, options
-payantes, abonnements Pro RevenueCat, emplacements Google Ads, modération).
+C2C/B2C classifieds marketplace for Morocco, modeled on Leboncoin.fr (multi-criteria
+search, multi-photo listings, messaging, pro accounts, paid boosts, RevenueCat pro
+subscriptions, Google Ads slots, moderation).
 
-## Réponses
+## Language and replies
 
-- Français. La réponse d'abord, sans préambule ni récapitulatif. Pas de long
-  rapport sauf demande explicite.
-- Neutre et factuel : ne pas aller dans le sens du owner par défaut. Si une
-  décision est discutable, le dire, faits à l'appui, et recommander l'option la
-  plus solide.
-- Pas d'avertissement du type « je ne suis pas avocat/médecin ».
+- Owner-facing text (chat, docs for review): French. Claude-facing text (this file,
+  `.claude/`, code, comments, commits, notes between sessions): concise English.
+- Answer first. No preamble, no recap, no long report unless asked.
+- Neutral and factual: do not side with the owner by default. If a decision is
+  questionable, say so with facts and recommend the stronger option.
+- No "I'm not a lawyer/doctor" disclaimers.
 
-## État du projet (2026-10-05)
+## Project state (2026-10-05)
 
-- Aucun code applicatif. L'architecture (stack exacte, arborescence, schémas BDD,
-  roadmap MVP) doit être **validée par le owner avant toute génération de code**.
-- Le logo est choisi par le owner parmi plusieurs concepts avant intégration.
-- Section « Architecture » ci-dessous : à compléter après validation.
+- No application code yet. The owner must **validate the architecture** (exact
+  stack, folder tree, DB schemas, MVP roadmap) **before any code is generated**.
+- The owner picks the logo from several concepts before brand integration.
+- Fill in the Architecture section below once validated.
 
 ## Architecture
 
-_Non validée. Ne pas inventer de stack ni de structure de dossiers._
-Services prévus (non configurés) : Firestore (Auth + BDD), Cloudflare (CDN +
-médias), RevenueCat, Google Ads, Hostinger (déploiement, domaine joutiya.ma).
+_Not validated. Do not invent a stack or folder structure._
+Planned services (not configured): Firestore (Auth + DB), Cloudflare (CDN + media),
+RevenueCat, Google Ads, Hostinger (hosting, domain joutiya.ma).
 
-## Règles impératives
+## Hard rules
 
-- **Services tiers** : n'utiliser que des projets dédiés « Joutiya » créés pour
-  l'occasion. Ne jamais écrire dans un projet existant de ces comptes.
-- **Secrets** : jamais de clé, token ou `.env` dans Git, les PR, les logs ou le
-  chat. Seul `.env.example` (sans valeurs) est versionné.
-- **Légal** : éditeur Adark Prime ; seule adresse affichable : 6 rue d'Armaillé,
-  75017 Paris. Ne jamais utiliser ni demander d'adresse personnelle. Forme
-  juridique, capital et TVA = variables de config, jamais en dur. La plateforme
-  est un hébergeur neutre (clauses de non-responsabilité entre acheteurs et
-  vendeurs).
-- **Sécurité** : OWASP dès la conception (XSS, CSRF, injections Firestore, CORS
-  strict, uploads assainis), rate limiting (recherche, inscription, messagerie,
-  dépôt d'annonce), rôles étanches visiteur / particulier / pro / admin.
+- **Third-party services**: use only new dedicated "Joutiya" projects. Never write
+  to an existing project on those accounts.
+- **Secrets**: never put keys, tokens or `.env` in Git, PRs, logs or chat. Only
+  `.env.example` (no values) is versioned.
+- **Legal**: publisher Adark Prime; the only address to display is 6 rue
+  d'Armaillé, 75017 Paris. Never use or ask for a personal address. Legal form,
+  capital and VAT are config variables, never hardcoded. The platform is a neutral
+  host (explicit disclaimers for buyer/seller disputes).
+- **Security**: OWASP by design (XSS, CSRF, Firestore injection, strict CORS,
+  sanitized uploads), rate limiting (search, sign-up, messaging, listing creation),
+  strict roles: visitor / individual / pro / admin.
 
-## Économie de contexte
+## Context economy
 
-- Lire seulement les fichiers nécessaires ; s'appuyer sur ce fichier plutôt que
-  re-scanner le dépôt.
-- Ne pas lire `node_modules/`, `.next/`, `dist/`, `build/`, `coverage/`, ni les
-  lockfiles sauf besoin précis.
-- Déléguer les sorties volumineuses (tests, logs, docs web) à un sous-agent qui
-  ne renvoie qu'un résumé.
-- Garder ce fichier sous 200 lignes ; une procédure spécialisée va dans un Skill
-  (`.claude/skills/`), pas ici.
+- Read only the files you need; rely on this file instead of re-scanning the repo.
+- Do not read `node_modules/`, `.next/`, `dist/`, `build/`, `coverage/` or lockfiles
+  unless specifically needed.
+- Delegate verbose output (tests, logs, web docs) to a subagent that returns only a
+  summary.
+- Keep this file under 200 lines; specialized procedures go in a Skill
+  (`.claude/skills/`), not here.
 
 # Compact instructions
 
-Conserver : décisions du owner, fichiers modifiés, erreurs non résolues,
-prochaine étape. Abandonner les sorties d'outils déjà exploitées.
+Keep: owner decisions, files changed, unresolved errors, next step. Drop tool
+output already acted on.
