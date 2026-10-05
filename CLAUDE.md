@@ -42,6 +42,14 @@ RevenueCat, Google Ads, Hostinger (hosting, domain joutiya.ma).
   sanitized uploads), rate limiting (search, sign-up, messaging, listing creation),
   strict roles: visitor / individual / pro / admin.
 
+## Model and effort
+
+- Project default (`.claude/settings.json`): Opus 5.5 (`opus`), effort `high`.
+- Code and debug work must run on Opus 5.5. If the session runs another model, say
+  so in one line before starting.
+- The owner starts code/debug prompts with `ultracode` (per-prompt workflow
+  opt-in). Never launch a workflow without that keyword or `/effort ultracode`.
+
 ## Context economy
 
 - Read only the files you need; rely on this file instead of re-scanning the repo.
