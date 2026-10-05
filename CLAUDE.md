@@ -6,8 +6,10 @@ subscriptions, Google Ads slots, moderation).
 
 ## Language and replies
 
-- Owner-facing text (chat, docs for review): French. Claude-facing text (this file,
-  `.claude/`, code, comments, commits, notes between sessions): concise English.
+- **Always reply to the user in French**, in every message, whatever language the
+  context is in. Docs written for the user to review are in French too.
+- Claude-facing text (this file, `.claude/`, code, comments, commits, notes for
+  Claude or between sessions): concise English.
 - Answer first. No preamble, no recap, no long report unless asked.
 - Neutral and factual: do not side with the owner by default. If a decision is
   questionable, say so with facts and recommend the stronger option.
