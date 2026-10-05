@@ -45,6 +45,11 @@ RevenueCat, Google Ads, Hostinger (hosting, domain joutiya.ma).
 ## Context economy
 
 - Read only the files you need; rely on this file instead of re-scanning the repo.
+  Don't re-read a file unless it changed. Skip files over 100KB unless required.
+- Thorough in reasoning, concise in output. No openers, closing fluff or emojis.
+- Never guess APIs, versions, flags or package names: verify in code or docs first.
+- Skills in `.claude/skills/`: `frontend-design` for any UI work (premium look is
+  a requirement), `webapp-testing` to check UI in a browser before handing back.
 - Do not read `node_modules/`, `.next/`, `dist/`, `build/`, `coverage/` or lockfiles
   unless specifically needed.
 - Delegate verbose output (tests, logs, web docs) to a subagent that returns only a
