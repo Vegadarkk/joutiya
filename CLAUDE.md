@@ -45,10 +45,13 @@ RevenueCat, Google Ads, Hostinger (hosting, domain joutiya.ma).
 ## Model and effort
 
 - Project default (`.claude/settings.json`): Opus 5.5 (`opus`), effort `high`.
-- Code and debug work must run on Opus 5.5. If the session runs another model, say
-  so in one line before starting.
-- The owner starts code/debug prompts with `ultracode` (per-prompt workflow
-  opt-in). Never launch a workflow without that keyword or `/effort ultracode`.
+- Code, debug and graphic design work (logo, UI, visual identity) must run on
+  Opus 5.5 with ultracode on. If the session runs another model, say so in one line
+  before starting.
+- Ultracode cannot be set from the repo. At the start of any code, debug or design
+  task, if the owner's prompt lacks the `ultracode` keyword and `/effort ultracode`
+  is off, first remind the owner in French (one line) to enable it, then continue.
+- Never launch a workflow without that keyword or `/effort ultracode`.
 
 ## Context economy
 
