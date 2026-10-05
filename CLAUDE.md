@@ -44,14 +44,16 @@ RevenueCat, Google Ads, Hostinger (hosting, domain joutiya.ma).
 
 ## Model and effort
 
-- Project default (`.claude/settings.json`): Opus 5.5 (`opus`), effort `high`.
+- Never change Cody's model or effort level: the owner sets them personally. The repo
+  pins only `model: opus` (Opus 5.5) and `ultracode: true`; effort is left to the
+  owner's own setting.
 - Code, debug and graphic design work (logo, UI, visual identity) must run on
-  Opus 5.5 with ultracode on. If the session runs another model, say so in one line
-  before starting.
-- Ultracode cannot be set from the repo. At the start of any code, debug or design
-  task, if the owner's prompt lacks the `ultracode` keyword and `/effort ultracode`
-  is off, first remind the owner in French (one line) to enable it, then continue.
-- Never launch a workflow without that keyword or `/effort ultracode`.
+  Opus 5.5 with ultracode on. If the session runs another model or ultracode is
+  off, remind the owner in French (one line) at the start of the task, then continue.
+- Search, triage and research go to subagents / workflow agents on Sonnet (Haiku for
+  trivial lookups). Keep Opus for code, debug, design and verification.
+- Never launch a workflow without `ultracode` on, the `ultracode` keyword, or
+  `/effort ultracode`.
 
 ## Context economy
 
