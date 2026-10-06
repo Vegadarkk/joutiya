@@ -1,0 +1,210 @@
+# =============================================================================
+# Joutiya — strict .gitignore (Node.js / Next.js / Firebase / Cloudflare)
+# Rule: no secrets, keys or build artifacts in Git.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Secrets & environment variables
+# Only value-less templates (*.example) are tracked.
+# -----------------------------------------------------------------------------
+.env
+.env.*
+*.env
+!.env.example
+!**/.env.example
+.envrc
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Keys, certificates, credentials
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+*.gpg
+*.asc
+secrets/
+.secrets/
+credentials/
+*credentials*.json
+*-credentials.json
+service-account*.json
+*serviceAccount*.json
+*-sa.json
+*-adminsdk-*.json
+gcloud-*.json
+application_default_credentials.json
+client_secret*.json
+google-ads.yaml
+*.secret
+*.secrets
+*token*.txt
+*api-key*.txt
+*apikey*.txt
+*api-key*.json
+*API*.txt
+
+# -----------------------------------------------------------------------------
+# Dependencies
+# -----------------------------------------------------------------------------
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnpm-store/
+bower_components/
+jspm_packages/
+web_modules/
+
+# -----------------------------------------------------------------------------
+# Build output
+# -----------------------------------------------------------------------------
+.next/
+out/
+build/
+dist/
+dist-ssr/
+.output/
+.nuxt/
+.svelte-kit/
+.vercel/
+.netlify/
+.open-next/
+.turbo/
+.nx/cache/
+.parcel-cache/
+.vite/
+.cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+next-env.d.ts
+storybook-static/
+public/workbox-*.js
+public/fallback-*.js
+
+# -----------------------------------------------------------------------------
+# Firebase / Google Cloud
+# -----------------------------------------------------------------------------
+.firebase/
+.firebaserc.local
+firebase-debug.log*
+firebase-debug.*.log*
+firestore-debug.log*
+database-debug.log*
+pubsub-debug.log*
+ui-debug.log*
+emulator-data/
+.emulator-data/
+functions/lib/
+functions/node_modules/
+.gcloud/
+
+# -----------------------------------------------------------------------------
+# Cloudflare (Wrangler, Workers, R2)
+# -----------------------------------------------------------------------------
+.wrangler/
+.mf/
+worker/dist/
+
+# -----------------------------------------------------------------------------
+# Tests & coverage
+# -----------------------------------------------------------------------------
+coverage/
+.nyc_output/
+*.lcov
+junit.xml
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+playwright/.auth/
+cypress/videos/
+cypress/screenshots/
+__snapshots__/*.snap.tmp
+
+# -----------------------------------------------------------------------------
+# Logs & temp files
+# -----------------------------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+*.pid
+*.seed
+*.pid.lock
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+
+# -----------------------------------------------------------------------------
+# Local data, uploads, dev databases (never user data)
+# -----------------------------------------------------------------------------
+uploads/
+.uploads/
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.sql.gz
+backups/
+
+# -----------------------------------------------------------------------------
+# Private documents (company paperwork, key screenshots)
+# -----------------------------------------------------------------------------
+*attestation*.pdf
+*kbis*.pdf
+*Kbis*.pdf
+private/
+
+# -----------------------------------------------------------------------------
+# Editors & OS
+# -----------------------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.iml
+*.sublime-workspace
+*.swp
+*.swo
+*~
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# -----------------------------------------------------------------------------
+# Local tools
+# -----------------------------------------------------------------------------
+.claude/settings.local.json
+.sentryclirc
+.terraform/
+*.tfstate
+*.tfstate.*
