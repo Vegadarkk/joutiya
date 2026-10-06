@@ -45,8 +45,9 @@ RevenueCat, Google Ads, Hostinger (hosting, domain joutiya.ma).
 ## Model and effort
 
 - Never change Cody's model or effort level: the owner sets them personally. The repo
-  pins only `model: opus` (Opus 5.5) and `ultracode: true`; effort is left to the
-  owner's own setting.
+  pins only `model: opus` (Opus 5.5). Ultracode and effort live in the owner's own
+  Cody config, never in committed settings: cloud threads (Sonnet research and
+  triage included) share this checkout and would inherit them.
 - Code, debug and graphic design work (logo, UI, visual identity) must run on
   Opus 5.5 with ultracode on. If the session runs another model or ultracode is
   off, remind the owner in French (one line) at the start of the task, then continue.
