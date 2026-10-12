@@ -15,18 +15,40 @@ subscriptions, Google Ads slots, moderation).
   questionable, say so with facts and recommend the stronger option.
 - No "I'm not a lawyer/doctor" disclaimers.
 
-## Project state (2026-10-05)
+## Project state (2026-10-12)
 
-- No application code yet. The owner must **validate the architecture** (exact
-  stack, folder tree, DB schemas, MVP roadmap) **before any code is generated**.
-- The owner picks the logo from several concepts before brand integration.
-- Fill in the Architecture section below once validated.
+- Architecture v3 ("start at 0 EUR") validated by the owner on 2026-10-12. MVP phase 0
+  is under way; launch is planned after phases 0-6 (~week 16). Source of truth:
+  the architecture doc (Claude Doc "Architecture du MVP v3"), copy in the project
+  files as `joutiya/architecture-final.md`; read only the section you need (11 sections,
+  ~175 KB). Deviations need the owner's approval.
+- The owner picks the logo from concepts before brand integration.
+- No cloud resource is created, and no existing account completed, without the
+  owner's explicit approval; all targets are listed in `infra/targets.json` and checked
+  by `scripts/assert-target.ts`.
 
 ## Architecture
 
-_Not validated. Do not invent a stack or folder structure._
-Planned services (not configured): Firestore (Auth + DB), Cloudflare (CDN + media),
-RevenueCat, Google Ads, Hostinger (hosting, domain joutiya.ma).
+- **App**: one Next.js 16 (App Router, strict TypeScript, Tailwind v4, shadcn/ui,
+  next-intl FR/AR/RIF) app + a BullMQ worker sharing `src/lib`; one Docker image,
+  targets `web` and `worker`. Public anonymous pages: ISR + hash CSP; private pages:
+  dynamic + nonce CSP. `admin.joutiya.ma` is rewritten to `src/app/admin` by `proxy.ts`.
+- **Hosting**: Oracle Cloud Always Free ARM VM (Docker Compose, staging as a separate
+  Compose project), Cloudflare Free in front, traffic only via Cloudflare Tunnel (no
+  inbound port, SSH included). The VM holds no unique data (`infra/redeploy.md`).
+- **Data**: Firebase Spark (Auth without Identity Platform, Firestore Standard, EU),
+  projects dev / staging / prod. All reads and writes go through the Next.js API (server
+  first, rate limited); Firestore rules deny everything except realtime messaging.
+- **Services**: Meilisearch (search), R2 + `sharp` + local ONNX models (photos),
+  Valkey x2 (queue `noeviction`, rate limit `allkeys-lru`), Resend (mail), WhatsApp
+  inbound phone check, Turnstile, Sentry EU, Stripe + RevenueCat (credits wallet, Pro
+  subscriptions), Claude Haiku 5.5 / Sonnet 5.5 for moderation and the assistant,
+  hard cap 5 USD/month.
+- **Adapters**: every free service sits behind an interface (`MailTransport`,
+  `PhoneVerifier`, `AiProvider`, `ModerationClassifier`, `ObjectStore`,
+  `PaymentProvider`, `Alerter`); switch by config, never by rewrite.
+- **Quota guards**: each free quota has an app-side counter, a 70% alert and a defined
+  degraded mode at 100%.
 
 ## Hard rules
 
