@@ -59,10 +59,10 @@ Répondre en tant que `contact@` : pas maintenant. Google supprime en janvier 20
 
 1. oracle.com/cloud/free → **Start for free** → pays France, votre Gmail.
 2. **Home Region : France Central (Paris)**. **Irréversible** : la VM gratuite ne pourra être créée que dans cette région.
-3. Vérification de la carte : une petite somme est bloquée, puis rendue.
+3. Vérification par une carte bancaire classique (les cartes prépayées ou virtuelles sont refusées) : une petite somme est bloquée, puis rendue sous quelques jours.
 4. Activez la double authentification du compte.
 5. Ne créez pas encore la VM : la phase 1 donne ses réglages exacts, et Oracle peut récupérer une VM gratuite inactive pendant 7 jours.
-6. Mentions légales (hébergeur) : relevez dans le contrat accepté à l'inscription l'entité Oracle, son adresse et son téléphone. Pour la France, c'est a priori Oracle France S.A.S., 15 boulevard Charles de Gaulle, 92715 Colombes Cedex : vérifiez-le sur votre contrat.
+6. Mentions légales (hébergeur) : gardez une copie du contrat accepté à l'inscription et relevez-y l'entité Oracle, son adresse et son téléphone (Oracle France ou Oracle America selon le contrat).
 
 À noter : la région d'origine (`eu-paris-1`).
 
@@ -74,7 +74,7 @@ Cody peut faire les points 1 à 3 (prompt B).
 3. Dans chaque projet : **Firestore Database** → **Créer une base de données** → édition **Standard** → emplacement **europe-west9 (Paris)** → mode production. **Irréversible** : la région ne change plus. Si Paris est refusé, arrêtez-vous et dites-le-moi avant de prendre `europe-west1`.
 4. Restez sur l'offre **Spark** : ne passez jamais à Blaze, et ne cliquez pas « Upgrade » vers Identity Platform dans Authentication (sur Spark, cela plafonne à 3 000 utilisateurs actifs par jour). Authentication s'active en phase 2.
 
-Un identifiant de projet est définitif et jamais réutilisable, même après suppression.
+Un identifiant de projet est définitif et jamais réutilisable, même après suppression. Un compte Google n'a droit qu'à quelques projets sans facturation (environ 5 à 10, projets Google Cloud compris) : si la création est refusée, demandez une hausse de quota (gratuite) plutôt que de supprimer un projet existant.
 
 À noter : les 3 identifiants de projet et la région de chaque base.
 
