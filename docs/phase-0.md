@@ -11,35 +11,42 @@ Ce qui reste à faire de votre côté pour clore la phase 0 (architecture v3, §
 - **Clés secrètes** : créez-les seulement à la phase qui s'en sert, puis rangez-les dans votre `.env` local sous le nom prévu par `.env.example`. Jamais dans le dépôt ni dans le chat.
 - Alignez votre `.env` actuel sur le nouveau `.env.example` : des noms ont changé (par exemple `CF_ACCOUNT_ID`). N'y gardez que des clés propres à Joutiya ; une clé qui ouvre tout un compte (Global API Key Cloudflare, clé d'un autre projet Google) n'a rien à y faire. Les jetons Hostinger attendent votre décision Z11.
 
-**Ordre conseillé.** Les étapes 1 à 6 bloquent la phase 1 : commencez par elles. Les étapes 7 à 11 servent aux phases 2 à 7. L'étape 12 clôt la phase 0.
+**Ordre conseillé.** L'étape 0 d'abord. Les étapes 1 à 6 bloquent la phase 1 : faites-les ensuite. Les étapes 7 à 11 servent aux phases 2 à 7. L'étape 12 clôt la phase 0.
+
+## 0. D'abord : le domaine `joutiya.ma` est-il validé ?
+
+Un .MA n'est actif qu'après vérification d'une pièce d'identité par le registre (2 à 4 semaines). Sans pièce envoyée dans les 14 jours suivant l'achat, le domaine est suspendu, puis peut être libéré ([aide Hostinger](https://www.hostinger.com/support/requirements-to-register-a-ma-domain/)).
+1. hPanel → **Domaines** → `joutiya.ma` : vérifiez qu'il est actif, sans bandeau de vérification ni de suspension.
+2. Sinon, envoyez tout de suite la pièce demandée (passeport pour un titulaire étranger) et prévenez-moi : les étapes 1, 2 et 7 attendent la validation.
 
 ## 1. Cloudflare : la zone `joutiya.ma`
 
+Faites-la une fois le domaine actif : Cloudflare supprime une zone restée en attente 28 jours.
 1. Dans votre compte Cloudflare existant : **Add a domain** → `joutiya.ma` → offre **Free**.
 2. Cloudflare importe les enregistrements DNS actuels. Supprimez ceux de l'ancienne boîte Hostinger (MX, SPF Hostinger, DKIM, `autodiscover`, `autoconfig`) et ceux de la page d'attente Hostinger : la boîte n'existe plus et le site arrive en phase 1.
 3. Notez les 2 nameservers donnés par Cloudflare.
 4. Si DNSSEC est actif sur le domaine chez Hostinger, désactivez-le d'abord, puis attendez 24 h.
 5. hPanel : **Domaines** → **Portefeuille de domaines** → **Gérer** (`joutiya.ma`) → **DNS / Nameservers** (ou « Serveurs de noms ») → **Changer les nameservers** → saisissez les 2 nameservers Cloudflare → Enregistrer. Gardez chez Hostinger le verrou de transfert et le renouvellement automatique.
-6. Attendez l'e-mail de Cloudflare annonçant que la zone est active (de quelques minutes à 24 h, parfois plus).
+6. Attendez l'e-mail de Cloudflare annonçant que la zone est active (de quelques minutes à 24 h, parfois plusieurs jours pour un .MA).
 
 À noter : **Account ID** et **Zone ID** (page d'accueil de la zone, colonne de droite).
 
 ## 2. Cloudflare : Email Routing (Z12)
 
 Une fois la zone active :
-1. Zone `joutiya.ma` → **Email** → **Email Routing** → **Get started**.
+1. Zone `joutiya.ma` → **Email Routing** (menu *Email*, ou *Compute* → *Email Service* selon la version du tableau de bord) → **Get started**.
 2. Destination : votre Gmail ; cliquez le lien de vérification reçu.
 3. Créez `contact@`, `dsa@`, `abuse@` et `dpo@`, chacune vers votre Gmail.
-4. **Add records and enable** : Cloudflare ajoute 3 MX et 1 SPF. Aucun autre MX ne doit rester.
+4. **Add records and enable** : Cloudflare ajoute ses MX, un SPF et une clé DKIM. Aucun autre MX ne doit rester, et un seul SPF.
 5. Testez en écrivant à `contact@joutiya.ma` depuis une autre adresse.
 
-Pour répondre en tant que `contact@`, voir l'étape 7 (Brevo).
+Répondre en tant que `contact@` : pas maintenant. Google supprime en janvier 2027 l'envoi depuis une adresse externe dans Gmail ; la méthode de remplacement sera fixée avant le lancement.
 
 ## 3. Cloudflare : R2 et Zero Trust
 
 **R2**
 1. **R2 Object Storage** → activez l'offre gratuite (carte demandée ; rien n'est débité sous 10 Go).
-2. Créez 9 buckets en juridiction **European Union (EU)** : `joutiya-dev-quarantine`, `joutiya-dev-media`, `joutiya-dev-private`, puis les mêmes avec `staging` et `prod`. Cody peut le faire (prompt A).
+2. Créez 9 buckets en juridiction **European Union (EU)**, non modifiable ensuite : `joutiya-dev-quarantine`, `joutiya-dev-media`, `joutiya-dev-private`, puis les mêmes avec `staging` et `prod`. Cody peut le faire (prompt A).
 3. Aucune clé R2 maintenant : elles arrivent en phase 3.
 
 **Zero Trust**
@@ -75,7 +82,7 @@ Un identifiant de projet est définitif et jamais réutilisable, même après su
 
 1. Telegram → **@BotFather** → `/newbot` → nom « Joutiya Alertes » → identifiant finissant par `bot`, par exemple `joutiya_alertes_bot`.
 2. Copiez le jeton dans `.env` : `TELEGRAM_BOT_TOKEN=…`
-3. Ouvrez votre bot et envoyez-lui `/start`.
+3. Ouvrez votre bot, envoyez-lui `/start`, puis lancez le prompt C dans les 24 h : Telegram ne garde les messages que 24 h.
 4. Cody récupère votre identifiant de conversation (prompt C) ; ajoutez-le dans `.env` : `TELEGRAM_CHAT_ID=…`
 
 ## 7. E-mail : Resend et Brevo (après l'étape 1)
@@ -86,17 +93,17 @@ Un identifiant de projet est définitif et jamais réutilisable, même après su
 3. Ajoutez dans Cloudflare les enregistrements affichés, en « DNS only » (nuage gris), puis **Verify**.
 4. Pas de clé API avant la phase 2.
 
-**Brevo** (secours, et vos réponses en tant que `contact@`)
-1. brevo.com → inscription, offre Free.
-2. Authentifiez les domaines `notif.joutiya.ma` et `joutiya.ma` avec les enregistrements affichés (dans Cloudflare, « DNS only »). Un seul enregistrement SPF par nom : s'il en faut un pour `joutiya.ma`, fusionnez-le avec celui d'Email Routing.
-3. Optionnel, pour répondre en tant que `contact@joutiya.ma` depuis Gmail : Paramètres → **Comptes et importation** → **Envoyer des e-mails en tant que** → `contact@joutiya.ma` → serveur `smtp-relay.brevo.com`, port 587, identifiant et clé SMTP Brevo.
+**Brevo** (secours, pour les seuls e-mails de sécurité)
+1. brevo.com → inscription, offre Free, sans carte.
+2. Authentifiez le domaine `notif.joutiya.ma` avec les enregistrements affichés (dans Cloudflare, « DNS only »).
+3. Pas de clé API avant la phase 2.
 
 ## 8. Claude Console : organisation « Joutiya » (Z4)
 
-1. console.anthropic.com → connexion avec votre Gmail → créez l'organisation **Joutiya**.
+1. console.anthropic.com → connexion avec votre Gmail → créez l'organisation **Joutiya**. Une adresse ne peut créer qu'une organisation : si votre Gmail en a déjà une, inscrivez-vous avec `contact@joutiya.ma` (reçue dans Gmail grâce à l'étape 2).
 2. **Settings** → **Workspaces** : créez `joutiya-prod` et `joutiya-staging`.
-3. **Settings** → **Limits** : limite de dépense mensuelle de l'organisation à **5 $**, et une limite plus basse pour `joutiya-staging`. Si la page ne le propose pas encore, faites-le à l'achat des crédits.
-4. N'achetez pas de crédits maintenant : l'IA arrive en phase 5. À ce moment-là (5 $ minimum), laissez la recharge automatique désactivée.
+3. Réglages des limites (*Limits*, ou *Billing* → *Spend limits*) : limite de dépense mensuelle de l'organisation à **5 $**, et une limite plus basse pour `joutiya-staging`. Si la page ne le propose pas encore, faites-le à l'achat des crédits.
+4. N'achetez pas de crédits maintenant : l'IA arrive en phase 5 et les crédits expirent au bout d'un an. À l'achat, laissez la recharge automatique désactivée.
 
 À noter : l'**Organization ID** (Settings → Organization).
 
@@ -104,9 +111,9 @@ Un identifiant de projet est définitif et jamais réutilisable, même après su
 
 Prérequis : une carte SIM prépayée marocaine, jamais inscrite sur WhatsApp, qui peut recevoir un SMS ou un appel au moment de l'ajout. Ce numéro ne pourra plus servir dans l'application WhatsApp.
 1. business.facebook.com → créez le portefeuille business **Joutiya**.
-2. developers.facebook.com → **Créer une app** → cas d'usage WhatsApp (ou « Autre », type Business) → nom **Joutiya**, rattachée au portefeuille Joutiya → ajoutez le produit **WhatsApp** si Meta ne l'a pas déjà fait. Meta fournit un numéro de test : il servira en dev et en staging.
-3. WhatsApp → **API Setup** → **Add phone number** → nom affiché « Joutiya » → validez par SMS ou appel. Le nom affiché passe en revue chez Meta ; la réception fonctionne pendant la revue.
-4. N'ajoutez aucun moyen de paiement : Joutiya ne fait que recevoir.
+2. developers.facebook.com → **Créer une app** → cas d'usage « Connect with customers through WhatsApp » → nom **Joutiya**, rattachée au portefeuille Joutiya. Meta fournit un numéro de test : il servira en dev et en staging.
+3. WhatsApp → **API Setup** → **Add phone number** → nom affiché « Joutiya » → validez par SMS ou appel. Le nom affiché passe en revue chez Meta. L'enregistrement final du numéro (code PIN à 6 chiffres) et la mise en ligne de l'app se font en phase 2.
+4. N'ajoutez pas de moyen de paiement : Joutiya ne fait que recevoir.
 5. Pas de jeton ni de secret d'app maintenant : ils arrivent en phase 2.
 
 À noter : Business ID, App ID, et pour le numéro de test comme pour le vrai, le **WhatsApp Business Account ID** et le **Phone number ID**.
