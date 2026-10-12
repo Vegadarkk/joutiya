@@ -26,7 +26,7 @@ const SHARED_SHAPE = {
     accessTeamDomain: /^[a-z0-9][a-z0-9-]*\.cloudflareaccess\.com$/,
   },
   oracle: { homeRegion: /^eu-(paris|marseille)-1$/ },
-  anthropic: { organizationId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/ },
+  anthropic: { organizationId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i },
   stripe: { accountId: /^acct_[A-Za-z0-9]{8,}$/ },
   revenuecat: { projectId: /^[A-Za-z0-9_-]{4,64}$/ },
   meta: { businessId: META_ID, appId: META_ID },
