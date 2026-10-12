@@ -6,7 +6,7 @@ Ce qui reste à faire de votre côté pour clore la phase 0 (architecture v3, §
 
 - Inscrivez-vous avec votre Gmail : les adresses `@joutiya.ma` ne reçoivent rien avant l'étape 2.
 - Activez la double authentification partout.
-- Ne créez que des ressources neuves pour Joutiya ; ne modifiez ni ne supprimez rien d'existant.
+- Ne créez que des ressources neuves pour Joutiya ; ne modifiez ni ne supprimez rien d'existant. Si un service refuse (quota atteint, compte unique déjà pris), ne réutilisez rien d'existant : dites-le-moi, je vous propose une solution.
 - **Identifiants** (identifiant de projet ou de compte, nom de bucket) : notez-les au fil des étapes, ils vont dans `infra/targets.json` à l'étape 12. Ce ne sont pas des secrets.
 - **Clés secrètes** : créez-les seulement à la phase qui s'en sert, puis rangez-les dans votre `.env` local sous le nom prévu par `.env.example`. Jamais dans le dépôt ni dans le chat.
 - Alignez votre `.env` actuel sur le nouveau `.env.example` : des noms ont changé (par exemple `CF_ACCOUNT_ID`). N'y gardez que des clés propres à Joutiya ; une clé qui ouvre tout un compte (Global API Key Cloudflare, clé d'un autre projet Google) n'a rien à y faire. Les jetons Hostinger attendent votre décision Z11.
@@ -50,18 +50,18 @@ Répondre en tant que `contact@` : pas maintenant. Google supprime en janvier 20
 3. Aucune clé R2 maintenant : elles arrivent en phase 3.
 
 **Zero Trust**
-1. **Zero Trust** → nom d'équipe `joutiya` (ou `joutiya-ma` s'il est pris) → offre **Free** (carte demandée, 0 €).
+1. **Zero Trust** → nom d'équipe `joutiya` (ou `joutiya-ma` s'il est pris) → offre **Free** (carte demandée, 0 €). Si Zero Trust est déjà activé sur ce compte, ne changez rien : notez le domaine d'équipe existant.
 2. Rien d'autre : les applications Access arrivent en phase 1.
 
 À noter : le domaine d'équipe `<équipe>.cloudflareaccess.com` et les noms exacts des 9 buckets.
 
 ## 4. Oracle Cloud (Z1)
 
-1. oracle.com/cloud/free → **Start for free** → pays France, votre Gmail.
+1. oracle.com/cloud/free → **Start for free** → pays France, votre Gmail. Oracle n'autorise qu'un compte gratuit par personne : si vous en avez déjà un, n'en créez pas d'autre et dites-le-moi.
 2. **Home Region : France Central (Paris)**. **Irréversible** : la VM gratuite ne pourra être créée que dans cette région.
 3. Vérification par une carte bancaire classique (les cartes prépayées ou virtuelles sont refusées) : une petite somme est bloquée, puis rendue sous quelques jours.
 4. Activez la double authentification du compte.
-5. Ne créez pas encore la VM : la phase 1 donne ses réglages exacts, et Oracle peut récupérer une VM gratuite inactive pendant 7 jours.
+5. Ne créez pas encore la VM : la phase 1 donne ses réglages exacts, et Oracle peut récupérer une VM gratuite inactive pendant 7 jours. Un compte gratuit inactif 30 jours peut aussi être suspendu : la VM doit suivre dans ce délai.
 6. Mentions légales (hébergeur) : gardez une copie du contrat accepté à l'inscription et relevez-y l'entité Oracle, son adresse et son téléphone (Oracle France ou Oracle America selon le contrat).
 
 À noter : la région d'origine (`eu-paris-1`).
