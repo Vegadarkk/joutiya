@@ -6,8 +6,8 @@
 #
 # Keeps the metadata service (which serves this script, token included) away from non-root users,
 # starts the SSH tunnel, then installs Docker, swap and unattended upgrades. The VM is reached only
-# through ssh.joutiya.ma (Cloudflare Access): the VCN has no ingress rule. Users, sshd, sudoers and Compose files come next, from
-# `node scripts/deploy-prod.ts vm-sync` on the owner's machine.
+# through ssh.joutiya.ma (Cloudflare Access): the VCN has no ingress rule. Users, sshd, sudoers and
+# Compose files come next, from `node scripts/deploy-prod.ts vm-sync` on the owner's machine.
 set -euo pipefail
 
 SSH_TUNNEL_TOKEN='__JOUTIYA_SSH_TUNNEL_TOKEN__'
@@ -24,11 +24,12 @@ fi
 apt-get update
 apt-get install -y ca-certificates curl zstd unattended-upgrades iptables-persistent
 
-# Instance metadata (169.254.169.254) for root only, as Oracle recommends; saved with the image's
-# own rules (Oracle images load /etc/iptables/rules.v4 at boot). Containers are blocked separately
-# (infra/vm/joutiya-docker-firewall.service).
-iptables -C OUTPUT -d 169.254.169.254/32 -m owner ! --uid-owner 0 -j DROP 2> /dev/null \
-  || iptables -I OUTPUT 1 -d 169.254.169.254/32 -m owner ! --uid-owner 0 -j DROP
+# Instance metadata (HTTP on 169.254.169.254) for root only, as Oracle recommends; saved with the
+# image's own rules (Oracle images load /etc/iptables/rules.v4 at boot). Only port 80: the same
+# address is the VCN's DNS (53) and NTP (123) server, used by non-root systemd services. Containers
+# are blocked separately (infra/vm/joutiya-docker-firewall.service).
+iptables -C OUTPUT -d 169.254.169.254/32 -p tcp --dport 80 -m owner ! --uid-owner 0 -j DROP 2> /dev/null \
+  || iptables -I OUTPUT 1 -d 169.254.169.254/32 -p tcp --dport 80 -m owner ! --uid-owner 0 -j DROP
 mkdir -p /etc/iptables
 iptables-save > /etc/iptables/rules.v4
 

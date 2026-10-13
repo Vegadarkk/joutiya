@@ -1,6 +1,8 @@
 # Installed by infra/vm/install.sh. Containers never reach the instance metadata service
-# (link-local 169.254.0.0/16), which serves the cloud-init user data. DOCKER-USER is the chain
-# Docker leaves to the administrator; the rule is re-added whenever Docker restarts.
+# (link-local 169.254.0.0/16), which serves the cloud-init user data. DNS to 169.254.169.254 (the
+# VCN resolver) stays open: Docker's embedded resolver forwards from the container's namespace.
+# DOCKER-USER is the chain Docker leaves to the administrator; the rules are re-added whenever
+# Docker restarts. Each -I goes on top, so the DNS exceptions end up above the DROP.
 [Unit]
 Description=Joutiya: block containers from the instance metadata service
 After=docker.service
@@ -11,6 +13,8 @@ PartOf=docker.service
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/bin/sh -c 'iptables -C DOCKER-USER -d 169.254.0.0/16 -j DROP 2>/dev/null || iptables -I DOCKER-USER -d 169.254.0.0/16 -j DROP'
+ExecStart=/bin/sh -c 'iptables -C DOCKER-USER -d 169.254.169.254/32 -p udp --dport 53 -j RETURN 2>/dev/null || iptables -I DOCKER-USER -d 169.254.169.254/32 -p udp --dport 53 -j RETURN'
+ExecStart=/bin/sh -c 'iptables -C DOCKER-USER -d 169.254.169.254/32 -p tcp --dport 53 -j RETURN 2>/dev/null || iptables -I DOCKER-USER -d 169.254.169.254/32 -p tcp --dport 53 -j RETURN'
 
 [Install]
 WantedBy=docker.service

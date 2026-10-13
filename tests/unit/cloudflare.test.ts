@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dnsChange, readEdgeFile, substitute, tunnelHostnames, validateEdge, type DnsRecord, type TunnelConfig } from "../../scripts/cloudflare";
+import { dnsChange, googleIdp, readEdgeFile, substitute, tunnelHostnames, validateEdge, type AccessApp, type DnsRecord, type TunnelConfig } from "../../scripts/cloudflare";
 
 const record = (type: string, content: string, proxied = true): DnsRecord => ({ id: `${type}-${content}`, type, name: "joutiya.ma", content, proxied });
 const TARGET = "0f0e0d0c-0b0a-4908-8706-050403020100.cfargotunnel.com";
@@ -25,6 +25,19 @@ describe("infra/cloudflare", () => {
     expect(errors).toContain("tunnel.staging.json: preview.staging.joutiya.ma is not covered by Universal SSL");
     expect(errors).toContain("tunnel.staging.json: beta.joutiya.ma has no Access application");
     expect(errors).toContain("tunnel.staging.json: ssh.joutiya.ma: SSH goes through tunnel.ssh.json only");
+  });
+
+  it("lets staff in with the Google login method only", () => {
+    const { apps } = readEdgeFile<{ apps: AccessApp[] }>("access-apps.json");
+    const withOtp = { apps: apps.map((app, index) => (index === 0 ? { ...app, allowed_idps: [] } : app)) };
+    const read = <T,>(name: string): T => (name === "access-apps.json" ? withOtp : readEdgeFile(name)) as T;
+    expect(validateEdge(read)).toEqual(["access-apps.json: admin.joutiya.ma must allow the Google login method only (§6)"]);
+  });
+
+  it("picks the account's only Google login method", () => {
+    expect(googleIdp([{ id: "otp", type: "onetimepin" }, { id: "g1", type: "google" }])).toBe("g1");
+    expect(() => googleIdp([{ id: "otp", type: "onetimepin" }])).toThrow("found 0");
+    expect(() => googleIdp([{ id: "g1", type: "google" }, { id: "g2", type: "google" }])).toThrow("found 2");
   });
 
   it("lists the tunnel hostnames", () => {

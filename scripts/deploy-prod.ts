@@ -53,8 +53,10 @@ export function promoteCommand(staging: EnvStatus): string {
   return `promote ${staging.release} ${staging.web} ${staging.worker}`;
 }
 
+// No BatchMode: ssh asks for the key passphrase on the terminal (the keys of docs/phase-1.md have
+// one; AddKeysToAgent in ~/.ssh/config keeps it for the next calls).
 function ssh(alias: string, command: string): string {
-  const result = spawnSync("ssh", ["-o", "BatchMode=yes", alias, command], { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+  const result = spawnSync("ssh", [alias, command], { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
   if (result.error) throw new Error(`ssh ${alias}: ${result.error.message}`);
   if (result.status !== 0) throw new Error(`ssh ${alias} "${command.split(" ")[0]}" failed (exit ${result.status})`);
   return result.stdout;
@@ -130,7 +132,7 @@ async function vmSync(): Promise<void> {
       const tar = spawn("tar", ["-czf", "-", "-C", root, "infra/vm", "docker/compose.yml", "docker/compose.prod.yml", "docker/compose.staging.yml", "docker/valkey", "-C", staging, "keys"], {
         stdio: ["ignore", "pipe", "inherit"],
       });
-      const remoteShell = spawn("ssh", ["-o", "BatchMode=yes", SSH_ADMIN, `sudo -n bash -c '${remote}'`], { stdio: [tar.stdout, "inherit", "inherit"] });
+      const remoteShell = spawn("ssh", [SSH_ADMIN, `sudo -n bash -c '${remote}'`], { stdio: [tar.stdout, "inherit", "inherit"] });
       tar.on("error", reject);
       remoteShell.on("error", reject);
       remoteShell.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`install.sh failed (exit ${code})`))));

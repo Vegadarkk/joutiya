@@ -18,7 +18,7 @@ Suivez `docs/phase-1.md`, étapes 5 à 7, avec ces différences :
 
 1. **VM** (étape 5) : même réglage. Recréez `bootstrap.local.sh` (prompt E, point 4), avec le nouveau jeton du Tunnel SSH s'il a changé.
 2. **Empreinte SSH** (étape 6) : la nouvelle VM a une nouvelle clé d'hôte. Retirez l'ancienne ligne `ssh.joutiya.ma` de `~/.ssh/known_hosts`, puis mettez à jour la variable GitHub `VM_SSH_KNOWN_HOSTS`.
-3. **Fichiers et secrets** (étape 6) : `node scripts/deploy-prod.ts vm-sync`, puis les fichiers `/etc/joutiya/<env>/*.env`. Si `ALERT_RELAY_SECRET` change, mettez le même dans le Worker de sonde (`wrangler secret put`).
+3. **Fichiers et secrets** (étape 6) : `node scripts/deploy-prod.ts vm-sync`, puis les fichiers `/etc/joutiya/<env>/*.env`. `ALERT_RELAY_URL` reçoit tout de suite l'URL du Worker de sonde suivie de `/alert` : le Worker existe déjà, et l'application ne démarre pas sans. Si `ALERT_RELAY_SECRET` change, mettez le même dans le Worker (`wrangler secret put`).
 4. **Certificats Google** (étape 7) : un nouveau certificat par conteneur, signé par votre autorité ; le pool et les comptes de service restent.
 5. **Staging** : relancez le dernier déploiement (GitHub → Actions → Deploy staging → **Run workflow** sur `main`).
 6. **Production** : `node scripts/deploy-prod.ts promote`.

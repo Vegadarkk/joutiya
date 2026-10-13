@@ -8,7 +8,8 @@
 #   deploy-prod (owner key):  promote <release> <web image id> <worker image id>
 #                             rollback | status
 #
-# Production can only run images already loaded and running in staging, pinned by image ID.
+# Production can only run images already loaded and running in staging, pinned by image ID, and
+# the staging key can never load a tarball that would move the tags of a production release.
 set -euo pipefail
 umask 077
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -101,15 +102,59 @@ status() {
   printf '}\n'
 }
 
+# Image names a `docker save` tarball would create, from every file `docker load` takes them from:
+# manifest.json (RepoTags), index.json (OCI annotations) and the legacy repositories file.
+tarball_names() {
+  python3 - "$1" << 'PY'
+import json, sys, tarfile
+names = set()
+with tarfile.open(sys.argv[1]) as tar:
+    def read(name):
+        try:
+            member = tar.getmember(name)
+        except KeyError:
+            return None
+        return json.load(tar.extractfile(member)) if member.isfile() else None
+    for entry in read("manifest.json") or []:
+        names.update(entry.get("RepoTags") or [])
+    for descriptor in (read("index.json") or {}).get("manifests") or []:
+        for key, value in (descriptor.get("annotations") or {}).items():
+            if key in ("io.containerd.image.name", "org.opencontainers.image.ref.name"):
+                names.add(value)
+    for repository, tags in (read("repositories") or {}).items():
+        names.update(f"{repository}:{tag}" for tag in tags)
+print("\n".join(sorted(names)))
+PY
+}
+
 load() {
   [[ "$ENV_NAME" == "staging" ]] || die "load is reserved to staging"
-  local release="${ARGS[1]:-}" output loaded
+  local release="${ARGS[1]:-}" tarball names name output loaded
   valid_release "$release" || die "invalid release"
-  output="$(head -c "$MAX_IMAGE_BYTES" | zstd -dc | docker load)" || die "docker load failed"
-  loaded="$(sed -n 's/^Loaded image: //p' <<< "$output" | sort)"
-  local expected
-  expected="$(printf 'joutiya-web:%s\njoutiya-worker:%s\n' "$release" "$release" | sort)"
-  if [[ "$loaded" != "$expected" ]]; then
+  # Production runs its images by tag: loading one of its releases again would replace them.
+  if [[ "$release" == "$(current_release prod)" || "$release" == "$(cat "$STATE_DIR/prod.previous" 2>/dev/null || true)" ]]; then
+    die "$release is a production release"
+  fi
+  tarball="$(mktemp -p "$STATE_DIR" load.XXXXXX)"
+  # shellcheck disable=SC2064 # expanded now: $tarball is local to this function
+  trap "rm -f '$tarball'" EXIT
+  head -c "$MAX_IMAGE_BYTES" | zstd -dc | head -c "$MAX_IMAGE_BYTES" > "$tarball" || die "unreadable or oversized tarball"
+  # Names are checked before docker load: once loaded, a tag already points to the new image.
+  names="$(tarball_names "$tarball")" || die "unreadable tarball"
+  while read -r name; do
+    [[ -n "$name" ]] || continue
+    case "${name#docker.io/library/}" in
+      "joutiya-web:$release" | "joutiya-worker:$release" | "$release") ;;
+      *) die "unexpected image name in the tarball" ;;
+    esac
+  done <<< "$names"
+  for name in joutiya-web joutiya-worker; do
+    grep -qx -e "$name:$release" -e "docker.io/library/$name:$release" <<< "$names" || die "$name:$release is missing from the tarball"
+  done
+  output="$(docker load -i "$tarball")" || die "docker load failed"
+  rm -f "$tarball"
+  loaded="$(sed -n 's/^Loaded image: //p' <<< "$output" | sed 's|^docker.io/library/||' | sort)"
+  if [[ "$loaded" != "$(printf 'joutiya-web:%s\njoutiya-worker:%s' "$release" "$release")" ]]; then
     # Anything else than the two expected images is removed, never run.
     xargs -r docker image rm <<< "$loaded" >/dev/null 2>&1 || true
     die "unexpected images in the tarball"

@@ -27,8 +27,8 @@ services:
   web:
     <<: *service
     image: joutiya-web:${RELEASE:?RELEASE is required}
-    # Non-root whatever the image says: uid of the node user in node:24-slim (owner of .next), and
-    # a group per environment (compose.<env>.yml) that alone can read /etc/joutiya/<env>/gcp.
+    # Non-root whatever the image says: uid of the node user in node:24-slim, and a group per
+    # environment (compose.<env>.yml) that alone can read /etc/joutiya/<env>/gcp.
     user: "1000:1000"
     env_file:
       - /etc/joutiya/${APP_ENV}/app.env
@@ -41,7 +41,11 @@ services:
       # config, certificate config, certificate and key. Same path as on the host, so the paths
       # gcloud wrote into the files stay valid. The worker mounts its own directory only.
       - /etc/joutiya/${APP_ENV}/gcp/web:/etc/joutiya/${APP_ENV}/gcp/web:ro
-    tmpfs: [/tmp]
+    # Read-only file system (§2): regenerated ISR pages stay in memory (next.config.ts).
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+      - /app/.next/cache:uid=1000,mode=0700,size=64m
     networks: [edge, data, egress]
     depends_on:
       valkey-queue: { condition: service_healthy }

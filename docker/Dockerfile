@@ -26,13 +26,14 @@ LABEL org.opencontainers.image.source="https://github.com/Vegadarkk/joutiya" \
       org.opencontainers.image.revision="${RELEASE}"
 
 FROM runtime AS web
-# Code is owned by root and read-only for the app user; only .next (ISR cache) is writable.
+# Code is owned by root; the container runs with a read-only file system (docker/compose.yml), and
+# regenerated ISR pages stay in memory (next.config.ts). .next/cache is a tmpfs mount point.
 COPY --from=build /src/.next/standalone ./
 COPY --from=build /src/.next/static ./.next/static
 COPY --from=build /src/public ./public
 COPY --from=build /src/dist/server ./dist/server
 COPY --from=build /src/infra/targets.json ./infra/targets.json
-RUN mkdir -p .next/cache && chown -R node:node .next
+RUN mkdir -p .next/cache
 ENV PORT=3000 \
     HOSTNAME=0.0.0.0
 USER node

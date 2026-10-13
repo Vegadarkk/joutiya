@@ -18,6 +18,9 @@ const nextConfig: NextConfig = {
     // Integrity attributes on every script chunk: public ISR pages run under a hash-based CSP.
     sri: { algorithm: "sha256" },
     globalNotFound: true,
+    // Regenerated ISR pages stay in memory (cacheMaxMemorySize, 50 MB): the container's file system
+    // is read-only (§2) and the VM keeps no unique data.
+    isrFlushToDisk: false,
   },
   images: {
     // Photos are served by R2 (media host), never optimized on the VM (§2).

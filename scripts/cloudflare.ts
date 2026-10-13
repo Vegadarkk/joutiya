@@ -6,7 +6,8 @@
 //   parts: zone (settings and rules), tunnel:staging, tunnel:prod, tunnel:ssh, access
 //
 // Environment (never printed): JOUTIYA_CLOUDFLARE_API_TOKEN, a custom token limited to the Joutiya
-// account and the joutiya.ma zone (a prefixed name: a shared shell may hold other projects' tokens); for access: ACCESS_OWNER_EMAIL, ACCESS_CI_TOKEN_ID, ACCESS_PROBE_TOKEN_ID.
+// account and the joutiya.ma zone (a prefixed name: a shared shell may hold other projects' tokens);
+// for access: ACCESS_OWNER_EMAIL, ACCESS_CI_TOKEN_ID, ACCESS_PROBE_TOKEN_ID.
 // An existing A, AAAA or CNAME record on a tunnel hostname is only replaced with --replace-dns.
 
 import { readFileSync, realpathSync } from "node:fs";
@@ -58,8 +59,13 @@ export interface AccessApp {
   domain: string;
   type: string;
   session_duration: string;
+  allowed_idps: string[];
+  auto_redirect_to_identity: boolean;
   policies: { name: string; decision: string; include: unknown[] }[];
 }
+
+/** Staff sign in with Google only (§6); the identity provider is looked up in the account. */
+export const GOOGLE_IDP = "${ACCESS_GOOGLE_IDP_ID}";
 export interface DnsRecord {
   id: string;
   type: string;
@@ -96,6 +102,11 @@ export function validateEdge(read: <T>(name: string) => T = readEdgeFile): strin
   }
   const access = read<{ apps: AccessApp[] }>("access-apps.json").apps;
   const guarded = new Set(access.map((app) => app.domain));
+  for (const app of access) {
+    if (app.allowed_idps?.length !== 1 || app.allowed_idps[0] !== GOOGLE_IDP || app.auto_redirect_to_identity !== true) {
+      errors.push(`access-apps.json: ${app.domain} must allow the Google login method only (§6)`);
+    }
+  }
   for (const name of TUNNELS) {
     const file = `tunnel.${name}.json`;
     const ingress = read<TunnelConfig>(file).config.ingress;
@@ -238,10 +249,19 @@ async function applyTunnel(api: CloudflareApi, targets: Targets, name: TunnelNam
   if (blocked.length > 0) throw new Error(`DNS records in the way (rerun with --replace-dns to replace them):\n  ${blocked.join("\n  ")}`);
 }
 
+/** The account's Google login method, created by the owner in Zero Trust (docs/phase-1.md, step 3). */
+export function googleIdp(providers: { id: string; type: string }[]): string {
+  const google = providers.filter((provider) => provider.type === "google");
+  const [only] = google;
+  if (!only || google.length > 1) throw new Error(`expected one Google login method in Zero Trust, found ${google.length} (docs/phase-1.md, step 3)`);
+  return only.id;
+}
+
 async function applyAccess(api: CloudflareApi, targets: Targets): Promise<void> {
   const { accountId } = await checkZone(api, targets);
   const template = readEdgeFile<{ apps: AccessApp[] }>("access-apps.json").apps;
-  const { value: apps, missing } = substitute(template, process.env);
+  const providers = await api.call<{ id: string; type: string }[]>({ method: "GET", path: `/accounts/${accountId}/access/identity_providers` });
+  const { value: apps, missing } = substitute(template, { ...process.env, ACCESS_GOOGLE_IDP_ID: googleIdp(providers) });
   if (missing.length > 0) throw new Error(`set ${missing.join(", ")} in the environment first`);
   for (const [index, app] of apps.entries()) {
     const found = await api.call<{ id: string; domain: string; aud: string }[]>({
