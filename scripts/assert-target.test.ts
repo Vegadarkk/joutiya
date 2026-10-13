@@ -119,13 +119,13 @@ describe("assertTargets", () => {
 
   it("rejects an unknown APP_ENV", () => {
     assert.deepEqual(assertTargets(recorded(), { APP_ENV: "production" }), [
-      "APP_ENV=production is not one of dev, staging, prod",
+      "APP_ENV must be one of dev, staging, prod",
     ]);
   });
 
   it("rejects an identifier that belongs to another environment", () => {
     assert.deepEqual(assertTargets(recorded(), { ...staging, NEXT_PUBLIC_FIREBASE_PROJECT_ID: "joutiya-prod-4821" }), [
-      "NEXT_PUBLIC_FIREBASE_PROJECT_ID=joutiya-prod-4821 does not match environments.staging.firebase.projectId (joutiya-staging-4821)",
+      "NEXT_PUBLIC_FIREBASE_PROJECT_ID does not match environments.staging.firebase.projectId (joutiya-staging-4821)",
     ]);
   });
 
@@ -140,15 +140,36 @@ describe("assertTargets", () => {
   it("requires the EU endpoint of the recorded R2 account", () => {
     const errors = assertTargets(recorded(), { ...staging, R2_S3_ENDPOINT: `https://${ACCOUNT}.r2.cloudflarestorage.com` });
     assert.equal(errors.length, 1);
-    assert.match(errors[0] ?? "", /^R2_S3_ENDPOINT=/);
+    assert.match(errors[0] ?? "", /^R2_S3_ENDPOINT does not match/);
   });
 
-  it("keeps live Stripe keys in production only, without printing them", () => {
+  it("checks the account Wrangler and gcloud read implicitly", () => {
+    assert.deepEqual(
+      assertTargets(recorded(), { ...staging, CLOUDFLARE_ACCOUNT_ID: "ffffffffffffffffffffffffffffffff", CLOUDSDK_CORE_PROJECT: "punk-records-1234" }),
+      [
+        "CLOUDSDK_CORE_PROJECT does not match environments.staging.firebase.projectId (joutiya-staging-4821)",
+        `CLOUDFLARE_ACCOUNT_ID does not match shared.cloudflare.accountId (${ACCOUNT})`,
+      ],
+    );
+  });
+
+  it("never prints a configured value", () => {
+    const leaked = "pasted-secret-value";
+    const errors = assertTargets(recorded(), { ...staging, APP_ENV: "staging", FIREBASE_PROJECT_ID: leaked, CF_ACCOUNT_ID: leaked });
+    assert.equal(errors.length, 2);
+    assert.doesNotMatch(errors.join("\n"), new RegExp(leaked));
+    assert.doesNotMatch(assertTargets(recorded(), { APP_ENV: leaked }).join("\n"), new RegExp(leaked));
+  });
+
+  it("accepts restricted Stripe keys only, live in production only", () => {
     assert.deepEqual(assertTargets(recorded(), { ...staging, STRIPE_SECRET_KEY: "rk_live_x" }), [
-      "STRIPE_SECRET_KEY must be a test-mode key when APP_ENV=staging",
+      "STRIPE_SECRET_KEY must be a restricted rk_test_… key when APP_ENV=staging",
     ]);
-    assert.deepEqual(assertTargets(recorded(), { APP_ENV: "prod", STRIPE_SECRET_KEY: "sk_test_x" }), [
-      "STRIPE_SECRET_KEY must be a live-mode key when APP_ENV=prod",
+    assert.deepEqual(assertTargets(recorded(), { ...staging, STRIPE_SECRET_KEY: "sk_test_x" }), [
+      "STRIPE_SECRET_KEY must be a restricted rk_test_… key when APP_ENV=staging",
+    ]);
+    assert.deepEqual(assertTargets(recorded(), { APP_ENV: "prod", STRIPE_SECRET_KEY: "sk_live_x" }), [
+      "STRIPE_SECRET_KEY must be a restricted rk_live_… key when APP_ENV=prod",
     ]);
     assert.deepEqual(assertTargets(recorded(), { APP_ENV: "prod", STRIPE_SECRET_KEY: "rk_live_x" }), []);
   });

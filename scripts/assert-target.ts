@@ -3,8 +3,7 @@
 // stops. Runs in CI; web and worker run it at startup from phase 1.
 // Erasable TypeScript only, so Node runs it directly: `node scripts/assert-target.ts`.
 
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 export const APP_ENVS = ["dev", "staging", "prod"] as const;
@@ -68,12 +67,14 @@ const r2Bucket = (variable: string, role: keyof EnvTargets["r2"]): Binding => ({
 });
 
 // Configured identifiers checked against the targets of APP_ENV.
-// GOOGLE_CLOUD_PROJECT and GCLOUD_PROJECT are read implicitly by Google client libraries.
+// GOOGLE_CLOUD_PROJECT, GCLOUD_PROJECT and CLOUDSDK_CORE_PROJECT are read implicitly by Google
+// tools, CLOUDFLARE_ACCOUNT_ID by Wrangler.
 const BINDINGS: Binding[] = [
   firebaseProject("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
   firebaseProject("FIREBASE_PROJECT_ID"),
   firebaseProject("GOOGLE_CLOUD_PROJECT"),
   firebaseProject("GCLOUD_PROJECT"),
+  firebaseProject("CLOUDSDK_CORE_PROJECT"),
   r2Bucket("R2_BUCKET_QUARANTINE", "quarantine"),
   r2Bucket("R2_BUCKET_MEDIA", "media"),
   r2Bucket("R2_BUCKET_PRIVATE", "private"),
@@ -88,6 +89,11 @@ const BINDINGS: Binding[] = [
   },
   {
     variable: "CF_ACCOUNT_ID",
+    target: "shared.cloudflare.accountId",
+    expected: (t) => t.shared.cloudflare.accountId,
+  },
+  {
+    variable: "CLOUDFLARE_ACCOUNT_ID",
     target: "shared.cloudflare.accountId",
     expected: (t) => t.shared.cloudflare.accountId,
   },
@@ -191,14 +197,16 @@ function isAppEnv(value: string): value is AppEnv {
   return (APP_ENVS as readonly string[]).includes(value);
 }
 
-// Live keys only in prod, test keys everywhere else. The key itself is never printed.
+// Restricted keys only (§9): live in prod, test everywhere else. The key itself is never printed.
 function checkStripeMode(appEnv: AppEnv, key: string): string[] {
-  const mode = /^(sk|rk)_live_/.test(key) ? "live" : /^(sk|rk)_test_/.test(key) ? "test" : "unknown";
-  const wanted = appEnv === "prod" ? "live" : "test";
-  return mode === wanted ? [] : [`STRIPE_SECRET_KEY must be a ${wanted}-mode key when APP_ENV=${appEnv}`];
+  const wanted = appEnv === "prod" ? "rk_live_" : "rk_test_";
+  return key.startsWith(wanted) ? [] : [`STRIPE_SECRET_KEY must be a restricted ${wanted}… key when APP_ENV=${appEnv}`];
 }
 
-/** Compares the configured identifiers with the targets of APP_ENV. Returns the errors found. */
+/**
+ * Compares the configured identifiers with the targets of APP_ENV. Returns the errors found.
+ * Configured values are never printed: a secret pasted into the wrong variable stays out of logs.
+ */
 export function assertTargets(targets: Targets, env: Env): string[] {
   const value = (name: string): string => (env[name] ?? "").trim();
   const configured = BINDINGS.filter((binding) => value(binding.variable) !== "");
@@ -210,7 +218,7 @@ export function assertTargets(targets: Targets, env: Env): string[] {
     if (stripeKey !== "") names.push("STRIPE_SECRET_KEY");
     return names.length === 0 ? [] : [`APP_ENV is required when ${names.join(", ")} is set`];
   }
-  if (!isAppEnv(appEnv)) return [`APP_ENV=${appEnv} is not one of ${APP_ENVS.join(", ")}`];
+  if (!isAppEnv(appEnv)) return [`APP_ENV must be one of ${APP_ENVS.join(", ")}`];
 
   const errors: string[] = [];
   for (const binding of configured) {
@@ -220,7 +228,7 @@ export function assertTargets(targets: Targets, env: Env): string[] {
     if (expected === null) {
       errors.push(`${binding.variable} is set but ${target} is not recorded in infra/targets.json`);
     } else if (actual !== expected) {
-      errors.push(`${binding.variable}=${actual} does not match ${target} (${expected})`);
+      errors.push(`${binding.variable} does not match ${target} (${expected})`);
     }
   }
   if (stripeKey !== "") errors.push(...checkStripeMode(appEnv, stripeKey));
@@ -248,4 +256,5 @@ function main(): void {
   console.log(`assert-target: OK (${appEnv ? `APP_ENV=${appEnv}` : "targets file valid, APP_ENV not set"})`);
 }
 
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+// realpath: Node resolves symlinks in import.meta.url, so a symlinked checkout still runs main().
+if (process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) main();

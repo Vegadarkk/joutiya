@@ -98,7 +98,7 @@ subscriptions, Google Ads slots, moderation).
 Node 24, no install needed yet.
 - `node scripts/assert-target.ts`: validate `infra/targets.json` (exact third-party
   identifiers). With `APP_ENV` set it also checks the configured identifiers, e.g.
-  `node --env-file=.env scripts/assert-target.ts`; never print `.env` values.
+  `node --env-file=.env.local scripts/assert-target.ts`; never print env file values.
 - `node --test scripts/assert-target.test.ts`: guard unit tests (run in CI).
 
 # Compact instructions

@@ -4,13 +4,15 @@ Ce qui reste à faire de votre côté pour clore la phase 0 (architecture v3, §
 
 ## Règles pour chaque compte
 
-- Inscrivez-vous avec votre Gmail : les adresses `@joutiya.ma` ne reçoivent rien avant l'étape 2.
+- **Comptes dédiés** (votre choix du 12 octobre) : chaque service reçoit un compte, un projet ou une organisation neuve, réservée à Joutiya. Ne modifiez ni ne supprimez rien d'existant.
+- **Gardez votre identité actuelle** là où une même personne peut créer plusieurs ressources : Google (nouveaux projets Firebase), Meta (nouveau portefeuille depuis votre profil Facebook : un seul profil par personne), Stripe (nouveau compte sous votre connexion actuelle), Telegram (bot créé depuis votre compte), Cloudflare (zone et buckets dans votre compte actuel). Oracle n'admet qu'un compte gratuit par personne.
+- **Resend, Brevo et console Claude** : inscrivez-vous avec votre Gmail. Si vous y avez déjà un compte à cette adresse, prenez un alias Gmail, `votre.adresse+joutiya@gmail.com` : Gmail le reçoit sans réglage. N'utilisez pas `contact@joutiya.ma` pour vous connecter : elle est publique et dépend du domaine.
+- Si un service refuse (quota atteint, compte unique déjà pris, alias refusé), ne réutilisez rien : prévenez Claude dans le projet, il vous proposera une solution.
 - Activez la double authentification partout.
-- **Comptes dédiés** (votre choix du 12 octobre) : chaque service reçoit un compte, un projet ou une organisation neuve, réservée à Joutiya. Seul Cloudflare reste votre compte actuel, avec une zone et des buckets propres à Joutiya. Ne modifiez ni ne supprimez rien d'existant.
-- Si vous avez déjà un compte sur un service avec votre Gmail, ne vous en servez pas pour Joutiya : inscrivez-vous avec `contact@joutiya.ma`, qui arrive dans votre Gmail après l'étape 2. Si un service refuse (quota atteint, compte unique déjà pris), ne réutilisez rien : dites-le-moi, je vous propose une solution.
+- **Adresse** : quand un service demande l'adresse de l'entreprise, donnez uniquement la domiciliation, 6 rue d'Armaillé, 75017 Paris.
 - **Identifiants** (identifiant de projet ou de compte, nom de bucket) : notez-les au fil des étapes, ils vont dans `infra/targets.json` à l'étape 12. Ce ne sont pas des secrets.
-- **Clés secrètes** : créez-les seulement à la phase qui s'en sert, puis rangez-les dans votre `.env` local sous le nom prévu par `.env.example`. Jamais dans le dépôt ni dans le chat.
-- Alignez votre `.env` actuel sur le nouveau `.env.example` : des noms ont changé (par exemple `CF_ACCOUNT_ID`). N'y gardez que des clés propres à Joutiya ; une clé qui ouvre tout un compte (Global API Key Cloudflare, clé d'un autre projet Google) n'a rien à y faire. Les jetons Hostinger attendent votre décision Z11.
+- **Clés secrètes** : créez-les seulement à la phase qui s'en sert, puis rangez-les dans le fichier local `.env.local` sous le nom prévu par `.env.example`. Jamais dans le dépôt ni dans le chat.
+- Si vous avez un `.env` dans le dossier du dépôt, renommez-le en `.env.local` et alignez-le sur le nouveau `.env.example` : des noms ont changé (par exemple `CF_ACCOUNT_ID`). N'y gardez que des clés propres à Joutiya ; une clé qui ouvre tout un compte (Global API Key Cloudflare, clé d'un autre projet Google) n'a rien à y faire. Les jetons Hostinger attendent votre décision Z11.
 
 **Ordre conseillé.** L'étape 0 d'abord. Les étapes 1 à 6 bloquent la phase 1 : faites-les ensuite. Les étapes 7 à 11 servent aux phases 2 à 7. L'étape 12 clôt la phase 0.
 
@@ -18,7 +20,7 @@ Ce qui reste à faire de votre côté pour clore la phase 0 (architecture v3, §
 
 Un .MA n'est actif qu'après vérification d'une pièce d'identité par le registre (2 à 4 semaines). Sans pièce envoyée dans les 14 jours suivant l'achat, le domaine est suspendu, puis peut être libéré ([aide Hostinger](https://www.hostinger.com/support/requirements-to-register-a-ma-domain/)).
 1. hPanel → **Domaines** → `joutiya.ma` : vérifiez qu'il est actif, sans bandeau de vérification ni de suspension.
-2. Sinon, envoyez tout de suite la pièce demandée (passeport pour un titulaire étranger) et prévenez-moi : les étapes 1, 2 et 7 attendent la validation.
+2. Sinon, envoyez tout de suite la pièce demandée (passeport pour un titulaire étranger) et prévenez Claude : les étapes 1, 2 et 7 attendent la validation.
 
 ## 1. Cloudflare : la zone `joutiya.ma`
 
@@ -51,28 +53,28 @@ Répondre en tant que `contact@` : pas maintenant. Google supprime en janvier 20
 3. Aucune clé R2 maintenant : elles arrivent en phase 3.
 
 **Zero Trust**
-1. **Zero Trust** → nom d'équipe `joutiya` (ou `joutiya-ma` s'il est pris) → offre **Free** (carte demandée, 0 €). Si Zero Trust est déjà activé sur ce compte, ne changez rien et dites-le-moi.
+1. **Zero Trust** → nom d'équipe `joutiya` (ou `joutiya-ma` s'il est pris) → offre **Free** (carte demandée, 0 €). Si Zero Trust est déjà activé sur ce compte, ne changez rien et prévenez Claude.
 2. Rien d'autre : les applications Access arrivent en phase 1.
 
 À noter : le domaine d'équipe `<équipe>.cloudflareaccess.com` et les noms exacts des 9 buckets.
 
 ## 4. Oracle Cloud (Z1)
 
-1. oracle.com/cloud/free → **Start for free** → pays France, votre Gmail. Oracle n'autorise qu'un compte gratuit par personne : si vous en avez déjà un, n'en créez pas d'autre et dites-le-moi.
-2. **Home Region : France Central (Paris)**. **Irréversible** : la VM gratuite ne pourra être créée que dans cette région.
+1. oracle.com/cloud/free → **Start for free** → pays France, votre Gmail. Oracle n'autorise qu'un compte gratuit par personne : si vous en avez déjà un, n'en créez pas d'autre et prévenez Claude.
+2. **Home Region : France Central (Paris)**, sinon France South (Marseille) ; si aucune des deux n'est proposée, arrêtez-vous et prévenez Claude. **Irréversible** : la VM gratuite ne pourra être créée que dans cette région.
 3. Vérification par une carte bancaire classique (les cartes prépayées ou virtuelles sont refusées) : une petite somme est bloquée, puis rendue sous quelques jours.
-4. Activez la double authentification du compte.
+4. Activez la double authentification du compte. Restez en offre gratuite : ne passez pas en **Pay As You Go**, même si Oracle le propose, sans en parler d'abord dans le projet.
 5. Ne créez pas encore la VM : la phase 1 donne ses réglages exacts, et Oracle peut récupérer une VM gratuite inactive pendant 7 jours. Un compte gratuit inactif 30 jours peut aussi être suspendu : la VM doit suivre dans ce délai.
 6. Mentions légales (hébergeur) : gardez une copie du contrat accepté à l'inscription et relevez-y l'entité Oracle, son adresse et son téléphone (Oracle France ou Oracle America selon le contrat).
 
-À noter : la région d'origine (`eu-paris-1`).
+À noter : la région d'origine (`eu-paris-1` ou `eu-marseille-1`).
 
 ## 5. Firebase : 3 projets Spark (Z2)
 
-Cody peut faire les points 1 à 3 (prompt B).
+Cody peut faire les points 1 à 3 (prompt B), une fois que vous avez lancé vous-même `npx firebase-tools login` dans un terminal : cette connexion demande un terminal interactif.
 1. console.firebase.google.com → **Créer un projet** `joutiya-dev` → si l'identifiant proposé porte un suffixe, notez-le tel quel → **désactivez Google Analytics** → Créer.
 2. Recommencez pour `joutiya-staging` et `joutiya-prod`.
-3. Dans chaque projet : **Firestore Database** → **Créer une base de données** → édition **Standard** → emplacement **europe-west9 (Paris)** → mode production. **Irréversible** : la région ne change plus. Si Paris est refusé, arrêtez-vous et dites-le-moi avant de prendre `europe-west1`.
+3. Dans chaque projet : **Firestore Database** → **Créer une base de données** → édition **Standard** → emplacement **europe-west9 (Paris)** → mode production. **Irréversible** : la région ne change plus. Si Paris est refusé, arrêtez-vous et prévenez Claude avant de prendre `europe-west1`.
 4. Restez sur l'offre **Spark** : ne passez jamais à Blaze, et ne cliquez pas « Upgrade » vers Identity Platform dans Authentication (sur Spark, cela plafonne à 3 000 utilisateurs actifs par jour). Authentication s'active en phase 2.
 
 Un identifiant de projet est définitif et jamais réutilisable, même après suppression. Un compte Google n'a droit qu'à quelques projets sans facturation (environ 5 à 10, projets Google Cloud compris) : si la création est refusée, demandez une hausse de quota (gratuite) plutôt que de supprimer un projet existant.
@@ -82,9 +84,9 @@ Un identifiant de projet est définitif et jamais réutilisable, même après su
 ## 6. Bot Telegram (alertes)
 
 1. Telegram → **@BotFather** → `/newbot` → nom « Joutiya Alertes » → identifiant finissant par `bot`, par exemple `joutiya_alertes_bot`.
-2. Copiez le jeton dans `.env` : `TELEGRAM_BOT_TOKEN=…`
+2. Copiez le jeton dans `.env.local` : `TELEGRAM_BOT_TOKEN=…`
 3. Ouvrez votre bot, envoyez-lui `/start`, puis lancez le prompt C dans les 24 h : Telegram ne garde les messages que 24 h.
-4. Cody récupère votre identifiant de conversation (prompt C) ; ajoutez-le dans `.env` : `TELEGRAM_CHAT_ID=…`
+4. Cody récupère votre identifiant de conversation (prompt C) ; ajoutez-le dans `.env.local` : `TELEGRAM_CHAT_ID=…`
 
 ## 7. E-mail : Resend et Brevo (après l'étape 1)
 
@@ -92,7 +94,8 @@ Un identifiant de projet est définitif et jamais réutilisable, même après su
 1. resend.com → inscription avec votre Gmail, offre Free, sans carte.
 2. **Domains** → **Add domain** → `notif.joutiya.ma`, région **eu-west-1 (Irlande)**. **Irréversible** : changer de région impose de recréer le domaine.
 3. Ajoutez dans Cloudflare les enregistrements affichés, en « DNS only » (nuage gris), puis **Verify**.
-4. Pas de clé API avant la phase 2.
+4. Ajoutez un enregistrement DMARC pour ce sous-domaine : type TXT, nom `_dmarc.notif`, valeur `v=DMARC1; p=none;`. Un seul : si Resend ou Brevo en propose un autre, gardez un unique enregistrement `_dmarc.notif`.
+5. Pas de clé API avant la phase 2.
 
 **Brevo** (secours, pour les seuls e-mails de sécurité)
 1. brevo.com → inscription, offre Free, sans carte.
@@ -101,7 +104,7 @@ Un identifiant de projet est définitif et jamais réutilisable, même après su
 
 ## 8. Claude Console : organisation « Joutiya » (Z4)
 
-1. console.anthropic.com → connexion avec votre Gmail → créez l'organisation **Joutiya**. Une adresse ne peut créer qu'une organisation : si votre Gmail en a déjà une, inscrivez-vous avec `contact@joutiya.ma` (reçue dans Gmail grâce à l'étape 2).
+1. console.anthropic.com → connexion avec votre Gmail → créez l'organisation **Joutiya**. Une adresse ne peut créer qu'une organisation : si votre Gmail en a déjà une, prenez l'alias `+joutiya` (voir les règles). Cette organisation sert au site seulement : Cody n'utilise aucune de ses clés, sinon il consomme les 5 $.
 2. **Settings** → **Workspaces** : créez `joutiya-prod` et `joutiya-staging`.
 3. Réglages des limites (*Limits*, ou *Billing* → *Spend limits*) : limite de dépense mensuelle de l'organisation à **5 $**, et une limite plus basse pour `joutiya-staging`. Si la page ne le propose pas encore, faites-le à l'achat des crédits.
 4. N'achetez pas de crédits maintenant : l'IA arrive en phase 5 et les crédits expirent au bout d'un an. À l'achat, laissez la recharge automatique désactivée.
@@ -133,30 +136,30 @@ Prérequis : une carte SIM prépayée marocaine, jamais inscrite sur WhatsApp, q
 
 ## 12. Consigner les identifiants
 
-Donnez les identifiants notés à Cody (prompt D), ou collez-les dans le fil du projet. RevenueCat reste vide jusqu'à la phase 7.
+Donnez les identifiants notés, y compris ceux rendus par les prompts A et B, à Cody (prompt D), ou collez-les dans le fil du projet. RevenueCat reste vide jusqu'à la phase 7.
 
-**Fin de la phase 0 :** `infra/targets.json` rempli, `node scripts/assert-target.ts` au vert, aucune clé dans le dépôt.
+**Fin de la phase 0 :** décision Z11 prise (jetons Hostinger), `infra/targets.json` rempli, `node scripts/assert-target.ts` au vert, aucune clé dans le dépôt.
 
 ## Prompts Cody
 
-À coller dans Cody, depuis le dossier du dépôt à jour (`git pull`).
+À coller dans Cody, depuis le dossier du dépôt à jour (`git pull`). Node 24 ou plus récent est nécessaire (`node --version`).
 
 **A. Buckets R2** (après l'activation de R2, étape 3)
 
 ```text
-Crée les buckets R2 de Joutiya avec Wrangler. Lance `npx wrangler login` (je valide dans le navigateur), puis `npx wrangler whoami` : vérifie que c'est le compte où la zone joutiya.ma a été ajoutée et donne-moi son Account ID. Crée ensuite en juridiction UE, avec `npx wrangler r2 bucket create <nom> --jurisdiction eu`, les 9 buckets joutiya-dev-quarantine, joutiya-dev-media, joutiya-dev-private, joutiya-staging-quarantine, joutiya-staging-media, joutiya-staging-private, joutiya-prod-quarantine, joutiya-prod-media et joutiya-prod-private. Ne modifie et ne supprime aucune ressource existante ; si un nom est refusé, arrête-toi et dis-le-moi. Vérifie la liste des buckets UE, inscris l'Account ID et les noms exacts dans infra/targets.json, puis lance `node scripts/assert-target.ts`.
+Crée les buckets R2 de Joutiya avec Wrangler. Travaille depuis un dossier temporaire vide, hors du dépôt, pour que Wrangler ne lise aucun fichier .env. Lance `npx wrangler login` (je valide dans le navigateur), puis `npx wrangler whoami` : vérifie qu'il annonce une connexion OAuth, et non un jeton d'API ou une clé, sur le compte où la zone joutiya.ma a été ajoutée, et donne-moi son Account ID. Si Wrangler demande de choisir un compte, préfixe chaque commande par CLOUDFLARE_ACCOUNT_ID=<cet Account ID>. Crée ensuite en juridiction UE, avec `npx wrangler r2 bucket create <nom> --jurisdiction eu`, les 9 buckets joutiya-dev-quarantine, joutiya-dev-media, joutiya-dev-private, joutiya-staging-quarantine, joutiya-staging-media, joutiya-staging-private, joutiya-prod-quarantine, joutiya-prod-media et joutiya-prod-private. Ne modifie et ne supprime aucune ressource existante ; si un nom est refusé, arrête-toi et dis-le-moi. Vérifie la liste des buckets UE, donne-moi l'Account ID et les noms exacts sans rien écrire dans le dépôt, puis lance `npx wrangler logout`.
 ```
 
 **B. Projets Firebase** (étape 5)
 
 ```text
-Crée les 3 projets Firebase de Joutiya avec firebase-tools. Lance `npx firebase-tools login` (je valide dans le navigateur). Crée joutiya-dev, joutiya-staging et joutiya-prod avec `npx firebase-tools projects:create <id> --display-name "Joutiya <env>"` ; si un identifiant est pris, ajoute un suffixe de 4 chiffres et dis-le-moi. Ne touche à aucun autre projet et n'active aucune facturation (offre Spark). Pour chaque projet, crée la base Firestore avec `npx firebase-tools firestore:databases:create "(default)" --location europe-west9 --project <id>`, en ajoutant `--delete-protection ENABLED` pour la prod ; si europe-west9 est refusé, arrête-toi et demande-moi. Inscris les identifiants exacts et la région dans infra/targets.json, puis lance `node scripts/assert-target.ts`.
+Crée les 3 projets Firebase de Joutiya avec firebase-tools. Je me suis connecté moi-même avec `npx firebase-tools login`. Travaille depuis un dossier temporaire vide, hors du dépôt. Crée joutiya-dev, joutiya-staging et joutiya-prod avec `npx firebase-tools projects:create <id> --display-name "Joutiya <env>"` ; si un identifiant est pris, ajoute un suffixe de 4 chiffres et dis-le-moi. Ne touche à aucun autre projet et n'active aucune facturation (offre Spark). Pour chaque projet, crée la base Firestore avec `npx firebase-tools firestore:databases:create "(default)" --location europe-west9 --project <id>`, en ajoutant `--delete-protection ENABLED` pour la prod ; si europe-west9 est refusé, arrête-toi et demande-moi. Donne-moi les identifiants exacts et la région de chaque base sans rien écrire dans le dépôt, puis lance `npx firebase-tools logout`.
 ```
 
 **C. Identifiant de conversation Telegram** (étape 6)
 
 ```text
-J'ai mis TELEGRAM_BOT_TOKEN dans .env et envoyé /start à mon bot. Appelle la méthode getUpdates de l'API Telegram en lisant le jeton depuis .env (par exemple avec `node --env-file=.env`), sans jamais afficher le jeton, et donne-moi seulement le chat id. Envoie ensuite le message « Joutiya : alertes OK » à ce chat avec sendMessage.
+J'ai mis TELEGRAM_BOT_TOKEN dans .env.local et envoyé /start à mon bot. Appelle la méthode getUpdates de l'API Telegram en lisant le jeton depuis .env.local (par exemple avec `node --env-file=.env.local`), sans jamais afficher le jeton, et donne-moi seulement le chat id. Envoie ensuite le message « Joutiya : alertes OK » à ce chat avec sendMessage.
 ```
 
 **D. Consigner les identifiants** (étape 12)
