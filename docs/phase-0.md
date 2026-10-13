@@ -6,7 +6,8 @@ Ce qui reste à faire de votre côté pour clore la phase 0 (architecture v3, §
 
 - Inscrivez-vous avec votre Gmail : les adresses `@joutiya.ma` ne reçoivent rien avant l'étape 2.
 - Activez la double authentification partout.
-- Ne créez que des ressources neuves pour Joutiya ; ne modifiez ni ne supprimez rien d'existant. Si un service refuse (quota atteint, compte unique déjà pris), ne réutilisez rien d'existant : dites-le-moi, je vous propose une solution.
+- **Comptes dédiés** (votre choix du 12 octobre) : chaque service reçoit un compte, un projet ou une organisation neuve, réservée à Joutiya. Seul Cloudflare reste votre compte actuel, avec une zone et des buckets propres à Joutiya. Ne modifiez ni ne supprimez rien d'existant.
+- Si vous avez déjà un compte sur un service avec votre Gmail, ne vous en servez pas pour Joutiya : inscrivez-vous avec `contact@joutiya.ma`, qui arrive dans votre Gmail après l'étape 2. Si un service refuse (quota atteint, compte unique déjà pris), ne réutilisez rien : dites-le-moi, je vous propose une solution.
 - **Identifiants** (identifiant de projet ou de compte, nom de bucket) : notez-les au fil des étapes, ils vont dans `infra/targets.json` à l'étape 12. Ce ne sont pas des secrets.
 - **Clés secrètes** : créez-les seulement à la phase qui s'en sert, puis rangez-les dans votre `.env` local sous le nom prévu par `.env.example`. Jamais dans le dépôt ni dans le chat.
 - Alignez votre `.env` actuel sur le nouveau `.env.example` : des noms ont changé (par exemple `CF_ACCOUNT_ID`). N'y gardez que des clés propres à Joutiya ; une clé qui ouvre tout un compte (Global API Key Cloudflare, clé d'un autre projet Google) n'a rien à y faire. Les jetons Hostinger attendent votre décision Z11.
@@ -50,7 +51,7 @@ Répondre en tant que `contact@` : pas maintenant. Google supprime en janvier 20
 3. Aucune clé R2 maintenant : elles arrivent en phase 3.
 
 **Zero Trust**
-1. **Zero Trust** → nom d'équipe `joutiya` (ou `joutiya-ma` s'il est pris) → offre **Free** (carte demandée, 0 €). Si Zero Trust est déjà activé sur ce compte, ne changez rien : notez le domaine d'équipe existant.
+1. **Zero Trust** → nom d'équipe `joutiya` (ou `joutiya-ma` s'il est pris) → offre **Free** (carte demandée, 0 €). Si Zero Trust est déjà activé sur ce compte, ne changez rien et dites-le-moi.
 2. Rien d'autre : les applications Access arrivent en phase 1.
 
 À noter : le domaine d'équipe `<équipe>.cloudflareaccess.com` et les noms exacts des 9 buckets.
