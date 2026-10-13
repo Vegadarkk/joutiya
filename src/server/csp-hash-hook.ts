@@ -6,7 +6,7 @@
 // Cloudflare compresses at the edge.
 
 import { ServerResponse, type OutgoingHttpHeaders } from "node:http";
-import { INLINE_HASH_MARKER, inlineScriptHashes, withScriptHashes } from "../lib/security/inline-hashes.ts";
+import { INLINE_HASH_MARKER, inlineScripts, withScriptHashes } from "../lib/security/inline-hashes.ts";
 
 const MAX_BUFFER = 5 * 1024 * 1024;
 const CSP_HEADERS = ["content-security-policy", "content-security-policy-report-only"];
@@ -62,18 +62,26 @@ function toBuffer(chunk: unknown, encoding?: unknown): Buffer | null {
   return Buffer.from(String(chunk), typeof encoding === "string" ? (encoding as BufferEncoding) : "utf8");
 }
 
-/** Applies the deferred writeHead, headers first so the CSP can still be rewritten. */
-function applyHead(res: Res, buffered: Buffering): void {
-  const head = buffered.head ?? [res.statusCode];
+/** Moves the headers given to the deferred writeHead onto the response, where they can be rewritten. */
+function stageHeaders(res: Res, buffered: Buffering): void {
+  const head = buffered.head ?? [];
   const headers = head.find((arg) => typeof arg === "object" && arg !== null) as OutgoingHttpHeaders | unknown[] | undefined;
   if (Array.isArray(headers)) {
     for (let i = 0; i < headers.length - 1; i += 2) res.setHeader(String(headers[i]), headers[i + 1] as string);
   } else if (headers) {
     for (const [key, value] of Object.entries(headers)) if (value !== undefined) res.setHeader(key, value);
   }
+  // Staged once: the status line is all that is left to send.
+  if (buffered.head) buffered.head = buffered.head.filter((arg) => typeof arg !== "object" || arg === null);
+  res.removeHeader(INLINE_HASH_MARKER);
+}
+
+/** Sends the deferred head (status line and the staged headers) and stops buffering. */
+function applyHead(res: Res, buffered: Buffering): void {
+  stageHeaders(res, buffered);
+  const head = buffered.head ?? [res.statusCode];
   const status = typeof head[0] === "number" ? head[0] : res.statusCode;
   const reason = typeof head[1] === "string" ? head[1] : undefined;
-  res.removeHeader(INLINE_HASH_MARKER);
   res[STATE] = null;
   if (reason) original.writeHead.call(res, status, reason);
   else original.writeHead.call(res, status);
@@ -82,7 +90,11 @@ function applyHead(res: Res, buffered: Buffering): void {
 function tightenCsp(res: Res, body: Buffer): void {
   if (res.getHeader("content-encoding")) return;
   const html = body.toString("utf8");
-  const hashes = inlineScriptHashes(html);
+  const { hashes, untrusted } = inlineScripts(html);
+  if (untrusted > 0) {
+    // Plain stderr line: the hook runs before the app logger exists.
+    console.warn(JSON.stringify({ level: 40, msg: "csp: untrusted inline script left unhashed", count: untrusted }));
+  }
   for (const name of CSP_HEADERS) {
     const policy = res.getHeader(name);
     if (typeof policy === "string") res.setHeader(name, withScriptHashes(policy, hashes));
@@ -133,6 +145,7 @@ proto.end = function end(this: Res, chunk?: unknown, encoding?: unknown, callbac
   const done = [chunk, encoding, callback].find((arg) => typeof arg === "function") as Callback | undefined;
   const body = Buffer.concat(buffered.chunks);
   try {
+    stageHeaders(this, buffered);
     tightenCsp(this, body);
   } catch {
     // Keep the fallback policy.

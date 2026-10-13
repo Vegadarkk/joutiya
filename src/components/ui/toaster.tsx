@@ -1,7 +1,7 @@
 "use client";
 
 import { Toaster as Sonner } from "sonner";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/layout/theme";
 
 /** Toasts at the top end of the screen; direction and theme follow the page. */
 export function Toaster({ dir }: { dir: "ltr" | "rtl" }) {
@@ -9,7 +9,7 @@ export function Toaster({ dir }: { dir: "ltr" | "rtl" }) {
   return (
     <Sonner
       dir={dir}
-      theme={resolvedTheme === "dark" ? "dark" : "light"}
+      theme={resolvedTheme}
       position={dir === "rtl" ? "top-left" : "top-right"}
       closeButton
       richColors

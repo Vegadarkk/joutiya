@@ -127,6 +127,7 @@ export function proxy(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  // Everything but build assets and files with an extension (brand images, robots.txt).
+  // Everything but build assets and files with an extension (brand images, robots.txt). Page
+  // slugs must never contain a dot (phase 3 slug rules), or they would skip the CSP set here.
   matcher: ["/((?!_next/static|_next/image|.*\\..*).*)"],
 };

@@ -7,6 +7,7 @@ import { Footer } from "@/components/legal/footer";
 import { readex, tarifitFallback } from "@/lib/fonts";
 import { Providers } from "./providers";
 import { SiteHeader } from "./site-header";
+import { ThemeScript } from "./theme-script";
 import "@/styles/globals.css";
 
 /**
@@ -19,6 +20,7 @@ export async function RootShell({ locale, nonce, children }: { locale: Locale; n
   return (
     <html lang={LOCALE_TAGS[locale]} dir={dir} className={`${readex.variable} ${tarifitFallback.variable}`} suppressHydrationWarning>
       <body className="flex min-h-dvh flex-col antialiased">
+        <ThemeScript nonce={nonce} />
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:shadow-lg"
@@ -26,7 +28,7 @@ export async function RootShell({ locale, nonce, children }: { locale: Locale; n
           {t("skip")}
         </a>
         <NextIntlClientProvider>
-          <Providers dir={dir} nonce={nonce}>
+          <Providers dir={dir}>
             <SiteHeader locale={locale} />
             <main id="main" className="flex flex-1 flex-col">
               {children}

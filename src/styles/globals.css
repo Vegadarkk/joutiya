@@ -234,3 +234,11 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Set for one frame while the theme switches (src/components/layout/theme.tsx). */
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+}

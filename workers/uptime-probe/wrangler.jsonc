@@ -1,0 +1,24 @@
+// Uptime probe and alert e-mail relay (architecture §2, Z5). Free plan: 1 of the 5 cron
+// triggers, 10 ms CPU per run (waiting on fetch does not count), KV writes on state changes only.
+// Deploy: see docs/phase-1.md (npx wrangler@4.144.0 deploy, from the owner's machine).
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "joutiya-uptime-probe",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-29",
+  "workers_dev": true,
+  "preview_urls": false,
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "observability": { "enabled": true },
+  // KV namespace "joutiya-uptime-state": its id is printed by `wrangler kv namespace create`.
+  "kv_namespaces": [{ "binding": "STATE", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }],
+  // Free: delivers only to verified Email Routing destination addresses of the account.
+  "send_email": [{ "name": "EMAIL" }],
+  "vars": {
+    "ALERT_EMAIL_FROM": "alertes@joutiya.ma",
+    // Health endpoints probed every 5 minutes. Staging sits behind Access: service token headers.
+    "PROBE_TARGETS": "[{\"name\":\"production\",\"url\":\"https://joutiya.ma/api/health\"},{\"name\":\"staging\",\"url\":\"https://staging.joutiya.ma/api/health\",\"access\":true}]"
+  }
+  // Secrets (wrangler secret put): TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ALERT_EMAIL_TO,
+  // ALERT_RELAY_SECRET, ACCESS_CLIENT_ID, ACCESS_CLIENT_SECRET.
+}

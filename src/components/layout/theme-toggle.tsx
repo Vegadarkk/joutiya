@@ -2,9 +2,9 @@
 
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
+import { useTheme } from "./theme";
 
 const OPTIONS = [
   { value: "light", icon: Sun },

@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { ThemeProvider } from "@/components/layout/theme-provider";
+import { ThemeSync } from "@/components/layout/theme";
+import { ThemeScript } from "@/components/layout/theme-script";
 import { ACCESS_JWT_HEADER, verifyAccessJwt } from "@/lib/auth/access-jwt";
 import { serverEnv } from "@/lib/env";
 import { readex } from "@/lib/fonts";
@@ -31,7 +32,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   return (
     <html lang="fr-MA" dir="ltr" className={readex.variable} suppressHydrationWarning>
       <body className="min-h-dvh bg-surface-muted antialiased">
-        <ThemeProvider nonce={nonce}>{children}</ThemeProvider>
+        <ThemeScript nonce={nonce} />
+        <ThemeSync />
+        {children}
       </body>
     </html>
   );

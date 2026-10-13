@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { DoorMark } from "@/components/feedback/door-mark";
 import { buttonVariants } from "@/components/ui/button";
@@ -18,9 +19,9 @@ export default async function GlobalNotFound() {
           <DoorMark className="w-20" />
           <h1 className="text-xl font-semibold text-balance">{t("title")}</h1>
           <p className="text-foreground-muted text-pretty">{t("body")}</p>
-          <a href="/fr" className={buttonVariants({ className: "mt-2" })}>
+          <Link href="/fr" className={buttonVariants({ className: "mt-2" })}>
             {t("back")}
-          </a>
+          </Link>
         </main>
       </body>
     </html>
