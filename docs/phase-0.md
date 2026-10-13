@@ -18,15 +18,16 @@ Ce qui reste à faire de votre côté pour clore la phase 0 (architecture v3, §
 
 ## 0. D'abord : le domaine `joutiya.ma` est-il validé ?
 
-Un .MA n'est actif qu'après vérification d'une pièce d'identité par le registre (2 à 4 semaines). Sans pièce envoyée dans les 14 jours suivant l'achat, le domaine est suspendu, puis peut être libéré ([aide Hostinger](https://www.hostinger.com/support/requirements-to-register-a-ma-domain/)).
-1. hPanel → **Domaines** → `joutiya.ma` : vérifiez qu'il est actif, sans bandeau de vérification ni de suspension.
-2. Sinon, envoyez tout de suite la pièce demandée (passeport pour un titulaire étranger) et prévenez Claude : les étapes 1, 2 et 7 attendent la validation.
+Le registre .MA valide chaque domaine sur pièces, envoyées dans les 14 jours suivant l'achat : pour `joutiya.ma`, acheté le 5 octobre 2026, **avant le 19 octobre 2026**. L'examen prend 2 à 4 semaines. Sans pièces, le domaine est suspendu, puis peut être supprimé, sans remboursement ([aide Hostinger](https://www.hostinger.com/support/requirements-to-register-a-ma-domain/)). « Actif » dans hPanel ne prouve pas la validation.
+1. Envoyez au support Hostinger, par leur formulaire de vérification : votre passeport, une courte description de l'usage du site, et un contact administratif. Ce contact doit être une personne physique résidant au Maroc selon Hostinger, de nationalité marocaine selon d'autres registraires : faites-leur préciser.
+2. Le nom du titulaire dans hPanel doit être exactement celui de la pièce : le corriger plus tard impose un transfert payant.
+3. Demandez au support une confirmation écrite de la validation, puis prévenez Claude. Les étapes 1 et 2 peuvent avancer en attendant ; si hPanel refuse le changement de nameservers, prévenez Claude.
 
 ## 1. Cloudflare : la zone `joutiya.ma`
 
-Faites-la une fois le domaine actif : Cloudflare supprime une zone restée en attente 28 jours.
+Cloudflare supprime une zone restée en attente 28 jours : changez les nameservers (point 5) dans la foulée.
 1. Dans votre compte Cloudflare existant : **Add a domain** → `joutiya.ma` → offre **Free**.
-2. Cloudflare importe les enregistrements DNS actuels. Supprimez ceux de l'ancienne boîte Hostinger (MX, SPF Hostinger, DKIM, `autodiscover`, `autoconfig`) et ceux de la page d'attente Hostinger : la boîte n'existe plus et le site arrive en phase 1.
+2. Cloudflare importe les enregistrements DNS actuels. Supprimez ceux de la page d'attente Hostinger : le site arrive en phase 1. Gardez ceux du courrier (MX, SPF, DKIM, `autodiscover`, `autoconfig`) : l'étape 2 les règle.
 3. Notez les 2 nameservers donnés par Cloudflare.
 4. Si DNSSEC est actif sur le domaine chez Hostinger, désactivez-le d'abord, puis attendez 24 h.
 5. hPanel : **Domaines** → **Portefeuille de domaines** → **Gérer** (`joutiya.ma`) → **DNS / Nameservers** (ou « Serveurs de noms ») → **Changer les nameservers** → saisissez les 2 nameservers Cloudflare → Enregistrer. Gardez chez Hostinger le verrou de transfert et le renouvellement automatique.
