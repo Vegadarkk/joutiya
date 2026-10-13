@@ -1,0 +1,18 @@
+{
+  "phase": "http_ratelimit",
+  "description": "The only rate limiting rule of Cloudflare Free (§6): 300 requests per 10 s per IP and data center. Free accepts only the Path and Verified Bot fields. Webhooks, verified bots and immutable build assets do not count, so a shared mobile IP (CGNAT) is not blocked by page assets. Finer limits live in the app (Valkey).",
+  "rules": [
+    {
+      "ref": "site_wide",
+      "description": "Whole site: 300 requests per 10 s per IP",
+      "expression": "not starts_with(http.request.uri.path, \"/api/webhooks/\") and not starts_with(http.request.uri.path, \"/_next/static/\") and not cf.client.bot",
+      "action": "block",
+      "ratelimit": {
+        "characteristics": ["cf.colo.id", "ip.src"],
+        "period": 10,
+        "requests_per_period": 300,
+        "mitigation_timeout": 10
+      }
+    }
+  ]
+}

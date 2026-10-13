@@ -1,0 +1,244 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/*
+ * Joutiya design tokens. Palette from the "door" logo (v3-2):
+ * bab green #0D4B4D (frame), khoukha ochre #C0582C, threshold gold #D2A24C, cream #F2E9D8, ink #0B1E1F.
+ * Ochre is the action colour, green the structure, gold marks what is featured, cream the brand moments.
+ * Physical directions are never used: logical properties keep RTL (ar) and LTR (fr, rif) in sync.
+ */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  --font-sans: var(--font-readex), var(--font-tarifit), ui-sans-serif, system-ui, "Segoe UI", Tahoma, sans-serif;
+
+  /* Major-third scale on a 16px body. */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.3rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.6rem;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.85rem;
+  --text-xl: 1.5625rem;
+  --text-xl--line-height: 2.1rem;
+  --text-2xl: 1.953rem;
+  --text-2xl--line-height: 2.45rem;
+  --text-3xl: 2.441rem;
+  --text-3xl--line-height: 2.85rem;
+  --text-4xl: 3.052rem;
+  --text-4xl--line-height: 3.35rem;
+
+  --color-bab-50: #eef6f5;
+  --color-bab-100: #d5e8e6;
+  --color-bab-200: #a9d0cc;
+  --color-bab-300: #74b0ab;
+  --color-bab-400: #3f8a86;
+  --color-bab-500: #1f6a69;
+  --color-bab-600: #135a5b;
+  --color-bab-700: #0d4b4d;
+  --color-bab-800: #0b3a3c;
+  --color-bab-900: #0b2a2c;
+  --color-bab-950: #0b1e1f;
+
+  --color-ochre-50: #fbf1ec;
+  --color-ochre-100: #f6dfd3;
+  --color-ochre-200: #ecbda6;
+  --color-ochre-300: #e1946f;
+  --color-ochre-400: #d86f43;
+  --color-ochre-500: #c0582c;
+  --color-ochre-600: #a94b26;
+  --color-ochre-700: #8a3d20;
+  --color-ochre-800: #6c311c;
+  --color-ochre-900: #522616;
+
+  --color-gold-100: #f7ecd3;
+  --color-gold-200: #eed8a6;
+  --color-gold-300: #e2b865;
+  --color-gold-400: #d2a24c;
+  --color-gold-500: #b8873a;
+  --color-gold-700: #7a5822;
+
+  --color-cream-50: #fbf7ef;
+  --color-cream-100: #f7f1e6;
+  --color-cream-200: #f2e9d8;
+  --color-cream-300: #e6d8bd;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
+  --radius-arch: 999px 999px 0.75rem 0.75rem;
+
+  --ease-door: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Semantic roles: components only use these, so dark mode is one remap. */
+:root {
+  color-scheme: light;
+  --background: #ffffff;
+  --surface: #ffffff;
+  --surface-muted: #f5f7f6;
+  --surface-brand: var(--color-cream-200);
+  --foreground: var(--color-bab-950);
+  --foreground-muted: #4a5a5b;
+  --border: #dde4e2;
+  --border-strong: #b9c6c3;
+  --primary: var(--color-ochre-600);
+  --primary-hover: var(--color-ochre-700);
+  --primary-foreground: #ffffff;
+  --structure: var(--color-bab-700);
+  --structure-foreground: var(--color-cream-200);
+  --featured: var(--color-gold-400);
+  --featured-foreground: var(--color-bab-950);
+  --link: var(--color-bab-600);
+  --ring: var(--color-bab-400);
+  --danger: #b42318;
+  --danger-foreground: #ffffff;
+  --danger-surface: #fdecea;
+  --success: #17703f;
+  --success-surface: #e8f5ee;
+  --warning: #8a5a00;
+  --warning-surface: #fdf3dc;
+  --skeleton: #e9eeec;
+  --skeleton-shine: #f6f8f7;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --background: var(--color-bab-950);
+  --surface: #0f2829;
+  --surface-muted: #133234;
+  --surface-brand: var(--color-bab-800);
+  --foreground: var(--color-cream-200);
+  --foreground-muted: #a9bcb9;
+  --border: #21403f;
+  --border-strong: #2f5856;
+  --primary: var(--color-ochre-400);
+  --primary-hover: var(--color-ochre-300);
+  --primary-foreground: var(--color-bab-950);
+  --structure: var(--color-bab-800);
+  --structure-foreground: var(--color-cream-200);
+  --featured: var(--color-gold-300);
+  --featured-foreground: var(--color-bab-950);
+  --link: var(--color-bab-200);
+  --ring: var(--color-gold-300);
+  --danger: #f97066;
+  --danger-foreground: var(--color-bab-950);
+  --danger-surface: #3a1714;
+  --success: #6ce9a6;
+  --success-surface: #0f2e22;
+  --warning: #fdb022;
+  --warning-surface: #33260a;
+  --skeleton: #183a3b;
+  --skeleton-shine: #21494a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-brand: var(--surface-brand);
+  --color-foreground: var(--foreground);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-structure: var(--structure);
+  --color-structure-foreground: var(--structure-foreground);
+  --color-featured: var(--featured);
+  --color-featured-foreground: var(--featured-foreground);
+  --color-link: var(--link);
+  --color-ring: var(--ring);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-surface: var(--danger-surface);
+  --color-success: var(--success);
+  --color-success-surface: var(--success-surface);
+  --color-warning: var(--warning);
+  --color-warning-surface: var(--warning-surface);
+  --color-skeleton: var(--skeleton);
+  --color-skeleton-shine: var(--skeleton-shine);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "kern";
+    min-height: 100dvh;
+  }
+  /* Arabic script needs more vertical room for marks. */
+  :lang(ar) body {
+    line-height: 1.75;
+  }
+  ::selection {
+    background: var(--color-gold-200);
+    color: var(--color-bab-950);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  a {
+    color: inherit;
+    text-underline-offset: 0.2em;
+  }
+}
+
+/* Gold threshold under the header: the step through the door. */
+@utility threshold {
+  box-shadow: inset 0 -3px 0 var(--featured);
+}
+
+/* Pointed horseshoe arch of the logo, used for brand frames. */
+@utility arch {
+  border-start-start-radius: 50% 2.25rem;
+  border-start-end-radius: 50% 2.25rem;
+}
+
+@utility skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton) 0%,
+    var(--skeleton-shine) 40%,
+    var(--skeleton) 80%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Set for one frame while the theme switches (src/components/layout/theme.tsx). */
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+}

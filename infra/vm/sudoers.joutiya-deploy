@@ -1,0 +1,6 @@
+# /etc/sudoers.d/joutiya-deploy (0440). The deploy users are not in the docker group: their only
+# privilege is this script, with their own environment name as the only argument.
+Defaults:deploy-staging env_keep += "SSH_ORIGINAL_COMMAND"
+Defaults:deploy-prod env_keep += "SSH_ORIGINAL_COMMAND"
+deploy-staging ALL=(root) NOPASSWD: /usr/local/sbin/joutiya-deploy staging
+deploy-prod ALL=(root) NOPASSWD: /usr/local/sbin/joutiya-deploy prod

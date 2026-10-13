@@ -1,0 +1,10 @@
+{
+  "description": "Ingress of the staging Tunnel joutiya-staging-tunnel (connector in the joutiya-staging Compose project, token in /etc/joutiya/staging/tunnel.env). Every hostname is behind Access. Staging hosts are first-level subdomains: Universal SSL does not cover a.b.joutiya.ma.",
+  "config": {
+    "ingress": [
+      { "hostname": "staging.joutiya.ma", "service": "http://web:3000" },
+      { "hostname": "admin-staging.joutiya.ma", "service": "http://web:3000" },
+      { "service": "http_status:404" }
+    ]
+  }
+}

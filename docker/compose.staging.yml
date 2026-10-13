@@ -1,0 +1,29 @@
+# Staging: separate project, network, volumes, secrets and Tunnel; reduced limits.
+# Group joutiya-staging (gid 2002, infra/vm/install.sh): the only group that reads /etc/joutiya/staging/gcp.
+services:
+  web:
+    user: "1000:2002"
+    environment:
+      NODE_OPTIONS: --max-old-space-size=576
+    deploy:
+      resources:
+        limits: { cpus: "0.75", memory: 768M }
+  worker:
+    user: "1000:2002"
+    environment:
+      NODE_OPTIONS: --max-old-space-size=288
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 384M }
+  valkey-queue:
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 256M }
+  valkey-ratelimit:
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 96M }
+  cloudflared:
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 128M }

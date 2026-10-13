@@ -3,7 +3,8 @@
     "cloudflare": {
       "accountId": null,
       "zoneId": null,
-      "accessTeamDomain": null
+      "accessTeamDomain": null,
+      "sshTunnelId": null
     },
     "oracle": {
       "homeRegion": null
@@ -36,6 +37,10 @@
       "whatsapp": {
         "wabaId": null,
         "phoneNumberId": null
+      },
+      "cloudflare": {
+        "tunnelId": null,
+        "accessAud": null
       }
     },
     "staging": {
@@ -51,6 +56,10 @@
       "whatsapp": {
         "wabaId": null,
         "phoneNumberId": null
+      },
+      "cloudflare": {
+        "tunnelId": null,
+        "accessAud": null
       }
     },
     "prod": {
@@ -66,6 +75,10 @@
       "whatsapp": {
         "wabaId": null,
         "phoneNumberId": null
+      },
+      "cloudflare": {
+        "tunnelId": null,
+        "accessAud": null
       }
     }
   }

@@ -1,7 +1,7 @@
 // Third-party isolation guard (architecture §9). Every identifier the app is configured
 // with must equal the exact value recorded in infra/targets.json, otherwise the process
-// stops. Runs in CI; web and worker run it at startup from phase 1.
-// Erasable TypeScript only, so Node runs it directly: `node scripts/assert-target.ts`.
+// stops. Runs in CI; web and worker run it at startup in strict mode (staging, prod).
+// Erasable TypeScript only, so Node runs it directly: `node scripts/assert-target.ts [--strict]`.
 
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -14,6 +14,7 @@ type Shape = Record<string, Record<string, RegExp>>;
 type Env = Record<string, string | undefined>;
 
 const HEX32 = /^[0-9a-f]{32}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const META_ID = /^[0-9]{5,25}$/;
 const R2_BUCKET = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/;
 
@@ -23,9 +24,11 @@ const SHARED_SHAPE = {
     accountId: HEX32,
     zoneId: HEX32,
     accessTeamDomain: /^[a-z0-9][a-z0-9-]*\.cloudflareaccess\.com$/,
+    // Tunnel of the host's cloudflared (SSH only), independent of Docker.
+    sshTunnelId: UUID,
   },
   oracle: { homeRegion: /^eu-(paris|marseille)-1$/ },
-  anthropic: { organizationId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i },
+  anthropic: { organizationId: UUID },
   stripe: { accountId: /^acct_[A-Za-z0-9]{8,}$/ },
   revenuecat: { projectId: /^[A-Za-z0-9_-]{4,64}$/ },
   meta: { businessId: META_ID, appId: META_ID },
@@ -38,6 +41,8 @@ const ENV_SHAPE = {
   },
   r2: { quarantine: R2_BUCKET, media: R2_BUCKET, private: R2_BUCKET },
   whatsapp: { wabaId: META_ID, phoneNumberId: META_ID },
+  // Tunnel of this environment and AUD tag of the Access application protecting its back office.
+  cloudflare: { tunnelId: UUID, accessAud: /^[0-9a-f]{64}$/ },
 } satisfies Shape;
 
 type Recorded<S extends Shape> = { [K in keyof S]: { [F in keyof S[K]]: Id } };
@@ -104,6 +109,11 @@ const BINDINGS: Binding[] = [
     normalize: (value) => value.replace(/^https:\/\//, "").replace(/\/+$/, ""),
   },
   {
+    variable: "CF_ACCESS_AUD",
+    target: "environments.<env>.cloudflare.accessAud",
+    expected: (t, env) => t.environments[env].cloudflare.accessAud,
+  },
+  {
     variable: "WHATSAPP_PHONE_NUMBER_ID",
     target: "environments.<env>.whatsapp.phoneNumberId",
     expected: (t, env) => t.environments[env].whatsapp.phoneNumberId,
@@ -166,6 +176,8 @@ function checkDistinct(targets: Targets): string[] {
   for (const env of APP_ENVS) {
     const t = targets.environments[env];
     claim("firebase", `environments.${env}.firebase.projectId`, t.firebase.projectId);
+    claim("tunnel", `environments.${env}.cloudflare.tunnelId`, t.cloudflare.tunnelId);
+    claim("access", `environments.${env}.cloudflare.accessAud`, t.cloudflare.accessAud);
     for (const role of ["quarantine", "media", "private"] as const) {
       claim("r2", `environments.${env}.r2.${role}`, t.r2[role]);
     }
@@ -203,24 +215,112 @@ function checkStripeMode(appEnv: AppEnv, key: string): string[] {
   return key.startsWith(wanted) ? [] : [`STRIPE_SECRET_KEY must be a restricted ${wanted}… key when APP_ENV=${appEnv}`];
 }
 
+/** Variables a deployed web or worker cannot start without (strict mode). */
+export const STRICT_REQUIRED = [
+  "APP_ENV",
+  "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+  "GOOGLE_APPLICATION_CREDENTIALS",
+  "CF_ACCESS_TEAM_DOMAIN",
+  "CF_ACCESS_AUD",
+] as const;
+
+export interface AssertOptions {
+  /** Staging and production: every STRICT_REQUIRED variable must be set and recorded. */
+  strict?: boolean;
+  /** Reads credential files (GOOGLE_APPLICATION_CREDENTIALS, FIREBASE_CONFIG as a path). */
+  readFile?: (path: string) => string;
+}
+
+function parseJson(text: string): Record<string, unknown> | null {
+  try {
+    const value: unknown = JSON.parse(text);
+    return isRecord(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Cloudflare tunnel tokens are base64 JSON: { a: account tag, t: tunnel id, s: secret }. */
+function tunnelTokenErrors(variable: string, token: string, targets: Targets, target: string, tunnel: Id): string[] {
+  const decoded = parseJson(Buffer.from(token, "base64").toString("utf8"));
+  if (!decoded || typeof decoded.a !== "string" || typeof decoded.t !== "string") {
+    return [`${variable} is not a Cloudflare tunnel token`];
+  }
+  const errors: string[] = [];
+  const account = targets.shared.cloudflare.accountId;
+  if (account === null) errors.push(`${variable} is set but shared.cloudflare.accountId is not recorded in infra/targets.json`);
+  else if (decoded.a !== account) errors.push(`${variable} belongs to another account than shared.cloudflare.accountId (${account})`);
+  if (tunnel === null) errors.push(`${variable} is set but ${target} is not recorded in infra/targets.json`);
+  else if (decoded.t !== tunnel) errors.push(`${variable} is for another tunnel than ${target} (${tunnel})`);
+  return errors;
+}
+
+// Tunnel tokens kept in the owner's .env.local (docs/phase-1.md step 2), checked whatever APP_ENV.
+const OWNER_TUNNEL_TOKENS: readonly { variable: string; target: string; tunnel: (targets: Targets) => Id }[] = [
+  { variable: "JOUTIYA_SSH_TUNNEL_TOKEN", target: "shared.cloudflare.sshTunnelId", tunnel: (t) => t.shared.cloudflare.sshTunnelId },
+  { variable: "JOUTIYA_PROD_TUNNEL_TOKEN", target: "environments.prod.cloudflare.tunnelId", tunnel: (t) => t.environments.prod.cloudflare.tunnelId },
+  {
+    variable: "JOUTIYA_STAGING_TUNNEL_TOKEN",
+    target: "environments.staging.cloudflare.tunnelId",
+    tunnel: (t) => t.environments.staging.cloudflare.tunnelId,
+  },
+];
+
+/**
+ * Google project behind a credential file: the impersonated service account of a Workload
+ * Identity Federation config (§9), or project_id of a service account key (documented exception).
+ */
+export function credentialProject(credential: Record<string, unknown>): string | null {
+  if (credential.type === "service_account") return typeof credential.project_id === "string" ? credential.project_id : null;
+  if (credential.type === "external_account" && typeof credential.service_account_impersonation_url === "string") {
+    const match = /serviceAccounts\/[^@/]+@([a-z][a-z0-9-]{4,28}[a-z0-9])\.iam\.gserviceaccount\.com:/.exec(
+      credential.service_account_impersonation_url,
+    );
+    return match?.[1] ?? null;
+  }
+  return null;
+}
+
+function projectFileErrors(variable: string, path: string, expected: Id, appEnv: AppEnv, options: AssertOptions): string[] {
+  const target = `environments.${appEnv}.firebase.projectId`;
+  if (expected === null) return [`${variable} is set but ${target} is not recorded in infra/targets.json`];
+  let credential: Record<string, unknown> | null;
+  try {
+    credential = parseJson((options.readFile ?? ((file: string) => readFileSync(file, "utf8")))(path));
+  } catch {
+    return [`${variable}: cannot read the file it points to`];
+  }
+  if (!credential) return [`${variable}: the file is not a JSON object`];
+  const project = variable === "FIREBASE_CONFIG" ? credential.projectId : credentialProject(credential);
+  if (typeof project !== "string") return [`${variable}: cannot tell which Google project the credential belongs to`];
+  return project === expected ? [] : [`${variable} belongs to another project than ${target} (${expected})`];
+}
+
 /**
  * Compares the configured identifiers with the targets of APP_ENV. Returns the errors found.
  * Configured values are never printed: a secret pasted into the wrong variable stays out of logs.
  */
-export function assertTargets(targets: Targets, env: Env): string[] {
+export function assertTargets(targets: Targets, env: Env, options: AssertOptions = {}): string[] {
   const value = (name: string): string => (env[name] ?? "").trim();
   const configured = BINDINGS.filter((binding) => value(binding.variable) !== "");
   const stripeKey = value("STRIPE_SECRET_KEY");
   const appEnv = value("APP_ENV");
+  const ownerTunnels = OWNER_TUNNEL_TOKENS.filter(({ variable }) => value(variable) !== "").flatMap(({ variable, target, tunnel }) =>
+    tunnelTokenErrors(variable, value(variable), targets, target, tunnel(targets)),
+  );
 
   if (appEnv === "") {
+    if (options.strict) return [...STRICT_REQUIRED.filter((name) => value(name) === "").map((name) => `${name} is required in strict mode`), ...ownerTunnels];
     const names = configured.map((binding) => binding.variable);
     if (stripeKey !== "") names.push("STRIPE_SECRET_KEY");
-    return names.length === 0 ? [] : [`APP_ENV is required when ${names.join(", ")} is set`];
+    return names.length === 0 ? ownerTunnels : [`APP_ENV is required when ${names.join(", ")} is set`, ...ownerTunnels];
   }
   if (!isAppEnv(appEnv)) return [`APP_ENV must be one of ${APP_ENVS.join(", ")}`];
 
-  const errors: string[] = [];
+  const errors: string[] = [...ownerTunnels];
+  if (options.strict) {
+    for (const name of STRICT_REQUIRED) if (value(name) === "") errors.push(`${name} is required in strict mode`);
+  }
   for (const binding of configured) {
     const target = binding.target.replace("<env>", appEnv);
     const expected = binding.expected(targets, appEnv);
@@ -232,6 +332,23 @@ export function assertTargets(targets: Targets, env: Env): string[] {
     }
   }
   if (stripeKey !== "") errors.push(...checkStripeMode(appEnv, stripeKey));
+  const tunnelToken = value("CLOUDFLARE_TUNNEL_TOKEN");
+  if (tunnelToken !== "") {
+    const target = `environments.${appEnv}.cloudflare.tunnelId`;
+    errors.push(...tunnelTokenErrors("CLOUDFLARE_TUNNEL_TOKEN", tunnelToken, targets, target, targets.environments[appEnv].cloudflare.tunnelId));
+  }
+  const expectedProject = targets.environments[appEnv].firebase.projectId;
+  const credentials = value("GOOGLE_APPLICATION_CREDENTIALS");
+  if (credentials !== "") errors.push(...projectFileErrors("GOOGLE_APPLICATION_CREDENTIALS", credentials, expectedProject, appEnv, options));
+  const firebaseConfig = value("FIREBASE_CONFIG");
+  if (firebaseConfig !== "") {
+    if (firebaseConfig.startsWith("{")) {
+      const project = parseJson(firebaseConfig)?.projectId;
+      if (project !== expectedProject) errors.push(`FIREBASE_CONFIG does not match environments.${appEnv}.firebase.projectId (${expectedProject})`);
+    } else {
+      errors.push(...projectFileErrors("FIREBASE_CONFIG", firebaseConfig, expectedProject, appEnv, options));
+    }
+  }
   return errors;
 }
 
@@ -250,11 +367,16 @@ function main(): void {
   }
   const fileErrors = validateTargets(raw);
   if (fileErrors.length > 0) fail(fileErrors);
-  const errors = assertTargets(raw as Targets, process.env);
+  const strict = process.argv.includes("--strict");
+  const errors = assertTargets(raw as Targets, process.env, { strict });
   if (errors.length > 0) fail(errors);
   const appEnv = process.env.APP_ENV?.trim();
-  console.log(`assert-target: OK (${appEnv ? `APP_ENV=${appEnv}` : "targets file valid, APP_ENV not set"})`);
+  const mode = strict ? ", strict" : "";
+  console.log(`assert-target: OK (${appEnv ? `APP_ENV=${appEnv}` : "targets file valid, APP_ENV not set"}${mode})`);
 }
 
 // realpath: Node resolves symlinks in import.meta.url, so a symlinked checkout still runs main().
-if (process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+// The file name check keeps main() out of bundles that import this module (dist/worker/index.mjs
+// shares import.meta.url with its entry point).
+const self = fileURLToPath(import.meta.url);
+if (/[\\/]assert-target\.(?:ts|mjs)$/.test(self) && process.argv[1] !== undefined && realpathSync(process.argv[1]) === self) main();

@@ -6,7 +6,10 @@ Plateforme web de petites annonces et de seconde main au Maroc (C2C / B2C), doma
 
 ## État du projet
 
-Architecture v3 validée le 12 octobre 2026. Phase 0 en cours : ouverture des comptes gratuits dédiés à Joutiya, pas à pas dans [`docs/phase-0.md`](docs/phase-0.md).
+Architecture v3 validée le 12 octobre 2026.
+
+- Phase 0 : ouverture des comptes gratuits dédiés à Joutiya, pas à pas dans [`docs/phase-0.md`](docs/phase-0.md).
+- Phase 1 (fondations) : le code est prêt ; la mise en ligne se fait pas à pas avec [`docs/phase-1.md`](docs/phase-1.md). Pour reconstruire la VM : [`infra/redeploy.md`](infra/redeploy.md).
 
 ## Sécurité du dépôt
 

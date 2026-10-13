@@ -1,0 +1,11 @@
+{
+  "description": "Ingress of the production Tunnel joutiya-prod-tunnel (remotely managed, connector in the joutiya-prod Compose project, token in /etc/joutiya/prod/tunnel.env). Each hostname gets a proxied CNAME to <tunnelId>.cfargotunnel.com.",
+  "config": {
+    "ingress": [
+      { "hostname": "joutiya.ma", "service": "http://web:3000" },
+      { "hostname": "www.joutiya.ma", "service": "http://web:3000" },
+      { "hostname": "admin.joutiya.ma", "service": "http://web:3000" },
+      { "service": "http_status:404" }
+    ]
+  }
+}

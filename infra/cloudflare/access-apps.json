@@ -1,0 +1,119 @@
+{
+  "description": "Zero Trust Access applications (Free, up to 50 users). ${VAR} values come from the environment of scripts/cloudflare.ts, never from this file; ACCESS_GOOGLE_IDP_ID is looked up by the script (the account's only Google login method). Staff sign in with Google only, on an account with 2-step verification (§6). Service tokens are created in the dashboard (secret shown once). The CI token reaches sshd, where its key is only accepted for deploy-staging (forced command). The AUD tag of admin.joutiya.ma and admin-staging.joutiya.ma goes to CF_ACCESS_AUD of each environment and to infra/targets.json.",
+  "apps": [
+    {
+      "name": "Joutiya back-office",
+      "domain": "admin.joutiya.ma",
+      "type": "self_hosted",
+      "session_duration": "8h",
+      "allowed_idps": [
+        "${ACCESS_GOOGLE_IDP_ID}"
+      ],
+      "auto_redirect_to_identity": true,
+      "policies": [
+        {
+          "name": "Owner",
+          "decision": "allow",
+          "include": [
+            {
+              "email": {
+                "email": "${ACCESS_OWNER_EMAIL}"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Joutiya SSH",
+      "domain": "ssh.joutiya.ma",
+      "type": "self_hosted",
+      "session_duration": "8h",
+      "allowed_idps": [
+        "${ACCESS_GOOGLE_IDP_ID}"
+      ],
+      "auto_redirect_to_identity": true,
+      "policies": [
+        {
+          "name": "CI deploy (staging)",
+          "decision": "non_identity",
+          "include": [
+            {
+              "service_token": {
+                "token_id": "${ACCESS_CI_TOKEN_ID}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Owner",
+          "decision": "allow",
+          "include": [
+            {
+              "email": {
+                "email": "${ACCESS_OWNER_EMAIL}"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Joutiya staging",
+      "domain": "staging.joutiya.ma",
+      "type": "self_hosted",
+      "session_duration": "24h",
+      "allowed_idps": [
+        "${ACCESS_GOOGLE_IDP_ID}"
+      ],
+      "auto_redirect_to_identity": true,
+      "policies": [
+        {
+          "name": "Uptime probe",
+          "decision": "non_identity",
+          "include": [
+            {
+              "service_token": {
+                "token_id": "${ACCESS_PROBE_TOKEN_ID}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Owner",
+          "decision": "allow",
+          "include": [
+            {
+              "email": {
+                "email": "${ACCESS_OWNER_EMAIL}"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Joutiya back-office staging",
+      "domain": "admin-staging.joutiya.ma",
+      "type": "self_hosted",
+      "session_duration": "8h",
+      "allowed_idps": [
+        "${ACCESS_GOOGLE_IDP_ID}"
+      ],
+      "auto_redirect_to_identity": true,
+      "policies": [
+        {
+          "name": "Owner",
+          "decision": "allow",
+          "include": [
+            {
+              "email": {
+                "email": "${ACCESS_OWNER_EMAIL}"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

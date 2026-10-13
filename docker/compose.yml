@@ -1,0 +1,143 @@
+# Base of the two Compose projects on the VM (§1): joutiya-prod and joutiya-staging, each with
+# its own network, volumes, secrets, Tunnel and limits (compose.prod.yml, compose.staging.yml).
+# No port is published: cloudflared reaches web:3000 on the internal network.
+#
+#   APP_ENV=staging RELEASE=<sha> docker compose -f compose.yml -f compose.staging.yml up -d
+#
+# Secrets live in /etc/joutiya/<env>/*.env (root, 0600), never in this repository.
+
+name: joutiya-${APP_ENV:?APP_ENV is required}
+
+x-service: &service
+  restart: unless-stopped
+  init: true
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+x-valkey-health: &valkey-health
+  test: ["CMD-SHELL", "valkey-cli -a \"$$VALKEY_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+  interval: 10s
+  timeout: 3s
+  retries: 5
+
+services:
+  web:
+    <<: *service
+    image: joutiya-web:${RELEASE:?RELEASE is required}
+    # Non-root whatever the image says: uid of the node user in node:24-slim, and a group per
+    # environment (compose.<env>.yml) that alone can read /etc/joutiya/<env>/gcp.
+    user: "1000:1000"
+    env_file:
+      - /etc/joutiya/${APP_ENV}/app.env
+    environment:
+      APP_ENV: ${APP_ENV}
+      RELEASE: ${RELEASE}
+      GOOGLE_APPLICATION_CREDENTIALS: /etc/joutiya/${APP_ENV}/gcp/web/credentials.json
+    volumes:
+      # Workload Identity Federation (X.509, §9) of the joutiya-web service account: credential
+      # config, certificate config, certificate and key. Same path as on the host, so the paths
+      # gcloud wrote into the files stay valid. The worker mounts its own directory only.
+      - /etc/joutiya/${APP_ENV}/gcp/web:/etc/joutiya/${APP_ENV}/gcp/web:ro
+    # Read-only file system (§2): regenerated ISR pages stay in memory (next.config.ts).
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+      - /app/.next/cache:uid=1000,mode=0700,size=64m
+    networks: [edge, data, egress]
+    depends_on:
+      valkey-queue: { condition: service_healthy }
+      valkey-ratelimit: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then((r)=>process.exit(r.status===200?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    stop_grace_period: 20s
+
+  worker:
+    <<: *service
+    image: joutiya-worker:${RELEASE}
+    user: "1000:1000"
+    env_file:
+      - /etc/joutiya/${APP_ENV}/app.env
+    environment:
+      APP_ENV: ${APP_ENV}
+      RELEASE: ${RELEASE}
+      GOOGLE_APPLICATION_CREDENTIALS: /etc/joutiya/${APP_ENV}/gcp/worker/credentials.json
+    volumes:
+      - /etc/joutiya/${APP_ENV}/gcp/worker:/etc/joutiya/${APP_ENV}/gcp/worker:ro
+    read_only: true
+    tmpfs: [/tmp]
+    networks: [data, egress]
+    depends_on:
+      valkey-queue: { condition: service_healthy }
+    # Heartbeat file touched by the worker after each successful write to valkey-queue (30 s).
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(Date.now()-require('fs').statSync('/tmp/joutiya-worker-heartbeat').mtimeMs<90000?0:1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    stop_grace_period: 30s
+
+  valkey-queue:
+    <<: *service
+    image: valkey/valkey:8.1.10-alpine3.24@sha256:081c2f5cb575efc901aa80ff9cdbd1ec6a301682fd35e1ebb4b0990a4a4a8507
+    user: valkey
+    env_file:
+      - /etc/joutiya/${APP_ENV}/valkey-queue.env
+    command: ["sh", "-c", "exec valkey-server /etc/valkey/valkey.conf --requirepass \"$$VALKEY_PASSWORD\""]
+    read_only: true
+    volumes:
+      - ./valkey/queue.conf:/etc/valkey/valkey.conf:ro
+      - valkey-queue-data:/data
+    networks: [data]
+    healthcheck: *valkey-health
+
+  valkey-ratelimit:
+    <<: *service
+    image: valkey/valkey:8.1.10-alpine3.24@sha256:081c2f5cb575efc901aa80ff9cdbd1ec6a301682fd35e1ebb4b0990a4a4a8507
+    user: valkey
+    env_file:
+      - /etc/joutiya/${APP_ENV}/valkey-ratelimit.env
+    command: ["sh", "-c", "exec valkey-server /etc/valkey/valkey.conf --requirepass \"$$VALKEY_PASSWORD\""]
+    read_only: true
+    tmpfs: [/data]
+    volumes:
+      - ./valkey/ratelimit.conf:/etc/valkey/valkey.conf:ro
+    networks: [data]
+    healthcheck: *valkey-health
+
+  cloudflared:
+    <<: *service
+    image: cloudflare/cloudflared:2026.9.1@sha256:b269e8abd07a5bf6f3f4be65d5050b2174eca89c56a0241a8ff32a16aec454e4
+    # Remote-managed tunnel: ingress rules live in Cloudflare (infra/cloudflare/tunnel.<env>.json).
+    command: ["tunnel", "--no-autoupdate", "run"]
+    env_file:
+      - /etc/joutiya/${APP_ENV}/tunnel.env
+    environment:
+      TUNNEL_METRICS: 127.0.0.1:20241
+    read_only: true
+    networks: [edge, egress]
+    depends_on:
+      web: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:20241", "ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  # cloudflared <-> web only.
+  edge: { internal: true }
+  # Valkey: no route outside the project.
+  data: { internal: true }
+  # Outbound internet (Firestore, Telegram, Cloudflare edge).
+  egress: {}
+
+volumes:
+  valkey-queue-data: {}
