@@ -1,0 +1,17 @@
+{
+  "phase": "http_request_cache_settings",
+  "description": "Cache Rules (§1): anonymous public pages on joutiya.ma are cached for the TTL the origin sends (ISR s-maxage); a production deploy purges the cache. Only locale-prefixed paths: '/' and unprefixed paths redirect per visitor. Bypassed as soon as the __Host-session cookie is present. Private pages send no-store. Build assets (/_next/static) are cached by default.",
+  "rules": [
+    {
+      "ref": "public_pages",
+      "description": "Anonymous public pages: cache, TTLs from the origin",
+      "expression": "http.host eq \"joutiya.ma\" and (http.request.uri.path in {\"/fr\" \"/ar\" \"/rif\"} or starts_with(http.request.uri.path, \"/fr/\") or starts_with(http.request.uri.path, \"/ar/\") or starts_with(http.request.uri.path, \"/rif/\")) and not http.cookie contains \"__Host-session\"",
+      "action": "set_cache_settings",
+      "action_parameters": {
+        "cache": true,
+        "edge_ttl": { "mode": "respect_origin" },
+        "browser_ttl": { "mode": "respect_origin" }
+      }
+    }
+  ]
+}

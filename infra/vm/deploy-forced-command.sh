@@ -122,7 +122,7 @@ promote() {
   [[ "$ENV_NAME" == "prod" ]] || die "promote is reserved to production"
   local release="${ARGS[1]:-}" web="${ARGS[2]:-}" worker="${ARGS[3]:-}"
   valid_release "$release" || die "invalid release"
-  valid_image_id "$web" && valid_image_id "$worker" || die "invalid image id"
+  if ! valid_image_id "$web" || ! valid_image_id "$worker"; then die "invalid image id"; fi
   [[ "$(current_release staging)" == "$release" ]] || die "$release is not the release running in staging"
   [[ "$(image_id "joutiya-web:$release")" == "$web" ]] || die "web image id mismatch"
   [[ "$(image_id "joutiya-worker:$release")" == "$worker" ]] || die "worker image id mismatch"

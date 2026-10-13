@@ -1,0 +1,9 @@
+{
+  "description": "Ingress of joutiya-ssh-tunnel, served by cloudflared installed on the host (systemd, apt updates), not by Docker: SSH keeps working when Docker or a Compose project is down. Access guards ssh.joutiya.ma; sshd still requires a key.",
+  "config": {
+    "ingress": [
+      { "hostname": "ssh.joutiya.ma", "service": "ssh://localhost:22" },
+      { "service": "http_status:404" }
+    ]
+  }
+}

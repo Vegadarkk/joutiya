@@ -14,7 +14,7 @@ if (!existsSync(`${app}/server.js`)) {
 }
 cpSync(`${root}.next/static`, `${app}/.next/static`, { recursive: true });
 cpSync(`${root}public`, `${app}/public`, { recursive: true });
-cpSync(`${root}dist`, `${app}/dist`, { recursive: true });
+cpSync(`${root}dist/server`, `${app}/dist/server`, { recursive: true });
 mkdirSync(`${app}/infra`, { recursive: true });
 cpSync(`${root}infra/targets.json`, `${app}/infra/targets.json`);
 

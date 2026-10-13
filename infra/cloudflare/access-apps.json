@@ -1,0 +1,103 @@
+{
+  "description": "Zero Trust Access applications (Free, up to 50 users). ${VAR} values come from the environment of scripts/cloudflare.ts, never from this file. Service tokens are created in the dashboard (secret shown once). The CI token reaches sshd, where its key is only accepted for deploy-staging (forced command). The AUD tag of admin.joutiya.ma and admin-staging.joutiya.ma goes to CF_ACCESS_AUD of each environment and to infra/targets.json.",
+  "apps": [
+    {
+      "name": "Joutiya back-office",
+      "domain": "admin.joutiya.ma",
+      "type": "self_hosted",
+      "session_duration": "8h",
+      "policies": [
+        {
+          "name": "Owner",
+          "decision": "allow",
+          "include": [
+            {
+              "email": {
+                "email": "${ACCESS_OWNER_EMAIL}"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Joutiya SSH",
+      "domain": "ssh.joutiya.ma",
+      "type": "self_hosted",
+      "session_duration": "8h",
+      "policies": [
+        {
+          "name": "CI deploy (staging)",
+          "decision": "non_identity",
+          "include": [
+            {
+              "service_token": {
+                "token_id": "${ACCESS_CI_TOKEN_ID}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Owner",
+          "decision": "allow",
+          "include": [
+            {
+              "email": {
+                "email": "${ACCESS_OWNER_EMAIL}"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Joutiya staging",
+      "domain": "staging.joutiya.ma",
+      "type": "self_hosted",
+      "session_duration": "24h",
+      "policies": [
+        {
+          "name": "Uptime probe",
+          "decision": "non_identity",
+          "include": [
+            {
+              "service_token": {
+                "token_id": "${ACCESS_PROBE_TOKEN_ID}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Owner",
+          "decision": "allow",
+          "include": [
+            {
+              "email": {
+                "email": "${ACCESS_OWNER_EMAIL}"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Joutiya back-office staging",
+      "domain": "admin-staging.joutiya.ma",
+      "type": "self_hosted",
+      "session_duration": "8h",
+      "policies": [
+        {
+          "name": "Owner",
+          "decision": "allow",
+          "include": [
+            {
+              "email": {
+                "email": "${ACCESS_OWNER_EMAIL}"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

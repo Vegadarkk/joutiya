@@ -1,0 +1,16 @@
+# Installed by infra/vm/install.sh. Containers never reach the instance metadata service
+# (link-local 169.254.0.0/16), which serves the cloud-init user data. DOCKER-USER is the chain
+# Docker leaves to the administrator; the rule is re-added whenever Docker restarts.
+[Unit]
+Description=Joutiya: block containers from the instance metadata service
+After=docker.service
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'iptables -C DOCKER-USER -d 169.254.0.0/16 -j DROP 2>/dev/null || iptables -I DOCKER-USER -d 169.254.0.0/16 -j DROP'
+
+[Install]
+WantedBy=docker.service

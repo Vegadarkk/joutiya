@@ -52,6 +52,8 @@ google-ads.yaml
 *apikey*.txt
 *api-key*.json
 *API*.txt
+# Filled copies of templates (infra/vm/bootstrap.sh with its tunnel token)
+*.local.sh
 
 # -----------------------------------------------------------------------------
 # Dependencies

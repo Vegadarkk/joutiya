@@ -3,7 +3,8 @@
     "cloudflare": {
       "accountId": null,
       "zoneId": null,
-      "accessTeamDomain": null
+      "accessTeamDomain": null,
+      "sshTunnelId": null
     },
     "oracle": {
       "homeRegion": null

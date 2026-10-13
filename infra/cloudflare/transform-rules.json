@@ -1,0 +1,20 @@
+{
+  "phase": "http_request_late_transform",
+  "description": "Request header Transform Rules. X-Verified-Bot is overwritten on every request (first rule), so a client cannot forge it; the app exempts verified bots from its page limits (§6). Runs after the WAF and rate limiting: origin only.",
+  "rules": [
+    {
+      "ref": "verified_bot_reset",
+      "description": "X-Verified-Bot: 0 on every request",
+      "expression": "true",
+      "action": "rewrite",
+      "action_parameters": { "headers": { "X-Verified-Bot": { "operation": "set", "value": "0" } } }
+    },
+    {
+      "ref": "verified_bot_set",
+      "description": "X-Verified-Bot: 1 for Cloudflare verified bots",
+      "expression": "cf.client.bot",
+      "action": "rewrite",
+      "action_parameters": { "headers": { "X-Verified-Bot": { "operation": "set", "value": "1" } } }
+    }
+  ]
+}

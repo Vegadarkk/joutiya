@@ -1,0 +1,32 @@
+{
+  "phase": "http_request_firewall_custom",
+  "description": "WAF custom rules (Free: 5). The Cloudflare Free Managed Ruleset is on by default. Bot Fight Mode stays off: no rule can skip it and it would block webhooks and the uptime probe (§2).",
+  "rules": [
+    {
+      "ref": "webhooks_skip",
+      "description": "Webhooks (signed by RevenueCat, Stripe, Meta): no edge rate limit, Browser Integrity Check or Security Level",
+      "expression": "starts_with(http.request.uri.path, \"/api/webhooks/\")",
+      "action": "skip",
+      "action_parameters": { "phases": ["http_ratelimit"], "products": ["bic", "securityLevel"] },
+      "logging": { "enabled": true }
+    },
+    {
+      "ref": "sitemaps_verified_bots",
+      "description": "Sitemaps are served to verified bots only (§6)",
+      "expression": "starts_with(http.request.uri.path, \"/sitemap\") and not cf.client.bot",
+      "action": "block"
+    },
+    {
+      "ref": "scanner_paths",
+      "description": "Paths that only vulnerability scanners request (no PHP, no dotfiles except /.well-known/)",
+      "expression": "ends_with(http.request.uri.path, \".php\") or starts_with(http.request.uri.path, \"/wp-\") or (starts_with(http.request.uri.path, \"/.\") and not starts_with(http.request.uri.path, \"/.well-known/\")) or http.request.uri.path contains \"/cgi-bin/\"",
+      "action": "block"
+    },
+    {
+      "ref": "methods",
+      "description": "HTTP methods the application never serves",
+      "expression": "not http.request.method in {\"GET\" \"HEAD\" \"POST\" \"PUT\" \"PATCH\" \"DELETE\" \"OPTIONS\"}",
+      "action": "block"
+    }
+  ]
+}

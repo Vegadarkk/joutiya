@@ -1,0 +1,105 @@
+name: Deploy staging
+
+# Every push on main that passed CI: arm64 image built on GitHub, sent to the VM over SSH through
+# Cloudflare Access (no registry), loaded and started by the forced command of deploy-staging
+# (infra/vm/deploy-forced-command.sh). Production is promoted from the owner's machine
+# (scripts/deploy-prod.ts): no production key is stored here.
+#
+# Inert until the owner sets the repository variable STAGING_DEPLOY_ENABLED=true (docs/phase-1.md)
+# and these values:
+#   secrets STAGING_DEPLOY_SSH_KEY           private key of deploy-staging (ed25519)
+#           STAGING_ACCESS_CLIENT_ID         Access service token "joutiya-ci" (ssh.joutiya.ma)
+#           STAGING_ACCESS_CLIENT_SECRET
+#   vars    VM_SSH_KNOWN_HOSTS               "ssh.joutiya.ma ssh-ed25519 AAAA..." (host key of the VM)
+#           FIREBASE_STAGING_WIF_PROVIDER    projects/<number>/locations/global/workloadIdentityPools/github/providers/joutiya
+#           FIREBASE_STAGING_DEPLOYER        joutiya-deployer@<staging project>.iam.gserviceaccount.com
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+env:
+  # Same digest as docker/compose.yml: the CI's SSH proxy is the image the VM runs.
+  CLOUDFLARED_IMAGE: cloudflare/cloudflared:2026.9.1@sha256:b269e8abd07a5bf6f3f4be65d5050b2174eca89c56a0241a8ff32a16aec454e4
+
+jobs:
+  deploy:
+    name: Build and deploy to staging
+    # A push on main whose CI succeeded, or a manual run on main.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      # Workload Identity Federation for the staging Firestore rules (no JSON key).
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Release
+        id: release
+        run: echo "id=$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Build web and worker (linux/arm64)
+        env:
+          RELEASE: ${{ steps.release.outputs.id }}
+        run: |
+          for target in web worker; do
+            docker build -f docker/Dockerfile --target "$target" --build-arg RELEASE="$RELEASE" -t "joutiya-$target:$RELEASE" .
+          done
+          {
+            echo "### Release $RELEASE"
+            echo '| Image | ID |'
+            echo '|---|---|'
+            for target in web worker; do echo "| joutiya-$target | \`$(docker image inspect --format '{{.Id}}' "joutiya-$target:$RELEASE")\` |"; done
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Send to the VM
+        if: vars.STAGING_DEPLOY_ENABLED == 'true'
+        env:
+          RELEASE: ${{ steps.release.outputs.id }}
+          DEPLOY_KEY: ${{ secrets.STAGING_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.VM_SSH_KNOWN_HOSTS }}
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.STAGING_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.STAGING_ACCESS_CLIENT_SECRET }}
+        run: |
+          install -d -m 0700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_staging
+          chmod 0600 ~/.ssh/deploy_staging
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          docker pull --quiet "$CLOUDFLARED_IMAGE"
+          docker save "joutiya-web:$RELEASE" "joutiya-worker:$RELEASE" | zstd -T0 -10 -q \
+            | ssh -i ~/.ssh/deploy_staging -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
+                -o ProxyCommand="docker run --rm -i -e TUNNEL_SERVICE_TOKEN_ID -e TUNNEL_SERVICE_TOKEN_SECRET $CLOUDFLARED_IMAGE access ssh --hostname %h" \
+                deploy-staging@ssh.joutiya.ma "load $RELEASE"
+      - name: Firestore rules and indexes (staging)
+        if: vars.STAGING_DEPLOY_ENABLED == 'true' && vars.FIREBASE_STAGING_WIF_PROVIDER != ''
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.FIREBASE_STAGING_WIF_PROVIDER }}
+          service_account: ${{ vars.FIREBASE_STAGING_DEPLOYER }}
+      - name: Deploy Firestore rules
+        if: vars.STAGING_DEPLOY_ENABLED == 'true' && vars.FIREBASE_STAGING_WIF_PROVIDER != ''
+        run: |
+          project="$(node -e "const t=require('./infra/targets.json');process.stdout.write(t.environments.staging.firebase.projectId??'')")"
+          test -n "$project" || { echo "environments.staging.firebase.projectId is not recorded"; exit 1; }
+          npx --yes firebase-tools@15.33.0 deploy --only firestore:rules,firestore:indexes --project "$project" --non-interactive
+      - name: Clean up
+        if: always()
+        run: rm -f ~/.ssh/deploy_staging

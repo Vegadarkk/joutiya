@@ -24,6 +24,8 @@ const SHARED_SHAPE = {
     accountId: HEX32,
     zoneId: HEX32,
     accessTeamDomain: /^[a-z0-9][a-z0-9-]*\.cloudflareaccess\.com$/,
+    // Tunnel of the host's cloudflared (SSH only), independent of Docker.
+    sshTunnelId: UUID,
   },
   oracle: { homeRegion: /^eu-(paris|marseille)-1$/ },
   anthropic: { organizationId: UUID },

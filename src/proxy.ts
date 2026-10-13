@@ -14,8 +14,9 @@ const handleI18nRouting = createMiddleware(routing);
 /** API paths served on the admin host; every other /api path answers 404 there. */
 const ADMIN_HOST_API = /^\/api\/(admin(\/|$)|health$|csp-report$)/;
 
+/** Host without port or trailing dot ("admin.localhost:3100" in e2e, "admin.joutiya.ma" deployed). */
 function normalizeHost(value: string | null | undefined): string {
-  return (value ?? "").trim().toLowerCase().replace(/\.$/, "");
+  return (value ?? "").trim().toLowerCase().replace(/:\d+$/, "").replace(/\.$/, "");
 }
 
 function notFound(): NextResponse {

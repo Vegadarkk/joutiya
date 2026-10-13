@@ -30,6 +30,8 @@ describe("proxy", () => {
 
   it("serves only its own APIs on the admin host", () => {
     expect(proxy(request("/api/health", "admin.joutiya.ma")).status).toBe(200);
+    expect(proxy(request("/api/health", "admin.joutiya.ma:443")).status).toBe(200);
+    expect(proxy(request("/api/listings", "ADMIN.joutiya.ma.")).status).toBe(404);
     expect(proxy(request("/api/listings", "admin.joutiya.ma")).status).toBe(404);
   });
 
