@@ -1,0 +1,13 @@
+{
+  "displayName": "joutiya-vcn-security-list",
+  "ingressSecurityRules": [],
+  "egressSecurityRules": [
+    {
+      "description": "Outbound only: Cloudflare Tunnel, Firestore, Telegram, package updates",
+      "destination": "0.0.0.0/0",
+      "destinationType": "CIDR_BLOCK",
+      "protocol": "all",
+      "isStateless": false
+    }
+  ]
+}

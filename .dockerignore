@@ -1,0 +1,21 @@
+# Build context: sources only. Never secrets, never local builds.
+.git
+.github
+.next
+dist
+node_modules
+coverage
+playwright-report
+test-results
+tests
+docs
+workers
+.claude
+.env
+.env.*
+!.env.example
+*.log
+*.pem
+*.key
+**/*credentials*.json
+**/service-account*.json

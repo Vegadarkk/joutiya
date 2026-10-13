@@ -123,6 +123,9 @@ export function proxy(request: NextRequest): NextResponse {
   // Fallback policy; the server hook swaps 'unsafe-inline' for the hashes of this HTML.
   const response = decorate(routed, "public", csp("public"));
   response.headers.set(INLINE_HASH_MARKER, "1");
+  // Shared pages carry no cookie, so Cloudflare can cache them. The locale cookie is written by
+  // the locale switcher (next-intl Link) and still read here for the "/" redirect.
+  response.headers.delete("set-cookie");
   return response;
 }
 

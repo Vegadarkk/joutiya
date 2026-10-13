@@ -1,6 +1,7 @@
 // BullMQ worker (§4) on valkey-queue. Receives no connection. Phase 1 jobs: heartbeat and the
 // nightly quota report; later phases register their jobs in ./jobs.
 
+import { writeFile } from "node:fs/promises";
 import { Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import { serverEnv } from "@/lib/env";
@@ -9,6 +10,9 @@ import { logger } from "@/lib/logging/logger";
 import { runStartupChecks } from "@/lib/startup/checks";
 import { clientOptions } from "@/lib/valkey/clients";
 import { JOBS, SYSTEM_QUEUE, SCHEDULES } from "./jobs";
+
+/** Touched after each successful heartbeat; the container healthcheck reads its age. */
+const HEARTBEAT_FILE = "/tmp/joutiya-worker-heartbeat";
 
 async function main(): Promise<void> {
   await runStartupChecks("worker");
@@ -39,6 +43,7 @@ async function main(): Promise<void> {
   const beat = async () => {
     try {
       await connection.set(WORKER_HEARTBEAT_KEY, new Date().toISOString(), "EX", WORKER_HEARTBEAT_TTL);
+      await writeFile(HEARTBEAT_FILE, "").catch(() => undefined);
     } catch (error) {
       logger.warn({ err: (error as Error).message }, "heartbeat failed");
     }

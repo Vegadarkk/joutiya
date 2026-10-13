@@ -358,4 +358,7 @@ function main(): void {
 }
 
 // realpath: Node resolves symlinks in import.meta.url, so a symlinked checkout still runs main().
-if (process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+// The file name check keeps main() out of bundles that import this module (dist/worker/index.mjs
+// shares import.meta.url with its entry point).
+const self = fileURLToPath(import.meta.url);
+if (/[\\/]assert-target\.(?:ts|mjs)$/.test(self) && process.argv[1] !== undefined && realpathSync(process.argv[1]) === self) main();

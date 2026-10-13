@@ -1,0 +1,26 @@
+# Staging: separate project, network, volumes, secrets and Tunnel; reduced limits.
+services:
+  web:
+    environment:
+      NODE_OPTIONS: --max-old-space-size=576
+    deploy:
+      resources:
+        limits: { cpus: "0.75", memory: 768M }
+  worker:
+    environment:
+      NODE_OPTIONS: --max-old-space-size=288
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 384M }
+  valkey-queue:
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 256M }
+  valkey-ratelimit:
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 96M }
+  cloudflared:
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 128M }

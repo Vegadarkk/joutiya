@@ -1,0 +1,26 @@
+# Production limits on the Oracle A1 VM (2 OCPU, 12 GB, arm64), staging running beside it.
+services:
+  web:
+    environment:
+      NODE_OPTIONS: --max-old-space-size=1152
+    deploy:
+      resources:
+        limits: { cpus: "1.5", memory: 1536M }
+  worker:
+    environment:
+      NODE_OPTIONS: --max-old-space-size=576
+    deploy:
+      resources:
+        limits: { cpus: "0.75", memory: 768M }
+  valkey-queue:
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 320M }
+  valkey-ratelimit:
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 128M }
+  cloudflared:
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 192M }

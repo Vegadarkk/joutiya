@@ -44,6 +44,7 @@ describe("proxy", () => {
     expect(response.headers.get(INLINE_HASH_MARKER)).toBe("1");
     expect(response.headers.get("content-security-policy")).toContain("script-src 'self' 'unsafe-inline'");
     expect(response.headers.get("x-robots-tag")).toBeNull();
+    expect(response.headers.get("set-cookie")).toBeNull();
   });
 
   it("gives private pages a fresh nonce", () => {
