@@ -1,0 +1,72 @@
+{
+  "shared": {
+    "cloudflare": {
+      "accountId": null,
+      "zoneId": null,
+      "accessTeamDomain": null
+    },
+    "oracle": {
+      "homeRegion": null
+    },
+    "anthropic": {
+      "organizationId": null
+    },
+    "stripe": {
+      "accountId": null
+    },
+    "revenuecat": {
+      "projectId": null
+    },
+    "meta": {
+      "businessId": null,
+      "appId": null
+    }
+  },
+  "environments": {
+    "dev": {
+      "firebase": {
+        "projectId": null,
+        "firestoreLocation": null
+      },
+      "r2": {
+        "quarantine": null,
+        "media": null,
+        "private": null
+      },
+      "whatsapp": {
+        "wabaId": null,
+        "phoneNumberId": null
+      }
+    },
+    "staging": {
+      "firebase": {
+        "projectId": null,
+        "firestoreLocation": null
+      },
+      "r2": {
+        "quarantine": null,
+        "media": null,
+        "private": null
+      },
+      "whatsapp": {
+        "wabaId": null,
+        "phoneNumberId": null
+      }
+    },
+    "prod": {
+      "firebase": {
+        "projectId": null,
+        "firestoreLocation": null
+      },
+      "r2": {
+        "quarantine": null,
+        "media": null,
+        "private": null
+      },
+      "whatsapp": {
+        "wabaId": null,
+        "phoneNumberId": null
+      }
+    }
+  }
+}
