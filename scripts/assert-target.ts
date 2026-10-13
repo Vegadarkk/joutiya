@@ -241,20 +241,30 @@ function parseJson(text: string): Record<string, unknown> | null {
 }
 
 /** Cloudflare tunnel tokens are base64 JSON: { a: account tag, t: tunnel id, s: secret }. */
-function tunnelTokenErrors(token: string, targets: Targets, appEnv: AppEnv): string[] {
+function tunnelTokenErrors(variable: string, token: string, targets: Targets, target: string, tunnel: Id): string[] {
   const decoded = parseJson(Buffer.from(token, "base64").toString("utf8"));
   if (!decoded || typeof decoded.a !== "string" || typeof decoded.t !== "string") {
-    return ["CLOUDFLARE_TUNNEL_TOKEN is not a Cloudflare tunnel token"];
+    return [`${variable} is not a Cloudflare tunnel token`];
   }
   const errors: string[] = [];
   const account = targets.shared.cloudflare.accountId;
-  if (account === null) errors.push("CLOUDFLARE_TUNNEL_TOKEN is set but shared.cloudflare.accountId is not recorded in infra/targets.json");
-  else if (decoded.a !== account) errors.push(`CLOUDFLARE_TUNNEL_TOKEN belongs to another account than shared.cloudflare.accountId (${account})`);
-  const tunnel = targets.environments[appEnv].cloudflare.tunnelId;
-  if (tunnel === null) errors.push(`CLOUDFLARE_TUNNEL_TOKEN is set but environments.${appEnv}.cloudflare.tunnelId is not recorded in infra/targets.json`);
-  else if (decoded.t !== tunnel) errors.push(`CLOUDFLARE_TUNNEL_TOKEN is for another tunnel than environments.${appEnv}.cloudflare.tunnelId (${tunnel})`);
+  if (account === null) errors.push(`${variable} is set but shared.cloudflare.accountId is not recorded in infra/targets.json`);
+  else if (decoded.a !== account) errors.push(`${variable} belongs to another account than shared.cloudflare.accountId (${account})`);
+  if (tunnel === null) errors.push(`${variable} is set but ${target} is not recorded in infra/targets.json`);
+  else if (decoded.t !== tunnel) errors.push(`${variable} is for another tunnel than ${target} (${tunnel})`);
   return errors;
 }
+
+// Tunnel tokens kept in the owner's .env.local (docs/phase-1.md step 2), checked whatever APP_ENV.
+const OWNER_TUNNEL_TOKENS: readonly { variable: string; target: string; tunnel: (targets: Targets) => Id }[] = [
+  { variable: "JOUTIYA_SSH_TUNNEL_TOKEN", target: "shared.cloudflare.sshTunnelId", tunnel: (t) => t.shared.cloudflare.sshTunnelId },
+  { variable: "JOUTIYA_PROD_TUNNEL_TOKEN", target: "environments.prod.cloudflare.tunnelId", tunnel: (t) => t.environments.prod.cloudflare.tunnelId },
+  {
+    variable: "JOUTIYA_STAGING_TUNNEL_TOKEN",
+    target: "environments.staging.cloudflare.tunnelId",
+    tunnel: (t) => t.environments.staging.cloudflare.tunnelId,
+  },
+];
 
 /**
  * Google project behind a credential file: the impersonated service account of a Workload
@@ -295,16 +305,19 @@ export function assertTargets(targets: Targets, env: Env, options: AssertOptions
   const configured = BINDINGS.filter((binding) => value(binding.variable) !== "");
   const stripeKey = value("STRIPE_SECRET_KEY");
   const appEnv = value("APP_ENV");
+  const ownerTunnels = OWNER_TUNNEL_TOKENS.filter(({ variable }) => value(variable) !== "").flatMap(({ variable, target, tunnel }) =>
+    tunnelTokenErrors(variable, value(variable), targets, target, tunnel(targets)),
+  );
 
   if (appEnv === "") {
-    if (options.strict) return STRICT_REQUIRED.filter((name) => value(name) === "").map((name) => `${name} is required in strict mode`);
+    if (options.strict) return [...STRICT_REQUIRED.filter((name) => value(name) === "").map((name) => `${name} is required in strict mode`), ...ownerTunnels];
     const names = configured.map((binding) => binding.variable);
     if (stripeKey !== "") names.push("STRIPE_SECRET_KEY");
-    return names.length === 0 ? [] : [`APP_ENV is required when ${names.join(", ")} is set`];
+    return names.length === 0 ? ownerTunnels : [`APP_ENV is required when ${names.join(", ")} is set`, ...ownerTunnels];
   }
   if (!isAppEnv(appEnv)) return [`APP_ENV must be one of ${APP_ENVS.join(", ")}`];
 
-  const errors: string[] = [];
+  const errors: string[] = [...ownerTunnels];
   if (options.strict) {
     for (const name of STRICT_REQUIRED) if (value(name) === "") errors.push(`${name} is required in strict mode`);
   }
@@ -320,7 +333,10 @@ export function assertTargets(targets: Targets, env: Env, options: AssertOptions
   }
   if (stripeKey !== "") errors.push(...checkStripeMode(appEnv, stripeKey));
   const tunnelToken = value("CLOUDFLARE_TUNNEL_TOKEN");
-  if (tunnelToken !== "") errors.push(...tunnelTokenErrors(tunnelToken, targets, appEnv));
+  if (tunnelToken !== "") {
+    const target = `environments.${appEnv}.cloudflare.tunnelId`;
+    errors.push(...tunnelTokenErrors("CLOUDFLARE_TUNNEL_TOKEN", tunnelToken, targets, target, targets.environments[appEnv].cloudflare.tunnelId));
+  }
   const expectedProject = targets.environments[appEnv].firebase.projectId;
   const credentials = value("GOOGLE_APPLICATION_CREDENTIALS");
   if (credentials !== "") errors.push(...projectFileErrors("GOOGLE_APPLICATION_CREDENTIALS", credentials, expectedProject, appEnv, options));

@@ -44,7 +44,7 @@ install_keys deploy-prod "$KEYS/deploy-prod.pub"
 install -d -m 0711 -o root -g root /etc/joutiya
 for env in prod staging; do
   install -d -m 0700 -o root -g root "/etc/joutiya/$env"
-  install -d -m 0750 -o root -g "joutiya-$env" "/etc/joutiya/$env/gcp"
+  install -d -m 0750 -o root -g "joutiya-$env" "/etc/joutiya/$env/gcp" "/etc/joutiya/$env/gcp/web" "/etc/joutiya/$env/gcp/worker"
   find "/etc/joutiya/$env/gcp" -type f -exec chown root:"joutiya-$env" {} + -exec chmod 0640 {} +
   find "/etc/joutiya/$env" -maxdepth 1 -type f -name '*.env' -exec chown root:root {} + -exec chmod 0600 {} +
 done

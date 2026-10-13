@@ -53,7 +53,7 @@ jobs:
       - name: Compose projects
         run: |
           for env in staging prod; do
-            sudo mkdir -p /etc/joutiya/$env/gcp
+            sudo mkdir -p /etc/joutiya/$env/gcp/web /etc/joutiya/$env/gcp/worker
             for file in app valkey-queue valkey-ratelimit tunnel; do sudo touch /etc/joutiya/$env/$file.env; done
             APP_ENV=$env RELEASE=0123456789ab docker compose -f docker/compose.yml -f docker/compose.$env.yml config --quiet
           done

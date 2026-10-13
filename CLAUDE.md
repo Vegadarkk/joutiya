@@ -95,11 +95,19 @@ subscriptions, Google Ads slots, moderation).
 
 ## Commands
 
-Node 24, no install needed yet.
+Node 24; `npm ci --ignore-scripts` once.
+- `npm run check`: lint, typecheck, unit tests. `npm run test:rules`: Firestore rules in the
+  emulator (Java 21). `npm run build`, then `npm run test:e2e` (Playwright; in the cloud set
+  `PLAYWRIGHT_CHROMIUM_PATH`). `shellcheck infra/vm/*.sh` for the VM scripts.
 - `node scripts/assert-target.ts`: validate `infra/targets.json` (exact third-party
-  identifiers). With `APP_ENV` set it also checks the configured identifiers, e.g.
+  identifiers). With `APP_ENV` set it also checks the configured identifiers, and it always
+  checks the owner's `JOUTIYA_*_TUNNEL_TOKEN`, e.g.
   `node --env-file=.env.local scripts/assert-target.ts`; never print env file values.
-- `node --test scripts/assert-target.test.ts`: guard unit tests (run in CI).
+  Unit tests: `node --test scripts/assert-target.test.ts` (run in CI).
+- Owner-machine scripts, dry run unless `--apply`: `scripts/cloudflare.ts` (edge config),
+  `scripts/legal-config.ts` (Firestore `config/legal`); `scripts/deploy-prod.ts` promotes,
+  rolls back and syncs the VM files. Steps in `docs/phase-1.md`, rebuild in `infra/redeploy.md`.
+- Image: `docker build -f docker/Dockerfile --target web` (or `worker`); Compose in `docker/`.
 
 # Compact instructions
 

@@ -1,5 +1,5 @@
 # Staging: separate project, network, volumes, secrets and Tunnel; reduced limits.
-# Group joutiya-staging (gid 2002, infra/vm/bootstrap.sh): the only group that reads /etc/joutiya/staging/gcp.
+# Group joutiya-staging (gid 2002, infra/vm/install.sh): the only group that reads /etc/joutiya/staging/gcp.
 services:
   web:
     user: "1000:2002"

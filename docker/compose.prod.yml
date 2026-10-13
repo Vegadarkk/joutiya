@@ -1,5 +1,5 @@
 # Production limits on the Oracle A1 VM (2 OCPU, 12 GB, arm64), staging running beside it.
-# Group joutiya-prod (gid 2001, infra/vm/bootstrap.sh): the only group that reads /etc/joutiya/prod/gcp.
+# Group joutiya-prod (gid 2001, infra/vm/install.sh): the only group that reads /etc/joutiya/prod/gcp.
 services:
   web:
     user: "1000:2001"

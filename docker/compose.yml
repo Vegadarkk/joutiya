@@ -35,10 +35,12 @@ services:
     environment:
       APP_ENV: ${APP_ENV}
       RELEASE: ${RELEASE}
-    volumes: &google-credentials
-      # Workload Identity Federation (X.509, §9): credential config, certificate config, certificate
-      # and key. Same path as on the host, so the paths gcloud wrote into the files stay valid.
-      - /etc/joutiya/${APP_ENV}/gcp:/etc/joutiya/${APP_ENV}/gcp:ro
+      GOOGLE_APPLICATION_CREDENTIALS: /etc/joutiya/${APP_ENV}/gcp/web/credentials.json
+    volumes:
+      # Workload Identity Federation (X.509, §9) of the joutiya-web service account: credential
+      # config, certificate config, certificate and key. Same path as on the host, so the paths
+      # gcloud wrote into the files stay valid. The worker mounts its own directory only.
+      - /etc/joutiya/${APP_ENV}/gcp/web:/etc/joutiya/${APP_ENV}/gcp/web:ro
     tmpfs: [/tmp]
     networks: [edge, data, egress]
     depends_on:
@@ -61,7 +63,9 @@ services:
     environment:
       APP_ENV: ${APP_ENV}
       RELEASE: ${RELEASE}
-    volumes: *google-credentials
+      GOOGLE_APPLICATION_CREDENTIALS: /etc/joutiya/${APP_ENV}/gcp/worker/credentials.json
+    volumes:
+      - /etc/joutiya/${APP_ENV}/gcp/worker:/etc/joutiya/${APP_ENV}/gcp/worker:ro
     read_only: true
     tmpfs: [/tmp]
     networks: [data, egress]

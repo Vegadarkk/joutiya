@@ -261,4 +261,18 @@ describe("strict mode", () => {
       "CLOUDFLARE_TUNNEL_TOKEN is not a Cloudflare tunnel token",
     ]);
   });
+
+  it("checks the owner's tunnel tokens whatever APP_ENV", () => {
+    const owner = {
+      JOUTIYA_PROD_TUNNEL_TOKEN: tunnelToken(ACCOUNT, TUNNELS.prod),
+      JOUTIYA_STAGING_TUNNEL_TOKEN: tunnelToken(ACCOUNT, TUNNELS.prod),
+      JOUTIYA_SSH_TUNNEL_TOKEN: tunnelToken(ACCOUNT, TUNNELS.dev),
+    };
+    const expected = [
+      `JOUTIYA_SSH_TUNNEL_TOKEN is set but shared.cloudflare.sshTunnelId is not recorded in infra/targets.json`,
+      `JOUTIYA_STAGING_TUNNEL_TOKEN is for another tunnel than environments.staging.cloudflare.tunnelId (${TUNNELS.staging})`,
+    ];
+    assert.deepEqual(assertTargets(recorded(), owner), expected);
+    assert.deepEqual(assertTargets(recorded(), { ...deployed, ...owner }, { readFile }), expected);
+  });
 });
