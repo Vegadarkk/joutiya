@@ -18,15 +18,16 @@ Ce qui reste à faire de votre côté pour clore la phase 0 (architecture v3, §
 
 ## 0. D'abord : le domaine `joutiya.ma` est-il validé ?
 
-Un .MA n'est actif qu'après vérification d'une pièce d'identité par le registre (2 à 4 semaines). Sans pièce envoyée dans les 14 jours suivant l'achat, le domaine est suspendu, puis peut être libéré ([aide Hostinger](https://www.hostinger.com/support/requirements-to-register-a-ma-domain/)).
-1. hPanel → **Domaines** → `joutiya.ma` : vérifiez qu'il est actif, sans bandeau de vérification ni de suspension.
-2. Sinon, envoyez tout de suite la pièce demandée (passeport pour un titulaire étranger) et prévenez Claude : les étapes 1, 2 et 7 attendent la validation.
+Le registre .MA valide chaque domaine sur pièces, envoyées dans les 14 jours suivant l'achat : pour `joutiya.ma`, acheté le 5 octobre 2026, **avant le 19 octobre 2026**. L'examen prend 2 à 4 semaines. Sans pièces, le domaine est suspendu, puis peut être supprimé, sans remboursement ([aide Hostinger](https://www.hostinger.com/support/requirements-to-register-a-ma-domain/)). « Actif » dans hPanel ne prouve pas la validation.
+1. Envoyez au support Hostinger, par leur formulaire de vérification : votre passeport, une courte description de l'usage du site, et un contact administratif. Ce contact doit être une personne physique résidant au Maroc selon Hostinger, de nationalité marocaine selon d'autres registraires : faites-leur préciser.
+2. Le nom du titulaire dans hPanel doit être exactement celui de la pièce : le corriger plus tard impose un transfert payant.
+3. Demandez au support une confirmation écrite de la validation, puis prévenez Claude. Les étapes 1 et 2 peuvent avancer en attendant ; si hPanel refuse le changement de nameservers, prévenez Claude.
 
 ## 1. Cloudflare : la zone `joutiya.ma`
 
-Faites-la une fois le domaine actif : Cloudflare supprime une zone restée en attente 28 jours.
+Cloudflare supprime une zone restée en attente 28 jours : changez les nameservers (point 5) dans la foulée.
 1. Dans votre compte Cloudflare existant : **Add a domain** → `joutiya.ma` → offre **Free**.
-2. Cloudflare importe les enregistrements DNS actuels. Supprimez ceux de l'ancienne boîte Hostinger (MX, SPF Hostinger, DKIM, `autodiscover`, `autoconfig`) et ceux de la page d'attente Hostinger : la boîte n'existe plus et le site arrive en phase 1.
+2. Cloudflare importe les enregistrements DNS actuels. Supprimez ceux de la page d'attente Hostinger : le site arrive en phase 1. Gardez ceux du courrier (MX, SPF, DKIM, `autodiscover`, `autoconfig`) : l'étape 2 les règle.
 3. Notez les 2 nameservers donnés par Cloudflare.
 4. Si DNSSEC est actif sur le domaine chez Hostinger, désactivez-le d'abord, puis attendez 24 h.
 5. hPanel : **Domaines** → **Portefeuille de domaines** → **Gérer** (`joutiya.ma`) → **DNS / Nameservers** (ou « Serveurs de noms ») → **Changer les nameservers** → saisissez les 2 nameservers Cloudflare → Enregistrer. Gardez chez Hostinger le verrou de transfert et le renouvellement automatique.
@@ -34,16 +35,21 @@ Faites-la une fois le domaine actif : Cloudflare supprime une zone restée en at
 
 À noter : **Account ID** et **Zone ID** (page d'accueil de la zone, colonne de droite).
 
-## 2. Cloudflare : Email Routing (Z12)
+## 2. Courrier @joutiya.ma : la boîte Hostinger (Z12, choix du 13 octobre)
+
+Le courrier arrive dans les boîtes Hostinger de l'offre gratuite liée à votre hébergement : 1 Go par boîte, 100 e-mails reçus et 100 envoyés par jour, jusqu'au 24 janvier 2029. Cloudflare Email Routing n'est pas utilisé : un domaine n'a qu'une destination de courrier.
 
 Une fois la zone active :
-1. Zone `joutiya.ma` → **Email Routing** (menu *Email*, ou *Compute* → *Email Service* selon la version du tableau de bord) → **Get started**.
-2. Destination : votre Gmail ; cliquez le lien de vérification reçu.
-3. Créez `contact@`, `dsa@`, `abuse@` et `dpo@`, chacune vers votre Gmail.
-4. **Add records and enable** : Cloudflare ajoute ses MX, un SPF et une clé DKIM. Aucun autre MX ne doit rester, et un seul SPF.
+1. hPanel → **Emails** → `joutiya.ma` → **Paramètres du nom de domaine** : Hostinger affiche les enregistrements attendus. Dans Cloudflare (**DNS** → **Records**), vérifiez qu'ils y sont tous, en « DNS only » (nuage gris), puis relancez la vérification dans hPanel :
+   - MX `@` : `mx1.hostinger.com` (priorité 5) et `mx2.hostinger.com` (priorité 10), sans autre MX ;
+   - un seul SPF sur `@` : `v=spf1 include:_spf.mail.hostinger.com ~all` ;
+   - DKIM : 3 CNAME, `hostingermail-a._domainkey` vers `hostingermail-a.dkim.mail.hostinger.com`, puis de même avec `b` et `c` ;
+   - CNAME `autodiscover` vers `autodiscover.mail.hostinger.com` et `autoconfig` vers `autoconfig.mail.hostinger.com` ;
+   - le TXT de vérification affiché par hPanel.
+2. Ajoutez un DMARC : TXT `_dmarc`, valeur `v=DMARC1; p=none;`.
+3. Créez les boîtes `dsa@`, `abuse@` et `dpo@` : l'offre n'accepte qu'un alias par boîte, et les boîtes sont gratuites.
+4. **Agentic Mail** → **Accès API** : révoquez l'ancien jeton (celui du fichier « Cody Joutiya API.txt »), puis créez un jeton limité à ces 4 boîtes, avec la permission SMTP/IMAP. Rangez-le dans l'environnement cloud du projet sous `HOSTINGER_MAIL_API_TOKEN`, jamais dans le chat : Claude gère alors ces boîtes.
 5. Testez en écrivant à `contact@joutiya.ma` depuis une autre adresse.
-
-Répondre en tant que `contact@` : pas maintenant. Google supprime en janvier 2027 l'envoi depuis une adresse externe dans Gmail ; la méthode de remplacement sera fixée avant le lancement.
 
 ## 3. Cloudflare : R2 et Zero Trust
 
