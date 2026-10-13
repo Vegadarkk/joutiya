@@ -14,7 +14,7 @@ Ce qui reste à faire de votre côté pour clore la phase 0 (architecture v3, §
 - **Clés secrètes** : créez-les seulement à la phase qui s'en sert, puis rangez-les dans le fichier local `.env.local` sous le nom prévu par `.env.example`. Jamais dans le dépôt ni dans le chat.
 - Si vous avez un `.env` dans le dossier du dépôt, renommez-le en `.env.local` et alignez-le sur le nouveau `.env.example` : des noms ont changé (par exemple `CF_ACCOUNT_ID`). N'y gardez que des clés propres à Joutiya ; une clé qui ouvre tout un compte (Global API Key Cloudflare, clé d'un autre projet Google) n'a rien à y faire. Les jetons Hostinger attendent votre décision Z11.
 
-**Ordre conseillé.** L'étape 0 d'abord. Les étapes 1 à 6 bloquent la phase 1 : faites-les ensuite. Les étapes 7 à 11 servent aux phases 2 à 7. L'étape 12 clôt la phase 0.
+**Ordre conseillé.** L'étape 0 d'abord. Les étapes 1 à 6 bloquent la phase 1 : faites-les ensuite. L'étape 7 (Resend) sert dès les alertes de la phase 1 ; les étapes 8 à 11 servent aux phases 2 à 7. L'étape 12 clôt la phase 0.
 
 ## 0. D'abord : le domaine `joutiya.ma` est-il validé ?
 
@@ -75,6 +75,39 @@ Une fois la zone active :
 
 À noter : la région d'origine (`eu-paris-1` ou `eu-marseille-1`).
 
+**Accès limité pour Claude** (votre choix du 13 octobre)
+
+Claude reçoit un utilisateur à lui, sans accès à la console, qui n'agit que dans un compartiment `joutiya` plafonné au niveau gratuit. Il ne peut pas passer le compte en payant : c'est réservé aux administrateurs. Votre accès administrateur reste à vous seul, et Claude ne crée rien sans votre accord. Tout se fait depuis le menu ☰ de la console Oracle :
+1. **Identity & Security** → **Compartments** → **Create compartment** : nom `joutiya`, description « Joutiya », compartiment parent : la racine (votre tenancy) → créez. Notez son OCID.
+2. **Identity & Security** → **Domains** → `Default` → **User management** :
+   - **Groups** → **Create group** : nom `joutiya-automation`, sans cocher « User can request access » → créez.
+   - **Users** → **Create** : prénom `Joutiya`, nom `Claude`, décochez « Use the email address as the username », identifiant `joutiya-claude`, e-mail `votre.adresse+joutiya@gmail.com`, cochez le groupe `joutiya-automation` → créez. Ignorez l'e-mail d'activation s'il arrive.
+   - Ouvrez `joutiya-claude` → **Edit user capabilities** : ne laissez cochée que **API keys** (décochez notamment *Local password*, ce qui ferme la console à cet utilisateur) → **Save changes**.
+3. **Identity & Security** → **Policies** → *List scope* : la racine → **Create Policy** : nom `joutiya-automation-policy`, compartiment : la racine → **Show manual editor** → collez ces 4 lignes, puis validez :
+   ```text
+   Allow group Default/joutiya-automation to manage instance-family in compartment joutiya
+   Allow group Default/joutiya-automation to manage virtual-network-family in compartment joutiya
+   Allow group Default/joutiya-automation to manage volume-family in compartment joutiya
+   Allow group Default/joutiya-automation to inspect compartments in tenancy
+   ```
+   La dernière ligne ne donne que les noms des compartiments, utiles pour lister les zones de disponibilité. Placée à la racine, cette règle n'est modifiable que par vous.
+4. **Governance & Administration** → **Quota policies** → **Create quota** : nom `joutiya-free-tier`, compartiment : la racine, puis collez ces lignes dans cet ordre (les lignes `zero` d'abord) et créez :
+   ```text
+   zero compute-core quotas in compartment joutiya
+   set compute-core quota standard-a1-core-count to 2 in compartment joutiya
+   zero compute-memory quotas in compartment joutiya
+   set compute-memory quota standard-a1-memory-count to 12 in compartment joutiya
+   set block-storage quota total-storage-gb to 200 in compartment joutiya
+   set block-storage quota backup-count to 0 in compartment joutiya
+   set vcn quota reserved-public-ip-count to 0 in compartment joutiya
+   ```
+   Dans `joutiya`, il ne peut alors exister qu'une VM Ampere de 2 OCPU et 12 Go au plus, avec 200 Go de disque : le niveau gratuit. Comptez 10 minutes avant l'effet.
+5. **Domains** → `Default` → **Users** → `joutiya-claude` → **API keys** → **Add API key** → **Generate API key pair** → **Download private key** → **Add**. La fenêtre *Configuration file preview* affiche `user`, `fingerprint`, `tenancy` et `region` : notez-les, ce ne sont pas des secrets.
+6. Rangez dans l'environnement cloud du projet, comme `HOSTINGER_MAIL_API_TOKEN` et jamais dans le chat :
+   - `JOUTIYA_OCI_USER`, `JOUTIYA_OCI_TENANCY`, `JOUTIYA_OCI_FINGERPRINT`, `JOUTIYA_OCI_REGION` (`eu-paris-1`) et `JOUTIYA_OCI_COMPARTMENT` (l'OCID du point 1) ;
+   - `JOUTIYA_OCI_KEY_B64` : la clé privée téléchargée, encodée sur une ligne ; Cody la met dans votre presse-papiers sans l'afficher (prompt O). Collez-la, puis supprimez le fichier `.pem` : en cas de perte, vous en générerez une autre.
+7. Prévenez Claude dans le projet : une nouvelle session vérifie l'accès par une simple lecture.
+
 ## 5. Firebase : 3 projets Spark (Z2)
 
 Cody peut faire les points 1 à 3 (prompt B), une fois que vous avez lancé vous-même `npx firebase-tools login` dans un terminal : cette connexion demande un terminal interactif.
@@ -101,7 +134,7 @@ Un identifiant de projet est définitif et jamais réutilisable, même après su
 2. **Domains** → **Add domain** → `notif.joutiya.ma`, région **eu-west-1 (Irlande)**. **Irréversible** : changer de région impose de recréer le domaine.
 3. Ajoutez dans Cloudflare les enregistrements affichés, en « DNS only » (nuage gris), puis **Verify**.
 4. Ajoutez un enregistrement DMARC pour ce sous-domaine : type TXT, nom `_dmarc.notif`, valeur `v=DMARC1; p=none;`. Un seul : si Resend ou Brevo en propose un autre, gardez un unique enregistrement `_dmarc.notif`.
-5. Pas de clé API avant la phase 2.
+5. Pas de clé API maintenant : elles arrivent avec les alertes de la phase 1, puis en phase 2.
 
 **Brevo** (secours, pour les seuls e-mails de sécurité)
 1. brevo.com → inscription, offre Free, sans carte.
@@ -166,6 +199,12 @@ Crée les 3 projets Firebase de Joutiya avec firebase-tools. Je me suis connect�
 
 ```text
 J'ai mis TELEGRAM_BOT_TOKEN dans .env.local et envoyé /start à mon bot. Appelle la méthode getUpdates de l'API Telegram en lisant le jeton depuis .env.local (par exemple avec `node --env-file=.env.local`), sans jamais afficher le jeton, et donne-moi seulement le chat id. Envoie ensuite le message « Joutiya : alertes OK » à ce chat avec sendMessage.
+```
+
+**O. Clé Oracle de Claude** (étape 4, accès limité, point 6)
+
+```text
+La clé privée de l'utilisateur Oracle joutiya-claude est dans <chemin du fichier .pem téléchargé>. Encode-la en base64 sur une seule ligne, sans retour à la ligne, et copie le résultat dans mon presse-papiers avec l'outil de mon système. Ne l'affiche jamais et ne l'écris dans aucun fichier ni dans le dépôt. Vérifie seulement que le contenu copié, une fois décodé, commence par « -----BEGIN », et dis-moi si c'est le cas. Ne fais rien d'autre.
 ```
 
 **D. Consigner les identifiants** (étape 12)
