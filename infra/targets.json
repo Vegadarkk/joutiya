@@ -8,8 +8,9 @@
     },
     "oracle": {
       "homeRegion": "eu-paris-1",
-      "tenancyId": null,
-      "compartmentId": "ocid1.compartment.oc1..aaaaaaaag4vrrhtajdpxdtzd4mfv4g5nceyoth4nsvs42ehebb65g2yo4iua"
+      "tenancyId": "ocid1.tenancy.oc1..aaaaaaaa2vsndafj3yo4p7ndkzbuexxlx7y3v4ji7rcznprjoqeaxknn543q",
+      "compartmentId": "ocid1.compartment.oc1..aaaaaaaag4vrrhtajdpxdtzd4mfv4g5nceyoth4nsvs42ehebb65g2yo4iua",
+      "userId": "ocid1.user.oc1..aaaaaaaapcgofwhegeb4jkc3xzmd6kqsug5zlhunsgxyuwlqbnk7udeqgiiq"
     },
     "anthropic": {
       "organizationId": null

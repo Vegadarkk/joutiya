@@ -33,6 +33,8 @@ const SHARED_SHAPE = {
     // OCIDs of the tenancy and of the `joutiya` compartment Claude's user is limited to (§9).
     tenancyId: /^ocid1\.tenancy\.oc1\.\.[a-z0-9]{20,}$/,
     compartmentId: /^ocid1\.compartment\.oc1\.\.[a-z0-9]{20,}$/,
+    // OCID of the IAM user `joutiya-claude` (API keys only), checked against JOUTIYA_OCI_USER.
+    userId: /^ocid1\.user\.oc1\.\.[a-z0-9]{20,}$/,
   },
   anthropic: { organizationId: UUID },
   stripe: { accountId: /^acct_[A-Za-z0-9]{8,}$/ },
@@ -319,6 +321,7 @@ const OWNER_TUNNEL_TOKENS: readonly { variable: string; target: string; tunnel: 
 // Claude's Oracle access (cloud environment, docs/phase-0.md step 4), checked whatever APP_ENV.
 const SHARED_BINDINGS: readonly { variable: string; target: string; expected: (targets: Targets) => Id }[] = [
   { variable: "JOUTIYA_OCI_TENANCY", target: "shared.oracle.tenancyId", expected: (t) => t.shared.oracle.tenancyId },
+  { variable: "JOUTIYA_OCI_USER", target: "shared.oracle.userId", expected: (t) => t.shared.oracle.userId },
   { variable: "JOUTIYA_OCI_COMPARTMENT", target: "shared.oracle.compartmentId", expected: (t) => t.shared.oracle.compartmentId },
   { variable: "JOUTIYA_OCI_REGION", target: "shared.oracle.homeRegion", expected: (t) => t.shared.oracle.homeRegion },
 ];

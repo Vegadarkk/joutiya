@@ -30,7 +30,7 @@ function recorded(): Targets {
   return {
     shared: {
       cloudflare: { accountId: ACCOUNT, zoneId: "fedcba9876543210fedcba9876543210", accessTeamDomain: "joutiya.cloudflareaccess.com", sshTunnelId: null },
-      oracle: { homeRegion: "eu-paris-1", tenancyId: `ocid1.tenancy.oc1..${"a".repeat(60)}`, compartmentId: `ocid1.compartment.oc1..${"b".repeat(60)}` },
+      oracle: { homeRegion: "eu-paris-1", tenancyId: `ocid1.tenancy.oc1..${"a".repeat(60)}`, compartmentId: `ocid1.compartment.oc1..${"b".repeat(60)}`, userId: `ocid1.user.oc1..${"d".repeat(60)}` },
       anthropic: { organizationId: "123e4567-e89b-12d3-a456-426614174000" },
       stripe: { accountId: "acct_1Q2w3E4r5T6y7U8i" },
       revenuecat: { projectId: "proj5a6b7c8d" },
@@ -363,15 +363,18 @@ describe("strict mode", () => {
     const targets = recorded();
     const claude = {
       JOUTIYA_OCI_TENANCY: targets.shared.oracle.tenancyId ?? "",
+      JOUTIYA_OCI_USER: `ocid1.user.oc1..${"e".repeat(60)}`,
       JOUTIYA_OCI_COMPARTMENT: `ocid1.compartment.oc1..${"c".repeat(60)}`,
       JOUTIYA_OCI_REGION: "eu-paris-1",
     };
     assert.deepEqual(assertTargets(targets, claude), [
+      `JOUTIYA_OCI_USER does not match shared.oracle.userId (${targets.shared.oracle.userId})`,
       `JOUTIYA_OCI_COMPARTMENT does not match shared.oracle.compartmentId (${targets.shared.oracle.compartmentId})`,
     ]);
-    assert.deepEqual(assertTargets(targets, { ...deployed, ...claude, JOUTIYA_OCI_COMPARTMENT: targets.shared.oracle.compartmentId ?? "" }, { readFile }), []);
+    const matching = { ...claude, JOUTIYA_OCI_USER: targets.shared.oracle.userId ?? "", JOUTIYA_OCI_COMPARTMENT: targets.shared.oracle.compartmentId ?? "" };
+    assert.deepEqual(assertTargets(targets, { ...deployed, ...matching }, { readFile }), []);
     targets.shared.oracle.compartmentId = null;
-    const errors = assertTargets(targets, claude);
+    const errors = assertTargets(targets, { ...matching, JOUTIYA_OCI_COMPARTMENT: claude.JOUTIYA_OCI_COMPARTMENT });
     assert.deepEqual(errors, ["JOUTIYA_OCI_COMPARTMENT is set but shared.oracle.compartmentId is not recorded in infra/targets.json"]);
     assert.doesNotMatch(errors.join("\n"), /c{60}/);
   });
