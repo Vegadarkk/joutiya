@@ -34,9 +34,9 @@
         "firestoreLocation": null
       },
       "r2": {
-        "quarantine": null,
-        "media": null,
-        "private": null
+        "quarantine": "joutiya-dev-quarantine",
+        "media": "joutiya-dev-media",
+        "private": "joutiya-dev-private"
       },
       "whatsapp": {
         "wabaId": null,
@@ -54,9 +54,9 @@
         "firestoreLocation": null
       },
       "r2": {
-        "quarantine": null,
-        "media": null,
-        "private": null
+        "quarantine": "joutiya-staging-quarantine",
+        "media": "joutiya-staging-media",
+        "private": "joutiya-staging-private"
       },
       "whatsapp": {
         "wabaId": null,
@@ -74,9 +74,9 @@
         "firestoreLocation": null
       },
       "r2": {
-        "quarantine": null,
-        "media": null,
-        "private": null
+        "quarantine": "joutiya-prod-quarantine",
+        "media": "joutiya-prod-media",
+        "private": "joutiya-prod-private"
       },
       "whatsapp": {
         "wabaId": null,
