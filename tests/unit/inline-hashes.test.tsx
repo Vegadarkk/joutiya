@@ -7,6 +7,9 @@ import { inlineScripts, isFrameworkScript, PINNED_SCRIPT_HASHES, scriptHash, wit
 const sha = (text: string) => createHash("sha256").update(text).digest("base64");
 const BOOT = "(self.__next_f=self.__next_f||[]).push([0])";
 const CHUNK = 'self.__next_f.push([1,"0:{\\"a\\":\\"\\u003cb\\u003e\\"}\\n"])';
+// Exact shape emitted by Next.js 16.4.2 (Turbopack) in prerendered HTML.
+const TURBOPACK =
+  '(globalThis["TURBOPACK"] || (globalThis["TURBOPACK"] = [])).push({"otherChunks":["static/chunks/3_1kpbd8aih6c.js","static/chunks/063al_q720fkj.js"],"runtimeModuleIds":[94553]});';
 
 describe("inlineScripts", () => {
   it("hashes the framework scripts and skips external and data scripts", () => {
@@ -23,6 +26,23 @@ describe("inlineScripts", () => {
     ];
     const html = injected.map((body) => `<script>${body}</script>`).join("");
     expect(inlineScripts(html)).toEqual({ hashes: [], untrusted: injected.length });
+  });
+
+  it("hashes the Turbopack runtime bootstrap of Next.js 16.4", () => {
+    expect(inlineScripts(`<script id="_R_">${TURBOPACK}</script>`)).toEqual({ hashes: [sha(TURBOPACK)], untrusted: 0 });
+    expect(isFrameworkScript(TURBOPACK.slice(0, -1))).toBe(true);
+    expect(isFrameworkScript('(globalThis["TURBOPACK"] || (globalThis["TURBOPACK"] = [])).push({"otherChunks":[],"runtimeModuleIds":[]});')).toBe(true);
+  });
+
+  it("rejects Turbopack look-alikes", () => {
+    const forged = [
+      `${TURBOPACK}alert(1)`,
+      TURBOPACK.replace("[94553]", '["x"]'),
+      TURBOPACK.replace("[94553]", "[94553],\"x\":[1]"),
+      TURBOPACK.replace('"static/chunks/3_1kpbd8aih6c.js"', '"a"+alert(1)+"b"'),
+      TURBOPACK.replace('"static/chunks/3_1kpbd8aih6c.js"', '"a\\\\"+alert(1)+"b"'),
+    ];
+    expect(inlineScripts(forged.map((body) => `<script>${body}</script>`).join(""))).toEqual({ hashes: [], untrusted: forged.length });
   });
 
   it("normalizes newlines like browsers and deduplicates", () => {

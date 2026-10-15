@@ -18,6 +18,10 @@ const JS_TYPES = new Set(["", "module", "text/javascript", "application/javascri
 
 /** A JSON string literal: no unescaped quote, so nothing can follow it inside the call. */
 const JSON_STRING = String.raw`"(?:[^"\\\n\r]|\\.)*"`;
+/** Comma-separated JSON string literals (possibly none). */
+const JSON_STRINGS = String.raw`(?:${JSON_STRING}(?:,${JSON_STRING})*)?`;
+/** Comma-separated non-negative integers (possibly none). */
+const INTEGERS = String.raw`(?:\d+(?:,\d+)*)?`;
 
 /** Whole-body shapes of the scripts Next.js emits in prerendered HTML. */
 const FRAMEWORK_SCRIPTS = [
@@ -25,6 +29,10 @@ const FRAMEWORK_SCRIPTS = [
   /^\(self\.__next_f=self\.__next_f\|\|\[\]\)\.push\(\[0\]\)(?:;self\.__next_f\.push\(\[2,null\]\))?$/,
   // RSC payload chunks: a type number and one JSON string (or null).
   new RegExp(String.raw`^self\.__next_f\.push\(\[\d,(?:null|${JSON_STRING})\]\)$`),
+  // Turbopack runtime bootstrap (Next.js 16.4+, <script id="_R_">): chunk paths and numeric module ids only.
+  new RegExp(
+    String.raw`^\(globalThis\["TURBOPACK"\] \|\| \(globalThis\["TURBOPACK"\] = \[\]\)\)\.push\(\{"otherChunks":\[${JSON_STRINGS}\],"runtimeModuleIds":\[${INTEGERS}\]\}\);?$`,
+  ),
 ];
 
 export function scriptHash(body: string): string {
