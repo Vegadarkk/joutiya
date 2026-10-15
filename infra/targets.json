@@ -3,7 +3,7 @@
     "cloudflare": {
       "accountId": "795e3aeafd644dbdf1810fc0e29a5e97",
       "zoneId": "f09bd1e8b2f7ae0d61472b0eb617b0b0",
-      "accessTeamDomain": null,
+      "accessTeamDomain": "joutiya.cloudflareaccess.com",
       "sshTunnelId": null
     },
     "oracle": {
@@ -16,7 +16,7 @@
       "organizationId": null
     },
     "stripe": {
-      "accountId": null
+      "accountId": "acct_1UQxR07tCjk226ma"
     },
     "revenuecat": {
       "projectId": null
@@ -34,9 +34,9 @@
         "firestoreLocation": null
       },
       "r2": {
-        "quarantine": null,
-        "media": null,
-        "private": null
+        "quarantine": "joutiya-dev-quarantine",
+        "media": "joutiya-dev-media",
+        "private": "joutiya-dev-private"
       },
       "whatsapp": {
         "wabaId": null,
@@ -54,9 +54,9 @@
         "firestoreLocation": null
       },
       "r2": {
-        "quarantine": null,
-        "media": null,
-        "private": null
+        "quarantine": "joutiya-staging-quarantine",
+        "media": "joutiya-staging-media",
+        "private": "joutiya-staging-private"
       },
       "whatsapp": {
         "wabaId": null,
@@ -74,9 +74,9 @@
         "firestoreLocation": null
       },
       "r2": {
-        "quarantine": null,
-        "media": null,
-        "private": null
+        "quarantine": "joutiya-prod-quarantine",
+        "media": "joutiya-prod-media",
+        "private": "joutiya-prod-private"
       },
       "whatsapp": {
         "wabaId": null,
