@@ -39,8 +39,10 @@ env:
 jobs:
   deploy:
     name: Build and deploy to staging
-    # A push on main whose CI succeeded, or a manual run on main.
+    # Once staging is enabled: a push on main whose CI succeeded, or a manual run on main.
+    # Before that the job is skipped entirely (CI already proves the image builds).
     if: >-
+      vars.STAGING_DEPLOY_ENABLED == 'true' &&
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' ||
        (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))

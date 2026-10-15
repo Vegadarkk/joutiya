@@ -22,7 +22,10 @@ export async function startupReport(service: Service, env: Record<string, string
   const warnings: string[] = [];
   const parsed = parseEnv(env);
   const appEnv = parsed.env.APP_ENV;
-  const deployed = appEnv !== "dev";
+  // Decided from the raw value: a parse failure falls back to dev defaults and must not demote
+  // staging or production to a development server (errors as warnings, strict mode off).
+  const rawAppEnv = (env.APP_ENV ?? "").trim();
+  const deployed = rawAppEnv !== "" && rawAppEnv !== "dev";
 
   (deployed ? fatal : warnings).push(...parsed.errors);
 
