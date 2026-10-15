@@ -119,9 +119,12 @@ describe("validateTargets", () => {
 describe("assertTargets", () => {
   const staging = {
     APP_ENV: "staging",
-    NEXT_PUBLIC_FIREBASE_PROJECT_ID: "joutiya-staging-4821",
-    NEXT_PUBLIC_FIREBASE_APP_ID: "1:100000000001:web:0a1b2c3d4e5f",
+    FIREBASE_PROJECT_ID: "joutiya-staging-4821",
+    FIREBASE_APP_ID: "1:100000000001:web:0a1b2c3d4e5f",
     GOOGLE_OAUTH_CLIENT_ID: "100000000001-0a1b2c3d4e5f.apps.googleusercontent.com",
+    FIREBASE_SERVICE_ACCOUNT: "joutiya-web@joutiya-staging-4821.iam.gserviceaccount.com",
+    FIREBASE_DEPLOYER_SERVICE_ACCOUNT: "joutiya-deployer@joutiya-staging-4821.iam.gserviceaccount.com",
+    FIREBASE_WIF_PROVIDER: "projects/100000000001/locations/global/workloadIdentityPools/joutiya/providers/github",
     R2_BUCKET_QUARANTINE: "joutiya-staging-quarantine",
     R2_BUCKET_MEDIA: "joutiya-staging-media",
     R2_BUCKET_PRIVATE: "joutiya-staging-private",
@@ -161,9 +164,9 @@ describe("assertTargets", () => {
 
   it("checks the project number behind the web app id and the OAuth client id", () => {
     assert.deepEqual(
-      assertTargets(recorded(), { ...staging, NEXT_PUBLIC_FIREBASE_APP_ID: "1:100000000002:web:0a1b2c3d4e5f", GOOGLE_OAUTH_CLIENT_ID: "nope" }),
+      assertTargets(recorded(), { ...staging, FIREBASE_APP_ID: "1:100000000002:web:0a1b2c3d4e5f", GOOGLE_OAUTH_CLIENT_ID: "nope" }),
       [
-        "NEXT_PUBLIC_FIREBASE_APP_ID does not match environments.staging.firebase.projectNumber (100000000001)",
+        "FIREBASE_APP_ID does not match environments.staging.firebase.projectNumber (100000000001)",
         "GOOGLE_OAUTH_CLIENT_ID does not match environments.staging.firebase.projectNumber (100000000001)",
       ],
     );
@@ -171,6 +174,26 @@ describe("assertTargets", () => {
     targets.environments.staging.firebase.projectNumber = null;
     assert.deepEqual(assertTargets(targets, { APP_ENV: "staging", GOOGLE_OAUTH_CLIENT_ID: staging.GOOGLE_OAUTH_CLIENT_ID }), [
       "GOOGLE_OAUTH_CLIENT_ID is set but environments.staging.firebase.projectNumber is not recorded in infra/targets.json",
+    ]);
+  });
+
+  it("checks the project behind the service accounts and the WIF provider", () => {
+    assert.deepEqual(
+      assertTargets(recorded(), {
+        ...staging,
+        FIREBASE_SERVICE_ACCOUNT: "joutiya-web@joutiya-prod-4821.iam.gserviceaccount.com",
+        FIREBASE_DEPLOYER_SERVICE_ACCOUNT: "ops@gmail.com",
+        FIREBASE_WIF_PROVIDER: "projects/100000000002/locations/global/workloadIdentityPools/joutiya/providers/github",
+      }),
+      [
+        "FIREBASE_SERVICE_ACCOUNT does not match environments.staging.firebase.projectId (joutiya-staging-4821)",
+        "FIREBASE_DEPLOYER_SERVICE_ACCOUNT must be <name>@<project id>.iam.gserviceaccount.com, a service account of the environment's Firebase project",
+        "FIREBASE_WIF_PROVIDER does not match environments.staging.firebase.projectNumber (100000000001)",
+      ],
+    );
+    const malformed = "projects/joutiya-staging-4821/locations/global/workloadIdentityPools/joutiya/providers/github";
+    assert.deepEqual(assertTargets(recorded(), { ...staging, FIREBASE_WIF_PROVIDER: malformed }), [
+      "FIREBASE_WIF_PROVIDER must be projects/<project number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>",
     ]);
   });
 
@@ -183,8 +206,8 @@ describe("assertTargets", () => {
   });
 
   it("rejects an identifier that belongs to another environment", () => {
-    assert.deepEqual(assertTargets(recorded(), { ...staging, NEXT_PUBLIC_FIREBASE_PROJECT_ID: "joutiya-prod-4821" }), [
-      "NEXT_PUBLIC_FIREBASE_PROJECT_ID does not match environments.staging.firebase.projectId (joutiya-staging-4821)",
+    assert.deepEqual(assertTargets(recorded(), { ...staging, FIREBASE_PROJECT_ID: "joutiya-prod-4821" }), [
+      "FIREBASE_PROJECT_ID does not match environments.staging.firebase.projectId (joutiya-staging-4821)",
     ]);
   });
 
@@ -256,7 +279,7 @@ describe("strict mode", () => {
   };
   const deployed = {
     APP_ENV: "staging",
-    NEXT_PUBLIC_FIREBASE_PROJECT_ID: "joutiya-staging-4821",
+    FIREBASE_PROJECT_ID: "joutiya-staging-4821",
     GOOGLE_APPLICATION_CREDENTIALS: "/etc/joutiya/wif.json",
     CF_ACCESS_TEAM_DOMAIN: "joutiya.cloudflareaccess.com",
     CF_ACCESS_AUD: AUD,
@@ -269,7 +292,7 @@ describe("strict mode", () => {
 
   it("requires the core variables", () => {
     assert.deepEqual(assertTargets(recorded(), { APP_ENV: "prod" }, { strict: true, readFile }), [
-      "NEXT_PUBLIC_FIREBASE_PROJECT_ID is required in strict mode",
+      "FIREBASE_PROJECT_ID is required in strict mode",
       "GOOGLE_APPLICATION_CREDENTIALS is required in strict mode",
       "CF_ACCESS_TEAM_DOMAIN is required in strict mode",
       "CF_ACCESS_AUD is required in strict mode",

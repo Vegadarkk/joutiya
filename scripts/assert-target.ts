@@ -65,6 +65,8 @@ interface Binding {
   target: string;
   expected: (targets: Targets, env: AppEnv) => Id;
   normalize?: (value: string) => string;
+  /** Values of another shape are rejected before the comparison: "<variable> must be <description>". */
+  shape?: { pattern: RegExp; description: string };
 }
 
 const firebaseProject = (variable: string): Binding => ({
@@ -79,18 +81,40 @@ const r2Bucket = (variable: string, role: keyof EnvTargets["r2"]): Binding => ({
   expected: (t, env) => t.environments[env].r2[role],
 });
 
+// <name>@<project id>.iam.gserviceaccount.com: the project is the part after the @.
+const SERVICE_ACCOUNT = /^[a-z][a-z0-9-]{4,28}[a-z0-9]@([a-z][a-z0-9-]{4,28}[a-z0-9])\.iam\.gserviceaccount\.com$/;
+// projects/<project number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
+const WIF_PROVIDER = /^projects\/([0-9]{6,20})\/locations\/global\/workloadIdentityPools\/[a-z0-9-]{4,32}\/providers\/[a-z0-9-]{4,32}$/;
+
+const serviceAccount = (variable: string): Binding => ({
+  variable,
+  target: "environments.<env>.firebase.projectId",
+  expected: (t, env) => t.environments[env].firebase.projectId,
+  shape: { pattern: SERVICE_ACCOUNT, description: "<name>@<project id>.iam.gserviceaccount.com, a service account of the environment's Firebase project" },
+  normalize: (value) => SERVICE_ACCOUNT.exec(value)?.[1] ?? "",
+});
+
 // Configured identifiers checked against the targets of APP_ENV.
 // GOOGLE_CLOUD_PROJECT, GCLOUD_PROJECT and CLOUDSDK_CORE_PROJECT are read implicitly by Google
 // tools, CLOUDFLARE_ACCOUNT_ID by Wrangler.
 const BINDINGS: Binding[] = [
-  firebaseProject("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
   firebaseProject("FIREBASE_PROJECT_ID"),
   firebaseProject("GOOGLE_CLOUD_PROJECT"),
   firebaseProject("GCLOUD_PROJECT"),
   firebaseProject("CLOUDSDK_CORE_PROJECT"),
+  // Custom-token signing identity of the web app, and the CI deployer of deploy-staging.yml.
+  serviceAccount("FIREBASE_SERVICE_ACCOUNT"),
+  serviceAccount("FIREBASE_DEPLOYER_SERVICE_ACCOUNT"),
+  {
+    variable: "FIREBASE_WIF_PROVIDER",
+    target: "environments.<env>.firebase.projectNumber",
+    expected: (t, env) => t.environments[env].firebase.projectNumber,
+    shape: { pattern: WIF_PROVIDER, description: "projects/<project number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>" },
+    normalize: (value) => WIF_PROVIDER.exec(value)?.[1] ?? "",
+  },
   {
     // 1:<project number>:web:<hash>
-    variable: "NEXT_PUBLIC_FIREBASE_APP_ID",
+    variable: "FIREBASE_APP_ID",
     target: "environments.<env>.firebase.projectNumber",
     expected: (t, env) => t.environments[env].firebase.projectNumber,
     normalize: (value) => value.split(":")[1] ?? "",
@@ -241,7 +265,7 @@ function checkStripeMode(appEnv: AppEnv, key: string): string[] {
 /** Variables a deployed web or worker cannot start without (strict mode). */
 export const STRICT_REQUIRED = [
   "APP_ENV",
-  "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+  "FIREBASE_PROJECT_ID",
   "GOOGLE_APPLICATION_CREDENTIALS",
   "CF_ACCESS_TEAM_DOMAIN",
   "CF_ACCESS_AUD",
@@ -366,6 +390,10 @@ export function assertTargets(targets: Targets, env: Env, options: AssertOptions
   }
   for (const binding of configured) {
     const target = binding.target.replace("<env>", appEnv);
+    if (binding.shape && !binding.shape.pattern.test(value(binding.variable))) {
+      errors.push(`${binding.variable} must be ${binding.shape.description}`);
+      continue;
+    }
     const expected = binding.expected(targets, appEnv);
     const actual = binding.normalize ? binding.normalize(value(binding.variable)) : value(binding.variable);
     if (expected === null) {
