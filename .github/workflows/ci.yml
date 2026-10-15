@@ -93,7 +93,8 @@ jobs:
 
   image:
     name: Docker image (arm64)
-    # Pull requests that touch the image only: main builds it in deploy-staging.yml.
+    # Pull requests that touch the image only: the e2e job's `npm run build` already covers the app
+    # and worker bundles, and the staging deploy builds the image on main once enabled.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
@@ -103,8 +104,11 @@ jobs:
           fetch-depth: 0
       - name: Changed files
         id: changes
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        # grep reads the whole list: with pipefail, `grep -q` closing early would fail git diff and skip the build.
         run: |
-          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qE '^(docker/|\.dockerignore|package(-lock)?\.json|next\.config\.ts|scripts/build-node\.ts|src/worker/|src/server/)'; then
+          if git diff --name-only "origin/$BASE_REF...HEAD" | grep -E '^(docker/|\.dockerignore|package(-lock)?\.json|next\.config\.ts|scripts/build-node\.ts|src/worker/|src/server/)' >/dev/null; then
             echo "build=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Build web and worker

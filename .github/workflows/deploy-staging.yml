@@ -13,6 +13,9 @@ name: Deploy staging
 #   vars    VM_SSH_KNOWN_HOSTS               "ssh.joutiya.ma ssh-ed25519 AAAA..." (host key of the VM)
 #           FIREBASE_STAGING_WIF_PROVIDER    projects/<number>/locations/global/workloadIdentityPools/github/providers/joutiya
 #           FIREBASE_STAGING_DEPLOYER        joutiya-deployer@<staging project>.iam.gserviceaccount.com
+#
+# Two jobs on purpose: the SSH key only ever exists inside one step of the build job, where no
+# third-party action runs, and the OIDC token (id-token: write) is only granted to the rules job.
 
 on:
   workflow_run:
@@ -32,10 +35,6 @@ concurrency:
   group: deploy-staging
   cancel-in-progress: false
 
-env:
-  # Same digest as docker/compose.yml: the CI's SSH proxy is the image the VM runs.
-  CLOUDFLARED_IMAGE: cloudflare/cloudflared:2026.9.1@sha256:b269e8abd07a5bf6f3f4be65d5050b2174eca89c56a0241a8ff32a16aec454e4
-
 jobs:
   deploy:
     name: Build and deploy to staging
@@ -45,13 +44,13 @@ jobs:
       vars.STAGING_DEPLOY_ENABLED == 'true' &&
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' ||
-       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 40
     permissions:
       contents: read
-      # Workload Identity Federation for the staging Firestore rules (no JSON key).
-      id-token: write
+    outputs:
+      release: ${{ steps.release.outputs.id }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -73,7 +72,6 @@ jobs:
             for target in web worker; do echo "| joutiya-$target | \`$(docker image inspect --format '{{.Id}}' "joutiya-$target:$RELEASE")\` |"; done
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Send to the VM
-        if: vars.STAGING_DEPLOY_ENABLED == 'true'
         env:
           RELEASE: ${{ steps.release.outputs.id }}
           DEPLOY_KEY: ${{ secrets.STAGING_DEPLOY_SSH_KEY }}
@@ -81,27 +79,48 @@ jobs:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.STAGING_ACCESS_CLIENT_ID }}
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.STAGING_ACCESS_CLIENT_SECRET }}
         run: |
+          # The key lives only for this step, created unreadable by others, removed on any exit.
+          umask 077
+          trap 'rm -f ~/.ssh/deploy_staging' EXIT
           install -d -m 0700 ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_staging
-          chmod 0600 ~/.ssh/deploy_staging
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The CI's SSH proxy is the cloudflared image the VM runs (same tag and digest, kept by Dependabot).
+          CLOUDFLARED_IMAGE="$(grep -m 1 -oE 'cloudflare/cloudflared:[^[:space:]]+' docker/compose.yml)"
+          test -n "$CLOUDFLARED_IMAGE" || { echo "cloudflared image not found in docker/compose.yml"; exit 1; }
           docker pull --quiet "$CLOUDFLARED_IMAGE"
           docker save "joutiya-web:$RELEASE" "joutiya-worker:$RELEASE" | zstd -T0 -10 -q \
             | ssh -i ~/.ssh/deploy_staging -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
                 -o ProxyCommand="docker run --rm -i -e TUNNEL_SERVICE_TOKEN_ID -e TUNNEL_SERVICE_TOKEN_SECRET $CLOUDFLARED_IMAGE access ssh --hostname %h" \
                 deploy-staging@ssh.joutiya.ma "load $RELEASE"
-      - name: Firestore rules and indexes (staging)
-        if: vars.STAGING_DEPLOY_ENABLED == 'true' && vars.FIREBASE_STAGING_WIF_PROVIDER != ''
-        uses: google-github-actions/auth@v3
+
+  rules:
+    name: Firestore rules and indexes (staging)
+    needs: deploy
+    # Skipped with the deploy job; also waits for the Workload Identity Federation provider.
+    if: vars.FIREBASE_STAGING_WIF_PROVIDER != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # Workload Identity Federation for the staging Firestore rules (no JSON key).
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      # firebase-tools from the lockfile (devDependency kept current by Dependabot), not a fresh npx download.
+      - run: npm ci --ignore-scripts
+      - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.FIREBASE_STAGING_WIF_PROVIDER }}
           service_account: ${{ vars.FIREBASE_STAGING_DEPLOYER }}
       - name: Deploy Firestore rules
-        if: vars.STAGING_DEPLOY_ENABLED == 'true' && vars.FIREBASE_STAGING_WIF_PROVIDER != ''
         run: |
           project="$(node -e "const t=require('./infra/targets.json');process.stdout.write(t.environments.staging.firebase.projectId??'')")"
           test -n "$project" || { echo "environments.staging.firebase.projectId is not recorded"; exit 1; }
-          npx --yes firebase-tools@15.33.0 deploy --only firestore:rules,firestore:indexes --project "$project" --non-interactive
-      - name: Clean up
-        if: always()
-        run: rm -f ~/.ssh/deploy_staging
+          npx firebase deploy --only firestore:rules,firestore:indexes --project "$project" --non-interactive
