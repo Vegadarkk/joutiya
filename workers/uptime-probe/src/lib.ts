@@ -161,3 +161,22 @@ export function mime(from: string, to: string, alert: Alert, now: Date, id: stri
     body,
   ].join("\r\n");
 }
+
+/** Text of `body`, or null as soon as it exceeds `max` bytes: an oversized body is never held in memory. */
+export async function readCapped(body: ReadableStream<Uint8Array> | null, max: number): Promise<string | null> {
+  if (!body) return "";
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return text + decoder.decode();
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+}

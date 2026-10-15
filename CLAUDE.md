@@ -96,7 +96,8 @@ subscriptions, Google Ads slots, moderation).
 - Never guess APIs, versions, flags or package names: verify in code or docs first.
 - Skills in `.claude/skills/`: `frontend-design` for any UI work (premium look is
   a requirement), `webapp-testing` to check UI in a real browser (the repo's Node
-  Playwright) before handing back.
+  Playwright) before handing back, `gemini-crosscheck` to second-check public-info
+  research (free tier: no user, listing or repo data).
 - `.claude/settings.json` denies reading secret files (`.env`, `.env.local`, `.envrc`,
   `secrets/`, `*.pem`, service-account JSON) and generated output (`.next/`, `dist/`,
   `build/`, `coverage/`), through Read and through `cat`/`head`/`tail`/`sed` in Bash, and
@@ -111,7 +112,7 @@ subscriptions, Google Ads slots, moderation).
 ## Commands
 
 Node 24; `npm ci --ignore-scripts` once.
-- `npm run check`: lint, typecheck, unit tests. `npm run test:rules`: Firestore rules in the
+- `npm run check`: lint, typecheck, unit tests, guard tests. `npm run test:rules`: Firestore rules in the
   emulator (Java 21). `npm run build`, then `npm run test:e2e` (Playwright; in the cloud set
   `PLAYWRIGHT_CHROMIUM_PATH`). `shellcheck infra/vm/*.sh` for the VM scripts.
 - `node scripts/assert-target.ts`: validate `infra/targets.json` (exact third-party

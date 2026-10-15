@@ -51,7 +51,7 @@ Pour chacun :
 
 **Jetons d'API** : My Profile → **API Tokens** → **Create Token** → **Custom token**, deux fois.
 
-1. `joutiya-edge`, pour le script de configuration, sur votre machine seulement :
+1. `joutiya-edge`, pour le script de configuration (votre machine, et l'environnement cloud Claude global si Claude doit appliquer la configuration lui-même) :
    - Compte (Account resources : votre compte) : **Cloudflare Tunnel : Edit**, **Access: Apps and Policies : Edit** et **Access: Organizations, Identity Providers, and Groups : Read**.
    - Zone (Zone resources : **Specific zone** → `joutiya.ma`) : **Zone : Read**, **Zone Settings : Edit**, **Zone WAF : Edit**, **Transform Rules : Edit**, **Cache Rules : Edit**, **Single Redirect : Edit** et **DNS : Edit**.
    - Durée : 30 jours.

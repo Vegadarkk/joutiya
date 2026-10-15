@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import { assertTargets, credentialProject, STRICT_REQUIRED, validateTargets } from "./assert-target.ts";
 import type { EnvTargets, Targets } from "./assert-target.ts";
 
@@ -15,11 +17,12 @@ const TUNNELS = {
 } as const;
 
 function envTargets(name: keyof typeof TUNNELS, phoneNumberId: string): EnvTargets {
+  const index = Object.keys(TUNNELS).indexOf(name);
   return {
-    firebase: { projectId: `joutiya-${name}-4821`, firestoreLocation: "europe-west9" },
+    firebase: { projectId: `joutiya-${name}-4821`, projectNumber: `10000000000${index}`, firestoreLocation: "europe-west9" },
     r2: { quarantine: `joutiya-${name}-quarantine`, media: `joutiya-${name}-media`, private: `joutiya-${name}-private` },
     whatsapp: { wabaId: "102030405060708", phoneNumberId },
-    cloudflare: { tunnelId: TUNNELS[name], accessAud: "a".repeat(63) + String(Object.keys(TUNNELS).indexOf(name)) },
+    cloudflare: { tunnelId: TUNNELS[name], accessAud: "a".repeat(63) + String(index) },
   };
 }
 
@@ -27,7 +30,7 @@ function recorded(): Targets {
   return {
     shared: {
       cloudflare: { accountId: ACCOUNT, zoneId: "fedcba9876543210fedcba9876543210", accessTeamDomain: "joutiya.cloudflareaccess.com", sshTunnelId: null },
-      oracle: { homeRegion: "eu-paris-1" },
+      oracle: { homeRegion: "eu-paris-1", tenancyId: `ocid1.tenancy.oc1..${"a".repeat(60)}`, compartmentId: `ocid1.compartment.oc1..${"b".repeat(60)}` },
       anthropic: { organizationId: "123e4567-e89b-12d3-a456-426614174000" },
       stripe: { accountId: "acct_1Q2w3E4r5T6y7U8i" },
       revenuecat: { projectId: "proj5a6b7c8d" },
@@ -93,12 +96,32 @@ describe("validateTargets", () => {
       "environments.prod.whatsapp.phoneNumberId: same number as staging",
     ]);
   });
+
+  it("rejects a bucket or an Access application recorded twice", () => {
+    const targets = recorded();
+    targets.environments.dev.r2.media = targets.environments.dev.r2.quarantine;
+    targets.environments.staging.cloudflare.accessAud = targets.environments.dev.cloudflare.accessAud;
+    assert.deepEqual(validateTargets(targets), [
+      "environments.dev.r2.media: joutiya-dev-quarantine is already recorded at environments.dev.r2.quarantine",
+      `environments.staging.cloudflare.accessAud: ${"a".repeat(63)}0 is already recorded at environments.dev.cloudflare.accessAud`,
+    ]);
+  });
+
+  it("rejects a tunnel id that is not lowercase, since tokens are compared verbatim", () => {
+    const targets = recorded();
+    targets.shared.cloudflare.sshTunnelId = "ABCDEF12-1111-4111-8111-111111111111";
+    const errors = validateTargets(targets);
+    assert.equal(errors.length, 1);
+    assert.match(errors[0] ?? "", /^shared\.cloudflare\.sshTunnelId/);
+  });
 });
 
 describe("assertTargets", () => {
   const staging = {
     APP_ENV: "staging",
     NEXT_PUBLIC_FIREBASE_PROJECT_ID: "joutiya-staging-4821",
+    NEXT_PUBLIC_FIREBASE_APP_ID: "1:100000000001:web:0a1b2c3d4e5f",
+    GOOGLE_OAUTH_CLIENT_ID: "100000000001-0a1b2c3d4e5f.apps.googleusercontent.com",
     R2_BUCKET_QUARANTINE: "joutiya-staging-quarantine",
     R2_BUCKET_MEDIA: "joutiya-staging-media",
     R2_BUCKET_PRIVATE: "joutiya-staging-private",
@@ -124,9 +147,38 @@ describe("assertTargets", () => {
     ]);
   });
 
+  it("requires APP_ENV when a credential file or a tunnel token is configured", () => {
+    assert.deepEqual(assertTargets(recorded(), { GOOGLE_APPLICATION_CREDENTIALS: "/etc/joutiya/wif.json", FIREBASE_CONFIG: "{}", TUNNEL_TOKEN: "x" }), [
+      "APP_ENV is required when GOOGLE_APPLICATION_CREDENTIALS, FIREBASE_CONFIG, TUNNEL_TOKEN is set",
+    ]);
+  });
+
   it("rejects an unknown APP_ENV", () => {
     assert.deepEqual(assertTargets(recorded(), { APP_ENV: "production" }), [
       "APP_ENV must be one of dev, staging, prod",
+    ]);
+  });
+
+  it("checks the project number behind the web app id and the OAuth client id", () => {
+    assert.deepEqual(
+      assertTargets(recorded(), { ...staging, NEXT_PUBLIC_FIREBASE_APP_ID: "1:100000000002:web:0a1b2c3d4e5f", GOOGLE_OAUTH_CLIENT_ID: "nope" }),
+      [
+        "NEXT_PUBLIC_FIREBASE_APP_ID does not match environments.staging.firebase.projectNumber (100000000001)",
+        "GOOGLE_OAUTH_CLIENT_ID does not match environments.staging.firebase.projectNumber (100000000001)",
+      ],
+    );
+    const targets = recorded();
+    targets.environments.staging.firebase.projectNumber = null;
+    assert.deepEqual(assertTargets(targets, { APP_ENV: "staging", GOOGLE_OAUTH_CLIENT_ID: staging.GOOGLE_OAUTH_CLIENT_ID }), [
+      "GOOGLE_OAUTH_CLIENT_ID is set but environments.staging.firebase.projectNumber is not recorded in infra/targets.json",
+    ]);
+  });
+
+  it("reports an unrecorded project for an inline FIREBASE_CONFIG", () => {
+    const targets = recorded();
+    targets.environments.staging.firebase.projectId = null;
+    assert.deepEqual(assertTargets(targets, { APP_ENV: "staging", FIREBASE_CONFIG: '{"projectId":"joutiya-staging-4821"}' }), [
+      "FIREBASE_CONFIG is set but environments.staging.firebase.projectId is not recorded in infra/targets.json",
     ]);
   });
 
@@ -194,6 +246,8 @@ describe("strict mode", () => {
     "/etc/joutiya/wif.json": wif("joutiya-staging-4821"),
     "/etc/joutiya/other.json": wif("punk-records-1234"),
     "/etc/joutiya/user.json": JSON.stringify({ type: "authorized_user" }),
+    "/etc/joutiya/key.json": JSON.stringify({ type: "service_account", project_id: "punk-records-1234", private_key: "-----BEGIN" }),
+    "/etc/joutiya/firebase.json": JSON.stringify({ projectId: "joutiya-staging-4821" }),
   };
   const readFile = (path: string) => {
     const content = files[path];
@@ -240,6 +294,12 @@ describe("strict mode", () => {
     assert.deepEqual(assertTargets(recorded(), { ...deployed, FIREBASE_CONFIG: '{"projectId":"joutiya-prod-4821"}' }, { strict: true, readFile }), [
       "FIREBASE_CONFIG does not match environments.staging.firebase.projectId (joutiya-staging-4821)",
     ]);
+    assert.deepEqual(assertTargets(recorded(), { ...deployed, FIREBASE_CONFIG: "/etc/joutiya/firebase.json" }, { strict: true, readFile }), []);
+    const errors = assertTargets(recorded(), { ...deployed, GOOGLE_APPLICATION_CREDENTIALS: "/etc/joutiya/key.json" }, { strict: true, readFile });
+    assert.deepEqual(errors, [
+      "GOOGLE_APPLICATION_CREDENTIALS belongs to another project than environments.staging.firebase.projectId (joutiya-staging-4821)",
+    ]);
+    assert.doesNotMatch(errors.join("\n"), /BEGIN/);
   });
 
   it("checks the Access application of the environment", () => {
@@ -248,17 +308,17 @@ describe("strict mode", () => {
     ]);
   });
 
-  it("checks the account and tunnel inside the tunnel token, without printing it", () => {
-    assert.deepEqual(assertTargets(recorded(), { ...deployed, CLOUDFLARE_TUNNEL_TOKEN: tunnelToken(ACCOUNT, TUNNELS.staging) }, { readFile }), []);
+  it("checks the account and tunnel inside cloudflared's TUNNEL_TOKEN, without printing it", () => {
+    assert.deepEqual(assertTargets(recorded(), { ...deployed, TUNNEL_TOKEN: tunnelToken(ACCOUNT, TUNNELS.staging) }, { readFile }), []);
     const wrong = tunnelToken("ffffffffffffffffffffffffffffffff", TUNNELS.prod);
-    const errors = assertTargets(recorded(), { ...deployed, CLOUDFLARE_TUNNEL_TOKEN: wrong }, { readFile });
+    const errors = assertTargets(recorded(), { ...deployed, TUNNEL_TOKEN: wrong }, { readFile });
     assert.deepEqual(errors, [
-      `CLOUDFLARE_TUNNEL_TOKEN belongs to another account than shared.cloudflare.accountId (${ACCOUNT})`,
-      `CLOUDFLARE_TUNNEL_TOKEN is for another tunnel than environments.staging.cloudflare.tunnelId (${TUNNELS.staging})`,
+      `TUNNEL_TOKEN belongs to another account than shared.cloudflare.accountId (${ACCOUNT})`,
+      `TUNNEL_TOKEN is for another tunnel than environments.staging.cloudflare.tunnelId (${TUNNELS.staging})`,
     ]);
     assert.doesNotMatch(errors.join("\n"), new RegExp(wrong));
-    assert.deepEqual(assertTargets(recorded(), { ...deployed, CLOUDFLARE_TUNNEL_TOKEN: "garbage" }, { readFile }), [
-      "CLOUDFLARE_TUNNEL_TOKEN is not a Cloudflare tunnel token",
+    assert.deepEqual(assertTargets(recorded(), { ...deployed, TUNNEL_TOKEN: "garbage" }, { readFile }), [
+      "TUNNEL_TOKEN is not a Cloudflare tunnel token",
     ]);
   });
 
@@ -274,5 +334,40 @@ describe("strict mode", () => {
     ];
     assert.deepEqual(assertTargets(recorded(), owner), expected);
     assert.deepEqual(assertTargets(recorded(), { ...deployed, ...owner }, { readFile }), expected);
+  });
+
+  it("checks Claude's Oracle variables whatever APP_ENV, without printing them", () => {
+    const targets = recorded();
+    const claude = {
+      JOUTIYA_OCI_TENANCY: targets.shared.oracle.tenancyId ?? "",
+      JOUTIYA_OCI_COMPARTMENT: `ocid1.compartment.oc1..${"c".repeat(60)}`,
+      JOUTIYA_OCI_REGION: "eu-paris-1",
+    };
+    assert.deepEqual(assertTargets(targets, claude), [
+      `JOUTIYA_OCI_COMPARTMENT does not match shared.oracle.compartmentId (${targets.shared.oracle.compartmentId})`,
+    ]);
+    assert.deepEqual(assertTargets(targets, { ...deployed, ...claude, JOUTIYA_OCI_COMPARTMENT: targets.shared.oracle.compartmentId ?? "" }, { readFile }), []);
+    targets.shared.oracle.compartmentId = null;
+    const errors = assertTargets(targets, claude);
+    assert.deepEqual(errors, ["JOUTIYA_OCI_COMPARTMENT is set but shared.oracle.compartmentId is not recorded in infra/targets.json"]);
+    assert.doesNotMatch(errors.join("\n"), /c{60}/);
+  });
+});
+
+describe("command line", () => {
+  const script = fileURLToPath(new URL("./assert-target.ts", import.meta.url));
+  const run = (args: string[]) =>
+    spawnSync(process.execPath, [script, ...args], { env: { PATH: process.env.PATH ?? "", NODE_ENV: "test" }, encoding: "utf8" });
+
+  it("validates the targets file when nothing is configured", () => {
+    const result = run([]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /^assert-target: OK \(targets file valid, APP_ENV not set\)/);
+  });
+
+  it("refuses an empty environment in strict mode", () => {
+    const result = run(["--strict"]);
+    assert.equal(result.status, 1);
+    for (const name of STRICT_REQUIRED) assert.match(result.stderr, new RegExp(`^assert-target: ${name} is required in strict mode$`, "m"));
   });
 });

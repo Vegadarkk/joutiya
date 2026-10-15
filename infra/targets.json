@@ -7,7 +7,9 @@
       "sshTunnelId": null
     },
     "oracle": {
-      "homeRegion": null
+      "homeRegion": "eu-paris-1",
+      "tenancyId": null,
+      "compartmentId": "ocid1.compartment.oc1..aaaaaaaag4vrrhtajdpxdtzd4mfv4g5nceyoth4nsvs42ehebb65g2yo4iua"
     },
     "anthropic": {
       "organizationId": null
@@ -27,6 +29,7 @@
     "dev": {
       "firebase": {
         "projectId": null,
+        "projectNumber": null,
         "firestoreLocation": null
       },
       "r2": {
@@ -46,6 +49,7 @@
     "staging": {
       "firebase": {
         "projectId": null,
+        "projectNumber": null,
         "firestoreLocation": null
       },
       "r2": {
@@ -65,6 +69,7 @@
     "prod": {
       "firebase": {
         "projectId": null,
+        "projectNumber": null,
         "firestoreLocation": null
       },
       "r2": {

@@ -1,5 +1,5 @@
 import { EmailMessage } from "cloudflare:email";
-import { alertText, mime, parseAlert, parseTargets, transition, verdict, verifySignature, type Alert, type ProbeState, type Target } from "./lib";
+import { alertText, mime, parseAlert, parseTargets, readCapped, transition, verdict, verifySignature, type Alert, type ProbeState, type Target } from "./lib";
 
 // Uptime probe (cron, every 5 minutes) and e-mail relay for the app's alerts (POST /alert).
 // Outside the VM on purpose: it still rings when the VM, the tunnel or Valkey is down.
@@ -67,10 +67,10 @@ async function check(env: Env, target: Target, now: number): Promise<void> {
 }
 
 async function relay(request: Request, env: Env): Promise<Response> {
-  const length = Number(request.headers.get("content-length") ?? "0");
-  if (length > MAX_ALERT_BYTES) return new Response(null, { status: 413 });
-  const body = await request.text();
-  if (body.length > MAX_ALERT_BYTES) return new Response(null, { status: 413 });
+  if (Number(request.headers.get("content-length") ?? "0") > MAX_ALERT_BYTES) return new Response(null, { status: 413 });
+  // Chunked bodies carry no Content-Length: the read itself is capped, before any signature work.
+  const body = await readCapped(request.body, MAX_ALERT_BYTES);
+  if (body === null) return new Response(null, { status: 413 });
   const valid = await verifySignature(
     env.ALERT_RELAY_SECRET ?? "",
     request.headers.get("X-Joutiya-Timestamp"),
