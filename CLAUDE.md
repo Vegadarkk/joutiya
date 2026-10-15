@@ -85,7 +85,9 @@ subscriptions, Google Ads slots, moderation).
 - Thorough in reasoning, concise in output. No openers, closing fluff or emojis.
 - Never guess APIs, versions, flags or package names: verify in code or docs first.
 - Skills in `.claude/skills/`: `frontend-design` for any UI work (premium look is
-  a requirement), `webapp-testing` to check UI in a browser before handing back.
+  a requirement), `webapp-testing` to check UI in a browser before handing back,
+  `gemini-crosscheck` to second-check public-info research (free tier: no user, listing
+  or repo data).
 - Do not read `node_modules/`, `.next/`, `dist/`, `build/`, `coverage/` or lockfiles
   unless specifically needed.
 - Delegate verbose output (tests, logs, web docs) to a subagent that returns only a
