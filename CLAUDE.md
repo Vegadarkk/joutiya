@@ -97,13 +97,12 @@ subscriptions, Google Ads slots, moderation).
 - Skills in `.claude/skills/`: `frontend-design` for any UI work (premium look is
   a requirement), `webapp-testing` to check UI in a real browser (the repo's Node
   Playwright) before handing back.
-- `.claude/settings.json` denies reading secret files (`.env`, `.env.local`, `secrets/`,
-  `*.pem`, service-account JSON), `node_modules/` and generated output (`.next/`, `dist/`,
-  `build/`, `coverage/`), and dumping the environment (`env`, `printenv`); Read denies also
-  cover `cat`/`head`/`tail`/`sed` in Bash. A guard, not a sandbox; lockfiles are off
-  limits too unless specifically needed. Known defect: the `Bash(... *.env*)` rules reject
-  any command containing `.env` (`.env.example`, `process.env.X`); write `process[.]env`
-  in greps until they are removed.
+- `.claude/settings.json` denies reading secret files (`.env`, `.env.local`, `.envrc`,
+  `secrets/`, `*.pem`, service-account JSON) and generated output (`.next/`, `dist/`,
+  `build/`, `coverage/`), through Read and through `cat`/`head`/`tail`/`sed` in Bash, and
+  dumping the environment (`env`, `printenv`, bare `set`/`export`); `.env.example` stays
+  readable. A guard, not a sandbox. Do not scan `node_modules/` or lockfiles; open one
+  file there only to verify an API.
 - Delegate verbose output (tests, logs, web docs) to a subagent that returns only a
   summary.
 - Keep this file under 200 lines; specialized procedures go in a Skill
