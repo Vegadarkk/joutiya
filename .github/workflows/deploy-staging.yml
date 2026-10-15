@@ -53,7 +53,7 @@ jobs:
       # Workload Identity Federation for the staging Firestore rules (no JSON key).
       id-token: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Release
