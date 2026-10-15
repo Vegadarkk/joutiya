@@ -16,7 +16,7 @@
       "organizationId": null
     },
     "stripe": {
-      "accountId": null
+      "accountId": "acct_1UQxR07tCjk226ma"
     },
     "revenuecat": {
       "projectId": null
