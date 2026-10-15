@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { CONFIRMATIONS, mime, parseAlert, parseTargets, sign, transition, verdict, verifySignature, type ProbeState } from "../../workers/uptime-probe/src/lib";
+import { CONFIRMATIONS, mime, parseAlert, parseTargets, readCapped, sign, transition, verdict, verifySignature, type ProbeState } from "../../workers/uptime-probe/src/lib";
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
@@ -86,5 +86,15 @@ describe("mime", () => {
     expect(head).not.toContain("Bcc:");
     expect(head).toContain("Subject: =?UTF-8?B?");
     expect(head).toContain("Message-ID: <id1@joutiya.ma>");
+  });
+});
+
+describe("readCapped", () => {
+  it("returns the body up to the cap and null beyond it", async () => {
+    const small = new Response("{\"severity\":\"P0\"}").body;
+    expect(await readCapped(small, 64)).toBe('{"severity":"P0"}');
+    const big = new Response("x".repeat(100)).body;
+    expect(await readCapped(big, 64)).toBeNull();
+    expect(await readCapped(null, 64)).toBe("");
   });
 });

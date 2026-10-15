@@ -1,3 +1,4 @@
+import { readCapped } from "@/lib/http/body";
 import { logger } from "@/lib/logging/logger";
 
 // CSP violation reports (report-uri and Reporting API). Logged, sampled, never stored.
@@ -24,9 +25,10 @@ function path(value: unknown): string | undefined {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const length = Number(request.headers.get("content-length") ?? "0");
-  if (length > MAX_BYTES) return new Response(null, { status: 413 });
-  const text = (await request.text()).slice(0, MAX_BYTES);
+  if (Number(request.headers.get("content-length") ?? "0") > MAX_BYTES) return new Response(null, { status: 413 });
+  // Chunked bodies carry no Content-Length: the read itself is capped.
+  const text = await readCapped(request.body, MAX_BYTES);
+  if (text === null) return new Response(null, { status: 413 });
   if (sample()) {
     try {
       const payload: unknown = JSON.parse(text);
