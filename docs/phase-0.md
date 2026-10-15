@@ -1,200 +1,157 @@
 # Phase 0 : ouvrir les comptes gratuits de Joutiya
 
-Ce qui reste à faire de votre côté pour clore la phase 0 (architecture v3, §9 et §10). Tout est gratuit : Oracle, R2 et Zero Trust demandent une carte, sans rien débiter.
+Ce qui reste à faire pour clore la phase 0 (architecture v3, §9 et §10). Tout est gratuit : Oracle, R2 et Zero Trust demandent une carte, sans rien débiter. L'état au jour le jour est dans le fichier du projet `joutiya/phase-0/suivi-phase-0.md`, tenu par le fil « Phase 0 du MVP ».
 
-Dans ce guide, « Claude » désigne les sessions du projet claude.ai, qui agissent par API ou depuis votre navigateur quand vous l'autorisez ; « Cody » est votre Claude Code local, qui lit `.env.local`.
+## Qui fait quoi (règle n°1, votre consigne du 15 octobre)
+
+- **Claude** (les sessions du projet claude.ai) agit par API. Pour chaque service qui en a une, il reçoit un jeton dédié, à la portée la plus petite possible, rangé dans votre environnement cloud Claude sous un nom commençant par `JOUTIYA_`.
+- **Nav** (Claude dans votre navigateur, sur PC2, fil « Consoles via ton navigateur ») fait tout ce qui n'a pas d'API : ouverture des comptes, réglages dans les consoles, préparation de chaque jeton jusqu'à l'écran qui le crée. Le coordinateur lui envoie les étapes de ce guide dans l'ordre de la file ci-dessous. Nav ne voit, ne tape et ne photographie jamais la valeur d'un secret.
+- **Vous** : mots de passe, codes de double authentification, CAPTCHA, cartes bancaires, pièces d'identité, et le clic qui révèle un secret, suivi de son rangement ; plus une autorisation écrite dans le fil de Nav avant qu'il crée quoi que ce soit (sa session l'exige ; une phrase de vous couvre toute la file). Ces moments sont signalés par **Vous :** dans ce guide ; rien d'autre ne vous est demandé.
+- **Cody** (votre Claude Code local, PC1) : le bot Telegram (prompt C) et, si vous le souhaitez, l'encodage de la clé Oracle (prompt O).
 
 ## Règles pour chaque compte
 
-- **Comptes dédiés** (votre choix du 12 octobre) : chaque service reçoit un compte, un projet ou une organisation neuve, réservée à Joutiya. Ne modifiez ni ne supprimez rien d'existant.
-- **Gardez votre identité actuelle** là où une même personne peut créer plusieurs ressources : Google (nouveaux projets Firebase), Meta (nouveau portefeuille depuis votre profil Facebook : un seul profil par personne), Stripe (nouveau compte sous votre connexion actuelle), Telegram (bot créé depuis votre compte), Cloudflare (zone et buckets dans votre compte actuel). Oracle n'admet qu'un compte gratuit par personne.
-- **Resend, Brevo et console Claude** : inscrivez-vous avec votre Gmail. Si vous y avez déjà un compte à cette adresse, prenez un alias Gmail, `votre.adresse+joutiya@gmail.com` : Gmail le reçoit sans réglage. N'utilisez pas `contact@joutiya.ma` pour vous connecter : elle est publique et dépend du domaine.
-- Si un service refuse (quota atteint, compte unique déjà pris, alias refusé), ne réutilisez rien : prévenez Claude dans le projet, il vous proposera une solution.
-- Activez la double authentification partout.
-- **Adresse** : quand un service demande l'adresse de l'entreprise, donnez uniquement la domiciliation, 6 rue d'Armaillé, 75017 Paris.
-- **Identifiants** (identifiant de projet ou de compte, nom de bucket) : notez-les au fil des étapes, ils vont dans `infra/targets.json` à l'étape 12. Ce ne sont pas des secrets.
-- **Clés secrètes** : créez-les seulement à la phase qui s'en sert. Elles ont deux maisons : le fichier local `.env.local`, sous le nom prévu par `.env.example`, pour les clés du site et du déploiement (lues par Cody) ; votre environnement cloud Claude, partagé avec vos autres projets, pour les accès propres à Claude (`HOSTINGER_MAIL_API_TOKEN`, `JOUTIYA_OCI_*`). Jamais dans le dépôt ni dans le chat.
-- Si vous avez un `.env` dans le dossier du dépôt, renommez-le en `.env.local` et alignez-le sur le nouveau `.env.example` : des noms ont changé (par exemple `CF_ACCOUNT_ID`). N'y gardez que des clés propres à Joutiya ; une clé qui ouvre tout un compte (Global API Key Cloudflare, clé d'un autre projet Google) n'a rien à y faire. Les jetons Hostinger se règlent à l'étape 2 (points 4 et 6).
+- **Comptes dédiés** (votre choix du 12 octobre) : chaque service reçoit un compte, un projet ou une organisation neuve, réservée à Joutiya. Rien d'existant n'est modifié ni supprimé.
+- **Votre identité actuelle** là où une même personne peut créer plusieurs ressources : Google (nouveaux projets Firebase), Meta (nouveau portefeuille depuis votre profil Facebook : un seul profil par personne), Stripe (nouveau compte sous votre connexion), Telegram (bot créé depuis votre compte), Cloudflare (zone et buckets dans votre compte actuel). Oracle n'admet qu'un compte gratuit par personne.
+- **Resend, Brevo et Console Claude** : inscription avec votre Gmail. Si cette adresse y a déjà un compte, prenez l'alias `votre.adresse+joutiya@gmail.com` : Gmail le reçoit sans réglage. `contact@joutiya.ma` ne sert jamais d'identifiant : elle est publique et dépend du domaine.
+- Si un service refuse (quota atteint, compte unique déjà pris, alias refusé), Nav s'arrête et le rapporte ; Claude propose une solution dans le projet.
+- Double authentification partout : elle reste à vous.
+- **Adresse** : quand un service demande l'adresse de l'entreprise, uniquement la domiciliation, 6 rue d'Armaillé, 75017 Paris.
+- **Identifiants** (identifiant de projet ou de compte, nom de bucket, OCID) : Nav les rapporte, Claude les consigne dans `infra/targets.json` par une PR (étape 12). Ce ne sont pas des secrets.
+- **Clés secrètes** : créées seulement à la phase qui s'en sert. Deux maisons : votre fichier local `.env.local`, sous le nom prévu par `.env.example`, pour les clés du site et du déploiement (lues par Cody) ; votre environnement cloud Claude pour les accès propres à Claude. Cet environnement est partagé avec vos autres projets : d'où le préfixe `JOUTIYA_`, qui évite d'écraser la variable d'un autre projet, et l'interdiction pour une session Joutiya d'utiliser une clé sans ce préfixe. Une variable ajoutée n'est visible que des sessions démarrées ensuite : après chaque rangement, prévenez Claude, un nouveau fil vérifie l'accès par une simple lecture. L'éditeur de l'environnement prend une ligne `NOM=valeur` par variable : un secret sur plusieurs lignes (une clé privée) y passe encodé en base64 sur une ligne. Jamais de clé dans le dépôt ni dans le chat.
+- Si vous avez un `.env` dans le dossier du dépôt, renommez-le en `.env.local` et alignez-le sur `.env.example` : des noms ont changé (par exemple `CF_ACCOUNT_ID`). N'y gardez que des clés propres à Joutiya ; une clé qui ouvre tout un compte (Global API Key Cloudflare, clé d'un autre projet Google) n'a rien à y faire.
+- **Réseau de Claude** (vérifié le 15 octobre depuis une session du projet) : la politique réseau de votre environnement cloud bloque aujourd'hui `*.oraclecloud.com`, `api.cloudflare.com`, `api.resend.com`, `api.brevo.com`, `api.stripe.com`, `graph.facebook.com`, `sentry.io`, `de.sentry.io`, `api.telegram.org` et `api.hostinger.com` ; seuls les hôtes Google et Anthropic passent. Tant qu'ils ne sont pas ajoutés dans les réglages de l'environnement (réglage à vous seul ; le coordinateur vous donne la liste), Claude ne peut piloter aucun de ces services par API : c'est le préalable de la règle n°1.
 
-**Ordre conseillé.** L'étape 0 d'abord. Les étapes 1 à 6 et la partie Resend de l'étape 7 bloquent la phase 1 (ses alertes e-mail partent par Resend) : faites-les ensuite. Les étapes 8 à 11 servent aux phases 2 à 7. L'étape 12 clôt la phase 0.
+**Ordre.** File de Nav au 15 octobre : accès limité Oracle (étape 4), pièces .MA (0), zone Cloudflare et jeton `joutiya-edge` (1), puis N1 Firebase (5), N2 Zero Trust (3), N3 boîtes (2), N4 jeton mail (2), N5 Resend (7), N6 Brevo (7), N7 buckets R2 (3), N8 Meta (9), N9 Console Claude (8), N10 Stripe (10). Les étapes 0 à 7 bloquent la phase 1 (ses alertes partent par Resend et Telegram) ; les étapes 8 à 10 servent aux phases 2 à 7 ; l'étape 11 attend l'avant-lancement ; l'étape 12 suit au fil de l'eau.
 
-## 0. D'abord : le domaine `joutiya.ma` est-il validé ?
+## 0. Le domaine `joutiya.ma` (fil « Documents du domaine .MA »)
 
 Le registre .MA valide chaque domaine sur pièces, envoyées dans les 14 jours suivant l'achat : pour `joutiya.ma`, acheté le 5 octobre 2026, **avant le 19 octobre 2026**. L'examen prend 2 à 4 semaines. Sans pièces, le domaine est suspendu, puis peut être supprimé, sans remboursement ([aide Hostinger](https://www.hostinger.com/support/requirements-to-register-a-ma-domain/)). « Actif » dans hPanel ne prouve pas la validation.
-1. Envoyez au support Hostinger, par leur formulaire de vérification : votre passeport, une courte description de l'usage du site, et un contact administratif. Ce contact doit être une personne physique résidant au Maroc selon Hostinger, de nationalité marocaine selon d'autres registraires : faites-leur préciser.
-2. Le nom du titulaire dans hPanel doit être exactement celui de la pièce : le corriger plus tard impose un transfert payant.
-3. Demandez au support une confirmation écrite de la validation, puis prévenez Claude. Les étapes 1 et 2 peuvent avancer en attendant ; si hPanel refuse le changement de nameservers, prévenez Claude.
+1. Nav remplit le formulaire officiel de vérification .MA de Hostinger (description de l'usage du site comprise), puis suit le dossier avec le Customer Success par le chat de hPanel ; chaque réponse exacte est rapportée au fil.
+2. **Vous :** le passeport (une entreprise individuelle ne fournit pas de certificat d'immatriculation, et le champ « société » reste vide) ; le contact administratif, personne physique de nationalité marocaine résidant au Maroc (nom, adresse, téléphone) ; le nom du titulaire dans hPanel exactement comme sur le passeport (le corriger plus tard impose un transfert payant). Pas de protection WHOIS sur un .MA.
+3. Validation confirmée par écrit : Nav change alors les nameservers vers Cloudflare (étape 1, point 4). Les étapes 1 à 7 avancent en attendant.
 
-## 1. Cloudflare : la zone `joutiya.ma`
+## 1. Cloudflare : la zone `joutiya.ma` (fil « Ajouter joutiya.ma à Cloudflare »)
 
-Cloudflare supprime une zone restée en attente 28 jours : changez les nameservers (point 5) dans la foulée.
-1. Dans votre compte Cloudflare existant : **Add a domain** → `joutiya.ma` → offre **Free**.
-2. Cloudflare importe les enregistrements DNS actuels. Supprimez ceux de la page d'attente Hostinger : le site arrive en phase 1. Gardez ceux du courrier (MX, SPF, DKIM, `autodiscover`, `autoconfig`) : l'étape 2 les règle.
-3. Notez les 2 nameservers donnés par Cloudflare.
-4. Si DNSSEC est actif sur le domaine chez Hostinger, désactivez-le d'abord, puis attendez 24 h.
-5. hPanel : **Domaines** → **Portefeuille de domaines** → **Gérer** (`joutiya.ma`) → **DNS / Nameservers** (ou « Serveurs de noms ») → **Changer les nameservers** → saisissez les 2 nameservers Cloudflare → Enregistrer. Gardez chez Hostinger le verrou de transfert et le renouvellement automatique.
-6. Attendez l'e-mail de Cloudflare annonçant que la zone est active (de quelques minutes à 24 h, parfois plusieurs jours pour un .MA).
+1. Nav, dans votre compte Cloudflare : **Add a domain** → `joutiya.ma` → offre **Free**. Cloudflare importe les enregistrements actuels : ceux de la page d'attente Hostinger sont retirés (le site arrive en phase 1), ceux du courrier (MX, SPF, DKIM, `autodiscover`, `autoconfig`) gardés en « DNS only » (nuage gris). Nav rapporte les 2 nameservers, l'**Account ID** et le **Zone ID**.
+2. Nav prépare le jeton API personnalisé `joutiya-edge` (permissions de `docs/phase-1.md`, étape 3 : compte → Tunnel et Access ; zone `joutiya.ma` seulement → zone, réglages, WAF, règles, DNS ; durée 30 jours) jusqu'à l'écran de résumé. Un jeton limité à une zone ne peut pas la créer : c'est pourquoi Nav ajoute la zone lui-même.
+3. **Vous :** cliquez **Create Token**, rangez la valeur sous `JOUTIYA_CLOUDFLARE_API_TOKEN` dans l'environnement cloud, puis prévenez Claude : un nouveau fil vérifie le jeton, règle la zone (`scripts/cloudflare.ts`) et consigne `accountId` et `zoneId`.
+4. Nameservers : après la validation .MA (étape 0), Nav les change dans hPanel (**Domaines** → **Portefeuille de domaines** → **Gérer** → **DNS / Nameservers**), DNSSEC désactivé 24 h avant s'il est actif, verrou de transfert et renouvellement automatique gardés. Cloudflare supprime une zone restée en attente 28 jours : si la validation .MA tarde, Nav ajoute la zone de nouveau.
 
-À noter : **Account ID** et **Zone ID** (page d'accueil de la zone, colonne de droite).
-
-## 2. Courrier @joutiya.ma : la boîte Hostinger (Z12, choix du 13 octobre)
+## 2. Courrier @joutiya.ma : les boîtes Hostinger (Z12, choix du 13 octobre)
 
 Le courrier arrive dans les boîtes Hostinger de l'offre gratuite liée à votre hébergement : 1 Go par boîte, 100 e-mails reçus et 100 envoyés par jour, jusqu'au 24 janvier 2029. Cloudflare Email Routing n'est pas utilisé : un domaine n'a qu'une destination de courrier.
-
-Une fois la zone active :
-1. hPanel → **Emails** → `joutiya.ma` → **Paramètres du nom de domaine** : Hostinger affiche les enregistrements attendus. Dans Cloudflare (**DNS** → **Records**), vérifiez qu'ils y sont tous, en « DNS only » (nuage gris), puis relancez la vérification dans hPanel :
-   - MX `@` : `mx1.hostinger.com` (priorité 5) et `mx2.hostinger.com` (priorité 10), sans autre MX ;
-   - un seul SPF sur `@` : `v=spf1 include:_spf.mail.hostinger.com ~all` ;
-   - DKIM : 3 CNAME, `hostingermail-a._domainkey` vers `hostingermail-a.dkim.mail.hostinger.com`, puis de même avec `b` et `c` ;
-   - CNAME `autodiscover` vers `autodiscover.mail.hostinger.com` et `autoconfig` vers `autoconfig.mail.hostinger.com` ;
-   - le TXT de vérification affiché par hPanel.
-2. Ajoutez un DMARC : TXT `_dmarc`, valeur `v=DMARC1; p=none;`.
-3. `contact@` existe déjà ; créez les boîtes `dsa@`, `abuse@` et `dpo@` : l'offre n'accepte qu'un alias par boîte, et les boîtes sont gratuites.
-4. **Agentic Mail** → **Accès API** : révoquez l'ancien jeton (celui du fichier « Cody Joutiya API.txt »), puis supprimez ce fichier, corbeille comprise. Créez ensuite un jeton limité à ces 4 boîtes, avec les seules actions SMTP/IMAP (pas la gestion des webhooks). Rangez-le dans votre environnement cloud Claude sous `HOSTINGER_MAIL_API_TOKEN`, jamais dans le chat : Claude gère alors ces boîtes. Si Agentic Mail n'apparaît pas pour l'offre gratuite héritée, arrêtez-vous et prévenez Claude.
-5. Testez en écrivant à `contact@joutiya.ma` depuis une autre adresse.
-6. **Z11** : dans hPanel, révoquez aussi le jeton API Hostinger à tous droits (page des jetons API) : rien dans le projet n'en a besoin. Si vous préférez le garder, dites-le à Claude et pourquoi.
+1. Claude (jeton `joutiya-edge`) vérifie dans la zone les enregistrements attendus par Hostinger, en « DNS only » : MX `@` vers `mx1.hostinger.com` (priorité 5) et `mx2.hostinger.com` (10), sans autre MX ; un seul SPF, `v=spf1 include:_spf.mail.hostinger.com ~all` ; les 3 CNAME DKIM `hostingermail-a`, `-b`, `-c` `._domainkey` ; `autodiscover` et `autoconfig` ; le TXT de vérification ; et il ajoute le DMARC, TXT `_dmarc` = `v=DMARC1; p=none;`. Nav relance ensuite la vérification dans hPanel (**Emails** → `joutiya.ma` → **Paramètres du nom de domaine**).
+2. Nav (N3) crée les boîtes `dsa@`, `abuse@` et `dpo@` (`contact@` existe ; un alias par boîte au plus, boîtes gratuites). **Vous :** leurs mots de passe, tapés par vous et gardés dans votre gestionnaire.
+3. Nav (N4) prépare dans **Agentic Mail** → **Accès API** un jeton `joutiya-claude-mail` limité à ces 4 boîtes, actions SMTP/IMAP seulement (pas de webhooks). **Vous :** le clic qui le crée, rangement sous `JOUTIYA_HOSTINGER_MAIL_API_TOKEN`, puis prévenez Claude : un nouveau fil lit `contact@` pour vérifier. Nav a vérifié le 15 octobre que la section Agentic Mail (« Boîte mail IA », bêta) est bien présente pour cette offre, sans paiement demandé.
+4. Pas de jeton API Hostinger complet pour Claude (carte du 15 octobre, recommandation « Nav seulement », appliquée sauf avis contraire de votre part) : ces jetons n'ont aucune portée (facturation, moyens de paiement, codes de transfert du domaine). Les quelques actions hPanel restantes sont faites par Nav.
+5. **Z11, à la fin seulement** : quand tout fonctionne, Nav révoque dans hPanel l'ancien jeton mail en clair et le jeton API à tous droits ; **Vous :** supprimez le fichier « Cody Joutiya API.txt », corbeille comprise. Rien n'est révoqué avant.
 
 ## 3. Cloudflare : R2 et Zero Trust
 
-**R2**
-1. **R2 Object Storage** → activez l'offre gratuite (carte demandée ; rien n'est débité sous 10 Go).
-2. Créez 9 buckets en juridiction **European Union (EU)**, non modifiable ensuite : `joutiya-dev-quarantine`, `joutiya-dev-media`, `joutiya-dev-private`, puis les mêmes avec `staging` et `prod`. Cody peut le faire (prompt A).
-3. Aucune clé R2 maintenant : elles arrivent en phase 3.
-
-**Zero Trust**
-1. **Zero Trust** → nom d'équipe `joutiya` (ou `joutiya-ma` s'il est pris) → offre **Free** (carte demandée, 0 €). Si Zero Trust est déjà activé sur ce compte, ne changez rien et prévenez Claude.
-2. Rien d'autre : les applications Access arrivent en phase 1.
-
-À noter : le domaine d'équipe `<équipe>.cloudflareaccess.com` et les noms exacts des 9 buckets.
+- **R2** est activé sur votre compte : les 10 Go gratuits sont partagés avec `punkrecords.fr`, qui en occupe déjà 4,14 Go (relevé de Nav du 15 octobre), soit environ 5,8 Go pour Joutiya ; le garde-fou R2 de la phase 3 lira l'usage du compte entier, pas seulement celui de Joutiya. Nav (N7) crée 9 buckets en juridiction **European Union (EU)**, non modifiable ensuite : `joutiya-dev-quarantine`, `joutiya-dev-media`, `joutiya-dev-private`, puis les mêmes avec `staging` et `prod`. Pourquoi Nav : la permission qui crée des buckets couvre tous les buckets du compte, un jeton ne peut pas être limité à des noms. Les clés S3 du site (phase 3) seront limitées aux buckets Joutiya. Nav rapporte les noms exacts.
+- **Zero Trust** : Nav (N2) → nom d'équipe `joutiya` (ou `joutiya-ma` s'il est pris) → offre **Free**. **Vous :** la carte bancaire (0 €). Nav a vérifié le 15 octobre que Zero Trust n'est pas encore activé sur ce compte. Les applications Access arrivent en phase 1. Nav rapporte le domaine d'équipe `<équipe>.cloudflareaccess.com`.
 
 ## 4. Oracle Cloud (Z1)
 
-Compte Always Free ouvert le 13 octobre 2026, région d'origine `eu-paris-1` (définitive : la VM gratuite ne peut être créée qu'à Paris). Oracle n'autorise qu'un compte gratuit par personne : n'en créez pas d'autre. Il reste :
-1. Activez la double authentification du compte. Restez en offre gratuite : ne passez pas en **Pay As You Go**, même si Oracle le propose, sans en parler d'abord dans le projet.
-2. Ne créez pas la VM vous-même : Claude la crée en phase 1 avec l'accès limité ci-dessous, **avant le 12 novembre 2026** (un compte gratuit inactif 30 jours peut être suspendu ; une VM gratuite inactive 7 jours peut être reprise).
-3. Mentions légales (hébergeur) : gardez une copie du contrat accepté à l'inscription et relevez-y l'entité Oracle, son adresse et son téléphone (Oracle France ou Oracle America selon le contrat) : à donner à Claude pour `config/legal` (`scripts/legal-config.ts`), pas pour `infra/targets.json`.
+Compte Always Free ouvert le 13 octobre 2026, région d'origine `eu-paris-1` (définitive : la VM gratuite ne se crée qu'à Paris), compartiment `joutiya` sous la racine. Un seul compte gratuit par personne. Restez en offre gratuite : jamais **Pay As You Go** sans en parler dans le projet. Claude crée la VM en phase 1, **avant le 12 novembre 2026** (un compte inactif 30 jours peut être suspendu ; une VM gratuite inactive 7 jours peut être reprise). **Vous :** la double authentification du compte, et une copie du contrat accepté à l'inscription (entité Oracle, adresse, téléphone : pour `config/legal`, via `scripts/legal-config.ts`).
 
-À noter : la région `eu-paris-1`, l'OCID de la tenancy et celui du compartiment `joutiya` (accès limité, point 1).
-
-**Accès limité pour Claude** (votre choix du 13 octobre)
-
-Claude reçoit un utilisateur à lui, sans accès à la console, qui n'agit que dans un compartiment `joutiya` plafonné au niveau gratuit. Il ne peut pas passer le compte en payant : c'est réservé aux administrateurs. Votre accès administrateur reste à vous seul, et Claude ne crée rien sans votre accord. Tout se fait depuis le menu ☰ de la console Oracle, par vous ou par Claude dans votre navigateur :
-1. **Identity & Security** → **Compartments** → ouvrez `joutiya` (créé le 13 octobre sous la racine ; ne le recréez pas) → copiez son OCID. Celui de la tenancy est dans le menu profil → **Tenancy**.
-2. **Identity & Security** → **Domains** → `Default` → **User management** :
-   - **Groups** → **Create group** : nom `joutiya-automation`, sans cocher « User can request access » → créez.
-   - **Users** → **Create** : prénom `Joutiya`, nom `Claude`, décochez « Use the email address as the username », identifiant `joutiya-claude`, e-mail `votre.adresse+joutiya@gmail.com`, cochez le groupe `joutiya-automation` → créez. Ignorez l'e-mail d'activation s'il arrive.
-   - Ouvrez `joutiya-claude` → **Edit user capabilities** : ne laissez cochée que **API keys** (décochez notamment *Local password*, ce qui ferme la console à cet utilisateur) → **Save changes**.
-3. **Identity & Security** → **Policies** → *List scope* : la racine → **Create Policy** : nom `joutiya-automation-policy`, compartiment : la racine → **Show manual editor** → collez ces 4 lignes, puis validez :
+**Accès limité de Claude** (votre choix du 13 octobre), créé par Nav le 15 octobre : groupe `joutiya-automation` ; utilisateur `joutiya-claude`, capacité **API keys** seulement (ni console ni mot de passe) ; quota `joutiya-free-tier` à la racine :
+```text
+zero compute-core quotas in compartment joutiya
+set compute-core quota standard-a1-core-count to 2 in compartment joutiya
+zero compute-memory quotas in compartment joutiya
+set compute-memory quota standard-a1-memory-count to 12 in compartment joutiya
+set block-storage quota total-storage-gb to 200 in compartment joutiya
+set block-storage quota backup-count to 0 in compartment joutiya
+set vcn quota reserved-public-ip-count to 0 in compartment joutiya
+```
+Dans `joutiya`, il ne peut exister qu'une VM Ampere de 2 OCPU et 12 Go au plus, avec 200 Go de disque : le niveau gratuit. Claude ne peut pas passer le compte en payant (réservé aux administrateurs) ; votre accès administrateur reste à vous seul.
+1. Politique `joutiya-automation-policy` (à la racine, modifiable par vous seul), préparée par Nav :
    ```text
    Allow group joutiya-automation to manage instance-family in compartment joutiya
    Allow group joutiya-automation to manage virtual-network-family in compartment joutiya
    Allow group joutiya-automation to manage volume-family in compartment joutiya
    Allow group joutiya-automation to inspect compartments in tenancy
    ```
-   La dernière ligne ne donne que les noms des compartiments, utiles pour lister les zones de disponibilité. Placée à la racine, cette règle n'est modifiable que par vous. Oracle peut réécrire le groupe en `'Default'/'joutiya-automation'` : c'est équivalent.
-4. **Governance & Administration** → **Tenancy Management** → **Quota policies** → **Create quota** : nom `joutiya-free-tier`, compartiment : la racine, puis collez ces lignes dans cet ordre (les lignes `zero` d'abord) et créez :
-   ```text
-   zero compute-core quotas in compartment joutiya
-   set compute-core quota standard-a1-core-count to 2 in compartment joutiya
-   zero compute-memory quotas in compartment joutiya
-   set compute-memory quota standard-a1-memory-count to 12 in compartment joutiya
-   set block-storage quota total-storage-gb to 200 in compartment joutiya
-   set block-storage quota backup-count to 0 in compartment joutiya
-   set vcn quota reserved-public-ip-count to 0 in compartment joutiya
-   ```
-   Dans `joutiya`, il ne peut alors exister qu'une VM Ampere de 2 OCPU et 12 Go au plus, avec 200 Go de disque : le niveau gratuit. Comptez 10 minutes avant l'effet.
-5. **Domains** → `Default` → **Users** → `joutiya-claude` → **API keys** → **Add API key** → **Generate API key pair** → **Download private key** → **Add**. La fenêtre *Configuration file preview* affiche `user`, `fingerprint`, `tenancy` et `region` : notez-les, ce ne sont pas des secrets. Seuls `tenancy` et l'OCID du compartiment vont dans `infra/targets.json` (étape 12) ; `user` et `fingerprint` ne vont que dans l'environnement cloud, point 6.
-6. Rangez dans votre environnement cloud Claude (celui du projet, partagé avec vos autres projets), comme `HOSTINGER_MAIL_API_TOKEN`, et jamais dans le chat :
-   - `JOUTIYA_OCI_USER`, `JOUTIYA_OCI_TENANCY`, `JOUTIYA_OCI_FINGERPRINT`, `JOUTIYA_OCI_REGION` (`eu-paris-1`) et `JOUTIYA_OCI_COMPARTMENT` (l'OCID du point 1) ;
-   - `JOUTIYA_OCI_KEY_B64` : la clé privée téléchargée, encodée sur une ligne ; Cody la met dans votre presse-papiers sans l'afficher (prompt O). Collez-la, videz le presse-papiers (et son historique), puis supprimez le fichier `.pem` : en cas de perte, vous en générerez une autre.
-7. Prévenez Claude dans le projet : une nouvelle session vérifie l'accès par une simple lecture, et `node scripts/assert-target.ts` compare `JOUTIYA_OCI_TENANCY`, `JOUTIYA_OCI_COMPARTMENT` et `JOUTIYA_OCI_REGION` à `infra/targets.json`.
+   **Vous :** la session de Nav exige votre accord écrit pour une attribution de droits : écrivez « oui » dans le fil « Consoles via ton navigateur ». Oracle peut réécrire le groupe en `'Default'/'joutiya-automation'` : c'est équivalent.
+2. Clé API de `joutiya-claude` : Nav prépare **Add API key** → **Generate API key pair** ; **Vous :** **Download private key** puis **Add** (fait le 15 octobre). L'aperçu de configuration affiche `user`, `fingerprint`, `tenancy` et `region` : Nav les relève, ce ne sont pas des secrets.
+3. Rangement dans l'environnement cloud, noms définitifs : `JOUTIYA_OCI_TENANCY`, `JOUTIYA_OCI_USER`, `JOUTIYA_OCI_COMPARTMENT`, `JOUTIYA_OCI_REGION` (`eu-paris-1`), `JOUTIYA_OCI_FINGERPRINT`, et `JOUTIYA_OCI_KEY_B64` pour la clé privée encodée en base64 sur une ligne (prompt O : Cody la met dans votre presse-papiers sans l'afficher ; collez, videz le presse-papiers et son historique, supprimez le fichier `.pem`). Fait le 15 octobre pour les 6 variables. `node scripts/assert-target.ts` compare `JOUTIYA_OCI_TENANCY`, `_USER`, `_COMPARTMENT` et `_REGION` à `infra/targets.json`, où ils sont consignés.
+4. Vérification : le fil « Vérifier la clé Oracle » contrôle le format, l'empreinte, l'authentification, puis l'autorisation une fois la politique en place. Au plus 3 clés par utilisateur ; les suivantes peuvent être ajoutées par API.
+5. **Rotation finale** (votre consigne du 15 octobre) : quand tout est en place, Nav prépare une nouvelle clé sur `joutiya-claude` ; **Vous :** Download + Add, puis la nouvelle valeur remplace `JOUTIYA_OCI_KEY_B64` (et `JOUTIYA_OCI_FINGERPRINT`) hors du chat ; Nav supprime ensuite l'ancienne clé dans la console, et un nouveau fil vérifie.
 
 ## 5. Firebase : 3 projets Spark (Z2)
 
-Cody peut faire les points 1 à 3 (prompt B), une fois que vous avez lancé vous-même `npx firebase-tools login` dans un terminal : cette connexion demande un terminal interactif.
-1. console.firebase.google.com → **Créer un projet** `joutiya-dev` → si l'identifiant proposé porte un suffixe, notez-le tel quel → **désactivez Google Analytics** → Créer.
-2. Recommencez pour `joutiya-staging` et `joutiya-prod`.
-3. Dans chaque projet : **Firestore Database** → **Créer une base de données** → édition **Standard** → emplacement **europe-west9 (Paris)** → mode production. **Irréversible** : la région ne change plus. Si Paris est refusé, arrêtez-vous et prévenez Claude avant de prendre `europe-west1`.
-4. Restez sur l'offre **Spark** : ne passez jamais à Blaze, et ne cliquez pas « Upgrade » vers Identity Platform dans Authentication (sur Spark, cela plafonne à 3 000 utilisateurs actifs par jour). Authentication s'active en phase 2.
+Nav (N1), connecté à votre compte Google sur console.firebase.google.com :
+1. **Créer un projet** `joutiya-dev` → si l'identifiant proposé porte un suffixe, il est gardé tel quel → **Google Analytics désactivé** → Créer. De même `joutiya-staging` et `joutiya-prod`.
+2. Dans chaque projet : **Firestore Database** → **Créer une base de données** → édition **Standard** → emplacement **europe-west9 (Paris)** → mode production. **Irréversible** : la région ne change plus. Si Paris est refusé, Nav s'arrête et le rapporte avant toute autre région.
+3. Rien d'autre : offre **Spark** toujours (jamais Blaze, jamais « Upgrade » vers Identity Platform, qui plafonne à 3 000 utilisateurs actifs par jour sur Spark). Authentication s'active en phase 2 : son client OAuth Google n'existe que dans la console, Nav le fera alors.
+4. **Vous :** le mot de passe Google ou un code si demandé.
 
-Un identifiant de projet est définitif et jamais réutilisable, même après suppression. Le quota de projets d'un compte Google sans facturation est faible et varie selon le compte (projets Google Cloud compris) : si la création est refusée, demandez une hausse de quota (gratuite) plutôt que de supprimer un projet existant.
+Pourquoi Nav : un compte de service ne peut pas créer de projet hors d'une organisation Google. Un identifiant de projet est définitif et jamais réutilisable, même supprimé (la suppression compte encore 30 jours dans le quota). Le quota de projets d'un compte sans facturation est d'environ 5 à 10 : en cas de refus, demander une hausse gratuite plutôt que supprimer. Les comptes de service de Claude (`joutiya-claude`, rôles minimaux) et l'accès de la VM (fédération d'identité X.509) arrivent en phases 1 et 2, dans leurs fils.
 
-À noter : les 3 identifiants de projet, le numéro de chaque projet (**Paramètres du projet**, ou `npx firebase-tools projects:list`) et la région de chaque base.
+Nav rapporte : les 3 identifiants, le numéro de chaque projet (**Paramètres du projet**) et la région de chaque base.
 
-## 6. Bot Telegram (alertes)
+## 6. Bot Telegram (alertes) : vous et Cody
 
+Pas d'API : seul @BotFather crée un bot, et il affiche le jeton dans la conversation.
 1. Telegram → **@BotFather** → `/newbot` → nom « Joutiya Alertes » → identifiant finissant par `bot`, par exemple `joutiya_alertes_bot`.
-2. Copiez le jeton dans `.env.local` : `TELEGRAM_BOT_TOKEN=…`
-3. Ouvrez votre bot, envoyez-lui `/start`, puis lancez le prompt C dans les 24 h : Telegram ne garde les messages que 24 h.
-4. Cody récupère votre identifiant de conversation (prompt C) ; ajoutez-le dans `.env.local` : `TELEGRAM_CHAT_ID=…`
+2. Copiez le jeton dans `.env.local` : `TELEGRAM_BOT_TOKEN=…` (`/token` chez BotFather le régénère en cas de doute).
+3. Ouvrez votre bot, envoyez-lui `/start`, puis lancez le prompt C dans les 24 h : Telegram ne garde les messages que 24 h. Cody rend votre identifiant de conversation : `TELEGRAM_CHAT_ID=…` dans `.env.local`.
 
 ## 7. E-mail : Resend et Brevo (après l'étape 1)
 
 **Resend** (e-mails du site)
-1. resend.com → inscription avec votre Gmail, offre Free, sans carte.
-2. **Domains** → **Add domain** → `notif.joutiya.ma`, région **eu-west-1 (Irlande)**. **Irréversible** : changer de région impose de recréer le domaine.
-3. Ajoutez dans Cloudflare les enregistrements affichés, en « DNS only » (nuage gris), puis **Verify**.
-4. Ajoutez un enregistrement DMARC pour ce sous-domaine : type TXT, nom `_dmarc.notif`, valeur `v=DMARC1; p=none;`. Un seul : si Resend ou Brevo en propose un autre, gardez un unique enregistrement `_dmarc.notif`.
-5. Pas de clé API maintenant : elles arrivent avec les alertes de la phase 1, puis en phase 2.
+1. Nav (N5) : inscription sur resend.com avec votre Gmail (ou l'alias), offre Free, sans carte ; équipe « Joutiya » ; puis **API Keys** → clé `joutiya-claude`, permission **Full access** (seul niveau au-dessus de « Sending access », nécessaire pour les domaines, leur vérification, les webhooks et la création des clés d'envoi), préparée jusqu'au clic. **Vous :** mot de passe, code reçu par e-mail, le clic qui crée la clé, rangement sous `JOUTIYA_RESEND_API_KEY`, puis prévenez Claude.
+2. Claude, par API : domaine `notif.joutiya.ma` en région **eu-west-1 (Irlande)** (irréversible), ses enregistrements dans la zone Cloudflare en « DNS only », un unique DMARC, TXT `_dmarc.notif` = `v=DMARC1; p=none;`, puis la vérification (après le changement de nameservers). Les clés d'envoi du site et du Worker sont créées par API par le fil de déploiement et rangées directement, jamais affichées. Offre Free : 3 000 e-mails par mois, 100 par jour.
 
 **Brevo** (secours, pour les seuls e-mails de sécurité)
-1. brevo.com → inscription, offre Free, sans carte.
-2. Authentifiez le domaine `notif.joutiya.ma` avec les enregistrements affichés (dans Cloudflare, « DNS only »).
-3. Pas de clé API avant la phase 2.
+1. Nav (N6) : inscription sur brevo.com (Gmail ou alias), offre Free, sans carte ; **SMTP & API** → clé API v3 `joutiya-claude`, expiration 1 an (ces clés couvrent tout le compte, d'où le compte dédié). **Vous :** mot de passe, code de vérification de l'appareil, le clic qui crée la clé, rangement sous `JOUTIYA_BREVO_API_KEY`. « Bloquer les adresses IP inconnues » reste désactivé : les sessions cloud changent d'adresse.
+2. Claude, par API : authentification du domaine `notif.joutiya.ma` (après le changement de nameservers).
 
-## 8. Claude Console : organisation « Joutiya » (Z4)
+## 8. Console Claude : organisation « Joutiya » (Z4)
 
-1. console.anthropic.com → connexion avec votre Gmail → créez l'organisation **Joutiya**. Si votre Gmail a déjà une organisation et que le sélecteur d'organisation ne permet pas d'en créer une autre, prenez l'alias `+joutiya` (voir les règles). Cette organisation sert au site seulement : Cody n'utilise aucune de ses clés, sinon il consomme les 5 $.
-2. **Settings** → **Workspaces** : créez `joutiya-prod` et `joutiya-staging`.
-3. **Billing** → **Spend limits** → **Set limit** : limite mensuelle de l'organisation à **5 $** ; puis **Workspaces** → `joutiya-staging` → **Limits** → **Change limit**, plus basse. Si la page ne le propose pas encore, faites-le à l'achat des crédits.
-4. N'achetez pas de crédits maintenant : l'IA arrive en phase 5 et les crédits expirent au bout d'un an. À l'achat, laissez la recharge automatique désactivée.
+Nav (N9) sur platform.claude.com (anciennement console.anthropic.com), avec votre Gmail ; si ce Gmail a déjà une organisation et que le sélecteur n'en propose pas de nouvelle, inscription avec l'alias `+joutiya`. Cette organisation sert au site seulement : Cody n'utilise aucune de ses clés, sinon il consomme les 5 $.
+1. Organisation **Joutiya** (**Settings** → **Organization**).
+2. **Settings** → **Workspaces** : `joutiya-prod` et `joutiya-staging`.
+3. **Billing** → **Spend limits** → **Set limit** : 5 $ par mois pour l'organisation ; puis page **Workspaces** → `joutiya-staging` → **Spend limits** : 2 $ (au plus la limite de l'organisation ; impossible sur le Default Workspace). Si ces réglages n'apparaissent qu'après un achat de crédits, ils seront faits à l'achat.
+4. Pas de crédits maintenant : l'IA arrive en phase 5 et les crédits expirent au bout d'un an ; à l'achat, recharge automatique désactivée. **Vous :** mot de passe et code.
+5. Clés en phase 5 : la clé d'administration (**Settings** → **Admin keys**, préfixe `sk-ant-admin01-`, sans portée possible, affichée une fois, avec une date d'expiration) va sous `JOUTIYA_ANTHROPIC_ADMIN_KEY`, pour la lecture de l'usage et des coûts et la gestion des espaces ; elle ne peut pas créer de clés API : celles du site sont créées dans la Console, par espace de travail (**Vous :** le clic), pour `.env.local` et la VM.
 
-À noter : l'**Organization ID** (Settings → Organization).
+Nav rapporte : l'**Organization ID** (Settings → Organization).
 
 ## 9. WhatsApp de Meta (Z3)
 
-Prérequis : une carte SIM prépayée marocaine, jamais inscrite sur WhatsApp, qui peut recevoir un SMS ou un appel au moment de l'ajout. Ce numéro ne pourra plus servir dans l'application WhatsApp.
-1. business.facebook.com → créez le portefeuille business **Joutiya**.
-2. developers.facebook.com → **Créer une app** → cas d'usage « Connect with customers through WhatsApp » → nom **Joutiya**, rattachée au portefeuille Joutiya. Meta fournit un numéro de test : il servira en dev et en staging.
-3. WhatsApp → **API Setup** → **Add phone number** → nom affiché « Joutiya » → validez par SMS ou appel. Le nom affiché passe en revue chez Meta. L'enregistrement final du numéro (code PIN à 6 chiffres) et la mise en ligne de l'app se font en phase 2.
-4. N'ajoutez pas de moyen de paiement : Joutiya ne fait que recevoir.
-5. Pas de jeton ni de secret d'app maintenant : ils arrivent en phase 2.
+Nav (N8), depuis votre profil Facebook :
+1. business.facebook.com → portefeuille business **Joutiya**.
+2. developers.facebook.com → **Créer une app** → cas d'usage WhatsApp (« Connect with customers through WhatsApp » ou équivalent) → nom **Joutiya**, rattachée au portefeuille Joutiya → produit WhatsApp : Meta fournit un numéro de test, qui servira en dev et en staging.
+3. Rien d'autre maintenant : pas de numéro, pas de moyen de paiement (Joutiya ne fait que recevoir, et la réception est gratuite), pas de vérification de l'entreprise, pas d'utilisateur système ni de jeton. **Vous :** mot de passe Facebook et code.
 
-À noter : Business ID, App ID, puis le **WhatsApp Business Account ID** et le **Phone number ID** du numéro de test (dev et staging, mêmes valeurs) et du vrai numéro (prod : le garde-fou exige qu'il diffère).
+En phase 2, par API : ajout du vrai numéro (carte SIM prépayée marocaine jamais inscrite sur WhatsApp, qui ne pourra plus servir dans l'application ; **Vous :** le code reçu par SMS ou appel), enregistrement avec un PIN à 6 chiffres, utilisateur système `joutiya-claude` et son jeton (`whatsapp_business_management`, `whatsapp_business_messaging` ; **Vous :** le clic qui le révèle, rangement sous `JOUTIYA_META_SYSTEM_TOKEN`). Le webhook de l'app se règle dans le tableau de bord (Nav). Le nom affiché n'est examiné par Meta qu'après la vérification de l'entreprise (pièces : **Vous**).
+
+Nav rapporte : Business ID, App ID, le **WhatsApp Business Account ID** et le **Phone number ID** du numéro de test (dev et staging) ; ceux du vrai numéro suivront en phase 2 (prod : le garde-fou exige qu'il diffère).
 
 ## 10. Stripe : nouveau compte « Joutiya » (Z7)
 
-1. dashboard.stripe.com → sélecteur de compte (en haut à gauche) → **Nouveau compte** → nom **Joutiya**, pays France.
-2. Ne l'activez pas : il sert en mode test jusqu'à la phase 7.
+Nav (N10) sur dashboard.stripe.com, sous votre connexion : sélecteur de compte (en haut à gauche) → **Nouveau compte** → nom **Joutiya**, pays France. Il n'est pas activé : mode test jusqu'à la phase 7. Pas de clé maintenant ; en phase 7, des clés restreintes (`rk_test_`, puis `rk_live_`, permissions par ressource) créées dans le tableau de bord avec la double authentification, la clé live n'étant affichée qu'une fois (**Vous :** le clic). **Vous :** mot de passe et code.
 
-À noter : l'identifiant du compte, au format `acct_…`.
+Nav rapporte : l'identifiant du compte, au format `acct_…`.
 
-## 11. Démarches administratives (gratuites)
+## 11. Démarches administratives (gratuites, avant le lancement)
 
-- Guichet unique (formalites.entreprises.gouv.fr) → modification de l'entreprise → ajoutez l'activité de plateforme de petites annonces en ligne et de régie publicitaire, avant tout revenu, AdSense compris.
-- Vérifiez au registre (RNE) que l'adresse est la domiciliation du 6 rue d'Armaillé, 75017 Paris ; sinon, déclarez le transfert. Relevez le nom exact inscrit au registre (le mémento fiscal indique « DARKAOUI ADIL ») : à donner à Claude pour `config/legal`, pas pour `infra/targets.json`.
+Reportée à l'avant-lancement (15 octobre) : une formalité officielle sur votre entreprise, avec un éventuel transfert d'adresse, se fait à votre initiative, et rien ne l'exige avant le lancement ; ce n'est pas un critère de fin de phase 0. Guichet unique (formalites.entreprises.gouv.fr), avant tout revenu, AdSense compris. **Vous :** la connexion FranceConnect dans le navigateur de Nav, la signature et toute pièce d'identité. Nav remplit la modification de l'entreprise : ajout de l'activité de plateforme de petites annonces en ligne et de régie publicitaire ; vérification que l'adresse inscrite au registre (RNE) est la domiciliation du 6 rue d'Armaillé, 75017 Paris, sinon déclaration du transfert dans la même formalité. Le nom exact inscrit au registre va dans `config/legal` (`scripts/legal-config.ts`), pas dans `infra/targets.json` ; Nav ne relève aucune autre donnée personnelle.
 
 ## 12. Consigner les identifiants
 
-Donnez les identifiants notés, y compris ceux rendus par les prompts A et B, à Cody (prompt D), ou collez-les dans le fil du projet. Le prompt D peut être lancé deux fois : après les étapes 1 à 6, pour débloquer la phase 1, puis à la fin. RevenueCat reste vide jusqu'à la phase 7 ; les identifiants de Tunnel et les audiences Access (`sshTunnelId`, `tunnelId`, `accessAud`) sont remplis par Cody en phase 1.
+Claude consigne dans `infra/targets.json`, par PR, les identifiants rapportés par Nav : Cloudflare (`accountId`, `zoneId`, domaine d'équipe Zero Trust, buckets), Oracle (fait : tenancy, compartiment, utilisateur, région), Firebase (identifiants et numéros de projet), Meta et Stripe. `node scripts/assert-target.ts` et ses tests passent en CI. RevenueCat reste vide jusqu'à la phase 7 ; les identifiants de Tunnel et les audiences Access (`sshTunnelId`, `tunnelId`, `accessAud`) sont remplis en phase 1.
 
-**Fin de la phase 0 :** jeton Hostinger à tous droits révoqué (Z11) ou décision motivée, `infra/targets.json` rempli, `node scripts/assert-target.ts` au vert, aucune clé dans le dépôt.
+Pour la phase 2, Sentry (organisation en région UE, choisie à l'inscription par Nav ; jeton d'intégration interne pour Claude : `project:write`, `event:read`, `event:write`, `org:ci`) suit le même modèle.
+
+**Fin de la phase 0 :** `infra/targets.json` rempli et garde-fou au vert en CI ; chaque jeton rangé (`JOUTIYA_CLOUDFLARE_API_TOKEN`, `JOUTIYA_HOSTINGER_MAIL_API_TOKEN`, `JOUTIYA_RESEND_API_KEY`, `JOUTIYA_BREVO_API_KEY`, `JOUTIYA_OCI_*`) vérifié par un nouveau fil ; clé Oracle tournée (nouvelle `JOUTIYA_OCI_KEY_B64`, ancienne clé supprimée dans la console) ; Z11 : anciens jetons Hostinger révoqués et fichier « Cody Joutiya API.txt » supprimé ; aucune clé dans le dépôt ni dans le chat.
 
 ## Prompts Cody
 
-À coller dans Cody, depuis le dossier du dépôt à jour (`git pull`). Node 24 ou plus récent est nécessaire (`node --version`).
-
-**A. Buckets R2** (après l'activation de R2, étape 3)
-
-```text
-Crée les buckets R2 de Joutiya avec Wrangler. Travaille depuis un dossier temporaire vide, hors du dépôt, pour que Wrangler ne lise aucun fichier .env. Lance `npx wrangler login` (je valide dans le navigateur), puis `npx wrangler whoami` : vérifie qu'il annonce une connexion OAuth, et non un jeton d'API ou une clé, sur le compte où la zone joutiya.ma a été ajoutée, et donne-moi son Account ID. Si whoami annonce un API Token (un CLOUDFLARE_API_TOKEN d'un autre projet est défini dans le shell), arrête-toi et dis-le-moi. Si Wrangler demande de choisir un compte, préfixe chaque commande par CLOUDFLARE_ACCOUNT_ID=<cet Account ID>. Crée ensuite en juridiction UE, avec `npx wrangler r2 bucket create <nom> --jurisdiction eu`, les 9 buckets joutiya-dev-quarantine, joutiya-dev-media, joutiya-dev-private, joutiya-staging-quarantine, joutiya-staging-media, joutiya-staging-private, joutiya-prod-quarantine, joutiya-prod-media et joutiya-prod-private. Ne modifie et ne supprime aucune ressource existante ; si un nom est refusé, arrête-toi et dis-le-moi. Vérifie la liste des buckets UE, donne-moi l'Account ID et les noms exacts sans rien écrire dans le dépôt, puis lance `npx wrangler logout`.
-```
-
-**B. Projets Firebase** (étape 5)
-
-```text
-Crée les 3 projets Firebase de Joutiya avec firebase-tools. Je me suis connecté moi-même avec `npx firebase-tools login`. Travaille depuis un dossier temporaire vide, hors du dépôt. Crée joutiya-dev, joutiya-staging et joutiya-prod avec `npx firebase-tools projects:create <id> --display-name "Joutiya <env>"` ; si un identifiant est pris, ajoute un suffixe de 4 chiffres et dis-le-moi. Ne touche à aucun autre projet et n'active aucune facturation (offre Spark). Pour chaque projet, crée la base Firestore avec `npx firebase-tools firestore:databases:create "(default)" --location europe-west9 --edition standard --project <id>`, en ajoutant `--delete-protection ENABLED` pour la prod ; si europe-west9 est refusé, arrête-toi et demande-moi. Donne-moi les identifiants exacts, le numéro de chaque projet (`npx firebase-tools projects:list`) et la région de chaque base sans rien écrire dans le dépôt, puis lance `npx firebase-tools logout`.
-```
+À coller dans Cody, depuis le dossier du dépôt à jour (`git pull`). Node 24 ou plus récent (`node --version`). Les anciens prompts A (buckets R2), B (projets Firebase) et D (identifiants) ne servent plus : Nav crée les buckets et les projets, Claude consigne les identifiants.
 
 **C. Identifiant de conversation Telegram** (étape 6)
 
@@ -202,15 +159,8 @@ Crée les 3 projets Firebase de Joutiya avec firebase-tools. Je me suis connect�
 J'ai mis TELEGRAM_BOT_TOKEN dans .env.local et envoyé /start à mon bot. Vérifie d'abord que TELEGRAM_BOT_TOKEN et TELEGRAM_CHAT_ID ne sont pas déjà définis dans le shell (une variable du shell l'emporte sur .env.local) ; si c'est le cas, arrête-toi et dis-le-moi. Appelle la méthode getUpdates de l'API Telegram en lisant le jeton depuis .env.local (par exemple avec `node --env-file=.env.local`), sans jamais afficher le jeton, et donne-moi seulement le chat id. Envoie ensuite le message « Joutiya : alertes OK » à ce chat avec sendMessage.
 ```
 
-**O. Clé Oracle de Claude** (étape 4, accès limité, point 6)
+**O. Clé Oracle de Claude** (étape 4, points 3 et 5)
 
 ```text
 La clé privée de l'utilisateur Oracle joutiya-claude est dans <chemin du fichier .pem téléchargé>. Encode-la en base64 sur une seule ligne, sans retour à la ligne, et copie le résultat dans mon presse-papiers avec l'outil de mon système. Ne l'affiche jamais et ne l'écris dans aucun fichier ni dans le dépôt. Vérifie seulement que le contenu copié, une fois décodé, commence par « -----BEGIN », et dis-moi si c'est le cas. Ne fais rien d'autre.
-```
-
-**D. Consigner les identifiants** (étape 12)
-
-```text
-Depuis main à jour, inscris dans infra/targets.json les identifiants ci-dessous (ce ne sont pas des secrets ; laisse null ce qui manque, y compris les OCID Oracle et les numéros de projet Firebase si je ne les donne pas). Lance `node scripts/assert-target.ts` et `node --test scripts/assert-target.test.ts` jusqu'au vert, puis pousse une branche phase-0-targets et ouvre une PR vers main intitulée « Record phase 0 identifiers ». Aucune clé ni aucun secret dans le commit.
-<collez ici les identifiants notés>
 ```
