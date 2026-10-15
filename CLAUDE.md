@@ -15,17 +15,21 @@ subscriptions, Google Ads slots, moderation).
   questionable, say so with facts and recommend the stronger option.
 - No "I'm not a lawyer/doctor" disclaimers.
 
-## Project state (2026-10-12)
+## Project state (2026-10-15)
 
-- Architecture v3 ("start at 0 EUR") validated by the owner on 2026-10-12. MVP phase 0
-  is under way; launch is planned after phases 0-6 (~week 16). Source of truth:
-  the architecture doc (Claude Doc "Architecture du MVP v3"), copy in the project
-  files as `joutiya/architecture-final.md`; read only the section you need (11 sections,
-  ~175 KB). Deviations need the owner's approval.
-- The owner picks the logo from concepts before brand integration.
-- No cloud resource is created, and no existing account completed, without the
-  owner's explicit approval; all targets are listed in `infra/targets.json` and checked
-  by `scripts/assert-target.ts`.
+- Architecture v3 ("start at 0 EUR") validated by the owner on 2026-10-12; launch is
+  planned after phases 0-6 (~week 16). Source of truth: the architecture doc (Claude Doc
+  "Architecture du MVP v3"), copy in the project files as `joutiya/architecture-final.md`;
+  read only the section you need (11 sections, ~175 KB). Deviations need the owner's
+  approval.
+- Phase 0 (owner accounts and services, `docs/phase-0.md`) is in progress on the owner's
+  side. Phase 1 code (app, Docker, VM, Cloudflare, CI) is merged; its owner steps are in
+  `docs/phase-1.md`. Phase 2 must deliver client config at runtime: one image serves
+  staging and prod, so no build-time `NEXT_PUBLIC_*`.
+- Brand: final logo files are in `public/brand/` (Moroccan door; ochre, green, gold, cream).
+- No cloud resource is created, and no existing account completed, without the owner's
+  explicit approval; all targets are listed in `infra/targets.json` and checked by
+  `scripts/assert-target.ts`.
 
 ## Architecture
 
@@ -52,10 +56,16 @@ subscriptions, Google Ads slots, moderation).
 
 ## Hard rules
 
-- **Third-party services**: use only new dedicated "Joutiya" projects. Never write
-  to an existing project on those accounts.
-- **Secrets**: never put keys, tokens or `.env` in Git, PRs, logs or chat. Only
-  `.env.example` (no values) is versioned.
+- **Accounts and keys**: every service gets a new, dedicated, free "Joutiya" account or
+  project (owner decision, 2026-10-12); never reuse, write to or alter an existing one.
+  Only the Claude cloud environment stays shared with the owner's other projects until
+  Joutiya has revenue: its keys belong to those projects, so scripts read `JOUTIYA_*`
+  names only (`JOUTIYA_CLOUDFLARE_API_TOKEN`, never `CLOUDFLARE_API_TOKEN`), never
+  modify or delete a resource not named `joutiya-*` or not listed in `infra/targets.json`,
+  and need the owner's approval to create a `joutiya-*` resource in an existing account.
+- **Secrets**: never put keys, tokens or `.env` files in Git, PRs, logs or chat; print
+  variable names, never values. Only `.env.example` (no values) is versioned; local
+  secrets live in `.env.local`.
 - **Legal**: publisher Adark Prime; the only address to display is 6 rue
   d'Armaillé, 75017 Paris. Never use or ask for a personal address. Legal form,
   capital and VAT are config variables, never hardcoded. The platform is a neutral
@@ -85,11 +95,15 @@ subscriptions, Google Ads slots, moderation).
 - Thorough in reasoning, concise in output. No openers, closing fluff or emojis.
 - Never guess APIs, versions, flags or package names: verify in code or docs first.
 - Skills in `.claude/skills/`: `frontend-design` for any UI work (premium look is
-  a requirement), `webapp-testing` to check UI in a browser before handing back,
-  `gemini-crosscheck` to second-check public-info research (free tier: no user, listing
-  or repo data).
-- Do not read `node_modules/`, `.next/`, `dist/`, `build/`, `coverage/` or lockfiles
-  unless specifically needed.
+  a requirement), `webapp-testing` to check UI in a real browser (the repo's Node
+  Playwright) before handing back, `gemini-crosscheck` to second-check public-info
+  research (free tier: no user, listing or repo data).
+- `.claude/settings.json` denies reading secret files (`.env`, `.env.local`, `.envrc`,
+  `secrets/`, `*.pem`, service-account JSON) and generated output (`.next/`, `dist/`,
+  `build/`, `coverage/`), through Read and through `cat`/`head`/`tail`/`sed` in Bash, and
+  dumping the environment (`env`, `printenv`, bare `set`/`export`); `.env.example` stays
+  readable. A guard, not a sandbox. Do not scan `node_modules/` or lockfiles; open one
+  file there only to verify an API.
 - Delegate verbose output (tests, logs, web docs) to a subagent that returns only a
   summary.
 - Keep this file under 200 lines; specialized procedures go in a Skill
