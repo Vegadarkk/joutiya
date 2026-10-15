@@ -14,7 +14,8 @@ type Shape = Record<string, Record<string, RegExp>>;
 type Env = Record<string, string | undefined>;
 
 const HEX32 = /^[0-9a-f]{32}$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Lowercase, as Cloudflare prints them: tunnel tokens are compared to the recorded value verbatim.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const META_ID = /^[0-9]{5,25}$/;
 const R2_BUCKET = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/;
 
@@ -27,16 +28,23 @@ const SHARED_SHAPE = {
     // Tunnel of the host's cloudflared (SSH only), independent of Docker.
     sshTunnelId: UUID,
   },
-  oracle: { homeRegion: /^eu-(paris|marseille)-1$/ },
+  oracle: {
+    homeRegion: /^eu-(paris|marseille)-1$/,
+    // OCIDs of the tenancy and of the `joutiya` compartment Claude's user is limited to (§9).
+    tenancyId: /^ocid1\.tenancy\.oc1\.\.[a-z0-9]{20,}$/,
+    compartmentId: /^ocid1\.compartment\.oc1\.\.[a-z0-9]{20,}$/,
+  },
   anthropic: { organizationId: UUID },
   stripe: { accountId: /^acct_[A-Za-z0-9]{8,}$/ },
-  revenuecat: { projectId: /^[A-Za-z0-9_-]{4,64}$/ },
+  revenuecat: { projectId: /^proj[A-Za-z0-9]{4,251}$/ },
   meta: { businessId: META_ID, appId: META_ID },
 } satisfies Shape;
 
 const ENV_SHAPE = {
   firebase: {
     projectId: /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/,
+    // Numeric project number: prefix of the web app id and of the OAuth client id.
+    projectNumber: /^[0-9]{6,20}$/,
     firestoreLocation: /^europe-west[19]$/,
   },
   r2: { quarantine: R2_BUCKET, media: R2_BUCKET, private: R2_BUCKET },
@@ -80,6 +88,20 @@ const BINDINGS: Binding[] = [
   firebaseProject("GOOGLE_CLOUD_PROJECT"),
   firebaseProject("GCLOUD_PROJECT"),
   firebaseProject("CLOUDSDK_CORE_PROJECT"),
+  {
+    // 1:<project number>:web:<hash>
+    variable: "NEXT_PUBLIC_FIREBASE_APP_ID",
+    target: "environments.<env>.firebase.projectNumber",
+    expected: (t, env) => t.environments[env].firebase.projectNumber,
+    normalize: (value) => value.split(":")[1] ?? "",
+  },
+  {
+    // <project number>-<hash>.apps.googleusercontent.com
+    variable: "GOOGLE_OAUTH_CLIENT_ID",
+    target: "environments.<env>.firebase.projectNumber",
+    expected: (t, env) => t.environments[env].firebase.projectNumber,
+    normalize: (value) => value.split("-")[0] ?? "",
+  },
   r2Bucket("R2_BUCKET_QUARANTINE", "quarantine"),
   r2Bucket("R2_BUCKET_MEDIA", "media"),
   r2Bucket("R2_BUCKET_PRIVATE", "private"),
@@ -176,6 +198,7 @@ function checkDistinct(targets: Targets): string[] {
   for (const env of APP_ENVS) {
     const t = targets.environments[env];
     claim("firebase", `environments.${env}.firebase.projectId`, t.firebase.projectId);
+    claim("firebase-number", `environments.${env}.firebase.projectNumber`, t.firebase.projectNumber);
     claim("tunnel", `environments.${env}.cloudflare.tunnelId`, t.cloudflare.tunnelId);
     claim("access", `environments.${env}.cloudflare.accessAud`, t.cloudflare.accessAud);
     for (const role of ["quarantine", "media", "private"] as const) {
@@ -224,6 +247,9 @@ export const STRICT_REQUIRED = [
   "CF_ACCESS_AUD",
 ] as const;
 
+// Variables checked against the targets of APP_ENV outside BINDINGS: setting one requires APP_ENV.
+const CONTEXT_VARIABLES = ["STRIPE_SECRET_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "FIREBASE_CONFIG", "TUNNEL_TOKEN"] as const;
+
 export interface AssertOptions {
   /** Staging and production: every STRICT_REQUIRED variable must be set and recorded. */
   strict?: boolean;
@@ -266,6 +292,21 @@ const OWNER_TUNNEL_TOKENS: readonly { variable: string; target: string; tunnel: 
   },
 ];
 
+// Claude's Oracle access (cloud environment, docs/phase-0.md step 4), checked whatever APP_ENV.
+const SHARED_BINDINGS: readonly { variable: string; target: string; expected: (targets: Targets) => Id }[] = [
+  { variable: "JOUTIYA_OCI_TENANCY", target: "shared.oracle.tenancyId", expected: (t) => t.shared.oracle.tenancyId },
+  { variable: "JOUTIYA_OCI_COMPARTMENT", target: "shared.oracle.compartmentId", expected: (t) => t.shared.oracle.compartmentId },
+  { variable: "JOUTIYA_OCI_REGION", target: "shared.oracle.homeRegion", expected: (t) => t.shared.oracle.homeRegion },
+];
+
+function sharedBindingErrors(targets: Targets, value: (name: string) => string): string[] {
+  return SHARED_BINDINGS.filter(({ variable }) => value(variable) !== "").flatMap(({ variable, target, expected }) => {
+    const recorded = expected(targets);
+    if (recorded === null) return [`${variable} is set but ${target} is not recorded in infra/targets.json`];
+    return value(variable) === recorded ? [] : [`${variable} does not match ${target} (${recorded})`];
+  });
+}
+
 /**
  * Google project behind a credential file: the impersonated service account of a Workload
  * Identity Federation config (§9), or project_id of a service account key (documented exception).
@@ -305,14 +346,16 @@ export function assertTargets(targets: Targets, env: Env, options: AssertOptions
   const configured = BINDINGS.filter((binding) => value(binding.variable) !== "");
   const stripeKey = value("STRIPE_SECRET_KEY");
   const appEnv = value("APP_ENV");
-  const ownerTunnels = OWNER_TUNNEL_TOKENS.filter(({ variable }) => value(variable) !== "").flatMap(({ variable, target, tunnel }) =>
-    tunnelTokenErrors(variable, value(variable), targets, target, tunnel(targets)),
-  );
+  const ownerTunnels = [
+    ...OWNER_TUNNEL_TOKENS.filter(({ variable }) => value(variable) !== "").flatMap(({ variable, target, tunnel }) =>
+      tunnelTokenErrors(variable, value(variable), targets, target, tunnel(targets)),
+    ),
+    ...sharedBindingErrors(targets, value),
+  ];
 
   if (appEnv === "") {
     if (options.strict) return [...STRICT_REQUIRED.filter((name) => value(name) === "").map((name) => `${name} is required in strict mode`), ...ownerTunnels];
-    const names = configured.map((binding) => binding.variable);
-    if (stripeKey !== "") names.push("STRIPE_SECRET_KEY");
+    const names = [...configured.map((binding) => binding.variable), ...CONTEXT_VARIABLES.filter((name) => value(name) !== "")];
     return names.length === 0 ? ownerTunnels : [`APP_ENV is required when ${names.join(", ")} is set`, ...ownerTunnels];
   }
   if (!isAppEnv(appEnv)) return [`APP_ENV must be one of ${APP_ENVS.join(", ")}`];
@@ -332,17 +375,21 @@ export function assertTargets(targets: Targets, env: Env, options: AssertOptions
     }
   }
   if (stripeKey !== "") errors.push(...checkStripeMode(appEnv, stripeKey));
-  const tunnelToken = value("CLOUDFLARE_TUNNEL_TOKEN");
+  // cloudflared's own variable (/etc/joutiya/<env>/tunnel.env on the VM, docs/phase-1.md step 9):
+  // `node --env-file=/etc/joutiya/<env>/tunnel.env scripts/assert-target.ts` checks it in place.
+  const tunnelToken = value("TUNNEL_TOKEN");
   if (tunnelToken !== "") {
     const target = `environments.${appEnv}.cloudflare.tunnelId`;
-    errors.push(...tunnelTokenErrors("CLOUDFLARE_TUNNEL_TOKEN", tunnelToken, targets, target, targets.environments[appEnv].cloudflare.tunnelId));
+    errors.push(...tunnelTokenErrors("TUNNEL_TOKEN", tunnelToken, targets, target, targets.environments[appEnv].cloudflare.tunnelId));
   }
   const expectedProject = targets.environments[appEnv].firebase.projectId;
   const credentials = value("GOOGLE_APPLICATION_CREDENTIALS");
   if (credentials !== "") errors.push(...projectFileErrors("GOOGLE_APPLICATION_CREDENTIALS", credentials, expectedProject, appEnv, options));
   const firebaseConfig = value("FIREBASE_CONFIG");
   if (firebaseConfig !== "") {
-    if (firebaseConfig.startsWith("{")) {
+    if (expectedProject === null) {
+      errors.push(`FIREBASE_CONFIG is set but environments.${appEnv}.firebase.projectId is not recorded in infra/targets.json`);
+    } else if (firebaseConfig.startsWith("{")) {
       const project = parseJson(firebaseConfig)?.projectId;
       if (project !== expectedProject) errors.push(`FIREBASE_CONFIG does not match environments.${appEnv}.firebase.projectId (${expectedProject})`);
     } else {

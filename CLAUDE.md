@@ -98,7 +98,7 @@ subscriptions, Google Ads slots, moderation).
 ## Commands
 
 Node 24; `npm ci --ignore-scripts` once.
-- `npm run check`: lint, typecheck, unit tests. `npm run test:rules`: Firestore rules in the
+- `npm run check`: lint, typecheck, unit tests, guard tests. `npm run test:rules`: Firestore rules in the
   emulator (Java 21). `npm run build`, then `npm run test:e2e` (Playwright; in the cloud set
   `PLAYWRIGHT_CHROMIUM_PATH`). `shellcheck infra/vm/*.sh` for the VM scripts.
 - `node scripts/assert-target.ts`: validate `infra/targets.json` (exact third-party
