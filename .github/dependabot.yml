@@ -4,10 +4,17 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly, day: monday }
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 10
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Typings follow the runtime major (package.json engines, docker/Dockerfile).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # typescript-eslint (through eslint-config-next) does not support TypeScript 7 yet.
+      - dependency-name: typescript
+        versions: [">=7"]
   - package-ecosystem: docker
     directory: /docker
     schedule: { interval: weekly, day: monday }
@@ -17,3 +24,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
+    # One PR for all actions: separate PRs edit the same lines and conflict with each other.
+    groups:
+      actions:
+        patterns: ["*"]
