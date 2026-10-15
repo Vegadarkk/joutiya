@@ -1,8 +1,8 @@
 {
   "shared": {
     "cloudflare": {
-      "accountId": null,
-      "zoneId": null,
+      "accountId": "795e3aeafd644dbdf1810fc0e29a5e97",
+      "zoneId": "f09bd1e8b2f7ae0d61472b0eb617b0b0",
       "accessTeamDomain": null,
       "sshTunnelId": null
     },
