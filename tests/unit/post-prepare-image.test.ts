@@ -12,7 +12,7 @@ const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0
 const WEBP = new Uint8Array([...Buffer.from("RIFF"), 0, 0, 0, 0, ...Buffer.from("WEBPVP8 "), 0, 0, 0, 0]);
 const GIF = new Uint8Array([...Buffer.from("GIF89a"), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
-function ftyp(major: string, compat: string[]): Uint8Array {
+function ftyp(major: string, compat: string[]): Uint8Array<ArrayBuffer> {
   const size = 16 + compat.length * 4;
   const bytes = [0, 0, 0, size, ...Buffer.from("ftyp"), ...Buffer.from(major), 0, 0, 0, 0];
   for (const brand of compat) bytes.push(...Buffer.from(brand));
@@ -93,7 +93,7 @@ describe("prepareImage", () => {
   it("converts HEIC through the injected converter when the browser cannot decode it", async () => {
     const converted = new Blob([JPEG], { type: "image/jpeg" });
     const convertHeic = vi.fn(async () => converted);
-    const resize = vi.fn(async () => resized(500));
+    const resize = vi.fn(async (_request: ResizeRequest) => resized(500));
     const out = await prepareImage(new Blob([ftyp("mif1", ["mif1", "heic", "hevc"])]), { resize, convertHeic });
     expect(convertHeic).toHaveBeenCalledTimes(1);
     expect(resize.mock.calls[0]?.[0].blob).toBe(converted);
@@ -108,7 +108,7 @@ describe("prepareImage", () => {
   });
 
   it("retries at a lower quality, then rejects a file still above the byte limit", async () => {
-    const resize = vi.fn(async () => resized(300));
+    const resize = vi.fn(async (_request: ResizeRequest) => resized(300));
     await expect(prepareImage(new Blob([JPEG]), { resize, maxBytes: 200 })).rejects.toBeInstanceOf(PrepareImageError);
     expect(resize).toHaveBeenCalledTimes(2);
     expect(resize.mock.calls[1]?.[0].quality).toBe(0.7);

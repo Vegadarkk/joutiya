@@ -8,6 +8,8 @@ import { cityBySlug, regionByCode, searchCities } from "@/config/regions";
 import type { Locale } from "@/config/site";
 
 const noop = () => undefined;
+/** React escapes text content (`L'Oriental` -> `L&#x27;Oriental`). */
+const escapeHtml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&#x27;").replace(/"/g, "&quot;");
 
 function render(props: Partial<Parameters<typeof CityCombobox>[0]>, locale: Locale = "fr") {
   return renderToStaticMarkup(
@@ -24,18 +26,18 @@ describe("groupByRegion", () => {
     const cities = searchCities("", "fr", 12);
     const groups = groupByRegion(cities, "fr");
     expect(groups.flatMap((g) => g.cities).length).toBe(cities.length);
-    expect(groups[0].cities[0]).toBe(cities[0]);
+    expect(groups[0]!.cities[0]).toBe(cities[0]);
     for (const group of groups) {
       expect(group.name).toBe(regionByCode(group.code)!.nameFr);
       for (const city of group.cities) expect(city.regionCode).toBe(group.code);
     }
-    expect(groupByRegion(cities, "ar")[0].name).toBe(regionByCode(groups[0].code)!.nameAr);
+    expect(groupByRegion(cities, "ar")[0]!.name).toBe(regionByCode(groups[0]!.code)!.nameAr);
   });
 
   it("matches accents, apostrophes and the Arabic script", () => {
     expect(searchCities("casa", "fr").map((c) => c.slug)).toContain("casablanca");
-    expect(searchCities("Tetouan", "fr")[0].slug).toBe("tetouan");
-    expect(searchCities("الدار", "ar")[0].slug).toBe("casablanca");
+    expect(searchCities("Tetouan", "fr")[0]!.slug).toBe("tetouan");
+    expect(searchCities("الدار", "ar")[0]!.slug).toBe("casablanca");
     expect(searchCities("mdiq", "fr").map((c) => c.slug)).toContain("mdiq");
   });
 });
@@ -60,7 +62,7 @@ describe("CityCombobox", () => {
   it("names the listbox groups after the regions", () => {
     const html = render({});
     for (const group of groupByRegion(searchCities("", "fr", 12), "fr")) {
-      expect(html).toContain(`>${group.name}<`);
+      expect(html).toContain(`>${escapeHtml(group.name)}<`);
       expect(html).toContain(`role="group" aria-labelledby="`);
     }
   });

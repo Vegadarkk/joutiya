@@ -26,14 +26,15 @@ function render(props: Partial<PriceInputProps>, locale: Locale = "fr") {
   );
 }
 
-const inputValue = (html: string) => /<input[^>]*inputmode="numeric"[^>]*>/.exec(html)?.[0].match(/ value="([^"]*)"/)?.[1];
+// React 19 writes `inputMode` in camelCase (HTML attribute names are case-insensitive).
+const inputValue = (html: string) => /<input[^>]*inputmode="numeric"[^>]*>/i.exec(html)?.[0].match(/ value="([^"]*)"/)?.[1];
 
 describe("PriceInput", () => {
   it("groups the digits of the amount and shows the currency", () => {
     const html = render({ value: 1500 });
     expect(inputValue(html)).toBe("1 500");
     expect(html).toContain(">DH<");
-    expect(html).toContain('inputmode="numeric"');
+    expect(html).toMatch(/inputmode="numeric"/i);
     expect(html).toContain('dir="ltr"');
   });
 
@@ -70,12 +71,12 @@ describe("PriceInput", () => {
   it("disables the amount for a donation or an undecided price", () => {
     const donation = render({ donationAllowed: true, isDonation: true });
     expect(inputValue(donation)).toBe("0");
-    expect(donation).toMatch(/<input[^>]*inputmode="numeric"[^>]*disabled/);
+    expect(donation).toMatch(/<input[^>]*inputmode="numeric"[^>]*disabled/i);
     expect(donation).toContain('role="switch" aria-checked="true"');
 
     const toDiscuss = render({ priceOptional: true, value: null });
     expect(inputValue(toDiscuss)).toBe("");
-    expect(toDiscuss).toMatch(/<input[^>]*inputmode="numeric"[^>]*disabled/);
+    expect(toDiscuss).toMatch(/<input[^>]*inputmode="numeric"[^>]*disabled/i);
   });
 
   it("shows the validation message", () => {

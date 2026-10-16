@@ -1,11 +1,13 @@
 import { ApiError, uploadToPresignedUrl } from "@/lib/auth/client";
 import type { ListingPhoto, UploadRejectReason, UploadStatusResponse } from "@/lib/contracts/media";
-import { completeUpload, pollUpload, signUpload, type PollOptions } from "./api";
+import { completeUpload, deleteUpload, pollUpload, signUpload, type PollOptions } from "./api";
 import { prepareImage, PrepareImageError, type PrepareOptions, type PreparedImage } from "./prepare-image";
 
 // One photo, end to end (design §3): prepare in the browser -> POST /api/uploads/sign -> PUT the
 // blob to the presigned URL (progress, abort) -> POST /api/uploads/{id}/complete -> poll while
-// the pipeline runs. Pure orchestration, unit-tested with injected prepare/upload/poll.
+// the pipeline runs. Pure orchestration, unit-tested with injected prepare/upload/poll. A
+// cancelled upload rejects with ApiError "aborted" and, once signed, deletes its upload record so
+// the quarantine object and the photo slot are freed at once.
 
 export type PhotoUploadPhase =
   | { phase: "preparing" }
@@ -26,6 +28,8 @@ export interface UploadPhotoOptions {
   complete?: typeof completeUpload;
   poll?: (id: string, options?: PollOptions) => Promise<UploadStatusResponse>;
   pollOptions?: PollOptions;
+  /** Deletes a signed upload after a cancellation (default DELETE /api/uploads/{id}). */
+  discard?: (id: string) => Promise<void>;
 }
 
 export interface UploadPhotoResult {
@@ -34,8 +38,10 @@ export interface UploadPhotoResult {
   status: UploadStatusResponse;
 }
 
+const aborted = () => new ApiError(0, "aborted");
+
 function throwIfAborted(signal?: AbortSignal): void {
-  if (signal?.aborted) throw new ApiError(0, "aborted");
+  if (signal?.aborted) throw aborted();
 }
 
 export async function uploadListingPhoto(listingId: string, file: Blob, options: UploadPhotoOptions = {}): Promise<UploadPhotoResult> {
@@ -45,22 +51,32 @@ export async function uploadListingPhoto(listingId: string, file: Blob, options:
   const sign = options.sign ?? signUpload;
   const complete = options.complete ?? completeUpload;
   const poll = options.poll ?? pollUpload;
+  const discard = options.discard ?? deleteUpload;
 
+  throwIfAborted(signal);
   onPhase?.({ phase: "preparing" });
   const prepared = await prepare(file, options.prepareOptions);
   throwIfAborted(signal);
 
   const signed = await sign({ purpose: "listing", targetId: listingId, declaredSize: prepared.blob.size, declaredType: prepared.type });
   const uploadId = signed.uploadId;
-  throwIfAborted(signal);
+  let status: UploadStatusResponse;
+  try {
+    throwIfAborted(signal);
+    onPhase?.({ phase: "uploading", progress: 0, uploadId });
+    await put(signed.url, signed.headers, prepared.blob, (fraction) => onPhase?.({ phase: "uploading", progress: fraction, uploadId }), signal);
+    throwIfAborted(signal);
 
-  onPhase?.({ phase: "uploading", progress: 0, uploadId });
-  await put(signed.url, signed.headers, prepared.blob, (fraction) => onPhase?.({ phase: "uploading", progress: fraction, uploadId }), signal);
-
-  onPhase?.({ phase: "processing", uploadId });
-  let status = await complete(uploadId);
-  if (status.status === "processing") {
-    status = await poll(uploadId, { ...options.pollOptions, signal });
+    onPhase?.({ phase: "processing", uploadId });
+    status = await complete(uploadId);
+    throwIfAborted(signal);
+    if (status.status === "processing") {
+      status = await poll(uploadId, { ...options.pollOptions, signal });
+    }
+  } catch (error) {
+    if (!signal?.aborted) throw error;
+    void discard(uploadId).catch(() => undefined);
+    throw aborted();
   }
   if (status.status === "ready") onPhase?.({ phase: "ready", uploadId, photo: status.photo });
   else if (status.status === "rejected") onPhase?.({ phase: "rejected", uploadId, reason: status.rejectReason });

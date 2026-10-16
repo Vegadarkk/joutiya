@@ -1,7 +1,14 @@
-import { fitWithin } from "./prepare-image";
-
 // Shared by the Web Worker and the main-thread fallback: decode, downscale, re-encode. The
 // re-encoded bytes come from the decoded pixels only: EXIF, XMP, ICC and GPS never survive.
+// Dependency-free on purpose: the worker bundle carries nothing else.
+
+/** Downscale so the longest edge is at most `maxEdge`; never upscales. Integer pixels, at least 1. */
+export function fitWithin(width: number, height: number, maxEdge: number): { width: number; height: number; scale: number } {
+  const longest = Math.max(width, height);
+  if (longest <= maxEdge || longest <= 0) return { width: Math.max(1, Math.round(width)), height: Math.max(1, Math.round(height)), scale: 1 };
+  const scale = maxEdge / longest;
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)), scale };
+}
 
 export interface CanvasResizeInput {
   blob: Blob;

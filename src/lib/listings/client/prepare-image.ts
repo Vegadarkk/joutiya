@@ -1,4 +1,5 @@
 import { MAX_CLIENT_EDGE_PX, MAX_UPLOAD_BYTES, type UploadDeclaredType } from "@/lib/contracts/media";
+import { fitWithin as fitBox } from "./resize-core";
 
 // Browser-side photo preparation (design D6): sniff the real type, convert HEIC/HEIF, resize so
 // the longest edge is <= 2048 px, re-encode as JPEG q0.85 (WebP when the source is WebP). The
@@ -45,12 +46,9 @@ export function sniffImage(bytes: Uint8Array): SniffedImage | null {
   return null;
 }
 
-/** Downscale so the longest edge is at most `maxEdge`; never upscales. Integer pixels, at least 1. */
+/** Downscale so the longest edge is at most `maxEdge` (2048 px by default); never upscales. */
 export function fitWithin(width: number, height: number, maxEdge: number = MAX_CLIENT_EDGE_PX): { width: number; height: number; scale: number } {
-  const longest = Math.max(width, height);
-  if (longest <= maxEdge || longest <= 0) return { width: Math.max(1, Math.round(width)), height: Math.max(1, Math.round(height)), scale: 1 };
-  const scale = maxEdge / longest;
-  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)), scale };
+  return fitBox(width, height, maxEdge);
 }
 
 /** What the browser sends: WebP stays WebP; everything else (JPEG, PNG, HEIC, AVIF) becomes JPEG. */
@@ -165,6 +163,9 @@ function supportsWorkerResize(): boolean {
   return typeof Worker === "function" && typeof OffscreenCanvas === "function" && typeof createImageBitmap === "function";
 }
 
+/** A worker that answers nothing within this delay is abandoned for the main thread. */
+const WORKER_TIMEOUT_MS = 30_000;
+
 let worker: Worker | null = null;
 let nextRequestId = 1;
 const waiting = new Map<number, { resolve: (result: ResizeResult) => void; reject: (error: Error) => void }>();
@@ -196,28 +197,67 @@ function getWorker(): Worker {
 export function resizeInWorker(request: ResizeRequest): Promise<ResizeResult> {
   return new Promise((resolve, reject) => {
     const id = nextRequestId++;
-    waiting.set(id, { resolve, reject });
-    getWorker().postMessage({ id, ...request });
+    const timer = setTimeout(() => {
+      if (!waiting.delete(id)) return;
+      reject(new Error("worker timeout"));
+    }, WORKER_TIMEOUT_MS);
+    waiting.set(id, {
+      resolve: (result) => {
+        clearTimeout(timer);
+        resolve(result);
+      },
+      reject: (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    });
+    try {
+      getWorker().postMessage({ id, ...request });
+    } catch (error) {
+      waiting.delete(id);
+      clearTimeout(timer);
+      reject(error instanceof Error ? error : new Error("worker unavailable"));
+    }
   });
 }
 
-/** Main thread: a detached <canvas>; used when OffscreenCanvas or Worker is missing. */
-export async function resizeOnMainThread(request: ResizeRequest): Promise<ResizeResult> {
-  const bitmap = await createImageBitmap(request.blob, { imageOrientation: "from-image" });
+/** Decoded pixels for the main-thread canvas: an ImageBitmap, or an <img> where createImageBitmap is missing. */
+async function decodeOnMainThread(blob: Blob): Promise<{ source: CanvasImageSource; width: number; height: number; release: () => void }> {
+  if (typeof createImageBitmap === "function") {
+    // `from-image` applies the EXIF orientation before the tag disappears with the re-encode.
+    const bitmap = await createImageBitmap(blob, { imageOrientation: "from-image" });
+    return { source: bitmap, width: bitmap.width, height: bitmap.height, release: () => bitmap.close() };
+  }
+  const url = URL.createObjectURL(blob);
+  const image = new Image();
+  image.decoding = "async";
+  image.src = url;
   try {
-    const { width, height } = fitWithin(bitmap.width, bitmap.height, request.maxEdge);
+    await image.decode();
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+  return { source: image, width: image.naturalWidth, height: image.naturalHeight, release: () => URL.revokeObjectURL(url) };
+}
+
+/** Main thread: a detached <canvas>; used when OffscreenCanvas or Worker is missing or failed. */
+export async function resizeOnMainThread(request: ResizeRequest): Promise<ResizeResult> {
+  const decoded = await decodeOnMainThread(request.blob);
+  try {
+    const { width, height } = fitWithin(decoded.width, decoded.height, request.maxEdge);
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("no 2d context");
     context.imageSmoothingQuality = "high";
-    context.drawImage(bitmap, 0, 0, width, height);
+    context.drawImage(decoded.source, 0, 0, width, height);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, request.type, request.quality));
     if (!blob) throw new Error("encode failed");
     return { blob, width, height };
   } finally {
-    bitmap.close();
+    decoded.release();
   }
 }
 

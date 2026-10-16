@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { OwnerListing } from "@/lib/contracts/listings";
 import { parseWizardPath, wizardPath } from "@/lib/listings/client/routes";
-import { allIssues, firstIncompleteStep, nextStep, previousStep, stepIssues, stepOfPath, stepState } from "@/lib/listings/client/validation";
+import { allIssues, firstIncompleteStep, nextStep, previousStep, sanitizePatch, stepIssues, stepOfPath, stepState, withoutRejectedFields } from "@/lib/listings/client/validation";
 
 // Per-step readiness of the wizard (design D3/D4), derived from the shared contracts.
 
@@ -85,10 +85,15 @@ describe("stepIssues", () => {
     expect(stepIssues("description", { ...car, description: "trop court" })).toEqual([{ path: "description", code: "description_min" }]);
   });
 
-  it("applies the price rules of D4", () => {
+  it("applies the price rules of D4 and the server's readiness", () => {
     expect(stepIssues("prix", { ...car, price: null })).toEqual([{ path: "price", code: "price_required" }]);
-    expect(stepIssues("prix", { ...car, price: null, isDonation: true })).toEqual([]);
+    expect(stepIssues("prix", { ...car, price: 0 })).toEqual([{ path: "price", code: "price_invalid" }]);
     expect(stepIssues("prix", { ...car, price: 100_000_001 })).toEqual([{ path: "price", code: "price_max" }]);
+    // Cars cannot be given away; furniture can.
+    expect(stepIssues("prix", { ...car, price: null, isDonation: true })).toEqual([{ path: "isDonation", code: "donation_not_allowed" }]);
+    const sofa = draft({ categoryId: "maison-jardin", subcategoryId: "ameublement", price: null, isDonation: true });
+    expect(stepIssues("prix", sofa)).toEqual([]);
+    // "À discuter": null is fine where the subcategory makes the price optional.
     const service = draft({ categoryId: "services", subcategoryId: "cours", attributes: { "course-subject": "langues" } });
     expect(stepIssues("prix", service)).toEqual([]);
   });
@@ -99,10 +104,21 @@ describe("stepIssues", () => {
     expect(stepIssues("lieu", { ...car, location: { regionCode: "06", citySlug: "casablanca", district: "x".repeat(65) } }).map((i) => i.code)).toEqual(["district_max"]);
   });
 
-  it("lets photos be empty (the server decides) but caps them", () => {
-    expect(stepIssues("photos", { ...car, photos: [] })).toEqual([]);
+  it("needs at least one ready photo (photos_required at publish) and caps them", () => {
+    expect(stepIssues("photos", { ...car, photos: [] })).toEqual([{ path: "photos", code: "photos_required" }]);
+    expect(stepIssues("photos", { ...car, photos: [{ id: "upload0009", status: "processing" }] })).toEqual([{ path: "photos", code: "photos_required" }]);
     const many = Array.from({ length: 11 }, (_, i) => ({ id: `upload000${i}`, status: "ready" as const, w: 1, h: 1, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj" }));
     expect(stepIssues("photos", { ...car, photos: many }, { maxPhotos: 10 })).toEqual([{ path: "photos", code: "photos_max" }]);
+  });
+
+  it("flags a shown phone when the seller's number is not verified", () => {
+    const shown = { ...car, contact: { showPhone: true, whatsapp: true } };
+    expect(stepIssues("contact", shown)).toEqual([]);
+    expect(stepIssues("contact", shown, { phoneVerified: true })).toEqual([]);
+    expect(stepIssues("contact", shown, { phoneVerified: false })).toEqual([
+      { path: "contact.showPhone", code: "phone_required" },
+      { path: "contact.whatsapp", code: "phone_required" },
+    ]);
   });
 
   it("tells empty steps apart from incomplete ones", () => {
@@ -147,5 +163,23 @@ describe("step navigation helpers", () => {
     expect(parseWizardPath("/deposer/abcdefgh/nope").invalid).toBe(true);
     expect(parseWizardPath("/deposer/ABCDEFGH").invalid).toBe(true);
     expect(parseWizardPath("/deposer/abcdefgh/titre/extra").invalid).toBe(true);
+  });
+});
+
+describe("autosave payload", () => {
+  it("keeps only the fields the API accepts as they stand", () => {
+    expect(sanitizePatch({ title: "Vélo", description: "Trop court", price: 1500 })).toEqual({ price: 1500 });
+    expect(sanitizePatch({ title: "Vélo de ville", price: -3, priceNegotiable: true })).toEqual({ title: "Vélo de ville", priceNegotiable: true });
+    expect(sanitizePatch({ price: null, isDonation: true })).toEqual({ price: null, isDonation: true });
+    expect(sanitizePatch({ location: { regionCode: "06", citySlug: "casablanca", district: "x".repeat(65) } })).toEqual({});
+    expect(sanitizePatch({ photos: ["upload0001", "bad id"] })).toEqual({});
+    expect(sanitizePatch({ subcategoryId: "voitures", categoryId: "vehicules" })).toEqual({ subcategoryId: "voitures", categoryId: "vehicules" });
+  });
+
+  it("drops the fields a 400 answer names, or everything when it names none", () => {
+    expect(withoutRejectedFields({ title: "Vélo de ville", location: { regionCode: "01", citySlug: "casablanca" } }, [{ path: "location.regionCode", code: "mismatch" }])).toEqual({ title: "Vélo de ville" });
+    expect(withoutRejectedFields({ title: "Vélo de ville" }, [{ path: "title", code: "too_small" }])).toBeNull();
+    expect(withoutRejectedFields({ title: "Vélo de ville" }, [{ path: "other", code: "x" }])).toBeNull();
+    expect(withoutRejectedFields({ title: "Vélo de ville" }, undefined)).toBeNull();
   });
 });

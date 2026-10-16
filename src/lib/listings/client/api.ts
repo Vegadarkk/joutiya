@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/auth/client";
+import { apiDelete, apiGet, apiPatch, apiPost, csrfToken } from "@/lib/auth/client";
 import {
   LISTING_API,
   type CreateListingInput,
@@ -11,6 +11,7 @@ import {
   type PublishListingResponse,
 } from "@/lib/contracts/listings";
 import { MEDIA_API, type SignUploadInput, type SignUploadResponse, type UploadStatusResponse } from "@/lib/contracts/media";
+import { CSRF_HEADER } from "@/lib/security/cookies";
 
 // Typed calls of the listings and uploads API (design §3): the wizard and "Mes annonces" call
 // exactly these paths with exactly these bodies. Errors are ApiError instances (code translated
@@ -26,6 +27,18 @@ export function getListing(id: string): Promise<ListingResponse> {
 
 export function patchListing(id: string, patch: ListingPatch): Promise<ListingResponse> {
   return apiPatch<ListingResponse>(LISTING_API.listing(id), patch);
+}
+
+/**
+ * Last-chance save when the page is being unloaded: a `keepalive` request outlives the page
+ * (64 KiB body cap, a draft patch is far below). Fire and forget: the answer is never read.
+ */
+export function patchListingOnUnload(id: string, patch: ListingPatch): void {
+  if (typeof fetch !== "function") return;
+  const headers: Record<string, string> = { accept: "application/json", "content-type": "application/json" };
+  const csrf = csrfToken();
+  if (csrf) headers[CSRF_HEADER] = csrf;
+  void fetch(LISTING_API.listing(id), { method: "PATCH", credentials: "same-origin", keepalive: true, headers, body: JSON.stringify(patch) }).catch(() => undefined);
 }
 
 export function deleteListing(id: string): Promise<void> {
@@ -98,6 +111,7 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
  * offers a manual refresh instead of hammering the API).
  */
 export async function pollUpload(id: string, options: PollOptions = {}): Promise<UploadStatusResponse> {
+  if (options.signal?.aborted) throw new DOMException("aborted", "AbortError");
   const interval = options.intervalMs ?? UPLOAD_POLL_MS;
   const deadline = Date.now() + (options.maxMs ?? UPLOAD_POLL_MAX_MS);
   const wait = options.sleep ?? sleep;

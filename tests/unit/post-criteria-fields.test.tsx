@@ -29,11 +29,11 @@ describe("CriteriaFields", () => {
     const html = render(voitures);
     const messages = criteriaMessages("fr");
     for (const criterion of voitures.criteria) {
-      expect(html, criterion.id).toContain(messages[criterion.id].label);
+      expect(html, criterion.id).toContain(messages[criterion.id]!.label);
     }
     // Condition first (the subcategory shows it), with every condition option.
-    expect(html.indexOf(fr.Listing.fields.condition)).toBeLessThan(html.indexOf(messages["car-brand"].label));
-    for (const condition of CONDITIONS) expect(html).toContain(messages["condition"].options![condition]);
+    expect(html.indexOf(fr.Listing.fields.condition)).toBeLessThan(html.indexOf(messages["car-brand"]!.label));
+    for (const condition of CONDITIONS) expect(html).toContain(messages["condition"]!.options![condition]);
   });
 
   it("picks the control from the criterion type", () => {
@@ -41,16 +41,17 @@ describe("CriteriaFields", () => {
     // Many brands: native select with the option labels; few fuels: radio chips.
     expect(html).toMatch(/<select[^>]*>[\s\S]*Dacia[\s\S]*<\/select>/);
     expect(html).toContain('role="radiogroup"');
-    expect(html).toContain(criteriaMessages("fr")["fuel"].options!["diesel"]);
-    // Numbers: numeric keypad, unit suffix for km (not for years), value echoed.
-    expect(html).toContain('inputmode="numeric"');
+    expect(html).toContain(criteriaMessages("fr")["fuel"]!.options!["diesel"]);
+    // Numbers: numeric keypad, unit suffix for km (not for years), value echoed. React 19 keeps the
+    // camelCase spelling of these attributes in its HTML (HTML attribute names are case-insensitive).
+    expect(html).toMatch(/inputmode="numeric"/i);
     expect(html).toContain(`>${fr.Listing.units.km}<`);
     expect(html).not.toContain(`>${fr.Listing.units.an}<`);
     expect(html).toContain('value="85000"');
     expect(html).toContain('value="2019"');
     // Boolean: a switch; text: a bounded input.
     expect(html).toContain('role="switch"');
-    expect(html).toContain('maxlength="80"');
+    expect(html).toMatch(/maxlength="80"/i);
   });
 
   it("renders multiselect amenities as checkbox chips with the chosen ones checked", () => {
@@ -58,7 +59,7 @@ describe("CriteriaFields", () => {
     expect(html).toContain('role="group"');
     expect(html.match(/role="checkbox"/g)?.length).toBe(9);
     expect(html.match(/role="checkbox" aria-checked="true"/g)?.length).toBe(2);
-    expect(html).toContain(criteriaMessages("fr")["amenities"].options!["piscine"]);
+    expect(html).toContain(criteriaMessages("fr")["amenities"]!.options!["piscine"]);
   });
 
   it("marks required criteria and shows the optional hint on the others", () => {
@@ -78,7 +79,7 @@ describe("CriteriaFields", () => {
   it("renders the Arabic labels", () => {
     const html = render(voitures, {}, "ar");
     const messages = criteriaMessages("ar");
-    for (const criterion of voitures.criteria) expect(html, criterion.id).toContain(messages[criterion.id].label);
+    for (const criterion of voitures.criteria) expect(html, criterion.id).toContain(messages[criterion.id]!.label);
     expect(html).toContain(`>${ar.Listing.units.km}<`);
   });
 });

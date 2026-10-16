@@ -41,7 +41,7 @@ describe("uploadListingPhoto", () => {
       onProgress?.(1, 1234, 1234);
     });
     const phases: PhotoUploadPhase[] = [];
-    const result = await uploadListingPhoto("abcdefgh", new Blob([1]), {
+    const result = await uploadListingPhoto("abcdefgh", new Blob([new Uint8Array([1])]), {
       prepare: async () => prepared(),
       put,
       onPhase: (phase) => phases.push(phase),
@@ -63,7 +63,7 @@ describe("uploadListingPhoto", () => {
       "POST /api/uploads/upload0002/complete": { body: { status: "rejected", rejectReason: "nsfw" } },
     });
     const phases: PhotoUploadPhase[] = [];
-    const result = await uploadListingPhoto("abcdefgh", new Blob([1]), { prepare: async () => prepared(), put: async () => {}, onPhase: (phase) => phases.push(phase) });
+    const result = await uploadListingPhoto("abcdefgh", new Blob([new Uint8Array([1])]), { prepare: async () => prepared(), put: async () => {}, onPhase: (phase) => phases.push(phase) });
     expect(result.status).toEqual({ status: "rejected", rejectReason: "nsfw" });
     expect(phases.at(-1)).toEqual({ phase: "rejected", uploadId: "upload0002", reason: "nsfw" });
   });
@@ -71,7 +71,7 @@ describe("uploadListingPhoto", () => {
   it("surfaces the API refusal of the signature (quota, storage) as an ApiError", async () => {
     stubFetch({ "POST /api/uploads/sign": { status: 422, body: { error: { code: "photo_limit" } } } });
     const put = vi.fn();
-    await expect(uploadListingPhoto("abcdefgh", new Blob([1]), { prepare: async () => prepared(), put })).rejects.toMatchObject({ code: "photo_limit" });
+    await expect(uploadListingPhoto("abcdefgh", new Blob([new Uint8Array([1])]), { prepare: async () => prepared(), put })).rejects.toMatchObject({ code: "photo_limit" });
     expect(put).not.toHaveBeenCalled();
   });
 
@@ -79,7 +79,7 @@ describe("uploadListingPhoto", () => {
     const calls = stubFetch({});
     const error = Object.assign(new Error("too big"), { name: "PrepareImageError", code: "file_too_large" });
     await expect(
-      uploadListingPhoto("abcdefgh", new Blob([1]), {
+      uploadListingPhoto("abcdefgh", new Blob([new Uint8Array([1])]), {
         prepare: async () => {
           throw error;
         },

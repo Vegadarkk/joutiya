@@ -12,9 +12,11 @@ import {
   descriptionSchema,
   listingContactInputSchema,
   listingLocationInputSchema,
+  listingPatchSchema,
   priceSchema,
   titleSchema,
   type FieldIssue,
+  type ListingPatch,
   type OwnerListing,
   type WizardStep,
 } from "@/lib/contracts/listings";
@@ -109,18 +111,25 @@ export function criteriaStepSchema(subcategoryId: string | null) {
 export const titleStepSchema = z.object({ title: titleSchema });
 export const descriptionStepSchema = z.object({ description: descriptionSchema });
 
+/** At least one photo (the server's `photos_required`), at most the seller's quota. */
 export function photosStepSchema(maxPhotos: number = MAX_PHOTOS_PRO) {
-  return z.object({ photos: z.array(z.string()).max(maxPhotos) });
+  return z.object({ photos: z.array(z.string()).min(1).max(maxPhotos) });
 }
 
-/** Price rules (D4): null only as a donation or when the subcategory allows "à discuter". */
+/** Price rules (D4, server readiness): null only as a donation or "à discuter"; an amount is at least 1 DH. */
 export function priceStepSchema(subcategoryId: string | null) {
-  const priceOptional = Boolean(subcategoryId && subcategoryById(subcategoryId)?.priceOptional);
+  const subcategory = subcategoryId ? subcategoryById(subcategoryId) : undefined;
   return z
     .object({ price: priceSchema.nullable(), priceNegotiable: z.boolean(), isDonation: z.boolean() })
     .superRefine((data, ctx) => {
-      if (data.price === null && !data.isDonation && !priceOptional) {
-        ctx.addIssue({ code: "custom", path: ["price"], message: "price_required" });
+      if (data.isDonation) {
+        if (subcategory && !subcategory.donationAllowed) ctx.addIssue({ code: "custom", path: ["isDonation"], message: "donation_not_allowed" });
+        return;
+      }
+      if (data.price === null) {
+        if (!subcategory?.priceOptional) ctx.addIssue({ code: "custom", path: ["price"], message: "price_required" });
+      } else if (data.price < 1) {
+        ctx.addIssue({ code: "custom", path: ["price"], message: "price_invalid" });
       }
     });
 }
@@ -220,8 +229,14 @@ export function stepValues(step: WizardStep, draft: DraftLike): Record<string, u
   }
 }
 
+export interface IssueOptions {
+  maxPhotos?: number;
+  /** The seller's verified-phone badge; when false, showing the phone or WhatsApp is a blocker. */
+  phoneVerified?: boolean;
+}
+
 /** The blocking issues of one step (empty = the step is complete). The review step has none of its own. */
-export function stepIssues(step: WizardStep, draft: DraftLike, options: { maxPhotos?: number } = {}): FieldIssue[] {
+export function stepIssues(step: WizardStep, draft: DraftLike, options: IssueOptions = {}): FieldIssue[] {
   const values = stepValues(step, draft);
   switch (step) {
     case "categorie":
@@ -239,10 +254,18 @@ export function stepIssues(step: WizardStep, draft: DraftLike, options: { maxPho
     case "lieu":
       return dedupeLocationIssues(toIssues(locationStepSchema.safeParse(values), values));
     case "contact":
-      return toIssues(contactStepSchema.safeParse(values), values);
+      return [...toIssues(contactStepSchema.safeParse(values), values), ...phoneIssues(draft, options)];
     case "apercu":
       return [];
   }
+}
+
+function phoneIssues(draft: DraftLike, options: IssueOptions): FieldIssue[] {
+  if (options.phoneVerified !== false) return [];
+  const issues: FieldIssue[] = [];
+  if (draft.contact.showPhone) issues.push({ path: "contact.showPhone", code: "phone_required" });
+  if (draft.contact.whatsapp) issues.push({ path: "contact.whatsapp", code: "phone_required" });
+  return issues;
 }
 
 /** The city field carries region and slug together: one blocker for both, under the slug path. */
@@ -264,7 +287,7 @@ function dedupeLocationIssues(issues: FieldIssue[]): FieldIssue[] {
 export type StepState = "complete" | "incomplete" | "empty";
 
 /** A step with no issue is complete; without any value entered yet it is "empty" (shown as to do, not as an error). */
-export function stepState(step: WizardStep, draft: DraftLike, options: { maxPhotos?: number } = {}): StepState {
+export function stepState(step: WizardStep, draft: DraftLike, options: IssueOptions = {}): StepState {
   if (step === "apercu") return "incomplete";
   if (stepIssues(step, draft, options).length === 0) return "complete";
   return isStepTouched(step, draft) ? "incomplete" : "empty";
@@ -293,12 +316,12 @@ function isStepTouched(step: WizardStep, draft: DraftLike): boolean {
 }
 
 /** Every issue of the listing with the step it belongs to (the review step's checklist). */
-export function allIssues(draft: DraftLike, options: { maxPhotos?: number } = {}): (FieldIssue & { step: WizardStep })[] {
+export function allIssues(draft: DraftLike, options: IssueOptions = {}): (FieldIssue & { step: WizardStep })[] {
   return WIZARD_STEPS.flatMap((step) => stepIssues(step, draft, options).map((issue) => ({ ...issue, step })));
 }
 
 /** Where to resume: the first step with an issue, else the review step. */
-export function firstIncompleteStep(draft: DraftLike, options: { maxPhotos?: number } = {}): WizardStep {
+export function firstIncompleteStep(draft: DraftLike, options: IssueOptions = {}): WizardStep {
   for (const step of WIZARD_STEPS) {
     if (step === "apercu") break;
     if (stepIssues(step, draft, options).length > 0) return step;
@@ -309,4 +332,34 @@ export function firstIncompleteStep(draft: DraftLike, options: { maxPhotos?: num
 /** Numeric bounds of a criterion, for the validation messages. */
 export function criterionBounds(criterion: Criterion): { min?: number; max?: number } {
   return { ...(criterion.min !== undefined ? { min: criterion.min } : {}), ...(criterion.max !== undefined ? { max: criterion.max } : {}) };
+}
+
+// --- Autosave payload -------------------------------------------------------------------------
+
+/**
+ * The part of a patch the API accepts field by field (`listingPatchSchema` is strict and bounds
+ * the texts): a title still too short, an empty description or an out-of-range price stays on
+ * screen but is not sent, so one half-typed field never blocks the save of the others.
+ */
+export function sanitizePatch(patch: ListingPatch): ListingPatch {
+  const shape = listingPatchSchema.shape;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined || !(key in shape)) continue;
+    const field = shape[key as keyof typeof shape];
+    const parsed = field.safeParse(value);
+    if (parsed.success) out[key] = value;
+  }
+  return out as ListingPatch;
+}
+
+/**
+ * After a 400 `invalid_body` (`details: [{ path }]`): the patch without the refused fields, or null
+ * when nothing useful is left (every field refused, or none identified: resending would fail again).
+ */
+export function withoutRejectedFields(patch: ListingPatch, details: unknown): ListingPatch | null {
+  if (!Array.isArray(details)) return null;
+  const rejected = new Set(details.map((detail) => (detail && typeof detail === "object" && typeof (detail as { path?: unknown }).path === "string" ? (detail as { path: string }).path.split(".")[0] : "")));
+  const kept = Object.fromEntries(Object.entries(patch).filter(([key]) => !rejected.has(key)));
+  return Object.keys(kept).length > 0 && Object.keys(kept).length < Object.keys(patch).length ? (kept as ListingPatch) : null;
 }

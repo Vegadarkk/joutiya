@@ -1,7 +1,9 @@
 // Draft autosave with coalescing (design D2): writes happen on step change, on blur and after
 // 5 s without typing, never per keystroke. Patches queued while a save is in flight are merged
-// and sent once it completes; a failed save keeps its patch so the next trigger retries it.
-// Pure TypeScript (timers injected via globalThis), unit-tested with fake timers.
+// and sent once it completes; a failed save keeps its patch (or what `recover` keeps of it).
+// Retries follow `retryAfter`: transient failures back off, refusals wait for a manual retry.
+// "Manual" mode (a live listing: every write re-screens it) never saves on its own: only
+// `flush({ force: true })` sends. Pure TypeScript, unit-tested with fake timers.
 
 export type AutosaveState = "idle" | "pending" | "saving" | "saved" | "error";
 
@@ -13,9 +15,19 @@ export interface AutosaveOptions<P extends object> {
   /** Idle delay before an automatic save. */
   idleMs?: number;
   onState?: (state: AutosaveState, error?: unknown) => void;
+  /** After a failure: the patch to keep for the next attempt (default: all of it); null drops it. */
+  recover?: (patch: P, error: unknown) => P | null;
+  /**
+   * After a failure: delay in ms before an automatic retry, or null to stop automatic saves until
+   * a forced flush (a refusal that resending cannot fix). Default: 15 s doubling, at most 2 min.
+   */
+  retryAfter?: (error: unknown, attempt: number) => number | null;
+  /** Starts in manual mode (no idle timer, unforced flushes do nothing). */
+  manual?: boolean;
 }
 
 export const AUTOSAVE_IDLE_MS = 5_000;
+const MAX_RETRY_MS = 120_000;
 
 export class Autosave<P extends object> {
   private pending: P | null = null;
@@ -23,25 +35,45 @@ export class Autosave<P extends object> {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private flushAfter = false;
   private disposed = false;
+  private halted = false;
+  private manual: boolean;
+  private failures = 0;
   private state: AutosaveState = "idle";
   private readonly idleMs: number;
   private readonly save: (patch: P) => Promise<void>;
   private readonly merge: (older: P, newer: P) => P;
   private readonly onState: ((state: AutosaveState, error?: unknown) => void) | undefined;
+  private readonly recover: (patch: P, error: unknown) => P | null;
+  private readonly retryAfter: (error: unknown, attempt: number) => number | null;
 
   constructor(options: AutosaveOptions<P>) {
     this.save = options.save;
     this.merge = options.merge ?? ((older, newer) => ({ ...older, ...newer }));
     this.idleMs = options.idleMs ?? AUTOSAVE_IDLE_MS;
     this.onState = options.onState;
+    this.recover = options.recover ?? ((patch) => patch);
+    this.retryAfter = options.retryAfter ?? ((_error, attempt) => Math.min(MAX_RETRY_MS, this.idleMs * 3 * 2 ** (attempt - 1)));
+    this.manual = options.manual ?? false;
   }
 
   get currentState(): AutosaveState {
     return this.state;
   }
 
+  get isManual(): boolean {
+    return this.manual;
+  }
+
   hasPending(): boolean {
     return this.pending !== null;
+  }
+
+  /** Manual mode keeps changes until a forced flush; back to automatic, pending changes save after the idle delay. */
+  setManual(manual: boolean): void {
+    if (this.manual === manual) return;
+    this.manual = manual;
+    if (manual) this.clearTimer();
+    else if (this.pending && !this.halted) this.armTimer();
   }
 
   /** Records a change; the save happens later (idle timer) or at the next flush. */
@@ -49,18 +81,23 @@ export class Autosave<P extends object> {
     if (this.disposed) return;
     this.pending = this.pending ? this.merge(this.pending, patch) : patch;
     this.setState("pending");
-    this.armTimer();
+    if (!this.manual && !this.halted) this.armTimer();
   }
 
-  /** Saves what is pending now (step change, blur, page hide); resolves when nothing is left to send. */
-  flush(): Promise<void> {
+  /**
+   * Saves what is pending now (step change, blur, page hide; `force` for an explicit save or retry).
+   * Resolves true when nothing is left to send, false when changes are still unsaved.
+   */
+  flush(options: { force?: boolean } = {}): Promise<boolean> {
+    if (options.force) this.halted = false;
+    else if (this.manual || this.halted) return Promise.resolve(this.pending === null && this.inflight === null);
     this.clearTimer();
     if (this.inflight) {
       // The current request may miss the latest patch: run again right after it.
       if (this.pending) this.flushAfter = true;
-      return this.inflight.then(() => (this.flushAfter || this.pending ? this.flush() : undefined));
+      return this.inflight.then(() => (this.pending && (this.flushAfter || options.force) && !this.halted ? this.flush(options) : this.pending === null));
     }
-    if (!this.pending) return Promise.resolve();
+    if (!this.pending) return Promise.resolve(true);
     const patch = this.pending;
     this.pending = null;
     this.flushAfter = false;
@@ -68,19 +105,26 @@ export class Autosave<P extends object> {
     this.inflight = this.save(patch).then(
       () => {
         this.inflight = null;
-        if (!this.pending) this.setState("saved");
+        this.failures = 0;
+        this.setState(this.pending ? "pending" : "saved");
       },
       (error: unknown) => {
         this.inflight = null;
+        this.failures += 1;
         // The failed patch goes back under whatever was typed since: nothing is lost.
-        this.pending = this.pending ? this.merge(patch, this.pending) : patch;
+        const kept = this.recover(patch, error);
+        if (kept) this.pending = this.pending ? this.merge(kept, this.pending) : kept;
         this.setState("error", error);
-        // A retry happens on the next trigger (queue/flush), not in a tight loop; one slow retry
-        // is scheduled so a transient outage heals without user action.
-        this.armTimer(this.idleMs * 3);
+        const delay = this.retryAfter(error, this.failures);
+        if (delay === null) this.halted = true;
+        else if (this.pending && !this.disposed && !this.manual) this.armTimer(delay);
       },
     );
-    return this.inflight.then(() => (this.flushAfter && this.pending ? this.flush() : undefined));
+    return this.inflight.then(() => {
+      const failed = this.state === "error";
+      if (this.pending && !failed && !this.halted && (this.flushAfter || options.force)) return this.flush(options);
+      return this.pending === null && !failed;
+    });
   }
 
   /** Stops the timers; pending changes are not sent (the caller flushes first when it wants them saved). */
@@ -89,7 +133,22 @@ export class Autosave<P extends object> {
     this.clearTimer();
   }
 
+  /** Undoes `dispose` (a component remounted, as React's StrictMode does in development). */
+  revive(): void {
+    this.disposed = false;
+    if (this.pending && !this.manual && !this.halted) this.armTimer();
+  }
+
+  /** What is waiting to be sent, without sending it (page hide: handed to a keepalive request). */
+  takePending(): P | null {
+    const patch = this.pending;
+    this.pending = null;
+    this.clearTimer();
+    return patch;
+  }
+
   private armTimer(delay = this.idleMs): void {
+    if (this.disposed) return;
     this.clearTimer();
     this.timer = setTimeout(() => {
       this.timer = null;
