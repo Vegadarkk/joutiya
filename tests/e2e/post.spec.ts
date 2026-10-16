@@ -85,7 +85,8 @@ function signedInbound(from: string, body: string, wamid: string): { raw: string
 
 /** Verifies a fresh Moroccan mobile for the signed-in user (code delivered by the signed webhook). */
 async function verifyPhone(page: Page, request: APIRequestContext): Promise<void> {
-  const digits = `7${String(Date.now() % 100_000_000).padStart(8, "0")}`;
+  // 061xxxxxxx is always a valid Moroccan mobile range (07 4x, 06 8[356] are not).
+  const digits = `61${String(Date.now() % 10_000_000).padStart(7, "0")}`;
   await page.goto("/fr/verifications");
   await page.getByLabel("Numéro de mobile").fill(`0${digits}`);
   const started = page.waitForResponse((response) => response.url().endsWith("/api/auth/phone/start") && response.request().method() === "POST");

@@ -16,7 +16,8 @@ const uniqueEmail = () => `e2e-phone-${Date.now()}-${Math.floor(Math.random() * 
 
 /** A fresh Moroccan mobile per run: verified numbers persist in the emulator for the session. */
 function freshNumber(): { typed: string; from: string; national: string } {
-  const digits = `6${String(Date.now() % 100_000_000).padStart(8, "0")}`;
+  // 061xxxxxxx is always a valid Moroccan mobile range (06 8[356] is not).
+  const digits = `61${String(Date.now() % 10_000_000).padStart(7, "0")}`;
   const national = `0${digits}`.replace(/^(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/, "$1 $2 $3 $4 $5");
   return { typed: `0${digits}`, from: `212${digits}`, national };
 }

@@ -106,7 +106,9 @@ export async function getUserPrivate(uid: string): Promise<UserPrivateDoc | null
 
 /** Marks the e-mail verified and the account activated (the role claim is set by the caller). */
 export async function activateAccount(uid: string, now = new Date()): Promise<void> {
-  await userRef(uid).set({ activation: "done", "badges.emailVerified": true, updatedAt: now } as never, { merge: true });
+  // A nested map, not a dotted key: set() with merge stores "badges.emailVerified" as a literal field
+  // name, which leaves the badge false and makes the strict user schema refuse the document.
+  await userRef(uid).set({ activation: "done", badges: { emailVerified: true }, updatedAt: now }, { merge: true });
 }
 
 export async function linkProvider(uid: string, provider: "password" | "google.com"): Promise<void> {
