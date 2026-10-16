@@ -136,8 +136,9 @@ export interface EngineQuery {
 
 export interface EngineResult<T = CardDocument> {
   hits: T[];
-  /** Exhaustive up to SEARCH_MAX_TOTAL_HITS (Meilisearch page mode). */
+  /** Exhaustive (not capped). */
   totalHits: number;
+  /** Capped by SEARCH_MAX_TOTAL_HITS / hitsPerPage (deeper pages come back empty). */
   totalPages: number;
   page: number;
   facetDistribution?: Record<string, Record<string, number>>;

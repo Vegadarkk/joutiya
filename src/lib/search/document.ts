@@ -5,6 +5,7 @@ import type { ListingStatus, ModerationState } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import ar from "../../../messages/ar.json";
 import fr from "../../../messages/fr.json";
+import { foldDigits } from "./normalize";
 import { districtKey } from "./params";
 import { SEARCH_DESCRIPTION_MAX, attributeField, sitemapShardOf, type SearchDocument } from "./types";
 
@@ -155,6 +156,11 @@ export function toSearchDocument(listing: ListingRecord, now: Date = new Date())
     if (filterable !== undefined) attributes[attributeField(criterion.id)] = filterable;
   }
   if (listing.condition) attrsText.push(...labels(["Criteria", "condition", "options", listing.condition]));
+  // Queries fold Arabic-Indic digits (normalizeQuery): index a folded copy of a title that has any,
+  // and keep the displayed title as written.
+  const title = listing.title.trim();
+  const foldedTitle = foldDigits(title);
+  if (foldedTitle !== title) attrsText.push(foldedTitle);
 
   const photo = listing.photos[0];
   const featuredUntil = listing.boosts.featuredUntil?.getTime();
@@ -163,8 +169,8 @@ export function toSearchDocument(listing: ListingRecord, now: Date = new Date())
   return {
     id: listing.id,
     slugId,
-    title: listing.title.trim(),
-    description: truncateText(listing.description, SEARCH_DESCRIPTION_MAX),
+    title,
+    description: foldDigits(truncateText(listing.description, SEARCH_DESCRIPTION_MAX)),
     categoryText: joinText([...labels(["Categories", categoryId, "name"]), ...labels(["Categories", categoryId, "sub", subcategoryId])]),
     placeText: joinText([city?.nameFr, city?.nameAr, region?.nameFr, region?.nameAr, location.district]),
     attrsText: joinText(attrsText),

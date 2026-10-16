@@ -164,6 +164,14 @@ describe("toSearchDocument", () => {
     expect(doc).not.toHaveProperty("photo");
   });
 
+  it("folds Arabic-Indic digits in the indexed text, keeps the displayed title as written", () => {
+    const doc = toSearchDocument(listing({ title: "سيارة ٢٠١٩", description: "موديل ٢٠١٩ بحالة جيدة" }), NOW)!;
+    expect(doc.title).toBe("سيارة ٢٠١٩");
+    expect(doc.attrsText).toContain("سيارة 2019");
+    expect(doc.description).toBe("موديل 2019 بحالة جيدة");
+    expect(toSearchDocument(listing({ title: "Golf 7 2019" }), NOW)!.attrsText).not.toContain("Golf 7 2019");
+  });
+
   it("truncates the description", () => {
     const doc = toSearchDocument(listing({ description: `${"mot ".repeat(1_000)}fin` }), NOW)!;
     expect(doc.description.length).toBeLessThanOrEqual(SEARCH_DESCRIPTION_MAX);
