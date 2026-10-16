@@ -31,9 +31,9 @@
   "environments": {
     "dev": {
       "firebase": {
-        "projectId": null,
-        "projectNumber": null,
-        "firestoreLocation": null
+        "projectId": "joutiya-dev",
+        "projectNumber": "89741285084",
+        "firestoreLocation": "europe-west9"
       },
       "r2": {
         "quarantine": "joutiya-dev-quarantine",
@@ -51,9 +51,9 @@
     },
     "staging": {
       "firebase": {
-        "projectId": null,
-        "projectNumber": null,
-        "firestoreLocation": null
+        "projectId": "joutiya-staging",
+        "projectNumber": "365736224142",
+        "firestoreLocation": "europe-west9"
       },
       "r2": {
         "quarantine": "joutiya-staging-quarantine",
@@ -71,9 +71,9 @@
     },
     "prod": {
       "firebase": {
-        "projectId": null,
-        "projectNumber": null,
-        "firestoreLocation": null
+        "projectId": "joutiya-prod",
+        "projectNumber": "652258095167",
+        "firestoreLocation": "europe-west9"
       },
       "r2": {
         "quarantine": "joutiya-prod-quarantine",
