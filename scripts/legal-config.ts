@@ -2,8 +2,8 @@
 // the machine that holds the CA of scripts/google-wif.ts, with the gcloud sign-in of its `login`
 // (own configuration, ~/.joutiya/gcloud): never `gcloud auth application-default login`, which
 // would replace the machine-wide credentials of the owner's other projects.
-// The file holds only the fields that differ from DEFAULT_LEGAL (src/config/legal.ts), e.g. the
-// host entity; the app merges the document over the defaults. Production refuses to start while
+// The file holds only the fields that differ from DEFAULT_LEGAL (src/config/legal.ts), which
+// already holds the hosts, e.g. the consumer mediator; the app merges the document over the defaults. Production refuses to start while
 // a mention required by art. 1-1 LCEN is missing.
 //
 //   node scripts/legal-config.ts <staging|prod> <file.json> [--apply]     dry run without --apply
