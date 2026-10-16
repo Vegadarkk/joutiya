@@ -220,6 +220,20 @@ Pour l'envoi, Cody a besoin dans votre `.env.local` des six lignes `JOUTIYA_OCI_
 Envoie les clés de mon .env.local sur la VM de Joutiya (docs/phase-1.md, étape 16). Ce fichier sert aussi à un autre produit : ne le lis pas toi-même (ni cat, head, tail, sed, ni grep sans -q), ne l'affiche pas, ne le réécris pas et ne change ni l'ordre ni le texte de ses lignes ; seuls les deux scripts ci-dessous le lisent. 1) `node scripts/vm-env.ts pepper .env.local` : ajoute HASH_PEPPER_STAGING et HASH_PEPPER_PROD à la fin du fichier s'ils manquent, sans montrer de valeur ; dis-moi alors de les copier dans mon gestionnaire de mots de passe. 2) Pour staging puis prod : `node --env-file=.env.local scripts/oracle-vm.ts env <env> --from=.env.local`, simulation qui liste les noms, leurs lignes et ce qui manque. Sans erreur, relance la même commande avec --apply ; sinon montre-moi les erreurs et arrête. S'il manque des variables JOUTIYA_OCI_*, dis-moi lesquelles ajouter, sans valeur. Ne me donne aucune valeur, seulement des noms.
 ```
 
+## Renouvellements
+
+Toutes les échéances du projet sont dans `joutiya/echeances.md`, dans les fichiers du projet. Celles de cette phase :
+
+- **Certificats Google de la VM** (web et worker, staging et production) : 365 jours à partir de leur pose. Oubliés, web et worker n'obtiennent plus d'accès Google : Firestore et Firebase Auth échouent, et le site ne fonctionne plus. Le renouvellement prend une dizaine de minutes ; web et worker redémarrent en quelques secondes :
+  1. Claude : `node scripts/oracle-vm.ts wif staging --apply`, puis `wif prod --apply` : nouvelles clés sur la VM, demandes de certificat affichées ;
+  2. Nav, sur le PC2 : `node scripts/google-wif.ts sign <fichier des demandes>`, qui rend les lignes `certificate` ;
+  3. Claude : `node scripts/oracle-vm.ts wif <env> --certificates=<fichier> --apply` pour chacun, puis contrôle des journaux.
+
+  Un rappel part 30 jours avant l'échéance : Claude le pose avec les certificats.
+- **Autorité des certificats** (PC2, `~/.joutiya/wif-ca`) : 10 ans, jusqu'au 13 octobre 2036. Gardez le dossier `~/.joutiya` du PC2 (autorité et connexion gcloud). S'il est perdu ou si l'autorité expire, Nav en crée une nouvelle (`ca --new`) et refait `setup staging --apply` et `setup prod --apply`, puis Claude refait les certificats de la VM comme ci-dessus.
+- **Jeton Cloudflare `joutiya-edge`** : jusqu'au 15 novembre 2026. Oublié, Claude ne peut plus régler Cloudflare par API (DNS, tunnels, cache) ; le site continue de tourner. Nav prépare un jeton aux mêmes droits, vous le rangez sous `JOUTIYA_CLOUDFLARE_API_TOKEN`.
+- **Jeton GitHub `joutiya-claude-actions`** (étape 8) : 90 jours à partir de sa création. Oublié, Claude ne peut plus changer les secrets et variables de la CI ; les déploiements continuent.
+
 ## Fin de la phase 1
 
 - `main` se déploie seul en staging ;

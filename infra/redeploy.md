@@ -23,6 +23,12 @@ Ce qui se perd : les files BullMQ et les compteurs de quotas du jour (`valkey-qu
 7. **Production** : Claude promeut la version du staging par Run Command (`node scripts/oracle-vm.ts promote --apply`, qui vide aussi le cache Cloudflare), puis `search-setup prod --reindex=<lectures> --apply`.
 8. **Contrôle** : `https://joutiya.ma/api/health` répond `ok`, et la sonde annonce le rétablissement.
 
+## Renouvellements
+
+- Certificats Google de web et worker : 365 jours, rappel 30 jours avant. Ils se renouvellent en trois étapes (`docs/phase-1.md`, Renouvellements) : `oracle-vm.ts wif <env> --apply`, signature sur le PC2 (`google-wif.ts sign`), puis `wif <env> --certificates=<fichier> --apply`. Expirés, web et worker perdent Firestore et Firebase Auth.
+- Autorité de ces certificats : 10 ans (13 octobre 2036), sur le PC2 dans `~/.joutiya`, à garder. Une reconstruction de la VM ne la touche pas.
+- Les autres échéances du projet sont dans `joutiya/echeances.md` (fichiers du projet).
+
 ## Entretien courant
 
 - Les mises à jour de sécurité (Ubuntu, Docker, cloudflared, agent Oracle) s'installent seules chaque nuit. Si un redémarrage est nécessaire, il a lieu à 03:30 UTC, et les conteneurs repartent seuls.

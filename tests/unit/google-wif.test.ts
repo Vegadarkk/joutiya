@@ -3,7 +3,7 @@ import { X509Certificate } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import {
   APIS,
@@ -86,6 +86,8 @@ describe("what setup wants", () => {
     expect(prod.attributeMapping).toEqual({ "google.subject": "assertion.subject.dn.cn" });
     expect(prod.attributeCondition).toBe('assertion.subject.dn.cn in ["joutiya-prod-web", "joutiya-prod-worker"]');
     expect(prod.x509?.trustStore?.trustAnchors).toEqual([{ pemCertificate: caPem.trim() }]);
+    // A CA written by openssl on Windows (CRLF) reaches Google with LF line endings.
+    expect(vmProviderBody("prod", caPem.replace(/\n/g, "\r\n")).x509).toEqual(prod.x509);
     expect(prod.displayName?.length).toBeLessThanOrEqual(32);
   });
 
@@ -221,6 +223,13 @@ describe("the CA and the certificates", () => {
     const certificates = signRequests(text, ca);
     expect(certificates.map((line) => line.split(" ").slice(0, 2).join(" "))).toEqual(["certificate joutiya-staging-web", "certificate joutiya-staging-worker"]);
     expect(wifCertificates(certificates.join("\n"), "staging").size).toBe(2);
+
+    // A CA written by openssl on Windows (CRLF files) signs CRLF text the same way.
+    const windows = caFiles(join(work, "windows"));
+    mkdirSync(windows.dir, { recursive: true });
+    for (const file of [ca.key, ca.cert]) writeFileSync(join(windows.dir, basename(file)), readFileSync(file, "utf8").replace(/\n/g, "\r\n"));
+    const signed = signRequests(text.replace(/\r?\n/g, "\r\n"), windows);
+    expect(wifCertificates(signed.join("\r\n"), "staging").size).toBe(2);
 
     expect(() => signRequests("no request here", ca)).toThrow(/no `request/);
     const twice = `request joutiya-prod-web ${der("joutiya-prod-web")}\nrequest joutiya-prod-web ${der("joutiya-prod-web")}`;

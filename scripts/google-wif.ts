@@ -361,7 +361,8 @@ export function vmProviderBody(env: DeployedEnv, caPem: string): Provider {
     description: `Containers of joutiya-vm (${env}), certificates of the Joutiya VM CA (guide phase 1, step 9)`,
     attributeMapping: { "google.subject": "assertion.subject.dn.cn" },
     attributeCondition: `assertion.subject.dn.cn in [${subjects}]`,
-    x509: { trustStore: { trustAnchors: [{ pemCertificate: caPem.trim() }] } },
+    // openssl on Windows writes ca.pem with CRLF, which Google refuses ("not in PEM format").
+    x509: { trustStore: { trustAnchors: [{ pemCertificate: caPem.replace(/\r\n/g, "\n").trim() }] } },
   };
 }
 
