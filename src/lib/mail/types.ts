@@ -33,7 +33,9 @@ export type TemplateId =
   | "appealOutcome"
   | "reporterWarning"
   // Search (phase 4): the daily digest of the saved searches with an alert (design D19).
-  | "savedSearchAlert";
+  | "savedSearchAlert"
+  // Messaging (phase 5, L5): the grouped new-messages mail (design D21).
+  | "newMessages";
 
 /**
  * Statement of reasons (art. 17 DSA, design D8) carried by the hold and rejection mails. The
@@ -143,6 +145,11 @@ export interface TemplateData {
    * List-Unsubscribe header and the "Se désabonner" link.
    */
   savedSearchAlert: { displayName: string; searches: SavedSearchAlertSection[]; unsubscribeToken: string };
+  /**
+   * Grouped new-messages mail (bulk, D21): the unread total and up to 3 conversations (listing
+   * title, the other member's display name). Never the text of a message.
+   */
+  newMessages: { displayName: string; count: number; conversations: { listingTitle: string; counterpartName: string }[] };
 }
 
 /** One saved search of the digest: its results page, the count of new listings and the newest few. */

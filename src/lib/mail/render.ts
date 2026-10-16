@@ -21,6 +21,7 @@ import { phoneVerified } from "./templates/phoneVerified";
 import { reportReceived } from "./templates/reportReceived";
 import { resetPassword } from "./templates/resetPassword";
 import { savedSearchAlert } from "./templates/savedSearchAlert";
+import { newMessages } from "./templates/newMessages";
 import { signupExisting } from "./templates/signupExisting";
 import { staffInvite } from "./templates/staffInvite";
 import { verifyEmail } from "./templates/verifyEmail";
@@ -51,6 +52,7 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   appealOutcome,
   reporterWarning,
   savedSearchAlert,
+  newMessages,
 };
 
 export const TEMPLATE_IDS = Object.keys(TEMPLATES) as TemplateId[];

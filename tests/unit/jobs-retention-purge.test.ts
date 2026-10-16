@@ -30,6 +30,17 @@ vi.mock("@/lib/db/repositories/retention", () => ({
   purgeListing: vi.fn(),
   deleteJournalPastPurge: vi.fn(async () => 0),
   oldestPastPurge: vi.fn(async () => null),
+  // Phase 5 steps (D22): nothing past purgeAt here (tests/unit/jobs-phase5-retention.test.ts).
+  listPastPurge: vi.fn(),
+  deleteIfPurgeable: vi.fn(),
+  readDecisionPurgeAts: vi.fn(),
+  setAiDecisionPurgeAt: vi.fn(),
+  deleteConversationMessages: vi.fn(),
+  deleteOrphanEvidence: vi.fn(),
+  deleteConversationIfEmpty: vi.fn(),
+  readUserBlocksCursor: vi.fn(),
+  writeUserBlocksCursor: vi.fn(),
+  purgeOrphanUserBlocks: vi.fn(),
 }));
 vi.mock("@/lib/storage", async () => {
   const memory = await import("@/lib/storage/memory");
@@ -107,6 +118,9 @@ beforeEach(() => {
   vi.mocked(retention.purgeListing).mockImplementation(async (id, purgeable) => (purgeable(listing(id)) ? { status: "purged", categoryId: "vehicules", purgedAt: NOW, version: 8, updatedAt: NOW } : null));
   vi.mocked(retention.deleteJournalPastPurge).mockResolvedValue(0);
   vi.mocked(retention.oldestPastPurge).mockResolvedValue(null);
+  vi.mocked(retention.listPastPurge).mockResolvedValue({ docs: [], read: 0 });
+  vi.mocked(retention.readUserBlocksCursor).mockResolvedValue(null);
+  vi.mocked(retention.purgeOrphanUserBlocks).mockResolvedValue({ deleted: 0, read: 0, last: null });
   vi.mocked(uploadsRepo.listPastPurge).mockResolvedValue([]);
   vi.mocked(uploadsRepo.listUploadsByTarget).mockResolvedValue([]);
   vi.mocked(getListings).mockReset().mockResolvedValue([]);

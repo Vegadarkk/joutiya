@@ -52,6 +52,30 @@ export async function applyAuthSanction(uid: string, sanction: Sanction): Promis
   return async () => undefined;
 }
 
+/**
+ * Auth side of a reversed sanction (appeal, D16), before the reversal's transaction: a ban's
+ * account enabled again, a suspension's `st` claim dropped. Returns how to undo it.
+ */
+export async function reverseAuthSanction(uid: string, action: Sanction["action"]): Promise<Undo> {
+  if (action === "ban") {
+    const record = await auth().getUser(uid);
+    if (!record.disabled) return async () => undefined;
+    await auth().updateUser(uid, { disabled: false });
+    return async () => {
+      await auth().updateUser(uid, { disabled: true });
+      await auth().revokeRefreshTokens(uid);
+    };
+  }
+  if (action === "suspend_account") {
+    const before = await getClaims(uid);
+    if (before.st !== "suspended") return async () => undefined;
+    const { st: _st, ...rest } = before;
+    await setClaims(uid, rest);
+    return async () => setClaims(uid, before);
+  }
+  return async () => undefined;
+}
+
 /** Runs an undo, logging (never throwing) when it fails too. */
 export async function undoQuietly(undo: Undo, context: Record<string, unknown>): Promise<void> {
   try {
@@ -123,8 +147,19 @@ async function changeListings(listings: readonly ListingRecord[], compute: (list
   return changes;
 }
 
-/** Suspension (D14): the published listings are paused with pausedReason "moderation". */
-export async function pauseListingsForSuspension(uid: string, now: Date): Promise<string[]> {
+/** `hiddenBy` dropped when the report that hid the listing is closed by the account decision (a user target's reports). */
+function moderationAfter(listing: ListingRecord, clearHiddenFor: ReadonlySet<string> | undefined): ListingRecord["moderation"] {
+  const hiddenBy = listing.moderation.hiddenBy;
+  if (!hiddenBy || !clearHiddenFor?.has(hiddenBy.reportId)) return listing.moderation;
+  const { hiddenBy: _hidden, ...moderation } = listing.moderation;
+  return moderation;
+}
+
+/**
+ * Suspension (D14): the published listings are paused with pausedReason "moderation".
+ * `clearHiddenFor`: report ids the decision closed (a user target): listings they hid are not hidden at the lift.
+ */
+export async function pauseListingsForSuspension(uid: string, now: Date, clearHiddenFor?: ReadonlySet<string>): Promise<string[]> {
   const life = await lifetime();
   const listings = await listOwnerListingsByStatus(uid, ["published"], SANCTION_LISTINGS_MAX);
   const changes = await changeListings(
@@ -132,7 +167,7 @@ export async function pauseListingsForSuspension(uid: string, now: Date): Promis
     (listing) => {
       if (listing.status !== "published") return null;
       const { patch } = transition(listing, "paused", { now, lifetime: life, pausedReason: "moderation" });
-      return { patch: { ...patch, adsEligible: false }, search: "delete" };
+      return { patch: { ...patch, moderation: moderationAfter(listing, clearHiddenFor), adsEligible: false }, search: "delete" };
     },
     now,
     "suspension pause",
@@ -163,7 +198,7 @@ export async function resumeModerationPaused(uid: string, now: Date): Promise<st
 }
 
 /** Ban (D14): published, paused and held listings are removed (decision per account); marked with the ban decision for a reversal. */
-export async function removeListingsForBan(uid: string, decisionId: string, actorUid: string, now: Date): Promise<string[]> {
+export async function removeListingsForBan(uid: string, decisionId: string, actorUid: string, now: Date, clearHiddenFor?: ReadonlySet<string>): Promise<string[]> {
   const life = await lifetime();
   const listings = await listOwnerListingsByStatus(uid, [...BAN_STATUSES], SANCTION_LISTINGS_MAX);
   const changes = await changeListings(
@@ -172,7 +207,7 @@ export async function removeListingsForBan(uid: string, decisionId: string, acto
       if (!(BAN_STATUSES as readonly string[]).includes(listing.status)) return null;
       const { patch, effects } = transition(listing, "removed", { now, lifetime: life });
       return {
-        patch: { ...patch, adsEligible: false, moderation: { ...listing.moderation, lastDecisionId: decisionId, reviewedBy: actorUid, reviewedAt: now } },
+        patch: { ...patch, adsEligible: false, moderation: { ...moderationAfter(listing, clearHiddenFor), lastDecisionId: decisionId, reviewedBy: actorUid, reviewedAt: now } },
         search: effects.search,
       };
     },

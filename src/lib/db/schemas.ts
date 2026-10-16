@@ -374,6 +374,8 @@ export const moderationDecisionSchema = z
         status: z.enum(["open", "upheld", "reversed"]),
         /** Who complains (art. 20: the affected user or the notifier, phase 5 D16). Absent on phase 3 records. */
         by: z.enum(["affected", "reporter"]).optional(),
+        /** A notifier's appeal: the report it comes from (the outcome mail goes to its reporter). */
+        reportId: z.string().max(128).optional(),
         text: z.string().max(2000).optional(),
         openedAt: ts,
         /** openedAt + 14 days. */

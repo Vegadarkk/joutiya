@@ -123,6 +123,55 @@ export interface DecisionView {
 
 // ---- Appeals (D16) ---------------------------------------------------------------------------
 
+/** Answer delay of an appeal (slaDueAt = openedAt + 14 days). */
+export const APPEAL_SLA_DAYS = 14;
+export const APPEAL_TEXT_MIN = 10;
+export const APPEAL_TEXT_MAX = 2000;
+const appealTextSchema = z.string().trim().min(APPEAL_TEXT_MIN).max(APPEAL_TEXT_MAX);
+/** Signed appeal link token (src/lib/decisions/appeal-token.ts). */
+export const appealTokenSchema = z.string().min(40).max(400).regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+
+/** POST /api/appeals: a signed-in account appeals a decision about it or about its notice. */
+export const openAppealSchema = z.object({ decisionId: docIdSchema, text: appealTextSchema }).strict();
+export type OpenAppealRequest = z.infer<typeof openAppealSchema>;
+
+/** POST /api/appeals/link: the signed link of a decision or outcome mail (banned accounts, visitors). */
+export const linkAppealSchema = z.object({ token: appealTokenSchema, text: appealTextSchema }).strict();
+export type LinkAppealRequest = z.infer<typeof linkAppealSchema>;
+
+/** GET /api/appeals/link?token=: what the link page shows before the form. */
+export const linkAppealQuerySchema = z.object({ token: appealTokenSchema }).strict();
+
+export interface OpenAppealResponse {
+  decisionId: string;
+  by: "affected" | "reporter";
+  status: "open";
+  slaDueAt: string;
+}
+
+/** A decision as its affected user or notifier sees it (account "Décisions" page, link page). */
+export interface AppealableDecision {
+  decisionId: string;
+  /** Who this view is for. */
+  by: "affected" | "reporter";
+  action: DecisionView["action"];
+  targetType: string;
+  /** src/config/decision-templates.ts (facts and ground in the reader's language). */
+  templateId: string;
+  durationDays: number | null;
+  origin: DecisionView["origin"];
+  automated: { detection: boolean; decision: boolean };
+  createdAt: string;
+  appealDeadline: string;
+  /** An appeal may be opened now. */
+  appealable: boolean;
+  appeal: { status: "open" | "upheld" | "reversed"; openedAt: string; slaDueAt: string | null; closedAt: string | null; note: string | null } | null;
+}
+
+export interface MyDecisionsResponse {
+  items: AppealableDecision[];
+}
+
 export const APPEAL_NOTE_MIN = 10;
 export const APPEAL_NOTE_MAX = 2000;
 
