@@ -12,7 +12,7 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | 2 | DNS de `joutiya.ma` | Claude (API) | `joutiya.ma` et `www` faits ; les noms protégés attendent l'étape 6 |
 | 3 | Réseau et VM Oracle | Claude (API), Nav pour le quota | Réseau fait, quota corrigé par Nav ; VM en création |
 | 4 | Accès de Claude à la VM | Nav, sur votre phrase | Fait ; vérifié sur la VM dès sa création |
-| 5 | Connexion Google d'Access | Nav, puis vous | Prête : projets Firebase créés le 16 octobre |
+| 5 | Connexion Google d'Access | Nav, puis vous | Fait le 16 octobre, vérifié |
 | 6 | Applications Access et jetons de service | Claude (API), Nav | Après les étapes 5 et 7 (Access exige une zone active) |
 | 7 | Serveurs DNS chez Cloudflare | Nav (Hostinger) | Après la validation du .MA, avant le 12 novembre |
 | 8 | Déploiement automatique du staging | Claude (API), vous pour un jeton | Après les étapes 6 et 7 |
@@ -26,7 +26,6 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 
 ## Ce qui reste à vous
 
-- **Étape 5** : cliquer sur **Create** du client Google préparé par Nav (Google n'affiche le secret qu'à ce moment), puis coller l'ID et le secret dans le formulaire Zero Trust que Nav a ouvert. Vérifier que la validation en deux étapes de votre compte Google est active.
 - **Étape 8** : sur la page de jeton GitHub préparée par Nav, cliquer sur **Generate token**, puis l'enregistrer dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
 
 Rien d'autre : ni clé SSH, ni commande, ni console.
@@ -87,6 +86,8 @@ Le client OAuth d'Access vit dans le projet de staging (`environments.staging.fi
 3. Nav prépare **Clients** → **Create client** → *Web application* `cloudflare-access` : origine `https://joutiya.cloudflareaccess.com`, redirection `https://joutiya.cloudflareaccess.com/cdn-cgi/access/callback`. Il s'arrête avant **Create** : Google n'affiche le secret qu'une fois, à la création ([Google](https://support.google.com/cloud/answer/15549257)).
 4. Vous cliquez sur **Create**, collez l'ID du client dans **App ID** et le secret dans **Client secret** du formulaire Zero Trust, puis cliquez sur **Save**. Fenêtre fermée trop tôt : **Clients** → `cloudflare-access` → **Add secret**, même copie.
 5. Nav lance **Test** : la connexion doit réussir avec votre Gmail.
+
+Fait le 16 octobre à 12:20 UTC : client `cloudflare-access` créé dans `joutiya-staging` (Google a accepté `cloudflareaccess.com`), test de Nav réussi avec votre Gmail. Claude a vérifié par API : une seule méthode Google, nommée « Google », PKCE activé, ID du client conforme ; l'autre méthode du compte, celle que Cloudflare crée par défaut, n'est admise par aucune application Joutiya.
 
 Une seule méthode Google dans le compte : le script la retrouve seul, et Claude vérifie par API qu'il n'y en a qu'une. Un futur membre du personnel entre dans la règle Access (étape 6) et, si Google le refuse en *Testing*, dans les utilisateurs test du projet de staging (100 au plus).
 
