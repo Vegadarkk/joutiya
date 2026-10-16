@@ -214,6 +214,8 @@ describe("restore options and errors", () => {
     expect(until.plan.dates).toEqual(["2026-10-15"]);
     expect([...until.written.entries()]).toEqual([["users/u1", { v: 1 }]]);
     expect(until.plan.warnings).toEqual(['collection "staff" is in no backup part']);
+    await addDate(source, "2026-10-19", [{ mode: "full", collection: "users", docs: [{ p: "users/u3", u: null }] }]);
+    expect((await planRestore(source, identity)).warnings).toEqual(["no backup for 2 day(s) before 2026-10-19 (failed runs, or an incomplete download)"]);
     await expect(planRestore(source, identity, { until: "16/10/2026" })).rejects.toBeInstanceOf(RestoreError);
   });
 

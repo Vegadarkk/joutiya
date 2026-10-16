@@ -70,7 +70,8 @@ node scripts/restore-firestore.ts ... --apply
   `--until YYYY-MM-DD` (state as of that night, e.g. before a bad deploy).
 - Each document gets its newest captured version (highest update time across all dates and passes),
   written with `set()` in batches of 500. A date whose manifest is missing (run that did not finish) is
-  restored unverified, with a warning; a part that does not match its manifest stops the restore.
+  restored unverified, with a warning; a part that does not match its manifest stops the restore; days
+  without any backup are reported.
 - `set()` replaces whole documents: restoring into a live database reverts what changed since the backup.
   Prefer an empty project, or narrow with `--collections`.
 - Spark allows 20 000 writes a day: split a larger restore with `--collections` over several days.

@@ -163,6 +163,10 @@ export async function planRestore(source: BackupSource, identity: string, option
   }
 
   const dates = [...new Set([...byDate.keys(), ...manifests.keys()])].sort();
+  for (const [index, date] of dates.entries()) {
+    const missing = index === 0 ? 0 : (Date.parse(date) - Date.parse(dates[index - 1] as string)) / 86_400_000 - 1;
+    if (missing > 0) warnings.push(`no backup for ${missing} day(s) before ${date} (failed runs, or an incomplete download)`);
+  }
   const selected: RestorePart[] = [];
   const verifiedDates: string[] = [];
   const seenCollections = new Set<string>();
