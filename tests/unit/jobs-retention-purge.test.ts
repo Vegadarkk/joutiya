@@ -8,6 +8,7 @@ import type { UploadRecord } from "@/lib/db/repositories/uploads";
 // purgeAt are deleted in batches under a nightly budget. Repositories are mocked; a
 // MemoryObjectStore records storage.
 
+const stored = vi.hoisted(() => new Map<string, UploadRecord>());
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/quota", () => ({ isDegraded: vi.fn(async () => false), consume: vi.fn(async () => ({ level: "ok" })) }));
 vi.mock("@/lib/uploads/storage-gauge", () => ({ recordMediaBytes: vi.fn(async () => null) }));
@@ -20,7 +21,8 @@ vi.mock("@/lib/db/repositories/uploads", () => ({
   UPLOADS_BY_TARGET_LIMIT: 100,
   listPastPurge: vi.fn(async () => []),
   listUploadsByTarget: vi.fn(async () => []),
-  deleteUploadDocument: vi.fn(async () => undefined),
+  // Returns the document as stored, like the transaction: every fixture built by upload() below.
+  deleteUploadDocument: vi.fn(async (id: string): Promise<UploadRecord | null> => stored.get(id) ?? null),
   updateUpload: vi.fn(async () => undefined),
 }));
 vi.mock("@/lib/db/repositories/retention", () => ({
@@ -60,7 +62,7 @@ function listing(id: string, overrides: Partial<ListingRecord> = {}): ListingRec
 }
 
 function upload(id: string, targetId: string, overrides: Partial<UploadRecord> = {}): UploadRecord {
-  return {
+  const record: UploadRecord = {
     id,
     ownerUid: "owner-1",
     purpose: "listing",
@@ -77,6 +79,8 @@ function upload(id: string, targetId: string, overrides: Partial<UploadRecord> =
     updatedAt: NOW,
     ...overrides,
   };
+  stored.set(id, record);
+  return record;
 }
 
 function seed(listingId: string, photoId: string): void {
@@ -95,6 +99,7 @@ function page(listings: ListingRecord[], read = listings.length) {
 }
 
 beforeEach(() => {
+  stored.clear();
   configured.value = true;
   store = new MemoryObjectStore();
   for (const mocked of [retention, uploadsRepo]) for (const fn of Object.values(mocked)) if (vi.isMockFunction(fn)) fn.mockReset();
@@ -157,6 +162,19 @@ describe("retention-purge: listings", () => {
     expect(await retentionPurge(NOW, { store })).toMatchObject({ listings: 1, uploads: 2, failed: 0 });
     expect(store.keys("media")).toEqual([]);
     expect(recordMediaBytes).toHaveBeenCalledWith(-40_000, NOW);
+  });
+
+  it("frees nothing for an upload document another path deleted meanwhile (owner DELETE, purge-quarantine)", async () => {
+    const record = listing("gone2345", { photos: [] });
+    seed(record.id, "photogone0000001");
+    seed(record.id, "photokept0000002");
+    vi.mocked(uploadsRepo.listUploadsByTarget).mockResolvedValue([upload("photogone0000001", record.id, { size: 40_000 }), upload("photokept0000002", record.id, { size: 25_000 })]);
+    vi.mocked(uploadsRepo.deleteUploadDocument).mockResolvedValueOnce(null);
+    vi.mocked(retention.listListingsPastPurge).mockResolvedValueOnce(page([record]));
+
+    expect(await retentionPurge(NOW, { store })).toMatchObject({ listings: 1, uploads: 2, failed: 0 });
+    expect(store.keys("media")).toEqual([]);
+    expect(recordMediaBytes).toHaveBeenCalledExactlyOnceWith(-25_000, NOW);
   });
 
   it("never touches another listing's objects", async () => {

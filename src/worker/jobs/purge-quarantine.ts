@@ -22,7 +22,7 @@ import { logger } from "@/lib/logging/logger";
 import { MEDIA_CONTENT_TYPE, photoFinalKey, photoObjectKey, type PhotoBucket } from "@/lib/media/urls";
 import { isDegraded } from "@/lib/quota";
 import { isStorageNotConfigured, moveObject, objectStore, type ObjectStore } from "@/lib/storage";
-import { RETAINED_STATUSES } from "@/lib/uploads/policy";
+import { RETAINED_STATUSES, storedBytes } from "@/lib/uploads/policy";
 import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 
 // Hourly at :20 (design §4, architecture §6 "Les objets non traités sont purgés après 24 h"):
@@ -275,8 +275,9 @@ async function purgeExpiredDocuments(store: ObjectStore, now: Date, result: Purg
         } else {
           // An orphan may have been a removed listing's: its variants can be in either bucket.
           await deleteObjects(store, upload, upload.bucket === "private" || !listing ? ["media", "private"] : ["media"]);
-          await deleteUploadDocument(upload.id);
-          if ((upload.status === "ready" || upload.heldObjects) && upload.size) result.freedBytes += upload.size;
+          // By the document as this run removed it: an owner DELETE or retention-purge may have ended
+          // or removed it since the listing, and then its bytes were theirs.
+          result.freedBytes += storedBytes(await deleteUploadDocument(upload.id));
           result.purged += 1;
         }
       } catch (error) {
