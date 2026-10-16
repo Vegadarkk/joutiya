@@ -170,6 +170,22 @@ describe("expire-listings", () => {
     expect(vi.mocked(sendMail).mock.calls[0]?.[0]).toMatchObject({ locale: "ar", to: "arabic@example.com" });
   });
 
+  it("stops mid-run once the write quota turns degraded, and at the first RESOURCE_EXHAUSTED", async () => {
+    const [a, b, c] = ["aaaa2345", "bbbb2345", "cccc2345"].map((id) => listing(id));
+    for (const record of [a!, b!, c!]) current.set(record.id, record);
+    vi.mocked(retention.listListingsToExpire).mockResolvedValue(page([a!, b!, c!], EXPIRE_BATCH));
+    // Start-of-run check, then before each listing: degraded before the second one.
+    vi.mocked(isDegraded).mockResolvedValueOnce(false).mockResolvedValueOnce(false).mockResolvedValue(true);
+    expect(await expireListings(NOW)).toEqual({ expired: 1, mailed: 1, skipped: 0, failed: 0 });
+    expect(retention.listListingsToExpire).toHaveBeenCalledTimes(1);
+
+    writes = [];
+    vi.mocked(isDegraded).mockReset().mockResolvedValue(false);
+    vi.mocked(retention.applyListingTransition).mockRejectedValueOnce(Object.assign(new Error("8 RESOURCE_EXHAUSTED: Quota exceeded."), { code: 8 }));
+    expect(await expireListings(NOW)).toEqual({ expired: 0, mailed: 0, skipped: 0, failed: 1 });
+    expect(writes).toEqual([]);
+  });
+
   it("does nothing without Firebase, and defers while the write quota is degraded", async () => {
     configured.value = false;
     expect(await expireListings(NOW)).toEqual({ expired: 0, mailed: 0, skipped: 0, failed: 0 });
