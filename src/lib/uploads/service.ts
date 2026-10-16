@@ -1,0 +1,172 @@
+import "server-only";
+import { requireOwner, type AuthContext } from "@/lib/auth/guards";
+import { PHOTO_VARIANTS, UPLOAD_URL_TTL_SECONDS, type SignUploadInput, type SignUploadResponse, type UploadStatusResponse } from "@/lib/contracts/media";
+import { recordContentOp } from "@/lib/db/repositories/content-ops";
+import { getListing, removePhoto, type ListingRecord } from "@/lib/db/repositories/listings";
+import { enqueueSearchOutbox } from "@/lib/db/repositories/search-outbox";
+import { createUpload, deleteUploadDocument, getUpload, listUploadsByTarget, newUploadId, transitionUpload, UPLOAD_RETENTION_DAYS, type UploadRecord } from "@/lib/db/repositories/uploads";
+import { COLLECTIONS } from "@/lib/db/schemas";
+import { HttpError, notFound, unavailable } from "@/lib/http/errors";
+import { revalidateListingPaths } from "@/lib/listings/revalidate";
+import { logger } from "@/lib/logging/logger";
+import { expireUpload } from "@/lib/media/pipeline";
+import { dispatchUpload, enqueueMediaJob, isMediaQueueEnabled } from "@/lib/media/queue";
+import { mediaObjectKey, quarantineObjectKey } from "@/lib/media/urls";
+import { captureServerException } from "@/lib/observability/capture";
+import { enforceLimit } from "@/lib/rate-limit/limiter";
+import { isStorageNotConfigured, objectStore, type ObjectStore } from "@/lib/storage";
+import { LIVE_STATUSES, PHOTO_TARGET_STATUSES, maxPhotosOf, toStatusResponse } from "./policy";
+import { isStorageFull, recordMediaBytes } from "./storage-gauge";
+
+// Uploads service (design §3 MEDIA_API, architecture §6 "Uploads"): signing a presigned PUT to
+// the quarantine bucket, completing (processing inline or queued, D12), status and deletion. The
+// caller is a signed-in member (handlers.ts); an upload or listing of someone else answers 404.
+
+export interface Uploader {
+  auth: AuthContext;
+  /** Clear client IP (contentOps, LCEN); "" when unknown. */
+  ip: string;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** A signed upload still counts against the photo limit while its URL can be used (5 min) plus margin. */
+const SIGNED_HOLD_MS = 2 * UPLOAD_URL_TTL_SECONDS * 1000;
+
+function store(): ObjectStore {
+  try {
+    return objectStore();
+  } catch (error) {
+    // Deployed without the R2 variables: uploads are off until the bucket tokens exist.
+    if (isStorageNotConfigured(error)) throw unavailable("object storage is not configured");
+    throw error;
+  }
+}
+
+async function ownedListing(uploader: Uploader, listingId: string): Promise<ListingRecord> {
+  const listing = await getListing(listingId);
+  if (!listing) throw notFound();
+  requireOwner(uploader.auth, listing);
+  return listing;
+}
+
+/** The caller's upload; anyone else's (or a missing one) answers 404, never 403 (IDOR). */
+async function ownedUpload(uploader: Uploader, id: string): Promise<UploadRecord> {
+  const upload = await getUpload(id);
+  if (!upload || upload.ownerUid !== uploader.auth.user.uid) throw notFound();
+  return upload;
+}
+
+export const uploadContentRef = (id: string) => `${COLLECTIONS.uploads}/${id}`;
+
+/**
+ * POST /api/uploads/sign: the caller's editable listing, room for one more photo, storage not
+ * degraded, 30 signatures an hour and 200 MiB declared a day; then the `signed` document and a
+ * presigned PUT bound to the declared type (and length, where the adapter signs it), 5 minutes.
+ */
+export async function signUpload(uploader: Uploader, input: SignUploadInput, now = new Date()): Promise<SignUploadResponse> {
+  const { uid } = uploader.auth.user;
+  const objects = store();
+  if (await isStorageFull()) throw new HttpError(503, "storage_full", undefined, { headers: { "Retry-After": "3600" } });
+  await enforceLimit("upload.sign.uid", uid);
+
+  const listing = await ownedListing(uploader, input.targetId);
+  if (!PHOTO_TARGET_STATUSES.includes(listing.status)) throw notFound();
+  const attached = new Set(listing.photos.map((photo) => photo.id));
+  const inFlight = (await listUploadsByTarget(listing.id, ["signed", "processing"])).filter(
+    (upload) => !attached.has(upload.id) && (upload.status === "processing" || now.getTime() - upload.createdAt.getTime() < SIGNED_HOLD_MS),
+  );
+  if (attached.size + inFlight.length >= maxPhotosOf(listing)) throw new HttpError(409, "photo_limit");
+
+  // Points = declared bytes; the pipeline refuses an object larger than declared.
+  await enforceLimit("upload.bytes.uid", uid, input.declaredSize);
+
+  const id = newUploadId();
+  const quarantineKey = quarantineObjectKey(id);
+  await createUpload(id, {
+    ownerUid: uid,
+    purpose: input.purpose,
+    targetId: listing.id,
+    declaredSize: input.declaredSize,
+    declaredType: input.declaredType,
+    status: "signed",
+    quarantineKey,
+    bucket: "media",
+    checks: {},
+    purgeAt: new Date(now.getTime() + UPLOAD_RETENTION_DAYS * DAY_MS),
+    createdAt: now,
+    updatedAt: now,
+  });
+  const signed = await objects.presignPut({ bucket: "quarantine", key: quarantineKey, contentType: input.declaredType, contentLength: input.declaredSize, expiresInSeconds: UPLOAD_URL_TTL_SECONDS });
+  if (uploader.ip) await recordContentOp({ uid, op: "upload.create", contentRef: uploadContentRef(id), ip: uploader.ip, now });
+  return { uploadId: id, url: signed.url, method: "PUT", headers: { "Content-Type": input.declaredType }, expiresAt: signed.expiresAt.toISOString() };
+}
+
+/**
+ * POST /api/uploads/{id}/complete: `signed` -> `processing`, then the pipeline (inline without
+ * Valkey: the answer is final; queued otherwise: `processing`, the client polls). Repeating it is
+ * harmless: a finished upload answers its status, a queued one is re-enqueued (same job id).
+ */
+export async function completeUpload(uploader: Uploader, id: string, now = new Date()): Promise<UploadStatusResponse> {
+  const upload = await ownedUpload(uploader, id);
+  if (upload.status === "ready" || upload.status === "rejected") return toStatusResponse(upload);
+  const started = await transitionUpload(id, ["signed"], { status: "processing" }, now);
+  if (!started.ok) {
+    if (!started.upload) throw notFound();
+    if (started.upload.status === "processing" && isMediaQueueEnabled()) await enqueueMediaJob(id);
+    return toStatusResponse(started.upload);
+  }
+  let result: UploadStatusResponse | null;
+  try {
+    result = await dispatchUpload(id);
+  } catch (error) {
+    if (isMediaQueueEnabled()) {
+      // Not enqueued, nothing will process it: back to `signed`, so complete can be called again.
+      await transitionUpload(id, ["processing"], { status: "signed" }).catch(() => undefined);
+      logger.error({ uploadId: id, err: (error as Error).message }, "media job not enqueued");
+      throw unavailable("media queue unavailable");
+    }
+    // Inline (dev): an infrastructure failure expires the upload; the wizard offers a retry.
+    captureServerException(error, { route: "uploads.complete", uploadId: id });
+    result = await expireUpload(id).catch(() => {
+      throw error;
+    });
+  }
+  // Null: deleted by its owner while it was processing.
+  if (!result) throw notFound();
+  return result;
+}
+
+/** GET /api/uploads/{id}: the owner's status (the wizard polls it while the worker runs). */
+export async function uploadStatus(uploader: Uploader, id: string): Promise<UploadStatusResponse> {
+  return toStatusResponse(await ownedUpload(uploader, id));
+}
+
+const photosRequired = () => new HttpError(422, "invalid_listing", undefined, { details: [{ path: "photos", code: "photos_required" }] });
+
+/**
+ * DELETE /api/uploads/{id}: detaches the photo from the listing, deletes the quarantine object and
+ * the variants, then the document. A live listing keeps at least one photo (422, like a PATCH).
+ * Under a legal hold the objects and the document stay as evidence; only the listing changes.
+ */
+export async function deleteUpload(uploader: Uploader, id: string, now = new Date()): Promise<void> {
+  const upload = await ownedUpload(uploader, id);
+  const listing = await getListing(upload.targetId);
+  if (listing?.photos.some((photo) => photo.id === id)) {
+    if (LIVE_STATUSES.includes(listing.status) && listing.photos.length <= 1) throw photosRequired();
+    const updated = await removePhoto(listing.id, id, now);
+    if (updated && listing.status === "published") {
+      // The public page and the search index drop the photo now, not at the next ISR window.
+      await enqueueSearchOutbox(listing.id, "upsert", updated.version, now);
+      revalidateListingPaths({ slugId: listing.slugId, publicId: listing.sellerPublicId });
+    }
+  }
+  if (listing && listing.legalHold.length > 0) {
+    logger.info({ uploadId: id, listingId: listing.id }, "upload kept under legal hold");
+    return;
+  }
+  const objects = store();
+  await objects.delete("quarantine", upload.quarantineKey);
+  for (const variant of PHOTO_VARIANTS) await objects.delete("media", mediaObjectKey(upload.targetId, id, variant));
+  await deleteUploadDocument(id);
+  if (upload.status === "ready" && upload.size) await recordMediaBytes(-upload.size, now);
+}

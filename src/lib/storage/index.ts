@@ -11,7 +11,10 @@ import type { ObjectStore } from "./types";
 export type { BucketRole, ObjectHead, ObjectStore, PresignedPut, PresignPutInput, PutOptions } from "./types";
 export { assertObjectKey, bucketName, bucketRole, isValidObjectKey, mediaBaseUrl } from "./keys";
 export { MemoryObjectStore } from "./memory";
+export type { MemoryCall, MemoryOp } from "./memory";
 export { MeteredObjectStore } from "./metered";
+export { S3ObjectStore, StorageError } from "./s3";
+export type { S3ObjectStoreConfig, S3Operation } from "./s3";
 
 export class StorageNotConfiguredError extends Error {
   constructor() {
@@ -41,4 +44,13 @@ export function objectStore(): ObjectStore {
 /** Tests only: forget the cached store after changing the environment. */
 export function resetObjectStore(): void {
   shared = undefined;
+}
+
+/** Tests only: serve `store` from objectStore() until the next reset (API tests use a MemoryObjectStore). */
+export function setObjectStoreForTests(store: ObjectStore | undefined): void {
+  shared = store;
+}
+
+export function isStorageNotConfigured(error: unknown): error is StorageNotConfiguredError {
+  return error instanceof StorageNotConfiguredError;
 }
