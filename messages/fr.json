@@ -2053,7 +2053,9 @@
         "later": "plus tard",
         "unavailable": "L'affichage des numéros est momentanément indisponible. Réessayez dans quelques minutes.",
         "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez."
-      }
+      },
+      "challenge": "Beaucoup de numéros ont été consultés depuis votre connexion internet : confirmez que vous n'êtes pas un robot pour afficher celui-ci.",
+      "challengeFailed": "La vérification n'a pas abouti. Réessayez."
     },
     "safety": {
       "title": "Conseils de sécurité",

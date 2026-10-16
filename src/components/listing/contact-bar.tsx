@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { LogIn, MessageCircle, MessageSquare, Phone, Settings2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { formatWait, useApiErrorMessage } from "@/components/auth/form-message";
+import { TurnstileWidget } from "@/components/auth/turnstile-widget";
 import { InlineError } from "@/components/feedback/inline-error";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
@@ -30,7 +31,14 @@ export interface ContactBarProps {
 
 type Phone = PhoneRevealResponse["phone"];
 
-type RevealState = { kind: "idle" } | { kind: "loading" } | { kind: "signin" } | { kind: "revealed"; phone: Phone } | { kind: "error"; error: unknown };
+type RevealState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "signin" }
+  /** The IP allowance is spent (escalation.ts): a Turnstile challenge, then the same request with its token. */
+  | { kind: "challenge"; failed: boolean }
+  | { kind: "revealed"; phone: Phone }
+  | { kind: "error"; error: unknown };
 
 /** Reveal refusals with a message of their own (src/lib/listings/phone-reveal.ts, escalation.ts, limiter). */
 export const REVEAL_ERROR_KEYS = ["reveal_not_allowed", "listing_unavailable", "not_found", "turnstile_required", "turnstile_failed", "rate_limited", "unavailable", "network"] as const;
@@ -43,7 +51,7 @@ export type RevealErrorKey = (typeof REVEAL_ERROR_KEYS)[number];
 export function revealFailure(error: unknown): "signin" | RevealErrorKey | null {
   const code: ApiErrorCode = error instanceof ApiError ? error.code : "internal";
   if (code === "unauthenticated") return "signin";
-  // Turnstile cannot run on a public page (hash CSP): both escalation answers say "later".
+  // Both escalation answers share one message (shown only when the challenge cannot help).
   if (code === "turnstile_failed") return "turnstile_required";
   return (REVEAL_ERROR_KEYS as readonly string[]).includes(code) ? (code as RevealErrorKey) : null;
 }
@@ -67,6 +75,20 @@ export function isWhatsappUrl(url: string): boolean {
 
 const subscribeNever = () => () => {};
 
+/** Tailwind `lg`: the actions sit in the seller card from here, in the fixed phone bar below. */
+const DESKTOP_QUERY = "(min-width: 64rem)";
+
+function subscribeDesktop(onChange: () => void): () => void {
+  const query = window.matchMedia(DESKTOP_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+/** One layout renders the challenge: two Turnstile widgets would ask twice. */
+function useDesktop(): boolean {
+  return useSyncExternalStore(subscribeDesktop, () => window.matchMedia(DESKTOP_QUERY).matches, () => false);
+}
+
 /**
  * Room for the fixed phone bar after the footer (portalled to the end of <body>): without it the bar
  * would cover the last lines of the page. Client only, below the fold: no visible shift.
@@ -83,12 +105,13 @@ export function ContactBar({ listingId, slugId, sellerPublicId, showPhone, whats
   const message = useRevealMessage();
   const hintId = useId();
   const [state, setState] = useState<RevealState>({ kind: "idle" });
+  const desktop = useDesktop();
 
   const canReveal = showPhone || whatsapp;
   const own = status === "ready" && session !== null && session.publicId === sellerPublicId;
   const next = `/${locale}/annonce/${slugId}`;
 
-  async function reveal() {
+  async function reveal(turnstileToken?: string) {
     if (state.kind === "loading") return;
     setState({ kind: "loading" });
     const viewer = await loadSession();
@@ -97,9 +120,15 @@ export function ContactBar({ listingId, slugId, sellerPublicId, showPhone, whats
       return;
     }
     try {
-      const { phone } = await apiPost<PhoneRevealResponse>(LISTING_API.phone(listingId), {});
+      const { phone } = await apiPost<PhoneRevealResponse>(LISTING_API.phone(listingId), turnstileToken ? { turnstileToken } : {});
       setState({ kind: "revealed", phone });
     } catch (error) {
+      const code = error instanceof ApiError ? error.code : undefined;
+      if (code === "turnstile_required" || code === "turnstile_failed") {
+        // A refused token is single use: the widget mounts again for a fresh one.
+        setState({ kind: "challenge", failed: code === "turnstile_failed" || turnstileToken !== undefined });
+        return;
+      }
       setState(revealFailure(error) === "signin" ? { kind: "signin" } : { kind: "error", error });
     }
   }
@@ -159,8 +188,23 @@ export function ContactBar({ listingId, slugId, sellerPublicId, showPhone, whats
     </Button>
   );
 
-  const feedback =
-    state.kind === "signin" ? (
+  const feedback = (inDesktopBlock: boolean) =>
+    state.kind === "challenge" ? (
+      inDesktopBlock === desktop ? (
+        <div data-testid="reveal-challenge" className="flex flex-col gap-2 rounded-md bg-surface-muted p-3 text-sm">
+          <p className="text-pretty">{t("challenge")}</p>
+          <TurnstileWidget
+            key={state.failed ? "retry" : "first"}
+            action="listing"
+            cData="listing-reveal"
+            onToken={(token) => {
+              if (token) void reveal(token);
+            }}
+            error={state.failed ? t("challengeFailed") : undefined}
+          />
+        </div>
+      ) : null
+    ) : state.kind === "signin" ? (
       <div className="flex flex-col gap-2 rounded-md bg-surface-muted p-3 text-sm">
         <p className="text-pretty">{t("signInBody")}</p>
         <Button asChild variant="structure" className="self-start">
@@ -194,7 +238,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, showPhone, whats
       {/* lg and up: inside the seller card. */}
       <div className="hidden flex-col gap-3 lg:flex">
         <div className="flex flex-col gap-2">{primary(false)}</div>
-        {feedback}
+        {feedback(true)}
         {messageButton(false)}
         {hint}
       </div>
@@ -203,7 +247,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, showPhone, whats
           hidden text). Once revealed, the bar holds the call and WhatsApp actions only. */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_-18px_rgb(11_30_31/0.35)] lg:hidden">
         <div className="mx-auto flex max-w-xl flex-col gap-2">
-          {feedback}
+          {feedback(false)}
           <div className="flex gap-2">
             {revealed ? null : messageButton(true)}
             {primary(true)}

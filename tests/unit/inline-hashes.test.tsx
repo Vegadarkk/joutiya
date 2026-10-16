@@ -81,4 +81,9 @@ describe("withScriptHashes", () => {
   it("keeps 'unsafe-eval' when present (dev)", () => {
     expect(withScriptHashes("script-src 'self' 'unsafe-inline' 'unsafe-eval'", [])).toBe("script-src 'self' 'unsafe-eval'");
   });
+
+  it("keeps the Turnstile origin and drops the other hosts", () => {
+    const policy = "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://accounts.google.com/gsi/client";
+    expect(withScriptHashes(policy, ["AAA="])).toBe("script-src 'self' 'sha256-AAA=' https://challenges.cloudflare.com");
+  });
 });

@@ -39,7 +39,7 @@ const FIREBASE_ORIGINS = [
   "https://securetoken.googleapis.com",
   "https://firestore.googleapis.com",
 ];
-const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
+export const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 /** Google Identity Services (Google sign-in, phase 2): script, button iframe, style sheet. */
 const GIS_SCRIPT = "https://accounts.google.com/gsi/client";
 const GIS_FRAME = "https://accounts.google.com/gsi/";

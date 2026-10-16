@@ -9,6 +9,7 @@
 
 import { createHash } from "node:crypto";
 import { THEME_SCRIPT } from "../theme/script.ts";
+import { TURNSTILE_ORIGIN } from "./csp.ts";
 
 export { INLINE_HASH_MARKER } from "./csp.ts";
 
@@ -71,14 +72,18 @@ export function inlineScripts(html: string): InlineScripts {
   return { hashes: [...hashes], untrusted };
 }
 
-/** Replaces the script-src directive with 'self' plus the given hashes; keeps 'unsafe-eval' (dev). */
+/**
+ * Replaces the script-src directive with 'self' plus the given hashes; keeps 'unsafe-eval' (dev)
+ * and the Turnstile origin (the phone reveal of the public listing page may escalate to a challenge).
+ */
 export function withScriptHashes(policy: string, hashes: string[]): string {
   return policy
     .split(";")
     .map((directive) => {
       const trimmed = directive.trim();
       if (!/^script-src\s/i.test(trimmed)) return trimmed;
-      const extra = trimmed.includes("'unsafe-eval'") ? ["'unsafe-eval'"] : [];
+      const sources = trimmed.split(/\s+/);
+      const extra = [TURNSTILE_ORIGIN, "'unsafe-eval'"].filter((source) => sources.includes(source));
       return ["script-src", "'self'", ...hashes.map((hash) => `'sha256-${hash}'`), ...extra].join(" ");
     })
     .filter(Boolean)
