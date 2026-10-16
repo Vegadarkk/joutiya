@@ -1,25 +1,33 @@
 #!/bin/bash
-# First boot of the Joutiya VM (Oracle Always Free Ampere A1, Ubuntu 24.04 aarch64), given as the
-# cloud-init script when the instance is created (docs/phase-1.md). Copy this file to
-# bootstrap.local.sh (ignored by Git), replace the placeholder with the token of joutiya-ssh-tunnel,
-# and paste the copy; never commit the filled copy.
+# First boot of the Joutiya VM (Oracle Always Free Ampere A1, Ubuntu 24.04 aarch64), sent as the
+# cloud-init user data by `node scripts/oracle-vm.ts create`, which fills the placeholders in memory
+# (tunnel tokens read from the Cloudflare API, a tarball of infra/vm and docker/). Never fill or
+# commit a copy by hand.
 #
-# Keeps the metadata service (which serves this script, token included) away from non-root users,
-# starts the SSH tunnel, then installs Docker, swap and unattended upgrades. The VM is reached only
-# through ssh.joutiya.ma (Cloudflare Access): the VCN has no ingress rule. Users, sshd, sudoers and
-# Compose files come next, from `node scripts/deploy-prod.ts vm-sync` on the owner's machine.
+# Keeps the metadata service (which serves this script, tokens included) away from non-root users,
+# starts the SSH tunnel, installs Docker, swap and unattended upgrades, then this repository's VM
+# files (infra/vm/install.sh) and the two Compose tunnels' tokens. The VCN has no ingress rule: the
+# VM is reached through ssh.joutiya.ma (Cloudflare Access) or OCI Run Command. Progress lines (no
+# secret) go to the serial console, readable through the OCI console history.
 set -euo pipefail
 
 SSH_TUNNEL_TOKEN='__JOUTIYA_SSH_TUNNEL_TOKEN__'
+STAGING_TUNNEL_TOKEN='__JOUTIYA_STAGING_TUNNEL_TOKEN__'
+PROD_TUNNEL_TOKEN='__JOUTIYA_PROD_TUNNEL_TOKEN__'
+VM_FILES='__JOUTIYA_VM_FILES__'
 
 install -m 0600 /dev/null /var/log/joutiya-bootstrap.log
 exec >> /var/log/joutiya-bootstrap.log 2>&1
-echo "bootstrap: start $(date -u +%FT%TZ)"
+progress() { echo "joutiya-bootstrap: $*"; echo "joutiya-bootstrap: $*" > /dev/console 2> /dev/null || true; }
+trap 'progress "failed at line $LINENO (see /var/log/joutiya-bootstrap.log)"' ERR
+progress "start $(date -u +%FT%TZ)"
 export DEBIAN_FRONTEND=noninteractive
-if [[ "$SSH_TUNNEL_TOKEN" == __* ]]; then
-  echo "bootstrap: the SSH tunnel token was not filled in"
-  exit 1
-fi
+for value in "$SSH_TUNNEL_TOKEN" "$STAGING_TUNNEL_TOKEN" "$PROD_TUNNEL_TOKEN" "$VM_FILES"; do
+  if [[ "$value" == __* ]]; then
+    progress "a placeholder was not filled in"
+    exit 1
+  fi
+done
 
 apt-get update
 apt-get install -y ca-certificates curl zstd unattended-upgrades iptables-persistent
@@ -43,6 +51,7 @@ apt-get update
 apt-get install -y cloudflared
 cloudflared service install "$SSH_TUNNEL_TOKEN"
 systemctl enable --now cloudflared
+progress "ssh tunnel installed"
 
 # Swap: 4 GB on the boot volume, used only under memory pressure.
 if ! swapon --show | grep -q /swapfile; then
@@ -85,6 +94,7 @@ cat > /etc/docker/daemon.json << 'EOF'
 EOF
 systemctl enable docker
 systemctl restart docker
+progress "docker installed"
 
 # Security updates every day, Docker and cloudflared included; a reboot, when an update needs
 # one, happens at night (containers restart on their own, the probe tolerates 10 minutes).
@@ -102,4 +112,20 @@ APT::Periodic::Unattended-Upgrade "1";
 EOF
 systemctl enable --now unattended-upgrades
 
-echo "bootstrap: done $(date -u +%FT%TZ)"
+# This repository's VM files: users, sshd, sudoers, Compose files, container firewall. Later
+# changes go through the same install.sh (scripts/oracle-vm.ts sync).
+files="$(mktemp -d)"
+base64 -d <<< "$VM_FILES" | tar -xzf - -C "$files"
+bash "$files/infra/vm/install.sh" "$files"
+rm -rf "$files"
+progress "vm files installed"
+
+# Tokens of the Compose tunnels, root only (docker/compose.yml reads /etc/joutiya/<env>/tunnel.env).
+write_secret() { (umask 077 && printf '%s\n' "$2" > "$1"); }
+write_secret /etc/joutiya/staging/tunnel.env "TUNNEL_TOKEN=$STAGING_TUNNEL_TOKEN"
+write_secret /etc/joutiya/prod/tunnel.env "TUNNEL_TOKEN=$PROD_TUNNEL_TOKEN"
+unset SSH_TUNNEL_TOKEN STAGING_TUNNEL_TOKEN PROD_TUNNEL_TOKEN VM_FILES
+
+# Host key for the known_hosts line of ssh.joutiya.ma (public).
+progress "host key $(cut -d ' ' -f 1,2 /etc/ssh/ssh_host_ed25519_key.pub)"
+progress "done $(date -u +%FT%TZ)"

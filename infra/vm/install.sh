@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Installs this repository's VM files on the Joutiya VM. Run as root by `scripts/deploy-prod.ts
-# vm-sync`, which streams infra/vm, docker/ and the deploy users' public keys over SSH and calls
+# Installs this repository's VM files on the Joutiya VM. Run as root at first boot by bootstrap.sh,
+# then by `scripts/oracle-vm.ts sync` (OCI Run Command) or `scripts/deploy-prod.ts vm-sync` (SSH),
+# which send infra/vm, docker/ and the deploy users' public keys and call
 #   install.sh <extracted directory>
 # Idempotent. sshd and sudoers changes are validated before they replace the running ones.
 # Secrets are never handled here: /etc/joutiya/<env>/*.env are written by the owner (redeploy.md).
@@ -66,13 +67,17 @@ mv /etc/sudoers.d/.joutiya-deploy.new /etc/sudoers.d/joutiya-deploy
 readonly SSHD_DROPIN=/etc/ssh/sshd_config.d/10-joutiya.conf
 [[ -f "$SSHD_DROPIN" ]] && cp -p "$SSHD_DROPIN" "$SSHD_DROPIN.previous"
 install -m 0644 -o root -g root "$SRC/infra/vm/sshd_config.d/joutiya.conf" "$SSHD_DROPIN"
+# Ubuntu 24.04 starts sshd on the first connection (ssh.socket): at first boot its runtime
+# directory, which `sshd -t` requires, may not exist yet.
+install -d -m 0755 /run/sshd
 if ! sshd -t; then
   if [[ -f "$SSHD_DROPIN.previous" ]]; then mv "$SSHD_DROPIN.previous" "$SSHD_DROPIN"; else rm -f "$SSHD_DROPIN"; fi
   log "sshd configuration rejected: previous one restored"
   exit 1
 fi
 rm -f "$SSHD_DROPIN.previous"
-systemctl reload ssh
+# Reloads a running sshd only; a socket-activated one reads the new file on the next connection.
+systemctl try-reload-or-restart ssh
 
 # Containers never reach the instance metadata service (169.254.169.254): it serves the cloud-init
 # user data, which holds the SSH tunnel token.

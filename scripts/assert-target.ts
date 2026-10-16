@@ -293,7 +293,7 @@ function parseJson(text: string): Record<string, unknown> | null {
 }
 
 /** Cloudflare tunnel tokens are base64 JSON: { a: account tag, t: tunnel id, s: secret }. */
-function tunnelTokenErrors(variable: string, token: string, targets: Targets, target: string, tunnel: Id): string[] {
+export function tunnelTokenErrors(variable: string, token: string, targets: Targets, target: string, tunnel: Id): string[] {
   const decoded = parseJson(Buffer.from(token, "base64").toString("utf8"));
   if (!decoded || typeof decoded.a !== "string" || typeof decoded.t !== "string") {
     return [`${variable} is not a Cloudflare tunnel token`];
