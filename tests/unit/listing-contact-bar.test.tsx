@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it } from "vitest";
 import fr from "../../messages/fr.json";
-import { ContactBar, REVEAL_ERROR_KEYS, revealFailure, type ContactBarProps } from "@/components/listing/contact-bar";
+import { ContactBar, isWhatsappUrl, REVEAL_ERROR_KEYS, revealFailure, type ContactBarProps } from "@/components/listing/contact-bar";
 import { ApiError, InitialSessionContext, type ApiErrorCode } from "@/lib/auth/client";
 import type { SessionSummary } from "@/lib/contracts/auth";
 
@@ -46,6 +46,13 @@ describe("revealFailure", () => {
 
   it("has a French message for every reveal refusal", () => {
     for (const key of REVEAL_ERROR_KEYS) expect(fr.ListingPage.contact.errors[key], key).toBeTruthy();
+  });
+});
+
+describe("isWhatsappUrl", () => {
+  it("accepts only the wa.me links the reveal API builds", () => {
+    expect(isWhatsappUrl("https://wa.me/212612345678")).toBe(true);
+    for (const url of ["javascript:alert(1)", "http://wa.me/212612345678", "https://wa.me.evil.test/212612345678", "https://wa.me/212612345678?text=x", "https://wa.me/"]) expect(isWhatsappUrl(url), url).toBe(false);
   });
 });
 

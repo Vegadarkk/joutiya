@@ -155,6 +155,8 @@ describe("D1 canonical URL and D14 404", () => {
     await expect(ListingPage(params(`ancien-titre-${ID}`))).rejects.toThrow(`NEXT_PERMANENT_REDIRECT /fr/annonce/${SLUG_ID}`);
     await expect(ListingPage(params(ID, "ar"))).rejects.toThrow(`NEXT_PERMANENT_REDIRECT /ar/annonce/${SLUG_ID}`);
     await expect(ListingPage(params(`VELO-${ID}`))).rejects.toThrow(`NEXT_PERMANENT_REDIRECT /fr/annonce/${SLUG_ID}`);
+    await expect(ListingPage(params(SLUG_ID.toUpperCase()))).rejects.toThrow(`NEXT_PERMANENT_REDIRECT /fr/annonce/${SLUG_ID}`);
+    expect(repo.getListing).toHaveBeenLastCalledWith(ID);
     expect(await generateMetadata(params(`ancien-titre-${ID}`))).toEqual({});
   });
 

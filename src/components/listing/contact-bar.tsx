@@ -60,6 +60,11 @@ function useRevealMessage(): (error: unknown) => string {
   };
 }
 
+/** The API builds `https://wa.me/<digits>`; anything else is never turned into a link. */
+export function isWhatsappUrl(url: string): boolean {
+  return /^https:\/\/wa\.me\/\d{8,15}$/.test(url);
+}
+
 const subscribeNever = () => () => {};
 
 /**
@@ -129,7 +134,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, showPhone, whats
             </a>
           </Button>
         ) : null}
-        {revealed.whatsappUrl ? (
+        {revealed.whatsappUrl && isWhatsappUrl(revealed.whatsappUrl) ? (
           <Button asChild variant={showPhone ? "outline" : "primary"} className={cn(wide && "min-w-0 flex-1")}>
             <a href={revealed.whatsappUrl} target="_blank" rel="noopener noreferrer">
               <MessageCircle aria-hidden="true" />
@@ -158,7 +163,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, showPhone, whats
     state.kind === "signin" ? (
       <div className="flex flex-col gap-2 rounded-md bg-surface-muted p-3 text-sm">
         <p className="text-pretty">{t("signInBody")}</p>
-        <Button asChild variant="structure" size="sm" className="self-start">
+        <Button asChild variant="structure" className="self-start">
           <Link href={{ pathname: "/connexion", query: { next } }}>
             <LogIn aria-hidden="true" />
             {t("signIn")}

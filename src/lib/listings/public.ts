@@ -36,7 +36,8 @@ function isPublicState(status: ListingStatus): status is PublicState {
  * the listing never/no longer public (draft, pending_review, rejected, removed, purged).
  */
 export async function getPublishedBySlugId(segment: string): Promise<PublicListingLookup | null> {
-  const parsed = parseSlugId(segment);
+  // Ids are lower case: a segment retyped in capitals still finds its listing (then 301s).
+  const parsed = parseSlugId(segment.toLowerCase());
   if (!parsed) return null;
   const listing = await getListing(parsed.id);
   if (!listing || !isPublicState(listing.status)) return null;
