@@ -90,7 +90,7 @@ function page(listings: ListingRecord[], read = listings.length) {
 beforeEach(() => {
   configured.value = true;
   store = new MemoryObjectStore();
-  for (const module of [retention, uploadsRepo]) for (const fn of Object.values(module)) if (vi.isMockFunction(fn)) fn.mockReset();
+  for (const mocked of [retention, uploadsRepo]) for (const fn of Object.values(mocked)) if (vi.isMockFunction(fn)) fn.mockReset();
   vi.mocked(retention.listListingsPastPurge).mockResolvedValue({ listings: [], read: 0 });
   vi.mocked(retention.purgeListing).mockImplementation(async (id, purgeable) => (purgeable(listing(id)) ? { status: "purged", categoryId: "vehicules", purgedAt: NOW, version: 8 } : null));
   vi.mocked(retention.deleteJournalPastPurge).mockResolvedValue(0);
