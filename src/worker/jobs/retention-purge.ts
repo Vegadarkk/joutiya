@@ -7,9 +7,10 @@ import { deleteUploadDocument, listUploadsByTarget, updateUpload, UPLOADS_BY_TAR
 import { COLLECTIONS, type ListingStatus } from "@/lib/db/schemas";
 import { isFirestoreConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
-import { mediaObjectKey, quarantineObjectKey } from "@/lib/media/urls";
+import { photoObjectKey, quarantineObjectKey, type PhotoBucket } from "@/lib/media/urls";
 import { isDegraded } from "@/lib/quota";
 import { isStorageNotConfigured, objectStore, type ObjectStore } from "@/lib/storage";
+import { RETAINED_STATUSES } from "@/lib/uploads/policy";
 import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 
 // Nightly at 03:00 UTC (architecture §5 "Purges sans TTL", table of §7 retention, design D16):
@@ -17,8 +18,10 @@ import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 //    legal hold: replaced by a tombstone (transaction re-checking status, hold and date, with the
 //    searchOutbox delete), then their photo variants, quarantine objects and upload documents go.
 //    A removed listing keeps its text and its photos until then (architecture §5: removal + 12
-//    months): purge-quarantine (hourly) moves the purgeAt of its uploads to the listing's and
-//    never deletes them; unattached and orphan uploads of other listings are its job;
+//    months): purge-quarantine (hourly) moves its photos to the private bucket
+//    (`removed/listings/...`) and the purgeAt of its uploads to the listing's, and never deletes
+//    them; a removed listing's variants are deleted from both buckets (a move cut short can leave
+//    them in either). Unattached and orphan uploads of other listings are purge-quarantine's;
 // 2. contentOps (1 year) and revealLogs (90 days) past purgeAt.
 // At most PURGE_DELETE_BUDGET document deletions a night (Spark: 20 000 a day); the rest waits a
 // night, and a backlog older than 3 days raises an alert. Idempotent: every step re-reads.
@@ -64,16 +67,23 @@ export function isPurgeable(listing: Pick<ListingRecord, "status" | "legalHold" 
   return PURGEABLE_STATUSES.includes(listing.status) && listing.legalHold.length === 0 && listing.purgeAt !== undefined && listing.purgeAt.getTime() <= now.getTime();
 }
 
-async function deleteVariants(store: ObjectStore, listingId: string, photoId: string, state: RunState): Promise<void> {
-  for (const variant of PHOTO_VARIANTS) {
-    await store.delete("media", mediaObjectKey(listingId, photoId, variant));
-    state.result.objects += 1;
+/** Buckets that may hold a photo of `listing`: the private one too for a removed listing's, or an upload recorded there. */
+function photoBuckets(listing: Pick<ListingRecord, "status">, upload?: Pick<UploadRecord, "bucket">): PhotoBucket[] {
+  return RETAINED_STATUSES.includes(listing.status) || upload?.bucket === "private" ? ["media", "private"] : ["media"];
+}
+
+async function deleteVariants(store: ObjectStore, listingId: string, photoId: string, buckets: readonly PhotoBucket[], state: RunState): Promise<void> {
+  for (const bucket of buckets) {
+    for (const variant of PHOTO_VARIANTS) {
+      await store.delete(bucket, photoObjectKey(bucket, listingId, photoId, variant));
+      state.result.objects += 1;
+    }
   }
 }
 
 /** Objects first, then the document: a storage failure leaves the document to retry from. */
-async function deleteUpload(store: ObjectStore, upload: UploadRecord, state: RunState): Promise<void> {
-  await deleteVariants(store, upload.targetId, upload.id, state);
+async function deleteUpload(store: ObjectStore, listing: ListingRecord, upload: UploadRecord, state: RunState): Promise<void> {
+  await deleteVariants(store, upload.targetId, upload.id, photoBuckets(listing, upload), state);
   await store.delete("quarantine", upload.quarantineKey);
   state.result.objects += 1;
   await deleteUploadDocument(upload.id);
@@ -93,7 +103,7 @@ async function purgeListingMedia(store: ObjectStore, listing: ListingRecord, sta
     try {
       for (const upload of uploads) {
         known.add(upload.id);
-        await deleteUpload(store, upload, state);
+        await deleteUpload(store, listing, upload, state);
       }
     } catch (error) {
       // The listing is a tombstone now: hand what is left to purge-quarantine (orphan uploads past purgeAt).
@@ -105,7 +115,7 @@ async function purgeListingMedia(store: ObjectStore, listing: ListingRecord, sta
   // A photo id is its upload id: without the document, its keys are still derivable.
   for (const photo of listing.photos) {
     if (known.has(photo.id)) continue;
-    await deleteVariants(store, listing.id, photo.id, state);
+    await deleteVariants(store, listing.id, photo.id, photoBuckets(listing), state);
     await store.delete("quarantine", quarantineObjectKey(photo.id));
     state.result.objects += 1;
   }

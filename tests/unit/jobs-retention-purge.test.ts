@@ -4,7 +4,7 @@ import type { UploadRecord } from "@/lib/db/repositories/uploads";
 
 // retention-purge (03:00 UTC): listings past purgeAt (expired, sold, removed, rejected, no legal
 // hold) become tombstones and lose their media and upload documents (a removed listing keeps its
-// photos until then: no upload is deleted on its own purgeAt); contentOps and revealLogs past
+// photos until then, in the private bucket: no upload is deleted on its own purgeAt); contentOps and revealLogs past
 // purgeAt are deleted in batches under a nightly budget. Repositories are mocked; a
 // MemoryObjectStore records storage.
 
@@ -82,6 +82,11 @@ function upload(id: string, targetId: string, overrides: Partial<UploadRecord> =
 function seed(listingId: string, photoId: string): void {
   store.seed("quarantine", `uploads/${photoId}`, Buffer.from("o"), { contentType: "image/jpeg" });
   for (const variant of ["l", "s"]) store.seed("media", `listings/${listingId}/${photoId}-${variant}.webp`, Buffer.from("v"), { contentType: "image/webp" });
+}
+
+/** Variants moved to the private bucket (purge-quarantine, removed listings). */
+function seedPrivate(listingId: string, photoId: string): void {
+  for (const variant of ["l", "s"]) store.seed("private", `removed/listings/${listingId}/${photoId}-${variant}.webp`, Buffer.from("v"), { contentType: "image/webp" });
 }
 
 function page(listings: ListingRecord[], read = listings.length) {
@@ -210,15 +215,40 @@ describe("retention-purge: removed listings keep their photos until their own pu
     expect(store.keys("media")).toHaveLength(2);
   });
 
-  it("deletes them with the listing once the listing's purgeAt passed (removal + 12 months)", async () => {
-    const removed = listing("removed2", { status: "removed", photos: [{ id: "upl0000000000001", w: 1600, h: 1200, blurhash: "LEHV6nWB2yk8" }] });
-    seed(removed.id, "upl0000000000001");
-    vi.mocked(uploadsRepo.listUploadsByTarget).mockResolvedValue([upload("upl0000000000001", removed.id, { purgeAt: removed.purgeAt! })]);
+  it("deletes them with the listing once the listing's purgeAt passed (removal + 12 months), from the private bucket they moved to", async () => {
+    const removed = listing("removed2", {
+      status: "removed",
+      photos: [
+        { id: "upl0000000000001", w: 1600, h: 1200, blurhash: "LEHV6nWB2yk8" },
+        { id: "nodoc00000000002", w: 1600, h: 1200, blurhash: "LEHV6nWB2yk8" },
+      ],
+    });
+    seedPrivate(removed.id, "upl0000000000001");
+    // A move cut short before the document recorded it: the variants are private, the document still says media.
+    seedPrivate(removed.id, "upl0000000000003");
+    // A photo without its upload document.
+    seedPrivate(removed.id, "nodoc00000000002");
+    vi.mocked(uploadsRepo.listUploadsByTarget).mockResolvedValue([
+      upload("upl0000000000001", removed.id, { purgeAt: removed.purgeAt!, bucket: "private", finalKey: `removed/listings/${removed.id}/upl0000000000001` }),
+      upload("upl0000000000003", removed.id, { purgeAt: removed.purgeAt! }),
+    ]);
     vi.mocked(retention.listListingsPastPurge).mockResolvedValueOnce(page([removed]));
 
-    expect(await retentionPurge(NOW, { store })).toMatchObject({ listings: 1, uploads: 1, failed: 0 });
+    expect(await retentionPurge(NOW, { store })).toMatchObject({ listings: 1, uploads: 2, failed: 0 });
     expect(uploadsRepo.deleteUploadDocument).toHaveBeenCalledWith("upl0000000000001");
     expect(store.keys("media")).toEqual([]);
+    expect(store.keys("private")).toEqual([]);
+    // Both photos counted once in the gauge (bytes, not buckets).
+    expect(recordMediaBytes).toHaveBeenCalledWith(-180_000, NOW);
+  });
+
+  it("an ended listing that was never removed only has variants in the media bucket", async () => {
+    const record = listing("abcd2345", { status: "sold" });
+    vi.mocked(uploadsRepo.listUploadsByTarget).mockResolvedValue([upload("photo00000000001", record.id)]);
+    vi.mocked(retention.listListingsPastPurge).mockResolvedValueOnce(page([record]));
+    await retentionPurge(NOW, { store });
+    expect(store.calls.filter((call) => call.bucket === "private")).toEqual([]);
+    expect(store.calls.filter((call) => call.bucket === "media").map((call) => call.key)).toEqual(["listings/abcd2345/photo00000000001-l.webp", "listings/abcd2345/photo00000000001-s.webp"]);
   });
 
   it("reads the uploads of a purged listing page after page until a short page", async () => {

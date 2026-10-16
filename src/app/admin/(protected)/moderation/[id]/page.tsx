@@ -11,6 +11,7 @@ import type { ModerationDecisionDoc } from "@/lib/db/schemas";
 import { serverEnv } from "@/lib/env";
 import { moderationReview, type ModerationReview, type ModerationReviewPhoto } from "@/lib/listings/moderation-actions";
 import { mediaBaseUrl } from "@/lib/storage/keys";
+import { staffPhotoSources, usesStaffPhotos } from "../../../_lib/staff-photos";
 import { ModerationDecisionForm } from "../../../_components/moderation-decision-form";
 import { catalogLabels, formatPrice, waitingFor } from "../../../_components/moderation-labels";
 import { FlagBadges, HOLD_LABEL } from "../../../_components/moderation-queue";
@@ -82,10 +83,12 @@ function PhotoChecks({ photo }: { photo: ModerationReviewPhoto }) {
 function Photos({ review, base }: { review: ModerationReview; base: string | null }) {
   const { listing } = review;
   if (listing.photos.length === 0) return <p className="text-sm text-foreground-muted">Aucune photo.</p>;
+  // A removed listing's photos leave the public media bucket: read through the staff-only route.
+  const staff = usesStaffPhotos(listing.status);
   return (
     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       {listing.photos.map((photo, index) => {
-        const sources = photoSources(base, listing.id, photo, "s");
+        const sources = staff ? staffPhotoSources(listing.id, photo, "s") : photoSources(base, listing.id, photo, "s");
         return (
           <li key={photo.id}>
             <figure className="flex flex-col gap-1.5">

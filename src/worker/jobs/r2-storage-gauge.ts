@@ -6,8 +6,9 @@ import { logger } from "@/lib/logging/logger";
 import type { QuotaStatus } from "@/lib/quota";
 import { MAP_TILES_RESERVE_BYTES, readBackupBytes, readMediaBytes, resetMediaBytes, setBackupBytes } from "@/lib/uploads/storage-gauge";
 
-// Nightly at 03:10 UTC (D15): recount of the media bucket from the `ready` uploads (one Firestore
-// aggregation), which replaces the running Valkey counter, and of the encrypted backups still in
+// Nightly at 03:10 UTC (D15): recount of the photos from the `ready` uploads (one Firestore
+// aggregation; a removed listing's photos count once, from the private bucket they moved to), which
+// replaces the running Valkey counter, and of the encrypted backups still in
 // the private bucket (98 days, from the bytes the backup job records in system/backup: one read).
 // The r2.storage gauge = media + backups + map tiles reserve + R2_STORAGE_BASELINE_BYTES. setGauge
 // alerts once per level (8 GB warning, 9.5 GB degraded: new uploads refused with storage_full).
