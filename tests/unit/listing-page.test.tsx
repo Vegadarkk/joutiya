@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import type * as NextNavigation from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import ar from "../../messages/ar.json";
 import fr from "../../messages/fr.json";
 import type { ListingStatus } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
@@ -117,10 +118,10 @@ function user(overrides: Partial<UserRecord> = {}): UserRecord {
 
 const params = (slugId: string, locale = "fr") => ({ params: Promise.resolve({ locale, slugId }) });
 
-async function renderPage(slugId = SLUG_ID): Promise<string> {
-  const tree = await ListingPage(params(slugId));
+async function renderPage(slugId = SLUG_ID, locale: "fr" | "ar" = "fr"): Promise<string> {
+  const tree = await ListingPage(params(slugId, locale));
   return renderToStaticMarkup(
-    <NextIntlClientProvider locale="fr" messages={fr} timeZone="Africa/Casablanca">
+    <NextIntlClientProvider locale={locale} messages={locale === "ar" ? ar : fr} timeZone="Africa/Casablanca">
       {tree}
     </NextIntlClientProvider>,
   );
@@ -235,6 +236,15 @@ describe("page content", () => {
     expect(html).toMatch(/<a dir="auto"[^>]*href="\/fr\/profil\/abcdefghjk"[^>]*>Salma<\/a>/);
     // The gallery's alt texts isolate the title inside the translated sentence.
     expect(html).toContain(`alt="${isolate("Vélo de ville")}, photo 1 sur 2"`);
+  });
+
+  it("joins the city and the district with the locale's separator (an Arabic comma in Arabic)", async () => {
+    repo.getListing.mockResolvedValue(record("published", { location: { regionCode: "06", citySlug: "casablanca", district: "Maârif (près du parc)", geo: { lat: 33.57, lng: -7.59 } } }));
+    const district = isolate("Maârif (près du parc)");
+    expect(await renderPage()).toContain(`Casablanca, ${district}, Casablanca-Settat`);
+    const html = await renderPage(SLUG_ID, "ar");
+    expect(html).toContain(`الدار البيضاء، ${district}، الدار البيضاء-سطات`);
+    expect(html).not.toContain("الدار البيضاء,");
   });
 
   it("never prints the uid, the moderation data, the geo point or a phone number", async () => {

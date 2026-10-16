@@ -2149,7 +2149,8 @@
       },
       "body": "Adresse de la page : {url}\n\nMotif du signalement :\n",
       "hint": "Le signalement part par e-mail vers notre équipe de modération. Indiquez le motif : nous vous informerons de la suite donnée."
-    }
+    },
+    "cityDistrict": "{city}, {district}"
   },
   "Profile": {
     "roleIndividual": "Particulier",

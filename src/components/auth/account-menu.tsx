@@ -1,21 +1,33 @@
 "use client";
 
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { UserRound } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Link, usePathname } from "@/i18n/navigation";
 import { useSession } from "@/lib/auth/client";
+import { lazyIsland } from "@/components/layout/lazy-island";
 import type { SessionSummary } from "@/lib/contracts/auth";
 import { cn } from "@/lib/utils";
+import type { AccountDropdownProps } from "./account-dropdown";
 
 // Header account state. Private pages render with the session the layout already knows. Public
 // pages are static and carry no session: the anonymous button renders first (server and client
 // alike) and swaps once GET /api/auth/me has answered. Both states are 44 px tall, so nothing shifts.
 // The menu itself (account-dropdown.tsx) is a separate chunk, loaded once a session is known:
 // anonymous visitors never download it, and the same trigger shows as a plain button meanwhile.
+// If that chunk cannot be loaded, the trigger links to the account settings (sign-out included).
 
-const AccountDropdown = lazy(() => import("./account-dropdown"));
+const AccountDropdown = lazyIsland(() => import("./account-dropdown"), AccountSettingsLink);
+
+/** The account menu without its chunk (download failed): the trigger leads to the settings page. */
+export function AccountSettingsLink({ triggerClassName, children }: AccountDropdownProps) {
+  return (
+    <Link href="/parametres" className={triggerClassName}>
+      {children}
+    </Link>
+  );
+}
 
 /** Pages of the sign-in flow itself: coming back to them after signing in makes no sense. */
 const AUTH_PATHS = ["/connexion", "/inscription", "/mot-de-passe-oublie", "/action"];

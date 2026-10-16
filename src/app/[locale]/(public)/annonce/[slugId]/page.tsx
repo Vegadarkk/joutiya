@@ -133,8 +133,9 @@ export default async function ListingPage({ params }: { params: Params }) {
   const cityLabel = city ? cityName(city, locale) : undefined;
   const regionLabel = region ? regionName(region, locale) : undefined;
   // The district is the seller's text: isolated, so a Latin name keeps its place in Arabic (and the reverse).
+  // The separator is the locale's ("، " in Arabic).
   const district = listing.location.district ? isolate(listing.location.district) : undefined;
-  const place = [cityLabel, district].filter(Boolean).join(", ");
+  const place = cityLabel && district ? t("cityDistrict", { city: cityLabel, district }) : (cityLabel ?? district ?? "");
   const canonicalUrl = `${CANONICAL_ORIGIN}${listingPath(locale, listing.slugId)}`;
   const images = listing.photos.map((photo) => photoUrl(media, listing.id, photo.id, "l")).filter((url): url is string => url !== null);
   const published = listing.state === "published";

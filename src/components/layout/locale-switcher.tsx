@@ -1,17 +1,20 @@
 "use client";
 
-import { lazy, Suspense, useState } from "react";
+import { Suspense, useId, useState } from "react";
 import { Globe } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import type { Locale } from "@/config/site";
+import { Link, usePathname } from "@/i18n/navigation";
+import { LOCALES, type Locale } from "@/config/site";
 import { cn } from "@/lib/utils";
+import type { LocaleMenuProps } from "./locale-menu";
+import { lazyIsland } from "./lazy-island";
 
 // Header language switcher. The menu (locale-menu.tsx, dropdown primitives) is a separate chunk:
 // a plain trigger renders first, its download starts when the pointer or the focus reaches it, and
-// the click opens the menu once it has arrived.
+// the click opens the menu once it has arrived. If the chunk cannot be loaded, plain links stand in.
 
 const loadMenu = () => import("./locale-menu");
-const LocaleMenu = lazy(loadMenu);
+const LocaleMenu = lazyIsland(loadMenu, LocaleLinks);
 
 function warmMenu(): void {
   void loadMenu().catch(() => undefined);
@@ -55,5 +58,47 @@ export function LocaleSwitcher({ className }: { className?: string }) {
         {content}
       </LocaleMenu>
     </Suspense>
+  );
+}
+
+/**
+ * The language menu without its chunk (download failed): the same trigger toggles a plain list of
+ * the three links, open at first like the menu (the click asked for it). Escape closes it.
+ */
+export function LocaleLinks({ triggerClassName, label, children }: LocaleMenuProps) {
+  const t = useTranslations("Locale");
+  const current = useLocale() as Locale;
+  const pathname = usePathname();
+  const [open, setOpen] = useState(true);
+  const listId = useId();
+  return (
+    <div
+      className="relative"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") setOpen(false);
+      }}
+    >
+      <button type="button" aria-expanded={open} aria-controls={listId} aria-label={label} data-state={open ? "open" : "closed"} className={triggerClassName} onClick={() => setOpen(!open)}>
+        {children}
+      </button>
+      {open ? (
+        <ul id={listId} className="absolute end-0 top-full z-50 mt-1.5 min-w-44 rounded-md border border-border bg-surface p-1 shadow-lg shadow-bab-950/10">
+          {LOCALES.map((locale) => (
+            <li key={locale}>
+              <Link
+                href={pathname}
+                locale={locale}
+                lang={locale === "rif" ? "rif-Latn" : locale}
+                aria-current={locale === current ? "true" : undefined}
+                className="flex min-h-11 items-center justify-between gap-6 rounded-sm px-3 py-2 text-sm outline-none hover:bg-surface-muted focus-visible:bg-surface-muted aria-[current=true]:font-semibold"
+              >
+                {t(`names.${locale}`)}
+                {locale === current ? <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" /> : null}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }

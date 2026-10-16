@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
-import { staticSecurityHeaders, apiContentSecurityPolicy } from "./src/lib/security/headers.ts";
+import { SAME_ORIGIN_RESOURCE_SOURCE, apiContentSecurityPolicy, sameOriginResourcePolicy, staticSecurityHeaders } from "./src/lib/security/headers.ts";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
@@ -38,6 +38,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: staticSecurityHeaders() },
+      { source: SAME_ORIGIN_RESOURCE_SOURCE, headers: [sameOriginResourcePolicy] },
       {
         source: "/api/:path*",
         headers: [{ key: "Content-Security-Policy", value: apiContentSecurityPolicy }],

@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Expand, ImageOff } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { isolate } from "@/lib/i18n/bidi";
 import { cn } from "@/lib/utils";
-import { scrollToIndex, trackNavigation, useTrackIndex } from "./gallery-track";
+import { scrollToIndex, useTrackNavigation, useTrackIndex } from "./gallery-track";
 import { blurhashPlaceholder, photoSources, type PhotoLike } from "./photo";
 
 export { clampIndex, stepForKey, targetIndex, type GalleryStep } from "./gallery-track";
@@ -44,7 +44,7 @@ export function Gallery({ listingId, title, photos, mediaBaseUrl, className }: G
   const [track, setTrack] = useState<HTMLUListElement | null>(null);
   const count = photos.length;
   const [index] = useTrackIndex(track, count);
-  const { at, goTo, onKeyDown } = trackNavigation(track, index, count);
+  const { at, goTo, onKeyDown } = useTrackNavigation(track, index, count);
   const [lightbox, setLightbox] = useState<number | null>(null);
   // Mounted from the first open on, so its close animation and focus return keep working.
   const [lightboxMounted, setLightboxMounted] = useState(false);

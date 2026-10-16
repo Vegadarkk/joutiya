@@ -1,8 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fr from "../../messages/fr.json";
 import { clampIndex, Gallery, GALLERY_SIZES, stepForKey, targetIndex, type GalleryProps } from "@/components/listing/gallery";
+import { createTrackNavigator } from "@/components/listing/gallery-track";
 import { isolate } from "@/lib/i18n/bidi";
 
 // Server HTML of the listing gallery (design §5, §8): what the ISR page paints before hydration.
@@ -126,5 +127,101 @@ describe("gallery navigation", () => {
     expect(clampIndex(5, 2)).toBe(1);
     expect(clampIndex(-1, 2)).toBe(0);
     expect(clampIndex(0, 0)).toBe(0);
+  });
+});
+
+/** A scroll-snap track 360 px wide: smooth scrolls only record their target, the test moves it. */
+class FakeTrack {
+  clientWidth = 360;
+  scrollLeft = 0;
+  readonly targets: number[] = [];
+  constructor(
+    readonly direction: "ltr" | "rtl" = "ltr",
+    private readonly instant = false,
+  ) {}
+  scrollTo({ left }: { left: number }) {
+    this.targets.push(left);
+    if (this.instant) this.scrollLeft = left;
+  }
+  /** The photo a recorded scroll was heading to. */
+  photo(at = this.targets.length - 1): number {
+    return Math.abs(this.targets[at] ?? 0) / this.clientWidth;
+  }
+}
+
+describe("track navigation during a smooth scroll", () => {
+  beforeEach(() => {
+    vi.stubGlobal("getComputedStyle", (element: FakeTrack) => ({ direction: element.direction }));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const track = (direction: "ltr" | "rtl" = "ltr", instant = false) => new FakeTrack(direction, instant);
+  const element = (fake: FakeTrack) => fake as unknown as HTMLElement;
+
+  it("moves two photos for two presses made before the first scroll is halfway", () => {
+    const fake = track();
+    const nav = createTrackNavigator();
+    nav.goTo(element(fake), nav.at(element(fake), 4, 0) + 1, 4);
+    expect(fake.photo()).toBe(1);
+    // 100 ms later the scroll is under halfway: the position alone still says photo 1 of 4 (index 0).
+    fake.scrollLeft = 120;
+    nav.onScroll(element(fake), 4);
+    nav.goTo(element(fake), nav.at(element(fake), 4, 0) + 1, 4);
+    expect(fake.photo()).toBe(2);
+    // Past halfway to its photo, the position takes over again (and agrees).
+    fake.scrollLeft = 560;
+    nav.onScroll(element(fake), 4);
+    expect(nav.at(element(fake), 4, 0)).toBe(2);
+  });
+
+  it("mirrors the scroll in right-to-left pages and keeps the target there too", () => {
+    const fake = track("rtl");
+    const nav = createTrackNavigator();
+    nav.goTo(element(fake), 1, 4);
+    fake.scrollLeft = -90;
+    nav.goTo(element(fake), nav.at(element(fake), 4, 0) + 1, 4);
+    expect(fake.targets).toEqual([-360, -720]);
+  });
+
+  it("keeps the target across a scroll cut short by the next one, and drops it once the track rests elsewhere", () => {
+    const fake = track();
+    const nav = createTrackNavigator();
+    nav.goTo(element(fake), 2, 4);
+    // scrollend between two photos: the first scroll was interrupted, not finished.
+    fake.scrollLeft = 300;
+    nav.onScrollEnd(element(fake));
+    expect(nav.at(element(fake), 4, 0)).toBe(2);
+    // Resting on a photo (another scroll put it there): the position is the truth again.
+    fake.scrollLeft = 0;
+    nav.onScrollEnd(element(fake));
+    expect(nav.at(element(fake), 4, 0)).toBe(0);
+  });
+
+  it("follows the visitor who takes over the track mid-scroll", () => {
+    const fake = track();
+    const nav = createTrackNavigator();
+    nav.goTo(element(fake), 3, 4);
+    fake.scrollLeft = 200;
+    nav.settle();
+    expect(nav.at(element(fake), 4, 0)).toBe(1);
+  });
+
+  it("keeps nothing pending after an instant scroll or a step that cannot move", () => {
+    const instant = track("ltr", true);
+    const nav = createTrackNavigator();
+    nav.goTo(element(instant), 2, 4);
+    instant.scrollLeft = 0;
+    expect(nav.at(element(instant), 4, 0)).toBe(0);
+
+    const last = track();
+    last.scrollLeft = 3 * 360;
+    nav.goTo(element(last), 5, 4);
+    expect(last.photo()).toBe(3);
+    last.scrollLeft = 360;
+    expect(nav.at(element(last), 4, 0)).toBe(1);
+    // Without a track (not mounted yet), the index in state answers.
+    expect(nav.at(null, 4, 2)).toBe(2);
   });
 });

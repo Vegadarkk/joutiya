@@ -6,7 +6,7 @@ import { Dialog } from "radix-ui";
 import { useTranslations } from "next-intl";
 import { isolate } from "@/lib/i18n/bidi";
 import { cn } from "@/lib/utils";
-import { clampIndex, scrollToIndex, trackNavigation, useTrackIndex } from "./gallery-track";
+import { clampIndex, scrollToIndex, useTrackNavigation, useTrackIndex } from "./gallery-track";
 import { photoSources, type PhotoLike } from "./photo";
 
 // Full-screen view of the listing photos on the `l` variants (design §5). Loaded by the gallery on
@@ -29,7 +29,7 @@ export function Lightbox({ open, start, onClose, onCloseAutoFocus, listingId, ti
   const [track, setTrack] = useState<HTMLUListElement | null>(null);
   const count = photos.length;
   const [index, setIndex] = useTrackIndex(track, count);
-  const { at, goTo, onKeyDown } = trackNavigation(track, index, count);
+  const { at, goTo, onKeyDown } = useTrackNavigation(track, index, count);
 
   // The track has just mounted: show the photo that was clicked (no scroll event when it is the first).
   useEffect(() => {

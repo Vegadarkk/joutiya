@@ -1,6 +1,7 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import sharp from "sharp";
+import { isolate } from "../../src/lib/i18n/bidi";
 
 // Posting wizard (phase 3 lot C) against the production build and the Firebase emulators
 // (npm run test:e2e): a fresh individual signs up, confirms the e-mail from the dev mailbox and
@@ -197,10 +198,12 @@ test.describe("posting wizard", () => {
     await expect(page).toHaveURL(new RegExp(`/fr/annonce/${answer.slugId}$`));
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
 
-    const photo = page.getByRole("img", { name: `${title}, photo 1 sur 1` });
+    // The title is bidi-isolated inside the translated alt text.
+    const photo = page.getByRole("img", { name: `${isolate(title)}, photo 1 sur 1` });
     await expect(photo).toBeVisible();
+    // Any variant of the srcset (s, m or l, D6) as the browser picks it for the viewport.
     const src = await photo.evaluate((img: HTMLImageElement) => img.currentSrc || img.src);
-    expect(src).toMatch(new RegExp(`/listings/${listingId}/[^/]+-[ls]\\.webp$`));
+    expect(src).toMatch(new RegExp(`/listings/${listingId}/[^/]+-[lms]\\.webp$`));
     const served = await request.get(src);
     expect(served.ok()).toBe(true);
     const meta = await sharp(await served.body()).metadata();

@@ -50,6 +50,9 @@ function headers(contentType: string, size: number, role: BucketRole, cacheContr
     "X-Content-Type-Options": "nosniff",
     // Public media keys are immutable; the other buckets are read once by the worker.
     "Cache-Control": role === "media" ? (cacheControl ?? "public, max-age=300") : "no-store",
+    // Like media.joutiya.ma (no CORP): the admin host, another origin, shows the media photos too.
+    // next.config.ts leaves this path out of its global same-origin CORP.
+    "Cross-Origin-Resource-Policy": role === "media" ? "cross-origin" : "same-origin",
   };
 }
 
@@ -72,7 +75,7 @@ export const PUT = apiRoute(async (request, context) => {
   if (body.byteLength > MAX_BODY_BYTES) throw new HttpError(413, "payload_too_large");
   await fsObjectStore().put(found.role, found.key, body, { contentType });
   // Like S3: 200 with the MD5 ETag of the body.
-  return new Response(null, { status: 200, headers: { ETag: `"${createHash("md5").update(body).digest("hex")}"`, "Cache-Control": "no-store" } });
+  return new Response(null, { status: 200, headers: { ETag: `"${createHash("md5").update(body).digest("hex")}"`, "Cache-Control": "no-store", "Cross-Origin-Resource-Policy": "same-origin" } });
 });
 
 export const HEAD = apiRoute(async (request, context) => {
