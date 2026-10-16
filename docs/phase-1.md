@@ -18,7 +18,7 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | 8 | Déploiement automatique du staging | Claude (API), vous pour un jeton | Après les étapes 6 et 7 |
 | 9 | Accès sans clé de la VM à Firestore | Claude | Avec la phase 2 |
 | 10 | Mentions légales de la production | Claude | Après Firebase |
-| 11 | Alertes | Claude | Phase 2 |
+| 11 | Alertes | Claude (API), Nav pour un filtre Gmail | Code en phase 2 ; après l'étape 7 (domaine Resend) |
 | 12 | Mise en production et contrôles | Claude | Après l'étape 8 |
 | 13 | Test de reconstruction de la VM | Claude | Avant le lancement |
 
@@ -118,7 +118,15 @@ La production refuse de démarrer tant qu'une mention obligatoire manque : hébe
 
 ## 11. Alertes
 
-Les alertes du site partent par Resend (phase 2, `/mnt/project-files/joutiya/phase-1/alertes-resend-spec.md`), puis aussi par Telegram quand le bot existera. Le Worker de sonde `joutiya-uptime-probe` vérifie `https://joutiya.ma` et le staging toutes les 5 minutes ; il est déployé avec les alertes. L'Email Routing de Cloudflare n'est pas utilisé.
+Les alertes partent par e-mail (Resend) et par Telegram (`@Joutiyabot`). Le Worker de sonde `joutiya-uptime-probe` vérifie `https://joutiya.ma` et le staging toutes les 5 minutes, et relaie les alertes de l'application (`/mnt/project-files/joutiya/phase-1/alertes-resend-spec.md`). L'Email Routing de Cloudflare n'est pas utilisé.
+
+Prérequis : le domaine `notif.joutiya.ma` vérifié chez Resend, après la bascule DNS (étape 7).
+
+1. Claude crée par l'API Resend une clé d'envoi limitée à `notif.joutiya.ma`, réservée au Worker, et la place directement dans son secret `RESEND_API_KEY` : elle n'est ni sur la VM, ni dans l'environnement cloud, ni dans le chat.
+2. Claude déploie le Worker et pose ses secrets par l'API Cloudflare : `RESEND_API_KEY`, `ALERT_EMAIL_TO` (votre Gmail), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ALERT_RELAY_SECRET`, `ACCESS_CLIENT_ID` et `ACCESS_CLIENT_SECRET` (jeton `joutiya-probe`). L'expéditeur, `Joutiya alertes <alertes@notif.joutiya.ma>`, est dans `workers/uptime-probe/wrangler.jsonc`.
+3. Test : une alerte signée arrive dans votre Gmail depuis `alertes@notif.joutiya.ma`, avec SPF, DKIM et DMARC à PASS (« Afficher l'original ») ; Nav ajoute un filtre Gmail « Ne jamais envoyer dans le spam » pour cet expéditeur.
+
+Garde-fous : au plus 20 e-mails relayés par jour UTC (au-delà, l'application reçoit une erreur 429 et la note dans ses journaux), et un seul avis Telegram par jour quand le quota Resend du jour est épuisé. Sans `ALERT_EMAIL_TO` ni `RESEND_API_KEY`, le Worker n'envoie aucun e-mail et l'écrit dans ses journaux ; avec un seul des deux, il signale une erreur.
 
 ## 12. Mise en production et contrôles
 

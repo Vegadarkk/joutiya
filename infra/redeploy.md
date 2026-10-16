@@ -8,7 +8,7 @@ Ce qui se perd : les files BullMQ et les compteurs de quotas du jour (`valkey-qu
 
 1. Claude arrête `joutiya-vm` par API, sans supprimer le disque : il peut servir d'indice.
 2. Claude renouvelle par API le secret des 3 tunnels (`joutiya-ssh-tunnel`, `joutiya-prod-tunnel`, `joutiya-staging-tunnel`), ce qui coupe leurs connexions.
-3. Claude remplace tout ce qui était sur la VM : mots de passe Valkey, `HASH_PEPPER`, `ALERT_RELAY_SECRET` (et le secret du même nom dans le Worker), certificats Google (révoqués dans le magasin de confiance du pool WIF). Le jeton Telegram se révoque chez @BotFather (`/revoke`), par vous.
+3. Claude remplace tout ce qui était sur la VM : mots de passe Valkey, `HASH_PEPPER`, `ALERT_RELAY_SECRET` (et le secret du même nom dans le Worker), clés d'envoi de l'application (`MAIL_API_KEY`, `MAIL_FALLBACK_API_KEY`, `MAIL_WEBHOOK_SECRET`), certificats Google (révoqués dans le magasin de confiance du pool WIF). Le jeton Telegram se révoque chez @BotFather (`/revoke`), par vous. La clé Resend du Worker de sonde n'a jamais été sur la VM : elle reste.
 4. Claude remplace la clé de `deploy-staging` (secret GitHub) et le jeton de service Access `joutiya-ci`.
 5. Puis il reconstruit comme ci-dessous.
 
