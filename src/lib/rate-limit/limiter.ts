@@ -9,6 +9,9 @@ import { isValkeyConfigured, valkey } from "@/lib/valkey/clients";
 // Limiters on valkey-ratelimit (§6). Redis down: `rejectIfRedisNotReady` and a short command
 // timeout make the call fail fast, then the limiter's policy decides (open or closed). Without
 // RATE_LIMIT_REDIS_URL (local dev, unit tests) an in-memory limiter applies the same table.
+// The client is lazy (valkey/clients.ts): it stays "wait" until something connects it, and
+// rate-limiter-flexible refuses every call until it is "ready", so each call connects it first.
+// The proxy bundle has its own instance of this module, hence its own client (design D14).
 
 export type LimitOutcome =
   | { ok: true; remaining: number }
@@ -51,10 +54,29 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([promise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("rate limiter timeout")), ms))]);
 }
 
+let connecting: Promise<void> | undefined;
+
+/**
+ * Connects the lazy store client on first use; concurrent callers share the attempt. A failed
+ * attempt resolves too: ioredis keeps reconnecting in the background and, meanwhile, the limiter
+ * rejects at once ("not ready"), which the policy turns into open or closed.
+ */
+async function storeReady(): Promise<void> {
+  if (!isValkeyConfigured("ratelimit")) return;
+  const client = valkey("ratelimit");
+  if (client.status === "wait") connecting = client.connect().catch(() => undefined);
+  if (connecting && client.status !== "ready") await connecting;
+}
+
+/** One store call: connect first, all of it under the 500 ms budget. */
+function run<T>(call: () => Promise<T>): Promise<T> {
+  return withTimeout(storeReady().then(call), 500);
+}
+
 /** Consumes `points` for `rawKey`. Never throws: the outcome carries the decision. */
 export async function consumeLimit(id: RateLimitId, rawKey: string, points = 1): Promise<LimitOutcome> {
   try {
-    const result = await withTimeout(limiter(id).consume(limitKey(id, rawKey), points), 500);
+    const result = await run(() => limiter(id).consume(limitKey(id, rawKey), points));
     return { ok: true, remaining: result.remainingPoints };
   } catch (error) {
     if (error instanceof RateLimiterRes) return { ok: false, reason: "limited", retryAfterSeconds: Math.ceil(error.msBeforeNext / 1000) };
@@ -73,7 +95,7 @@ export interface LimitState {
 /** Consumed points and the time left on `rawKey`, or null when the store cannot answer. */
 export async function limitState(id: RateLimitId, rawKey: string): Promise<LimitState | null> {
   try {
-    const result = await withTimeout(limiter(id).get(limitKey(id, rawKey)), 500);
+    const result = await run(() => limiter(id).get(limitKey(id, rawKey)));
     return { consumedPoints: result?.consumedPoints ?? 0, msBeforeNext: Math.max(0, result?.msBeforeNext ?? 0) };
   } catch {
     return null;
@@ -94,7 +116,7 @@ export async function blockLimit(id: RateLimitId, rawKey: string, seconds?: numb
   const definition = RATE_LIMITS[id];
   const duration = seconds ?? ("blockDuration" in definition && definition.blockDuration > 0 ? definition.blockDuration : definition.duration);
   try {
-    await withTimeout(limiter(id).block(limitKey(id, rawKey), duration), 500);
+    await run(() => limiter(id).block(limitKey(id, rawKey), duration));
   } catch (error) {
     logger.warn({ limiter: id, err: (error as Error).message }, "rate limiter block skipped");
   }
@@ -103,7 +125,7 @@ export async function blockLimit(id: RateLimitId, rawKey: string, seconds?: numb
 /** Forgets a key (successful login clears the failure counters of that account + IP). */
 export async function resetLimit(id: RateLimitId, rawKey: string): Promise<void> {
   try {
-    await withTimeout(limiter(id).delete(limitKey(id, rawKey)), 500);
+    await run(() => limiter(id).delete(limitKey(id, rawKey)));
   } catch {
     // Best effort.
   }
@@ -131,4 +153,5 @@ export function isRateLimitError(error: unknown): boolean {
 /** Tests only: drop every limiter (memory state included). */
 export function resetRateLimiters(): void {
   limiters.clear();
+  connecting = undefined;
 }
