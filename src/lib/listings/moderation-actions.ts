@@ -19,6 +19,7 @@ import { sendMail } from "@/lib/mail";
 import { listingRecipient, siteUrl } from "@/lib/mail/recipients";
 import { APPROVAL_GROUND, REJECT_REASONS, rejectStatementFacts, type ModerationDecisionRequest, type ModerationDecisionResponse } from "@/lib/moderation/decisions";
 import type { RequestIdentity } from "@/lib/rate-limit/keys";
+import { notifySearchIndex } from "@/lib/search/queue";
 import { buildSlugId } from "./ids";
 import { IllegalTransitionError, approvalOutcome, approveHold, holdKind, transition, type ApprovalOutcome, type HoldKind, type TransitionResult } from "./lifecycle";
 import { revalidateListingPaths } from "./revalidate";
@@ -304,6 +305,7 @@ export async function decide(staff: StaffContext, id: string, input: ModerationD
     if (error instanceof ListingVersionError) throw new HttpError(409, "conflict", "listing changed meanwhile, reload it");
     throw error;
   }
+  if (effects.search) await notifySearchIndex([id]);
   const updated = applyPatch(listing, patch);
 
   await audit({

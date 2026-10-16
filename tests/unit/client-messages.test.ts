@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import fr from "../../messages/fr.json";
-import { pickMessages, PUBLIC_CLIENT_NAMESPACES } from "@/i18n/client-messages";
+import { pickMessages, PUBLIC_CLIENT_NAMESPACES, SEARCH_PAGE_CLIENT_NAMESPACES } from "@/i18n/client-messages";
 
 // The public pages ship only PUBLIC_CLIENT_NAMESPACES to the browser. A client component that reads
 // another namespace would show raw keys there: this walks the import graph of the public routes
@@ -60,12 +60,27 @@ function clientNamespaces(entries: string[]): Map<string, Set<string>> {
   return found;
 }
 
-const covered = (namespace: string) => PUBLIC_CLIENT_NAMESPACES.some((path) => namespace === path || namespace.startsWith(`${path}.`));
+const coveredBy = (list: readonly string[]) => (namespace: string) => list.some((path) => namespace === path || namespace.startsWith(`${path}.`));
+const covered = coveredBy(PUBLIC_CLIENT_NAMESPACES);
 const lookup = (tree: unknown, dotted: string) => dotted.split(".").reduce<unknown>((node, key) => (typeof node === "object" && node !== null ? (node as Record<string, unknown>)[key] : undefined), tree);
 
+/** The search page wraps its content in its own provider with the extra search namespaces. */
+const SEARCH_PAGE = path.join(SRC, "app/[locale]/(public)/recherche/page.tsx");
+
 describe("public client messages", () => {
-  const entries = filesUnder(path.join(SRC, "app/[locale]/(public)")).filter((file) => /\/(page|layout|error|not-found|loading|template)\.tsx$/.test(file));
+  const entries = filesUnder(path.join(SRC, "app/[locale]/(public)"))
+    .filter((file) => /\/(page|layout|error|not-found|loading|template)\.tsx$/.test(file))
+    .filter((file) => file !== SEARCH_PAGE);
   const used = clientNamespaces(entries);
+
+  it("covers what the search page's islands read with the public and search lists", () => {
+    const search = clientNamespaces([SEARCH_PAGE]);
+    expect(search.has("SearchFilters")).toBe(true);
+    const both = coveredBy([...PUBLIC_CLIENT_NAMESPACES, ...SEARCH_PAGE_CLIENT_NAMESPACES]);
+    const missing = [...search].filter(([namespace]) => !both(namespace)).map(([namespace, files]) => `${namespace} (${[...files].join(", ")})`);
+    expect(missing).toEqual([]);
+    for (const namespace of SEARCH_PAGE_CLIENT_NAMESPACES) expect(lookup(fr, namespace), namespace).toBeTypeOf("object");
+  });
 
   it("finds the client islands of the public routes", () => {
     expect(entries.length).toBeGreaterThan(5);

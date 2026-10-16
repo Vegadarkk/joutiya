@@ -107,6 +107,42 @@ export const RATE_LIMITS = {
   "profile.read.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
   // Staff moderation decisions (admin host, behind Access): a moderator working the queue.
   "moderation.decision.uid": { points: 300, duration: HOUR, policy: "closed", key: "uid" },
+  // --- Search and discovery (phase 4, design §6) ---------------------------------------------
+  // /api/search and /recherche pages: 30 per minute and 600 per hour per device (or uid), 120 per
+  // minute per IP; over: Turnstile, then 429. Open: reading and searching stay up without Valkey.
+  "search.device.minute": { points: 30, duration: MINUTE, policy: "open", key: "device" },
+  "search.device.hour": { points: 600, duration: HOUR, policy: "open", key: "device" },
+  "search.ip": { points: 120, duration: MINUTE, policy: "open", key: "ip" },
+  // After a solved challenge (30 min pass): a bounded allowance, then 429.
+  "search.passed.device": { points: 300, duration: 30 * MINUTE, policy: "open", key: "device" },
+  // Server-rendered pages /annonce, /c, /profil, /boutique (proxy.ts): visitor 120 per hour per
+  // device, signed in 600 per hour, 1 200 per hour per IP /64; verified bots exempt.
+  "pages.device": { points: 120, duration: HOUR, policy: "open", key: "device" },
+  "pages.session": { points: 600, duration: HOUR, policy: "open", key: "account" },
+  "pages.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
+  "pages.passed.device": { points: 600, duration: HOUR, policy: "open", key: "device" },
+  // Turnstile tokens refused by the page and search challenges (security/challenge-handler.ts):
+  // past 10 an hour per device, 429 without a siteverify call. Per IP, 300 an hour, only held
+  // against a device that already failed, so a stranger on a shared IPv4 cannot cheaply block a
+  // first, valid solve; the hard ceiling (5x) holds whatever the device and bounds the siteverify
+  // calls of a client minting one device cookie per junk token.
+  "challenge.device": { points: 10, duration: HOUR, policy: "closed", key: "device" },
+  "challenge.ip": { points: 300, duration: HOUR, policy: "closed", key: "ip" },
+  "challenge.ip.hard": { points: 1500, duration: HOUR, policy: "closed", key: "ip" },
+  // Favorites: adding and removing hearts (one write or delete each), 300 per day per account.
+  "favorites.write.uid": { points: 300, duration: DAY, policy: "open", key: "uid" },
+  // Reading them: 1 200 calls per hour (GET /api/favorites/ids answers from the Valkey set), and
+  // the documents read like listing.owner.read.uid (a page reads up to 49, a rebuild of the hearts
+  // set up to 600): 2 500 per day per account.
+  "favorites.read.uid": { points: 1200, duration: HOUR, policy: "open", key: "uid" },
+  "favorites.docs.uid": { points: 2500, duration: DAY, policy: "open", key: "uid" },
+  // Saved searches (10 per account): create, rename, alert toggle, delete, 100 per day; list,
+  // 600 calls per hour and 1 000 documents read per day.
+  "savedSearch.write.uid": { points: 100, duration: DAY, policy: "open", key: "uid" },
+  "savedSearch.read.uid": { points: 600, duration: HOUR, policy: "open", key: "uid" },
+  "savedSearch.docs.uid": { points: 1000, duration: DAY, policy: "open", key: "uid" },
+  // One-click unsubscribe links of the alert e-mails (signed token, no session).
+  "alerts.unsubscribe.ip": { points: 60, duration: HOUR, policy: "open", key: "ip" },
 } as const satisfies Record<string, RateLimitDefinition>;
 
 export type RateLimitId = keyof typeof RATE_LIMITS;

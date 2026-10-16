@@ -3,9 +3,10 @@
 import type { ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
-import { Link, usePathname } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
 import { LOCALES, type Locale } from "@/config/site";
 import { cn } from "@/lib/utils";
+import { useSamePageHref } from "./same-page-href";
 
 // The language menu: its own chunk, loaded by locale-switcher.tsx when the visitor reaches for the
 // trigger, so the dropdown primitives stay out of every page's first JavaScript. It mounts open
@@ -21,7 +22,7 @@ export interface LocaleMenuProps {
 export default function LocaleMenu({ triggerClassName, label, children }: LocaleMenuProps) {
   const t = useTranslations("Locale");
   const current = useLocale() as Locale;
-  const pathname = usePathname();
+  const href = useSamePageHref();
   return (
     <DropdownMenu.Root modal={false} defaultOpen>
       <DropdownMenu.Trigger className={triggerClassName} aria-label={label}>
@@ -39,7 +40,7 @@ export default function LocaleMenu({ triggerClassName, label, children }: Locale
           {LOCALES.map((locale) => (
             <DropdownMenu.Item key={locale} asChild>
               <Link
-                href={pathname}
+                href={href}
                 locale={locale}
                 lang={locale === "rif" ? "rif-Latn" : locale}
                 aria-current={locale === current ? "true" : undefined}

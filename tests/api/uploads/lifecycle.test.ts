@@ -8,6 +8,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 // listings' photos retained, photos deleted under a legal hold kept as evidence but never offered
 // again.
 
+// Search fast lane off: these tests read the searchOutbox entries it would drain (phase 4).
+vi.mock("@/lib/search/queue", () => ({ notifySearchIndex: vi.fn(async () => undefined) }));
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/listings/revalidate", async (importOriginal) => {
   const actual = await importOriginal<typeof Revalidate>();

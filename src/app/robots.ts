@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { headers } from "next/headers";
-import { LOCALES, PRIVATE_SEGMENTS } from "@/config/site";
+import { CANONICAL_ORIGIN, LOCALES, PRIVATE_SEGMENTS } from "@/config/site";
 
 // Per request: one image serves staging and production, so APP_ENV is read at runtime.
 export const dynamic = "force-dynamic";
@@ -11,6 +11,14 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
   if (process.env.APP_ENV !== "prod" || (adminHost && host === adminHost)) {
     return { rules: { userAgent: "*", disallow: "/" } };
   }
-  const privatePaths = LOCALES.flatMap((locale) => PRIVATE_SEGMENTS.map((segment) => `/${locale}/${segment}`));
-  return { rules: { userAgent: "*", allow: "/", disallow: ["/api/", ...privatePaths] } };
+  // Exact segment, its subpaths and its query variants: a bare prefix would also block public pages
+  // that start alike ("/fr/pro" matched "/fr/profil/...").
+  const privatePaths = LOCALES.flatMap((locale) => PRIVATE_SEGMENTS.flatMap((segment) => [`/${locale}/${segment}$`, `/${locale}/${segment}/`, `/${locale}/${segment}?`]));
+  // Internal search results stay out of crawling (design D16: Google prefers robots.txt for them);
+  // the category landing pages (/c/...) are the crawlable entry points.
+  const searchPaths = LOCALES.map((locale) => `/${locale}/recherche`);
+  return {
+    rules: { userAgent: "*", allow: "/", disallow: ["/api/", ...privatePaths, ...searchPaths] },
+    sitemap: `${CANONICAL_ORIGIN}/sitemap.xml`,
+  };
 }

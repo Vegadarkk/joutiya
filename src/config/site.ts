@@ -51,6 +51,9 @@ export const PRIVATE_SEGMENTS: readonly string[] = [
   "recours",
   // (pro)
   "pro",
+  // Phase 4, outside (account): page challenge of the SSR limits, alert e-mail unsubscribe.
+  "anti-robot",
+  "alertes",
 ];
 
 /** Feature flags defaults; the live values come from Firestore `config/flags` (phase 2+). */

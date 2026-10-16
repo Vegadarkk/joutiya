@@ -6,6 +6,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 // system/listingReminders, at most once) and retention-purge (tombstone, uploads and objects,
 // legal hold, contentOps / revealLogs). Real queries: their shapes must be valid Firestore queries.
 
+// Search fast lane off: these tests read the searchOutbox entries it would drain (phase 4).
+vi.mock("@/lib/search/queue", () => ({ notifySearchIndex: vi.fn(async () => undefined) }));
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/security/turnstile", () => ({ verifyTurnstile: vi.fn(async () => ({ ok: true, codes: [] })) }));
 
