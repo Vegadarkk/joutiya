@@ -7,8 +7,8 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build && npm run build:node",
+    "dev": "node scripts/copy-vendor.mjs && next dev",
+    "build": "node scripts/copy-vendor.mjs && next build && npm run build:node",
     "build:node": "node scripts/build-node.ts",
     "start": "next start",
     "worker": "node dist/worker/index.mjs",
