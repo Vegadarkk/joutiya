@@ -1,7 +1,7 @@
 import "server-only";
 import { Timestamp } from "firebase-admin/firestore";
 import { db } from "@/lib/firebase/admin";
-import { consume } from "@/lib/quota";
+import { aggregationReads, consume } from "@/lib/quota";
 import { pepperedHash } from "@/lib/security/hash";
 import { ipBuckets } from "@/lib/security/ip";
 import { COLLECTIONS, revealLogSchema, type RevealLogDoc } from "../schemas";
@@ -68,8 +68,9 @@ export async function hasRevealed(viewerUid: string, listingId: string): Promise
 /** Reveals of one listing since `since` (alert past 100 a day; index listingId asc, at asc). */
 export async function countRevealsSince(listingId: string, since: Date): Promise<number> {
   const result = await logs().where("listingId", "==", listingId).where("at", ">=", Timestamp.fromDate(since)).count().get();
-  void consume("firestore.reads", 1);
-  return result.data().count;
+  const count = result.data().count;
+  void consume("firestore.reads", aggregationReads(count));
+  return count;
 }
 
 /** Tests: entries of a listing. */
