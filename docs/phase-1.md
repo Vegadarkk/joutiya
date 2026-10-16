@@ -118,7 +118,7 @@ Après la validation du .MA par le registre, et avant le 12 novembre (Cloudflare
    - puis met `STAGING_DEPLOY_ENABLED` à `true`.
 3. Claude lance *Deploy staging* sur `main`. Ensuite, chaque fusion sur `main` construit l'image et la déploie en staging toute seule.
 
-Le déploiement des règles Firestore du staging par la CI attend l'étape 9 : Claude met alors aussi les variables `FIREBASE_STAGING_WIF_PROVIDER` et `FIREBASE_STAGING_DEPLOYER`, que `setup staging` affiche (rien de secret).
+Les variables `FIREBASE_STAGING_WIF_PROVIDER` et `FIREBASE_STAGING_DEPLOYER` (rien de secret, les valeurs que `setup staging` affiche) sont posées depuis le 16 octobre (Nav). Le déploiement des règles Firestore du staging par la CI attend encore l'étape 9 : sans le fournisseur et le compte qu'elle crée, son job échouerait.
 
 ## 9. Accès sans clé de la VM à Firestore
 
