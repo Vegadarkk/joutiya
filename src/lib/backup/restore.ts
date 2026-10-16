@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 import type { DocumentReference, Firestore } from "firebase-admin/firestore";
 import { decryptAge } from "./crypto.ts";
-import { BackupFormatError, decodeDocument, decodeValue, parseBackupLine, type RefResolver } from "./encode.ts";
+import { BackupFormatError, decodeDocument, parseBackupLine, type DecodedDocument, type RefResolver } from "./encode.ts";
 import { openPart, parseBackupKey, type BackupMode } from "./parts.ts";
 
 // Restore of the encrypted backups (D17), run by scripts/restore-firestore.ts and the emulator
@@ -221,7 +221,7 @@ const PATH_ONLY: RefResolver = { doc: (path: string) => path as unknown as Docum
 
 async function openChecked(source: BackupSource, part: RestorePart, identity: string): Promise<{ lines: string[]; sha256: string }> {
   const body = await readSource(source, part.key);
-  let opened;
+  let opened: Awaited<ReturnType<typeof openPart>>;
   try {
     opened = await openPart(body, identity);
   } catch (error) {
@@ -244,19 +244,19 @@ export async function checkRestore(source: BackupSource, plan: RestorePlan, iden
     sha256.push(opened.sha256);
     for (const [lineIndex, line] of opened.lines.entries()) {
       lines += 1;
-      let parsed;
+      let decoded: DecodedDocument;
       try {
-        parsed = parseBackupLine(line);
-        decodeValue(parsed.d, PATH_ONLY);
+        // The same decoding as the write pass, minus the database.
+        decoded = decodeDocument(line, PATH_ONLY);
       } catch (error) {
         throw new RestoreError(`${part.key} line ${lineIndex + 1}: ${(error as Error).message}`);
       }
-      const segments = parsed.p.split("/");
-      if (segments[segments.length - 2] !== part.collection) throw new RestoreError(`${part.key} line ${lineIndex + 1}: document of another collection`);
-      const at = parsed.u === null ? Number.NEGATIVE_INFINITY : Date.parse(parsed.u);
-      const current = choices.get(parsed.p);
+      if (decoded.collection !== part.collection) throw new RestoreError(`${part.key} line ${lineIndex + 1}: document of another collection`);
+      const path = decoded.ref as unknown as string;
+      const at = decoded.updateTime?.getTime() ?? Number.NEGATIVE_INFINITY;
+      const current = choices.get(path);
       // Parts are in capture order: on equal update times the later capture wins.
-      if (!current || at >= current.at) choices.set(parsed.p, { at, part: index, line: lineIndex, collection: part.collection });
+      if (!current || at >= current.at) choices.set(path, { at, part: index, line: lineIndex, collection: part.collection });
     }
   }
   const byCollection: Record<string, number> = {};
@@ -302,7 +302,7 @@ export async function applyRestore(
       const { p } = parseBackupLine(line);
       const choice = check.choices.get(p);
       if (!choice || choice.part !== index || choice.line !== lineIndex) continue;
-      let decoded;
+      let decoded: DecodedDocument;
       try {
         decoded = decodeDocument(line, db);
       } catch (error) {

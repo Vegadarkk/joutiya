@@ -482,11 +482,12 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
   for (let step = 0; step < timed.length; step += 1) {
     const collection = timed[(startAt + step) % timed.length] as BackupCollection;
     const field = collection.timeField as TimeField;
+    // Recorded even when the scan does not happen tonight: a later first window would skip documents.
+    const cursor = (incremental[collection.id] ??= { since: firstSince, after: null });
     if (budget <= 0 || state.quotaStopped) {
       incrementalNext ??= collection.id;
       continue;
     }
-    const cursor = incremental[collection.id] ?? { since: firstSince, after: null };
     const writer = new CollectionWriter(ctx, "incremental", collection.id);
     const query = baseQuery(db, collection).where(field, ">=", cursor.since).orderBy(field).orderBy(FieldPath.documentId());
     const result = await scan(query, budget, config.pageSize, cursor.after ? [cursor.since, db.doc(cursor.after)] : null, state, (doc) => writer.add(doc));
