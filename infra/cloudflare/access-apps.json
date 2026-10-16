@@ -1,5 +1,5 @@
 {
-  "description": "Zero Trust Access applications (Free, up to 50 users). ${VAR} values come from the environment of scripts/cloudflare.ts, never from this file; ACCESS_GOOGLE_IDP_ID is looked up by the script (the account's only Google login method). Staff sign in with Google only, on an account with 2-step verification (§6). Service tokens are created in the dashboard (secret shown once). The CI token reaches sshd, where its key is only accepted for deploy-staging (forced command). The AUD tag of admin.joutiya.ma and admin-staging.joutiya.ma goes to CF_ACCESS_AUD of each environment and to infra/targets.json.",
+  "description": "Zero Trust Access applications (Free, up to 50 users). ${VAR} values come from the environment of scripts/cloudflare.ts, never from this file; ACCESS_GOOGLE_IDP_ID is looked up by the script (the account's only Google login method). Staff sign in with Google only, on an account with 2-step verification (§6). Service tokens are created in the dashboard (secret shown once). Only the CI token reaches sshd, where its key is only accepted for deploy-staging (forced command): nobody else has an SSH user, administration goes through OCI Run Command. The AUD tag of admin.joutiya.ma and admin-staging.joutiya.ma goes to CF_ACCESS_AUD of each environment and to infra/targets.json.",
   "apps": [
     {
       "name": "Joutiya back-office",
@@ -41,17 +41,6 @@
             {
               "service_token": {
                 "token_id": "${ACCESS_CI_TOKEN_ID}"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Owner",
-          "decision": "allow",
-          "include": [
-            {
-              "email": {
-                "email": "${ACCESS_OWNER_EMAIL}"
               }
             }
           ]

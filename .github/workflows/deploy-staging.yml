@@ -2,8 +2,8 @@ name: Deploy staging
 
 # Every push on main that passed CI: arm64 image built on GitHub, sent to the VM over SSH through
 # Cloudflare Access (no registry), loaded and started by the forced command of deploy-staging
-# (infra/vm/deploy-forced-command.sh). Production is promoted from the owner's machine
-# (scripts/deploy-prod.ts): no production key is stored here.
+# (infra/vm/deploy-forced-command.sh). Production is promoted by Claude through OCI Run Command
+# (scripts/oracle-vm.ts promote): no production key exists, here or anywhere.
 #
 # Inert until the owner sets the repository variable STAGING_DEPLOY_ENABLED=true (docs/phase-1.md)
 # and these values:

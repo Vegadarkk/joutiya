@@ -120,9 +120,10 @@ Node 24; `npm ci --ignore-scripts` once.
   checks the owner's `JOUTIYA_*_TUNNEL_TOKEN`, e.g.
   `node --env-file=.env.local scripts/assert-target.ts`; never print env file values.
   Unit tests: `node --test scripts/assert-target.test.ts` (run in CI).
-- Owner-machine scripts, dry run unless `--apply`: `scripts/cloudflare.ts` (edge config),
-  `scripts/legal-config.ts` (Firestore `config/legal`); `scripts/deploy-prod.ts` promotes,
-  rolls back and syncs the VM files. Steps in `docs/phase-1.md`, rebuild in `infra/redeploy.md`.
+- Scripts, dry run unless `--apply`: `scripts/cloudflare.ts` (edge config),
+  `scripts/legal-config.ts` (Firestore `config/legal`), `scripts/oracle-vm.ts` (VM by API; sync,
+  promote, rollback and root scripts through OCI Run Command); `scripts/deploy-prod.ts firestore`
+  (production rules). Steps in `docs/phase-1.md`, rebuild in `infra/redeploy.md`.
 - Image: `docker build -f docker/Dockerfile --target web` (or `worker`); Compose in `docker/`.
 
 # Compact instructions

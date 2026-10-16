@@ -4,13 +4,15 @@
       "accountId": "795e3aeafd644dbdf1810fc0e29a5e97",
       "zoneId": "f09bd1e8b2f7ae0d61472b0eb617b0b0",
       "accessTeamDomain": "joutiya.cloudflareaccess.com",
-      "sshTunnelId": null
+      "sshTunnelId": "fddd6cc1-24d3-4fad-83b1-09e2ac432fe9"
     },
     "oracle": {
       "homeRegion": "eu-paris-1",
       "tenancyId": "ocid1.tenancy.oc1..aaaaaaaa2vsndafj3yo4p7ndkzbuexxlx7y3v4ji7rcznprjoqeaxknn543q",
       "compartmentId": "ocid1.compartment.oc1..aaaaaaaag4vrrhtajdpxdtzd4mfv4g5nceyoth4nsvs42ehebb65g2yo4iua",
-      "userId": "ocid1.user.oc1..aaaaaaaapcgofwhegeb4jkc3xzmd6kqsug5zlhunsgxyuwlqbnk7udeqgiiq"
+      "userId": "ocid1.user.oc1..aaaaaaaapcgofwhegeb4jkc3xzmd6kqsug5zlhunsgxyuwlqbnk7udeqgiiq",
+      "vmDynamicGroupId": "ocid1.dynamicgroup.oc1..aaaaaaaaak5yk4fgam3ptrq2sfwexkny26bmca6nq7iv57c4mpcxfbi25pqa",
+      "runCommandPolicyId": "ocid1.policy.oc1..aaaaaaaay54vhb66dno3sf4645wxjxjde6ujkldrfwdhvypx2a34smssu4fq"
     },
     "anthropic": {
       "organizationId": "de60375e-fd8c-47a8-bbbc-c40672c4eee5"
@@ -63,7 +65,7 @@
         "phoneNumberId": null
       },
       "cloudflare": {
-        "tunnelId": null,
+        "tunnelId": "9131a94f-52ec-46c6-b6cd-ec87792eabf1",
         "accessAud": null
       }
     },
@@ -83,7 +85,7 @@
         "phoneNumberId": null
       },
       "cloudflare": {
-        "tunnelId": null,
+        "tunnelId": "91426433-7a77-46cb-b3ca-ff68067a2007",
         "accessAud": null
       }
     }

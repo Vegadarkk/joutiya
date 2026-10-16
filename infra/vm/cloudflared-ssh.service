@@ -1,0 +1,19 @@
+# cloudflared of joutiya-ssh-tunnel on the host (systemd, apt updates), not in Docker: SSH keeps
+# working when Docker or a Compose project is down. Installed as
+# /etc/systemd/system/cloudflared.service by bootstrap.sh and install.sh. The token is read from a
+# root-only file (TUNNEL_TOKEN), never from the command line or this world-readable unit.
+[Unit]
+Description=cloudflared (joutiya-ssh-tunnel)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+EnvironmentFile=/etc/joutiya/ssh-tunnel.env
+ExecStart=/usr/bin/cloudflared --no-autoupdate tunnel run
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

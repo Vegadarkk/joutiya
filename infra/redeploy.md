@@ -1,32 +1,31 @@
 # Reconstruire la VM
 
-La VM ne garde aucune donnée unique (§2) : Firestore, R2, les secrets (votre gestionnaire de mots de passe et `.env.local`) et le code (GitHub) vivent ailleurs. Si elle est perdue, récupérée par Oracle ou compromise, on en crée une neuve. Comptez une heure.
+La VM ne garde aucune donnée unique (§2) : Firestore, R2, les secrets (Cloudflare, l'environnement cloud de Claude, GitHub) et le code (GitHub) vivent ailleurs. Si elle est perdue, reprise par Oracle ou compromise, Claude en crée une neuve par API (règle n° 1, `docs/phase-1.md`). Comptez une heure.
 
 Ce qui se perd : les files BullMQ et les compteurs de quotas du jour (`valkey-queue`), qui se reconstituent seuls, et les journaux des conteneurs.
 
 ## Si la VM est compromise
 
-1. Oracle → Compute → Instances → `joutiya-vm` → **Stop**, sans supprimer le disque : il peut servir d'indice.
-2. Cloudflare → Zero Trust → Networks → Tunnels : pour chacun des 3 Tunnels (`joutiya-ssh-tunnel`, `joutiya-prod-tunnel`, `joutiya-staging-tunnel`), **Rotate token**, puis supprimez ses connexions actives.
-3. Remplacez tout ce qui était sur la VM : mots de passe Valkey, `HASH_PEPPER`, `ALERT_RELAY_SECRET` (et le secret du même nom dans le Worker), jeton de purge du cache, certificats Google (révoquez-les dans le magasin de confiance du pool WIF), jeton Telegram (@BotFather → `/revoke`).
-4. Remplacez la clé `deploy-staging` (GitHub) et le jeton de service Access `joutiya-ci`.
-5. Puis reconstruisez comme ci-dessous.
+1. Claude arrête `joutiya-vm` par API, sans supprimer le disque : il peut servir d'indice.
+2. Claude renouvelle par API le secret des 3 tunnels (`joutiya-ssh-tunnel`, `joutiya-prod-tunnel`, `joutiya-staging-tunnel`), ce qui coupe leurs connexions.
+3. Claude remplace tout ce qui était sur la VM : mots de passe Valkey, `HASH_PEPPER`, `ALERT_RELAY_SECRET` (et le secret du même nom dans le Worker), clés d'envoi de l'application (`MAIL_API_KEY`, `MAIL_FALLBACK_API_KEY`, `MAIL_WEBHOOK_SECRET`), certificats Google (révoqués dans le magasin de confiance du pool WIF). Le jeton Telegram se révoque chez @BotFather (`/revoke`), par vous. La clé Resend du Worker de sonde n'a jamais été sur la VM : elle reste.
+4. Claude remplace la clé de `deploy-staging` (secret GitHub) et le jeton de service Access `joutiya-ci`.
+5. Puis il reconstruit comme ci-dessous.
 
 ## Reconstruire
 
-Suivez `docs/phase-1.md`, étapes 5 à 7, avec ces différences :
-
-1. **VM** (étape 5) : même réglage. Recréez `bootstrap.local.sh` (prompt E, point 4), avec le nouveau jeton du Tunnel SSH s'il a changé.
-2. **Empreinte SSH** (étape 6) : la nouvelle VM a une nouvelle clé d'hôte. Retirez l'ancienne ligne `ssh.joutiya.ma` de `~/.ssh/known_hosts`, puis mettez à jour la variable GitHub `VM_SSH_KNOWN_HOSTS`.
-3. **Fichiers et secrets** (étape 6) : `node scripts/deploy-prod.ts vm-sync`, puis les fichiers `/etc/joutiya/<env>/*.env`. `ALERT_RELAY_URL` reçoit tout de suite l'URL du Worker de sonde suivie de `/alert` : le Worker existe déjà, et l'application ne démarre pas sans. Si `ALERT_RELAY_SECRET` change, mettez le même dans le Worker (`wrangler secret put`).
-4. **Certificats Google** (étape 7) : un nouveau certificat par conteneur, signé par votre autorité ; le pool et les comptes de service restent.
-5. **Staging** : relancez le dernier déploiement (GitHub → Actions → Deploy staging → **Run workflow** sur `main`).
-6. **Production** : `node scripts/deploy-prod.ts promote`.
-7. **Contrôle** : `https://joutiya.ma/api/health` répond `ok`, la sonde Telegram annonce « rétabli ».
+1. **VM** : `node scripts/oracle-vm.ts create --apply --retry-minutes=120`, une fois l'ancienne VM supprimée. Le démarrage remet l'agent Oracle, les tunnels (jetons relus dans l'API Cloudflare), Docker et les fichiers du dépôt. Suivi : `node scripts/oracle-vm.ts status`. Si une étape échoue, `node scripts/oracle-vm.ts reboot --apply` relance tout le démarrage.
+2. **Accès** : Run Command marche sans rien recréer, le groupe dynamique `joutiya-vm` couvrant toute VM du compartiment `joutiya`. Claude vérifie que l'agent répond.
+3. **Empreinte SSH** : la nouvelle VM a une nouvelle clé d'hôte, lue par `status` sur la console série. Claude met à jour la variable GitHub `VM_SSH_KNOWN_HOSTS`.
+4. **Fichiers et secrets** : Claude réécrit par Run Command les fichiers `/etc/joutiya/<env>/*.env` et la clé publique de `deploy-staging`. `ALERT_RELAY_URL` reçoit tout de suite l'URL de la sonde : elle existe déjà, et l'application ne démarre pas sans.
+5. **Certificats Google** : un nouveau certificat par conteneur, signé par l'autorité ; le pool et les comptes de service restent.
+6. **Staging** : Claude relance le dernier déploiement (GitHub → Actions → *Deploy staging* sur `main`).
+7. **Production** : Claude promeut la version du staging par Run Command (`node scripts/oracle-vm.ts promote --apply`, qui vide aussi le cache Cloudflare).
+8. **Contrôle** : `https://joutiya.ma/api/health` répond `ok`, et la sonde annonce le rétablissement.
 
 ## Entretien courant
 
-- Les mises à jour de sécurité (Ubuntu, Docker, cloudflared) s'installent seules chaque nuit. Si un redémarrage est nécessaire, il a lieu à 03:30 UTC, et les conteneurs repartent seuls.
-- Une fois par mois : `ssh joutiya 'df -h / && sudo docker system df'`. Les anciennes images sont supprimées à chaque déploiement : on garde les 4 dernières versions.
+- Les mises à jour de sécurité (Ubuntu, Docker, cloudflared, agent Oracle) s'installent seules chaque nuit. Si un redémarrage est nécessaire, il a lieu à 03:30 UTC, et les conteneurs repartent seuls.
+- Une fois par mois, Claude vérifie le disque par Run Command (`df -h /` et `docker system df`). Les anciennes images sont supprimées à chaque déploiement : on garde les 4 dernières versions.
 - Images de base (Node, Valkey, cloudflared) : Dependabot ouvre une PR, et la CI la vérifie.
-- Oracle reprend une VM gratuite inactive sur 7 jours (processeur, réseau et mémoire sous 20 %). Le trafic du site suffit après le lancement. Avant, gardez un œil sur les e-mails d'Oracle.
+- Oracle reprend une VM gratuite inactive sur 7 jours (processeur, réseau et mémoire sous 20 %). Le trafic du site suffit après le lancement ; avant, le staging et la sonde réduisent ce risque.

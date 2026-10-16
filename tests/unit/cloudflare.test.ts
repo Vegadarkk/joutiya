@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dnsChange, googleIdp, readEdgeFile, substitute, tunnelHostnames, validateEdge, type AccessApp, type DnsRecord, type TunnelConfig } from "../../scripts/cloudflare";
+import { dnsChange, googleIdp, needsAccess, readEdgeFile, substitute, tunnelHostnames, validateEdge, type AccessApp, type DnsRecord, type TunnelConfig } from "../../scripts/cloudflare";
 
 const record = (type: string, content: string, proxied = true): DnsRecord => ({ id: `${type}-${content}`, type, name: "joutiya.ma", content, proxied });
 const TARGET = "0f0e0d0c-0b0a-4908-8706-050403020100.cfargotunnel.com";
@@ -38,6 +38,14 @@ describe("infra/cloudflare", () => {
     expect(googleIdp([{ id: "otp", type: "onetimepin" }, { id: "g1", type: "google" }])).toBe("g1");
     expect(() => googleIdp([{ id: "otp", type: "onetimepin" }])).toThrow("found 0");
     expect(() => googleIdp([{ id: "g1", type: "google" }, { id: "g2", type: "google" }])).toThrow("found 2");
+  });
+
+  it("guards every tunnel hostname except the public production site", () => {
+    expect(needsAccess("prod", "joutiya.ma")).toBe(false);
+    expect(needsAccess("prod", "www.joutiya.ma")).toBe(false);
+    expect(needsAccess("prod", "admin.joutiya.ma")).toBe(true);
+    expect(needsAccess("staging", "staging.joutiya.ma")).toBe(true);
+    expect(needsAccess("ssh", "ssh.joutiya.ma")).toBe(true);
   });
 
   it("lists the tunnel hostnames", () => {

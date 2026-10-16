@@ -8,7 +8,8 @@
 // Environment (never printed): JOUTIYA_CLOUDFLARE_API_TOKEN, a custom token limited to the Joutiya
 // account and the joutiya.ma zone (a prefixed name: a shared shell may hold other projects' tokens);
 // for access: ACCESS_OWNER_EMAIL, ACCESS_CI_TOKEN_ID, ACCESS_PROBE_TOKEN_ID.
-// An existing A, AAAA or CNAME record on a tunnel hostname is only replaced with --replace-dns.
+// An existing A, AAAA or CNAME record on a tunnel hostname is only replaced with --replace-dns, and
+// a hostname guarded by Access gets its DNS record only once its Access application exists.
 
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -118,9 +119,9 @@ export function validateEdge(read: <T>(name: string) => T = readEdgeFile): strin
       // Universal SSL covers the apex and first-level subdomains only.
       if (hostname.split(".").length > ZONE_NAME.split(".").length + 1) errors.push(`${file}: ${hostname} is not covered by Universal SSL`);
       if (service.startsWith("ssh://") !== (name === "ssh")) errors.push(`${file}: ${hostname}: SSH goes through tunnel.ssh.json only`);
-      const needsAccess = name !== "prod" || hostname.startsWith("admin.");
-      if (needsAccess && !guarded.has(hostname)) errors.push(`${file}: ${hostname} has no Access application`);
-      if (!needsAccess && guarded.has(hostname)) errors.push(`${file}: ${hostname} is public but has an Access application`);
+      const guardedHost = needsAccess(name, hostname);
+      if (guardedHost && !guarded.has(hostname)) errors.push(`${file}: ${hostname} has no Access application`);
+      if (!guardedHost && guarded.has(hostname)) errors.push(`${file}: ${hostname} is public but has an Access application`);
     }
   }
   return errors;
@@ -145,6 +146,11 @@ export function substitute<T>(value: T, env: Record<string, string | undefined>)
     return node;
   };
   return { value: walk(value) as T, missing: [...missing] };
+}
+
+/** Every tunnel hostname is behind Access, except the public production site (§6). */
+export function needsAccess(tunnel: TunnelName, hostname: string): boolean {
+  return tunnel !== "prod" || hostname.startsWith("admin.");
 }
 
 export function tunnelHostnames(config: TunnelConfig): string[] {
@@ -238,6 +244,12 @@ async function applyTunnel(api: CloudflareApi, targets: Targets, name: TunnelNam
   const target = `${tunnelId}.cfargotunnel.com`;
   const blocked: string[] = [];
   for (const hostname of tunnelHostnames(config)) {
+    // A guarded hostname gets its DNS record only once its Access application exists: otherwise
+    // the record would publish the service unguarded as soon as the zone is active.
+    if (needsAccess(name, hostname) && !(await accessApp(api, accountId, hostname))) {
+      console.log(`held  ${hostname}: no Access application yet, DNS record not created (run the access part first)`);
+      continue;
+    }
     const existing = await api.call<DnsRecord[]>({ method: "GET", path: `/zones/${zoneId}/dns_records?name=${encodeURIComponent(hostname)}` });
     const change = dnsChange(existing, target, replaceDns);
     for (const record of change.conflicts) blocked.push(`${hostname}: existing ${record.type} ${record.content}`);
@@ -257,6 +269,14 @@ export function googleIdp(providers: { id: string; type: string }[]): string {
   return only.id;
 }
 
+async function accessApp(api: CloudflareApi, accountId: string, domain: string): Promise<{ id: string; domain: string; aud: string } | undefined> {
+  const found = await api.call<{ id: string; domain: string; aud: string }[]>({
+    method: "GET",
+    path: `/accounts/${accountId}/access/apps?domain=${encodeURIComponent(domain)}&exact=true`,
+  });
+  return found.find((item) => item.domain === domain);
+}
+
 async function applyAccess(api: CloudflareApi, targets: Targets): Promise<void> {
   const { accountId } = await checkZone(api, targets);
   const template = readEdgeFile<{ apps: AccessApp[] }>("access-apps.json").apps;
@@ -264,11 +284,7 @@ async function applyAccess(api: CloudflareApi, targets: Targets): Promise<void> 
   const { value: apps, missing } = substitute(template, { ...process.env, ACCESS_GOOGLE_IDP_ID: googleIdp(providers) });
   if (missing.length > 0) throw new Error(`set ${missing.join(", ")} in the environment first`);
   for (const [index, app] of apps.entries()) {
-    const found = await api.call<{ id: string; domain: string; aud: string }[]>({
-      method: "GET",
-      path: `/accounts/${accountId}/access/apps?domain=${encodeURIComponent(app.domain)}&exact=true`,
-    });
-    const current = found.find((item) => item.domain === app.domain);
+    const current = await accessApp(api, accountId, app.domain);
     // PUT overwrites the whole application, policies included.
     const request: ApiRequest = current
       ? { method: "PUT", path: `/accounts/${accountId}/access/apps/${current.id}`, body: app }
