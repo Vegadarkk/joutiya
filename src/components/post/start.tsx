@@ -28,6 +28,7 @@ export function WizardStart() {
   const [state, setState] = useState<State>({ kind: forceNew ? "pick" : "checking" });
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const started = useRef(false);
+  const creating = useRef(false);
 
   useEffect(() => {
     if (forceNew || started.current) return;
@@ -50,11 +51,15 @@ export function WizardStart() {
 
   const onSubcategory = useCallback(
     async (subcategory: Subcategory) => {
+      // One draft per pick, however fast the double tap.
+      if (creating.current) return;
+      creating.current = true;
       setState({ kind: "creating" });
       try {
         const { id } = await createListing({ categoryId: subcategory.categoryId, subcategoryId: subcategory.id });
         router.replace(wizardPath(id, "criteres"));
       } catch (error) {
+        creating.current = false;
         if (isApiError(error, "draft_limit")) setState({ kind: "draftLimit" });
         else setState({ kind: "pick", failed: error });
       }

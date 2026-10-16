@@ -11,7 +11,7 @@ import { Link, getPathname, usePathname, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/config/site";
 import { isApiError } from "@/lib/auth/client";
 import { usePublicConfig } from "@/lib/config/client";
-import { WIZARD_STEPS, type OwnerListing, type PublishListingResponse, type WizardStep } from "@/lib/contracts/listings";
+import { WIZARD_DONE, WIZARD_STEPS, type ListingStatus, type OwnerListing, type PublishListingResponse, type WizardStep } from "@/lib/contracts/listings";
 import { MAX_PHOTOS_INDIVIDUAL } from "@/lib/contracts/media";
 import { getListing } from "@/lib/listings/client/api";
 import { parseWizardPath, wizardPath, type WizardScreen } from "@/lib/listings/client/routes";
@@ -28,6 +28,7 @@ import { PhotosStep } from "./steps/photos-step";
 import { PriceStep } from "./steps/price-step";
 import { ReviewStep } from "./steps/review-step";
 import { TitleStep } from "./steps/title-step";
+import { useIssueOptions } from "./use-issue-options";
 import { WizardShell } from "./wizard-shell";
 
 // The wizard shell for one listing id: hydrates from GET /api/listings/{id}, then renders the
@@ -35,6 +36,9 @@ import { WizardShell } from "./wizard-shell";
 // only validated the first URL), so the current step is read from the pathname.
 
 type LoadState = { kind: "loading" } | { kind: "failed"; error: unknown } | { kind: "ready"; listing: OwnerListing };
+
+/** Statuses the API refuses to edit (service EDITABLE_STATUSES). */
+const READ_ONLY: readonly ListingStatus[] = ["sold", "removed", "purged"];
 
 export function PostWizard({ listingId, nonce }: { listingId: string; nonce?: string }) {
   const t = useTranslations("Listing.wizard");
@@ -106,6 +110,21 @@ export function PostWizard({ listingId, nonce }: { listingId: string; nonce?: st
       </FormMessage>
     );
   }
+  if (READ_ONLY.includes(state.listing.status)) {
+    return (
+      <EmptyState
+        headingLevel="h1"
+        title={t("readOnlyTitle")}
+        action={
+          <Button asChild>
+            <Link href="/mes-annonces">{t("myListings")}</Link>
+          </Button>
+        }
+      >
+        {t("readOnlyBody")}
+      </EmptyState>
+    );
+  }
   return (
     <WizardProvider listing={state.listing} maxPhotos={config?.upload.maxPhotos ?? MAX_PHOTOS_INDIVIDUAL} mediaBaseUrl={config?.mediaBaseUrl ?? null}>
       <WizardScreens nonce={nonce} />
@@ -114,12 +133,13 @@ export function PostWizard({ listingId, nonce }: { listingId: string; nonce?: st
 }
 
 function WizardScreens({ nonce }: { nonce?: string }) {
-  const { listing, listingId, saveState, retrySave, maxPhotos, publishResult, setPublished, flush } = useWizard();
+  const { listing, listingId, saveState, saveError, saveMode, retrySave, save, publishResult, setPublished, flush } = useWizard();
   const t = useTranslations("Listing");
   const locale = useLocale() as Locale;
   const pathname = usePathname();
   const router = useRouter();
   const stepLabel = useStepLabel();
+  const issueOptions = useIssueOptions();
   const [busy, setBusy] = useState(false);
   const parsed = parseWizardPath(pathname);
   const screen: WizardScreen | null = parsed.id === listingId ? parsed.screen : null;
@@ -127,6 +147,7 @@ function WizardScreens({ nonce }: { nonce?: string }) {
   const navigate = useCallback(
     (next: WizardScreen, replace = false) => {
       const href = getPathname({ href: wizardPath(listingId, next), locale });
+      // History API: Next.js syncs usePathname with it, no server round trip between steps.
       if (typeof window !== "undefined" && typeof window.history?.pushState === "function") {
         if (replace) window.history.replaceState(null, "", href);
         else window.history.pushState(null, "", href);
@@ -139,13 +160,15 @@ function WizardScreens({ nonce }: { nonce?: string }) {
     [listingId, locale, router],
   );
 
-  // `/deposer/{id}`: resume where the draft stopped (a public listing opens on its review).
+  // `/deposer/{id}`: resume where the draft stopped (a live listing opens on its review). The
+  // result screen without a result (reload of a draft) goes back to the steps.
+  const needsRedirect = screen === null || (screen === WIZARD_DONE && !publishResult && listing.status === "draft");
   useEffect(() => {
-    if (screen !== null) return;
-    navigate(listing.status === "draft" ? firstIncompleteStep(listing, { maxPhotos }) : "apercu", true);
-  }, [screen, listing, maxPhotos, navigate]);
+    if (!needsRedirect) return;
+    navigate(listing.status === "draft" ? firstIncompleteStep(listing, issueOptions) : "apercu", true);
+  }, [needsRedirect, listing, issueOptions, navigate]);
 
-  const states = useMemo(() => Object.fromEntries(WIZARD_STEPS.map((step) => [step, stepState(step, listing, { maxPhotos })])) as Record<WizardStep, StepState>, [listing, maxPhotos]);
+  const states = useMemo(() => Object.fromEntries(WIZARD_STEPS.map((step) => [step, stepState(step, listing, issueOptions)])) as Record<WizardStep, StepState>, [listing, issueOptions]);
   const reachable = useCallback((step: WizardStep) => step === "categorie" || Boolean(listing.subcategoryId), [listing.subcategoryId]);
 
   const goTo = useCallback(
@@ -156,26 +179,31 @@ function WizardScreens({ nonce }: { nonce?: string }) {
     [flush, navigate],
   );
 
-  if (screen === null) return null;
+  const onSaveNow = useCallback(async () => {
+    if (await save()) toast.success(t("done.savedTitle"));
+  }, [save, t]);
 
-  if (screen === "termine") {
+  if (screen === null || needsRedirect) return null;
+
+  if (screen === WIZARD_DONE) {
     if (publishResult) return <DoneScreen status={publishResult.status} slugId={publishResult.slugId ?? listing.slugId} url={publishResult.url} listingId={listingId} />;
-    if (listing.status !== "draft") return <DoneScreen status={listing.status} slugId={listing.slugId} listingId={listingId} />;
-    navigate(firstIncompleteStep(listing, { maxPhotos }), true);
-    return null;
+    return <DoneScreen status={listing.status} slugId={listing.slugId} listingId={listingId} />;
   }
 
   const step = screen;
   const onNext = () => {
     const next = nextStep(step);
-    if (next) navigate(next);
+    if (next) {
+      void flush();
+      navigate(next);
+    }
   };
   const previous = previousStep(step);
   const onBack = previous ? () => goTo(previous) : undefined;
 
   function onPublished(result: PublishListingResponse) {
     setPublished(result);
-    navigate("termine");
+    navigate(WIZARD_DONE);
   }
 
   function onSaved() {
@@ -183,7 +211,7 @@ function WizardScreens({ nonce }: { nonce?: string }) {
     router.push("/mes-annonces");
   }
 
-  const editable = listing.status === "draft" || listing.status === "rejected";
+  const editable = saveMode === "auto";
 
   return (
     <WizardShell
@@ -197,7 +225,10 @@ function WizardScreens({ nonce }: { nonce?: string }) {
       nextLabel={step === "apercu" ? (editable ? t("review.publish") : t("review.save")) : undefined}
       nextLoading={step === "apercu" ? busy : false}
       saveState={saveState}
+      saveError={saveError}
+      saveMode={saveMode}
       onRetrySave={retrySave}
+      onSaveNow={() => void onSaveNow()}
     >
       {step === "categorie" ? <CategoryStep onNext={onNext} /> : null}
       {step === "criteres" ? <CriteriaStep onNext={onNext} /> : null}

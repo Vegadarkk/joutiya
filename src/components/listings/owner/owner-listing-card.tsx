@@ -1,10 +1,11 @@
 "use client";
 
-import { ImageOff } from "lucide-react";
+import { ImageOff, Pencil, Play, RefreshCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
-import { Link } from "@/i18n/navigation";
+import { Button } from "@/components/ui/button";
+import { Link, getPathname } from "@/i18n/navigation";
 import type { OwnerListingSummary } from "@/lib/contracts/listings";
 import type { OwnerAction } from "@/lib/listings/client/api";
 import { blurhashDataUrl } from "@/lib/listings/client/blurhash";
@@ -12,6 +13,7 @@ import { daysUntil, formatPrice, formatRelativeDays } from "@/lib/listings/clien
 import { photoUrl } from "@/lib/listings/client/photo-url";
 import { wizardPath } from "@/lib/listings/client/routes";
 import { cn } from "@/lib/utils";
+import { primaryAction } from "./buckets";
 import { ListingActions } from "./listing-actions";
 import { ListingStatusBadge } from "./status-badge";
 
@@ -20,11 +22,13 @@ interface OwnerListingCardProps {
   mediaBaseUrl: string | null;
   onAction: (action: OwnerAction) => Promise<void>;
   onDelete: () => Promise<void>;
+  /** An action of this row is running. */
+  busy?: boolean;
   now?: Date;
 }
 
 /** One row of "Mes annonces": cover, title, price, city, status, expiry, actions. */
-export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, now = new Date() }: OwnerListingCardProps) {
+export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, busy = false, now = new Date() }: OwnerListingCardProps) {
   const t = useTranslations("MyListings");
   const locale = useLocale() as Locale;
   const city = listing.citySlug ? cityBySlug(listing.citySlug) : undefined;
@@ -32,6 +36,9 @@ export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, no
   const placeholder = blurhashDataUrl(listing.thumb?.blurhash);
   const title = listing.title || t("untitled");
   const href = listing.status === "published" && listing.slugId ? null : wizardPath(listing.id);
+  // The public page is a full page load (public pages have their own CSP), in the language on screen.
+  const publicHref = listing.slugId ? getPathname({ href: `/annonce/${listing.slugId}`, locale }) : null;
+  const primary = primaryAction(listing);
   const expiry = listing.expiresAt ? daysUntil(new Date(listing.expiresAt), now) : null;
   const price = listing.isDonation ? t("donation") : listing.price !== null ? formatPrice(listing.price, locale) : t("toDiscuss");
 
@@ -61,12 +68,12 @@ export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, no
                 {title}
               </Link>
             ) : (
-              <a href={`/annonce/${listing.slugId}`} className="line-clamp-2 rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
+              <a href={publicHref ?? undefined} className="line-clamp-2 rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
                 {title}
               </a>
             )}
           </h3>
-          <ListingActions listing={listing} onAction={onAction} onDelete={onDelete} />
+          <ListingActions listing={listing} onAction={onAction} onDelete={onDelete} busy={busy} publicHref={publicHref} />
         </div>
         <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
           <span className="font-semibold tabular-nums">{price}</span>
@@ -85,6 +92,31 @@ export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, no
         </div>
         {listing.status === "pending_review" ? <p className="text-xs text-foreground-muted text-pretty">{t("pending.body")}</p> : null}
         {listing.status === "rejected" ? <p className="text-xs text-danger text-pretty">{t("rejected.body")}</p> : null}
+        {primary ? (
+          <div className="mt-2 flex">
+            {primary.kind === "continue" || primary.kind === "fix" ? (
+              <Button asChild variant="outline" size="sm" className="max-sm:h-11">
+                <Link href={wizardPath(listing.id)} aria-label={t(primary.kind === "continue" ? "actions.continueDraftOf" : "actions.editOf", { title })}>
+                  <Pencil aria-hidden="true" />
+                  {primary.kind === "continue" ? t("actions.continueDraft") : t("actions.edit")}
+                </Link>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="max-sm:h-11"
+                disabled={busy}
+                aria-label={t(primary.kind === "resume" ? "actions.resumeOf" : "actions.renewOf", { title })}
+                onClick={() => void onAction(primary.kind)}
+              >
+                {primary.kind === "resume" ? <Play aria-hidden="true" /> : <RefreshCw aria-hidden="true" />}
+                {primary.kind === "resume" ? t("actions.resume") : t("actions.renew")}
+              </Button>
+            )}
+          </div>
+        ) : null}
       </div>
     </li>
   );

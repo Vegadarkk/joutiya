@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Check, CloudOff, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CircleDot, CloudOff, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useApiErrorMessage } from "@/components/auth/form-message";
 import { Button } from "@/components/ui/button";
+import { isApiError } from "@/lib/auth/client";
 import type { WizardStep } from "@/lib/contracts/listings";
 import type { AutosaveState } from "@/lib/listings/client/autosave";
+import type { SaveMode } from "@/lib/listings/client/store";
 import type { StepState } from "@/lib/listings/client/validation";
 import { cn } from "@/lib/utils";
 import { StepProgress } from "./progress";
@@ -25,7 +28,11 @@ interface WizardShellProps {
   nextDisabled?: boolean;
   nextLoading?: boolean;
   saveState: AutosaveState;
+  saveError?: unknown;
+  saveMode?: SaveMode;
   onRetrySave: () => void;
+  /** Live listing: saves the pending changes from any step. */
+  onSaveNow?: () => void;
   children: ReactNode;
 }
 
@@ -34,7 +41,7 @@ interface WizardShellProps {
  * bottom on a phone). The Next button submits the step's form (`form` attribute), so each step
  * validates itself before the wizard moves on.
  */
-export function WizardShell({ step, title, lead, states, reachable, onSelect, onBack, nextLabel, nextDisabled, nextLoading, saveState, onRetrySave, children }: WizardShellProps) {
+export function WizardShell({ step, title, lead, states, reachable, onSelect, onBack, nextLabel, nextDisabled, nextLoading, saveState, saveError, saveMode = "auto", onRetrySave, onSaveNow, children }: WizardShellProps) {
   const t = useTranslations("Listing.wizard");
   const heading = useRef<HTMLHeadingElement>(null);
   const first = useRef(true);
@@ -71,7 +78,7 @@ export function WizardShell({ step, title, lead, states, reachable, onSelect, on
             "pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:backdrop-blur-none",
           )}
         >
-          <SaveIndicator state={saveState} onRetry={onRetrySave} />
+          <SaveIndicator state={saveState} error={saveError} mode={saveMode} onRetry={onRetrySave} onSave={onSaveNow} />
           <div className="flex items-center justify-between gap-3">
             {onBack ? (
               <Button type="button" variant="outline" onClick={onBack} className="min-w-28">
@@ -94,17 +101,66 @@ export function WizardShell({ step, title, lead, states, reachable, onSelect, on
   );
 }
 
-/** "Brouillon enregistré": one line, polite live region; the error offers a retry. */
-export function SaveIndicator({ state, onRetry }: { state: AutosaveState; onRetry: () => void }) {
+/** Failures the autosave retries by itself (Autosave `retryAfter`): the message says so. */
+function isTransient(error: unknown): boolean {
+  if (!isApiError(error)) return true;
+  return error.status >= 500 || ["network", "unavailable", "internal", "rate_limited"].includes(error.code);
+}
+
+interface SaveIndicatorProps {
+  state: AutosaveState;
+  error?: unknown;
+  mode?: SaveMode;
+  onRetry: () => void;
+  onSave?: () => void;
+}
+
+/**
+ * One line, polite live region. A draft: "Brouillon enregistré" (saved by itself). A live
+ * listing: "Modifications non enregistrées" with its Save button. A failure says whether the
+ * browser keeps retrying, and offers a retry.
+ */
+export function SaveIndicator({ state, error, mode = "auto", onRetry, onSave }: SaveIndicatorProps) {
   const t = useTranslations("Listing.wizard");
+  const apiMessage = useApiErrorMessage();
+  const live = mode === "manual";
   if (state === "idle") return <p className="h-5" aria-hidden="true" />;
+  const message =
+    state === "saving"
+      ? t("saving")
+      : state === "saved"
+        ? live
+          ? t("savedLive")
+          : t("saved")
+        : state === "pending"
+          ? live
+            ? t("unsaved")
+            : t("pending")
+          : isApiError(error, "invalid_listing")
+            ? t("saveBlocked")
+            : isTransient(error)
+              ? t("saveError")
+              : `${t("saveStopped")} ${apiMessage(error)}`;
   return (
-    <p role="status" aria-live="polite" className={cn("flex min-h-5 items-center gap-1.5 text-sm", state === "error" ? "text-danger" : "text-foreground-muted")}>
-      {state === "saving" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : state === "saved" ? <Check className="size-4 text-success" aria-hidden="true" /> : state === "error" ? <CloudOff className="size-4" aria-hidden="true" /> : null}
-      <span>{state === "saving" ? t("saving") : state === "saved" ? t("saved") : state === "pending" ? t("pending") : t("saveError")}</span>
-      {state === "error" ? (
-        <button type="button" onClick={onRetry} className="font-medium underline underline-offset-2">
+    <p role="status" aria-live="polite" className={cn("flex min-h-5 flex-wrap items-center gap-x-1.5 gap-y-1 text-sm", state === "error" ? "text-danger" : state === "pending" && live ? "text-warning" : "text-foreground-muted")}>
+      {state === "saving" ? (
+        <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
+      ) : state === "saved" ? (
+        <Check className="size-4 shrink-0 text-success" aria-hidden="true" />
+      ) : state === "error" ? (
+        <CloudOff className="size-4 shrink-0" aria-hidden="true" />
+      ) : live ? (
+        <CircleDot className="size-4 shrink-0" aria-hidden="true" />
+      ) : null}
+      <span className="min-w-0">{message}</span>
+      {state === "error" && !isApiError(error, "invalid_listing") ? (
+        <button type="button" onClick={onRetry} className="-my-2 inline-flex min-h-11 items-center rounded-sm px-1 font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
           {t("retrySave")}
+        </button>
+      ) : null}
+      {state === "pending" && live && onSave ? (
+        <button type="button" onClick={onSave} className="-my-2 inline-flex min-h-11 items-center rounded-sm px-1 font-medium text-link underline underline-offset-2 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
+          {t("saveNow")}
         </button>
       ) : null}
     </p>

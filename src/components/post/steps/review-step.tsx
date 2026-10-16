@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { CircleAlert, ImageOff, MapPin, MessageSquare, Phone, Tag } from "lucide-react";
+import { CircleAlert, ImageOff, MapPin, MessageSquare, Phone, ShieldAlert, Tag } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { InlineError } from "@/components/feedback/inline-error";
@@ -13,20 +13,25 @@ import { criterionById, subcategoryById } from "@/config/categories";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
-import { isApiError, type ApiError } from "@/lib/auth/client";
-import type { FieldIssue, PublishListingResponse, WizardStep } from "@/lib/contracts/listings";
+import { isApiError } from "@/lib/auth/client";
+import { SENSITIVE_DECLARATION_KINDS, type FieldIssue, type PublishListingResponse, type SensitiveDeclarationKind, type WizardStep } from "@/lib/contracts/listings";
 import { publishListing } from "@/lib/listings/client/api";
 import { formatPrice } from "@/lib/listings/client/format";
-import { useWizard } from "@/lib/listings/client/store";
+import { blockersOf, useWizard } from "@/lib/listings/client/store";
 import { allIssues, stepOfPath } from "@/lib/listings/client/validation";
 import { cn } from "@/lib/utils";
+import { ChipRadioGroup } from "../controls/chips";
+import { SwitchField } from "../controls/switch";
 import { groupIssuesByStep, useStepLabel, useValidationMessage } from "../field-messages";
 import { useCategoryLabels, useCriteriaLabels } from "../labels";
+import { useIssueOptions } from "../use-issue-options";
 import { STEP_FORM_ID } from "../wizard-shell";
 
 // Step 9: the listing as buyers will see it, the declarations, Turnstile when the API asks for it
 // (same mechanism as the phase 2 login) and Publish. A 422 lists the blockers with a jump link to
 // the faulty step. On a listing that is already public the step saves and goes back to "Mes annonces".
+// Publish first commits what is pending (a rejected listing is reopened as a draft by that save),
+// and one publish runs at a time whatever the number of clicks.
 
 interface ReviewStepProps {
   onEdit: (step: WizardStep) => void;
@@ -36,16 +41,8 @@ interface ReviewStepProps {
   nonce?: string;
 }
 
-/** Blockers of a 422 `invalid_listing`: `details` is the FieldIssue list, or `{ blockers }`. */
-export function blockersOf(error: ApiError): FieldIssue[] {
-  const details = error.details as unknown;
-  if (Array.isArray(details)) return details as FieldIssue[];
-  if (details && typeof details === "object" && Array.isArray((details as { blockers?: unknown }).blockers)) return (details as { blockers: FieldIssue[] }).blockers;
-  return [];
-}
-
 export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: ReviewStepProps) {
-  const { listing, photos, photosBusy, maxPhotos, blockers, setBlockers, flush, saveState, listingId } = useWizard();
+  const { listing, photos, photosBusy, blockers, setBlockers, save, saveState, saveMode, listingId, update } = useWizard();
   const t = useTranslations("Listing");
   const names = useCategoryLabels();
   const criteria = useCriteriaLabels();
@@ -53,7 +50,10 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
   const stepLabel = useStepLabel();
   const message = useValidationMessage();
   const acceptId = useId();
+  const sensitiveId = useId();
+  const issueOptions = useIssueOptions();
   const [accepted, setAccepted] = useState(false);
+  const [sensitive, setSensitive] = useState(listing.sensitiveDeclaration !== null);
   const [attempted, setAttempted] = useState(false);
   const [serverError, setServerError] = useState<unknown>();
   const [publishing, setPublishing] = useState(false);
@@ -61,9 +61,12 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
   const [token, setToken] = useState<string | null>(null);
   const turnstile = useRef<TurnstileHandle>(null);
   const resubmitOnToken = useRef(false);
+  const running = useRef(false);
 
-  const editable = listing.status === "draft" || listing.status === "rejected";
-  const issues = useMemo(() => allIssues(listing, { maxPhotos }), [listing, maxPhotos]);
+  // A draft (or a rejected listing, reopened by its next save) is published; a live one is saved.
+  const editable = saveMode === "auto";
+  const issues = useMemo(() => allIssues(listing, issueOptions), [listing, issueOptions]);
+  const sensitiveMissing = sensitive && listing.sensitiveDeclaration === null;
   const incomplete = issues.length > 0;
   const subcategory = listing.subcategoryId ? subcategoryById(listing.subcategoryId) : undefined;
   const city = listing.location ? cityBySlug(listing.location.citySlug) : undefined;
@@ -74,10 +77,13 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
   useEffect(() => onBusy(publishing), [publishing, onBusy]);
 
   async function publish() {
+    if (running.current) return;
+    running.current = true;
     setServerError(undefined);
     setPublishing(true);
     try {
-      await flush();
+      // The server publishes what it holds: pending edits first. The indicator shows a failed save.
+      if (!(await save({ reopen: listing.status === "rejected" }))) return;
       const result = await publishListing(listingId, { acceptRules: true, ...(token ? { turnstileToken: token } : {}) });
       setBlockers([]);
       onPublished(result);
@@ -94,6 +100,7 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
         setServerError(error);
       }
     } finally {
+      running.current = false;
       setPublishing(false);
     }
   }
@@ -108,21 +115,31 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    if (running.current) return;
     if (!editable) {
+      // A live listing: the save re-checks it (refusals come back as blockers above).
+      running.current = true;
       setPublishing(true);
       try {
-        await flush();
-        onSaved();
+        if (await save()) onSaved();
       } finally {
+        running.current = false;
         setPublishing(false);
       }
       return;
     }
     setAttempted(true);
-    if (incomplete || photosBusy || !accepted) return;
+    if (incomplete || photosBusy || !accepted || sensitiveMissing) return;
     if (turnstileNeeded && !token) return;
     await publish();
   }
+
+  function onSensitive(on: boolean) {
+    setSensitive(on);
+    if (!on && listing.sensitiveDeclaration !== null) update({ sensitiveDeclaration: null }, { flush: true });
+  }
+
+  const sensitiveOptions = SENSITIVE_DECLARATION_KINDS.map((kind) => ({ value: kind, label: t(`review.sensitiveKinds.${kind}`) }));
 
   const serverBlockers = useMemo(() => groupIssuesByStep(blockers.map((issue) => ({ ...issue, step: stepOfPath(issue.path) }))), [blockers]);
   const missing = useMemo(() => groupIssuesByStep(issues), [issues]);
@@ -281,6 +298,27 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
               <span className="text-pretty">{t.rich("review.acceptRules", { cgu: legal("cgu"), interdits: legal("objets-interdits") })}</span>
             </label>
             {attempted && !accepted ? <InlineError className="ps-8">{t("validation.accept_rules")}</InlineError> : null}
+          </div>
+          <div className="flex flex-col gap-3 border-t border-border pt-4">
+            <SwitchField label={t("review.sensitiveLabel")} hint={t("review.sensitiveHint")} checked={sensitive} onCheckedChange={onSensitive} />
+            {sensitive ? (
+              <div className="flex flex-col gap-2 rounded-lg bg-surface-muted p-4">
+                <p id={sensitiveId} className="flex gap-2 text-sm font-medium">
+                  <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+                  {t("review.sensitiveQuestion")}
+                </p>
+                <ChipRadioGroup
+                  options={sensitiveOptions}
+                  value={listing.sensitiveDeclaration?.kind ?? null}
+                  onChange={(kind) => update({ sensitiveDeclaration: { kind: kind as SensitiveDeclarationKind } }, { flush: true })}
+                  label={t("review.sensitiveQuestion")}
+                  labelledBy={sensitiveId}
+                  invalid={attempted && sensitiveMissing}
+                />
+                <p className="text-xs text-foreground-muted text-pretty">{t("review.sensitiveNote")}</p>
+                {attempted && sensitiveMissing ? <InlineError>{t("validation.sensitive_required")}</InlineError> : null}
+              </div>
+            ) : null}
           </div>
           <p className="text-xs text-foreground-muted">{t("review.hostNote")}</p>
           {photosBusy ? (

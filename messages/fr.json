@@ -356,7 +356,7 @@
       "photo_limit": "Le nombre maximal de photos pour cette annonce est atteint.",
       "file_too_large": "Cette photo dépasse la taille maximale autorisée (10 Mo).",
       "unsupported_media": "Ce format d'image n'est pas pris en charge. Utilisez une photo JPEG, WebP ou PNG.",
-      "storage_full": "L'envoi de photos est momentanément suspendu. Vous pouvez publier l'annonce et ajouter des photos plus tard.",
+      "storage_full": "L'envoi de photos est momentanément suspendu. Votre brouillon est conservé : réessayez dans une heure.",
       "upload_not_ready": "Une photo est encore en cours de traitement. Patientez quelques secondes, puis réessayez.",
       "phone_required": "Vérifiez votre numéro de téléphone pour afficher ce moyen de contact.",
       "listing_unavailable": "Cette annonce n'est plus disponible.",
@@ -372,7 +372,7 @@
       "saving": "Enregistrement…",
       "saved": "Brouillon enregistré",
       "pending": "Modifications en attente",
-      "saveError": "Le brouillon n'a pas pu être enregistré. Vérifiez votre connexion : vos modifications seront renvoyées.",
+      "saveError": "Connexion perdue : vos modifications seront renvoyées automatiquement.",
       "retrySave": "Réessayer l'enregistrement",
       "loading": "Chargement de votre annonce…",
       "loadFailedTitle": "L'annonce n'a pas pu être chargée",
@@ -388,7 +388,14 @@
       "requiredHint": "Les champs marqués d'une étoile sont obligatoires.",
       "optional": "facultatif",
       "newListing": "Déposer une annonce",
-      "myListings": "Mes annonces"
+      "myListings": "Mes annonces",
+      "readOnlyTitle": "Cette annonce ne peut plus être modifiée",
+      "readOnlyBody": "Une annonce vendue ou supprimée reste en lecture seule. Vous pouvez en déposer une nouvelle à tout moment.",
+      "savedLive": "Modifications enregistrées",
+      "unsaved": "Modifications non enregistrées",
+      "saveBlocked": "Modifications non enregistrées : corrigez les points signalés.",
+      "saveStopped": "Enregistrement interrompu.",
+      "saveNow": "Enregistrer"
     },
     "start": {
       "title": "Déposer une annonce",
@@ -520,10 +527,18 @@
       "tooMany": "Vous pouvez encore ajouter {count, plural, one {# photo} other {# photos}}.",
       "full": "Vous avez atteint le nombre maximal de photos.",
       "reorderHelp": "Faites glisser une photo, ou utilisez les flèches de chaque photo, pour changer l'ordre.",
-      "noPhotoWarning": "Sans photo, une annonce reçoit beaucoup moins de contacts. Vous pourrez en ajouter plus tard.",
+      "noPhotoWarning": "Ajoutez au moins une photo pour publier : avec plusieurs photos, une annonce reçoit bien plus de contacts.",
       "photoAlt": "Photo {index}",
       "pending": "Des photos sont encore en cours d'envoi.",
-      "list": "Photos de l'annonce"
+      "list": "Photos de l'annonce",
+      "cancel": "Annuler l'envoi de la photo {index}",
+      "removing": "Suppression…",
+      "removeFailed": "La photo n'a pas pu être retirée. Réessayez.",
+      "keepOne": "Une annonce en ligne garde au moins une photo : ajoutez-en une autre avant de retirer celle-ci.",
+      "moved": "Photo déplacée en position {position} sur {count}.",
+      "movedCover": "Photo placée en couverture.",
+      "dropHint": "ou déposez-les ici",
+      "progressLabel": "Envoi de la photo {index}"
     },
     "review": {
       "title": "Vérifiez votre annonce",
@@ -556,7 +571,15 @@
       "incompleteBody": "Complétez les étapes signalées pour publier.",
       "photosPending": "Attendez la fin de l'envoi des photos avant de publier.",
       "goToStep": "Aller à l'étape « {step} »",
-      "publishedListing": "Cette annonce est en ligne. Les modifications sont enregistrées au fur et à mesure et peuvent entraîner une nouvelle vérification."
+      "publishedListing": "Cette annonce a déjà été publiée. Vos modifications sont prises en compte quand vous les enregistrez, et peuvent entraîner une nouvelle vérification.",
+      "sensitiveLabel": "Mon annonce mentionne des données personnelles sensibles",
+      "sensitiveHint": "Santé, religion, origine, opinions, vie privée : un modérateur relit l'annonce avant sa mise en ligne.",
+      "sensitiveQuestion": "Ces données concernent :",
+      "sensitiveKinds": {
+        "self": "Moi-même",
+        "explicit_consent": "Une autre personne, avec son accord explicite"
+      },
+      "sensitiveNote": "Sans l'accord de la personne concernée, retirez ces informations de l'annonce."
     },
     "done": {
       "publishedTitle": "Votre annonce est en ligne",
@@ -608,7 +631,12 @@
       "pro_only": "Cette sous-catégorie est réservée aux comptes professionnels.",
       "donation_not_allowed": "Le don n'est pas possible dans cette sous-catégorie.",
       "donation_price": "Un don ne peut pas avoir de prix : laissez le prix vide.",
-      "region_mismatch": "La ville choisie ne se trouve pas dans cette région."
+      "region_mismatch": "La ville choisie ne se trouve pas dans cette région.",
+      "email_in_text": "Retirez l'adresse e-mail du texte : les acheteurs vous écrivent par la messagerie Joutiya.",
+      "url_in_text": "Retirez le lien du texte : les liens vers d'autres sites ne sont pas autorisés.",
+      "invalid": "Cette valeur n'est pas valide.",
+      "not_allowed": "Cette information n'est pas autorisée dans cette catégorie.",
+      "sensitive_required": "Indiquez à qui se rapportent ces données personnelles."
     },
     "status": {
       "draft": "Brouillon",
@@ -1894,7 +1922,7 @@
       "pendingTitle": "Aucune annonce en vérification",
       "pendingBody": "Les annonces qui demandent une relecture apparaissent ici jusqu'à leur mise en ligne.",
       "endedTitle": "Aucune annonce terminée",
-      "endedBody": "Les annonces vendues, expirées ou en pause se retrouvent ici."
+      "endedBody": "Les annonces vendues, expirées ou refusées se retrouvent ici."
     },
     "post": "Déposer une annonce",
     "loadFailedTitle": "Vos annonces n'ont pas pu être chargées",
@@ -1923,7 +1951,11 @@
       "resume": "Remettre en ligne",
       "sold": "Marquer comme vendue",
       "renew": "Renouveler pour 60 jours",
-      "delete": "Supprimer"
+      "delete": "Supprimer",
+      "continueDraftOf": "Reprendre « {title} »",
+      "editOf": "Modifier « {title} »",
+      "resumeOf": "Remettre en ligne « {title} »",
+      "renewOf": "Renouveler « {title} » pour 60 jours"
     },
     "confirm": {
       "deleteTitle": "Supprimer cette annonce ?",
@@ -1949,7 +1981,9 @@
       "title": "Annonce refusée",
       "body": "Le motif vous a été envoyé par e-mail. Modifiez l'annonce puis publiez-la à nouveau."
     },
-    "pausedQuota": "En pause : le nombre d'annonces actives de votre compte est atteint."
+    "pausedQuota": "En pause : le nombre d'annonces actives de votre compte est atteint.",
+    "loading": "Chargement de vos annonces…",
+    "draftsLimit": "{count, plural, one {# brouillon} other {# brouillons}} sur {max} possibles"
   },
   "Map": {
     "mapLabel": "Carte des régions du Maroc",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,7 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
   const locale = localeProp ?? hookLocale;
   // "À discuter": the person asked for no amount (distinct from "not typed yet").
   const [toDiscuss, setToDiscuss] = useState(priceOptional && value === null && !isDonation);
+  const input = useRef<HTMLInputElement>(null);
   // Digits only, grouped as you type: the text is a pure function of the integer value.
   const text = value === null ? "" : groupDigits(String(value));
 
@@ -47,6 +48,7 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
       <Field label={t("price")} hint={disabled ? undefined : t("priceHint")} error={error} required={!priceOptional && !isDonation}>
         <div className="relative">
           <Input
+            ref={input}
             type="text"
             inputMode="numeric"
             autoComplete="off"
@@ -77,6 +79,8 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
             onCheckedChange={(checked) => {
               setToDiscuss(checked);
               if (checked) onChange(null);
+              // Back to an amount: the field is where the next keystroke goes.
+              else requestAnimationFrame(() => input.current?.focus());
             }}
             className="py-3"
           />
@@ -93,7 +97,7 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
                 setToDiscuss(false);
                 onChange(null);
                 onNegotiable(false);
-              }
+              } else requestAnimationFrame(() => input.current?.focus());
             }}
             className="py-3"
           />

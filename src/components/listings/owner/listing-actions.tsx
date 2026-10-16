@@ -17,6 +17,8 @@ interface ListingActionsProps {
   onAction: (action: OwnerAction) => Promise<void>;
   onDelete: () => Promise<void>;
   busy?: boolean;
+  /** Localized path of the public page (published listings). */
+  publicHref?: string | null;
 }
 
 /** Which actions a status allows (design D16 and the lifecycle table). */
@@ -33,7 +35,7 @@ export function allowedActions(listing: OwnerListingSummary): { edit: boolean; v
   };
 }
 
-export function ListingActions({ listing, onAction, onDelete, busy }: ListingActionsProps) {
+export function ListingActions({ listing, onAction, onDelete, busy, publicHref }: ListingActionsProps) {
   const t = useTranslations("MyListings");
   const [confirm, setConfirm] = useState<"delete" | "sold" | null>(null);
   const [working, setWorking] = useState(false);
@@ -61,9 +63,9 @@ export function ListingActions({ listing, onAction, onDelete, busy }: ListingAct
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content align="end" sideOffset={6} className="z-50 min-w-56 rounded-md border border-border bg-surface p-1 shadow-lg shadow-bab-950/10 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95">
-            {allowed.view ? (
+            {allowed.view && publicHref ? (
               <DropdownMenu.Item asChild>
-                <a href={`/annonce/${listing.slugId}`} className={item}>
+                <a href={publicHref} className={item}>
                   <Eye aria-hidden="true" />
                   {t("actions.view")}
                 </a>

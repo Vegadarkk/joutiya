@@ -35,7 +35,8 @@ export default async function PostPage({ params }: Props) {
     <Container lang={locale === "rif" ? "fr" : undefined} className="max-w-4xl py-8 lg:py-12">
       <FrenchOnlyNotice className="mb-8" />
       {parsed.id ? (
-        <PostWizard listingId={parsed.id} nonce={nonce} />
+        // Keyed: another listing id is a fresh wizard (state, autosave, uploads).
+        <PostWizard key={parsed.id} listingId={parsed.id} nonce={nonce} />
       ) : (
         <Suspense fallback={<Skeleton className="h-64 w-full rounded-lg" />}>
           <WizardStart />

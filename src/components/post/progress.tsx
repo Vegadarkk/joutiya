@@ -28,7 +28,7 @@ export function StepProgress({ current, states, onSelect, reachable }: StepProgr
   return (
     <nav aria-label={t("stepsNav")} className="flex flex-col gap-3">
       <p className="text-sm font-medium text-foreground-muted lg:hidden">{t("stepOf", { current: currentIndex + 1, total: WIZARD_STEPS.length })}</p>
-      <ol className="flex gap-1 lg:hidden" aria-label={t("progress")}>
+      <ol className="-my-3 flex gap-1 lg:hidden" aria-label={t("progress")}>
         {WIZARD_STEPS.map((step, index) => {
           const isCurrent = step === current;
           const state = states[step];
@@ -41,11 +41,13 @@ export function StepProgress({ current, states, onSelect, reachable }: StepProgr
                 onClick={() => onSelect(step)}
                 aria-current={isCurrent ? "step" : undefined}
                 aria-label={`${index + 1}. ${label(step)}, ${isCurrent ? t("stepCurrent") : state === "complete" ? t("stepDone") : state === "incomplete" ? t("stepIncomplete") : t("stepTodo")}`}
-                className="group block h-6 w-full rounded-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25 disabled:cursor-default"
+                // 44 px touch target around a 6 px segment.
+                className="group flex h-11 w-full items-center rounded-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25 disabled:cursor-default"
               >
                 <span
                   className={cn(
-                    "mt-2 block h-1.5 w-full rounded-full transition-colors duration-150 ease-door",
+                    "block h-1.5 w-full rounded-full transition-[background-color,transform] duration-150 ease-door",
+                    isCurrent && "scale-y-[1.35]",
                     isCurrent ? "bg-featured" : state === "complete" ? "bg-structure" : state === "incomplete" && index < currentIndex ? "bg-danger/70" : "bg-border",
                     can && "group-hover:bg-bab-500",
                   )}

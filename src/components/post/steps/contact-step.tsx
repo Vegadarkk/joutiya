@@ -15,8 +15,11 @@ import { STEP_FORM_ID } from "../wizard-shell";
 export function ContactStep({ onNext }: { onNext: () => void }) {
   const { listing, update, blockers } = useWizard();
   const t = useTranslations("Listing");
-  const { session } = useSession();
+  const { status, session } = useSession();
+  const known = status === "ready";
   const verified = Boolean(session?.phoneVerified);
+  // Without the badge the switches can be turned off, never on (the API refuses: phone_required).
+  const blocked = known && !verified && (listing.contact.showPhone || listing.contact.whatsapp);
   const blocker = blockers.find((issue) => issue.path.startsWith("contact"));
 
   function onSubmit(event: FormEvent) {
@@ -36,7 +39,7 @@ export function ContactStep({ onNext }: { onNext: () => void }) {
           <h2 id="contact-phone-title" className="font-semibold">
             {t("steps.contact")}
           </h2>
-          {verified ? (
+          {!known ? null : verified ? (
             <Badge variant="success">
               <BadgeCheck className="size-3.5" aria-hidden="true" />
               {t("contact.phoneVerified")}
@@ -45,7 +48,7 @@ export function ContactStep({ onNext }: { onNext: () => void }) {
             <Badge variant="warning">{t("contact.phoneNotVerified")}</Badge>
           )}
         </div>
-        {!verified ? (
+        {known && !verified ? (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-foreground-muted text-pretty">{t("contact.verifyBody")}</p>
             <Button asChild variant="outline" size="sm" className="shrink-0">
@@ -57,21 +60,25 @@ export function ContactStep({ onNext }: { onNext: () => void }) {
           <SwitchField
             label={t("fields.showPhone")}
             hint={t("fields.showPhoneHint")}
-            checked={listing.contact.showPhone && verified}
-            disabled={!verified}
+            checked={listing.contact.showPhone}
+            disabled={!verified && !listing.contact.showPhone}
             onCheckedChange={(showPhone) => update({ contact: { ...listing.contact, showPhone } }, { flush: true })}
             className="py-3"
           />
           <SwitchField
             label={t("fields.whatsapp")}
             hint={t("fields.whatsappHint")}
-            checked={listing.contact.whatsapp && verified}
-            disabled={!verified}
+            checked={listing.contact.whatsapp}
+            disabled={!verified && !listing.contact.whatsapp}
             onCheckedChange={(whatsapp) => update({ contact: { ...listing.contact, whatsapp } }, { flush: true })}
             className="py-3"
           />
         </div>
-        {blocker ? <p className="text-sm text-danger">{t("validation.phone_required")}</p> : null}
+        {blocker || blocked ? (
+          <p role="alert" className="text-sm text-danger">
+            {t("validation.phone_required")}
+          </p>
+        ) : null}
       </section>
 
       <p className="flex gap-2 text-sm text-foreground-muted">

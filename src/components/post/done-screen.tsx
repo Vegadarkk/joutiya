@@ -25,7 +25,8 @@ export function DoneScreen({ status, slugId, url, listingId }: DoneScreenProps) 
   const locale = useLocale();
   const config = usePublicConfig();
   const [copied, setCopied] = useState(false);
-  const path = url ?? (slugId ? `/${locale}/annonce/${slugId}` : null);
+  // The page in the language on screen (the API answers with the seller's stored locale).
+  const path = slugId ? `/${locale}/annonce/${slugId}` : (url ?? null);
   const absolute = path ? new URL(path, config?.siteUrl ?? (typeof window !== "undefined" ? window.location.origin : "https://joutiya.ma")).toString() : null;
 
   async function share() {
