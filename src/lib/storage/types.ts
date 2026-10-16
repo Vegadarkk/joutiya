@@ -36,13 +36,22 @@ export interface PutOptions {
   cacheControl?: string;
 }
 
+export interface GetOptions {
+  /**
+   * Reads at most `maxBytes + 1` bytes: a longer object comes back cut there (the caller sees it
+   * exceeds the cap) and the rest is never downloaded. Guards the worker's memory when an object
+   * is replaced between its HEAD and its GET (a presigned PUT stays usable for 5 minutes).
+   */
+  maxBytes?: number;
+}
+
 export interface ObjectStore {
   readonly name: string;
   presignPut(input: PresignPutInput): Promise<PresignedPut>;
   /** Size and type without reading the body; null when the object does not exist. */
   head(bucket: BucketRole, key: string): Promise<ObjectHead | null>;
   /** The whole body in memory (one image at a time, §2); null when the object does not exist. */
-  get(bucket: BucketRole, key: string): Promise<Buffer | null>;
+  get(bucket: BucketRole, key: string, options?: GetOptions): Promise<Buffer | null>;
   put(bucket: BucketRole, key: string, body: Uint8Array, options: PutOptions): Promise<void>;
   /** Idempotent: deleting a missing object is not an error. */
   delete(bucket: BucketRole, key: string): Promise<void>;

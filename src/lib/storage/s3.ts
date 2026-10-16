@@ -1,7 +1,7 @@
 import "server-only";
 import { AwsClient } from "aws4fetch";
 import { assertObjectKey, bucketName } from "./keys";
-import type { BucketRole, ObjectHead, ObjectStore, PresignedPut, PresignPutInput, PutOptions } from "./types";
+import type { BucketRole, GetOptions, ObjectHead, ObjectStore, PresignedPut, PresignPutInput, PutOptions } from "./types";
 
 // Cloudflare R2 through its S3 API (research/libs-map-backup.md §C3): aws4fetch SigV4, region
 // "auto", path-style URLs on the EU endpoint (`https://<account>.eu.r2.cloudflarestorage.com/
@@ -61,6 +61,32 @@ async function discardBody(response: Response): Promise<void> {
   } catch {
     // Nothing to free.
   }
+}
+
+/** The body up to `maxBytes + 1` bytes; the rest of the stream is cancelled, never downloaded. */
+async function readCapped(response: Response, maxBytes: number): Promise<Buffer> {
+  if (!response.body) return Buffer.alloc(0);
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  let ended = false;
+  try {
+    while (length <= maxBytes) {
+      const { done, value } = await reader.read();
+      if (done) {
+        ended = true;
+        break;
+      }
+      chunks.push(value);
+      length += value.byteLength;
+    }
+  } finally {
+    // Over the cap or failed: stop the download.
+    if (!ended) await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+  const body = Buffer.concat(chunks, length);
+  return length > maxBytes ? body.subarray(0, maxBytes + 1) : body;
 }
 
 export class S3ObjectStore implements ObjectStore {
@@ -131,7 +157,7 @@ export class S3ObjectStore implements ObjectStore {
     return { size: Number.isFinite(size) ? size : 0, contentType: response.headers.get("content-type") ?? "application/octet-stream" };
   }
 
-  async get(bucket: BucketRole, key: string): Promise<Buffer | null> {
+  async get(bucket: BucketRole, key: string, options?: GetOptions): Promise<Buffer | null> {
     const response = await this.send(bucket, key, { method: "GET" });
     if (response.status === 404) {
       await discardBody(response);
@@ -141,6 +167,7 @@ export class S3ObjectStore implements ObjectStore {
       await discardBody(response);
       throw new StorageError("get", response.status, this.bucket(bucket));
     }
+    if (options?.maxBytes !== undefined) return readCapped(response, options.maxBytes);
     return Buffer.from(await response.arrayBuffer());
   }
 

@@ -1,7 +1,9 @@
 import "server-only";
+import { QUOTAS } from "@/config/quotas";
 import { serverEnv } from "@/lib/env";
 import { logger } from "@/lib/logging/logger";
 import { isDegraded, setGauge, type QuotaStatus } from "@/lib/quota";
+import { classify } from "@/lib/quota/period";
 import { isValkeyConfigured, valkey } from "@/lib/valkey/clients";
 
 // R2 storage gauge (D15): R2 exposes no cheap usage API, so the app counts the bytes it stores.
@@ -53,8 +55,13 @@ export async function resetMediaBytes(total: number, at = new Date()): Promise<Q
   }
 }
 
-/** Degraded storage (9.5 GB) or Class A operations (95 %): new uploads are refused (`storage_full`). */
+/**
+ * Degraded storage (9.5 GB) or Class A operations (95 %): new uploads are refused (`storage_full`).
+ * The storage level also comes from the running counter: the gauge lives in a daily key, empty
+ * after midnight UTC until the next ready photo or the 03:10 recount.
+ */
 export async function isStorageFull(): Promise<boolean> {
-  const [storage, writes] = await Promise.all([isDegraded("r2.storage"), isDegraded("r2.classA")]);
-  return storage || writes;
+  const [bytes, storage, writes] = await Promise.all([readMediaBytes(), isDegraded("r2.storage"), isDegraded("r2.classA")]);
+  const counted = bytes !== null && Number.isFinite(bytes) && classify(QUOTAS["r2.storage"], gaugeValue(bytes)) === "degraded";
+  return counted || storage || writes;
 }

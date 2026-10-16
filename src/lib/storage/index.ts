@@ -8,7 +8,7 @@ import type { ObjectStore } from "./types";
 // Factory (D11): R2 when the R2_* variables are set, the local file store in development,
 // nothing elsewhere (a deployed environment without R2 cannot accept uploads: callers answer 503).
 
-export type { BucketRole, ObjectHead, ObjectStore, PresignedPut, PresignPutInput, PutOptions } from "./types";
+export type { BucketRole, GetOptions, ObjectHead, ObjectStore, PresignedPut, PresignPutInput, PutOptions } from "./types";
 export { assertObjectKey, bucketName, bucketRole, isValidObjectKey, mediaBaseUrl } from "./keys";
 export { MemoryObjectStore } from "./memory";
 export type { MemoryCall, MemoryOp } from "./memory";

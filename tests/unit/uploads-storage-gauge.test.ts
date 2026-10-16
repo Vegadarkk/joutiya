@@ -111,6 +111,20 @@ describe("resetMediaBytes", () => {
 });
 
 describe("isStorageFull", () => {
+  it("reads the running counter when the daily gauge key is still empty (after midnight UTC)", async () => {
+    // Baseline 4.14 GB: degraded from 9.5 GB, i.e. 5.36 GB of photos.
+    data.set(MEDIA_BYTES_KEY, String(5_300_000_000));
+    expect(await isStorageFull()).toBe(false);
+    data.set(MEDIA_BYTES_KEY, String(5_400_000_000));
+    expect(data.has(gaugeKey)).toBe(false);
+    expect(await isStorageFull()).toBe(true);
+  });
+
+  it("lets uploads through when Valkey cannot answer (nothing known)", async () => {
+    configured.value = false;
+    expect(await isStorageFull()).toBe(false);
+  });
+
   it("also refuses uploads once R2 Class A operations are degraded (95 % of the month)", async () => {
     data.set("quota:r2.classA:2026-10", String(960_000));
     expect(await isStorageFull()).toBe(true);

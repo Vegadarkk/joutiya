@@ -1,9 +1,9 @@
 import "server-only";
 import { DEFAULT_AI, type AiConfig } from "@/config/ai";
 import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, type ListingPhoto, type UploadRejectReason, type UploadStatusResponse } from "@/lib/contracts/media";
-import { attachReadyPhoto, getListing, PhotoLimitError, removePhoto, type ListingRecord } from "@/lib/db/repositories/listings";
+import { getListing, removePhoto, type ListingRecord } from "@/lib/db/repositories/listings";
 import { recordModerationDecision } from "@/lib/db/repositories/moderation-decisions";
-import { getUpload, transitionUpload, type UploadRecord } from "@/lib/db/repositories/uploads";
+import { getUpload, markUploadReady, transitionUpload, type UploadRecord } from "@/lib/db/repositories/uploads";
 import { serverEnv } from "@/lib/env";
 import { logger } from "@/lib/logging/logger";
 import { objectStore, type BucketRole, type ObjectStore } from "@/lib/storage";
@@ -16,13 +16,14 @@ import { processImage, type ProcessedImage } from "./process";
 import { MEDIA_CACHE_CONTROL, MEDIA_CONTENT_TYPE, mediaObjectKey } from "./urls";
 
 // processUpload (architecture §3 step 5, design §4 and D6): HEAD the quarantine object, delete it
-// unread when it is too large, GET, sniff the real type, re-encode with sharp (EXIF/GPS dropped,
-// orientation applied, pixel cap), run the local checks (a nudity score at the reject threshold
-// refuses the photo before anything is published), put the two WebP variants, attach the photo
-// to a draft, mark the upload ready, then delete the original. The original goes last on purpose:
-// a retry after any failure redoes the whole run from it (puts overwrite the same keys, the
-// attach refreshes in place, the status write is conditional), and a ready upload never needs it.
-// Runs in the worker (queue "media") or inline in the complete route without Valkey (D12).
+// unread when it is too large, GET (capped at the declared size), sniff the real type, re-encode
+// with sharp (EXIF/GPS dropped, orientation applied, pixel cap), run the local checks (a nudity
+// score at the reject threshold refuses the photo before anything is published), put the two WebP
+// variants, then one transaction marks the upload ready and attaches the photo to a draft, and the
+// original is deleted last. A retry after any failure redoes the whole run from the original (puts
+// overwrite the same keys, the final transaction only applies to a `processing` upload), and a
+// ready upload never needs it. Runs in the worker (queue "media") or inline in the complete route
+// without Valkey (D12).
 
 export interface PipelineDeps {
   store?: ObjectStore;
@@ -144,9 +145,10 @@ async function run(upload: UploadRecord, ctx: Context): Promise<UploadStatusResp
   // Larger than declared means the byte quota was dodged: refused the same way.
   if (head.size > MAX_UPLOAD_BYTES || head.size > upload.declaredSize) return reject(upload, "too_large", ctx, { size: head.size });
 
-  const original = await ctx.store.get("quarantine", upload.quarantineKey);
+  // Capped read: a second PUT between the HEAD and the GET cannot load more than declared into memory.
+  const original = await ctx.store.get("quarantine", upload.quarantineKey, { maxBytes: upload.declaredSize });
   if (!original) return reject(upload, "expired", ctx, { size: head.size });
-  if (original.byteLength > MAX_UPLOAD_BYTES) return reject(upload, "too_large", ctx, { size: original.byteLength });
+  if (original.byteLength > upload.declaredSize) return reject(upload, "too_large", ctx, { size: original.byteLength });
   if ("reason" in checkImageType(original.subarray(0, SNIFF_BYTES), upload.declaredType)) return reject(upload, "bad_type", ctx, { size: head.size });
 
   let processed: ProcessedImage;
@@ -169,29 +171,18 @@ async function run(upload: UploadRecord, ctx: Context): Promise<UploadStatusResp
 
 async function publish(upload: UploadRecord, listing: ListingRecord, processed: ProcessedImage, checks: UploadRecord["checks"], ctx: Context): Promise<UploadStatusResponse | null> {
   const maxPhotos = maxPhotosOf(listing);
-  const attach = AUTO_ATTACH_STATUSES.includes(listing.status);
-  const alreadyAttached = listing.photos.some((photo) => photo.id === upload.id);
-  if (!attach && !alreadyAttached && listing.photos.length >= maxPhotos) return reject(upload, "quota", ctx, { checks });
+  const attachable = AUTO_ATTACH_STATUSES.includes(listing.status) || listing.photos.some((photo) => photo.id === upload.id);
+  // A full live listing cannot take it either: refused before anything is stored.
+  if (!attachable && listing.photos.length >= maxPhotos) return reject(upload, "quota", ctx, { checks });
 
   for (const variant of PHOTO_VARIANTS) {
     await ctx.store.put("media", mediaObjectKey(listing.id, upload.id, variant), processed.variants[variant], { contentType: MEDIA_CONTENT_TYPE, cacheControl: MEDIA_CACHE_CONTROL });
   }
   const photo: ListingPhoto = { id: upload.id, w: processed.width, h: processed.height, blurhash: processed.blurhash, hash: processed.hash };
-  if (attach) {
-    try {
-      await attachReadyPhoto(listing.id, photo, { maxPhotos, now: ctx.now() });
-    } catch (error) {
-      if (error instanceof PhotoLimitError) return reject(upload, "quota", ctx, { checks, variants: true });
-      throw error;
-    }
-  }
-
   const storedBytes = PHOTO_VARIANTS.reduce((sum, variant) => sum + processed.variants[variant].byteLength, 0);
-  const marked = await transitionUpload(
+  const outcome = await markUploadReady(
     upload.id,
-    ["processing"],
     {
-      status: "ready",
       size: storedBytes,
       width: processed.width,
       height: processed.height,
@@ -201,20 +192,22 @@ async function publish(upload: UploadRecord, listing: ListingRecord, processed: 
       variants: [...PHOTO_VARIANTS],
       finalKey: `listings/${listing.id}/${upload.id}`,
     },
+    { listingId: listing.id, photo, maxPhotos, targetStatuses: PHOTO_TARGET_STATUSES, attachStatuses: AUTO_ATTACH_STATUSES },
     ctx.now(),
   );
-  if (!marked.ok) {
+  if (!outcome.ok) {
+    if (outcome.reason === "photo_limit") return reject(upload, "quota", ctx, { checks, variants: true });
+    if (outcome.reason === "gone") return reject(upload, "expired", ctx, { checks, variants: true });
     // Another run already finished (same keys): keep its result.
-    if (marked.upload?.status === "ready") return toStatusResponse(marked.upload);
-    // Deleted by its owner or expired meanwhile: undo what this run published.
-    if (attach) await removePhoto(listing.id, upload.id, ctx.now());
+    if (outcome.upload?.status === "ready") return toStatusResponse(outcome.upload);
+    // Deleted by its owner or expired meanwhile: remove what this run stored.
     await deleteQuietly(ctx.store, "media", variantKeys(upload), upload.id);
     await deleteQuietly(ctx.store, "quarantine", [upload.quarantineKey], upload.id);
-    return marked.upload ? toStatusResponse(marked.upload) : null;
+    return outcome.upload ? toStatusResponse(outcome.upload) : null;
   }
   await recordMediaBytes(storedBytes, ctx.now());
   await deleteQuietly(ctx.store, "quarantine", [upload.quarantineKey], upload.id);
-  logger.info({ uploadId: upload.id, listingId: listing.id, bytes: storedBytes, attached: attach }, "upload ready");
+  logger.info({ uploadId: upload.id, listingId: listing.id, bytes: storedBytes, attached: outcome.attached }, "upload ready");
   return { status: "ready", photo };
 }
 

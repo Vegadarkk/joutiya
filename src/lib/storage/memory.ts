@@ -1,6 +1,6 @@
 import "server-only";
 import { assertObjectKey } from "./keys";
-import type { BucketRole, ObjectHead, ObjectStore, PresignedPut, PresignPutInput, PutOptions } from "./types";
+import type { BucketRole, GetOptions, ObjectHead, ObjectStore, PresignedPut, PresignPutInput, PutOptions } from "./types";
 
 // In-memory store for unit and API tests: records every call, so a test can assert, for example,
 // that an oversized quarantine object was deleted before any GET (exit criterion of phase 3).
@@ -45,11 +45,13 @@ export class MemoryObjectStore implements ObjectStore {
     return object ? { size: object.body.byteLength, contentType: object.contentType } : null;
   }
 
-  async get(bucket: BucketRole, key: string): Promise<Buffer | null> {
+  async get(bucket: BucketRole, key: string, options?: GetOptions): Promise<Buffer | null> {
     assertObjectKey(key);
     this.calls.push({ op: "get", bucket, key });
     const object = this.objects.get(MemoryObjectStore.id(bucket, key));
-    return object ? Buffer.from(object.body) : null;
+    if (!object) return null;
+    const cap = options?.maxBytes;
+    return Buffer.from(cap === undefined ? object.body : object.body.subarray(0, cap + 1));
   }
 
   async put(bucket: BucketRole, key: string, body: Uint8Array, options: PutOptions): Promise<void> {

@@ -1,12 +1,11 @@
 import "server-only";
-import { mkdir, readFile, rm } from "node:fs/promises";
-import { writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { serverEnv } from "@/lib/env";
 import { pepperedHash, safeEqual } from "@/lib/security/hash";
 import { assertObjectKey, bucketName } from "./keys";
-import type { BucketRole, ObjectHead, ObjectStore, PresignedPut, PresignPutInput, PutOptions } from "./types";
+import type { BucketRole, GetOptions, ObjectHead, ObjectStore, PresignedPut, PresignPutInput, PutOptions } from "./types";
 
 // Development stand-in for R2 (D11): objects live under os.tmpdir()/joutiya-dev-storage/<bucket>,
 // shared by the web and worker processes of one machine. "Presigned" URLs point to the dev-only
@@ -97,10 +96,23 @@ export class FsObjectStore implements ObjectStore {
     }
   }
 
-  async get(bucket: BucketRole, key: string): Promise<Buffer | null> {
+  async get(bucket: BucketRole, key: string, options?: GetOptions): Promise<Buffer | null> {
     assertObjectKey(key);
     try {
-      return await readFile(this.objectPath(bucket, key));
+      if (options?.maxBytes === undefined) return await readFile(this.objectPath(bucket, key));
+      const file = await open(this.objectPath(bucket, key), "r");
+      try {
+        const buffer = Buffer.alloc(options.maxBytes + 1);
+        let length = 0;
+        while (length < buffer.byteLength) {
+          const { bytesRead } = await file.read(buffer, length, buffer.byteLength - length, length);
+          if (bytesRead === 0) break;
+          length += bytesRead;
+        }
+        return buffer.subarray(0, length);
+      } finally {
+        await file.close();
+      }
     } catch (error) {
       if (isMissing(error)) return null;
       throw error;

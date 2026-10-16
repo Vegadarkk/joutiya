@@ -6,13 +6,15 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 // rules on drafts and live listings, and live listings left to the owner's PATCH.
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
-const classifier = vi.hoisted(() => ({ nsfw: 0.02, faces: 0, calls: 0 }));
+const classifier = vi.hoisted(() => ({ nsfw: 0.02, faces: 0, calls: 0, during: null as null | (() => Promise<void>) }));
 vi.mock("@/lib/media/classify", async (importOriginal) => ({
   ...(await importOriginal<typeof Classify>()),
   imageClassifier: () => ({
     name: "fixture",
     classify: async () => {
       classifier.calls += 1;
+      // Something else happens while the photo is being processed (races).
+      await classifier.during?.();
       return { nsfw: classifier.nsfw, faces: classifier.faces };
     },
   }),
@@ -21,6 +23,7 @@ vi.mock("@/lib/media/classify", async (importOriginal) => ({
 import { GET as getListingRoute } from "@/app/api/listings/[id]/route";
 import { POST as complete } from "@/app/api/uploads/[id]/complete/route";
 import { DELETE as remove, GET as status } from "@/app/api/uploads/[id]/route";
+import { POST as publishListing } from "@/app/api/listings/[id]/publish/route";
 import { POST as sign } from "@/app/api/uploads/sign/route";
 import { MAX_UPLOAD_BYTES, type SignUploadResponse, type UploadStatusResponse } from "@/lib/contracts/media";
 import type { ListingResponse } from "@/lib/contracts/listings";
@@ -34,7 +37,7 @@ import type * as Classify from "@/lib/media/classify";
 import { sharp } from "@/lib/media/sharp-setup";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { MemoryObjectStore, resetObjectStore, setObjectStoreForTests } from "@/lib/storage";
-import { call, draft, exifGpsJpeg, listingApi, member, patchListing, plainJpeg, publishedListing, type ErrorBody, type Member } from "./helpers";
+import { attachPhoto, call, draft, exifGpsJpeg, listingApi, member, patchListing, plainJpeg, publishedListing, readyPatch, seedReadyUpload, type ErrorBody, type Member } from "./helpers";
 
 const store = new MemoryObjectStore();
 
@@ -49,6 +52,7 @@ beforeEach(() => {
   classifier.nsfw = 0.02;
   classifier.faces = 0;
   classifier.calls = 0;
+  classifier.during = null;
 });
 
 /** sign -> the browser's PUT (seeded into the store) -> the upload id. */
@@ -157,6 +161,58 @@ describe("POST /api/uploads/{id}/complete (inline pipeline)", () => {
     const patched = await listingApi<ListingResponse>(patchListing, "PATCH", `/api/listings/${listingId}`, { member: owner, body: { photos: [...photoIds, id] } });
     expect(patched.status).toBe(200);
     expect((await getListing(listingId))!.photos.map((photo) => photo.id)).toEqual([...photoIds, id]);
+  });
+});
+
+describe("races between the pipeline and the other routes", () => {
+  it("does not attach a photo to a draft published while it was processing", async () => {
+    const owner = await member();
+    const listingId = await draft(owner);
+    const first = await seedReadyUpload(owner, listingId);
+    expect((await listingApi(patchListing, "PATCH", `/api/listings/${listingId}`, { member: owner, body: { ...readyPatch(), photos: [first] } })).status).toBe(200);
+    const id = await uploaded(owner, listingId);
+    classifier.during = async () => {
+      const published = await listingApi<{ status: string }>(publishListing, "POST", `/api/listings/${listingId}/publish`, { member: owner, body: { acceptRules: true } });
+      expect(published.body.status).toBe("published");
+    };
+    expect((await completeAs(owner, id)).body.status).toBe("ready");
+    const listing = (await getListing(listingId))!;
+    expect([listing.status, listing.photos.map((photo) => photo.id)]).toEqual(["published", [first]]);
+    expect((await getUpload(id))!.status).toBe("ready");
+  });
+
+  it("removes what an in-flight run stored when its upload is deleted meanwhile", async () => {
+    const owner = await member();
+    const listingId = await draft(owner);
+    const id = await uploaded(owner, listingId);
+    let deleted = 0;
+    classifier.during = async () => {
+      deleted = (await call(remove, "DELETE", `/api/uploads/${id}`, { member: owner })).status;
+    };
+    expect((await completeAs(owner, id)).status).toBe(404);
+    expect(deleted).toBe(204);
+    expect(await getUpload(id)).toBeNull();
+    expect((await getListing(listingId))!.photos).toEqual([]);
+    expect(store.keys("media")).toEqual([]);
+    expect(store.keys("quarantine")).toEqual([]);
+  });
+
+  it("lets only one of two photos completed together take the last free slot of a draft", async () => {
+    const owner = await member();
+    const listingId = await draft(owner);
+    for (let i = 0; i < 8; i += 1) await attachPhoto(listingId, await seedReadyUpload(owner, listingId));
+    const a = await uploaded(owner, listingId);
+    const b = await uploaded(owner, listingId);
+    // A 9th photo arrives through another path after both signatures (the sign check passed).
+    await attachPhoto(listingId, await seedReadyUpload(owner, listingId));
+    const results = await Promise.all([completeAs(owner, a), completeAs(owner, b)]);
+    expect(results.map((result) => result.body.status).sort()).toEqual(["ready", "rejected"]);
+    expect(results.find((result) => result.body.status === "rejected")!.body).toEqual({ status: "rejected", rejectReason: "quota" });
+    const listing = (await getListing(listingId))!;
+    expect(listing.photos).toHaveLength(10);
+    // The refused photo left nothing behind in the media bucket.
+    const refused = results.find((result) => result.body.status === "rejected") === results[0] ? a : b;
+    expect(store.keys("media").filter((key) => key.includes(refused))).toEqual([]);
   });
 });
 

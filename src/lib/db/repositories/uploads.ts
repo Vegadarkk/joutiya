@@ -1,10 +1,12 @@
 import "server-only";
 import { randomInt } from "node:crypto";
 import { AggregateField, FieldPath, FieldValue, Timestamp, type DocumentSnapshot } from "firebase-admin/firestore";
+import type { ListingPhoto } from "@/lib/contracts/media";
 import { db } from "@/lib/firebase/admin";
 import { LISTING_ID_ALPHABET } from "@/lib/listings/ids";
 import { consume } from "@/lib/quota";
-import { COLLECTIONS, uploadSchema, type UploadDoc, type UploadStatus } from "../schemas";
+import { COLLECTIONS, uploadSchema, type ListingStatus, type UploadDoc, type UploadStatus } from "../schemas";
+import { applyPatch, getListingTx, updateListingTx, type ListingFieldPatch, type ListingRecord } from "./listings";
 import { datesToTimestamps, timestampsToDates } from "./timestamps";
 
 // uploads/{id} (§5): one document per signed upload, id = photo id. Written by the sign route
@@ -94,6 +96,81 @@ export async function transitionUpload(id: string, from: readonly UploadStatus[]
     tx.update(uploadRef(id), { ...toUpdate(patch), updatedAt: Timestamp.fromDate(now) });
     void consume("firestore.writes", 1);
     return { ok: true, upload: next } as const;
+  });
+}
+
+export interface ReadyAttachment {
+  listingId: string;
+  photo: ListingPhoto;
+  maxPhotos: number;
+  /** Listing statuses that still take this photo; any other (or no listing): `gone`. */
+  targetStatuses: readonly ListingStatus[];
+  /** Of those, the statuses the photo is attached to here; the others get it through the owner's PATCH. */
+  attachStatuses: readonly ListingStatus[];
+}
+
+export type ReadyOutcome =
+  | { ok: true; upload: UploadRecord; attached: boolean }
+  /** No longer `processing` (finished by another run, deleted or expired): nothing written. */
+  | { ok: false; reason: "stale"; upload: UploadRecord | null }
+  /** The listing is gone or no longer takes photos: nothing written. */
+  | { ok: false; reason: "gone"; upload: UploadRecord }
+  /** The listing to attach to is full: nothing written. */
+  | { ok: false; reason: "photo_limit"; upload: UploadRecord };
+
+/**
+ * The pipeline's last write, in one transaction with the listing: `processing` -> `ready` and, on
+ * a listing in `attachStatuses`, the photo attached. Both are decided on the current documents, so
+ * a draft published meanwhile never gets an unscreened photo, and a DELETE (which first moves the
+ * upload out of `processing`) never leaves a photo attached without its upload.
+ */
+export async function markUploadReady(id: string, patch: UploadFieldPatch, attachment: ReadyAttachment, now = new Date()): Promise<ReadyOutcome> {
+  return db().runTransaction(async (tx) => {
+    const snapshot = await tx.get(uploadRef(id));
+    const listing = await getListingTx(tx, attachment.listingId);
+    void consume("firestore.reads", 1);
+    const upload = fromSnapshot(snapshot);
+    if (!upload || upload.status !== "processing") return { ok: false, reason: "stale", upload } as const;
+    if (!listing || !attachment.targetStatuses.includes(listing.status)) return { ok: false, reason: "gone", upload } as const;
+    const index = listing.photos.findIndex((item) => item.id === id);
+    const attach = index >= 0 || attachment.attachStatuses.includes(listing.status);
+    if (attach && index < 0 && listing.photos.length >= attachment.maxPhotos) return { ok: false, reason: "photo_limit", upload } as const;
+
+    const next = applyUploadPatch(upload, { ...patch, status: "ready" }, now);
+    tx.update(uploadRef(id), { ...toUpdate({ ...patch, status: "ready" }), updatedAt: Timestamp.fromDate(now) });
+    void consume("firestore.writes", 1);
+    if (attach) {
+      const photos = [...listing.photos];
+      if (index >= 0) photos[index] = attachment.photo;
+      else photos.push(attachment.photo);
+      updateListingTx(tx, listing.id, { photos, version: listing.version + 1, updatedAt: now });
+    }
+    return { ok: true, upload: next, attached: attach } as const;
+  });
+}
+
+/** A live listing would lose its last photo. */
+export class LastPhotoError extends Error {
+  constructor() {
+    super("a live listing keeps at least one photo");
+    this.name = "LastPhotoError";
+  }
+}
+
+/**
+ * Detaches a photo from its listing (transaction). Throws LastPhotoError when the listing is in
+ * `keepOneStatuses` and the photo is its only one. `changed` is false when it was not attached.
+ */
+export async function detachPhoto(listingId: string, photoId: string, keepOneStatuses: readonly ListingStatus[], now = new Date()): Promise<{ listing: ListingRecord | null; changed: boolean }> {
+  return db().runTransaction(async (tx) => {
+    const listing = await getListingTx(tx, listingId);
+    if (!listing) return { listing: null, changed: false };
+    const photos = listing.photos.filter((item) => item.id !== photoId);
+    if (photos.length === listing.photos.length) return { listing, changed: false };
+    if (photos.length === 0 && keepOneStatuses.includes(listing.status)) throw new LastPhotoError();
+    const patch: ListingFieldPatch = { photos, version: listing.version + 1, updatedAt: now };
+    updateListingTx(tx, listingId, patch);
+    return { listing: applyPatch(listing, patch), changed: true };
   });
 }
 

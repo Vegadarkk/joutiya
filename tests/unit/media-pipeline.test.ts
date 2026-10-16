@@ -9,21 +9,24 @@ import type { UploadRecord } from "@/lib/db/repositories/uploads";
 // StubImageClassifier drives the nudity paths, and in-memory fakes stand for the uploads and
 // listings repositories (their transactions are covered by the API tests on the emulator).
 
-const fake = vi.hoisted(() => {
-  class PhotoLimitError extends Error {
-    constructor() {
-      super("photo limit reached");
-      this.name = "PhotoLimitError";
-    }
+const fake = vi.hoisted(() => ({
+  uploads: new Map<string, unknown>(),
+  listings: new Map<string, unknown>(),
+  readyFailures: [] as Error[],
+  readyOutcome: null as null | { ok: false; reason: "stale"; upload: unknown },
+}));
+
+type FakeListing = { id: string; status: string; photos: { id: string }[] };
+
+function applyFakePatch(current: Record<string, unknown>, patch: Record<string, unknown>, now: Date): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...current, updatedAt: now };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) continue;
+    if (value === null) delete next[key];
+    else next[key] = value;
   }
-  return {
-    uploads: new Map<string, unknown>(),
-    listings: new Map<string, unknown>(),
-    PhotoLimitError,
-    attachFailures: [] as Error[],
-    readyWriteResult: null as null | { ok: false; upload: unknown },
-  };
-});
+  return next;
+}
 
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/uploads/storage-gauge", () => ({ recordMediaBytes: vi.fn(async () => null) }));
@@ -32,34 +35,36 @@ vi.mock("@/lib/db/repositories/uploads", () => ({
   getUpload: vi.fn(async (id: string) => structuredClone(fake.uploads.get(id) ?? null)),
   transitionUpload: vi.fn(async (id: string, from: readonly string[], patch: Record<string, unknown>, now: Date) => {
     const current = fake.uploads.get(id) as Record<string, unknown> | undefined;
-    if (patch.status === "ready" && fake.readyWriteResult) return fake.readyWriteResult;
     if (!current || !from.includes(current.status as string)) return { ok: false, upload: current ? structuredClone(current) : null };
-    const next: Record<string, unknown> = { ...current, updatedAt: now };
-    for (const [key, value] of Object.entries(patch)) {
-      if (value === undefined) continue;
-      if (value === null) delete next[key];
-      else next[key] = value;
-    }
+    const next = applyFakePatch(current, patch, now);
     fake.uploads.set(id, next);
     return { ok: true, upload: structuredClone(next) };
   }),
+  // Same decisions as the repository's transaction, on the in-memory documents.
+  markUploadReady: vi.fn(
+    async (id: string, patch: Record<string, unknown>, attachment: { listingId: string; photo: { id: string }; maxPhotos: number; targetStatuses: readonly string[]; attachStatuses: readonly string[] }, now: Date) => {
+      const failure = fake.readyFailures.shift();
+      if (failure) throw failure;
+      if (fake.readyOutcome) return fake.readyOutcome;
+      const current = fake.uploads.get(id) as Record<string, unknown> | undefined;
+      if (!current || current.status !== "processing") return { ok: false, reason: "stale", upload: current ? structuredClone(current) : null };
+      const listing = fake.listings.get(attachment.listingId) as FakeListing | undefined;
+      if (!listing || !attachment.targetStatuses.includes(listing.status)) return { ok: false, reason: "gone", upload: structuredClone(current) };
+      const index = listing.photos.findIndex((item) => item.id === id);
+      const attach = index >= 0 || attachment.attachStatuses.includes(listing.status);
+      if (attach && index < 0 && listing.photos.length >= attachment.maxPhotos) return { ok: false, reason: "photo_limit", upload: structuredClone(current) };
+      const next = applyFakePatch(current, { ...patch, status: "ready" }, now);
+      fake.uploads.set(id, next);
+      if (attach) {
+        if (index >= 0) listing.photos[index] = attachment.photo;
+        else listing.photos.push(attachment.photo);
+      }
+      return { ok: true, upload: structuredClone(next), attached: attach };
+    },
+  ),
 }));
 vi.mock("@/lib/db/repositories/listings", () => ({
-  PhotoLimitError: fake.PhotoLimitError,
   getListing: vi.fn(async (id: string) => structuredClone(fake.listings.get(id) ?? null)),
-  attachReadyPhoto: vi.fn(async (listingId: string, photo: { id: string }, options: { maxPhotos: number }) => {
-    const failure = fake.attachFailures.shift();
-    if (failure) throw failure;
-    const listing = fake.listings.get(listingId) as { photos: { id: string }[] } | undefined;
-    if (!listing) return null;
-    const index = listing.photos.findIndex((item) => item.id === photo.id);
-    if (index >= 0) listing.photos[index] = photo;
-    else {
-      if (listing.photos.length >= options.maxPhotos) throw new fake.PhotoLimitError();
-      listing.photos.push(photo);
-    }
-    return structuredClone(listing);
-  }),
   removePhoto: vi.fn(async (listingId: string, photoId: string) => {
     const listing = fake.listings.get(listingId) as { photos: { id: string }[] } | undefined;
     if (!listing) return null;
@@ -72,7 +77,8 @@ const { expireUpload, processUpload } = await import("@/lib/media/pipeline");
 const { MemoryObjectStore } = await import("@/lib/storage/memory");
 const { StubImageClassifier } = await import("@/lib/media/classify");
 const { sharp } = await import("@/lib/media/sharp-setup");
-const { attachReadyPhoto, removePhoto } = await import("@/lib/db/repositories/listings");
+const { removePhoto } = await import("@/lib/db/repositories/listings");
+const { markUploadReady } = await import("@/lib/db/repositories/uploads");
 const { recordModerationDecision } = await import("@/lib/db/repositories/moderation-decisions");
 const { recordMediaBytes } = await import("@/lib/uploads/storage-gauge");
 const { MEDIA_CACHE_CONTROL, MEDIA_CONTENT_TYPE } = await import("@/lib/media/urls");
@@ -81,6 +87,14 @@ const { MAX_UPLOAD_BYTES } = await import("@/lib/contracts/media");
 const LISTING_ID = "abcdefgh";
 const NOW = new Date("2026-10-16T10:00:00Z");
 const clean = () => new StubImageClassifier({ nsfw: 0.02, faces: 0 });
+/** A clean classifier that changes the listing's status mid-run (between the start and the final transaction). */
+const listingBecomes = (status: string) => ({
+  name: "fixture",
+  classify: async () => {
+    (fake.listings.get(LISTING_ID) as FakeListing).status = status;
+    return { nsfw: 0.02, faces: 0 };
+  },
+});
 
 let store: InstanceType<typeof MemoryObjectStore>;
 let counter = 0;
@@ -161,10 +175,10 @@ function pngBomb(width: number, height: number): Buffer {
 beforeEach(() => {
   fake.uploads.clear();
   fake.listings.clear();
-  fake.attachFailures.length = 0;
-  fake.readyWriteResult = null;
+  fake.readyFailures.length = 0;
+  fake.readyOutcome = null;
   store = new MemoryObjectStore();
-  vi.mocked(attachReadyPhoto).mockClear();
+  vi.mocked(markUploadReady).mockClear();
   vi.mocked(removePhoto).mockClear();
   vi.mocked(recordModerationDecision).mockClear();
   vi.mocked(recordMediaBytes).mockClear();
@@ -200,7 +214,9 @@ describe("processUpload: happy path", () => {
     expect(doc).toMatchObject({ status: "ready", width: 50, height: 100, size: bytes, variants: ["l", "s"], checks: { nsfw: 0.1, faces: 1 }, finalKey: `listings/${LISTING_ID}/${record.id}` });
     expect(doc.blurhash).toMatch(/^.{6,}$/);
     expect(doc.hash).toMatch(/^[0-9a-f]{16}$/);
-    expect(attachReadyPhoto).toHaveBeenCalledWith(LISTING_ID, { id: record.id, w: 50, h: 100, blurhash: doc.blurhash, hash: doc.hash }, { maxPhotos: 10, now: NOW });
+    const attached = { id: record.id, w: 50, h: 100, blurhash: doc.blurhash, hash: doc.hash };
+    expect(markUploadReady).toHaveBeenCalledWith(record.id, expect.objectContaining({ size: bytes, variants: ["l", "s"] }), expect.objectContaining({ listingId: LISTING_ID, photo: attached, maxPhotos: 10 }), NOW);
+    expect((fake.listings.get(LISTING_ID) as ListingRecord).photos).toEqual([attached]);
     expect(recordMediaBytes).toHaveBeenCalledWith(bytes, NOW);
     expect(recordModerationDecision).not.toHaveBeenCalled();
   });
@@ -238,7 +254,7 @@ describe("processUpload: happy path", () => {
     const record = upload();
     seed(record, await plainJpeg());
     expect(await processUpload(record.id, { store, classifier: clean() })).toMatchObject({ status: "ready" });
-    expect(attachReadyPhoto).not.toHaveBeenCalled();
+    expect((fake.listings.get(LISTING_ID) as ListingRecord).photos.map((item) => item.id)).toEqual(["existing1"]);
     expect(stored(record.id).status).toBe("ready");
   });
 
@@ -260,6 +276,17 @@ describe("processUpload: size gate and type checks", () => {
     expect(store.calls.some((call) => call.op === "get")).toBe(false);
     expect(store.keys("media")).toEqual([]);
     expect(stored(record.id)).toMatchObject({ status: "rejected", rejectReason: "too_large", size: MAX_UPLOAD_BYTES + 1 });
+  });
+
+  it("reads at most the declared size when the object grew after the HEAD (second PUT)", async () => {
+    const record = upload({ declaredSize: 2_000 });
+    seed(record, await noisyJpeg(400, 300));
+    vi.spyOn(store, "head").mockResolvedValueOnce({ size: 1_500, contentType: "image/jpeg" });
+    const get = vi.spyOn(store, "get");
+    expect(await processUpload(record.id, { store, classifier: clean() })).toEqual({ status: "rejected", rejectReason: "too_large" });
+    expect(get).toHaveBeenCalledWith("quarantine", record.quarantineKey, { maxBytes: 2_000 });
+    expect(stored(record.id)).toMatchObject({ status: "rejected", rejectReason: "too_large", size: 2_001 });
+    expect(store.has("quarantine", record.quarantineKey)).toBe(false);
   });
 
   it("refuses an object larger than its declared size (byte quota dodge) without reading it", async () => {
@@ -327,7 +354,7 @@ describe("processUpload: local checks", () => {
     expect(store.calls.some((call) => call.op === "put")).toBe(false);
     expect(store.has("quarantine", record.quarantineKey)).toBe(false);
     expect(stored(record.id)).toMatchObject({ status: "rejected", rejectReason: "nsfw", checks: { nsfw: 0.85, faces: 0 } });
-    expect(attachReadyPhoto).not.toHaveBeenCalled();
+    expect(markUploadReady).not.toHaveBeenCalled();
     expect(recordModerationDecision).toHaveBeenCalledWith(
       expect.objectContaining({ target: { type: "upload", id: record.id }, affectedUid: "owner-1", action: "remove", automation: { detection: true, decision: true }, decidedBy: "system", notified: true }),
     );
@@ -367,7 +394,8 @@ describe("processUpload: photo limit", () => {
     const record = upload();
     seed(record, await plainJpeg());
     expect(await processUpload(record.id, { store, classifier: clean() })).toMatchObject({ status: "ready" });
-    expect(vi.mocked(attachReadyPhoto).mock.calls[0]?.[2]).toMatchObject({ maxPhotos: 20 });
+    expect(vi.mocked(markUploadReady).mock.calls[0]?.[2]).toMatchObject({ maxPhotos: 20 });
+    expect((fake.listings.get(LISTING_ID) as ListingRecord).photos).toHaveLength(11);
   });
 });
 
@@ -386,7 +414,7 @@ describe("processUpload: idempotency and races", () => {
   it("redoes the whole run after a failure (retry) and ends in the same state", async () => {
     const record = upload();
     seed(record, await plainJpeg());
-    fake.attachFailures.push(new Error("firestore unavailable"));
+    fake.readyFailures.push(new Error("firestore unavailable"));
     await expect(processUpload(record.id, { store, classifier: clean() })).rejects.toThrow("firestore unavailable");
     // The original is still there for the retry; the variants are overwritten by it.
     expect(store.has("quarantine", record.quarantineKey)).toBe(true);
@@ -405,9 +433,9 @@ describe("processUpload: idempotency and races", () => {
   it("undoes its work when the owner deleted the upload while it was processing", async () => {
     const record = upload();
     seed(record, await plainJpeg());
-    fake.readyWriteResult = { ok: false, upload: null };
+    fake.readyOutcome = { ok: false, reason: "stale", upload: null };
     expect(await processUpload(record.id, { store, classifier: clean() })).toBeNull();
-    expect(removePhoto).toHaveBeenCalledWith(LISTING_ID, record.id, expect.any(Date));
+    expect((fake.listings.get(LISTING_ID) as ListingRecord).photos).toEqual([]);
     expect(store.keys("media")).toEqual([]);
     expect(store.has("quarantine", record.quarantineKey)).toBe(false);
     expect(recordMediaBytes).not.toHaveBeenCalled();
@@ -416,10 +444,28 @@ describe("processUpload: idempotency and races", () => {
   it("keeps the result of a concurrent run that finished first", async () => {
     const record = upload();
     seed(record, await plainJpeg());
-    fake.readyWriteResult = { ok: false, upload: { ...record, status: "ready", width: 64, height: 48, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", hash: "0123456789abcdef" } };
+    fake.readyOutcome = { ok: false, reason: "stale", upload: { ...record, status: "ready", width: 64, height: 48, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", hash: "0123456789abcdef" } };
     expect(await processUpload(record.id, { store, classifier: clean() })).toMatchObject({ status: "ready", photo: { id: record.id } });
-    expect(removePhoto).not.toHaveBeenCalled();
     expect(store.keys("media")).toEqual([keyL(record.id), keyS(record.id)]);
+  });
+
+  it("does not attach to a draft published while it was processing (the owner's PATCH re-screens it)", async () => {
+    const record = upload();
+    seed(record, await plainJpeg());
+    listing({ photos: [photo("first0001x")] });
+    expect(await processUpload(record.id, { store, classifier: listingBecomes("published") })).toMatchObject({ status: "ready" });
+    expect((fake.listings.get(LISTING_ID) as ListingRecord).photos.map((item) => item.id)).toEqual(["first0001x"]);
+    expect(stored(record.id).status).toBe("ready");
+    expect(store.keys("media")).toEqual([keyL(record.id), keyS(record.id)]);
+  });
+
+  it("expires the upload and removes its variants when the listing was removed while it was processing", async () => {
+    const record = upload();
+    seed(record, await plainJpeg());
+    expect(await processUpload(record.id, { store, classifier: listingBecomes("removed") })).toEqual({ status: "rejected", rejectReason: "expired" });
+    expect(store.keys("media")).toEqual([]);
+    expect(store.has("quarantine", record.quarantineKey)).toBe(false);
+    expect(recordMediaBytes).not.toHaveBeenCalled();
   });
 });
 

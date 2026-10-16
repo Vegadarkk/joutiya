@@ -1,6 +1,6 @@
 import "server-only";
 import { consume } from "@/lib/quota";
-import type { BucketRole, ObjectHead, ObjectStore, PresignedPut, PresignPutInput, PutOptions } from "./types";
+import type { BucketRole, GetOptions, ObjectHead, ObjectStore, PresignedPut, PresignPutInput, PutOptions } from "./types";
 
 // R2 free tier accounting (§2 quota guards): every mutation is a Class A operation, every read a
 // Class B one. The wrapper counts for whichever adapter is active, so the dev store exercises the
@@ -26,8 +26,8 @@ export class MeteredObjectStore implements ObjectStore {
     return result;
   }
 
-  async get(bucket: BucketRole, key: string): Promise<Buffer | null> {
-    const result = await this.inner.get(bucket, key);
+  async get(bucket: BucketRole, key: string, options?: GetOptions): Promise<Buffer | null> {
+    const result = await this.inner.get(bucket, key, options);
     await consume("r2.classB");
     return result;
   }
