@@ -35,7 +35,7 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
         listings: [{ title: "Vélo de ville", url: `${SITE}/fr/annonce/velo-de-ville-casablanca-abcd2345`, price: 1500, isDonation: false, citySlug: "casablanca" }],
       },
     ],
-    unsubscribeToken: "djEudWlkLio.c2lnbmF0dXJlLW9mLWZvcnR5LXRocmVlLWNoYXJhY3RlcnMtYWE",
+    unsubscribeToken: "djEudWlkLio.c2lnbmF0dXJlLW9mLWZvcnR5LXRocmVlLWNoYXJhY3RlcnMtYWE", // gitleaks:allow (fake fixture)
   },
 };
 

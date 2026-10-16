@@ -9,7 +9,7 @@ import type { TemplateData, TemplateMail } from "@/lib/mail/types";
 // + RFC 8058 one-click) and the confirm-page link; headers reach the transports.
 
 const SITE = "https://staging.joutiya.ma";
-const TOKEN = "djEudWlkLTEuKg.c2lnbmF0dXJlLW9mLWZvcnR5LXRocmVlLWNoYXJhY3RlcnMtYWE";
+const TOKEN = "djEudWlkLTEuKg.c2lnbmF0dXJlLW9mLWZvcnR5LXRocmVlLWNoYXJhY3RlcnMtYWE"; // gitleaks:allow (fake fixture: base64 of "v1.uid…" and "signature-of-forty-three-characters-aa")
 
 const DATA: TemplateData["savedSearchAlert"] = {
   displayName: "Nadia",

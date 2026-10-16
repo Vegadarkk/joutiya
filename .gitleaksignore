@@ -1,0 +1,4 @@
+# Fake unsubscribe-token fixtures in tests (base64 of readable text), flagged by generic-api-key in the
+# commits that added them; the lines now carry gitleaks:allow.
+62877d1ec5ba8949051925f70d704e9f59834be6:tests/unit/mail-saved-search-alert.test.ts:generic-api-key:12
+a1a58e0d49c0f7e44ab46717104cee476bef9c4b:tests/unit/mail-render.test.ts:generic-api-key:38
