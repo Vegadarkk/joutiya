@@ -117,6 +117,7 @@ export function PostWizard({ listingId, nonce }: { listingId: string; nonce?: st
             type="button"
             variant="outline"
             size="sm"
+            className="max-sm:h-11"
             onClick={() => {
               setState({ kind: "loading" });
               void load();

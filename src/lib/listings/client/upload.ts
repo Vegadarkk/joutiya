@@ -7,7 +7,8 @@ import { prepareImage, PrepareImageError, type PrepareOptions, type PreparedImag
 // blob to the presigned URL (progress, abort) -> POST /api/uploads/{id}/complete -> poll while
 // the pipeline runs. Pure orchestration, unit-tested with injected prepare/upload/poll. A
 // cancelled upload rejects with ApiError "aborted" and, once signed, deletes its upload record so
-// the quarantine object and the photo slot are freed at once.
+// the quarantine object and the photo slot are freed at once. Aborted with LEAVE_REASON (the page
+// goes away), a completed upload is kept: the pipeline attaches it and the next visit shows it.
 
 export type PhotoUploadPhase =
   | { phase: "preparing" }
@@ -40,6 +41,9 @@ export interface UploadPhotoResult {
 
 const aborted = () => new ApiError(0, "aborted");
 
+/** `controller.abort(LEAVE_REASON)`: stop following the upload without cancelling it once completed. */
+export const LEAVE_REASON = "leave";
+
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw aborted();
 }
@@ -61,6 +65,7 @@ export async function uploadListingPhoto(listingId: string, file: Blob, options:
   const signed = await sign({ purpose: "listing", targetId: listingId, declaredSize: prepared.blob.size, declaredType: prepared.type });
   const uploadId = signed.uploadId;
   let status: UploadStatusResponse;
+  let completed = false;
   try {
     throwIfAborted(signal);
     onPhase?.({ phase: "uploading", progress: 0, uploadId });
@@ -69,13 +74,14 @@ export async function uploadListingPhoto(listingId: string, file: Blob, options:
 
     onPhase?.({ phase: "processing", uploadId });
     status = await complete(uploadId);
+    completed = true;
     throwIfAborted(signal);
     if (status.status === "processing") {
       status = await poll(uploadId, { ...options.pollOptions, signal });
     }
   } catch (error) {
     if (!signal?.aborted) throw error;
-    void discard(uploadId).catch(() => undefined);
+    if (!(completed && signal.reason === LEAVE_REASON)) void discard(uploadId).catch(() => undefined);
     throw aborted();
   }
   if (status.status === "ready") onPhase?.({ phase: "ready", uploadId, photo: status.photo });

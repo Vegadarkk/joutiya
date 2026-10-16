@@ -51,7 +51,7 @@ export function ContactStep({ onNext }: { onNext: () => void }) {
         {known && !verified ? (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-foreground-muted text-pretty">{t("contact.verifyBody")}</p>
-            <Button asChild variant="outline" size="sm" className="shrink-0">
+            <Button asChild variant="outline" size="sm" className="shrink-0 max-sm:h-11">
               <Link href="/verifications">{t("contact.verifyLink")}</Link>
             </Button>
           </div>

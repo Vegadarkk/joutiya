@@ -1,5 +1,6 @@
 "use client";
 
+import type { KeyboardEvent } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,11 +34,37 @@ const chip = cn(
   "aria-checked:hover:bg-bab-600",
 );
 
-/** One value among a few (radio semantics): chips read faster than a select on a phone. */
+/** Index a radio-group key moves to (arrows follow the reading direction, wrap around), or null. */
+export function radioKeyTarget(key: string, index: number, count: number, rtl: boolean): number | null {
+  if (count <= 0) return null;
+  if (key === "ArrowDown" || key === (rtl ? "ArrowLeft" : "ArrowRight")) return (index + 1) % count;
+  if (key === "ArrowUp" || key === (rtl ? "ArrowRight" : "ArrowLeft")) return (index - 1 + count) % count;
+  if (key === "Home") return 0;
+  if (key === "End") return count - 1;
+  return null;
+}
+
+/**
+ * One value among a few (radio semantics): chips read faster than a select on a phone. Keyboard as
+ * a native radio group: one tab stop (the chosen chip, else the first), arrows move and choose.
+ */
 export function ChipRadioGroup({ options, value, onChange, label, labelledBy, describedBy, invalid, clearable, className }: SingleProps) {
+  const chosen = options.findIndex((option) => option.value === value);
+
+  function onKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
+    const target = radioKeyTarget(event.key, index, options.length, rtl);
+    const option = target === null ? undefined : options[target];
+    if (!option) return;
+    event.preventDefault();
+    onChange(option.value);
+    const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="radio"]');
+    buttons?.[target!]?.focus();
+  }
+
   return (
     <div role="radiogroup" aria-label={labelledBy ? undefined : label} aria-labelledby={labelledBy} aria-describedby={describedBy} aria-invalid={invalid || undefined} className={cn("flex flex-wrap gap-2", className)}>
-      {options.map((option) => {
+      {options.map((option, index) => {
         const checked = option.value === value;
         return (
           <button
@@ -45,7 +72,9 @@ export function ChipRadioGroup({ options, value, onChange, label, labelledBy, de
             type="button"
             role="radio"
             aria-checked={checked}
+            tabIndex={index === (chosen === -1 ? 0 : chosen) ? 0 : -1}
             onClick={() => (checked && clearable ? onChange("") : onChange(option.value))}
+            onKeyDown={(event) => onKeyDown(event, index)}
             className={chip}
           >
             {checked ? <Check className="size-4" aria-hidden="true" /> : null}

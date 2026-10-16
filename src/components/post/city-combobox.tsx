@@ -103,7 +103,7 @@ export function CityCombobox({ value, onSelect, error, required, locale: localeP
               setEditing(true);
               setOpen(true);
             }}
-            className="shrink-0"
+            className="shrink-0 max-sm:h-11"
           >
             {t("changeCity")}
           </Button>

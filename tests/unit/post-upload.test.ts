@@ -3,7 +3,7 @@ import { ApiError } from "@/lib/auth/client";
 import type { UploadStatusResponse } from "@/lib/contracts/media";
 import { pollUpload } from "@/lib/listings/client/api";
 import type { PreparedImage } from "@/lib/listings/client/prepare-image";
-import { uploadErrorCode, uploadListingPhoto, type PhotoUploadPhase } from "@/lib/listings/client/upload";
+import { LEAVE_REASON, uploadErrorCode, uploadListingPhoto, type PhotoUploadPhase } from "@/lib/listings/client/upload";
 import { createUploadRunner } from "@/lib/listings/client/store";
 
 // Upload orchestration of design §3: prepare -> sign -> presigned PUT (progress) -> complete ->
@@ -98,6 +98,29 @@ describe("uploadListingPhoto", () => {
     });
     await expect(uploadListingPhoto("abcdefgh", new Blob([new Uint8Array([1])]), { prepare: async () => prepared(), put, discard, signal: controller.signal })).rejects.toMatchObject({ code: "aborted" });
     expect(discard).toHaveBeenCalledWith("upload0003");
+  });
+
+  it("leaving the page keeps a completed upload (the pipeline attaches it) but drops one not yet sent", async () => {
+    stubFetch({
+      "POST /api/uploads/sign": { body: { uploadId: "upload0005", url: "https://q/put", method: "PUT", headers: { "Content-Type": "image/jpeg" }, expiresAt: "x" } },
+      "POST /api/uploads/upload0005/complete": { body: { status: "processing" } },
+    });
+    const controller = new AbortController();
+    const discard = vi.fn(async (_id: string) => {});
+    const poll = vi.fn(async () => {
+      controller.abort(LEAVE_REASON);
+      throw new ApiError(0, "aborted");
+    });
+    await expect(uploadListingPhoto("abcdefgh", new Blob([new Uint8Array([1])]), { prepare: async () => prepared(), put: async () => {}, poll, discard, signal: controller.signal })).rejects.toMatchObject({ code: "aborted" });
+    expect(discard).not.toHaveBeenCalled();
+
+    const during = new AbortController();
+    const put = vi.fn(async () => {
+      during.abort(LEAVE_REASON);
+      throw new DOMException("aborted", "AbortError");
+    });
+    await expect(uploadListingPhoto("abcdefgh", new Blob([new Uint8Array([1])]), { prepare: async () => prepared(), put, discard, signal: during.signal })).rejects.toMatchObject({ code: "aborted" });
+    expect(discard).toHaveBeenCalledWith("upload0005");
   });
 
   it("a cancellation before signing sends nothing", async () => {

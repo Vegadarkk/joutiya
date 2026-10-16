@@ -41,7 +41,7 @@ interface ReviewStepProps {
 }
 
 export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: ReviewStepProps) {
-  const { listing, photos, photosBusy, blockers, setBlockers, save, saveState, saveMode, listingId, update } = useWizard();
+  const { listing, photos, photosBusy, blockers, setBlockers, save, saveState, saveError, saveMode, listingId, update } = useWizard();
   const t = useTranslations("Listing");
   const names = useCategoryLabels();
   const criteria = useCriteriaLabels();
@@ -184,7 +184,7 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
           <Badge variant="neutral" className="absolute bottom-3 end-3 bg-surface/90">
             {readyCount === 0 ? t("review.noPhotos") : t("review.photos", { count: readyCount })}
           </Badge>
-          <EditButton onClick={() => onEdit("photos")} label={t("review.editStep", { step: stepLabel("photos") })} className="absolute end-3 top-3" />
+          <EditButton onClick={() => onEdit("photos")} label={t("review.editStep", { step: stepLabel("photos") })} className="absolute end-2 top-2 bg-surface/90 shadow-sm hover:bg-surface" />
         </div>
 
         <div className="flex flex-col gap-5 p-5">
@@ -337,7 +337,8 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
           ) : null}
         </section>
       ) : null}
-      {saveState === "error" ? <ErrorBanner tone="warning" title={t("wizard.saveError")} /> : null}
+      {/* The last save failed: its reason (refused fields come back as blockers above). */}
+      {saveState === "error" && !isApiError(saveError, "invalid_listing") ? <FormMessage error={saveError} tone="warning" /> : null}
     </form>
   );
 }
@@ -354,7 +355,12 @@ function Section({ children, onEdit, label }: { children: ReactNode; onEdit: () 
 function EditButton({ onClick, label, className }: { onClick: () => void; label: string; className?: string }) {
   const t = useTranslations("Listing.review");
   return (
-    <button type="button" onClick={onClick} aria-label={label} className={cn("shrink-0 rounded-md px-2 py-1 text-sm font-medium text-link underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25", className)}>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className={cn("-my-2 inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium text-link underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25", className)}
+    >
       {t("edit")}
     </button>
   );
@@ -377,7 +383,7 @@ function IssueList<T extends FieldIssue & { step: WizardStep }>({
     <ul className="flex flex-col gap-2">
       {groups.map((group) => (
         <li key={group.step} className="flex flex-col gap-0.5">
-          <button type="button" onClick={() => onEdit(group.step)} className="w-fit text-start font-medium underline underline-offset-2" aria-label={fixLabel(group.step)}>
+          <button type="button" onClick={() => onEdit(group.step)} className="-my-1.5 inline-flex min-h-11 w-fit items-center rounded-sm text-start font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25" aria-label={fixLabel(group.step)}>
             {stepLabel(group.step)}
           </button>
           <ul className="list-disc ps-5 text-sm">

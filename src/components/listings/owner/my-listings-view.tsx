@@ -215,7 +215,7 @@ export function MyListingsView() {
             error={current.error}
             title={t("loadFailedTitle")}
             action={
-              <Button type="button" variant="outline" size="sm" onClick={() => setBuckets((state) => ({ ...state, [tab]: undefined }))}>
+              <Button type="button" variant="outline" size="sm" className="max-sm:h-11" onClick={() => setBuckets((state) => ({ ...state, [tab]: undefined }))}>
                 {t("retry")}
               </Button>
             }

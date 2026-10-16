@@ -7,7 +7,7 @@ import type { ListingPhoto, UploadRejectReason } from "@/lib/contracts/media";
 import { deleteUpload, getUpload, patchListing, patchListingOnUnload, pollUpload } from "./api";
 import { Autosave, type AutosaveState } from "./autosave";
 import { photoUrl } from "./photo-url";
-import { uploadListingPhoto, uploadErrorCode } from "./upload";
+import { LEAVE_REASON, uploadListingPhoto, uploadErrorCode } from "./upload";
 import { sanitizePatch, withoutRejectedFields } from "./validation";
 
 // Client state of the posting wizard: the listing as edited (optimistic), the autosave queue
@@ -422,7 +422,8 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
         if (pending && Object.keys(pending).length > 0) onLeaveRef.current?.(pending);
       } else void instance.flush();
       instance.dispose();
-      for (const controller of controllers.values()) controller.abort();
+      // Uploads still being sent are dropped; completed ones finish server side (attached by the pipeline).
+      for (const controller of controllers.values()) controller.abort(LEAVE_REASON);
       pollsController.abort();
     };
   }, [autosave, controllers, listingId]);

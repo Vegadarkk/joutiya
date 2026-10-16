@@ -76,7 +76,7 @@ export function CategoryPicker({ categoryId, subcategoryId, onCategory, onSubcat
             <span className="truncate font-semibold">{names.category(category.id)}</span>
           </div>
         </div>
-        <Button type="button" variant="ghost" size="sm" onClick={() => onCategory(null)} className="shrink-0">
+        <Button type="button" variant="ghost" size="sm" onClick={() => onCategory(null)} className="shrink-0 max-sm:h-11">
           {t("change")}
         </Button>
       </div>

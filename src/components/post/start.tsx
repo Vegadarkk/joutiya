@@ -87,7 +87,7 @@ export function WizardStart() {
           tone="warning"
           title={t("draftLimitTitle")}
           action={
-            <Button asChild variant="outline" size="sm">
+            <Button asChild variant="outline" size="sm" className="max-sm:h-11">
               <Link href="/mes-annonces">{t("myListings")}</Link>
             </Button>
           }
