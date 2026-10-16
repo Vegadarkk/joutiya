@@ -15,7 +15,7 @@ export function Footer({ publisher }: { publisher: string }) {
       <Container className="grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr]">
         <div className="flex flex-col gap-4">
           <Logo label="Joutiya" className="h-12 w-fit" />
-          <p className="max-w-xs text-sm text-foreground-muted">{t("about")}</p>
+          <p className="max-w-xs text-sm text-pretty text-foreground-muted">{t("about")}</p>
           <ThemeToggle className="w-fit bg-background/40" />
         </div>
         <nav aria-labelledby="footer-legal">

@@ -26,7 +26,7 @@ export function AdminShell({ email, role, children }: AdminShellProps) {
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-stretch gap-x-6 px-4 sm:px-6 md:flex-nowrap">
           <Link href="/" className="flex h-14 shrink-0 items-center gap-3 rounded-sm" aria-label="Back-office Joutiya, accueil">
             <Logo label="Joutiya" className="h-7" />
-            <Badge variant="pro" className="whitespace-nowrap">
+            <Badge variant="pro" className="whitespace-nowrap dark:bg-bab-700">
               Back-office
             </Badge>
           </Link>
