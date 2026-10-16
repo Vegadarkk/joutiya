@@ -40,3 +40,29 @@ export const LISTING_API = {
   /** POST, answer `Cache-Control: no-store`. */
   phone: (id: string) => `/api/listings/${id}/phone`,
 } as const;
+
+// Phase 5 (design phase-5 §3, §4).
+export const MESSAGING_API = {
+  /** POST: first message about a listing (Turnstile). */
+  conversations: "/api/conversations",
+  /** POST a message. */
+  messages: (cid: string) => `/api/conversations/${cid}/messages`,
+  /** POST: zero my unread count. */
+  read: (cid: string) => `/api/conversations/${cid}/read`,
+  /** POST { archived } | { hidden: true } | { blocked }. */
+  state: (cid: string) => `/api/conversations/${cid}/state`,
+  /** GET { total } (Valkey). */
+  unread: "/api/messages/unread",
+} as const;
+
+export const REPORT_API = {
+  /** POST the notice form. */
+  reports: "/api/reports",
+} as const;
+
+export const APPEAL_API = {
+  /** POST (signed in). */
+  appeals: "/api/appeals",
+  /** POST with the signed token of the e-mail. */
+  link: "/api/appeals/link",
+} as const;

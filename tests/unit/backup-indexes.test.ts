@@ -16,7 +16,7 @@ describe("backup incremental indexes", () => {
 
   it("declares a collection-group index on the time field of every group collection with incrementals", () => {
     const grouped = BACKUP_COLLECTIONS.filter((collection) => collection.scope === "group" && collection.timeField);
-    expect(grouped.map((collection) => collection.id).sort()).toEqual(["favorites", "savedSearches"]);
+    expect(grouped.map((collection) => collection.id).sort()).toEqual(["evidence", "favorites", "messages", "savedSearches"]);
     for (const collection of grouped) {
       const override = file.fieldOverrides.find((o) => o.collectionGroup === collection.id && o.fieldPath === collection.timeField);
       expect(override?.indexes, collection.id).toContainEqual({ order: "ASCENDING", queryScope: "COLLECTION_GROUP" });

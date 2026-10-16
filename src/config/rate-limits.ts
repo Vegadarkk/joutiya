@@ -143,6 +143,36 @@ export const RATE_LIMITS = {
   "savedSearch.docs.uid": { points: 1000, duration: DAY, policy: "open", key: "uid" },
   // One-click unsubscribe links of the alert e-mails (signed token, no session).
   "alerts.unsubscribe.ip": { points: 60, duration: HOUR, policy: "open", key: "ip" },
+
+  // Phase 5 (architecture §6, design phase-5 §2).
+  // Messaging: 20 messages per minute; new conversations 50 per day, 10 for accounts under 7 days;
+  // Turnstile on the first message of every conversation. Open: a Valkey outage never blocks a reply.
+  "message.send.uid": { points: 20, duration: MINUTE, policy: "open", key: "uid" },
+  "conversation.new.uid": { points: 50, duration: DAY, policy: "open", key: "uid" },
+  "conversation.new.young.uid": { points: 10, duration: DAY, policy: "open", key: "uid" },
+  // Read, archive, hide, block calls of the inbox, and the unread badge.
+  "conversation.state.uid": { points: 600, duration: HOUR, policy: "open", key: "uid" },
+  "messages.unread.uid": { points: 600, duration: HOUR, policy: "open", key: "uid" },
+  // Reports: signed in 20 per day; anonymous 5 per hour per device and 20 per hour per IP (Turnstile
+  // always); P0 reasons 3 per day per account, 2 per device, 5 per IP /64. Open: a report is always
+  // accepted, and without Valkey a P0 hides nothing (no "multi" strong signal).
+  "report.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
+  "report.device": { points: 5, duration: HOUR, policy: "open", key: "device" },
+  "report.ip": { points: 20, duration: HOUR, policy: "open", key: "ip" },
+  "report.p0.uid": { points: 3, duration: DAY, policy: "open", key: "uid" },
+  "report.p0.device": { points: 2, duration: DAY, policy: "open", key: "device" },
+  "report.p0.ip": { points: 5, duration: DAY, policy: "open", key: "ip" },
+  // Appeals (art. 20): signed-in and signed-link routes.
+  "appeal.uid": { points: 10, duration: DAY, policy: "closed", key: "uid" },
+  "appeal.link.ip": { points: 30, duration: HOUR, policy: "closed", key: "ip" },
+  // Assistant Joutiya: 20 messages per hour and 50 per day per device or account; 200 per day per IP
+  // /64, then Turnstile. Closed: it spends the AI budget.
+  "assistant.device.hour": { points: 20, duration: HOUR, policy: "closed", key: "device" },
+  "assistant.device.day": { points: 50, duration: DAY, policy: "closed", key: "device" },
+  "assistant.ip": { points: 200, duration: DAY, policy: "closed", key: "ip" },
+  // Back-office reads (queues, target views, stats) and the staff conversation view (D18).
+  "admin.read.uid": { points: 3000, duration: HOUR, policy: "open", key: "uid" },
+  "admin.conversation.uid": { points: 60, duration: HOUR, policy: "closed", key: "uid" },
 } as const satisfies Record<string, RateLimitDefinition>;
 
 export type RateLimitId = keyof typeof RATE_LIMITS;

@@ -69,6 +69,15 @@ const TABLE: Record<BackedUpId, Omit<BackupCollection, "id">> = {
   moderationDecisions: { scope: "root", timeField: "createdAt" },
   favorites: { scope: "group", timeField: "createdAt" },
   savedSearches: { scope: "group", timeField: "updatedAt" },
+  // Phase 5: messages and their evidence are subcollections of conversations/{cid}.
+  conversations: { scope: "root", timeField: "updatedAt" },
+  messages: { scope: "group", timeField: "createdAt" },
+  evidence: { scope: "group", timeField: "createdAt" },
+  userBlocks: { scope: "root", timeField: "updatedAt" },
+  reports: { scope: "root", timeField: "updatedAt" },
+  aiDecisions: { scope: "root", timeField: "createdAt" },
+  authorityRequests: { scope: "root", timeField: "updatedAt" },
+  suspensions: { scope: "root", timeField: "createdAt" },
 };
 
 export const BACKUP_COLLECTIONS: readonly BackupCollection[] = (Object.keys(TABLE) as BackedUpId[]).map((id) => ({ id, ...TABLE[id] }));

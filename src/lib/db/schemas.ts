@@ -19,6 +19,8 @@ import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, UPLOAD_DECLARED_TYPES, UPLOAD_REJECT_
 import { ROLES } from "@/lib/firebase/claims";
 import { SAVED_SEARCH_ALERTS, SAVED_SEARCH_NAME_MAX } from "@/lib/contracts/search";
 import { storedSearchParamsSchema } from "@/lib/search/params";
+import { MESSAGE_RISK_FLAGS, MESSAGE_TEXT_MAX } from "@/lib/contracts/messaging";
+import { REPORT_PRIORITIES, REPORT_REASON_IDS, REPORT_TARGET_TYPES } from "@/config/report-reasons";
 
 // The enums shared with the browser are defined in the client-safe contracts (this module is
 // server-only through claims.ts) and re-exported here so the repositories have one import.
@@ -93,7 +95,21 @@ export const userPrivateSchema = z
       })
       .strict(),
     strikes: z.object({ level: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), lastAt: ts.optional(), suspendedUntil: ts.optional() }).strict(),
-    reporter: z.object({ recent: z.array(z.boolean()).max(10), total: z.number().int().min(0), abusiveUntil: ts.optional() }).strict(),
+    reporter: z
+      .object({
+        recent: z.array(z.boolean()).max(10),
+        total: z.number().int().min(0),
+        abusiveUntil: ts.optional(),
+        /** Dates of reports dismissed as manifestly unfounded (art. 23 DSA, design D15), newest last. */
+        manifest: z.array(ts).max(10).optional(),
+        /** Prior warning of art. 23 sent. */
+        warnedAt: ts.optional(),
+      })
+      .strict(),
+    /** E-mail preferences (phase 5, D21): the grouped new-messages mail, on by default. */
+    notifications: z.object({ messagesEmail: z.boolean() }).strict().optional(),
+    /** Purge suspended while not empty ("report:{id}", "appeal:{id}", "authority:{id}"). */
+    legalHold: z.array(z.string().min(1).max(64)).max(50).optional(),
     /** Sign-in providers linked to the account ("password", "google.com"). */
     providers: z.array(z.enum(["password", "google.com"])).max(2),
     closedAt: ts.optional(),
@@ -131,6 +147,8 @@ export const auditLogSchema = z
     reason: z.string().max(500).optional(),
     ipHash: z.string().max(64).optional(),
     at: ts,
+    /** at + 5 years (phase 5); older entries have none and are kept. */
+    purgeAt: ts.optional(),
   })
   .strict();
 export type AuditLogDoc = z.infer<typeof auditLogSchema>;
@@ -145,7 +163,8 @@ export type MailSuppressionDoc = z.infer<typeof mailSuppressionSchema>;
 
 export const SELLER_TYPES = ["individual", "pro"] as const;
 export const SORT_SOURCES = ["publish", "renew", "bump"] as const;
-export const PAUSED_REASONS = ["owner", "quota"] as const;
+/** "moderation": paused for the length of an account suspension, resumed when it is lifted (phase 5, D14). */
+export const PAUSED_REASONS = ["owner", "quota", "moderation"] as const;
 
 /** City (later district) centroid, rounded (~1 km): never the seller's address. */
 export const geoPointSchema = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).strict();
@@ -346,9 +365,27 @@ export const moderationDecisionSchema = z
     decidedBy: z.string().min(1).max(128),
     notifiedAt: ts.optional(),
     appeal: z
-      .object({ status: z.enum(["open", "upheld", "reversed"]), openedAt: ts, closedAt: ts.optional(), reviewer: z.string().max(128).optional(), note: z.string().max(2000).optional() })
+      .object({
+        status: z.enum(["open", "upheld", "reversed"]),
+        /** Who complains (art. 20: the affected user or the notifier, phase 5 D16). Absent on phase 3 records. */
+        by: z.enum(["affected", "reporter"]).optional(),
+        text: z.string().max(2000).optional(),
+        openedAt: ts,
+        /** openedAt + 14 days. */
+        slaDueAt: ts.optional(),
+        closedAt: ts.optional(),
+        reviewer: z.string().max(128).optional(),
+        note: z.string().max(2000).optional(),
+        /** The decision that reversed this one. */
+        outcomeDecisionId: z.string().max(128).optional(),
+      })
       .strict()
       .optional(),
+    /** The agent's proposal this decision confirmed, edited or rejected (phase 5, D13). */
+    aiDecisionId: z.string().max(128).optional(),
+    /** Decision reversed on appeal by this one / that this one reverses. */
+    supersededBy: z.string().max(128).optional(),
+    supersedes: z.string().max(128).optional(),
     /** Notification + 6 months. */
     appealDeadline: ts,
     createdAt: ts,
@@ -400,6 +437,210 @@ export const savedSearchSchema = z
   .strict();
 export type SavedSearchDoc = z.infer<typeof savedSearchSchema>;
 
+// ---- Phase 5: messaging, reports, decisions, AI (architecture §5, design phase-5/DESIGN.md §1).
+
+const hold = z.array(z.string().min(1).max(64)).max(50);
+const participantsSchema = z.tuple([uid, uid]);
+
+/** conversations/{cid}: one per (listing, buyer); cid derived on the server (D1). Read by participants (rules). */
+export const conversationSchema = z
+  .object({
+    listingId: listingIdSchema,
+    listingSlugId: slugIdSchema,
+    sellerUid: uid,
+    /** Pro listing: the shop's shared inbox (rules `shopMember`, phase 7). */
+    sellerProId: z.string().max(64).optional(),
+    buyerUid: uid,
+    /** [buyerUid, sellerUid]: the rules and the inbox query filter on it. */
+    participants: participantsSchema,
+    sellerName: z.string().max(80),
+    sellerPublicId: publicIdSchema,
+    buyerName: z.string().max(80),
+    buyerPublicId: publicIdSchema,
+    listingSnapshot: z
+      .object({
+        title: z.string().max(TITLE_MAX),
+        price: z.number().int().min(0).max(PRICE_MAX).nullable(),
+        isDonation: z.boolean(),
+        photo: z.object({ id: z.string().min(1).max(64), blurhash: z.string().max(100) }).strict().nullable(),
+      })
+      .strict(),
+    lastMessage: z.object({ preview: z.string().max(140), senderUid: uid, at: ts, flagged: z.boolean() }).strict(),
+    /** Unread count per participant uid. */
+    unread: z.record(uid, z.number().int().min(0)),
+    blockedBy: z.array(uid).max(2),
+    archivedBy: z.array(uid).max(2),
+    /** "Delete for me": hidden from that participant's inbox until a new message arrives. */
+    hiddenFor: z.array(uid).max(2),
+    /** frozen: dispute or authority request, nobody can write (D17). */
+    status: z.enum(["open", "frozen"]),
+    messageCount: z.number().int().min(0),
+    createdAt: ts,
+    updatedAt: ts,
+    /** Last activity + 12 months (AF §7 retention). */
+    purgeAt: ts,
+    legalHold: hold,
+  })
+  .strict();
+export type ConversationDoc = z.infer<typeof conversationSchema>;
+
+/** conversations/{cid}/messages/{mid}: participants duplicated so the rules need no get() (AF §6). */
+export const messageSchema = z
+  .object({
+    senderUid: uid,
+    participants: participantsSchema,
+    sellerProId: z.string().max(64).optional(),
+    type: z.enum(["text", "system"]),
+    /** URLs masked (D5); `⟦hidden⟧` once hidden by moderation. */
+    text: z.string().max(MESSAGE_TEXT_MAX + 200),
+    risk: z.object({ flags: z.array(z.enum(MESSAGE_RISK_FLAGS)).min(1).max(4), warned: z.boolean() }).strict().optional(),
+    hidden: z.boolean().optional(),
+    createdAt: ts,
+    readAt: ts.optional(),
+  })
+  .strict();
+export type MessageDoc = z.infer<typeof messageSchema>;
+
+/** conversations/{cid}/evidence/{mid}: server-only original of a masked or hidden message (rules deny). */
+export const messageEvidenceSchema = z
+  .object({ text: z.string().max(MESSAGE_TEXT_MAX), flags: z.array(z.enum(MESSAGE_RISK_FLAGS)).max(4), reason: z.enum(["masked", "hidden"]), createdAt: ts })
+  .strict();
+export type MessageEvidenceDoc = z.infer<typeof messageEvidenceSchema>;
+
+/** userBlocks/{uid}: accounts this user blocked (D6). */
+export const userBlocksSchema = z.object({ uids: z.array(uid).max(500), updatedAt: ts }).strict();
+export type UserBlocksDoc = z.infer<typeof userBlocksSchema>;
+
+export const REPORT_STATUSES = ["open", "in_review", "actioned", "dismissed"] as const;
+export const STRONG_SIGNALS = ["trusted", "multi", "auto", "authority"] as const;
+
+/** reports/{id}: notice of art. 16 DSA (D10), kept 5 years. */
+export const reportSchema = z
+  .object({
+    target: z
+      .object({
+        type: z.enum(REPORT_TARGET_TYPES),
+        /** listingId, uid, `{cid}/{mid}`, or proId. */
+        id: z.string().min(1).max(128),
+        /** Owner of the reported content (the person a decision would affect). */
+        ownerUid: uid,
+        /** Profile publicId of a user target, for the back-office links. */
+        publicId: publicIdSchema.optional(),
+        /** Listing of a reported message's conversation, for context. */
+        listingId: listingIdSchema.optional(),
+      })
+      .strict(),
+    reasonId: z.enum(REPORT_REASON_IDS),
+    priority: z.enum(REPORT_PRIORITIES),
+    explanation: z.string().max(2000),
+    goodFaith: z.literal(true),
+    /** user: notice form; system: messaging repeat rule or the agent; authority: authority request. */
+    source: z.enum(["user", "system", "authority"]),
+    reporter: z
+      .object({
+        uid: uid.optional(),
+        name: z.string().max(80).optional(),
+        email: z.string().email().max(254).optional(),
+        locale: localeSchema,
+        ipPrefixHash: z.string().max(64),
+        deviceHash: z.string().max(64),
+        trusted: z.boolean(),
+      })
+      .strict(),
+    strongSignal: z.enum(STRONG_SIGNALS).optional(),
+    /** The target was hidden because of this report. */
+    hidden: z.boolean(),
+    status: z.enum(REPORT_STATUSES),
+    outcome: z.enum(["founded", "unfounded"]).optional(),
+    manifestlyUnfounded: z.boolean().optional(),
+    assignee: uid.optional(),
+    slaDueAt: ts,
+    decisionId: z.string().max(128).optional(),
+    aiDecisionId: z.string().max(128).optional(),
+    authorityRequestId: z.string().max(128).optional(),
+    ackSentAt: ts.optional(),
+    createdAt: ts,
+    updatedAt: ts,
+    closedAt: ts.optional(),
+    /** createdAt + 5 years. */
+    purgeAt: ts,
+  })
+  .strict();
+export type ReportDoc = z.infer<typeof reportSchema>;
+
+export const AI_TASKS = ["listing_screen", "report_triage", "appeal_review"] as const;
+export const AI_PROVIDERS = ["anthropic", "workers-ai", "openai", "rules"] as const;
+export const AI_ACTIONS = ["approve", "hold", "reject", "escalate"] as const;
+export const AI_APPLIED = ["auto", "pending", "confirmed", "edited", "rejected"] as const;
+
+/** aiDecisions/{id}: the agent's proposal (Z4); never a sanction by itself. */
+export const aiDecisionSchema = z
+  .object({
+    task: z.enum(AI_TASKS),
+    target: z.object({ type: z.enum(["listing", "report", "decision"]), id: z.string().min(1).max(128) }).strict(),
+    provider: z.enum(AI_PROVIDERS),
+    model: z.string().max(80),
+    promptVersion: z.string().max(40),
+    output: z
+      .object({
+        action: z.enum(AI_ACTIONS),
+        policy: z.string().max(64),
+        severity: z.enum([...REPORT_PRIORITIES, "none"]),
+        confidence: z.number().min(0).max(1),
+        rationale: z.string().max(1000),
+        /** Draft statement of reasons (art. 17) for the seller, French. */
+        userMessage: z.string().max(1500).optional(),
+        /** Suggested decision template (report triage, appeal review). */
+        templateId: z.string().max(64).optional(),
+      })
+      .strict(),
+    applied: z.enum(AI_APPLIED),
+    reviewedBy: uid.optional(),
+    decisionId: z.string().max(128).optional(),
+    costMicroUsd: z.number().int().min(0),
+    /** sha256 of the masked input: the same input is not sent twice. */
+    inputHash: z.string().max(64),
+    error: z.string().max(200).optional(),
+    createdAt: ts,
+    /** + 12 months; the decision's purgeAt (5 years) when it grounds a decision. */
+    purgeAt: ts,
+    legalHold: hold,
+  })
+  .strict();
+export type AiDecisionDoc = z.infer<typeof aiDecisionSchema>;
+
+/** authorityRequests/{id}: requisitions and orders register (admin only, D17). */
+export const authorityRequestSchema = z
+  .object({
+    authority: z.string().min(2).max(200),
+    country: z.enum(["FR", "MA", "EU", "other"]),
+    legalBasis: z.string().min(2).max(500),
+    kind: z.enum(["removal_order", "data_request", "preservation", "other"]),
+    /** "listing:{id}", "user:{uid}", "conversation:{cid}". */
+    scope: z.array(z.string().min(3).max(160)).min(1).max(50),
+    identityCheck: z.object({ method: z.string().min(2).max(300), at: ts, by: uid }).strict(),
+    receivedAt: ts,
+    dueAt: ts.optional(),
+    status: z.enum(["open", "answered", "closed"]),
+    response: z.string().max(4000).optional(),
+    respondedAt: ts.optional(),
+    /** Hold ids set on the scoped documents. */
+    holds: z.array(z.string().min(1).max(160)).max(50),
+    reportIds: z.array(z.string().max(128)).max(50),
+    createdBy: uid,
+    createdAt: ts,
+    updatedAt: ts,
+    closedAt: ts.optional(),
+    /** closedAt + 5 years; far future while open. */
+    purgeAt: ts,
+  })
+  .strict();
+export type AuthorityRequestDoc = z.infer<typeof authorityRequestSchema>;
+
+/** suspensions/{uid}: active suspension, deleted by lift-suspensions when it ends (D14). */
+export const suspensionSchema = z.object({ until: ts, decisionId: z.string().min(1).max(128), createdAt: ts }).strict();
+export type SuspensionDoc = z.infer<typeof suspensionSchema>;
+
 export const COLLECTIONS = {
   users: "users",
   userPrivate: "private",
@@ -423,4 +664,15 @@ export const COLLECTIONS = {
   // Phase 4 (subcollections of users/{uid})
   favorites: "favorites",
   savedSearches: "savedSearches",
+  // Phase 5
+  conversations: "conversations",
+  /** conversations/{cid}/messages/{mid} */
+  messages: "messages",
+  /** conversations/{cid}/evidence/{mid} (server only) */
+  evidence: "evidence",
+  userBlocks: "userBlocks",
+  reports: "reports",
+  aiDecisions: "aiDecisions",
+  authorityRequests: "authorityRequests",
+  suspensions: "suspensions",
 } as const;
