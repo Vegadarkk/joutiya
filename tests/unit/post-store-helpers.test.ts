@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/auth/client";
 import type { OwnerListing } from "@/lib/contracts/listings";
 import { Autosave } from "@/lib/listings/client/autosave";
-import { blockersAfterPatch, blockersOf, isPhotoBusy, ownerPhotosOf, photoItemsFromListing, photoOrder, readyPhotoIds, recoverPatch, saveModeOf, saveRetryDelay, type PhotoItem } from "@/lib/listings/client/store";
+import { blockersAfterPatch, blockersOf, confirmsLeave, isPhotoBusy, ownerPhotosOf, photoItemsFromListing, photoOrder, readyPhotoIds, recoverPatch, saveModeOf, saveRetryDelay, type PhotoItem } from "@/lib/listings/client/store";
 
 // Pure parts of the wizard store: save mode per status, the retry policy of a failed save, what a
 // failed save keeps, the photo order sent to the API and the tiles built from the listing.
@@ -99,6 +99,58 @@ describe("saveRetryDelay", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("confirmsLeave", () => {
+  type Patch = { title?: string; price?: number };
+  const quota = new ApiError(503, "quota_exhausted", { retryAfter: 7_200 });
+
+  it("asks before leaving a draft whose changes a spent daily quota left unsaved, not one that saves normally", async () => {
+    const save = vi.fn(async (_patch: Patch) => {});
+    const autosave = new Autosave<Patch>({ save, retryAfter: saveRetryDelay });
+    expect(confirmsLeave(autosave, 0)).toBe(false);
+    // Pending changes of a draft that saves normally go out with the keepalive request on page hide.
+    autosave.queue({ title: "Vélo" });
+    expect(confirmsLeave(autosave, 0)).toBe(false);
+    expect(await autosave.flush()).toBe(true);
+    expect(confirmsLeave(autosave, 0)).toBe(false);
+
+    save.mockRejectedValueOnce(quota);
+    autosave.queue({ price: 900 });
+    expect(await autosave.flush()).toBe(false);
+    expect(confirmsLeave(autosave, 0)).toBe(true);
+    autosave.queue({ title: "Vélo de ville" });
+    expect(confirmsLeave(autosave, 0)).toBe(true);
+    // Saved by the manual retry: nothing left to lose.
+    expect(await autosave.flush({ force: true })).toBe(true);
+    expect(confirmsLeave(autosave, 0)).toBe(false);
+  });
+
+  it("asks after any failed save that still holds changes, and for a field too short to be sent", async () => {
+    vi.useFakeTimers();
+    try {
+      const save = vi.fn(async (_patch: Patch) => {});
+      save.mockRejectedValueOnce(new ApiError(503, "unavailable"));
+      const autosave = new Autosave<Patch>({ save, retryAfter: saveRetryDelay });
+      autosave.queue({ title: "Vélo" });
+      expect(await autosave.flush()).toBe(false);
+      expect(confirmsLeave(autosave, 0)).toBe(true);
+      // The automatic retry saves it.
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(save).toHaveBeenCalledTimes(2);
+      expect(confirmsLeave(autosave, 0)).toBe(false);
+      expect(confirmsLeave(autosave, 1)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("asks for a live listing's unsaved changes", () => {
+    const autosave = new Autosave<Patch>({ save: async () => {}, manual: true });
+    expect(confirmsLeave(autosave, 0)).toBe(false);
+    autosave.queue({ price: 900 });
+    expect(confirmsLeave(autosave, 0)).toBe(true);
   });
 });
 

@@ -278,6 +278,16 @@ export function recoverPatch(patch: ListingPatch, error: unknown): ListingPatch 
   return patch;
 }
 
+/**
+ * Leaving the page asks first (beforeunload): a live listing's unsaved changes, a field too short
+ * to be sent, or a draft's changes whose last save failed. Those would be lost: the keepalive
+ * request sent on page hide is refused the same way (a spent daily quota halts the autosave).
+ */
+export function confirmsLeave(autosave: Pick<Autosave<object>, "isManual" | "currentState" | "hasPending">, heldFields: number): boolean {
+  if (heldFields > 0) return true;
+  return autosave.hasPending() && (autosave.isManual || autosave.currentState === "error");
+}
+
 export interface WizardContextValue extends WizardState {
   listingId: string;
   maxPhotos: number;
@@ -419,9 +429,10 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
       const pending = instance.takePending();
       if (pending) patchListingOnUnload(listingId, pending);
     };
-    // Unsaved changes (a live listing's, or a field too short to be saved): the browser asks first.
+    // Unsaved changes (a live listing's, a draft's after a failed save, a field too short to be
+    // saved): the browser asks first.
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if ((instance.isManual && instance.hasPending()) || heldRef.current.length > 0) event.preventDefault();
+      if (confirmsLeave(instance, heldRef.current.length)) event.preventDefault();
     };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", onHide);

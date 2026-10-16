@@ -402,7 +402,8 @@
       "unsavedLeftTitle": "Modifications non enregistrées",
       "unsavedLeftBody": "Vous avez quitté l'annonce sans enregistrer vos dernières modifications.",
       "held": "Ce champ sera enregistré dès qu'il sera complet.",
-      "saveLimit": "Cette modification doit être vérifiée par notre équipe, et une annonce en cours de vérification compte parmi vos annonces actives : vous avez atteint le maximum. Mettez en pause ou supprimez une autre annonce, puis enregistrez à nouveau."
+      "saveLimit": "Cette modification doit être vérifiée par notre équipe, et une annonce en cours de vérification compte parmi vos annonces actives : vous avez atteint le maximum. Mettez en pause ou supprimez une autre annonce, puis enregistrez à nouveau.",
+      "saveQuota": "La limite quotidienne de notre service est atteinte : vos dernières modifications ne sont pas encore enregistrées. Gardez cette page ouverte et réessayez après 9 h (heure du Maroc)."
     },
     "start": {
       "title": "Déposer une annonce",

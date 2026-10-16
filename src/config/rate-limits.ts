@@ -80,7 +80,8 @@ export const RATE_LIMITS = {
   "listing.publish.uid": { points: 60, duration: DAY, policy: "open", key: "uid" },
   // GET /api/listings/{id} and /mine, points = documents read (a /mine tab reads up to 100, the
   // owner view the listing and its uploads, also when PATCH and the status routes answer with it):
-  // 5 000 per day per account, a tenth of the Spark day.
+  // 5 000 per day per account, a tenth of the Spark day. Pause and sold (they take a listing down)
+  // are charged without being refused.
   "listing.owner.read.uid": { points: 5000, duration: DAY, policy: "open", key: "uid" },
   // POST /api/uploads/sign: 30 per hour; bytes declared per day (points = bytes, 200 MiB).
   // Closed: every signed upload costs R2 operations and storage.

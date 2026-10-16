@@ -200,7 +200,7 @@ describe("GET /api/listings/{id} and /mine (listing.owner.read.uid)", () => {
     expect(await used()).toBe(10 + 1);
   });
 
-  it("charge the owner view a status change answers with; once spent, saves and status changes are refused before any read", async () => {
+  it("charge the owner view a status change answers with; once spent, saves, resume and renew are refused before any read, pause and sold still go through", async () => {
     const owner = await member();
     const id = await published(owner);
     const used = async () => (await limitState("listing.owner.read.uid", owner.uid))?.consumedPoints ?? 0;
@@ -209,7 +209,7 @@ describe("GET /api/listings/{id} and /mine (listing.owner.read.uid)", () => {
     expect(await used()).toBe(start + 2);
     expect((await act(resume, owner, id, "resume")).status).toBe(200);
     expect(await used()).toBe(start + 4);
-    // A refused change still costs the up-front point, like a 404 GET.
+    // A refused resume still costs the up-front point, like a 404 GET.
     expect((await act(resume, owner, id, "resume")).status).toBe(409);
     expect(await used()).toBe(start + 5);
 
@@ -217,12 +217,24 @@ describe("GET /api/listings/{id} and /mine (listing.owner.read.uid)", () => {
     vi.mocked(getListing).mockClear();
     vi.mocked(changeStatus).mockClear();
     vi.mocked(patchListing).mockClear();
-    expectLimited(await act(pause, owner, id, "pause"));
     expectLimited(await api<ErrorBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { priceNegotiable: false } }));
+    expectLimited(await act(resume, owner, id, "resume"));
+    expectLimited(await act(renew, owner, id, "renew"));
     expect(getListing).not.toHaveBeenCalled();
     expect(changeStatus).not.toHaveBeenCalled();
     expect(patchListing).not.toHaveBeenCalled();
     expect(await getListing(id)).toMatchObject({ status: "published", priceNegotiable: true });
+    const spent = await used();
+    expect(spent).toBeGreaterThanOrEqual(RATE_LIMITS["listing.owner.read.uid"].points);
+
+    // Taking the listing down stays open; its owner view is still counted.
+    const paused = await act(pause, owner, id, "pause");
+    expect([paused.status, paused.body.listing.status]).toEqual([200, "paused"]);
+    expect(await used()).toBe(spent + 2);
+    const marked = await act(sold, owner, id, "sold");
+    expect([marked.status, marked.body.listing.status]).toEqual([200, "sold"]);
+    expect(await used()).toBe(spent + 4);
+    expect((await getListing(id))?.status).toBe("sold");
   });
 
   it("answers 429 once the daily budget is spent, before any Firestore read", async () => {

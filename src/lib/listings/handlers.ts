@@ -46,7 +46,8 @@ const revealSchema = z.object({ turnstileToken: turnstileTokenSchema.optional() 
 /**
  * Owner reads are charged in Firestore documents (`listing.owner.read.uid`): one point before the
  * read, so a refused call reads nothing, then the rest once the answer shows what was read. The
- * owner view that a save or a status change answers with is charged the same way.
+ * owner view that a save, a renewal or a resumption answers with is charged the same way; pause
+ * and sold are never refused by this budget (they take a listing down) and pay for their view after.
  */
 async function chargeOwnerRead(uid: string, documents: number): Promise<void> {
   if (documents > 1) await consumeLimit("listing.owner.read.uid", uid, documents - 1);
@@ -112,12 +113,19 @@ export function transitionHandler(action: Exclude<OwnerAction, "remove">): (requ
     const auth = await requireUser(request, { mutation: true });
     const id = await listingIdOf(params);
     await enforceLimit("listing.status.uid", auth.user.uid);
-    // Renew and resume put the listing back online; pause and sold stay open.
-    if (action === "renew" || action === "resume") await assertQuotas(DEPOSIT_QUOTAS);
-    await enforceLimit("listing.owner.read.uid", auth.user.uid);
+    // Renew and resume put the listing back online: the quota gate and the owner-read budget may
+    // refuse them. Pause and sold take it down: neither does (listing.status.uid bounds them), and
+    // their owner view is charged once read, without refusal.
+    const takesDown = action === "pause" || action === "sold";
+    if (!takesDown) {
+      await assertQuotas(DEPOSIT_QUOTAS);
+      await enforceLimit("listing.owner.read.uid", auth.user.uid);
+    }
     const listing = await changeStatus(actorOf(request, auth), id, action);
     const body: ListingResponse = { listing: await ownerListingView(listing) };
-    await chargeOwnerRead(auth.user.uid, 1 + body.listing.photos.length);
+    const documents = 1 + body.listing.photos.length;
+    if (takesDown) await consumeLimit("listing.owner.read.uid", auth.user.uid, documents);
+    else await chargeOwnerRead(auth.user.uid, documents);
     return json(body);
   };
 }
