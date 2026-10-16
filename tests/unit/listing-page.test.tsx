@@ -247,6 +247,14 @@ describe("page content", () => {
     expect(html).not.toContain("الدار البيضاء,");
   });
 
+  it("offers the m variant in the gallery's srcset for photos that have it (D6), not for legacy ones", async () => {
+    const [first, second] = record().photos;
+    repo.getListing.mockResolvedValue(record("published", { photos: [{ ...first!, variants: ["l", "m", "s"] }, second!] }));
+    const html = await renderPage();
+    expect(html).toContain("/listings/abcd2345/photo0001-m.webp 960w");
+    expect(html).not.toContain("photo0002-m.webp");
+  });
+
   it("never prints the uid, the moderation data, the geo point or a phone number", async () => {
     repo.getListing.mockResolvedValue(record());
     const html = await renderPage();

@@ -227,7 +227,7 @@ async function fieldsOf(listing: ListingRecord, patch: ListingPatch, ctx: { uid:
       }
       const upload = ready.get(photoId);
       if (!upload) continue;
-      const photo = listingPhotoSchema.safeParse({ id: upload.id, w: upload.width, h: upload.height, blurhash: upload.blurhash, ...(upload.hash ? { hash: upload.hash } : {}) });
+      const photo = listingPhotoSchema.safeParse({ id: upload.id, w: upload.width, h: upload.height, blurhash: upload.blurhash, ...(upload.hash ? { hash: upload.hash } : {}), ...(upload.variants?.length ? { variants: upload.variants } : {}) });
       if (photo.success) photos.push(photo.data);
     }
     fields.photos = photos;

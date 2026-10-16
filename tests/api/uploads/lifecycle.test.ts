@@ -91,15 +91,15 @@ describe("POST /api/uploads/{id}/complete (inline pipeline)", () => {
     expect(done.status).toBe(200);
     expect(done.body).toMatchObject({ status: "ready", photo: { id, w: 50, h: 100 } });
     expect(store.has("quarantine", `uploads/${id}`)).toBe(false);
-    for (const variant of ["l", "s"]) {
+    for (const variant of ["l", "m", "s"]) {
       const body = (await store.get("media", `listings/${listingId}/${id}-${variant}.webp`))!;
       const meta = await sharp(body).metadata();
       expect([meta.format, meta.exif, meta.width, meta.height]).toEqual(["webp", undefined, 50, 100]);
     }
 
     const doc = (await getUpload(id))!;
-    expect(doc).toMatchObject({ status: "ready", width: 50, height: 100, variants: ["l", "s"], checks: { nsfw: 0.02, faces: 0 } });
-    expect((await getListing(listingId))!.photos).toEqual([{ id, w: 50, h: 100, blurhash: doc.blurhash, hash: doc.hash }]);
+    expect(doc).toMatchObject({ status: "ready", width: 50, height: 100, variants: ["l", "m", "s"], checks: { nsfw: 0.02, faces: 0 } });
+    expect((await getListing(listingId))!.photos).toEqual([{ id, w: 50, h: 100, blurhash: doc.blurhash, hash: doc.hash, variants: ["l", "m", "s"] }]);
     const owned = await listingApi<ListingResponse>(getListingRoute, "GET", `/api/listings/${listingId}`, { member: owner });
     expect(owned.body.listing.photos).toEqual([{ id, status: "ready", w: 50, h: 100, blurhash: doc.blurhash }]);
 

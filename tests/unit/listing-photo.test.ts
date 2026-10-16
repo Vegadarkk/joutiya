@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blurhashPlaceholder, photoSources, smallWidth, srcSetOf, variantWidth, withStoredVariants } from "@/components/listing/photo";
+import { blurhashPlaceholder, photoSources, smallWidth, srcSetOf, variantWidth } from "@/components/listing/photo";
 
 // Image attributes of listing photos (design §8): srcset over the s/m/l variants (s/l before m)
 // with their real widths, and the blurhash placeholder as a tiny BMP data URL that the server can render.
@@ -51,18 +51,6 @@ describe("photoSources", () => {
 
   it("returns null without a media host", () => {
     expect(photoSources(null, "abcd2345", { id: "photo0001", w: 1600, h: 1200, blurhash: HASH })).toBeNull();
-  });
-});
-
-describe("withStoredVariants", () => {
-  it("copies the stored variant list by id and leaves legacy photos as they are", () => {
-    const photos = [
-      { id: "photo0001", w: 1600, h: 1200, blurhash: HASH },
-      { id: "photo0002", w: 1600, h: 1200, blurhash: HASH },
-    ];
-    const merged = withStoredVariants(photos, [{ id: "photo0001", variants: ["l", "m", "s"] }, { id: "photo0002" }, { id: "other0001", variants: ["l", "s"] }]);
-    expect(merged).toEqual([{ ...photos[0], variants: ["l", "m", "s"] }, photos[1]]);
-    expect(merged[1]).toBe(photos[1]);
   });
 });
 

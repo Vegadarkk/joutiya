@@ -1,6 +1,7 @@
 import "server-only";
 import type { Condition } from "@/config/categories";
 import type { ListingAttributes, ListingStatus } from "@/lib/contracts/listings";
+import type { PhotoVariant } from "@/lib/contracts/photo-variants";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { getListing, listPublishedByOwner, type ListingRecord } from "@/lib/db/repositories/listings";
 import { findUserByPublicId, getUserRecord, type UserRecord } from "@/lib/db/repositories/profiles";
@@ -96,6 +97,8 @@ export interface PublicPhoto {
   w: number;
   h: number;
   blurhash: string;
+  /** Variants stored (D6); absent on photos from before `m` (LEGACY_PHOTO_VARIANTS). */
+  variants?: readonly PhotoVariant[];
 }
 
 export interface PublicListing {
@@ -141,7 +144,7 @@ export interface PublicListingCard {
 }
 
 function publicPhotos(record: ListingRecord): PublicPhoto[] {
-  return record.photos.map(({ id, w, h, blurhash }) => ({ id, w, h, blurhash }));
+  return record.photos.map(({ id, w, h, blurhash, variants }) => ({ id, w, h, blurhash, ...(variants ? { variants } : {}) }));
 }
 
 /**

@@ -62,18 +62,6 @@ export function photoSources(mediaBaseUrl: string | null, listingId: string, pho
   return { src: prefer === "s" ? small : large, srcSet, width: photo.w, height: photo.h, large };
 }
 
-/**
- * `photos` with the variant list of their stored record (by id): the public view keeps the four
- * display fields only, and the gallery needs to know which photos have `m`.
- */
-export function withStoredVariants<T extends PhotoLike>(photos: readonly T[], stored: readonly { id: string; variants?: readonly PhotoVariant[] }[]): T[] {
-  const byId = new Map(stored.map((photo) => [photo.id, photo.variants]));
-  return photos.map((photo) => {
-    const variants = byId.get(photo.id);
-    return variants ? { ...photo, variants } : photo;
-  });
-}
-
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 function base64(bytes: Uint8Array): string {

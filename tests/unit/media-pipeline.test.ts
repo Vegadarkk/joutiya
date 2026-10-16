@@ -419,7 +419,7 @@ describe("processUpload: idempotency and races", () => {
     const ready = upload({ status: "ready", width: 800, height: 600, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", hash: "0123456789abcdef", size: 1234, variants: ["l", "s"] });
     const rejected = upload({ status: "rejected", rejectReason: "nsfw" });
     const signed = upload({ status: "signed" });
-    expect(await processUpload(ready.id, { store, classifier: clean() })).toEqual({ status: "ready", photo: { id: ready.id, w: 800, h: 600, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", hash: "0123456789abcdef" } });
+    expect(await processUpload(ready.id, { store, classifier: clean() })).toEqual({ status: "ready", photo: { id: ready.id, w: 800, h: 600, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", hash: "0123456789abcdef", variants: ["l", "s"] } });
     expect(await processUpload(rejected.id, { store, classifier: clean() })).toEqual({ status: "rejected", rejectReason: "nsfw" });
     expect(await processUpload(signed.id, { store, classifier: clean() })).toEqual({ status: "processing" });
     expect(await processUpload("doesnotexist1", { store, classifier: clean() })).toBeNull();
