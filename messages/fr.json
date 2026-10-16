@@ -2053,7 +2053,9 @@
       "position": "Photo {index} sur {count}",
       "close": "Fermer",
       "lightboxHint": "Utilisez les flèches du clavier ou faites glisser pour changer de photo, et Échap pour fermer.",
-      "empty": "Le vendeur n'a pas encore ajouté de photo."
+      "empty": "Le vendeur n'a pas encore ajouté de photo.",
+      "unavailable": "Le plein écran n'a pas pu se charger. Rechargez la page pour l'afficher.",
+      "reload": "Recharger la page"
     },
     "criteria": {
       "yes": "Oui",

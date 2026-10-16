@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
@@ -6,7 +6,7 @@ import ar from "../../messages/ar.json";
 import fr from "../../messages/fr.json";
 import { loadWithRetry } from "@/components/layout/chunk-retry";
 import { loadRevealChallenge, loadRevealError, RevealFeedbackFallback } from "@/components/listing/contact-bar";
-import { loadLightboxView } from "@/components/listing/gallery";
+import { LightboxUnavailable, loadLightboxView } from "@/components/listing/gallery";
 
 // On-demand chunks of the listing page (reveal feedback, lightbox): a chunk that cannot be
 // downloaded (a tab opened before a redeploy, a dropped mobile connection) resolves to a stand-in
@@ -47,14 +47,21 @@ describe("listing page chunks that fail to download", () => {
       ["fr", fr],
       ["ar", ar],
     ] as const) {
-      const html = renderToStaticMarkup(
-        <NextIntlClientProvider locale={locale} messages={messages} timeZone="Africa/Casablanca">
-          <RevealFeedbackFallback />
-        </NextIntlClientProvider>,
-      );
-      expect(html).toContain('role="alert"');
-      expect(html).toContain(escape(messages.ListingPage.contact.errors.outdated));
-      expect(html).toMatch(new RegExp(`<button[^>]*type="button"[^>]*>(?:(?!</button>).)*${messages.ListingPage.contact.reload}</button>`));
+      const render = (node: ReactNode) =>
+        renderToStaticMarkup(
+          <NextIntlClientProvider locale={locale} messages={messages} timeZone="Africa/Casablanca">
+            {node}
+          </NextIntlClientProvider>,
+        );
+      const reload = (label: string) => new RegExp(`<button[^>]*type="button"[^>]*>(?:(?!</button>).)*${label}</button>`);
+      const reveal = render(<RevealFeedbackFallback />);
+      expect(reveal).toContain('role="alert"');
+      expect(reveal).toContain(escape(messages.ListingPage.contact.errors.outdated));
+      expect(reveal).toMatch(reload(messages.ListingPage.contact.reload));
+      const lightbox = render(<LightboxUnavailable open={false} start={0} onClose={() => undefined} onCloseAutoFocus={() => undefined} listingId="abcd2345" title="Vélo" photos={[]} mediaBaseUrl="https://media.joutiya.test" />);
+      expect(lightbox).toContain('role="alert"');
+      expect(lightbox).toContain(escape(messages.ListingPage.gallery.unavailable));
+      expect(lightbox).toMatch(reload(messages.ListingPage.gallery.reload));
     }
   });
 });

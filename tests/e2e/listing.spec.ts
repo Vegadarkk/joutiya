@@ -226,9 +226,12 @@ test.describe("listing page", () => {
       return route.abort("internetdisconnected");
     });
     await page.getByRole("button", { name: "Agrandir la photo" }).first().click();
-    // The lightbox chunk was asked for (warm-up on hover, loader, the stand-in's retry), and failed.
-    await expect.poll(() => chunks.length).toBeGreaterThan(0);
-    // Still the listing, still interactive: the gallery moves on (the error view would have replaced it).
+    // The lightbox chunk was asked for (warm-up on hover, loader, the stand-in's retry) and failed:
+    // a reload prompt under the gallery instead of the error view.
+    await expect(page.getByTestId("lightbox-unavailable")).toContainText("Le plein écran n'a pas pu se charger.", { timeout: 15_000 });
+    expect(chunks.length).toBeGreaterThan(0);
+    await expect(page.getByTestId("lightbox-unavailable").getByRole("button", { name: "Recharger la page" })).toBeVisible();
+    // Still the listing, still interactive: the gallery moves on.
     await page.getByRole("button", { name: "Photo suivante" }).click();
     await expect(page.getByTestId("gallery-counter")).toHaveText("2 / 2");
     await expect(page.getByRole("dialog")).toHaveCount(0);
