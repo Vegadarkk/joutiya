@@ -43,12 +43,21 @@ compose() {
     -f "$COMPOSE_DIR/compose.yml" -f "$COMPOSE_DIR/compose.$env.yml" "$@"
 }
 
+# Starts every service of a release, then waits for web and worker only: an unhealthy Meilisearch
+# (phase 4) means search answers 503, never a rolled-back release (D2). The Valkey instances are
+# waited for by the first `up` already (depends_on: service_healthy).
+up_release() {
+  local env="$1" release="$2"
+  compose "$env" "$release" up -d --remove-orphans \
+    && compose "$env" "$release" up -d --no-deps --no-recreate --wait --wait-timeout 240 web worker
+}
+
 # Starts a release, waits for health, rolls back to the previous release on failure.
 start() {
   local env="$1" release="$2" previous
   previous="$(current_release "$env")"
   log "starting $release (previous: ${previous:-none})"
-  if compose "$env" "$release" up -d --remove-orphans --wait --wait-timeout 240; then
+  if up_release "$env" "$release"; then
     if [[ -n "$previous" && "$previous" != "$release" ]]; then echo "$previous" > "$STATE_DIR/$env.previous"; fi
     echo "$release" > "$STATE_DIR/$env.release"
     log "running $release"
@@ -56,7 +65,7 @@ start() {
   fi
   if [[ -n "$previous" && "$previous" != "$release" ]]; then
     log "health check failed: rolling back to $previous"
-    compose "$env" "$previous" up -d --remove-orphans --wait --wait-timeout 240 || log "rollback failed too"
+    up_release "$env" "$previous" || log "rollback failed too"
   fi
   die "release $release did not become healthy"
 }
