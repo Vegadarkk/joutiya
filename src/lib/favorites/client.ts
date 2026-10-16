@@ -52,17 +52,18 @@ export function loadFavoriteIds(uid: string): Promise<void> {
   if (state.uid === uid && state.status === "ready") return Promise.resolve();
   if (state.uid === uid && inflight) return inflight;
   emit({ status: "loading", uid, ids: new Set(), busy: new Set() });
-  const run = (async () => {
-    try {
-      const { ids } = await apiGet<{ ids: string[] }>(SEARCH_API.favoriteIds);
+  const run: Promise<void> = apiGet<{ ids: string[] }>(SEARCH_API.favoriteIds).then(
+    ({ ids }) => {
       if (state.uid === uid) emit({ ...state, status: "ready", ids: new Set(ids) });
-    } catch {
+    },
+    () => {
       if (state.uid === uid) emit({ ...state, status: "failed" });
-    } finally {
-      if (inflight === run) inflight = undefined;
-    }
-  })();
+    },
+  );
   inflight = run;
+  void run.finally(() => {
+    if (inflight === run) inflight = undefined;
+  });
   return run;
 }
 

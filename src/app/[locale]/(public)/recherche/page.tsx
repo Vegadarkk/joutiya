@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
+import { useTranslations } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Container } from "@/components/layout/container";
@@ -47,8 +48,8 @@ interface ResultsProps {
   renderAction?: (card: SearchCard) => ReactNode;
 }
 
-async function Results({ response, locale, toolbarAction, renderAction }: ResultsProps) {
-  const t = await getTranslations({ locale, namespace: "SearchPage" });
+function Results({ response, locale, toolbarAction, renderAction }: ResultsProps) {
+  const t = useTranslations("SearchPage");
   const { params, hits, featured } = response;
   return (
     <>

@@ -334,7 +334,7 @@ export class MeiliEngine implements SearchEngine {
     try {
       await this.waitForTask(taskUid);
     } catch (error) {
-      if (!(error instanceof SearchUnavailableError) || !error.message.includes("task_not_found")) throw error;
+      if (!(error instanceof MeiliError) || error.code !== "task_not_found") throw error;
       await this.writeTask("POST", `${this.indexPath}/documents/delete-batch`, []);
     }
   }

@@ -27,7 +27,7 @@ describe("SEARCH_SETTINGS", () => {
     expect(SEARCH_SETTINGS.pagination.maxTotalHits).toBe(1200);
     expect(SEARCH_SETTINGS.typoTolerance.disableOnNumbers).toBe(true);
     expect(SEARCH_SETTINGS.localizedAttributes).toEqual([{ attributePatterns: [...SEARCH_SETTINGS.searchableAttributes], locales: ["fra", "ara"] }]);
-    expect(SEARCH_SETTINGS.stopWords).toEqual(["ال"]);
+    expect(SEARCH_SETTINGS.stopWords).toEqual(["ال", "أل", "إل", "آل", "ٱل"]);
     expect(SEARCH_SETTINGS.searchCutoffMs).toBe(500);
   });
 
@@ -118,7 +118,7 @@ describe("settingsDiff", () => {
   it("is empty for the same settings, whatever the order Meilisearch returns unordered lists in", () => {
     const current = live();
     current.sortableAttributes = ["_geo", "price", "sortAt"];
-    current.stopWords = ["ال"];
+    current.stopWords = [...SEARCH_SETTINGS.stopWords].reverse();
     current.synonyms = Object.fromEntries(Object.entries(SEARCH_SETTINGS.synonyms).reverse().map(([k, v]) => [k, [...v].reverse()]));
     // Extra keys and defaults Meilisearch adds do not count.
     current.embedders = {};

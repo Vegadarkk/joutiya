@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { FormMessage, useApiErrorMessage } from "@/components/auth/form-message";
@@ -31,22 +31,28 @@ export function FavoritesView() {
   const config = usePublicConfig();
   const [view, setView] = useState<View>({ kind: "loading" });
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
-  const request = useRef(0);
-
-  const load = useCallback(async () => {
-    const id = ++request.current;
-    setView({ kind: "loading" });
-    try {
-      const page = await listFavorites();
-      if (request.current === id) setView({ kind: "ready", favorites: page.favorites, next: page.next, total: page.total, more: "idle" });
-    } catch (error) {
-      if (request.current === id) setView({ kind: "failed", error });
-    }
-  }, []);
+  // Bumped by retry(): the effect loads the first page again.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let current = true;
+    listFavorites().then(
+      (page) => {
+        if (current) setView({ kind: "ready", favorites: page.favorites, next: page.next, total: page.total, more: "idle" });
+      },
+      (error: unknown) => {
+        if (current) setView({ kind: "failed", error });
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [attempt]);
+
+  function retry() {
+    setView({ kind: "loading" });
+    setAttempt((value) => value + 1);
+  }
 
   async function loadMore() {
     if (view.kind !== "ready" || !view.next || view.more === "loading") return;
@@ -132,7 +138,7 @@ export function FavoritesView() {
           error={view.error}
           title={t("loadFailedTitle")}
           action={
-            <Button type="button" variant="outline" size="sm" className="max-sm:h-11" onClick={() => void load()}>
+            <Button type="button" variant="outline" size="sm" className="max-sm:h-11" onClick={retry}>
               {t("retry")}
             </Button>
           }

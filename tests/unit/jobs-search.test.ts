@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SearchEngine } from "@/lib/search/types";
+import type * as Boosts from "@/lib/search/boosts";
+import type * as Queue from "@/lib/search/queue";
+import { SearchUnavailableError, type SearchEngine } from "@/lib/search/types";
 
 // The search queue's consumer (design D9): job dispatch, engine readiness before the first write
 // (memoized, retried after a failure), and the searchOutbox onSnapshot watch: reads counted per
@@ -9,14 +11,15 @@ vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(),
 vi.mock("@/lib/quota", () => ({ consume: vi.fn(async () => ({ level: "ok" })) }));
 vi.mock("@/lib/firebase/admin", () => ({ db: vi.fn() }));
 vi.mock("@/lib/search/indexer", () => ({ indexListing: vi.fn(async () => ({ acked: true })), processOutbox: vi.fn(async () => ({ pending: 0, lagSeconds: 0, alerted: false })) }));
-vi.mock("@/lib/search/boosts", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/search/boosts")>()), expireBoost: vi.fn(async () => true) }));
-vi.mock("@/lib/search/queue", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/search/queue")>()), enqueueIndexJobs: vi.fn(async () => undefined) }));
+vi.mock("@/lib/search/boosts", async (importOriginal) => ({ ...(await importOriginal<typeof Boosts>()), expireBoost: vi.fn(async () => true) }));
+vi.mock("@/lib/search/queue", async (importOriginal) => ({ ...(await importOriginal<typeof Queue>()), enqueueIndexJobs: vi.fn(async () => undefined) }));
 const ensureReady = vi.fn<() => Promise<{ created: boolean; settingsUpdated: boolean }>>(async () => ({ created: false, settingsUpdated: false }));
+const healthy = vi.fn(async () => true);
 const engineState = { throwOnAccess: false };
 vi.mock("@/lib/search/engine", () => ({
   searchEngine: () => {
     if (engineState.throwOnAccess) throw new Error("search is not configured");
-    return { ensureReady } as unknown as SearchEngine;
+    return { ensureReady, healthy } as unknown as SearchEngine;
   },
 }));
 
@@ -31,6 +34,7 @@ beforeEach(() => {
   jobs.resetEngineReadyForTests();
   engineState.throwOnAccess = false;
   ensureReady.mockReset().mockResolvedValue({ created: false, settingsUpdated: false });
+  healthy.mockReset().mockResolvedValue(true);
   vi.mocked(indexListing).mockClear();
   vi.mocked(processOutbox).mockClear();
   vi.mocked(expireBoost).mockReset().mockResolvedValue(true);
@@ -59,11 +63,40 @@ describe("processSearchJob", () => {
     expect(indexListing).not.toHaveBeenCalled();
   });
 
-  it("outbox-poll hands the ids to index-listing jobs", async () => {
+  it("outbox-poll hands the ids to index-listing jobs while the engine answers", async () => {
     await jobs.processSearchJob({ name: "outbox-poll", data: {} });
     const options = vi.mocked(processOutbox).mock.calls[0]?.[0];
     await options?.dispatch?.(["abcdefgh"]);
     expect(enqueueIndexJobs).toHaveBeenCalledWith(["abcdefgh"]);
+    healthy.mockResolvedValueOnce(false);
+    await options?.dispatch?.(["bcdefghj"]);
+    expect(enqueueIndexJobs).toHaveBeenCalledTimes(1);
+    expect(logger.warn).toHaveBeenCalled();
+  });
+
+  it("after an unavailable engine, index jobs fail fast without reading Firestore, then probe again", async () => {
+    vi.useFakeTimers();
+    vi.mocked(indexListing).mockRejectedValueOnce(new SearchUnavailableError("meilisearch unreachable"));
+    await expect(jobs.processSearchJob({ name: "index-listing", data: { id: "abcdefgh" } })).rejects.toBeInstanceOf(SearchUnavailableError);
+    await expect(jobs.processSearchJob({ name: "index-listing", data: { id: "bcdefghj" } })).rejects.toBeInstanceOf(SearchUnavailableError);
+    expect(indexListing).toHaveBeenCalledTimes(1);
+    // The poll does not even ask the engine during the backoff.
+    await jobs.processSearchJob({ name: "outbox-poll", data: {} });
+    await vi.mocked(processOutbox).mock.calls[0]?.[0]?.dispatch?.(["cdefghjk"]);
+    expect(healthy).not.toHaveBeenCalled();
+    expect(enqueueIndexJobs).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(jobs.ENGINE_BACKOFF_MS);
+    await jobs.processSearchJob({ name: "index-listing", data: { id: "bcdefghj" } });
+    expect(indexListing).toHaveBeenCalledTimes(2);
+  });
+
+  it("an expire-boost whose entry is written succeeds even with the engine down (the poll indexes it)", async () => {
+    vi.mocked(indexListing).mockRejectedValueOnce(new SearchUnavailableError("meilisearch unreachable"));
+    expect(await jobs.processSearchJob({ name: "expire-boost", data: { id: "abcdefgh", until: 1 } })).toBe(true);
+    vi.mocked(indexListing).mockRejectedValueOnce(new Error("bug"));
+    jobs.resetEngineReadyForTests();
+    await expect(jobs.processSearchJob({ name: "expire-boost", data: { id: "abcdefgh", until: 1 } })).rejects.toThrow("bug");
   });
 
   it("expire-boost writes the entry then indexes; nothing when the boost was extended", async () => {

@@ -5,19 +5,32 @@ import { logger } from "@/lib/logging/logger";
 import { consume } from "@/lib/quota";
 import { boostJobSchema, expireBoost } from "@/lib/search/boosts";
 import { searchEngine } from "@/lib/search/engine";
-import { indexListing, processOutbox, type IndexOutcome, type OutboxPollResult } from "@/lib/search/indexer";
+import { OUTBOX_POLL_LIMIT, indexListing, processOutbox, type IndexOutcome, type OutboxPollResult } from "@/lib/search/indexer";
 import { EXPIRE_BOOST_JOB, INDEX_LISTING_JOB, OUTBOX_POLL_JOB, enqueueIndexJobs, indexJobSchema } from "@/lib/search/queue";
+import { SearchUnavailableError } from "@/lib/search/types";
 
 // Consumer of the "search" queue (design D9), concurrency 1: the engine's only writer.
 //   index-listing {id, force?}  one listing from its outbox entry (forced: from the listing alone)
 //   outbox-poll                 every 60 s (job scheduler): oldest entries -> index-listing jobs, lag alert
 //   expire-boost {id, until}    delayed, end of an À la Une period: outbox entry, then indexed here
 // Plus the onSnapshot watch on searchOutbox (lane 2), started by src/worker/index.ts.
+// Spark reads (50 000 a day) bound the retry paths. Engine outage: index jobs fail fast for
+// ENGINE_BACKOFF_MS without reading Firestore, and the poll reads only the oldest entry (lag, alert)
+// and dispatches nothing; the outbox keeps everything. A stuck entry (an indexing bug) is dispatched
+// again by the poll only after POLL_REDISPATCH_MS, or FAILED_HOLD_MS once its job failed for good.
 
 export const OUTBOX_POLL_EVERY_MS = 60_000;
 export const OUTBOX_POLL_SCHEDULER = "search-outbox-poll";
+/** After an unavailable engine, index jobs fail without reading Firestore for this long; then one probes. */
+export const ENGINE_BACKOFF_MS = 30_000;
+/** Below the 5 min lag alert: a newer version the fast lane and the watch both missed is still on time. */
+export const POLL_REDISPATCH_MS = 3 * 60_000;
+export const FAILED_HOLD_MS = 30 * 60_000;
 
 let ready: Promise<void> | undefined;
+let engineDownUntil = 0;
+/** Listing id -> time before which the poll does not dispatch it again (this process). */
+const pollHold = new Map<string, number>();
 
 /**
  * Index and settings in place before the first write (D4: applied at start when they differ):
@@ -36,9 +49,55 @@ export function ensureEngineReady(): Promise<void> {
   return ready;
 }
 
-/** Tests: forgets the readiness memo. */
+/** Tests: forgets the readiness memo and any outage. */
 export function resetEngineReadyForTests(): void {
   ready = undefined;
+  engineDownUntil = 0;
+  pollHold.clear();
+}
+
+/** The worker's failed handler: an index job that failed for good is not dispatched again for FAILED_HOLD_MS. */
+export function holdFailedListing(id: string, now = Date.now()): void {
+  pollHold.set(id, now + FAILED_HOLD_MS);
+}
+
+/** Runs an engine write unless an outage was seen in the last ENGINE_BACKOFF_MS; records a new one. */
+async function guarded<T>(run: () => Promise<T>): Promise<T> {
+  if (Date.now() < engineDownUntil) throw new SearchUnavailableError("search engine unavailable: retrying later");
+  try {
+    await ensureEngineReady();
+    return await run();
+  } catch (error) {
+    if (error instanceof SearchUnavailableError) engineDownUntil = Date.now() + ENGINE_BACKOFF_MS;
+    throw error;
+  }
+}
+
+/** The poll dispatches only to an engine that answers (an outage would turn each entry into failing jobs). */
+async function engineAnswers(): Promise<boolean> {
+  if (Date.now() < engineDownUntil) return false;
+  try {
+    return await searchEngine().healthy();
+  } catch {
+    return false;
+  }
+}
+
+/** Poll dispatch: ids not held, each held for POLL_REDISPATCH_MS once enqueued. */
+async function dispatchPolled(ids: string[]): Promise<void> {
+  const now = Date.now();
+  for (const [id, until] of pollHold) if (until <= now) pollHold.delete(id);
+  const due = ids.filter((id) => !pollHold.has(id));
+  if (due.length === 0) return;
+  await enqueueIndexJobs(due);
+  for (const id of due) pollHold.set(id, now + POLL_REDISPATCH_MS);
+}
+
+/** 60 s poll: with the engine down, one read for the lag and nothing dispatched. */
+async function poll(): Promise<OutboxPollResult> {
+  if (await engineAnswers()) return processOutbox({ limit: OUTBOX_POLL_LIMIT, dispatch: dispatchPolled });
+  logger.warn("search engine unavailable: outbox entries left for a later poll");
+  return processOutbox({ limit: 1, dispatch: async () => undefined });
 }
 
 export async function processSearchJob(job: Pick<Job, "name" | "data">): Promise<IndexOutcome | OutboxPollResult | boolean> {
@@ -46,17 +105,22 @@ export async function processSearchJob(job: Pick<Job, "name" | "data">): Promise
     case INDEX_LISTING_JOB: {
       const data = indexJobSchema.safeParse(job.data);
       if (!data.success) throw new UnrecoverableError("invalid index-listing job");
-      await ensureEngineReady();
-      return indexListing(data.data.id, { force: data.data.force === true });
+      const { id, force } = data.data;
+      return guarded(() => indexListing(id, { force: force === true }));
     }
     case OUTBOX_POLL_JOB:
-      return processOutbox({ dispatch: (ids) => enqueueIndexJobs(ids) });
+      return poll();
     case EXPIRE_BOOST_JOB: {
       const data = boostJobSchema.safeParse(job.data);
       if (!data.success) throw new UnrecoverableError("invalid expire-boost job");
       if (!(await expireBoost(data.data.id))) return false;
-      await ensureEngineReady();
-      await indexListing(data.data.id);
+      try {
+        await guarded(() => indexListing(data.data.id));
+      } catch (error) {
+        // The entry is written: the poll indexes it once the engine is back.
+        if (!(error instanceof SearchUnavailableError)) throw error;
+        logger.warn({ listingId: data.data.id }, "boost expiry queued in the outbox: search engine unavailable");
+      }
       return true;
     }
     default:

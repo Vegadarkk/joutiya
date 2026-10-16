@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
+import type * as Queue from "@/lib/search/queue";
 
 // End of À la Une (design D8): the delayed expire-boost job scheduled at sale time (best effort,
 // never throws) and the transaction that writes the searchOutbox entry once the period ended.
@@ -9,7 +10,7 @@ vi.mock("@/lib/quota", () => ({ consume: vi.fn(async () => ({ level: "ok" })) })
 const queueState = { enabled: true };
 const add = vi.fn<(name: string, data: unknown, opts: Record<string, unknown>) => Promise<unknown>>(async () => ({}));
 vi.mock("@/lib/search/queue", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/search/queue")>()),
+  ...(await importOriginal<typeof Queue>()),
   isSearchQueueEnabled: () => queueState.enabled,
   searchQueue: () => ({ add }),
 }));

@@ -196,8 +196,11 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   response.headers.delete("set-cookie");
   // The search page is dynamic (never cached): its device cookie makes the per-device search limits
   // apply (D13) instead of the anonymous bucket of the IP.
+  // Appended as a header: the cookies API would also write back the locale cookie removed above.
   if (pageSegment(pathname) === "recherche" && !readDeviceId(request.cookies.get(DEVICE_COOKIE)?.value)) {
-    setDeviceCookie(response, newDeviceCookie().value);
+    const device = new NextResponse(null);
+    setDeviceCookie(device, newDeviceCookie().value);
+    for (const cookie of device.headers.getSetCookie()) response.headers.append("set-cookie", cookie);
   }
   return response;
 }

@@ -62,8 +62,11 @@ export const SORTABLE_ATTRIBUTES = ["sortAt", "price", "_geo"] as const;
  */
 export const RANKING_RULES = ["words", "sort", "typo", "proximity", "attributeRank", "wordPosition", "exactness", "sortAt:desc"] as const;
 
-/** The Arabic article is split off words as its own token: as a stop word it no longer matches every Arabic text. */
-export const STOP_WORDS = ["ال"] as const;
+/**
+ * Meilisearch splits the Arabic article (these five spellings) off words as its own token: as stop
+ * words they no longer match every Arabic text ("السيارة" finds "سيارة", "ال" alone finds nothing).
+ */
+export const STOP_WORDS = ["ال", "أل", "إل", "آل", "ٱل"] as const;
 
 /** Facet values returned per facet: every city (CITIES has 100) and every subcategory. */
 export const MAX_VALUES_PER_FACET = 200;
@@ -221,6 +224,8 @@ const UNORDERED = new Set([
 ]);
 
 function canonical(value: unknown, path: string): unknown {
+  // Meilisearch may return strings decomposed ("آ" as alef + madda): compare composed forms.
+  if (typeof value === "string") return value.normalize("NFC");
   if (Array.isArray(value)) {
     const items = value.map((item) => canonical(item, path));
     if (UNORDERED.has(path) || path.startsWith("synonyms.")) return items.map((item) => JSON.stringify(item)).sort();
@@ -228,7 +233,7 @@ function canonical(value: unknown, path: string): unknown {
   }
   if (value && typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    return Object.fromEntries(entries.map(([key, item]) => [key, canonical(item, `${path}.${key}`)]));
+    return Object.fromEntries(entries.map(([key, item]) => [key.normalize("NFC"), canonical(item, `${path}.${key}`)]));
   }
   return value;
 }

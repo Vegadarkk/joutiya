@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { BellRing, Pencil, Search, Trash2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Dialog } from "radix-ui";
@@ -194,22 +194,28 @@ export function SavedSearchesView() {
   const [busy, setBusy] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<SavedSearchView | null>(null);
   const [deleting, setDeleting] = useState<SavedSearchView | null>(null);
-  const request = useRef(0);
-
-  const load = useCallback(async () => {
-    const id = ++request.current;
-    setView({ kind: "loading" });
-    try {
-      const { searches } = await listSavedSearches();
-      if (request.current === id) setView({ kind: "ready", searches });
-    } catch (error) {
-      if (request.current === id) setView({ kind: "failed", error });
-    }
-  }, []);
+  // Bumped by retry(): the effect loads the list again.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let current = true;
+    listSavedSearches().then(
+      ({ searches }) => {
+        if (current) setView({ kind: "ready", searches });
+      },
+      (error: unknown) => {
+        if (current) setView({ kind: "failed", error });
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [attempt]);
+
+  function retry() {
+    setView({ kind: "loading" });
+    setAttempt((value) => value + 1);
+  }
 
   const replace = (search: SavedSearchView) => setView((current) => (current.kind === "ready" ? { kind: "ready", searches: current.searches.map((item) => (item.id === search.id ? search : item)) } : current));
 
@@ -277,7 +283,7 @@ export function SavedSearchesView() {
           error={view.error}
           title={t("loadFailedTitle")}
           action={
-            <Button type="button" variant="outline" size="sm" className="max-sm:h-11" onClick={() => void load()}>
+            <Button type="button" variant="outline" size="sm" className="max-sm:h-11" onClick={retry}>
               {t("retry")}
             </Button>
           }
