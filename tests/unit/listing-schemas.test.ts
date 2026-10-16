@@ -241,6 +241,14 @@ describe("firestore.indexes.json", () => {
     expect(keys).toContain("listings:ownerUid ASCENDING,status ASCENDING,sortAt DESCENDING");
     expect(keys).toContain("listings:status ASCENDING,expiresAt ASCENDING");
     expect(keys).toContain("listings:moderation.state ASCENDING,createdAt ASCENDING");
+    // Queries of the phase 3 lots (the emulator never asks for composite indexes; production does).
+    expect(keys).toContain("listings:status ASCENDING,updatedAt ASCENDING");
+    expect(keys).toContain("listings:ownerUid ASCENDING,publishedAt ASCENDING");
+    expect(keys).toContain("revealLogs:listingId ASCENDING,at ASCENDING");
+    expect(keys).toContain("moderationDecisions:affectedUid ASCENDING,createdAt DESCENDING");
+    expect(keys).toContain("uploads:status ASCENDING,createdAt ASCENDING");
+    expect(keys).toContain("uploads:status ASCENDING,size ASCENDING");
+    expect(keys).toContain("uploads:targetId ASCENDING,status ASCENDING");
     expect(new Set(keys).size).toBe(keys.length);
   });
 
