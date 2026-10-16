@@ -16,15 +16,23 @@ interface SwitchFieldProps {
 
 /**
  * Labelled on/off control (44 px row). The whole row is the label, so the accessible name of
- * the switch is the label text and the touch target is generous.
+ * the switch is the label text and the touch target is generous: the label's hit area covers the
+ * row and is at least 44 px tall even when a caller removes the row padding.
  */
 export const SwitchField = forwardRef<HTMLButtonElement, SwitchFieldProps>(function SwitchField({ label, hint, checked, onCheckedChange, disabled, name, className }, ref) {
   const id = useId();
   const hintId = `${id}-hint`;
   return (
-    <div className={cn("flex items-start justify-between gap-4 py-2", disabled && "opacity-60", className)}>
+    <div className={cn("relative flex items-start justify-between gap-4 py-2", disabled && "opacity-60", className)}>
       <div className="flex min-w-0 flex-col gap-0.5">
-        <label htmlFor={id} className={cn("text-base font-medium leading-6", !disabled && "cursor-pointer")}>
+        <label
+          htmlFor={id}
+          className={cn(
+            "text-base font-medium leading-6",
+            "after:absolute after:inset-x-0 after:top-1/2 after:h-full after:min-h-11 after:-translate-y-1/2 after:content-['']",
+            !disabled && "cursor-pointer",
+          )}
+        >
           {label}
         </label>
         {hint ? (

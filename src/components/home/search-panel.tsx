@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import { Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -6,13 +9,33 @@ import { inputClassName } from "@/components/ui/input";
 import { SEARCH_PATH, SEARCH_Q_MAX, SEARCH_QUERY_KEYS } from "@/lib/search/params";
 import { cn } from "@/lib/utils";
 
+/** Drops the empty fields of a submitted form (`?q=&ville=x` -> `?ville=x`). */
+export function dropEmptyFields(data: FormData): void {
+  for (const [key, value] of [...data.entries()]) {
+    if (typeof value === "string" && !value.trim()) data.delete(key);
+  }
+}
+
+function onFormData(event: FormDataEvent) {
+  dropEmptyFields(event.formData);
+}
+
 /**
  * Home hero: the bab of the logo as a wide pointed arch over the search, standing on the gold
  * threshold. The one bold element of the page; everything around it stays quiet. A GET form to
- * /recherche: words as `q`, the place from the location combobox as `ville` (slug) or `region`.
+ * /recherche: words as `q`, the place from the location combobox as `ville` (slug) or `region`,
+ * empty fields left out of the URL once hydrated.
  */
 export function SearchPanel({ locale }: { locale: string }) {
   const t = useTranslations("Home");
+  const form = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    const element = form.current;
+    element?.addEventListener("formdata", onFormData);
+    return () => element?.removeEventListener("formdata", onFormData);
+  }, []);
+
   return (
     <div className="relative">
       <svg className="block h-10 w-full text-structure sm:h-16" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true">
@@ -22,6 +45,7 @@ export function SearchPanel({ locale }: { locale: string }) {
         <h1 className="mx-auto max-w-2xl text-center text-2xl font-semibold text-balance sm:text-4xl">{t("title")}</h1>
         <p className="mx-auto mt-3 max-w-xl text-center text-structure-foreground/80 text-pretty sm:text-lg">{t("subtitle")}</p>
         <form
+          ref={form}
           action={`/${locale}${SEARCH_PATH}`}
           method="get"
           role="search"

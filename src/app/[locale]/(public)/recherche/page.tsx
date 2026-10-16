@@ -7,7 +7,7 @@ import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Container } from "@/components/layout/container";
 import { SaveSearchButton } from "@/components/saved-searches/save-search-button";
 import { ActiveFilterChips } from "@/components/search/active-filter-chips";
-import { FeaturedRow } from "@/components/search/featured-row";
+import { FeaturedRow, withoutFeatured } from "@/components/search/featured-row";
 import { FiltersSheet } from "@/components/search/filters-sheet";
 import { Pagination } from "@/components/search/pagination";
 import { RefineChips } from "@/components/search/refine-chips";
@@ -19,7 +19,7 @@ import { SearchError } from "@/components/search/search-error";
 import { PendingBar, PendingRegion, SearchNavigationProvider } from "@/components/search/search-navigation";
 import { SortSelect } from "@/components/search/sort-select";
 import type { Locale } from "@/config/site";
-import { pageLocale } from "@/i18n/params";
+import { numbersLocale, pageLocale } from "@/i18n/params";
 import { parseSearchParams, SEARCH_MAX_TOTAL_HITS, SEARCH_PATH, searchPath } from "@/lib/search/params";
 import type { SearchCard, SearchResponse } from "@/lib/search/types";
 import { loadSearch, pageRequest, searchPageTitle } from "./search-state";
@@ -55,12 +55,13 @@ interface ResultsProps {
 function Results({ response, locale, toolbarAction, renderAction }: ResultsProps) {
   const t = useTranslations("SearchPage");
   const { params, hits, featured } = response;
+  const organic = withoutFeatured(hits, featured);
   return (
     <>
       <RefineChips params={params} facets={response.facets} />
       <div className="sticky top-16 z-30 -mx-4 border-b border-border bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:-mx-6 sm:px-6 md:top-20">
         <div role="toolbar" aria-label={t("toolbar")} className="flex items-center gap-2">
-          <FiltersSheet params={params} facets={response.facets} />
+          <FiltersSheet params={params} facets={response.facets} className="max-sm:gap-1.5 max-sm:px-3" />
           <div className="ms-auto flex min-w-0 items-center gap-2">
             {toolbarAction}
             <SortSelect params={params} />
@@ -78,12 +79,14 @@ function Results({ response, locale, toolbarAction, renderAction }: ResultsProps
         {hits.length > 0 ? (
           <>
             <FeaturedRow cards={featured} locale={locale} renderAction={renderAction} />
-            <section aria-labelledby="search-results-title">
-              <h2 id="search-results-title" className="sr-only">
-                {t("results")}
-              </h2>
-              <ResultsGrid cards={hits} locale={locale} renderAction={renderAction} priorityCount={featured.length > 0 ? 2 : 4} />
-            </section>
+            {organic.length > 0 ? (
+              <section aria-labelledby="search-results-title">
+                <h2 id="search-results-title" className="sr-only">
+                  {t("results")}
+                </h2>
+                <ResultsGrid cards={organic} locale={locale} renderAction={renderAction} priorityCount={featured.length > 0 ? 2 : 4} />
+              </section>
+            ) : null}
             <Pagination params={params} page={response.page} totalPages={response.totalPages} total={response.total} className="pt-2" />
           </>
         ) : (
@@ -103,7 +106,8 @@ export default async function SearchPage({ params, searchParams }: Props) {
   const query = parseSearchParams(await searchParams);
   const outcome = await loadSearch(query, await pageRequest());
   const applied = outcome.kind === "results" ? outcome.response.params : query;
-  const [t, title] = await Promise.all([getTranslations({ locale, namespace: "SearchPage" }), searchPageTitle(locale, applied)]);
+  // The count prints a number: Tarifit pages format it as French (no Intl data for "rif").
+  const [t, title] = await Promise.all([getTranslations({ locale: numbersLocale(locale), namespace: "SearchPage" }), searchPageTitle(locale, applied)]);
   const total = outcome.kind === "results" ? outcome.response.total : 0;
 
   return (

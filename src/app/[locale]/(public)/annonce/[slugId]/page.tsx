@@ -28,6 +28,7 @@ import { photoUrl } from "@/lib/listings/client/photo-url";
 import { listingJsonLd } from "@/lib/listings/jsonld";
 import { getPublishedBySlugId, getSeller, listingPath, toPublicListing, type PublicListing, type PublicSeller } from "@/lib/listings/public";
 import { logger } from "@/lib/logging/logger";
+import { isIndexable } from "@/lib/search/document";
 import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
 import { mediaBaseUrl } from "@/lib/storage/keys";
 
@@ -50,6 +51,8 @@ interface Loaded {
   /** Server side only: the seller lookup. Never rendered, never passed to a client component. */
   ownerUid: string;
   redirect: boolean;
+  /** In the search index (D9), so counted by its deeper category landing pages. */
+  indexed: boolean;
 }
 
 /** One Firestore read per render, shared by generateMetadata and the page. */
@@ -57,7 +60,7 @@ const load = cache(async (segment: string): Promise<Loaded | null> => {
   const found = await getPublishedBySlugId(segment);
   if (!found) return null;
   const listing = toPublicListing(found.listing, found.state, found.canonicalSlugId);
-  return listing ? { listing, ownerUid: found.listing.ownerUid, redirect: found.redirect } : null;
+  return listing ? { listing, ownerUid: found.listing.ownerUid, redirect: found.redirect, indexed: isIndexable(found.listing) } : null;
 });
 
 async function sellerOf(ownerUid: string): Promise<PublicSeller | null> {
@@ -124,7 +127,7 @@ export default async function ListingPage({ params }: { params: Params }) {
   const region = regionByCode(listing.location.regionCode);
   type CategoryKey = Parameters<typeof names>[0];
   const categoryName = category ? names(`${category.id}.name` as CategoryKey) : undefined;
-  const subcategoryName = category && subcategory ? names(`${category.id}.sub.${subcategory.id}` as CategoryKey) : undefined;
+  const subcategoryName = category && subcategory?.categoryId === category.id ? names(`${category.id}.sub.${subcategory.id}` as CategoryKey) : undefined;
   const cityLabel = city ? cityName(city, locale) : undefined;
   const regionLabel = region ? regionName(region, locale) : undefined;
   const place = [cityLabel, listing.location.district].filter(Boolean).join(", ");
@@ -133,12 +136,16 @@ export default async function ListingPage({ params }: { params: Params }) {
   const published = listing.state === "published";
 
   const jsonLd = listingJsonLd({ listing, url: canonicalUrl, images, categoryName: subcategoryName ?? categoryName, cityName: cityLabel, regionName: regionLabel });
-  // Crawlable steps: the category landing pages (/recherche is robots-disallowed).
+  // Crawlable steps: the category landing pages (/recherche is robots-disallowed). /c/{category}
+  // always answers 200, a deeper page 404s without listings (D15): those are linked only while this
+  // listing counts in them (indexed, so not paused, sold or expired), and with a known subcategory.
+  const deep = found.indexed;
+  const landingSubcategory = subcategoryName ? listing.subcategoryId : undefined;
   const trail = [
     ...(categoryName ? [{ label: categoryName, href: landingHref({ category: listing.categoryId }) }] : []),
-    ...(categoryName && subcategoryName ? [{ label: subcategoryName, href: landingHref({ category: listing.categoryId, subcategory: listing.subcategoryId }) }] : []),
-    ...(categoryName && cityLabel
-      ? [{ label: cityLabel, href: landingHref({ category: listing.categoryId, subcategory: listing.subcategoryId, city: listing.location.citySlug }) }]
+    ...(deep && categoryName && subcategoryName ? [{ label: subcategoryName, href: landingHref({ category: listing.categoryId, subcategory: landingSubcategory }) }] : []),
+    ...(deep && categoryName && cityLabel
+      ? [{ label: cityLabel, href: landingHref({ category: listing.categoryId, subcategory: landingSubcategory, city: listing.location.citySlug }) }]
       : []),
   ];
   const breadcrumbLd = breadcrumbJsonLd([

@@ -6,29 +6,98 @@ import { toast } from "sonner";
 import { FormMessage, useApiErrorMessage } from "@/components/auth/form-message";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ListingGridSkeleton } from "@/components/feedback/skeletons";
+import { RESULTS_GRID_CLASS } from "@/components/search/grid";
 import { Button } from "@/components/ui/button";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
 import { usePublicConfig } from "@/lib/config/client";
-import { FAVORITES_MAX, type FavoriteView } from "@/lib/contracts/search";
+import { FAVORITES_MAX, type FavoritesPage, type FavoriteView } from "@/lib/contracts/search";
 import { listFavorites, setFavorite } from "@/lib/favorites/client";
-import { cn } from "@/lib/utils";
 import { FavoriteCard } from "./favorite-card";
 
 // "Mes favoris" (design D17): GET /api/favorites, 48 per page (cursor), newest first. Removing
 // takes the card away at once (the hearts of other tabs follow the shared store) with an undo
 // while the listing is still online.
 
-type View =
-  | { kind: "loading" }
-  | { kind: "failed"; error: unknown }
-  | { kind: "ready"; favorites: FavoriteView[]; next?: string; total: number; more: "idle" | "loading" | "failed" };
+/** The loaded pages: `next` is the cursor of the following one. */
+export interface FavoritesList {
+  favorites: FavoriteView[];
+  next?: string;
+  more: "idle" | "loading" | "failed";
+}
+
+type View = { kind: "loading" } | { kind: "failed"; error: unknown } | ({ kind: "ready"; total: number } & FavoritesList);
+
+/** Appends a later page to the ready list (a listing already shown is not repeated). */
+function withPage(current: View, page: FavoritesPage): View {
+  if (current.kind !== "ready") return current;
+  const known = new Set(current.favorites.map((item) => item.listingId));
+  return { kind: "ready", favorites: [...current.favorites, ...page.favorites.filter((item) => !known.has(item.listingId))], next: page.next, total: page.total, more: "idle" };
+}
+
+/**
+ * The cards in the search results grid, or the empty state once nothing is left to load. Removals
+ * can empty the loaded cards while later pages remain: the next page loads in their place.
+ */
+export function FavoritesGrid({
+  list,
+  busy,
+  onRemove,
+  onMore,
+}: {
+  list: FavoritesList;
+  busy: ReadonlySet<string>;
+  onRemove: (favorite: FavoriteView) => void;
+  onMore: () => void;
+}) {
+  const t = useTranslations("Favorites.page");
+  const locale = useLocale() as Locale;
+  const config = usePublicConfig();
+
+  if (list.favorites.length === 0 && !list.next) {
+    return (
+      <EmptyState
+        title={t("emptyTitle")}
+        action={
+          <Button asChild>
+            <Link href="/recherche">{t("browse")}</Link>
+          </Button>
+        }
+      >
+        {t("emptyBody")}
+      </EmptyState>
+    );
+  }
+  const refilling = list.favorites.length === 0 && list.more !== "failed";
+  return (
+    <>
+      {refilling ? (
+        <div aria-label={t("loading")}>
+          <ListingGridSkeleton count={4} />
+        </div>
+      ) : list.favorites.length > 0 ? (
+        <ul className={RESULTS_GRID_CLASS} data-testid="favorites-grid">
+          {list.favorites.map((favorite) => (
+            <li key={favorite.listingId} className="min-w-0">
+              <FavoriteCard favorite={favorite} mediaBaseUrl={config?.mediaBaseUrl ?? null} locale={locale} busy={busy.has(favorite.listingId)} onRemove={() => onRemove(favorite)} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {list.next && !refilling ? (
+        <div className="flex justify-center">
+          <Button type="button" variant="outline" loading={list.more === "loading"} onClick={onMore}>
+            {list.more === "failed" ? t("retry") : t("more")}
+          </Button>
+        </div>
+      ) : null}
+    </>
+  );
+}
 
 export function FavoritesView() {
   const t = useTranslations("Favorites.page");
-  const locale = useLocale() as Locale;
   const apiMessage = useApiErrorMessage();
-  const config = usePublicConfig();
   const [view, setView] = useState<View>({ kind: "loading" });
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
   // Bumped by retry(): the effect loads the first page again.
@@ -60,16 +129,33 @@ export function FavoritesView() {
     setView({ ...view, more: "loading" });
     try {
       const page = await listFavorites(cursor);
-      setView((current) => {
-        if (current.kind !== "ready") return current;
-        const known = new Set(current.favorites.map((item) => item.listingId));
-        return { kind: "ready", favorites: [...current.favorites, ...page.favorites.filter((item) => !known.has(item.listingId))], next: page.next, total: page.total, more: "idle" };
-      });
+      setView((current) => withPage(current, page));
     } catch (error) {
       setView((current) => (current.kind === "ready" ? { ...current, more: "failed" } : current));
       toast.error(apiMessage(error));
     }
   }
+
+  // Every loaded card was removed while later pages remain: the next page takes their place
+  // (FavoritesGrid shows a skeleton meanwhile, the "more" button again if it fails).
+  const refill = view.kind === "ready" && view.favorites.length === 0 && view.more === "idle" ? view.next : undefined;
+  useEffect(() => {
+    if (!refill) return;
+    let current = true;
+    listFavorites(refill).then(
+      (page) => {
+        if (current) setView((value) => withPage(value, page));
+      },
+      (error: unknown) => {
+        if (!current) return;
+        setView((value) => (value.kind === "ready" ? { ...value, more: "failed" } : value));
+        toast.error(apiMessage(error));
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [refill, apiMessage]);
 
   function markBusy(listingId: string, value: boolean) {
     setBusy((current) => {
@@ -111,12 +197,6 @@ export function FavoritesView() {
     }
   }
 
-  const browse = (
-    <Button asChild>
-      <Link href="/recherche">{t("browse")}</Link>
-    </Button>
-  );
-
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-2">
@@ -145,33 +225,8 @@ export function FavoritesView() {
         >
           {apiMessage(view.error)}
         </FormMessage>
-      ) : view.favorites.length === 0 ? (
-        <EmptyState title={t("emptyTitle")} action={browse}>
-          {t("emptyBody")}
-        </EmptyState>
       ) : (
-        <>
-          <ul className={cn("grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4")} data-testid="favorites-grid">
-            {view.favorites.map((favorite) => (
-              <li key={favorite.listingId} className="min-w-0">
-                <FavoriteCard
-                  favorite={favorite}
-                  mediaBaseUrl={config?.mediaBaseUrl ?? null}
-                  locale={locale}
-                  busy={busy.has(favorite.listingId)}
-                  onRemove={() => void remove(favorite)}
-                />
-              </li>
-            ))}
-          </ul>
-          {view.next ? (
-            <div className="flex justify-center">
-              <Button type="button" variant="outline" loading={view.more === "loading"} onClick={() => void loadMore()}>
-                {view.more === "failed" ? t("retry") : t("more")}
-              </Button>
-            </div>
-          ) : null}
-        </>
+        <FavoritesGrid list={view} busy={busy} onRemove={(favorite) => void remove(favorite)} onMore={() => void loadMore()} />
       )}
     </div>
   );

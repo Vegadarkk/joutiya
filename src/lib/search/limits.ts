@@ -1,11 +1,11 @@
 import "server-only";
-import { RATE_LIMITS } from "@/config/rate-limits";
 import { optionalUser } from "@/lib/auth/guards";
 import { TURNSTILE_HEADER } from "@/lib/contracts/search";
 import { serverEnv } from "@/lib/env";
 import { HttpError, rateLimited } from "@/lib/http/errors";
 import { requestIdentity } from "@/lib/rate-limit/keys";
-import { consumeLimit, limitState, type LimitOutcome } from "@/lib/rate-limit/limiter";
+import { consumeLimit, type LimitOutcome } from "@/lib/rate-limit/limiter";
+import { assertChallengeBudget, recordChallengeFailure } from "@/lib/security/challenge-handler";
 import { hasChallengePass } from "@/lib/security/challenge-pass";
 import { verifyTurnstile, type TurnstileAction } from "@/lib/security/turnstile";
 
@@ -18,15 +18,6 @@ import { verifyTurnstile, type TurnstileAction } from "@/lib/security/turnstile"
 export const SEARCH_TURNSTILE_ACTION: TurnstileAction = "search";
 
 const isLimited = (outcome: LimitOutcome): boolean => !outcome.ok && outcome.reason === "limited";
-
-/**
- * Failed token checks share `challenge.ip` with the page challenge (/anti-robot): past its budget a
- * client sending bad tokens gets a plain 429 without a new siteverify call. Solved checks cost nothing.
- */
-async function assertVerificationBudget(ipBucket: string): Promise<void> {
-  const state = await limitState("challenge.ip", ipBucket);
-  if (state && state.consumedPoints >= RATE_LIMITS["challenge.ip"].points) throw rateLimited(state.msBeforeNext / 1000);
-}
 
 /**
  * Consumes the search limits of `request`. Resolves `{ passGranted: true }` when this request
@@ -53,10 +44,11 @@ export async function enforceSearchLimit(request: Request): Promise<{ passGrante
 
   const token = request.headers.get(TURNSTILE_HEADER)?.trim();
   if (!token) throw new HttpError(403, "turnstile_required");
-  await assertVerificationBudget(identity.ipBucket);
+  // Failed checks share their budgets with the page challenge (/anti-robot); solved ones cost nothing.
+  await assertChallengeBudget(identity);
   const result = await verifyTurnstile(token, { action: SEARCH_TURNSTILE_ACTION, remoteIp: identity.ip, hostname: new URL(serverEnv().SITE_URL).hostname });
   if (!result.ok) {
-    await consumeLimit("challenge.ip", identity.ipBucket);
+    await recordChallengeFailure(identity, result.codes);
     throw new HttpError(403, "turnstile_failed", undefined, { details: { codes: result.codes } });
   }
   return { passGranted: true };

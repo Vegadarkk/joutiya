@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSelected, locationName, locationOf, locationOptions, optionKey, optionValue, regionOfCity, sameLocation } from "@/components/search/location";
+import { committedOption, isSelected, locationName, locationOf, locationOptions, optionKey, optionValue, regionOfCity, sameLocation } from "@/components/search/location";
 
 // Location choices of the search (lot L3b, D7): whole country, region or city.
 
@@ -12,13 +12,52 @@ describe("locationOptions", () => {
     expect(options.length).toBe(11);
   });
 
-  it("lists matching regions before matching cities, in both scripts", () => {
+  it("lists matching regions with the cities, in both scripts", () => {
     const options = locationOptions("casa", "fr");
-    expect(options[0]).toEqual({ kind: "region", code: "06" });
+    expect(options).toContainEqual({ kind: "region", code: "06" });
     expect(options).toContainEqual({ kind: "city", slug: "casablanca" });
     expect(locationOptions("الشرق", "ar")[0]).toEqual({ kind: "region", code: "02" });
+    expect(locationOptions("Souss", "fr")[0]).toEqual({ kind: "region", code: "09" });
     expect(locationOptions("Tetouan", "fr")).toContainEqual({ kind: "city", slug: "tetouan" });
     expect(locationOptions("zzzz", "fr")).toEqual([]);
+  });
+
+  it("puts a city named by the typed text first, its region right after (Enter picks the city)", () => {
+    const cases: [string, "fr" | "ar", string, string][] = [
+      ["Casablanca", "fr", "casablanca", "06"],
+      ["casa", "fr", "casablanca", "06"],
+      ["Rabat", "fr", "rabat", "04"],
+      ["Marrakech", "fr", "marrakech", "07"],
+      ["Tanger", "fr", "tanger", "01"],
+      ["Fès", "fr", "fes", "03"],
+      ["الدار البيضاء", "ar", "casablanca", "06"],
+      ["Casablanca", "ar", "casablanca", "06"],
+    ];
+    for (const [query, locale, slug, region] of cases) {
+      const options = locationOptions(query, locale);
+      expect(options[0], query).toEqual({ kind: "city", slug });
+      expect(options.findIndex((option) => option.kind === "region" && option.code === region), query).toBe(1);
+    }
+  });
+});
+
+describe("committedOption", () => {
+  const typed = locationOptions("Rabat", "fr");
+
+  it("commits the first option of typed text, or the highlighted one", () => {
+    expect(committedOption("Rabat", typed, 0)).toEqual({ kind: "city", slug: "rabat" });
+    expect(committedOption("Rabat", typed, -1)).toEqual({ kind: "city", slug: "rabat" });
+    expect(committedOption("Rabat", typed, 1)).toEqual(typed[1]);
+  });
+
+  it("commits the whole country for an emptied field", () => {
+    expect(committedOption("", locationOptions("", "fr"), -1)).toEqual({ kind: "all" });
+    expect(committedOption("  ", locationOptions("  ", "fr"), -1)).toEqual({ kind: "all" });
+  });
+
+  it("commits nothing without typing or without a match", () => {
+    expect(committedOption(null, locationOptions("", "fr"), -1)).toBeNull();
+    expect(committedOption("zzzz", locationOptions("zzzz", "fr"), 0)).toBeNull();
   });
 });
 

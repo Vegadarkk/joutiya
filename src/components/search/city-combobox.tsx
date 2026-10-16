@@ -7,13 +7,14 @@ import { inputClassName } from "@/components/ui/input";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { cn } from "@/lib/utils";
-import { isSelected, locationName, locationOptions, optionKey, optionValue, regionOfCity, type LocationOption, type LocationValue } from "./location";
+import { committedOption, isSelected, locationName, locationOptions, optionKey, optionValue, regionOfCity, type LocationOption, type LocationValue } from "./location";
 
 // Location field of the search (design D7, D21): the phase 3 city picker in its "any city"
 // variant. One input over the whole country, the 12 regions and ~100 cities; empty means the whole
 // country. ARIA combobox + listbox; Enter picks the highlighted option only after the person moved
 // through the list or typed, so Enter right after focusing still submits the form. In a GET form
-// the choice travels as a hidden `ville` or `region` input (the typed text is never submitted).
+// the choice travels as a hidden `ville` or `region` input (the typed text is never submitted:
+// leaving the field commits its highlighted or first option).
 
 interface SearchCityComboboxProps {
   value: LocationValue;
@@ -115,6 +116,10 @@ export function SearchCityCombobox({ value, onChange, label, hideLabel, names, i
             setOpen(true);
           }}
           onBlur={() => {
+            // Typed text counts without a pick (Tab, or a click on "Rechercher": blur is a discrete
+            // event, so the form submits after this re-render with the new place).
+            const option = committedOption(query, options, active);
+            if (option) choose(option);
             blurTimer.current = window.setTimeout(() => {
               if (document.activeElement === input.current) return;
               setOpen(false);
@@ -161,10 +166,15 @@ export function SearchCityCombobox({ value, onChange, label, hideLabel, names, i
       <div
         id={listId}
         role="listbox"
+        // Scrolling makes it focusable: Tab goes on to the next field, and a click in the list or on
+        // its scrollbar keeps the focus (and the typed text) in the input.
+        tabIndex={-1}
         aria-label={t("results")}
+        onMouseDown={(event) => event.preventDefault()}
         className={cn(
           "flex max-h-80 flex-col overflow-y-auto rounded-md border border-border bg-surface py-1 text-foreground shadow-lg shadow-bab-950/10",
-          !inline && "absolute inset-x-0 top-full z-30 mt-1",
+          // Above the sticky results toolbar (z-30), under the sticky header (z-40).
+          !inline && "absolute inset-x-0 top-full z-35 mt-1",
           !open && "hidden",
         )}
       >
@@ -181,7 +191,6 @@ export function SearchCityCombobox({ value, onChange, label, hideLabel, names, i
                 role="option"
                 aria-selected={selected}
                 data-active={index === active || undefined}
-                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(option)}
                 onMouseEnter={() => setActive(index)}
                 className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2 data-[active]:bg-surface-muted"

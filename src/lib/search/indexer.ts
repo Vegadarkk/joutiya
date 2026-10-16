@@ -131,6 +131,19 @@ export async function reportOutboxLag(lagSeconds: number, pending: number): Prom
   return true;
 }
 
+/** Lag stored by the last poll (seconds); null when unknown (no Valkey, no poll for 10 min). Never throws. */
+export async function readOutboxLag(): Promise<number | null> {
+  if (!isValkeyConfigured("queue")) return null;
+  try {
+    const value = await valkey("queue").get(SEARCH_LAG_KEY);
+    const seconds = value === null ? Number.NaN : Number(value);
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+  } catch (error) {
+    logger.warn({ err: (error as Error).message }, "search lag not read");
+    return null;
+  }
+}
+
 export interface OutboxPollResult {
   pending: number;
   lagSeconds: number;

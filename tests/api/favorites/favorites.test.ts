@@ -16,7 +16,7 @@ import { COLLECTIONS, type FavoriteSnapshot } from "@/lib/db/schemas";
 import { resetServerEnv } from "@/lib/env";
 import { db } from "@/lib/firebase/admin";
 import { datesToTimestamps } from "@/lib/db/repositories/timestamps";
-import { resetRateLimiters } from "@/lib/rate-limit/limiter";
+import { limitState, resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { setSearchEngineForTests } from "@/lib/search/engine";
 import type { MemoryEngine } from "@/lib/search/memory";
 import { call, doc, expectError, member, serve, spend, type ErrorBody, type Member } from "./helpers";
@@ -163,5 +163,16 @@ describe("GET /api/favorites", () => {
     expect(second.body.favorites.map((favorite) => favorite.listingId)).toEqual(seeded.slice(0, 5).reverse());
     expect(second.body.next).toBeUndefined();
     expectError(await page(salma, "forged"), 400, "invalid_body");
+  });
+
+  it("charges the documents read on a daily budget (favorites.docs.uid), then 429 before any read", async () => {
+    const salma = await member();
+    await seedFavorites(salma.uid, FAVORITES_PAGE_SIZE + 2);
+    expect((await page(salma)).status).toBe(200);
+    // The page (48 and the look-ahead), then the hearts rebuilt from the subcollection (no Valkey).
+    expect((await limitState("favorites.docs.uid", salma.uid))?.consumedPoints).toBe(FAVORITES_PAGE_SIZE + 1 + FAVORITES_PAGE_SIZE + 2);
+    await spend("favorites.docs.uid", salma.uid);
+    expectError(await page(salma), 429, "rate_limited");
+    expectError(await call(ids, "GET", "/api/favorites/ids", { member: salma }), 429, "rate_limited");
   });
 });

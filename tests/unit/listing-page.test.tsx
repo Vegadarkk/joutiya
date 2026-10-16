@@ -131,6 +131,17 @@ function jsonLd(html: string): Record<string, unknown> {
   return JSON.parse(body) as Record<string, unknown>;
 }
 
+/** Landing pages the breadcrumb links: the HTML hrefs and the BreadcrumbList `item` URLs. */
+function crumbLinks(html: string): { html: string[]; ld: string[] } {
+  const nav = /<nav[^>]*>([\s\S]*?)<\/nav>/.exec(html)?.[1] ?? "";
+  const blocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((match) => JSON.parse(match[1] ?? "{}") as Record<string, unknown>);
+  const list = blocks.find((block) => block["@type"] === "BreadcrumbList") as { itemListElement: { item?: string }[] } | undefined;
+  return {
+    html: [...nav.matchAll(/href="([^"]+)"/g)].map((match) => match[1] ?? ""),
+    ld: (list?.itemListElement ?? []).flatMap((step) => (step.item ? [step.item] : [])),
+  };
+}
+
 beforeEach(() => {
   repo.getListing.mockReset();
   repo.getUserRecord.mockReset();
@@ -226,6 +237,31 @@ describe("page content", () => {
     expect(html).toContain('aria-current="page"');
     expect(html).toContain('"@type":"BreadcrumbList"');
     expect(html).toMatch(/data-favorite="[^"]+"/);
+    expect(crumbLinks(html)).toEqual({
+      html: ["/fr", "/fr/c/vehicules", "/fr/c/vehicules/velos", "/fr/c/vehicules/velos/casablanca"],
+      ld: ["https://joutiya.ma/fr", "https://joutiya.ma/fr/c/vehicules", "https://joutiya.ma/fr/c/vehicules/velos", "https://joutiya.ma/fr/c/vehicules/velos/casablanca"],
+    });
+  });
+
+  it("links only /c/{category} for a listing its deeper landing pages do not count (they may 404, D15)", async () => {
+    const outOfIndex = [
+      ...(["sold", "paused", "expired"] as const).map((status) => record(status)),
+      record("published", { moderation: { state: "auto_ok", score: 12, flags: [], openReports: 1, hiddenBy: { reportId: "r1", signal: "multi", at: NOW } } }),
+    ];
+    for (const listing of outOfIndex) {
+      repo.getListing.mockResolvedValue(listing);
+      const html = await renderPage();
+      expect(crumbLinks(html), listing.status).toEqual({ html: ["/fr", "/fr/c/vehicules"], ld: ["https://joutiya.ma/fr", "https://joutiya.ma/fr/c/vehicules"] });
+    }
+  });
+
+  it("skips a subcategory /c no longer resolves: the city step falls back to /c/{category}/{city}", async () => {
+    repo.getListing.mockResolvedValue(record("published", { subcategoryId: "retiree", attributes: {} }));
+    const html = await renderPage();
+    expect(crumbLinks(html).html).toEqual(["/fr", "/fr/c/vehicules", "/fr/c/vehicules/casablanca"]);
+    // A subcategory of another category is not a step of this one either.
+    repo.getListing.mockResolvedValue(record("published", { subcategoryId: "colocation", attributes: {} }));
+    expect(crumbLinks(await renderPage()).html).toEqual(["/fr", "/fr/c/vehicules", "/fr/c/vehicules/casablanca"]);
   });
 
   it("shows a banner and no contact action for a sold, paused or expired listing", async () => {

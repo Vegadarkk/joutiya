@@ -18,7 +18,8 @@ export default async function FavoritesPage({ params }: { params: Promise<{ loca
   setRequestLocale(locale);
   return (
     // Tarifit: the account pages are French until a native review (see FrenchOnlyNotice).
-    <Container lang={locale === "rif" ? "fr" : undefined} className="max-w-4xl py-10 lg:py-14">
+    // Full container width, as the search page: the favorites use its 4-column card grid.
+    <Container lang={locale === "rif" ? "fr" : undefined} className="py-10 lg:py-14">
       <FrenchOnlyNotice className="mb-8" />
       <FavoritesView />
     </Container>

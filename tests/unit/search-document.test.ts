@@ -172,6 +172,23 @@ describe("toSearchDocument", () => {
     expect(toSearchDocument(listing({ title: "Golf 7 2019" }), NOW)!.attrsText).not.toContain("Golf 7 2019");
   });
 
+  it("folds Arabic-Indic digits of free-text criteria and of the district", () => {
+    const doc = toSearchDocument(
+      listing({
+        title: "بيجو للبيع",
+        categoryId: "vehicules",
+        subcategoryId: "voitures",
+        attributes: { "car-brand": "peugeot", model: "٢٠٨", year: 2019 },
+        location: { regionCode: "06", citySlug: "casablanca", district: "حي ٢٠ غشت", geo: { lat: 33.58, lng: -7.63 } },
+      }),
+      NOW,
+    )!;
+    expect(doc.attrsText).toContain("208");
+    expect(doc.attrsText).not.toMatch(/[٠-٩]/);
+    expect(doc.placeText).toContain("حي 20 غشت");
+    expect(doc.title).toBe("بيجو للبيع");
+  });
+
   it("truncates the description", () => {
     const doc = toSearchDocument(listing({ description: `${"mot ".repeat(1_000)}fin` }), NOW)!;
     expect(doc.description.length).toBeLessThanOrEqual(SEARCH_DESCRIPTION_MAX);

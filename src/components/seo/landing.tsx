@@ -3,15 +3,16 @@ import { useTranslations } from "next-intl";
 import type { Locale } from "@/config/site";
 import { cityName, type City } from "@/config/regions";
 import { Link } from "@/i18n/navigation";
-import { intlLocale } from "@/lib/listings/client/format";
+import { groupDigits } from "@/lib/listings/client/format";
 import { cn } from "@/lib/utils";
 
 // Building blocks of the category landing pages (design D15). Server components, no client state:
 // the HTML is shared by every visitor (ISR, Cloudflare). Links never prefetch: prefetches count
 // against the page-view limits (D14) and a page holds dozens of them.
 
-export function formatCount(count: number, locale: Locale): string {
-  return new Intl.NumberFormat(intlLocale(locale)).format(count);
+/** Same grouping as prices and the search chips ("1 200"), in every locale. */
+export function formatCount(count: number): string {
+  return groupDigits(String(count)) || "0";
 }
 
 export interface LandingCrumb {
@@ -54,7 +55,7 @@ export interface LandingChip {
 }
 
 /** Subcategories of the scope with their counts: a scroll row on phones, wrapped on larger screens. */
-export function SubcategoryChips({ chips, locale, label }: { chips: readonly LandingChip[]; locale: Locale; label: string }) {
+export function SubcategoryChips({ chips, label }: { chips: readonly LandingChip[]; label: string }) {
   return (
     <nav aria-label={label} className="-mx-4 sm:mx-0">
       <ul className="flex snap-x gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:px-0">
@@ -72,7 +73,7 @@ export function SubcategoryChips({ chips, locale, label }: { chips: readonly Lan
               )}
             >
               {chip.label}
-              <span className={cn("tabular-nums", chip.current ? "text-structure-foreground/75" : "text-foreground-muted")}>{formatCount(chip.count, locale)}</span>
+              <span className={cn("tabular-nums", chip.current ? "text-structure-foreground/75" : "text-foreground-muted")}>{formatCount(chip.count)}</span>
             </Link>
           </li>
         ))}
@@ -99,7 +100,7 @@ export function CityLinks({ links, locale, title, id }: { links: readonly Landin
           <li key={link.city.slug} className="min-w-0 border-b border-border/70">
             <Link href={link.href} prefetch={false} className="group flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
               <span className="truncate text-foreground group-hover:underline group-hover:underline-offset-2">{cityName(link.city, locale)}</span>
-              <span className="shrink-0 tabular-nums text-foreground-muted">{formatCount(link.count, locale)}</span>
+              <span className="shrink-0 tabular-nums text-foreground-muted">{formatCount(link.count)}</span>
             </Link>
           </li>
         ))}

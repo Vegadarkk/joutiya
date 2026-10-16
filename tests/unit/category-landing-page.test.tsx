@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import type * as NextNavigation from "next/navigation";
+import type * as FeaturedRowModule from "@/components/search/featured-row";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fr from "../../messages/fr.json";
 import { subcategoryById } from "@/config/categories";
@@ -23,7 +24,8 @@ vi.mock("@/components/search/results-grid", () => ({
     </ul>
   ),
 }));
-vi.mock("@/components/search/featured-row", () => ({
+vi.mock("@/components/search/featured-row", async (importOriginal) => ({
+  ...(await importOriginal<typeof FeaturedRowModule>()),
   FeaturedRow: ({ cards }: { cards: SearchCard[] }) => <section data-testid="featured-row">{cards.map((card) => card.slugId).join(",")}</section>,
 }));
 vi.mock("next/navigation", async (importOriginal) => ({
@@ -145,7 +147,9 @@ describe("category landing page", () => {
     expect(html).toContain('href="/fr/c/vehicules/velos"');
     expect(html).not.toContain('href="/fr/c/vehicules/bateaux"');
     expect(html).toContain('data-testid="featured-row">annonce-c2345678<');
-    expect(html.match(/<li>annonce-/g)).toHaveLength(6);
+    // The featured listing is not repeated in the grid below.
+    expect(html.match(/<li>annonce-/g)).toHaveLength(5);
+    expect(html).not.toContain("<li>annonce-c2345678<");
     // Busiest cities first (ties: the larger city).
     expect(html).toContain("Véhicules par ville");
     const cities = [...html.matchAll(/href="\/fr\/c\/vehicules\/(casablanca|mohammedia|rabat)"/g)].map((match) => match[1]);

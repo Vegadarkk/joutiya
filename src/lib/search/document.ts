@@ -157,7 +157,7 @@ export function toSearchDocument(listing: ListingRecord, now: Date = new Date())
   }
   if (listing.condition) attrsText.push(...labels(["Criteria", "condition", "options", listing.condition]));
   // Queries fold Arabic-Indic digits (normalizeQuery): index a folded copy of a title that has any,
-  // and keep the displayed title as written.
+  // and keep the displayed title as written. Free text (criteria, district) is folded below.
   const title = listing.title.trim();
   const foldedTitle = foldDigits(title);
   if (foldedTitle !== title) attrsText.push(foldedTitle);
@@ -172,8 +172,8 @@ export function toSearchDocument(listing: ListingRecord, now: Date = new Date())
     title,
     description: foldDigits(truncateText(listing.description, SEARCH_DESCRIPTION_MAX)),
     categoryText: joinText([...labels(["Categories", categoryId, "name"]), ...labels(["Categories", categoryId, "sub", subcategoryId])]),
-    placeText: joinText([city?.nameFr, city?.nameAr, region?.nameFr, region?.nameAr, location.district]),
-    attrsText: joinText(attrsText),
+    placeText: foldDigits(joinText([city?.nameFr, city?.nameAr, region?.nameFr, region?.nameAr, location.district])),
+    attrsText: foldDigits(joinText(attrsText)),
     categoryId,
     subcategoryId,
     regionCode: location.regionCode,

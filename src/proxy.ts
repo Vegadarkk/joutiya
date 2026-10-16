@@ -202,7 +202,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     const response = decorate(forwardWithNonce(routed, request, policy, nonce), "public", policy);
     if (dynamicPublic) {
       // Like shared pages, no locale cookie. The device cookie makes the per-device search limits
-      // apply (D13) instead of the anonymous bucket of the IP.
+      // apply (D13) instead of the anonymous bucket of the IP. It is not forwarded to this render:
+      // a request without it is an unknown device on its IP (§6), or dropping cookies would skip
+      // the device limits; over that bucket, a first search escalates to Turnstile.
       response.headers.delete("set-cookie");
       if (!readDeviceId(request.cookies.get(DEVICE_COOKIE)?.value)) appendDeviceCookie(response);
       return response;

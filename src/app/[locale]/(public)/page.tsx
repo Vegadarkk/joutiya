@@ -24,6 +24,14 @@ const favoriteAction = (card: SearchCard) => <FavoriteButton listingId={card.id}
 // page still renders.
 
 export const revalidate = 300;
+// Rendered on the first visit, never at build: the image is built without a search engine, so a
+// build-time page has no listing sections, and after each deploy the purged edge would cache it
+// (served stale by the origin, then re-stamped for 5 minutes). Overrides the locales of the layout.
+export const dynamicParams = true;
+
+export function generateStaticParams(): { locale: string }[] {
+  return [];
+}
 
 /** "Annonces récentes" on the home page. */
 const HOME_RECENT_COUNT = 12;

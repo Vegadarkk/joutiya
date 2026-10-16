@@ -15,7 +15,12 @@ import { useSearchSummary } from "./summary";
 // "Sauvegarder la recherche" on /recherche (design D18), placed in the results toolbar slot.
 // Anonymous visitors go to sign-in and come back to the same search. Nothing is read before the
 // click (a saved search costs Firestore reads): an already saved search is recognised by the 409
-// of the save itself. A blank search (no words, no filter) cannot be saved: no button.
+// of the save itself. A blank search (no words, no filter) cannot be saved: no button. Below md it
+// is an icon button (the label stays its accessible name): the toolbar must fit 360 px with
+// filters on, and the sort select its label on small tablets.
+
+/** Icon-only below md: 44 px square. */
+const COMPACT = "max-md:w-11 max-md:px-0";
 
 export interface SaveSearchButtonProps {
   params: SearchParams;
@@ -47,10 +52,10 @@ export function SaveSearchButton({ params, className }: SaveSearchButtonProps) {
 
   if (saved) {
     return (
-      <Button asChild variant="outline" className={cn("border-structure/40", className)} data-testid="save-search-button" data-saved="true">
+      <Button asChild variant="outline" className={cn("border-structure/40", COMPACT, className)} data-testid="save-search-button" data-saved="true">
         <Link href="/recherches">
           <Check aria-hidden="true" className="text-success" />
-          {t("saved")}
+          <span className="max-md:sr-only">{t("saved")}</span>
         </Link>
       </Button>
     );
@@ -58,9 +63,9 @@ export function SaveSearchButton({ params, className }: SaveSearchButtonProps) {
 
   return (
     <>
-      <Button type="button" variant="outline" loading={checking} onClick={() => void onClick()} className={className} data-testid="save-search-button">
+      <Button type="button" variant="outline" loading={checking} onClick={() => void onClick()} className={cn(COMPACT, className)} data-testid="save-search-button">
         {checking ? null : <BellPlus aria-hidden="true" />}
-        {t("save")}
+        <span className="max-md:sr-only">{t("save")}</span>
       </Button>
       {open ? (
         <SaveSearchDialog

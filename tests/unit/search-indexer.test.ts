@@ -10,7 +10,7 @@ import type { SearchDocument, SearchEngine } from "@/lib/search/types";
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/quota", () => ({ consume: vi.fn(async () => ({ level: "ok" })), isDegraded: vi.fn(async () => false) }));
 vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => true) }));
-const valkeyClient = { set: vi.fn(async () => "OK") };
+const valkeyClient = { set: vi.fn(async () => "OK"), get: vi.fn<(key: string) => Promise<string | null>>(async () => null) };
 const valkeyConfigured = { value: true };
 vi.mock("@/lib/valkey/clients", () => ({ isValkeyConfigured: () => valkeyConfigured.value, valkey: () => valkeyClient }));
 vi.mock("@/lib/db/repositories/search-outbox", () => ({ getSearchOutbox: vi.fn(), ackSearchOutbox: vi.fn() }));
@@ -107,6 +107,7 @@ beforeEach(() => {
   queryLog.length = 0;
   valkeyConfigured.value = true;
   valkeyClient.set.mockClear();
+  valkeyClient.get.mockReset().mockResolvedValue(null);
   vi.mocked(alert).mockClear();
   vi.mocked(outbox.getSearchOutbox).mockReset();
   vi.mocked(outbox.ackSearchOutbox).mockReset();
@@ -228,6 +229,19 @@ describe("processOutbox (poll, lag alert)", () => {
     valkeyConfigured.value = true;
     valkeyClient.set.mockRejectedValueOnce(new Error("down"));
     await expect(indexer.reportOutboxLag(10, 1)).resolves.toBe(false);
+  });
+
+  it("reads back the stored lag for the alerts job; unknown when missing, malformed or unreadable", async () => {
+    valkeyClient.get.mockResolvedValueOnce("420");
+    expect(await indexer.readOutboxLag()).toBe(420);
+    expect(valkeyClient.get).toHaveBeenCalledWith(indexer.SEARCH_LAG_KEY);
+    expect(await indexer.readOutboxLag()).toBeNull();
+    valkeyClient.get.mockResolvedValueOnce("soon");
+    expect(await indexer.readOutboxLag()).toBeNull();
+    valkeyClient.get.mockRejectedValueOnce(new Error("down"));
+    expect(await indexer.readOutboxLag()).toBeNull();
+    valkeyConfigured.value = false;
+    expect(await indexer.readOutboxLag()).toBeNull();
   });
 
   it("indexes inline by default, one failure not stopping the others", async () => {

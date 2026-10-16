@@ -132,6 +132,23 @@ describe("enforceSearchLimit", () => {
     expect(mocks.verify).not.toHaveBeenCalled();
   });
 
+  it("still checks the first token of another device when the shared IP spent its failure budget", async () => {
+    const who = client();
+    await spend("challenge.ip", who.ip);
+    await spend("search.ip", who.ip);
+    await expect(enforceSearchLimit(request(who, { "x-turnstile-token": "solved" }))).resolves.toEqual({ passGranted: true });
+    expect(mocks.verify).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops calling siteverify for a device past its own failure budget", async () => {
+    const who = client();
+    await spend("search.device.minute", `d:${who.device.id}`);
+    await spend("challenge.device", `d:${who.device.id}`);
+    const limited = await rejection(enforceSearchLimit(request(who, { "x-turnstile-token": "bad" })));
+    expect([limited.status, limited.code]).toEqual([429, "rate_limited"]);
+    expect(mocks.verify).not.toHaveBeenCalled();
+  });
+
   it("stays open when the limiter store is down", async () => {
     const down = { ok: false, reason: "unavailable" } as const;
     vi.mocked(consumeLimit).mockResolvedValueOnce(down).mockResolvedValueOnce(down).mockResolvedValueOnce(down);

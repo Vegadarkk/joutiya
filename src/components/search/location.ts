@@ -1,4 +1,4 @@
-import { cityBySlug, cityName, regionByCode, regionName, REGIONS, searchCities } from "@/config/regions";
+import { cityBySlug, cityName, regionByCode, regionName, REGIONS, searchCities, type City } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import type { SearchParams } from "@/lib/search/params";
 import { normalizeText } from "@/lib/text/normalize";
@@ -14,7 +14,7 @@ export interface LocationValue {
 
 export type LocationOption = { kind: "all" } | { kind: "region"; code: string } | { kind: "city"; slug: string };
 
-/** Regions shown above the cities when the typed text names one. */
+/** Regions listed with the cities when the typed text names one. */
 const MAX_REGIONS = 3;
 
 export function locationOf(params: Pick<SearchParams, "city" | "region">): LocationValue {
@@ -57,7 +57,8 @@ export function locationName(value: LocationValue, locale: Locale): string | nul
 
 /**
  * Options for the typed text: empty -> the whole country then the major cities; otherwise the
- * matching regions (at most 3) then the matching cities, accent- and script-insensitive.
+ * cities whose name starts with it, the matching regions (at most 3), then the other matching
+ * cities, accent- and script-insensitive. "Casablanca" + Enter picks the city, not its region.
  */
 export function locationOptions(query: string, locale: Locale, limit = 10): LocationOption[] {
   const q = normalizeText(query);
@@ -68,8 +69,20 @@ export function locationOptions(query: string, locale: Locale, limit = 10): Loca
   })
     .slice(0, MAX_REGIONS)
     .map((region) => ({ kind: "region" as const, code: region.code }));
-  const cities = searchCities(query, locale, limit).map((city) => ({ kind: "city" as const, slug: city.slug }));
-  return [...regions, ...cities];
+  const cities = searchCities(query, locale, limit);
+  const toOption = (city: City) => ({ kind: "city" as const, slug: city.slug });
+  const first = cities.filter((city) => [city.nameFr, city.nameAr].some((name) => normalizeText(name).startsWith(q)));
+  return [...first.map(toOption), ...regions, ...cities.filter((city) => !first.includes(city)).map(toOption)];
+}
+
+/**
+ * What leaving the field after typing commits (Tab, or a click on "Rechercher" before any pick):
+ * the highlighted option, else the first one (the whole country for an emptied field); nothing
+ * when the person did not type or nothing matches.
+ */
+export function committedOption(query: string | null, options: LocationOption[], active: number): LocationOption | null {
+  if (query === null) return null;
+  return options[active] ?? options[0] ?? null;
 }
 
 /** Secondary line of a city option: its region. */

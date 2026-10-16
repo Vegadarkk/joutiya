@@ -33,9 +33,9 @@ export function PageChallenge({ next, nonce }: { next: string; nonce?: string })
         setState({ kind: "done" });
         window.location.replace(next);
       } catch (error) {
+        // No automatic new check: the managed widget solves it again within a second, so a lasting
+        // refusal (429, a configuration mismatch, the limiter down) would post in a loop.
         setState({ kind: "failed", message: apiMessage(error) });
-        // Tokens are single use: ask for a fresh one.
-        widget.current?.reset();
       } finally {
         busy.current = false;
       }
@@ -43,10 +43,29 @@ export function PageChallenge({ next, nonce }: { next: string; nonce?: string })
     [apiMessage, next],
   );
 
+  // Tokens are single use: a fresh check, on request only.
+  function again() {
+    setState({ kind: "waiting" });
+    widget.current?.reset();
+  }
+
   return (
     <div className="flex flex-col gap-5">
-      <TurnstileWidget ref={widget} action="pages" cData="anti-robot" nonce={nonce} onToken={onToken} />
-      <p role="status" aria-live="polite" className="flex min-h-6 items-center gap-2 text-sm text-foreground-muted">
+      {/* When the widget cannot load, its own alert replaces the reserved box and the status line. */}
+      <TurnstileWidget
+        ref={widget}
+        action="pages"
+        cData="anti-robot"
+        nonce={nonce}
+        onToken={onToken}
+        className="peer/turnstile has-[[role=alert]]:[&>[data-turnstile]]:min-h-0"
+      />
+      {/* The widget's own alert contradicts only the "waiting" hint: checking and done stay visible. */}
+      <p
+        role="status"
+        aria-live="polite"
+        className={`flex min-h-6 items-center gap-2 text-sm text-foreground-muted ${state.kind === "waiting" ? "peer-has-[[role=alert]]/turnstile:hidden" : ""}`}
+      >
         {state.kind === "sending" ? (
           <>
             <Spinner />
@@ -58,7 +77,18 @@ export function PageChallenge({ next, nonce }: { next: string; nonce?: string })
           t("waiting")
         ) : null}
       </p>
-      {state.kind === "failed" ? <ErrorBanner title={t("failedTitle")}>{state.message}</ErrorBanner> : null}
+      {state.kind === "failed" ? (
+        <ErrorBanner
+          title={t("failedTitle")}
+          action={
+            <Button type="button" variant="outline" onClick={again}>
+              {t("again")}
+            </Button>
+          }
+        >
+          {state.message}
+        </ErrorBanner>
+      ) : null}
       {state.kind === "done" ? (
         <Button asChild variant="structure" className="self-start">
           {/* Fallback when the automatic return is blocked. */}

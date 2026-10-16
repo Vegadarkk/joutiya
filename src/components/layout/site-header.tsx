@@ -9,12 +9,15 @@ import { Container } from "./container";
 import { LocaleSwitcher } from "./locale-switcher";
 import { Logo } from "./logo";
 
+// Every header control is a 44 px touch target (logo link included). The header search hides on
+// pages whose main content has its own search form (home, /recherche): never two fields at once.
+
 export function SiteHeader({ locale }: { locale: string }) {
   const t = useTranslations("Nav");
   return (
     <header className="threshold sticky top-0 z-40 bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/85">
       <Container className="flex h-16 items-center gap-3 md:h-20 md:gap-5">
-        <Link href="/" className="h-10 shrink-0 rounded-sm md:h-12" aria-label={t("home")}>
+        <Link href="/" className="h-11 shrink-0 rounded-sm py-0.5 md:h-12 md:py-0" aria-label={t("home")}>
           <Logo label="Joutiya" className="h-full" />
         </Link>
 
@@ -25,7 +28,12 @@ export function SiteHeader({ locale }: { locale: string }) {
           </Link>
         </Button>
 
-        <form action={`/${locale}/recherche`} method="get" role="search" className="relative hidden min-w-0 flex-1 md:block">
+        <form
+          action={`/${locale}/recherche`}
+          method="get"
+          role="search"
+          className="relative hidden min-w-0 flex-1 md:block [:root:has(#main_[role=search])_&]:hidden"
+        >
           <label htmlFor="header-search" className="sr-only">
             {t("searchLabel")}
           </label>
@@ -41,7 +49,7 @@ export function SiteHeader({ locale }: { locale: string }) {
           />
         </form>
 
-        <div className="ms-auto flex items-center gap-1 md:ms-0">
+        <div className="ms-auto flex items-center gap-1 *:min-w-11">
           <LocaleSwitcher />
           <Button asChild variant="ghost" size="icon" className="md:hidden">
             <Link href="/deposer" aria-label={t("post")}>

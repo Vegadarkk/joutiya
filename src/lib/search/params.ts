@@ -119,12 +119,20 @@ function list(value: string | undefined): string[] {
 }
 
 /**
+ * First `max` UTF-16 units of `text` (what Zod's `max` counts), unpaired surrogates dropped: a cut
+ * emoji would reach Meilisearch as a lone `\ud83d` escape, which its JSON parser rejects (400).
+ */
+export function clipText(text: string, max: number): string {
+  return text.slice(0, max).replace(/\p{Cs}/gu, "");
+}
+
+/**
  * District key: what listings are filtered and faceted by. Lowercase, accents and Arabic
  * diacritics dropped, spaces collapsed; same folding as `normalizeText` (src/lib/text/normalize.ts)
  * without its server-only dependencies.
  */
 export function districtKey(value: string): string {
-  return value
+  const key = value
     .normalize("NFKD")
     .replace(/[̀-ًͯ-ٰٟـ]/g, "")
     .replace(/[أإآٱ]/g, "ا")
@@ -133,15 +141,15 @@ export function districtKey(value: string): string {
     .toLowerCase()
     .replace(/['’`]/g, "")
     .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim()
-    .slice(0, SEARCH_DISTRICT_MAX);
+    .trim();
+  return clipText(key, SEARCH_DISTRICT_MAX);
 }
 
 /** Lenient parse of a URL query (page searchParams, URLSearchParams, saved search). */
 export function parseSearchParams(source: Source): SearchParams {
   const k = SEARCH_QUERY_KEYS;
   const params: SearchParams = {};
-  const q = read(source, k.q)?.replace(/\s+/g, " ").trim().slice(0, SEARCH_Q_MAX);
+  const q = clipText(read(source, k.q)?.replace(/\s+/g, " ").trim() ?? "", SEARCH_Q_MAX).trim();
   if (q) params.q = q;
   const category = read(source, k.category);
   if (category && ID.test(category)) params.category = category;
@@ -206,7 +214,8 @@ export function parseSearchParams(source: Source): SearchParams {
 /**
  * Removes contradictions and values outside the whitelist: subcategory implies its category,
  * city implies its region, radius and district need a city (radius wins), criteria need the
- * subcategory that declares them, distance sort needs a city, price bounds are ordered.
+ * subcategory that declares them, distance sort needs a city, price bounds are ordered and
+ * dropped by "donations only".
  */
 export function canonicalSearchParams(input: SearchParams): SearchParams {
   const params: SearchParams = { ...input };
@@ -227,6 +236,12 @@ export function canonicalSearchParams(input: SearchParams): SearchParams {
   }
   if (params.radiusKm) delete params.district;
   if (params.district !== undefined && !params.district) delete params.district;
+  // Donations have no price (document.ts), so a price bound would leave none: the donation filter
+  // wins. A price sort stays (harmless: all equal) so the sort menu never snaps back.
+  if (params.donation) {
+    delete params.priceMin;
+    delete params.priceMax;
+  }
   if (params.priceMin !== undefined && params.priceMax !== undefined && params.priceMin > params.priceMax) {
     [params.priceMin, params.priceMax] = [params.priceMax, params.priceMin];
   }

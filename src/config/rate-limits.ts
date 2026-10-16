@@ -108,14 +108,26 @@ export const RATE_LIMITS = {
   "pages.session": { points: 600, duration: HOUR, policy: "open", key: "account" },
   "pages.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
   "pages.passed.device": { points: 600, duration: HOUR, policy: "open", key: "device" },
-  // Solving the page challenge (/anti-robot): Turnstile verifications per IP.
-  "challenge.ip": { points: 30, duration: HOUR, policy: "closed", key: "ip" },
-  // Favorites: adding and removing hearts, reading the list.
-  "favorites.write.uid": { points: 300, duration: HOUR, policy: "open", key: "uid" },
+  // Turnstile tokens refused by the page and search challenges (security/challenge-handler.ts):
+  // past 10 an hour per device, 429 without a siteverify call. Per IP, 300 an hour, only held
+  // against a device that already failed, so a stranger on a shared IPv4 cannot cheaply block a
+  // first, valid solve; the hard ceiling (5x) holds whatever the device and bounds the siteverify
+  // calls of a client minting one device cookie per junk token.
+  "challenge.device": { points: 10, duration: HOUR, policy: "closed", key: "device" },
+  "challenge.ip": { points: 300, duration: HOUR, policy: "closed", key: "ip" },
+  "challenge.ip.hard": { points: 1500, duration: HOUR, policy: "closed", key: "ip" },
+  // Favorites: adding and removing hearts (one write or delete each), 300 per day per account.
+  "favorites.write.uid": { points: 300, duration: DAY, policy: "open", key: "uid" },
+  // Reading them: 1 200 calls per hour (GET /api/favorites/ids answers from the Valkey set), and
+  // the documents read like listing.owner.read.uid (a page reads up to 49, a rebuild of the hearts
+  // set up to 600): 2 500 per day per account.
   "favorites.read.uid": { points: 1200, duration: HOUR, policy: "open", key: "uid" },
-  // Saved searches (10 per account): create, rename, alert toggle, delete; list.
-  "savedSearch.write.uid": { points: 60, duration: HOUR, policy: "open", key: "uid" },
+  "favorites.docs.uid": { points: 2500, duration: DAY, policy: "open", key: "uid" },
+  // Saved searches (10 per account): create, rename, alert toggle, delete, 100 per day; list,
+  // 600 calls per hour and 1 000 documents read per day.
+  "savedSearch.write.uid": { points: 100, duration: DAY, policy: "open", key: "uid" },
   "savedSearch.read.uid": { points: 600, duration: HOUR, policy: "open", key: "uid" },
+  "savedSearch.docs.uid": { points: 1000, duration: DAY, policy: "open", key: "uid" },
   // One-click unsubscribe links of the alert e-mails (signed token, no session).
   "alerts.unsubscribe.ip": { points: 60, duration: HOUR, policy: "open", key: "ip" },
 } as const satisfies Record<string, RateLimitDefinition>;

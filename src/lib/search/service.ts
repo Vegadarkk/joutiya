@@ -128,10 +128,11 @@ function counts(distribution: Record<string, number> | undefined): Record<string
   return Object.fromEntries(Object.entries(distribution ?? {}).filter(([, count]) => count > 0));
 }
 
-function facetsOf(result: EngineResult, fields: readonly string[]): SearchFacets {
+/** `districts`: the result of the district facet query, when the main query filters a district. */
+function facetsOf(result: EngineResult, fields: readonly string[], districts: EngineResult = result): SearchFacets {
   const distribution = result.facetDistribution ?? {};
   const facets: SearchFacets = { categories: counts(distribution[FACET_FIELDS.categories]), subcategories: counts(distribution[FACET_FIELDS.subcategories]) };
-  if (fields.includes(FACET_FIELDS.districts)) facets.districts = counts(distribution[FACET_FIELDS.districts]);
+  if (fields.includes(FACET_FIELDS.districts)) facets.districts = counts(districts.facetDistribution?.[FACET_FIELDS.districts]);
   return facets;
 }
 
@@ -151,9 +152,10 @@ function firstResult(results: EngineResult[], index = 0): EngineResult {
 }
 
 /**
- * One search (D5-D8). Main query (`matchingStrategy: "all"`) and, on page 1, the À la Une pool in
- * ONE engine round trip; no hit with two words or more -> one retry with "last" (approximate
- * results). Page mode: SEARCH_PAGE_SIZE cards, SEARCH_MAX_PAGE pages at most.
+ * One search (D5-D8). Main query (`matchingStrategy: "all"`), on page 1 the À la Une pool, and with
+ * a chosen district its facet query in ONE engine round trip; no hit with two words or more -> one
+ * retry with "last" (approximate results). Page mode: SEARCH_PAGE_SIZE cards, SEARCH_MAX_PAGE pages
+ * at most.
  */
 export async function runSearch(input: SearchParams, options: RunSearchOptions = {}): Promise<SearchResponse> {
   const started = performance.now();
@@ -164,6 +166,10 @@ export async function runSearch(input: SearchParams, options: RunSearchOptions =
   const sort = effectiveSort(params);
   const q = params.q ? normalizeQuery(params.q) : "";
   const facets = options.facets === false ? [] : facetFields(params);
+  // The district choices (D7) are the other districts of the city: with a district chosen, the main
+  // query (filtered on it) would only count that one, so a facet-only query drops that filter.
+  const splitDistricts = params.district !== undefined && facets.includes(FACET_FIELDS.districts);
+  const mainFacets = splitDistricts ? facets.filter((field) => field !== FACET_FIELDS.districts) : facets;
   const main: EngineQuery = {
     q,
     filter: and([buildFilter(params, now), options.extraFilter]),
@@ -171,17 +177,24 @@ export async function runSearch(input: SearchParams, options: RunSearchOptions =
     page,
     hitsPerPage,
     matchingStrategy: "all",
-    ...(facets.length ? { facets } : {}),
+    ...(mainFacets.length ? { facets: mainFacets } : {}),
   };
+  const districtQuery: EngineQuery | undefined = splitDistricts
+    ? { q, filter: and([buildFilter({ ...params, district: undefined }, now), options.extraFilter]), page: 1, hitsPerPage: 0, matchingStrategy: "all", facets: [FACET_FIELDS.districts] }
+    : undefined;
   const withFeatured = options.featured !== false && page === 1;
   const engine = searchEngine();
-  const results = await engine.search(withFeatured ? [main, featuredQuery(params, now)] : [main]);
+  const queries = [main, ...(withFeatured ? [featuredQuery(params, now)] : []), ...(districtQuery ? [districtQuery] : [])];
+  const results = await engine.search(queries);
   let result = firstResult(results);
+  let districts = districtQuery ? firstResult(results, queries.indexOf(districtQuery)) : result;
   let approximate = false;
   if (options.approximate !== false && result.totalHits === 0 && wordCount(q) >= 2) {
-    const retry = firstResult(await engine.search([{ ...main, matchingStrategy: "last" }]));
+    const retries = await engine.search([{ ...main, matchingStrategy: "last" }, ...(districtQuery ? [{ ...districtQuery, matchingStrategy: "last" as const }] : [])]);
+    const retry = firstResult(retries);
     if (retry.totalHits > 0) {
       result = retry;
+      districts = districtQuery ? firstResult(retries, 1) : retry;
       approximate = true;
     }
   }
@@ -195,7 +208,7 @@ export async function runSearch(input: SearchParams, options: RunSearchOptions =
     page,
     totalPages: Math.min(result.totalPages, Math.ceil(SEARCH_MAX_TOTAL_HITS / hitsPerPage), SEARCH_MAX_PAGE),
     approximate,
-    facets: facetsOf(result, facets),
+    facets: facetsOf(result, facets, districts),
     tookMs: Math.round(performance.now() - started),
   };
 }

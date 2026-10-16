@@ -148,9 +148,13 @@ export async function disableAlerts(uid: string, target: string, now = new Date(
 
 // ---- Alerts job (D19) -------------------------------------------------------------------------
 
-/** Document path just after every search of `uid` (cursor at an account boundary). */
+/**
+ * Document path just after every search of `uid` (cursor at an account boundary). Its id U+F8FF
+ * sorts after every auto-ID ([A-Za-z0-9]) of the account and before the next account; kept as an
+ * escape, since the invisible literal reads like a trailing slash (a path doc() refuses).
+ */
 export function accountEndPath(uid: string): string {
-  return `${COLLECTIONS.users}/${uid}/${COLLECTIONS.savedSearches}/`;
+  return `${COLLECTIONS.users}/${uid}/${COLLECTIONS.savedSearches}/\uf8ff`;
 }
 
 /** Account of a search path users/{uid}/savedSearches/{id}. */

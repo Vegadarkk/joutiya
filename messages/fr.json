@@ -2220,6 +2220,7 @@
     "checking": "Vérification en cours…",
     "done": "C'est fait, retour à votre page…",
     "failedTitle": "La vérification n'a pas abouti",
+    "again": "Réessayer",
     "continue": "Continuer vers la page",
     "why": "Cette étape protège les annonces contre la copie automatique et reste valable 30 minutes.",
     "home": "Revenir à l'accueil"
@@ -2242,7 +2243,7 @@
       "more": "Afficher plus de favoris",
       "unavailable": "Plus disponible",
       "remove": "Retirer des favoris",
-      "removeOf": "Retirer « {title} » des favoris",
+      "removeOf": "Retirer des favoris : « {title} »",
       "savedOn": "Ajoutée le {date}",
       "removed": "Annonce retirée de vos favoris",
       "undo": "Annuler",

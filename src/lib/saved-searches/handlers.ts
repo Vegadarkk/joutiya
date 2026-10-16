@@ -4,7 +4,7 @@ import { savedSearchCreateSchema, savedSearchIdSchema, savedSearchPatchSchema, t
 import { notFound } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { json, noContent } from "@/lib/http/route";
-import { enforceLimit } from "@/lib/rate-limit/limiter";
+import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
 import { createSearch, listSearches, patchSearch, removeSearch } from "./service";
 
 // Route handlers of /api/saved-searches/** (design D18, §3): member session (Origin + CSRF on
@@ -19,11 +19,16 @@ async function searchIdOf(params: Params): Promise<string> {
   return parsed.data;
 }
 
-/** GET /api/saved-searches -> { searches }. */
+/**
+ * GET /api/saved-searches -> { searches }. Charged in Firestore documents on the daily
+ * `savedSearch.docs.uid`: one point before the read, so a spent budget reads nothing, then the rest.
+ */
 export async function handleListSearches(request: Request): Promise<Response> {
   const auth = await requireUser(request);
   await enforceLimit("savedSearch.read.uid", auth.user.uid);
+  await enforceLimit("savedSearch.docs.uid", auth.user.uid);
   const body: { searches: SavedSearchView[] } = { searches: await listSearches(auth.user.uid) };
+  if (body.searches.length > 1) await consumeLimit("savedSearch.docs.uid", auth.user.uid, body.searches.length - 1);
   return json(body);
 }
 

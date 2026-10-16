@@ -6,7 +6,7 @@ import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { Container } from "@/components/layout/container";
 import { JsonLd } from "@/components/listing/json-ld";
-import { FeaturedRow } from "@/components/search/featured-row";
+import { FeaturedRow, withoutFeatured } from "@/components/search/featured-row";
 import { ResultsGrid } from "@/components/search/results-grid";
 import { CityLinks, LandingBreadcrumb, SubcategoryChips, type LandingChip, type LandingCrumb } from "@/components/seo/landing";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { categoryById } from "@/config/categories";
 import { cityBySlug, cityName } from "@/config/regions";
 import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
-import { pageLocale } from "@/i18n/params";
+import { numbersLocale, pageLocale } from "@/i18n/params";
 import { alternates } from "@/lib/i18n/metadata";
 import { SEARCH_PATH, searchQueryObject } from "@/lib/search/params";
 import { cityLinks, resolveSeoSegments, SEO_PAGE_SIZE, seoCounts, seoPath, seoSearchParams, seoVerdict, type SeoTarget } from "@/lib/search/seo";
@@ -60,7 +60,7 @@ interface Labels {
 }
 
 async function labelsOf(locale: Locale, target: SeoTarget): Promise<Labels> {
-  const [t, names] = await Promise.all([getTranslations({ locale, namespace: "Seo" }), getTranslations({ locale, namespace: "Categories" })]);
+  const [t, names] = await Promise.all([getTranslations({ locale: numbersLocale(locale), namespace: "Seo" }), getTranslations({ locale, namespace: "Categories" })]);
   type CategoryKey = Parameters<typeof names>[0];
   const category = names(`${target.category}.name` as CategoryKey);
   const subcategory = target.subcategory ? names(`${target.category}.sub.${target.subcategory}` as CategoryKey) : undefined;
@@ -81,7 +81,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const locale = pageLocale(value);
   const data = await load(category, restKeyOf(rest));
   if (!data || data.verdict === "notFound") return {};
-  const [t, labels] = await Promise.all([getTranslations({ locale, namespace: "Seo" }), labelsOf(locale, data.target)]);
+  const [t, labels] = await Promise.all([getTranslations({ locale: numbersLocale(locale), namespace: "Seo" }), labelsOf(locale, data.target)]);
   const title = t("metaTitle", { heading: labels.heading });
   const description = data.total > 0 ? t("metaDescription", { heading: labels.heading, count: data.total }) : t("metaDescriptionEmpty", { heading: labels.heading });
   const path = seoPath(data.target);
@@ -104,8 +104,9 @@ export default async function CategoryLandingPage({ params }: { params: Params }
   if (!data || data.verdict === "notFound") notFound();
 
   const { target, response, counts, total } = data;
+  const recent = withoutFeatured(response.hits, response.featured);
   const [t, names, labels] = await Promise.all([
-    getTranslations({ locale, namespace: "Seo" }),
+    getTranslations({ locale: numbersLocale(locale), namespace: "Seo" }),
     getTranslations({ locale, namespace: "Categories" }),
     labelsOf(locale, target),
   ]);
@@ -161,16 +162,16 @@ export default async function CategoryLandingPage({ params }: { params: Params }
           </header>
         </div>
 
-        {chips.length > 1 ? <SubcategoryChips chips={chips} locale={locale} label={t("subcategoriesLabel")} /> : null}
+        {chips.length > 1 ? <SubcategoryChips chips={chips} label={t("subcategoriesLabel")} /> : null}
 
         {response.featured.length > 0 ? <FeaturedRow cards={response.featured} locale={locale} renderAction={favoriteAction} /> : null}
 
-        {response.hits.length > 0 ? (
+        {recent.length > 0 ? (
           <section aria-labelledby="landing-recent" className="flex flex-col gap-5">
             <h2 id="landing-recent" className="text-xl font-semibold">
               {t("recentTitle")}
             </h2>
-            <ResultsGrid cards={response.hits} locale={locale} priorityCount={4} renderAction={favoriteAction} />
+            <ResultsGrid cards={recent} locale={locale} priorityCount={4} renderAction={favoriteAction} />
             {total > response.hits.length ? (
               <div className="flex justify-center pt-2">
                 <Button asChild variant="outline" size="lg">

@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth/guards";
 import { favoriteListingIdSchema, type FavoriteView, type FavoritesPage } from "@/lib/contracts/search";
 import { notFound } from "@/lib/http/errors";
 import { json, noContent } from "@/lib/http/route";
-import { enforceLimit } from "@/lib/rate-limit/limiter";
+import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
 import { addFavorite, favoriteIdsOf, favoritesPage, removeFavorite } from "./service";
 
 // Route handlers of /api/favorites/** (design D17, §3): member session on every route (Origin +
@@ -27,12 +27,19 @@ export async function handleFavoriteIds(request: Request): Promise<Response> {
   return json(body);
 }
 
-/** GET /api/favorites?cursor= -> FavoritesPage. */
+/**
+ * GET /api/favorites?cursor= -> FavoritesPage. Charged in Firestore documents on the daily
+ * `favorites.docs.uid`: one point before the read, so a spent budget reads nothing, then the rest.
+ */
 export async function handleFavorites(request: Request): Promise<Response> {
   const auth = await requireUser(request);
   const cursor = new URL(request.url).searchParams.get("cursor") ?? undefined;
   await enforceLimit("favorites.read.uid", auth.user.uid);
+  await enforceLimit("favorites.docs.uid", auth.user.uid);
   const body: FavoritesPage = await favoritesPage(auth.user.uid, cursor || undefined);
+  // The page read one favorite more when another page follows.
+  const documents = body.favorites.length + (body.next ? 1 : 0);
+  if (documents > 1) await consumeLimit("favorites.docs.uid", auth.user.uid, documents - 1);
   return json(body);
 }
 

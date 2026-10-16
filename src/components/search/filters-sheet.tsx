@@ -50,6 +50,16 @@ export function withCategory(draft: SearchParams, value: string): SearchParams {
   return next;
 }
 
+/**
+ * Whether Escape belongs to the focused field: an open combobox list (the place) closes itself.
+ * Radix catches Escape on the document in the capture phase, before the field's own handler.
+ */
+export function escapeClosesList(target: EventTarget | null): boolean {
+  if (!target || !("getAttribute" in target)) return false;
+  const element = target as Element;
+  return element.getAttribute("role") === "combobox" && element.getAttribute("aria-expanded") === "true";
+}
+
 /** The draft after choosing a place: radius and district belong to the previous city. */
 export function withLocation(draft: SearchParams, location: LocationValue): SearchParams {
   if (sameLocation(locationOf(draft), location)) return draft;
@@ -122,15 +132,20 @@ export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-bab-950/50 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-bab-950/50 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
         <Dialog.Content
           aria-describedby={undefined}
           data-testid="filters-sheet"
+          onEscapeKeyDown={(event) => {
+            if (escapeClosesList(event.target)) event.preventDefault();
+          }}
           className={cn(
             "fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-2xl border-t border-border bg-surface text-foreground shadow-2xl shadow-bab-950/30 outline-none",
             "sm:inset-y-0 sm:start-auto sm:end-0 sm:max-h-none sm:w-[26rem] sm:rounded-none sm:border-t-0 sm:border-s",
             "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom",
             "sm:data-[state=open]:[--tw-enter-translate-y:0] ltr:sm:data-[state=open]:slide-in-from-right rtl:sm:data-[state=open]:slide-in-from-left",
+            "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom",
+            "sm:data-[state=closed]:[--tw-exit-translate-y:0] ltr:sm:data-[state=closed]:slide-out-to-right rtl:sm:data-[state=closed]:slide-out-to-left",
           )}
         >
           <div aria-hidden="true" className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border-strong sm:hidden" />

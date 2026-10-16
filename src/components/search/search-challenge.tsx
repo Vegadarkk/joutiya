@@ -56,11 +56,20 @@ export function SearchChallenge({ params, className }: { params: SearchParams; c
   }
 
   // Tokens are single use: a new check, on request only (the development widget answers at once,
-  // so an automatic reset after a refusal would loop).
+  // so an automatic reset after a refusal would loop). From "limited" the widget mounts afresh.
   function again() {
     setState({ kind: "idle" });
     widget.current?.reset();
   }
+
+  const problem =
+    state.kind === "limited"
+      ? t("limited", { wait: formatWait(locale, state.retryAfter, t("later")) })
+      : state.kind === "failed"
+        ? t("failed")
+        : state.kind === "error"
+          ? t("error")
+          : null;
 
   return (
     <section data-testid="search-challenge" aria-labelledby="search-challenge-title" className={cn("mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-12 text-center", className)}>
@@ -71,20 +80,16 @@ export function SearchChallenge({ params, className }: { params: SearchParams; c
         {t("title")}
       </h2>
       <p className="text-foreground-muted text-pretty">{t("body")}</p>
-      {state.kind === "limited" ? (
-        <InlineError>{t("limited", { wait: formatWait(locale, state.retryAfter, t("later")) })}</InlineError>
-      ) : (
-        <TurnstileWidget ref={widget} action="search" cData="search-page" onToken={onToken} className="w-full max-w-xs" />
-      )}
+      {state.kind === "limited" ? null : <TurnstileWidget ref={widget} action="search" cData="search-page" onToken={onToken} className="w-full max-w-xs" />}
       {busy ? (
         <p role="status" className="flex items-center gap-2 text-sm text-foreground-muted">
           <Spinner />
           {t("checking")}
         </p>
       ) : null}
-      {state.kind === "failed" || state.kind === "error" ? (
+      {problem ? (
         <div className="flex flex-col items-center gap-3">
-          <InlineError>{state.kind === "failed" ? t("failed") : t("error")}</InlineError>
+          <InlineError>{problem}</InlineError>
           <Button type="button" variant="outline" onClick={again}>
             {t("again")}
           </Button>

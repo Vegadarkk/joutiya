@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cityBySlug } from "@/config/regions";
-import { SEARCH_MAX_PAGE, SEARCH_PAGE_SIZE, parseSearchParams, type SearchParams } from "@/lib/search/params";
+import { SEARCH_MAX_PAGE, SEARCH_PAGE_SIZE, parseSearchParams, searchPath, type SearchParams } from "@/lib/search/params";
 import { SearchUnavailableError, type CardDocument, type EngineQuery, type EngineResult } from "@/lib/search/types";
 
 // Search service (design D5-D8) against a scripted engine: the filter of every parameter, the sort
@@ -113,6 +113,13 @@ describe("buildFilter", () => {
     expect(filter({ donation: true })).toEqual({ field: "isDonation", op: "eq", value: true });
     expect(filter({ withPhoto: true })).toEqual({ field: "hasPhoto", op: "eq", value: true });
     expect(filter({ conditions: ["good", "new_tagged"] })).toEqual({ field: "condition", op: "in", values: ["new_tagged", "good"] });
+  });
+
+  it("lets donations win over price bounds (donations have no price)", () => {
+    expect(filter({ donation: true, priceMin: 10, priceMax: 500 })).toEqual({ field: "isDonation", op: "eq", value: true });
+    const params = parseSearchParams(new URLSearchParams("don=1&prix-min=0&prix-max=500&tri=prix-croissant"));
+    expect(params).toEqual({ donation: true, sort: "price_asc" });
+    expect(searchPath({ priceMax: 500, donation: true })).toBe("/recherche?don=1");
   });
 
   it("filters criteria by kind on their a_* fields, only for the chosen subcategory", () => {
@@ -293,6 +300,32 @@ describe("runSearch", () => {
     expect(queriesOf(0)[0]).toMatchObject({ sort: [{ field: "price", dir: "desc" }], facets: ["categoryId", "subcategoryId", "district"] });
     expect(response.sort).toBe("price_desc");
     expect(response.facets.districts).toEqual({ maarif: 3 });
+  });
+
+  it("counts the other districts of the city while one is chosen (D7)", async () => {
+    const extra = { field: "sortAt", op: "gt" as const, value: 5 };
+    script([
+      result([card("d1")], { facetDistribution: { categoryId: { immobilier: 1 }, subcategoryId: { location: 1 } } }),
+      result([]),
+      result([], { totalHits: 9, totalPages: 0, facetDistribution: { district: { maarif: 1, gauthier: 8, oasis: 0 } } }),
+    ]);
+    const response = await runSearch({ q: "studio", city: "casablanca", district: "maarif" }, { now: NOW, extraFilter: extra });
+    expect(engine.search).toHaveBeenCalledTimes(1);
+    const [main, featured, districts] = queriesOf(0);
+    expect(main?.facets).toEqual(["categoryId", "subcategoryId"]);
+    expect(main?.filter).toEqual({ and: [{ and: [{ field: "citySlug", op: "eq", value: "casablanca" }, { field: "district", op: "eq", value: "maarif" }] }, extra] });
+    expect(featured?.filter).toMatchObject({ and: [{ field: "citySlug", op: "eq", value: "casablanca" }, { field: "featuredUntil", op: "gt" }] });
+    expect(districts).toEqual({ q: "studio", filter: { and: [{ field: "citySlug", op: "eq", value: "casablanca" }, extra] }, page: 1, hitsPerPage: 0, matchingStrategy: "all", facets: ["district"] });
+    expect(response.facets).toEqual({ categories: { immobilier: 1 }, subcategories: { location: 1 }, districts: { maarif: 1, gauthier: 8 } });
+    expect(response).toMatchObject({ total: 1, params: { district: "maarif" } });
+
+    // Without À la Une, and with the approximate retry: the district counts follow the retry.
+    script([result([]), result([], { facetDistribution: { district: { gauthier: 2 } } })], [result([card("p1")]), result([], { facetDistribution: { district: { maarif: 1, gauthier: 5 } } })]);
+    const retried = await runSearch({ q: "studio meublé", city: "casablanca", district: "maarif" }, { featured: false, now: NOW });
+    expect(queriesOf(1)).toHaveLength(2);
+    expect(queriesOf(2).map((query) => query.matchingStrategy)).toEqual(["last", "last"]);
+    expect(queriesOf(2)[1]).toMatchObject({ hitsPerPage: 0, facets: ["district"] });
+    expect(retried).toMatchObject({ approximate: true, facets: { districts: { maarif: 1, gauthier: 5 } } });
   });
 
   it("asks no facets when disabled and ANDs an extra filter", async () => {

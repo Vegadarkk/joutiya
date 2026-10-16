@@ -7,7 +7,8 @@ import ar from "../../messages/ar.json";
 import fr from "../../messages/fr.json";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { FavoriteCard, formatSavedDate } from "@/components/favorites/favorite-card";
-import { FavoritesView } from "@/components/favorites/favorites-view";
+import { FavoritesGrid, FavoritesView, type FavoritesList } from "@/components/favorites/favorites-view";
+import { RESULTS_GRID_CLASS } from "@/components/search/grid";
 import { UnsubscribeConfirm } from "@/components/alerts/unsubscribe-confirm";
 import type { Locale } from "@/config/site";
 import type { FavoriteView } from "@/lib/contracts/search";
@@ -108,6 +109,17 @@ describe("FavoriteCard", () => {
     expect(text(arabic)).toContain("الدار البيضاء");
   });
 
+  it("names each remove button with its visible label first (WCAG 2.5.3), in fr and ar", () => {
+    const label = (html: string) => html.match(/aria-label="([^"]+)"/)?.[1]?.replace(/&#x27;/g, "'") ?? "";
+    for (const [locale, messages] of [["fr", fr], ["ar", ar]] as const) {
+      const live = render(<FavoriteCard favorite={FAVORITE} mediaBaseUrl={MEDIA} locale={locale} onRemove={() => undefined} />, locale);
+      const gone = render(<FavoriteCard favorite={{ ...FAVORITE, available: false }} mediaBaseUrl={MEDIA} locale={locale} onRemove={() => undefined} />, locale);
+      expect(label(live).startsWith(messages.Favorites.page.remove)).toBe(true);
+      expect(label(live)).toContain("Vélo de ville");
+      expect(label(gone).startsWith(messages.Favorites.page.remove)).toBe(true);
+    }
+  });
+
   it("formats the saved day as day and month", () => {
     expect(formatSavedDate("2026-10-12T12:00:00.000Z", "fr")).toBe("12 octobre");
     expect(formatSavedDate("2026-10-12T12:00:00.000Z", "ar")).toContain("أكتوبر");
@@ -118,6 +130,32 @@ describe("FavoritesView", () => {
   it("starts on its loading state", () => {
     const html = render(<FavoritesView />);
     expect(html).toContain(fr.Favorites.page.loading);
+  });
+});
+
+describe("FavoritesGrid", () => {
+  const grid = (list: FavoritesList, locale: Locale = "fr") => render(<FavoritesGrid list={list} busy={new Set()} onRemove={() => undefined} onMore={() => undefined} />, locale);
+
+  it("lays the cards out in the search results grid, with more to load", () => {
+    const html = grid({ favorites: [FAVORITE], next: "cursor", more: "idle" });
+    expect(html).toContain(`class="${RESULTS_GRID_CLASS}" data-testid="favorites-grid"`);
+    expect(RESULTS_GRID_CLASS).toContain("lg:grid-cols-4");
+    expect(text(html)).toContain(fr.Favorites.page.more);
+    expect(text(grid({ favorites: [FAVORITE], more: "idle" }))).not.toContain(fr.Favorites.page.more);
+  });
+
+  it("says empty only once no page is left to load", () => {
+    expect(text(grid({ favorites: [], more: "idle" }))).toContain(fr.Favorites.page.emptyTitle);
+    expect(text(grid({ favorites: [], more: "idle" }, "ar"))).toContain(ar.Favorites.page.emptyTitle);
+    // Removals emptied the loaded page while 12 favorites remain: the next page loads in its place.
+    const refilling = grid({ favorites: [], next: "cursor", more: "loading" });
+    expect(text(refilling)).not.toContain(fr.Favorites.page.emptyTitle);
+    expect(refilling).toContain('aria-busy="true"');
+    expect(refilling).not.toContain("<button");
+    // That load failed: the retry button stays reachable.
+    const failed = grid({ favorites: [], next: "cursor", more: "failed" });
+    expect(text(failed)).not.toContain(fr.Favorites.page.emptyTitle);
+    expect(text(failed)).toContain(fr.Favorites.page.retry);
   });
 });
 

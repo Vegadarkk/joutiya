@@ -1,16 +1,21 @@
 "use client";
 
 import { Globe } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { Link, usePathname } from "@/i18n/navigation";
 import { LOCALES, type Locale } from "@/config/site";
 import { cn } from "@/lib/utils";
 
+// The same page in another language, query string included: search filters, ?next= of the
+// challenge page and the unsubscribe token live in the URL. The items read the query only once the
+// menu opens (Radix mounts the content on open): useSearchParams never runs while a static page
+// prerenders, so the header needs no Suspense boundary.
+
 export function LocaleSwitcher({ className }: { className?: string }) {
   const t = useTranslations("Locale");
   const current = useLocale() as Locale;
-  const pathname = usePathname();
   return (
     <DropdownMenu.Root modal={false}>
       <DropdownMenu.Trigger
@@ -33,25 +38,33 @@ export function LocaleSwitcher({ className }: { className?: string }) {
             "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           )}
         >
-          {LOCALES.map((locale) => (
-            <DropdownMenu.Item key={locale} asChild>
-              <Link
-                href={pathname}
-                locale={locale}
-                lang={locale === "rif" ? "rif-Latn" : locale}
-                aria-current={locale === current ? "true" : undefined}
-                className={cn(
-                  "flex cursor-pointer items-center justify-between gap-6 rounded-sm px-3 py-2 text-sm outline-none",
-                  "data-[highlighted]:bg-surface-muted aria-[current=true]:font-semibold",
-                )}
-              >
-                {t(`names.${locale}`)}
-                {locale === current ? <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" /> : null}
-              </Link>
-            </DropdownMenu.Item>
-          ))}
+          <LocaleItems current={current} />
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
   );
+}
+
+function LocaleItems({ current }: { current: Locale }) {
+  const t = useTranslations("Locale");
+  const pathname = usePathname();
+  const query = useSearchParams().toString();
+  const href = query ? `${pathname}?${query}` : pathname;
+  return LOCALES.map((locale) => (
+    <DropdownMenu.Item key={locale} asChild>
+      <Link
+        href={href}
+        locale={locale}
+        lang={locale === "rif" ? "rif-Latn" : locale}
+        aria-current={locale === current ? "true" : undefined}
+        className={cn(
+          "flex min-h-11 cursor-pointer items-center justify-between gap-6 rounded-sm px-3 py-2 text-sm outline-none",
+          "data-[highlighted]:bg-surface-muted aria-[current=true]:font-semibold",
+        )}
+      >
+        {t(`names.${locale}`)}
+        {locale === current ? <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" /> : null}
+      </Link>
+    </DropdownMenu.Item>
+  ));
 }

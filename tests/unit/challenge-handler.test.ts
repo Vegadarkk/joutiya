@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as turnstile from "@/lib/security/turnstile";
 import { POST } from "@/app/api/challenge/pass/route";
 import { resetServerEnv } from "@/lib/env";
-import { resetRateLimiters } from "@/lib/rate-limit/limiter";
+import { RATE_LIMITS } from "@/config/rate-limits";
+import { consumeLimit, resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { hasChallengePass } from "@/lib/security/challenge-pass";
 import { newDeviceCookie } from "@/lib/security/device";
 
@@ -81,19 +82,62 @@ describe("POST /api/challenge/pass", () => {
     }
   });
 
-  it("answers 403 turnstile_failed, then 429 without siteverify once the IP spent its failures", async () => {
+  it("answers 403 turnstile_failed, then 429 without siteverify once the device spent its failures", async () => {
     verify.mockResolvedValue({ ok: false, codes: ["invalid-input-response"] });
-    for (let i = 0; i < 30; i += 1) {
-      const response = await POST(post({ token: "bad" }, { ip: "198.51.100.9" }), context);
+    const device = newDeviceCookie();
+    const cookie = `__Host-did=${device.value}`;
+    for (let i = 0; i < RATE_LIMITS["challenge.device"].points; i += 1) {
+      const response = await POST(post({ token: "bad" }, { ip: "198.51.100.9", cookie }), context);
       expect(response.status).toBe(403);
     }
-    expect(verify).toHaveBeenCalledTimes(30);
-    const blocked = await POST(post({ token: "bad" }, { ip: "198.51.100.9" }), context);
+    verify.mockClear();
+    const blocked = await POST(post({ token: "bad" }, { ip: "198.51.100.9", cookie }), context);
     expect(blocked.status).toBe(429);
     expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThan(0);
-    expect(verify).toHaveBeenCalledTimes(30);
-    // Another IP is not affected.
+    expect(verify).not.toHaveBeenCalled();
+    // Another device behind the same IP is not affected.
     verify.mockResolvedValue({ ok: true, codes: [] });
-    expect((await POST(post({ token: "solved" }, { ip: "198.51.100.10" }), context)).status).toBe(204);
+    expect((await POST(post({ token: "solved" }, { ip: "198.51.100.9", cookie: `__Host-did=${newDeviceCookie().value}` }), context)).status).toBe(204);
+  });
+
+  it("never lets junk tokens from one client refuse a valid solve to another on a shared IP", async () => {
+    // Carrier-grade NAT: a client cycling device cookies spends the IP's whole failure budget.
+    verify.mockResolvedValue({ ok: false, codes: ["invalid-input-response"] });
+    await consumeLimit("challenge.ip", "198.51.100.20", RATE_LIMITS["challenge.ip"].points - 1);
+    expect((await POST(post({ token: "bad" }, { ip: "198.51.100.20", cookie: `__Host-did=${newDeviceCookie().value}` }), context)).status).toBe(403);
+
+    // A person behind the same address, first try: checked and passed.
+    verify.mockResolvedValue({ ok: true, codes: [] });
+    expect((await POST(post({ token: "solved" }, { ip: "198.51.100.20", cookie: `__Host-did=${newDeviceCookie().value}` }), context)).status).toBe(204);
+
+    // A device that already failed meets the IP brake: no siteverify call.
+    const guesser = `__Host-did=${newDeviceCookie().value}`;
+    verify.mockResolvedValue({ ok: false, codes: ["invalid-input-response"] });
+    expect((await POST(post({ token: "bad" }, { ip: "198.51.100.20", cookie: guesser }), context)).status).toBe(403);
+    verify.mockClear();
+    expect((await POST(post({ token: "bad" }, { ip: "198.51.100.20", cookie: guesser }), context)).status).toBe(429);
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it("stops a client minting one device cookie per junk token at the hard IP ceiling", async () => {
+    verify.mockResolvedValue({ ok: false, codes: ["invalid-input-response"] });
+    await consumeLimit("challenge.ip.hard", "198.51.100.40", RATE_LIMITS["challenge.ip.hard"].points - 1);
+    expect((await POST(post({ token: "bad" }, { ip: "198.51.100.40", cookie: `__Host-did=${newDeviceCookie().value}` }), context)).status).toBe(403);
+    verify.mockClear();
+    const fresh = await POST(post({ token: "bad" }, { ip: "198.51.100.40", cookie: `__Host-did=${newDeviceCookie().value}` }), context);
+    expect(fresh.status).toBe(429);
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it("does not count siteverify outages against the client", async () => {
+    const cookie = `__Host-did=${newDeviceCookie().value}`;
+    verify.mockResolvedValue({ ok: false, codes: ["unreachable"] });
+    for (let i = 0; i < RATE_LIMITS["challenge.device"].points + 2; i += 1) {
+      expect((await POST(post({ token: "solved" }, { ip: "198.51.100.30", cookie }), context)).status).toBe(403);
+    }
+    verify.mockResolvedValue({ ok: false, codes: ["http-502"] });
+    expect((await POST(post({ token: "solved" }, { ip: "198.51.100.30", cookie }), context)).status).toBe(403);
+    verify.mockResolvedValue({ ok: true, codes: [] });
+    expect((await POST(post({ token: "solved" }, { ip: "198.51.100.30", cookie }), context)).status).toBe(204);
   });
 });

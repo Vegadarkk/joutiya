@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 // The seller block of the listing page (art. 6(3) DSA: who offers the item is always shown) and the
 // header of the public profile: door-shaped initial (the brand's arch over a gold threshold), name,
 // seniority, verified badges, listings online. No contact data: the number only comes from the
-// reveal API, the contact actions are passed in as children.
+// reveal API, the contact actions are passed in as children. The profile links never prefetch: a
+// prefetch counts against the page-view limits like a visit (/profil is metered, D14).
 
 /** "2025-10" -> "octobre 2025" / "أكتوبر 2025". */
 export function formatMemberSince(yearMonth: string, locale: Locale): string {
@@ -86,7 +87,7 @@ export function SellerCard({ seller, fallbackName, fallbackType, locale, childre
           <p className="text-xs text-foreground-muted">{type === "pro" ? t("roleBusiness") : t("roleIndividual")}</p>
           <h2 id="seller-name" className="flex flex-wrap items-center gap-2 text-lg font-semibold leading-tight">
             {seller ? (
-              <Link href={`/profil/${seller.publicId}`} className="break-words rounded-sm hover:underline hover:underline-offset-2">
+              <Link href={`/profil/${seller.publicId}`} prefetch={false} className="break-words rounded-sm hover:underline hover:underline-offset-2">
                 {name}
               </Link>
             ) : (
@@ -105,7 +106,7 @@ export function SellerCard({ seller, fallbackName, fallbackType, locale, childre
       </div>
       {seller ? <SellerBadges badges={seller.badges} sellerType={seller.sellerType} /> : null}
       {seller ? (
-        <Link href={`/profil/${seller.publicId}`} className="-my-3 inline-flex min-h-11 items-center self-start rounded-sm text-sm font-medium text-link underline underline-offset-4 hover:no-underline">
+        <Link href={`/profil/${seller.publicId}`} prefetch={false} className="-my-3 inline-flex min-h-11 items-center self-start rounded-sm text-sm font-medium text-link underline underline-offset-4 hover:no-underline">
           {t("listingsOnline", { count: seller.publishedCount })}
         </Link>
       ) : null}

@@ -27,6 +27,14 @@ import { useSearchSummary } from "./summary";
 
 type View = { kind: "loading" } | { kind: "failed"; error: unknown } | { kind: "ready"; searches: SavedSearchView[] };
 
+/** Searches with a request in flight, one lock each: overlapping requests never unlock each other. */
+export function withBusy(busy: ReadonlySet<string>, id: string, value: boolean): ReadonlySet<string> {
+  const next = new Set(busy);
+  if (value) next.add(id);
+  else next.delete(id);
+  return next;
+}
+
 export function formatDay(iso: string, locale: Locale): string {
   return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "long", timeZone: "Africa/Casablanca" }).format(new Date(iso));
 }
@@ -191,7 +199,7 @@ export function SavedSearchesView() {
   const t = useTranslations("SavedSearches.page");
   const apiMessage = useApiErrorMessage();
   const [view, setView] = useState<View>({ kind: "loading" });
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
   const [renaming, setRenaming] = useState<SavedSearchView | null>(null);
   const [deleting, setDeleting] = useState<SavedSearchView | null>(null);
   // Bumped by retry(): the effect loads the list again.
@@ -220,7 +228,9 @@ export function SavedSearchesView() {
   const replace = (search: SavedSearchView) => setView((current) => (current.kind === "ready" ? { kind: "ready", searches: current.searches.map((item) => (item.id === search.id ? search : item)) } : current));
 
   async function onAlert(search: SavedSearchView, on: boolean) {
-    setBusy(search.id);
+    // One PATCH per search at a time: answers landing out of order would show the wrong state.
+    if (busy.has(search.id)) return;
+    setBusy((current) => withBusy(current, search.id, true));
     replace({ ...search, alert: on ? "daily" : "none" });
     try {
       const { search: updated } = await updateSavedSearch(search.id, { alert: on ? "daily" : "none" });
@@ -230,14 +240,14 @@ export function SavedSearchesView() {
       replace(search);
       toast.error(apiMessage(error));
     } finally {
-      setBusy(null);
+      setBusy((current) => withBusy(current, search.id, false));
     }
   }
 
   async function onConfirmDelete() {
     const search = deleting;
-    if (!search) return;
-    setBusy(search.id);
+    if (!search || busy.has(search.id)) return;
+    setBusy((current) => withBusy(current, search.id, true));
     try {
       await deleteSavedSearch(search.id);
       setView((current) => (current.kind === "ready" ? { kind: "ready", searches: current.searches.filter((item) => item.id !== search.id) } : current));
@@ -246,7 +256,7 @@ export function SavedSearchesView() {
     } catch (error) {
       toast.error(apiMessage(error));
     } finally {
-      setBusy(null);
+      setBusy((current) => withBusy(current, search.id, false));
     }
   }
 
@@ -300,7 +310,7 @@ export function SavedSearchesView() {
             <SearchRow
               key={search.id}
               search={search}
-              busy={busy === search.id}
+              busy={busy.has(search.id)}
               onAlert={(on) => void onAlert(search, on)}
               onRename={() => setRenaming(search)}
               onDelete={() => setDeleting(search)}
@@ -328,7 +338,7 @@ export function SavedSearchesView() {
         body={t("confirm.body")}
         cancelLabel={t("confirm.cancel")}
         confirmLabel={t("confirm.confirm")}
-        loading={deleting !== null && busy === deleting.id}
+        loading={deleting !== null && busy.has(deleting.id)}
         onConfirm={() => void onConfirmDelete()}
       />
     </div>

@@ -58,6 +58,9 @@ export function FavoriteButton({ listingId, className, variant = "overlay" }: Fa
       toast.error(apiMessage(new ApiError(0, "network")));
       return;
     }
+    // A request for this listing is in flight: setFavorite would ignore the click, so no ring or
+    // "added" toast may claim a change (the ids already show the pending one).
+    if (store.busy.has(listingId)) return;
     const next = !store.ids.has(listingId);
     if (next) setBurst((value) => value + 1);
     try {

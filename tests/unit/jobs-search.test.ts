@@ -4,11 +4,13 @@ import type * as Queue from "@/lib/search/queue";
 import { SearchUnavailableError, type SearchEngine } from "@/lib/search/types";
 
 // The search queue's consumer (design D9): job dispatch, engine readiness before the first write
-// (memoized, retried after a failure), and the searchOutbox onSnapshot watch: reads counted per
-// delivered entry, restart with a doubling backoff, clean stop.
+// (memoized, retried after a failure), the poll's read bounds (engine down, writes failing, every
+// entry held, read quota spent) and the searchOutbox onSnapshot watch: reads counted per delivered
+// entry, restart with a doubling backoff, clean stop.
 
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
-vi.mock("@/lib/quota", () => ({ consume: vi.fn(async () => ({ level: "ok" })) }));
+const degraded = new Set<string>();
+vi.mock("@/lib/quota", () => ({ consume: vi.fn(async () => ({ level: "ok" })), isDegraded: vi.fn(async (id: string) => degraded.has(id)) }));
 vi.mock("@/lib/firebase/admin", () => ({ db: vi.fn() }));
 vi.mock("@/lib/search/indexer", () => ({ OUTBOX_POLL_LIMIT: 200, indexListing: vi.fn(async () => ({ acked: true })), processOutbox: vi.fn(async () => ({ pending: 0, lagSeconds: 0, alerted: false })) }));
 vi.mock("@/lib/search/boosts", async (importOriginal) => ({ ...(await importOriginal<typeof Boosts>()), expireBoost: vi.fn(async () => true) }));
@@ -32,6 +34,7 @@ const jobs = await import("@/worker/jobs/search");
 
 beforeEach(() => {
   jobs.resetEngineReadyForTests();
+  degraded.clear();
   engineState.throwOnAccess = false;
   ensureReady.mockReset().mockResolvedValue({ created: false, settingsUpdated: false });
   healthy.mockReset().mockResolvedValue(true);
@@ -98,6 +101,89 @@ describe("processSearchJob", () => {
     vi.advanceTimersByTime(jobs.FAILED_HOLD_MS);
     await (await poll())?.dispatch?.(["bcdefghj"]);
     expect(enqueueIndexJobs).toHaveBeenLastCalledWith(["bcdefghj"]);
+  });
+
+  it("a full page of held entries makes the next polls read only the oldest one, until it changes or FAILED_HOLD_MS passes", async () => {
+    vi.useFakeTimers();
+    await (await poll())?.dispatch?.(["abcdefgh", "bcdefghj"]);
+    // Every entry read is held (jobs failing or still running): nothing to dispatch.
+    const held = await poll();
+    expect(held?.limit).toBe(200);
+    await held?.dispatch?.(["abcdefgh", "bcdefghj"]);
+    const quiet = await poll();
+    expect(quiet?.limit).toBe(1);
+    await quiet?.dispatch?.(["abcdefgh"]);
+    vi.advanceTimersByTime(jobs.POLL_REDISPATCH_MS);
+    // Still the same oldest entry: dispatched alone once due, the rest is not read.
+    const probe = await poll();
+    expect(probe?.limit).toBe(1);
+    await probe?.dispatch?.(["abcdefgh"]);
+    expect(enqueueIndexJobs).toHaveBeenLastCalledWith(["abcdefgh"]);
+    // A new oldest entry (the old one was acknowledged): a full page again.
+    await (await poll())?.dispatch?.(["cdefghjk"]);
+    expect(enqueueIndexJobs).toHaveBeenLastCalledWith(["cdefghjk"]);
+    const full = await poll();
+    expect(full?.limit).toBe(200);
+    await full?.dispatch?.(["abcdefgh", "cdefghjk"]);
+    expect((await poll())?.limit).toBe(1);
+    vi.advanceTimersByTime(jobs.FAILED_HOLD_MS);
+    expect((await poll())?.limit).toBe(200);
+  });
+
+  it("a listing failing for good again waits twice as long each time, until one of its jobs succeeds", async () => {
+    vi.useFakeTimers();
+    const dispatchedAfter = async (ms: number) => {
+      vi.advanceTimersByTime(ms);
+      vi.mocked(enqueueIndexJobs).mockClear();
+      await (await poll())?.dispatch?.(["abcdefgh"]);
+      return vi.mocked(enqueueIndexJobs).mock.calls.length > 0;
+    };
+    jobs.holdFailedListing("abcdefgh");
+    expect(await dispatchedAfter(jobs.FAILED_HOLD_MS - 1)).toBe(false);
+    expect(await dispatchedAfter(1)).toBe(true);
+    jobs.holdFailedListing("abcdefgh");
+    expect(await dispatchedAfter(2 * jobs.FAILED_HOLD_MS - 1)).toBe(false);
+    expect(await dispatchedAfter(1)).toBe(true);
+    for (let i = 0; i < 10; i += 1) jobs.holdFailedListing("abcdefgh");
+    expect(await dispatchedAfter(jobs.FAILED_HOLD_MAX_MS - 1)).toBe(false);
+    expect(await dispatchedAfter(1)).toBe(true);
+    // A job that succeeds ends the run of failures.
+    await jobs.processSearchJob({ name: "index-listing", data: { id: "abcdefgh" } });
+    jobs.holdFailedListing("abcdefgh");
+    expect(await dispatchedAfter(jobs.FAILED_HOLD_MS)).toBe(true);
+  });
+
+  it("with index writes failing while reads answer, the poll dispatches the oldest entry alone until a write goes through", async () => {
+    vi.useFakeTimers();
+    vi.mocked(indexListing).mockRejectedValueOnce(new SearchUnavailableError("meilisearch 403 invalid_api_key"));
+    await expect(jobs.processSearchJob({ name: "index-listing", data: { id: "abcdefgh" } })).rejects.toBeInstanceOf(SearchUnavailableError);
+    vi.advanceTimersByTime(jobs.ENGINE_BACKOFF_MS);
+    const probe = await poll();
+    expect(healthy).toHaveBeenCalled();
+    expect(probe?.limit).toBe(1);
+    await probe?.dispatch?.(["bcdefghj"]);
+    expect(enqueueIndexJobs).toHaveBeenLastCalledWith(["bcdefghj"]);
+    // A job that wrote nothing (entry already acknowledged) proves nothing.
+    vi.mocked(indexListing).mockResolvedValueOnce({ id: "cdefghjk", action: "none", version: null, acked: true, pending: false, passes: 0 });
+    await jobs.processSearchJob({ name: "index-listing", data: { id: "cdefghjk" } });
+    expect((await poll())?.limit).toBe(1);
+    vi.mocked(indexListing).mockResolvedValueOnce({ id: "bcdefghj", action: "upsert", version: 2, acked: true, pending: false, passes: 1 });
+    await jobs.processSearchJob({ name: "index-listing", data: { id: "bcdefghj" } });
+    expect((await poll())?.limit).toBe(200);
+    // No write going through (the oldest entry held): a page again after FAILED_HOLD_MS.
+    vi.mocked(indexListing).mockRejectedValueOnce(new SearchUnavailableError("meilisearch 403 invalid_api_key"));
+    await expect(jobs.processSearchJob({ name: "index-listing", data: { id: "abcdefgh" } })).rejects.toBeInstanceOf(SearchUnavailableError);
+    vi.advanceTimersByTime(jobs.ENGINE_BACKOFF_MS);
+    expect((await poll())?.limit).toBe(1);
+    vi.advanceTimersByTime(jobs.FAILED_HOLD_MS);
+    expect((await poll())?.limit).toBe(200);
+  });
+
+  it("reads only the oldest entry while the Firestore read quota is spent", async () => {
+    degraded.add("firestore.reads");
+    expect((await poll())?.limit).toBe(1);
+    degraded.clear();
+    expect((await poll())?.limit).toBe(200);
   });
 
   it("after an unavailable engine, index jobs fail fast without reading Firestore, then probe again", async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ambiguousLexiconKeys, ambiguousSkeletons, arabiziCanonical, arabiziSkeleton, classifyToken, foldDigits, normalizeQuery } from "@/lib/search/normalize";
+import { ambiguousLexiconKeys, arabiziCanonical, classifyToken, foldDigits, normalizeQuery } from "@/lib/search/normalize";
+import { districtKey, parseSearchParams } from "@/lib/search/params";
 
 // Token tests of the research reference implementation (darija-synonyms.json, arabizi.rule.tests).
 const TOKEN_CASES: [input: string, cls: "N" | "P" | "A", key: string][] = [
@@ -40,6 +41,12 @@ const TOKEN_CASES: [input: string, cls: "N" | "P" | "A", key: string][] = [
   ["i7", "P", "i7"],
   ["b2b", "P", "b2b"],
   ["mp3", "P", "mp3"],
+  // Digit-first models and ordinals (oneplus 8t, xiaomi 9rt, airpods 3rd): "3rd" keys to "ard" (terrain).
+  ["8t", "P", "8t"],
+  ["7t", "P", "7t"],
+  ["9rt", "P", "9rt"],
+  ["3rd", "P", "3rd"],
+  ["5th", "P", "5th"],
 ];
 
 describe("classifyToken (arabizi digit guard)", () => {
@@ -78,8 +85,20 @@ describe("normalizeQuery", () => {
     expect(normalizeQuery("a ".repeat(80)).length).toBeLessThanOrEqual(100);
   });
 
+  it("never cuts a surrogate pair in half at the length cap", () => {
+    // A lone surrogate is sent as "\ud83d", which Meilisearch's JSON parser rejects (400, then 500).
+    const q = `${"a".repeat(99)}😀`;
+    expect(normalizeQuery(q)).toBe("a".repeat(99));
+    expect(normalizeQuery(q).isWellFormed()).toBe(true);
+    expect(parseSearchParams(new URLSearchParams({ q })).q).toBe("a".repeat(99));
+    expect(normalizeQuery(`${"a".repeat(98)}😀`)).toBe(`${"a".repeat(98)}😀`);
+    expect(normalizeQuery("x \ud83d y").isWellFormed()).toBe(true);
+    // Same cap on the district key (an astral letter at the cut).
+    expect(districtKey(`${"a".repeat(63)}𠀀`)).toBe("a".repeat(63));
+  });
+
   it("never rewrites numbers, models, units or prices", () => {
-    for (const q of ["iphone 13", "golf 7", "clio 4", "206", "5000dh", "128go", "4g", "0612345678", "peugeot 206 2007", "a3 sportback", "ps5", "mp3"]) {
+    for (const q of ["iphone 13", "golf 7", "clio 4", "206", "5000dh", "128go", "4g", "0612345678", "peugeot 206 2007", "a3 sportback", "ps5", "mp3", "oneplus 8t", "redmi note 8t", "oneplus 7t", "airpods 3rd", "camion 3t"]) {
       expect(normalizeQuery(q)).toBe(q);
     }
   });
@@ -108,26 +127,15 @@ describe("normalizeQuery", () => {
     expect(normalizeQuery("3lach 7out")).toBe("3lach 7out");
   });
 
-  it("matches unattested arabizi spellings through the vowel-insensitive skeleton", () => {
-    expect(arabiziSkeleton("chi9a")).toBe("chq");
-    expect(arabiziSkeleton("cha9a")).toBe("chq");
-    expect(arabiziSkeleton("ch9a")).toBe("chq");
-    expect(arabiziSkeleton("3ayla")).toBe(arabiziSkeleton("3ila"));
-    expect(arabiziSkeleton("3ayla")).toBe("3l");
-    expect(arabiziSkeleton("mo7ami")).toBe(arabiziSkeleton("m7ami"));
-    expect(normalizeQuery("chi9a")).toBe("appartement");
-    expect(normalizeQuery("cha9a f maarif")).toBe("appartement f maarif");
-    expect(normalizeQuery("mou7ami")).toBe("avocat");
-    expect(normalizeQuery("m7ami")).toBe("avocat");
-    // Verified spellings stay as typed (synonyms); protected and plain tokens are never matched.
-    expect(normalizeQuery("ch9a")).toBe("ch9a");
-    for (const q of ["iphone 13", "golf 7", "clio 4", "206", "s23u", "ps5", "5000dh", "a3", "x5", "chq"]) expect(normalizeQuery(q)).toBe(q);
-  });
-
-  it("drops skeletons two entries share (no rewrite for them)", () => {
-    // 7ouli (mouton) and 7li (bijoux) -> "hl"; 7mam (salle de bain) and 7mama (pigeon) -> "hm".
-    expect(ambiguousSkeletons()).toEqual(["hl", "hm"]);
-    expect(arabiziCanonical("7oli")).toBeUndefined();
+  it("never rewrites a word that only shares consonants with an entry", () => {
+    // Vowelled spellings are lexicon variants (synonyms expand them), never a skeleton match: 3ajel
+    // (urgent) shares "3jl" with 3jel (vache), 7ta (until) "ht" with 7out (poisson).
+    for (const q of ["3ajel", "3ajla", "3ajil", "chi9a 3ajla", "bi3 3ajel", "7ta", "7it", "7ayt", "7na", "9ana", "3omri", "7oli"]) {
+      expect(normalizeQuery(q)).toBe(q);
+    }
+    for (const q of ["chi9a", "cha9a", "ch9a", "mou7ami", "m7ami", "iphone 13", "golf 7", "clio 4", "206", "s23u", "ps5", "5000dh", "a3", "x5", "chq"]) {
+      expect(normalizeQuery(q)).toBe(q);
+    }
   });
 
   it("replaces lexicon Arabic phrases Meilisearch misses as synonym keys", () => {

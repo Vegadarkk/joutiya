@@ -74,7 +74,9 @@ describe("synonyms", () => {
   });
 
   it("is mutual within a group", () => {
-    expect(SEARCH_SYNONYMS["chi9a"]).toBeUndefined();
+    // Research candidates stay out until reviewed ("chqa"); reviewed ones join their group.
+    expect(SEARCH_SYNONYMS["chqa"]).toBeUndefined();
+    expect(SEARCH_SYNONYMS["chi9a"]).toEqual(expect.arrayContaining(["appartement", "ch9a", "شقة"]));
     const vendre = SEARCH_SYNONYMS["vendre"] ?? [];
     expect(vendre).toEqual(expect.arrayContaining(["bi3", "للبيع"]));
     expect(SEARCH_SYNONYMS["bi3"]).toEqual(expect.arrayContaining(["vendre"]));

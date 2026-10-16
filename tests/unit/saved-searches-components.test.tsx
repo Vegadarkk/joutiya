@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 import type * as NextNavigation from "next/navigation";
 import { renderToStaticMarkup } from "react-dom/server";
-import { NextIntlClientProvider } from "next-intl";
+import { createTranslator, NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
 import ar from "../../messages/ar.json";
 import fr from "../../messages/fr.json";
 import { SaveSearchButton } from "@/components/saved-searches/save-search-button";
-import { SavedSearchesView, formatDay } from "@/components/saved-searches/saved-searches-view";
+import { SavedSearchesView, formatDay, withBusy } from "@/components/saved-searches/saved-searches-view";
 import { suggestSearchName, useSearchSummary } from "@/components/saved-searches/summary";
 import type { Locale } from "@/config/site";
 import type { SearchParams } from "@/lib/search/params";
@@ -83,5 +83,24 @@ describe("SavedSearchesView", () => {
 
   it("formats a day as day and month", () => {
     expect(formatDay("2026-10-12T12:00:00.000Z", "fr")).toBe("12 octobre");
+  });
+
+  it("locks each search on its own: a request ending never unlocks another one in flight", () => {
+    const a = withBusy(new Set(), "a", true);
+    const both = withBusy(a, "b", true);
+    const bOnly = withBusy(both, "a", false);
+    expect([...a]).toEqual(["a"]);
+    expect(bOnly.has("b")).toBe(true);
+    expect(bOnly.has("a")).toBe(false);
+    expect(both.has("a")).toBe(true);
+  });
+
+  it("names each row action with its visible label first (WCAG 2.5.3), in fr and ar", () => {
+    for (const [locale, messages] of [["fr", fr], ["ar", ar]] as const) {
+      const t = createTranslator({ locale, messages, namespace: "SavedSearches.page" });
+      expect(t("openOf", { name: "Vélos" }).startsWith(t("open"))).toBe(true);
+      expect(t("renameOf", { name: "Vélos" }).startsWith(t("rename"))).toBe(true);
+      expect(t("deleteOf", { name: "Vélos" }).startsWith(t("delete"))).toBe(true);
+    }
   });
 });

@@ -2,11 +2,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 // Saved-search alerts on the emulator with the memory engine (design D19, D20): the collection
 // group pages and account-boundary cursors of the job on real Firestore, one digest per account
-// with its new listings, the cursors moved so nothing is sent twice, and the one-click unsubscribe
+// with its new listings, the cursors moved so nothing is sent twice, the rotation from a stored
+// account (system/savedSearchAlerts), and the one-click unsubscribe
 // (RFC 8058 POST with ?t=, or { token } from the confirm page): no session, no Origin, no CSRF,
 // signed token only, idempotent, limited per IP, no GET.
 
-vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
+vi.mock("@/lib/mail/deliver", () => ({ deliverMail: vi.fn(async () => ({ provider: "memory", id: "test" })) }));
 
 import * as unsubscribeRoute from "@/app/api/alerts/unsubscribe/route";
 import { POST as create } from "@/app/api/saved-searches/route";
@@ -16,7 +17,7 @@ import type { SavedSearchView } from "@/lib/contracts/search";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { resetServerEnv } from "@/lib/env";
 import { db } from "@/lib/firebase/admin";
-import { sendMail } from "@/lib/mail";
+import { deliverMail } from "@/lib/mail/deliver";
 import type { TemplateMail } from "@/lib/mail/types";
 import { requestIdentity } from "@/lib/rate-limit/keys";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
@@ -41,7 +42,7 @@ const save = async (who: Member, q: string, alert: "daily" | "none" = "daily") =
 };
 const searchDoc = (who: Member, id: string) => db().collection(COLLECTIONS.users).doc(who.uid).collection(COLLECTIONS.savedSearches).doc(id).get();
 const alertOf = async (who: Member, id: string) => (await searchDoc(who, id)).get("alert") as string;
-const mailsTo = (who: Member): TemplateMail[] => vi.mocked(sendMail).mock.calls.map(([mail]) => mail as TemplateMail).filter((mail) => mail.to === who.email);
+const mailsTo = (who: Member): TemplateMail[] => vi.mocked(deliverMail).mock.calls.map(([mail]) => mail as TemplateMail).filter((mail) => mail.to === who.email);
 const digest = (mail: TemplateMail | undefined) => (mail?.template === "savedSearchAlert" ? (mail as TemplateMail<"savedSearchAlert">) : undefined);
 const oneClick = (token: string, ip?: string) =>
   call<ErrorBody>(unsubscribe, "POST", `/api/alerts/unsubscribe?t=${encodeURIComponent(token)}`, { origin: null, rawBody: { text: "List-Unsubscribe=One-Click", type: "application/x-www-form-urlencoded" }, ...(ip ? { ip } : {}) });
@@ -53,7 +54,7 @@ beforeAll(async () => {
 });
 beforeEach(() => {
   resetRateLimiters();
-  vi.mocked(sendMail).mockClear();
+  vi.mocked(deliverMail).mockClear();
 });
 afterAll(() => setSearchEngineForTests(null));
 
@@ -91,8 +92,10 @@ describe("sendSavedSearchAlerts", () => {
       doc({ title: "Table marqueterie", categoryId: "maison", subcategoryId: "ameublement", citySlug: "marrakech", sortAt: now - 30_000 }),
     ];
     await engine.upsert(fresh);
+    // Past the indexing delay: the run sends listings older than 5 min only.
+    const runAt = now + 10 * 60_000;
     try {
-      const result = await sendSavedSearchAlerts(new Date(now));
+      const result = await sendSavedSearchAlerts(new Date(runAt));
       expect(result.complete).toBe(true);
       const [first, ...others] = mailsTo(salma);
       expect(others).toEqual([]);
@@ -108,10 +111,10 @@ describe("sendSavedSearchAlerts", () => {
       expect(verifyUnsubscribeToken(mail.data.unsubscribeToken)).toEqual({ uid: salma.uid, searchId: "*" });
       const cursor = await searchDoc(salma, commodes.id);
       expect(cursor.get("lastNotifiedSortAt")).toBe(now - 60_000);
-      expect(cursor.get("lastAlertAt")?.toMillis()).toBe(now);
+      expect(cursor.get("lastAlertAt")?.toMillis()).toBe(runAt);
       expect((await searchDoc(karim, quiet.id)).get("lastAlertAt")).toBeUndefined();
 
-      vi.mocked(sendMail).mockClear();
+      vi.mocked(deliverMail).mockClear();
       await sendSavedSearchAlerts(new Date(now + HOUR));
       expect(mailsTo(salma)).toEqual([]);
       await engine.upsert([doc({ title: "Commode laquee", categoryId: "maison", subcategoryId: "ameublement", citySlug: "fes", sortAt: now + 30 * 60_000 })]);
@@ -123,11 +126,34 @@ describe("sendSavedSearchAlerts", () => {
       // Unsubscribed: the next listings stay out of the mailbox.
       expect((await oneClick(unsubscribeToken(salma.uid))).status).toBe(204);
       await engine.upsert([doc({ title: "Commode doree", categoryId: "maison", subcategoryId: "ameublement", citySlug: "fes", sortAt: now + 90 * 60_000 })]);
-      vi.mocked(sendMail).mockClear();
+      vi.mocked(deliverMail).mockClear();
       await sendSavedSearchAlerts(new Date(now + 3 * HOUR));
       expect(mailsTo(salma)).toEqual([]);
     } finally {
       await db().collection(COLLECTIONS.system).doc("savedSearchAlerts").delete();
+    }
+  });
+});
+
+describe("rotation from a stored account", () => {
+  it("starts after the stored account, wraps around to it, then clears the cursor", async () => {
+    const cursorDoc = db().collection(COLLECTIONS.system).doc("savedSearchAlerts");
+    const [first, second] = [await member(), await member()].sort((x, y) => (x.uid < y.uid ? -1 : 1)) as [Member, Member];
+    await save(first, "gueridon fer forge");
+    await save(second, "gueridon fer forge");
+    const now = Date.now();
+    await engine.upsert([doc({ title: "Gueridon fer forge", categoryId: "maison", subcategoryId: "ameublement", citySlug: "fes", sortAt: now + 60_000 })]);
+    // A capped run stopped after `first`: the next one starts with the accounts after it.
+    await cursorDoc.set({ afterUid: first.uid });
+    try {
+      const result = await sendSavedSearchAlerts(new Date(now + HOUR));
+      expect(result).toMatchObject({ complete: true });
+      expect(result.stopped).toBeUndefined();
+      const order = vi.mocked(deliverMail).mock.calls.map(([mail]) => mail.to).filter((to) => to === first.email || to === second.email);
+      expect(order).toEqual([second.email, first.email]);
+      expect((await cursorDoc.get()).get("afterUid")).toBe("");
+    } finally {
+      await cursorDoc.delete();
     }
   });
 });

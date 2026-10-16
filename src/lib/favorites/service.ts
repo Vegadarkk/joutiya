@@ -2,6 +2,7 @@ import "server-only";
 import { FAVORITES_MAX, FAVORITES_PAGE_SIZE, type FavoriteView, type FavoritesPage } from "@/lib/contracts/search";
 import { HttpError } from "@/lib/http/errors";
 import { logger } from "@/lib/logging/logger";
+import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
 import { toSearchCard } from "@/lib/search/cards";
 import { searchEngine } from "@/lib/search/engine";
 import { SearchUnavailableError, type SearchCard } from "@/lib/search/types";
@@ -27,9 +28,18 @@ export async function liveCards(ids: readonly string[], now = new Date()): Promi
   return cards;
 }
 
-/** Favorite listing ids of the account (hearts): Valkey set, rebuilt from Firestore on a miss. */
+/**
+ * Favorite listing ids of the account (hearts): Valkey set, rebuilt from Firestore on a miss. A
+ * rebuild is charged in documents on the daily `favorites.docs.uid` (one point first, so a spent
+ * budget reads nothing): a cache that keeps missing must not turn each call into 600 reads.
+ */
 export function favoriteIdsOf(uid: string): Promise<string[]> {
-  return cachedFavoriteIds(uid, () => listFavoriteIds(uid, IDS_READ_LIMIT));
+  return cachedFavoriteIds(uid, async () => {
+    await enforceLimit("favorites.docs.uid", uid);
+    const ids = await listFavoriteIds(uid, IDS_READ_LIMIT);
+    if (ids.length > 1) await consumeLimit("favorites.docs.uid", uid, ids.length - 1);
+    return ids;
+  });
 }
 
 async function liveCard(listingId: string, now: Date): Promise<SearchCard | undefined> {

@@ -62,7 +62,7 @@ export function SearchEmpty({ params, locale, outOfRange = false, action, classN
   const filters = describeFilters(params, locale, labels);
   const wider = widenings(params);
   return (
-    <section data-testid="search-empty" aria-labelledby="search-empty-title" className={cn("mx-auto flex max-w-xl flex-col items-center gap-5 py-12 text-center", className)}>
+    <section data-testid="search-empty" aria-labelledby="search-empty-title" className={cn("mx-auto flex w-full max-w-xl flex-col items-center gap-5 py-12 text-center", className)}>
       <DoorMark className="w-16" />
       <div className="flex flex-col gap-2">
         <h2 id="search-empty-title" className="text-xl font-semibold text-balance">
@@ -89,7 +89,8 @@ export function SearchEmpty({ params, locale, outOfRange = false, action, classN
         {wider.map((option) => {
           const region = option.kind === "region" ? regionByCode(option.code) : undefined;
           return (
-            <Button key={option.kind} asChild variant="outline">
+            // Long region names ("Rabat-Salé-Kénitra") wrap instead of widening a phone page.
+            <Button key={option.kind} asChild variant="outline" className="h-auto min-h-11 max-w-full py-2 text-center whitespace-normal">
               <SearchLink params={option.params}>{region ? t("widenRegion", { region: regionName(region, locale) }) : t("widenCountry")}</SearchLink>
             </Button>
           );

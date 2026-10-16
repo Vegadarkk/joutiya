@@ -13,7 +13,7 @@ import { SAVED_SEARCHES_MAX, type SavedSearchCreate, type SavedSearchView } from
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { resetServerEnv } from "@/lib/env";
 import { db } from "@/lib/firebase/admin";
-import { resetRateLimiters } from "@/lib/rate-limit/limiter";
+import { limitState, resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { setSearchEngineForTests } from "@/lib/search/engine";
 import { call, doc, expectError, member, serve, spend, type ErrorBody, type Member } from "../favorites/helpers";
 
@@ -89,6 +89,16 @@ describe("POST /api/saved-searches", () => {
     expectError(await save(salma, { params: { q: "velo" } }), 429, "rate_limited");
     expect(await searchesOf(salma)).toEqual([]);
     await spend("savedSearch.read.uid", salma.uid);
+    expectError(await call(list, "GET", "/api/saved-searches", { member: salma }), 429, "rate_limited");
+  });
+
+  it("charges the list in documents read on a daily budget (savedSearch.docs.uid)", async () => {
+    const salma = await member();
+    expect((await save(salma, { params: { q: "velo" } })).status).toBe(201);
+    expect((await save(salma, { params: { q: "canape" } })).status).toBe(201);
+    expect(await searchesOf(salma)).toHaveLength(2);
+    expect((await limitState("savedSearch.docs.uid", salma.uid))?.consumedPoints).toBe(2);
+    await spend("savedSearch.docs.uid", salma.uid);
     expectError(await call(list, "GET", "/api/saved-searches", { member: salma }), 429, "rate_limited");
   });
 });

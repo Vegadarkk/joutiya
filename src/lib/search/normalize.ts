@@ -1,5 +1,5 @@
 import { CITY_LEXICON, DARIJA_LEXICON, citySpellings, entrySpellings } from "@/config/search/darija";
-import { SEARCH_Q_MAX } from "./params";
+import { SEARCH_Q_MAX, clipText } from "./params";
 
 // Query normalisation (design D5), applied to `q` before any engine call. Meilisearch already folds
 // case, accents and most Arabic letter variants; this step only does what it cannot:
@@ -12,10 +12,11 @@ import { SEARCH_Q_MAX } from "./params";
 //    the canonical spelling's synonyms then bring the phrase back.
 // 4. Arabizi digit guard (research rule): per token, class N (no arabizi digit, or not plain a-z0-9:
 //    untouched), P (protected: units, models, "b2b": untouched) or A (arabizi). Digits only build a
-//    lookup key (3 -> a, 7 -> h, 9 -> q...) and a vowel-insensitive skeleton; a class A token unknown
-//    to the lexicon whose key, else whose skeleton, belongs to exactly one entry is replaced by that
-//    entry's canonical spelling ("chi9a" -> "appartement"). Nothing else is rewritten: "iphone 13",
-//    "golf 7", "clio 4", "206", prices, years and phone numbers reach the engine as typed.
+//    lookup key (3 -> a, 7 -> h, 9 -> q...); a class A token unknown to the lexicon whose key belongs
+//    to exactly one entry is replaced by that entry's canonical spelling ("remor9ue" -> "remorque").
+//    No vowel-insensitive (skeleton) match: it rewrote ordinary words onto entries ("3ajel", urgent,
+//    -> "vache"); a missing spelling goes into the lexicon instead. Nothing else is rewritten:
+//    "iphone 13", "golf 7", "clio 4", "206", prices, years and phone numbers reach the engine as typed.
 // No generic Latin -> Arabic transliteration (lossy).
 
 const EASTERN_DIGITS = /[٠-٩۰-۹]/g;
@@ -35,6 +36,8 @@ const GUARD = {
   unit: new RegExp(`^\\d+(?:${UNITS})$`),
   /** iphone13 golf7 a52 s23u ps5 f3 x5 (a single letter before the digits counts as a model). */
   model: new RegExp(`^(?:[a-z]|${MODELS})\\d{1,4}(?:${SUFFIX})?$`),
+  /** 8t 9rt (OnePlus, Xiaomi models), 3t (tonnes), 3rd 5th (ordinals). */
+  numbered: /^\d{1,4}(?:t|rt|st|nd|rd|th)$/,
   /** Alphanumeric words that are not arabizi. */
   stop: /^(?:b2b|b2c|h2o|k7|o2)$/,
 };
@@ -54,28 +57,11 @@ export function classifyToken(raw: string): { cls: TokenClass; key: string } {
   if (!/^[a-z0-9]+$/.test(token)) return { cls: "N", key: token };
   if (!/[a-z]/.test(token)) return { cls: "N", key: token };
   if (!/[235-9]/.test(token)) return { cls: "N", key: token };
-  if (GUARD.unit.test(token) || GUARD.model.test(token) || GUARD.stop.test(token)) return { cls: "P", key: token };
+  if (GUARD.unit.test(token) || GUARD.model.test(token) || GUARD.numbered.test(token) || GUARD.stop.test(token)) return { cls: "P", key: token };
   return { cls: "A", key: token.replace(/[235-9]/g, (digit) => KEY_MAP[digit] ?? "") };
 }
 
 // ---- Lexicon lookups.
-
-/** Skeleton digits: like the key map, but ayn stays a consonant ("3ayla" and "3ila" share "3l"). */
-const SKELETON_MAP: Readonly<Record<string, string>> = { "2": "", "3": "3", "5": "kh", "6": "t", "7": "h", "8": "h", "9": "q" };
-/** Shortest skeleton used for a rewrite. */
-const MIN_SKELETON = 2;
-
-/**
- * Vowel-insensitive key of an arabizi spelling: digits mapped, "sh" = "ch", vowels (a e i o u y)
- * dropped, repeated letters collapsed: "chi9a", "cha9a", "ch9a" -> "chq"; "mo7ami", "m7ami" -> "mhm".
- */
-export function arabiziSkeleton(token: string): string {
-  return foldToken(token)
-    .replace(/[235-9]/g, (digit) => SKELETON_MAP[digit] ?? "")
-    .replace(/sh/g, "ch")
-    .replace(/[aeiouy]/g, "")
-    .replace(/(.)\1+/g, "$1");
-}
 
 /**
  * Arabic-script fold matching Meilisearch's (hamza carriers, alef maqsura, ta marbuta, marks, tatweel);
@@ -93,14 +79,10 @@ interface Tables {
   known: Set<string>;
   /** Lookup key -> canonical spelling (keys shared by two entries are dropped). */
   keys: Map<string, string>;
-  /** Skeleton of a verified class A spelling -> canonical spelling (shared skeletons are dropped). */
-  skeletons: Map<string, string>;
   /** Folded Arabic phrase of 2-3 words -> canonical spelling. */
   phrases: Map<string, string>;
   /** Keys and phrases shared by two groups (the data tests require none). */
   ambiguous: string[];
-  /** Skeletons shared by two groups (no rewrite for them). */
-  ambiguousSkeletons: string[];
 }
 
 let tables: Tables | undefined;
@@ -109,7 +91,6 @@ function lexiconTables(): Tables {
   if (tables) return tables;
   const known = new Set<string>();
   const keyOwners = new Map<string, Set<string>>();
-  const skeletonOwners = new Map<string, Set<string>>();
   const phraseOwners = new Map<string, Set<string>>();
   const claim = (owners: Map<string, Set<string>>, key: string, canonical: string) => owners.set(key, (owners.get(key) ?? new Set<string>()).add(canonical));
   const groups = [
@@ -124,8 +105,6 @@ function lexiconTables(): Tables {
         if (!/^[a-z0-9]+$/.test(key) || cls === "P") continue;
         known.add(foldToken(words[0] ?? ""));
         claim(keyOwners, key, canonical);
-        const skeleton = arabiziSkeleton(words[0] ?? "");
-        if (cls === "A" && skeleton.length >= MIN_SKELETON) claim(skeletonOwners, skeleton, canonical);
       } else if (words.length <= 3 && words.every((word) => ARABIC.test(word))) {
         claim(phraseOwners, words.map((word) => foldArabicWord(word)).join(" "), canonical);
       }
@@ -141,15 +120,7 @@ function lexiconTables(): Tables {
     return map;
   };
   const ambiguous: string[] = [];
-  const ambiguousSkeletons: string[] = [];
-  tables = {
-    known,
-    keys: unique(keyOwners, ambiguous),
-    skeletons: unique(skeletonOwners, ambiguousSkeletons),
-    phrases: unique(phraseOwners, ambiguous),
-    ambiguous,
-    ambiguousSkeletons: ambiguousSkeletons.sort(),
-  };
+  tables = { known, keys: unique(keyOwners, ambiguous), phrases: unique(phraseOwners, ambiguous), ambiguous };
   return tables;
 }
 
@@ -158,23 +129,16 @@ export function ambiguousLexiconKeys(): string[] {
   return lexiconTables().ambiguous;
 }
 
-/** Skeletons shared by verified arabizi spellings of two groups: never used for a rewrite. */
-export function ambiguousSkeletons(): string[] {
-  return lexiconTables().ambiguousSkeletons;
-}
-
 /**
- * Canonical spelling for an unknown class A token, else undefined: first the exact lookup key
- * (digits mapped), then the vowel-insensitive skeleton of the verified arabizi spellings
- * ("chi9a", "cha9a" -> the "ch9a" of appartement).
+ * Canonical spelling for an unknown class A token whose lookup key (digits mapped) one entry owns
+ * ("remor9ue" -> "remorque"), else undefined.
  */
 export function arabiziCanonical(token: string): string | undefined {
   const { cls, key } = classifyToken(token);
   if (cls !== "A") return undefined;
-  const { known, keys, skeletons } = lexiconTables();
+  const { known, keys } = lexiconTables();
   if (known.has(foldToken(token))) return undefined;
-  const skeleton = arabiziSkeleton(token);
-  return keys.get(key) ?? (skeleton.length >= MIN_SKELETON ? skeletons.get(skeleton) : undefined);
+  return keys.get(key);
 }
 
 /** Replaces lexicon Arabic phrases (longest first, 3 then 2 words) by their canonical spelling. */
@@ -208,9 +172,8 @@ export function normalizeQuery(q: string): string {
     .split(/\s+/)
     .map((word) => word.replace(/^[-‐-―]+/, ""))
     .filter(Boolean);
-  return replacePhrases(words)
+  const text = replacePhrases(words)
     .map((word) => arabiziCanonical(word) ?? word)
-    .join(" ")
-    .slice(0, SEARCH_Q_MAX)
-    .trim();
+    .join(" ");
+  return clipText(text, SEARCH_Q_MAX).trim();
 }
