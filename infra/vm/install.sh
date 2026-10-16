@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installs this repository's VM files on the Joutiya VM. Run as root at first boot by bootstrap.sh,
-# then by `scripts/oracle-vm.ts sync` (OCI Run Command) or `scripts/deploy-prod.ts vm-sync` (SSH),
-# which send infra/vm, docker/ and the deploy users' public keys and call
+# then by `scripts/oracle-vm.ts sync` (OCI Run Command), which sends infra/vm, docker/ and, when it
+# changes, the CI's public key (keys/deploy-staging.pub), and calls
 #   install.sh <extracted directory>
 # Idempotent. sshd and sudoers changes are validated before they replace the running ones.
 # Secrets are never handled here: bootstrap.sh writes the tunnel tokens, the other
@@ -21,13 +21,14 @@ ensure_group() { getent group "$1" > /dev/null || groupadd --gid "$2" "$1"; }
 ensure_group joutiya-prod 2001
 ensure_group joutiya-staging 2002
 
-# Deploy users: no password, not in the docker group; sshd forces their only command.
-for user in deploy-staging deploy-prod; do
-  id "$user" > /dev/null 2>&1 || useradd --create-home --shell /bin/bash --user-group "$user"
-  passwd --lock "$user" > /dev/null
-done
+# The CI's deploy user (staging only): no password, not in the docker group; sshd forces its only
+# command. Production has no SSH user: root runs it through OCI Run Command (scripts/oracle-vm.ts).
+id deploy-staging > /dev/null 2>&1 || useradd --create-home --shell /bin/bash --user-group deploy-staging
+passwd --lock deploy-staging > /dev/null
+# deploy-prod (the owner's SSH key) was retired for Run Command in October 2026.
+if id deploy-prod > /dev/null 2>&1; then userdel --remove deploy-prod 2> /dev/null; fi
 
-# authorized_keys owned by root: the deploy users cannot change their own keys.
+# authorized_keys owned by root: the deploy user cannot change its own key.
 install_keys() {
   local user="$1" file="$2" home
   [[ -s "$file" ]] || { log "no key for $user (kept as is)"; return 0; }
@@ -40,7 +41,6 @@ install_keys() {
   log "key installed for $user"
 }
 install_keys deploy-staging "$KEYS/deploy-staging.pub"
-install_keys deploy-prod "$KEYS/deploy-prod.pub"
 
 # Directories. Secrets: /etc/joutiya/<env> (root only), gcp/ readable by the environment's group.
 install -d -m 0711 -o root -g root /etc/joutiya

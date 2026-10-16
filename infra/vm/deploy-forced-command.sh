@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Forced command of the deploy users (§6), installed as /usr/local/sbin/joutiya-deploy (root,
-# 0755) and reached only through sudo (infra/vm/sudoers.joutiya-deploy). The environment comes
-# from sshd's ForceCommand, never from the client; the client only picks an action:
+# Forced command of the deployments (§6), installed as /usr/local/sbin/joutiya-deploy (root,
+# 0755). Staging: the CI's deploy-staging user reaches it only through sudo
+# (infra/vm/sudoers.joutiya-deploy), its environment set by sshd's ForceCommand. Production: root
+# runs it through OCI Run Command (scripts/oracle-vm.ts). The caller only picks an action:
 #
-#   deploy-staging (CI key):  load <release>      image tarball (docker save | zstd) on stdin
-#                             rollback | status
-#   deploy-prod (owner key):  promote <release> <web image id> <worker image id>
-#                             rollback | status
+#   staging (CI key):          load <release>      image tarball (docker save | zstd) on stdin
+#                              rollback | status
+#   prod (Run Command, root):  promote <release> <web image id> <worker image id>
+#                              rollback | status
 #
 # Production can only run images already loaded and running in staging, pinned by image ID, and
 # the staging key can never load a tarball that would move the tags of a production release.

@@ -20,16 +20,25 @@
 //       runs a local bash script as root on joutiya-vm through OCI Run Command (at most ~3.7 KB;
 //       the last 1 KB of output comes back). Oracle keeps the text 7 days: no secret that must not
 //       outlive the command.
-//   node scripts/oracle-vm.ts sync [--apply]
-//       installs infra/vm and docker/ on joutiya-vm (infra/vm/install.sh) through Run Command.
+//   node scripts/oracle-vm.ts sync [--apply] [--deploy-staging-key=<file.pub>]
+//       installs infra/vm and docker/ on joutiya-vm (infra/vm/install.sh) through Run Command, and
+//       the CI's public key for deploy-staging when given.
+//   node scripts/oracle-vm.ts deploy-status
+//       releases and image IDs running in staging and production (read only).
+//   node scripts/oracle-vm.ts promote [--apply]
+//       the release running in staging, if it is a commit of origin/main, goes to production
+//       (pinned by image ID), then the Cloudflare cache of the zone is purged.
+//   node scripts/oracle-vm.ts rollback [--apply]
+//       production back to its previous release, then the cache is purged.
 //
 // Environment (never printed): JOUTIYA_OCI_TENANCY, _USER, _FINGERPRINT, _REGION, _COMPARTMENT,
 // _KEY_B64 (base64 of the PEM key of joutiya-claude), JOUTIYA_CLOUDFLARE_API_TOKEN.
 
 import { createHash, createSign } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { readFileSync, realpathSync } from "node:fs";
-import { basename } from "node:path";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { tunnelTokenErrors, validateTargets, type Targets } from "./assert-target.ts";
@@ -45,7 +54,7 @@ export const BOOT_VOLUME_GB = 100;
 export const IMAGE = { operatingSystem: "Canonical Ubuntu", operatingSystemVersion: "24.04" } as const;
 /** OCI limit on the metadata of an instance (user_data included, base64). */
 export const MAX_METADATA_BYTES = 32_000;
-/** Files of this repository installed on the VM (as `scripts/deploy-prod.ts vm-sync`, minus what only runs here). */
+/** Files of this repository installed on the VM, at first boot and by `sync` (the bootstrap itself and the OCI-side files stay here). */
 export const VM_FILES = ["infra/vm", "docker/compose.yml", "docker/compose.prod.yml", "docker/compose.staging.yml", "docker/valkey"];
 const VM_FILES_EXCLUDED = ["infra/vm/bootstrap.sh", "infra/vm/oci-security-list.json"];
 
@@ -180,11 +189,29 @@ export function buildUserData(input: UserDataInput): string {
   return userData;
 }
 
-function vmFilesTarball(): string {
+/** The CI's public key for deploy-staging: one ed25519 key, no option (install.sh adds "restrict"). */
+export function deployStagingKey(text: string): string {
+  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  if (lines.length !== 1 || !/^ssh-ed25519 [A-Za-z0-9+/]+=* ?[\w@.-]*$/.test(lines[0] ?? "")) throw new Error("expected one ssh-ed25519 public key");
+  return `${lines[0]}\n`;
+}
+
+/** base64 of a gzip tarball of VM_FILES, plus keys/deploy-staging.pub when the CI key changes. */
+function vmFilesTarball(stagingKey?: string): string {
   const excluded = VM_FILES_EXCLUDED.map((file) => `--exclude=${file}`);
-  const tar = spawnSync("tar", ["-czf", "-", "--owner=0", "--group=0", ...excluded, "-C", root, ...VM_FILES], { maxBuffer: 16 * 1024 * 1024 });
-  if (tar.status !== 0) throw new Error(`tar failed: ${tar.stderr.toString()}`);
-  return tar.stdout.toString("base64");
+  const keys = stagingKey === undefined ? undefined : mkdtempSync(join(tmpdir(), "joutiya-keys-"));
+  try {
+    if (keys) {
+      mkdirSync(join(keys, "keys"));
+      writeFileSync(join(keys, "keys", "deploy-staging.pub"), deployStagingKey(stagingKey ?? ""));
+    }
+    const extra = keys ? ["-C", keys, "keys"] : [];
+    const tar = spawnSync("tar", ["-czf", "-", "--owner=0", "--group=0", ...excluded, "-C", root, ...VM_FILES, ...extra], { maxBuffer: 16 * 1024 * 1024 });
+    if (tar.status !== 0) throw new Error(`tar failed: ${tar.stderr.toString()}`);
+    return tar.stdout.toString("base64");
+  } finally {
+    if (keys) rmSync(keys, { recursive: true, force: true });
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -192,13 +219,14 @@ function vmFilesTarball(): string {
 
 const CF_API = "https://api.cloudflare.com/client/v4";
 
-async function cloudflare<T>(path: string): Promise<T> {
+async function cloudflare<T>(path: string, post?: unknown): Promise<T> {
   const token = process.env.JOUTIYA_CLOUDFLARE_API_TOKEN?.trim();
   if (!token) throw new Error("JOUTIYA_CLOUDFLARE_API_TOKEN is not set");
-  const response = await fetch(`${CF_API}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  const init = post === undefined ? {} : { method: "POST", body: JSON.stringify(post), headers: { "Content-Type": "application/json" } };
+  const response = await fetch(`${CF_API}${path}`, { ...init, headers: { ...init.headers, Authorization: `Bearer ${token}` } });
   const payload = (await response.json().catch(() => null)) as { success?: boolean; errors?: { code: number; message: string }[]; result?: T } | null;
   if (!response.ok || !payload?.success) {
-    throw new Error(`Cloudflare GET ${path.replace(/\/token$/, "/<token>")}: HTTP ${response.status} (${payload?.errors?.map((error) => error.message).join("; ") ?? "no JSON body"})`);
+    throw new Error(`Cloudflare ${post === undefined ? "GET" : "POST"} ${path.replace(/\/token$/, "/<token>")}: HTTP ${response.status} (${payload?.errors?.map((error) => error.message).join("; ") ?? "no JSON body"})`);
   }
   return payload.result as T;
 }
@@ -342,7 +370,7 @@ export function launchDetails(input: { availabilityDomain: string; compartmentId
     shapeConfig: { ocpus: SHAPE.ocpus, memoryInGBs: SHAPE.memoryInGBs },
     sourceDetails: { sourceType: "image", imageId: input.imageId, bootVolumeSizeInGBs: BOOT_VOLUME_GB },
     createVnicDetails: { subnetId: input.subnetId, assignPublicIp: true, displayName: NAMES.instance, hostnameLabel: NAMES.instance },
-    // No SSH key: admin access goes through ssh.joutiya.ma (Access) or OCI Run Command.
+    // No SSH key: administration goes through OCI Run Command; ssh.joutiya.ma serves the CI only.
     metadata: { user_data: input.userData },
     agentConfig: {
       isMonitoringDisabled: false,
@@ -497,8 +525,11 @@ interface CommandExecution {
 }
 const COMMAND_DONE = ["SUCCEEDED", "FAILED", "TIMED_OUT", "CANCELED"];
 
-/** Sends one command and waits for it; throws unless it exits 0. Returns its last 1 KB of output. */
-async function runCommand(oci: Oci, compartmentId: string, instanceId: string, displayName: string, text: string, timeoutSeconds = 900): Promise<string> {
+/**
+ * Sends one command and waits for it; throws unless it exits 0. Returns its last 1 KB of output.
+ * A read-only command (it changes nothing on the VM) also runs in a dry run.
+ */
+async function runCommand(oci: Oci, compartmentId: string, instanceId: string, displayName: string, text: string, timeoutSeconds = 900, readOnly = false): Promise<string> {
   const shown = { displayName, bytes: Buffer.byteLength(text), sha256: createHash("sha256").update(text).digest("hex") };
   const body = {
     compartmentId,
@@ -507,7 +538,9 @@ async function runCommand(oci: Oci, compartmentId: string, instanceId: string, d
     target: { instanceId },
     content: { source: { sourceType: "TEXT", text }, output: { outputType: "TEXT" } },
   };
-  const command = await oci.write<{ id: string }>("POST", "/20180530/instanceAgentCommands", body, shown);
+  const command = readOnly
+    ? await oci.call<{ id: string }>("POST", "iaas", "/20180530/instanceAgentCommands", body)
+    : await oci.write<{ id: string }>("POST", "/20180530/instanceAgentCommands", body, shown);
   if (!command) return "";
   // Delivery waits for the agent's next poll; past the timeout plus a delivery margin, it is cancelled.
   const deadline = Date.now() + (timeoutSeconds + 300) * 1000;
@@ -566,13 +599,100 @@ async function run(oci: Oci, compartmentId: string, file: string): Promise<void>
   if (output) console.log(output.trimEnd());
 }
 
-async function sync(oci: Oci, compartmentId: string): Promise<void> {
+async function sync(oci: Oci, compartmentId: string, stagingKeyFile?: string): Promise<void> {
   const instance = await runningInstance(oci, compartmentId);
-  const commands = syncCommands(vmFilesTarball());
+  const commands = syncCommands(vmFilesTarball(stagingKeyFile === undefined ? undefined : readFileSync(stagingKeyFile, "utf8")));
   for (const [index, text] of commands.entries()) {
     const output = await runCommand(oci, compartmentId, instance.id, `joutiya-sync ${index + 1}/${commands.length}`, text);
     if (output) console.log(output.trimEnd());
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Production releases (§2), run by root through Run Command with the forced command of the deploy
+// users (infra/vm/deploy-forced-command.sh, environment prod). Production only runs images already
+// running in staging, pinned by image ID; no production key exists anywhere.
+
+const RELEASE = /^[0-9a-f]{12,40}$/;
+const IMAGE_ID = /^sha256:[0-9a-f]{64}$/;
+
+export interface EnvStatus {
+  release: string;
+  web: string;
+  worker: string;
+}
+export type VmStatus = Record<"staging" | "prod", EnvStatus>;
+
+/** Parses the JSON printed by the forced command's `status` action. */
+export function parseStatus(text: string): VmStatus {
+  const value = JSON.parse(text) as Partial<VmStatus>;
+  for (const env of ["staging", "prod"] as const) {
+    const item = value[env];
+    if (!item || typeof item.release !== "string" || typeof item.web !== "string" || typeof item.worker !== "string") {
+      throw new Error(`unexpected status from the VM: ${env} is missing`);
+    }
+  }
+  return value as VmStatus;
+}
+
+/** The promote request, built only from values that passed validation. */
+export function promoteCommand(staging: EnvStatus): string {
+  if (!RELEASE.test(staging.release)) throw new Error("staging runs no valid release");
+  if (!IMAGE_ID.test(staging.web) || !IMAGE_ID.test(staging.worker)) throw new Error("staging image IDs are missing");
+  return `promote ${staging.release} ${staging.web} ${staging.worker}`;
+}
+
+/** Root script sending one request to the forced command of production (it splits the request on spaces, no shell parses it). */
+export function deployScript(request: string): string {
+  if (!/^[a-z]+( [0-9a-z:]+)*$/.test(request)) throw new Error("invalid deploy request");
+  return `SSH_ORIGINAL_COMMAND='${request}' /usr/local/sbin/joutiya-deploy prod`;
+}
+
+async function deployStatus(oci: Oci, compartmentId: string, instanceId: string): Promise<VmStatus> {
+  const output = await runCommand(oci, compartmentId, instanceId, "joutiya-deploy status", rootCommand(`${deployScript("status")} 2> /dev/null`), 300, true);
+  return parseStatus(output.trim().split("\n").at(-1) ?? "");
+}
+
+function printStatus(current: VmStatus): void {
+  for (const env of ["staging", "prod"] as const) {
+    const { release, web, worker } = current[env];
+    console.log(`${env.padEnd(8)} ${release || "(no release)"}  web ${web.slice(7, 19) || "-"}  worker ${worker.slice(7, 19) || "-"}`);
+  }
+}
+
+function isOnMain(release: string): boolean {
+  spawnSync("git", ["fetch", "--quiet", "origin", "main"], { cwd: root, stdio: "ignore" });
+  return spawnSync("git", ["merge-base", "--is-ancestor", release, "origin/main"], { cwd: root, stdio: "ignore" }).status === 0;
+}
+
+/** Purges the zone's cache after a production change. Warns only: the release itself is done. */
+async function purgeCache(targets: Targets): Promise<void> {
+  const zone = targets.shared.cloudflare.zoneId;
+  try {
+    if (!zone) throw new Error("shared.cloudflare.zoneId is not recorded");
+    await cloudflare(`/zones/${zone}/purge_cache`, { purge_everything: true });
+    console.log("Cloudflare cache purged");
+  } catch (error) {
+    console.warn(`warning: Cloudflare cache not purged (${(error as Error).message})`);
+  }
+}
+
+async function release(oci: Oci, targets: Targets, compartmentId: string, action: "status" | "promote" | "rollback"): Promise<void> {
+  const instance = await runningInstance(oci, compartmentId);
+  const current = await deployStatus(oci, compartmentId, instance.id);
+  printStatus(current);
+  if (action === "status") return;
+  let request = "rollback";
+  if (action === "promote") {
+    request = promoteCommand(current.staging);
+    if (current.staging.release === current.prod.release) throw new Error("production already runs this release");
+    if (!isOnMain(current.staging.release)) throw new Error(`release ${current.staging.release} is not a commit of origin/main: not promoted`);
+  }
+  const output = await runCommand(oci, compartmentId, instance.id, `joutiya-deploy ${request.split(" ").slice(0, 2).join(" ")}`, rootCommand(deployScript(request)));
+  if (!oci.apply) return;
+  console.log(output.trimEnd());
+  await purgeCache(targets);
+  printStatus(await deployStatus(oci, compartmentId, instance.id));
 }
 
 async function reboot(oci: Oci, compartmentId: string): Promise<void> {
@@ -600,9 +720,9 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);
-  const actions = ["create", "status", "reboot", "agent", "run", "sync"];
+  const actions = ["create", "status", "reboot", "agent", "run", "sync", "deploy-status", "promote", "rollback"];
   if (!action || !actions.includes(action) || (action === "run") !== (file !== undefined)) {
-    throw new Error("usage: scripts/oracle-vm.ts <create|status|reboot|agent|sync|run <script>> [--apply] [--retry-minutes=<n>]");
+    throw new Error("usage: scripts/oracle-vm.ts <create|status|reboot|agent|sync|run <script>|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>]");
   }
 
   const raw: unknown = JSON.parse(readFileSync(new URL("../infra/targets.json", import.meta.url), "utf8"));
@@ -621,9 +741,11 @@ async function main(): Promise<void> {
   else if (action === "reboot") await reboot(oci, compartment);
   else if (action === "agent") await agent(oci, compartment);
   else if (action === "run") await run(oci, compartment, file as string);
-  else if (action === "sync") await sync(oci, compartment);
+  else if (action === "sync") await sync(oci, compartment, args.find((arg) => arg.startsWith("--deploy-staging-key="))?.split("=").slice(1).join("="));
+  else if (action === "deploy-status") await release(oci, targets, compartment, "status");
+  else if (action === "promote" || action === "rollback") await release(oci, targets, compartment, action);
   else await status(oci, targets, compartment);
-  if (action !== "status" && action !== "agent") console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
+  if (!["status", "agent", "deploy-status"].includes(action)) console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
 }
 
 const self = fileURLToPath(import.meta.url);

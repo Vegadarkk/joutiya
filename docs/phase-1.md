@@ -88,7 +88,7 @@ Une seule méthode Google : le script la retrouve seul.
 
 1. Nav ajoute au jeton `joutiya-edge`, sans changer sa valeur, deux permissions : **Access: Service Tokens : Edit** (compte) et **Cache Purge : Purge** (zone `joutiya.ma`).
 2. Claude crée par API les jetons de service `joutiya-ci` (déploiement du staging, étape 8) et `joutiya-probe` (la sonde ; son secret sera renouvelé par API quand la sonde sera déployée). Un secret va directement de l'API à sa destination, jamais dans un fichier ni dans le chat.
-3. Claude lance `node scripts/cloudflare.ts access --apply`, avec `ACCESS_OWNER_EMAIL` (votre Gmail), `ACCESS_CI_TOKEN_ID` et `ACCESS_PROBE_TOKEN_ID` : `admin`, `ssh`, `staging` et `admin-staging` n'acceptent que votre compte Google, plus le jeton de la CI pour `ssh` et celui de la sonde pour `staging`.
+3. Claude lance `node scripts/cloudflare.ts access --apply`, avec `ACCESS_OWNER_EMAIL` (votre Gmail), `ACCESS_CI_TOKEN_ID` et `ACCESS_PROBE_TOKEN_ID` : `admin`, `staging` et `admin-staging` n'acceptent que votre compte Google (plus le jeton de la sonde pour `staging`), et `ssh` seulement le jeton de la CI.
 4. Claude relance les parties `tunnel:*` : les noms protégés reçoivent leur enregistrement DNS.
 5. Claude inscrit par PR les tags AUD de `admin.joutiya.ma` et `admin-staging.joutiya.ma` dans `infra/targets.json`. L'image de l'application embarque ce fichier.
 
@@ -100,7 +100,7 @@ Après la validation du .MA par le registre, et avant le 12 novembre (Cloudflare
 
 1. Nav prépare un jeton GitHub à grain fin `joutiya-claude-actions` : dépôt `joutiya` seul, permissions **Secrets** et **Variables** en lecture et écriture, 90 jours. Vous cliquez sur **Generate token** et l'enregistrez dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
 2. Claude, dans une nouvelle session :
-   - crée la clé de `deploy-staging` : la clé privée va dans le secret GitHub `STAGING_DEPLOY_SSH_KEY`, la clé publique sur la VM ;
+   - crée la clé de `deploy-staging` : la clé privée va dans le secret GitHub `STAGING_DEPLOY_SSH_KEY`, la clé publique sur la VM (`oracle-vm.ts sync --deploy-staging-key`) ;
    - met `STAGING_ACCESS_CLIENT_ID` et `STAGING_ACCESS_CLIENT_SECRET` (jeton `joutiya-ci`) ;
    - met la variable `VM_SSH_KNOWN_HOSTS`, avec la clé d'hôte lue sur la console série ;
    - puis met `STAGING_DEPLOY_ENABLED` à `true`.
@@ -123,7 +123,7 @@ Les alertes du site partent par Resend (phase 2, `/mnt/project-files/joutiya/pha
 ## 12. Mise en production et contrôles
 
 1. Claude vérifie que le dernier *Deploy staging* est vert, et que `https://staging.joutiya.ma` affiche l'accueil et les pages légales.
-2. Claude promeut la version du staging par Run Command (`joutiya-deploy prod promote`) : seules les images déjà en service en staging peuvent passer, désignées par leur identifiant exact. Il vide ensuite le cache Cloudflare par API.
+2. Claude promeut la version du staging par Run Command (`node scripts/oracle-vm.ts promote --apply`, qui vide ensuite le cache Cloudflare) : seules les images déjà en service en staging peuvent passer, désignées par leur identifiant exact, et seulement un commit de `main`. Retour arrière : `rollback --apply`. La production n'a aucun accès SSH : seul le staging en garde un, pour la CI.
 3. Contrôles de fin de phase :
    - `https://joutiya.ma/api/health` répond `ok` ;
    - un balayage de tous les ports de l'IP publique de la VM n'en trouve aucun ouvert ;

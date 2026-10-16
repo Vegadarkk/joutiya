@@ -5,9 +5,9 @@
 # commit a copy by hand.
 #
 # Keeps the metadata service (which serves this script, tokens included) away from non-root users,
-# sets up the two admin channels first (OCI Run Command, then the SSH tunnel), installs Docker, swap
-# and unattended upgrades, then this repository's VM files (infra/vm/install.sh) and the two Compose
-# tunnels' tokens. The VCN has no ingress rule. Progress lines (no secret) go to the serial console,
+# sets up the admin channel first (OCI Run Command), then the SSH tunnel of the CI's staging deploys,
+# installs Docker, swap and unattended upgrades, then this repository's VM files (infra/vm/install.sh)
+# and the two Compose tunnels' tokens. The VCN has no ingress rule. Progress lines (no secret) go to the serial console,
 # read by `node scripts/oracle-vm.ts status`. Every step is idempotent: a failed run stays as a
 # per-boot script and runs again at the next boot (`node scripts/oracle-vm.ts reboot --apply`), so a
 # transient failure never costs the instance.
@@ -61,7 +61,7 @@ write_secret() { (umask 077 && printf '%s\n' "$2" > "$1"); }
 files="$(mktemp -d)"
 base64 -d <<< "$VM_FILES" | tar -xzf - -C "$files"
 
-# Admin channel 1, OCI Run Command: the Oracle Cloud Agent (snap) runs its scripts as ocarun, made
+# Admin channel, OCI Run Command: the Oracle Cloud Agent (snap) runs its scripts as ocarun, made
 # root through sudo at once, so the VM stays manageable if a later step fails (install.sh keeps the
 # file current). Who may send commands is decided by OCI IAM. The agent's users must exist before
 # the metadata rule below.
@@ -91,8 +91,8 @@ imds() { sudo -u "$1" curl -fsS -m 5 -o /dev/null -H 'Authorization: Bearer Orac
 if imds nobody; then progress "WARNING: a non-root user reaches the metadata service"; fi
 if id -u snap_daemon > /dev/null 2>&1 && ! imds snap_daemon; then progress "WARNING: the Oracle Cloud Agent cannot reach the metadata service"; fi
 
-# Admin channel 2, the SSH tunnel: once the zone is active, ssh.joutiya.ma reaches the VM even if a
-# later step fails. cloudflared from Cloudflare's repository (pkg.cloudflare.com), updated by apt.
+# The SSH tunnel (ssh.joutiya.ma, for the CI's staging deploys once the zone is active). cloudflared
+# from Cloudflare's repository (pkg.cloudflare.com), updated by apt.
 # The token goes in a root-only file, never on the command line (`cloudflared service install
 # <token>` would put it in a world-readable unit and in the process list).
 install -d -m 0755 /usr/share/keyrings

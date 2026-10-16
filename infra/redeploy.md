@@ -20,7 +20,7 @@ Ce qui se perd : les files BullMQ et les compteurs de quotas du jour (`valkey-qu
 4. **Fichiers et secrets** : Claude réécrit par Run Command les fichiers `/etc/joutiya/<env>/*.env` et la clé publique de `deploy-staging`. `ALERT_RELAY_URL` reçoit tout de suite l'URL de la sonde : elle existe déjà, et l'application ne démarre pas sans.
 5. **Certificats Google** : un nouveau certificat par conteneur, signé par l'autorité ; le pool et les comptes de service restent.
 6. **Staging** : Claude relance le dernier déploiement (GitHub → Actions → *Deploy staging* sur `main`).
-7. **Production** : Claude promeut par Run Command la version du staging, puis vide le cache Cloudflare.
+7. **Production** : Claude promeut la version du staging par Run Command (`node scripts/oracle-vm.ts promote --apply`, qui vide aussi le cache Cloudflare).
 8. **Contrôle** : `https://joutiya.ma/api/health` répond `ok`, et la sonde annonce le rétablissement.
 
 ## Entretien courant
