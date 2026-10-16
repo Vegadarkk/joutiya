@@ -1,5 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { dnsChange, googleIdp, needsAccess, readEdgeFile, substitute, tunnelHostnames, validateEdge, type AccessApp, type DnsRecord, type TunnelConfig } from "../../scripts/cloudflare";
+import registry from "../../infra/targets.json";
+import type { Targets } from "../../scripts/assert-target";
+import {
+  dnsChange,
+  googleIdp,
+  needsAccess,
+  preflightErrors,
+  readEdgeFile,
+  substitute,
+  tunnelHostnames,
+  validateEdge,
+  validateR2,
+  type AccessApp,
+  type DnsRecord,
+  type R2CorsRule,
+  type R2Settings,
+  type TunnelConfig,
+} from "../../scripts/cloudflare";
 
 const record = (type: string, content: string, proxied = true): DnsRecord => ({ id: `${type}-${content}`, type, name: "joutiya.ma", content, proxied });
 const TARGET = "0f0e0d0c-0b0a-4908-8706-050403020100.cfargotunnel.com";
@@ -78,5 +95,52 @@ describe("dnsChange", () => {
     expect(dnsChange([parking], TARGET, true)).toEqual({ create: true, deletes: [parking], conflicts: [] });
     const unproxied = record("CNAME", TARGET, false);
     expect(dnsChange([unproxied], TARGET, false).conflicts).toEqual([unproxied]);
+  });
+});
+
+describe("r2-buckets.json", () => {
+  const targets = registry as unknown as Targets;
+
+  it("names registry buckets only, with each role's methods and each environment's origins", () => {
+    expect(validateR2(readEdgeFile<R2Settings>("r2-buckets.json"), targets)).toEqual([]);
+  });
+
+  it("flags another environment's origin, a write on media and a rule that would empty a private bucket", () => {
+    const settings: R2Settings = {
+      jurisdiction: "eu",
+      buckets: {
+        "joutiya-staging-quarantine": { cors: [{ AllowedOrigins: ["https://joutiya.ma"], AllowedMethods: ["PUT"] }] },
+        "joutiya-prod-media": { cors: [{ AllowedOrigins: ["https://joutiya.ma"], AllowedMethods: ["GET", "PUT"] }] },
+        "joutiya-prod-private": { lifecycle: [{ name: "purge", prefix: "", deleteAfterDays: 0 }] },
+        "joutiya-prod-backups": {},
+      },
+    };
+    expect(validateR2(settings, targets)).toEqual([
+      "r2-buckets.json: joutiya-staging-quarantine must not admit https://joutiya.ma",
+      "r2-buckets.json: joutiya-prod-media must not allow PUT",
+      "r2-buckets.json: joutiya-prod-private: purge needs a whole number of days",
+      "r2-buckets.json: joutiya-prod-private: purge would empty the bucket",
+      "r2-buckets.json: joutiya-prod-backups is not a bucket of infra/targets.json",
+    ]);
+  });
+});
+
+describe("preflightErrors", () => {
+  const rule: R2CorsRule = { AllowedOrigins: ["https://joutiya.ma"], AllowedMethods: ["PUT"], AllowedHeaders: ["Content-Type"], MaxAgeSeconds: 3600 };
+
+  it("accepts an answer that allows the origin, method and headers", () => {
+    const headers = new Headers({
+      "access-control-allow-origin": "https://joutiya.ma",
+      "access-control-allow-methods": "PUT",
+      "access-control-allow-headers": "content-type",
+      "access-control-max-age": "3600",
+    });
+    expect(preflightErrors(rule, "https://joutiya.ma", "PUT", 200, headers)).toEqual([]);
+  });
+
+  it("reports a bucket without CORS and an answer that lacks the method, headers and max age", () => {
+    expect(preflightErrors(rule, "https://joutiya.ma", "PUT", 403, new Headers())).toEqual(["HTTP 403"]);
+    const partial = new Headers({ "access-control-allow-origin": "https://joutiya.ma", "access-control-allow-methods": "GET, HEAD" });
+    expect(preflightErrors(rule, "https://joutiya.ma", "PUT", 200, partial)).toEqual(["allow-methods lacks PUT", "allow-headers lacks Content-Type", "max-age missing"]);
   });
 });

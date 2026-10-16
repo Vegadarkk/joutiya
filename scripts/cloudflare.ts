@@ -3,17 +3,19 @@
 // each tunnel must be joutiya-<name>-tunnel. Dry run by default (prints the requests); --apply sends.
 //
 //   node --env-file=<owner env file> scripts/cloudflare.ts <part>... [--apply] [--replace-dns]
-//   parts: zone (settings and rules), tunnel:staging, tunnel:prod, tunnel:ssh, access
+//   parts: zone (settings and rules), tunnel:staging, tunnel:prod, tunnel:ssh, access, r2
 //
 // Environment (never printed): JOUTIYA_CLOUDFLARE_API_TOKEN, a custom token limited to the Joutiya
 // account and the joutiya.ma zone (a prefixed name: a shared shell may hold other projects' tokens);
 // for access: ACCESS_OWNER_EMAIL, ACCESS_CI_TOKEN_ID, ACCESS_PROBE_TOKEN_ID.
+// r2 only checks: Nav applies r2-buckets.json in the dashboard (bucket settings need account-wide
+// R2 rights), and this part sends its CORS preflights, which need no token.
 // An existing A, AAAA or CNAME record on a tunnel hostname is only replaced with --replace-dns, and
 // a hostname guarded by Access gets its DNS record only once its Access application exists.
 
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { validateTargets, type Targets } from "./assert-target.ts";
+import { validateTargets, type AppEnv, type EnvTargets, type Targets } from "./assert-target.ts";
 
 export const ZONE_NAME = "joutiya.ma";
 const API = "https://api.cloudflare.com/client/v4";
@@ -296,12 +298,113 @@ async function applyAccess(api: CloudflareApi, targets: Targets): Promise<void> 
   }
 }
 
+/** A CORS rule as pasted in the R2 dashboard's JSON tab. */
+export interface R2CorsRule {
+  AllowedOrigins: string[];
+  AllowedMethods: string[];
+  AllowedHeaders?: string[];
+  ExposeHeaders?: string[];
+  MaxAgeSeconds?: number;
+}
+export interface R2Settings {
+  jurisdiction: string;
+  buckets: Record<string, { cors?: R2CorsRule[]; lifecycle?: { name: string; prefix: string; deleteAfterDays: number }[] }>;
+}
+type BucketRole = keyof EnvTargets["r2"];
+
+/** The site origins of each environment: a bucket never admits another environment's pages. */
+export const SITE_ORIGINS: Record<AppEnv, string[]> = {
+  dev: ["http://localhost:3000"],
+  staging: ["https://staging.joutiya.ma"],
+  prod: ["https://joutiya.ma", "https://www.joutiya.ma"],
+};
+const CORS_METHODS: Record<BucketRole, string[]> = { quarantine: ["PUT"], media: ["GET", "HEAD"], private: [] };
+
+/** r2-buckets.json against the registry: its buckets, each role's methods, each environment's origins. */
+export function validateR2(settings: R2Settings, targets: Targets): string[] {
+  const errors: string[] = [];
+  const owners = new Map<string, { env: AppEnv; role: BucketRole }>();
+  for (const [env, recorded] of Object.entries(targets.environments) as [AppEnv, EnvTargets][]) {
+    for (const [role, bucket] of Object.entries(recorded.r2) as [BucketRole, string][]) owners.set(bucket, { env, role });
+  }
+  if (settings.jurisdiction !== "eu") errors.push("r2-buckets.json: the buckets were created in the EU jurisdiction");
+  for (const [bucket, { cors = [], lifecycle = [] }] of Object.entries(settings.buckets)) {
+    const owner = owners.get(bucket);
+    if (!owner) {
+      errors.push(`r2-buckets.json: ${bucket} is not a bucket of infra/targets.json`);
+      continue;
+    }
+    for (const rule of cors) {
+      for (const method of rule.AllowedMethods) if (!CORS_METHODS[owner.role].includes(method)) errors.push(`r2-buckets.json: ${bucket} must not allow ${method}`);
+      for (const origin of rule.AllowedOrigins) if (!SITE_ORIGINS[owner.env].includes(origin)) errors.push(`r2-buckets.json: ${bucket} must not admit ${origin}`);
+    }
+    for (const rule of lifecycle) {
+      if (!Number.isInteger(rule.deleteAfterDays) || rule.deleteAfterDays < 1) errors.push(`r2-buckets.json: ${bucket}: ${rule.name} needs a whole number of days`);
+      // Media holds published photos, private holds backups and account files: only quarantine empties.
+      if (rule.prefix === "" && owner.role !== "quarantine") errors.push(`r2-buckets.json: ${bucket}: ${rule.name} would empty the bucket`);
+    }
+  }
+  return errors;
+}
+
+/** What a preflight answer lacks to let `origin` send `method` under `rule`; [] when it is allowed. */
+export function preflightErrors(rule: R2CorsRule, origin: string, method: string, status: number, headers: Headers): string[] {
+  if (status !== 200) return [`HTTP ${status}`];
+  const list = (name: string) => (headers.get(name) ?? "").split(",").map((value) => value.trim().toLowerCase());
+  const errors: string[] = [];
+  if (headers.get("access-control-allow-origin") !== origin) errors.push(`allow-origin ${headers.get("access-control-allow-origin") ?? "missing"}`);
+  if (!list("access-control-allow-methods").includes(method.toLowerCase())) errors.push(`allow-methods lacks ${method}`);
+  for (const header of rule.AllowedHeaders ?? []) if (!list("access-control-allow-headers").includes(header.toLowerCase())) errors.push(`allow-headers lacks ${header}`);
+  if (rule.MaxAgeSeconds !== undefined && headers.get("access-control-max-age") !== String(rule.MaxAgeSeconds)) errors.push(`max-age ${headers.get("access-control-max-age") ?? "missing"}`);
+  return errors;
+}
+
+async function preflight(url: string, origin: string, method: string, headers: string[]): Promise<{ status: number; headers: Headers }> {
+  const response = await fetch(url, {
+    method: "OPTIONS",
+    headers: { Origin: origin, "Access-Control-Request-Method": method, ...(headers.length > 0 ? { "Access-Control-Request-Headers": headers.join(",").toLowerCase() } : {}) },
+  });
+  await response.body?.cancel();
+  return { status: response.status, headers: response.headers };
+}
+
+/** Sends the CORS preflights of r2-buckets.json, plus one from a foreign origin per bucket, which must fail. */
+async function checkR2(targets: Targets): Promise<void> {
+  const settings = readEdgeFile<R2Settings>("r2-buckets.json");
+  const errors = validateR2(settings, targets);
+  if (errors.length > 0) throw new Error(errors.join("\n"));
+  const endpoint = `https://${targets.shared.cloudflare.accountId}.${settings.jurisdiction}.r2.cloudflarestorage.com`;
+  let failed = 0;
+  for (const [bucket, { cors = [], lifecycle = [] }] of Object.entries(settings.buckets)) {
+    const url = `${endpoint}/${bucket}/cors-check`;
+    for (const rule of cors) {
+      for (const origin of rule.AllowedOrigins) {
+        for (const method of rule.AllowedMethods) {
+          const answer = await preflight(url, origin, method, rule.AllowedHeaders ?? []);
+          const problems = preflightErrors(rule, origin, method, answer.status, answer.headers);
+          if (problems.length > 0) failed += 1;
+          console.log(`${problems.length > 0 ? "FAIL" : "ok  "}  ${bucket}: ${method} from ${origin}${problems.length > 0 ? ` (${problems.join("; ")})` : ""}`);
+        }
+      }
+    }
+    const firstMethod = cors[0]?.AllowedMethods[0];
+    if (firstMethod !== undefined) {
+      const foreign = await preflight(url, "https://example.org", firstMethod, []);
+      const admitted = foreign.status === 200 && foreign.headers.get("access-control-allow-origin") !== null;
+      if (admitted) failed += 1;
+      console.log(`${admitted ? "FAIL" : "ok  "}  ${bucket}: a foreign origin is ${admitted ? "admitted" : "refused"}`);
+    }
+    for (const rule of lifecycle) console.log(`      ${bucket}: lifecycle ${rule.name} (prefix "${rule.prefix}", ${rule.deleteAfterDays} d), read back by Nav`);
+  }
+  if (failed > 0) throw new Error(`${failed} CORS check(s) failed: apply r2-buckets.json in the dashboard (docs/phase-1.md, step 14)`);
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const apply = args.includes("--apply");
   const replaceDns = args.includes("--replace-dns");
   const parts = args.filter((arg) => !arg.startsWith("--"));
-  const known = ["zone", "access", ...TUNNELS.map((name) => `tunnel:${name}`)];
+  const known = ["zone", "access", "r2", ...TUNNELS.map((name) => `tunnel:${name}`)];
   const unknown = parts.filter((part) => !known.includes(part));
   if (parts.length === 0 || unknown.length > 0) throw new Error(`usage: scripts/cloudflare.ts <${known.join("|")}>... [--apply] [--replace-dns]`);
 
@@ -312,16 +415,18 @@ async function main(): Promise<void> {
   if (targetErrors.length > 0) throw new Error(targetErrors.join("\n"));
   const targets = raw as Targets;
 
-  const token = process.env.JOUTIYA_CLOUDFLARE_API_TOKEN?.trim();
-  if (!token) throw new Error("JOUTIYA_CLOUDFLARE_API_TOKEN is not set");
+  const token = process.env.JOUTIYA_CLOUDFLARE_API_TOKEN?.trim() ?? "";
+  if (!token && parts.some((part) => part !== "r2")) throw new Error("JOUTIYA_CLOUDFLARE_API_TOKEN is not set");
   const api = new CloudflareApi(token, apply);
   for (const part of parts) {
     console.log(`\n== ${part}`);
     if (part === "zone") await applyZone(api, targets);
     else if (part === "access") await applyAccess(api, targets);
+    else if (part === "r2") await checkR2(targets);
     else await applyTunnel(api, targets, part.slice("tunnel:".length) as TunnelName, replaceDns);
   }
-  console.log(apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
+  if (parts.every((part) => part === "r2")) console.log("\nChecks only: the r2 part writes nothing.");
+  else console.log(apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
 }
 
 const self = fileURLToPath(import.meta.url);
