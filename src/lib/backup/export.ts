@@ -7,17 +7,23 @@ import { consume, isDegraded } from "@/lib/quota";
 import type { ObjectStore } from "@/lib/storage";
 import { isValkeyConfigured, valkey } from "@/lib/valkey/clients";
 import { encryptAge, isAgeRecipient } from "./crypto.ts";
-import { encodeDocument } from "./encode.ts";
+import { encodeDocument, isDocumentPath } from "./encode.ts";
 import { PART_MAX_BYTES, PART_MAX_DOCS, PartBuilder, manifestKey, partKey, sealPart, type BackupMode, type SealedPart } from "./parts.ts";
 
 // Nightly export (D17), two passes written to the private bucket as NDJSON -> gzip -> age:
-//   - incremental: documents whose `updatedAt` (or, failing that, `createdAt`) is >= the last
-//     cursor; collections without such a field are only in the rolling full;
-//   - rolling full: up to `fullBudget` documents a night across collections, ordered by document
-//     id and continued from a per-collection cursor; a cycle is one pass over the table below.
-// Cursors live in `system/backup`. Without a valid recipient nothing is written: a backup is
-// encrypted or does not exist. Deletions are not exported: a restore resurrects purged documents
-// (run retention-purge after a restore, see notes-backup.md).
+//   1. incremental, per collection: documents whose `updatedAt` (or, failing that, `createdAt`) is
+//      at or after the collection's cursor, in (time, path) order. A budget or the read quota that
+//      stops a scan leaves the cursor on the last exported (time, path): the next run continues
+//      strictly after it, so documents sharing one timestamp are neither skipped nor looped on.
+//      The pass starts with the collection it stopped at (round robin). Collections without such
+//      a field are only in the rolling full;
+//   2. rolling full: up to `fullBudget` documents a night across collections, ordered by document
+//      path and continued from a per-collection cursor; a cycle is one pass over the table below.
+// Cursors live in `system/backup` and move only once the manifest is stored: a failed run is
+// redone by the next one. One run per UTC date: keys are per date, a second run would overwrite
+// the first. Scans stop when the Firestore read quota reaches `readsStopRatio` (the app keeps its
+// share). Without a valid recipient nothing is written: a backup is encrypted or does not exist.
+// Deletions are not exported: a restore resurrects purged documents (docs/backups.md).
 
 export type TimeField = "updatedAt" | "createdAt";
 
@@ -63,15 +69,17 @@ export interface BackupConfig {
   collections: readonly BackupCollection[];
   /** Documents the rolling full reads per run (D17: 10 000 a night, Spark 50 000 reads/day shared with the app). */
   fullBudget: number;
-  /** Safety cap of the incremental; past it the cursor stops at the last exported document (nothing lost). */
+  /** Documents the incremental reads per run; past it the cursors stay on the last exported document (nothing lost). */
   incrementalMax: number;
   pageSize: number;
   partMaxDocs: number;
   partMaxBytes: number;
-  /** Next incremental lower bound = now - overlapMs: tolerates clock skew between the app servers and the worker. */
+  /** A collection read to its end restarts at now - overlapMs: tolerates clock skew between the app servers and the worker. */
   overlapMs: number;
-  /** First run (no cursor): documents of the last 24 h. */
+  /** A collection without a cursor (first run): documents of the last 24 h, older ones come with the rolling full. */
   firstRunWindowMs: number;
+  /** Share of the daily Firestore read quota at which the scans stop. */
+  readsStopRatio: number;
 }
 
 export const DEFAULT_BACKUP_CONFIG: BackupConfig = {
@@ -83,7 +91,15 @@ export const DEFAULT_BACKUP_CONFIG: BackupConfig = {
   partMaxBytes: PART_MAX_BYTES,
   overlapMs: 10 * 60_000,
   firstRunWindowMs: 24 * 3_600_000,
+  readsStopRatio: 0.9,
 };
+
+export interface IncrementalCursor {
+  /** Inclusive lower bound of the time field (Firestore precision kept). */
+  since: Timestamp;
+  /** Last exported path at exactly `since`: the scan resumes strictly after (since, after). Null: `since` included. */
+  after: string | null;
+}
 
 export interface FullCursor {
   /** Collection where the budget ran out (continued next night); null = the cycle is complete. */
@@ -95,10 +111,12 @@ export interface FullCursor {
 }
 
 export interface BackupCursors {
-  /** Lower bound of the next incremental run; null before the first run. */
-  incrementalSince: Date | null;
+  incremental: Record<string, IncrementalCursor>;
+  /** Collection the next incremental pass starts with (where a budget stopped it); null = table order. */
+  incrementalNext: string | null;
   full: FullCursor;
   lastRunAt: Date | null;
+  /** UTC date of the last completed run. */
   lastDate: string | null;
 }
 
@@ -119,32 +137,40 @@ export interface BackupManifest {
   date: string;
   startedAt: string;
   finishedAt: string;
-  /** Incremental window used by this run (inclusive lower bound) and the one stored for the next. */
-  since: string;
-  nextSince: string;
   counts: Record<BackupMode, Record<string, number>>;
   parts: ManifestPart[];
   /** Encrypted bytes of all parts. */
   bytes: number;
   reads: number;
   truncated: boolean;
-  cursors: {
-    incrementalSince: string | null;
-    full: { next: string | null; after: Record<string, string>; cycleStartedAt: string | null; cycleCompletedAt: string | null };
-  };
+  quotaStopped: boolean;
+  /** Cursors stored for the next run. */
+  cursors: CursorsJson;
   collections: BackupCollection[];
 }
 
+export interface CursorsJson {
+  incremental: Record<string, { since: string; after: string | null }>;
+  incrementalNext: string | null;
+  full: { next: string | null; after: Record<string, string>; cycleStartedAt: string | null; cycleCompletedAt: string | null };
+}
+
+export type BackupSkipReason = "no_recipient" | "no_storage" | "reads_degraded" | "already_done";
+
 export interface BackupResult {
   status: "done" | "skipped";
-  reason?: "no_recipient" | "reads_degraded";
+  reason?: BackupSkipReason;
   date: string;
   manifestKey: string | null;
   counts: Record<BackupMode, Record<string, number>>;
   parts: number;
   bytes: number;
   reads: number;
+  /** The incremental pass did not reach the end of every collection (budget or quota): the next run continues. */
   truncated: boolean;
+  /** The read quota stopped the scans. */
+  quotaStopped: boolean;
+  durationMs: number;
   cursors: BackupCursors | null;
 }
 
@@ -165,17 +191,42 @@ const CONTENT_TYPE = "application/octet-stream";
 
 function toDate(value: unknown): Date | null {
   if (value instanceof Timestamp) return value.toDate();
-  if (value instanceof Date) return value;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
   return null;
 }
 
-function toStringMap(value: unknown): Record<string, string> {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return {};
-  return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+function toTimestamp(value: unknown): Timestamp | null {
+  if (value instanceof Timestamp) return value;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return Timestamp.fromDate(value);
+  return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** Paths only: a hand-edited value that is not a document path would make every run throw. */
+function toPathMap(value: unknown): Record<string, string> {
+  if (!isRecord(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string" && isDocumentPath(entry[1])));
+}
+
+function toIncremental(value: unknown): Record<string, IncrementalCursor> {
+  if (!isRecord(value)) return {};
+  const out: Record<string, IncrementalCursor> = {};
+  for (const [id, raw] of Object.entries(value)) {
+    if (!isRecord(raw)) continue;
+    const since = toTimestamp(raw["since"]);
+    if (!since) continue;
+    const after = raw["after"];
+    out[id] = { since, after: typeof after === "string" && isDocumentPath(after) ? after : null };
+  }
+  return out;
 }
 
 export const EMPTY_CURSORS: BackupCursors = {
-  incrementalSince: null,
+  incremental: {},
+  incrementalNext: null,
   full: { next: null, after: {}, cycleStartedAt: null, cycleCompletedAt: null },
   lastRunAt: null,
   lastDate: null,
@@ -183,26 +234,28 @@ export const EMPTY_CURSORS: BackupCursors = {
 
 /** Tolerant read of system/backup: a missing or hand-edited document never breaks the job. */
 export function parseCursors(data: unknown): BackupCursors {
-  if (data === null || typeof data !== "object") return EMPTY_CURSORS;
-  const doc = data as Record<string, unknown>;
-  const full = (doc["full"] ?? {}) as Record<string, unknown>;
+  if (!isRecord(data)) return EMPTY_CURSORS;
+  const full = isRecord(data["full"]) ? data["full"] : {};
   return {
-    incrementalSince: toDate(doc["incrementalSince"]),
+    incremental: toIncremental(data["incremental"]),
+    incrementalNext: typeof data["incrementalNext"] === "string" ? data["incrementalNext"] : null,
     full: {
       next: typeof full["next"] === "string" ? full["next"] : null,
-      after: toStringMap(full["after"]),
+      after: toPathMap(full["after"]),
       cycleStartedAt: toDate(full["cycleStartedAt"]),
       cycleCompletedAt: toDate(full["cycleCompletedAt"]),
     },
-    lastRunAt: toDate(doc["lastRunAt"]),
-    lastDate: typeof doc["lastDate"] === "string" ? doc["lastDate"] : null,
+    lastRunAt: toDate(data["lastRunAt"]),
+    lastDate: typeof data["lastDate"] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data["lastDate"]) ? data["lastDate"] : null,
   };
 }
 
-function cursorDocData(cursors: BackupCursors, now: Date): Record<string, unknown> {
+/** The system/backup document for `cursors` (Timestamps, so the incremental bounds keep Firestore precision). */
+export function serializeCursors(cursors: BackupCursors, now: Date): Record<string, unknown> {
   const ts = (date: Date | null) => (date ? Timestamp.fromDate(date) : null);
   return {
-    incrementalSince: ts(cursors.incrementalSince),
+    incremental: Object.fromEntries(Object.entries(cursors.incremental).map(([id, cursor]) => [id, { since: cursor.since, after: cursor.after }])),
+    incrementalNext: cursors.incrementalNext,
     full: { next: cursors.full.next, after: cursors.full.after, cycleStartedAt: ts(cursors.full.cycleStartedAt), cycleCompletedAt: ts(cursors.full.cycleCompletedAt) },
     lastRunAt: ts(cursors.lastRunAt),
     lastDate: cursors.lastDate,
@@ -210,32 +263,61 @@ function cursorDocData(cursors: BackupCursors, now: Date): Record<string, unknow
   };
 }
 
-// --- Alert without a recipient (once per day) --------------------------------------------------
-
-let alertedDate: string | null = null;
-
-/** Tests: forget the in-process "alerted today" marker. */
-export function resetBackupAlertMemory(): void {
-  alertedDate = null;
+function cursorsJson(cursors: BackupCursors): CursorsJson {
+  const iso = (date: Date | null) => date?.toISOString() ?? null;
+  return {
+    incremental: Object.fromEntries(Object.entries(cursors.incremental).map(([id, cursor]) => [id, { since: cursor.since.toDate().toISOString(), after: cursor.after }])),
+    incrementalNext: cursors.incrementalNext,
+    full: { next: cursors.full.next, after: cursors.full.after, cycleStartedAt: iso(cursors.full.cycleStartedAt), cycleCompletedAt: iso(cursors.full.cycleCompletedAt) },
+  };
 }
 
-async function alertNoRecipientOnce(date: string): Promise<void> {
+// --- Alert when a run cannot happen (once per day and reason) ----------------------------------
+
+const alertedInProcess = new Set<string>();
+
+/** Tests: forget the in-process "alerted today" markers. */
+export function resetBackupAlertMemory(): void {
+  alertedInProcess.clear();
+}
+
+const SKIP_ALERT: Record<"no_recipient" | "no_storage", { title: string; body: (date: string) => string }> = {
+  no_recipient: {
+    title: "Sauvegarde Firestore non effectuée : clé de chiffrement absente",
+    body: (date) =>
+      `BACKUP_AGE_RECIPIENT absent ou invalide le ${date} : aucune sauvegarde écrite (jamais en clair). Générer la paire de clés age hors ligne (age-keygen) et renseigner la clé publique age1… dans l'environnement du worker.`,
+  },
+  no_storage: {
+    title: "Sauvegarde Firestore non effectuée : stockage R2 non configuré",
+    body: (date) => `Variables R2_* absentes le ${date} : aucune sauvegarde écrite. Renseigner les variables R2 dans l'environnement du worker.`,
+  },
+};
+
+/** One alert per UTC date and reason (SET NX in valkey-queue, in-process without it); alert() also dedupes for an hour. */
+export async function alertBackupSkipped(date: string, reason: "no_recipient" | "no_storage"): Promise<void> {
+  const marker = `backup:alerted:${reason}:${date}`;
   if (isValkeyConfigured("queue")) {
     try {
-      if ((await valkey("queue").set(`backup:alerted:no-recipient:${date}`, "1", "EX", 2 * 86_400, "NX")) !== "OK") return;
+      if ((await valkey("queue").set(marker, "1", "EX", 2 * 86_400, "NX")) !== "OK") return;
     } catch (error) {
-      // alert() still dedupes the same title for an hour.
       logger.warn({ err: (error as Error).message }, "backup-firestore: alert marker unavailable");
     }
   } else {
-    if (alertedDate === date) return;
-    alertedDate = date;
+    if (alertedInProcess.has(marker)) return;
+    alertedInProcess.add(marker);
   }
-  await alert({
-    severity: "P1",
-    title: "Sauvegarde Firestore non effectuée : clé de chiffrement absente",
-    body: `BACKUP_AGE_RECIPIENT absent ou invalide le ${date} : aucune sauvegarde écrite (jamais en clair). Générer la paire de clés age hors ligne (age-keygen) et renseigner la clé publique age1… dans l'environnement du worker.`,
-  });
+  await alert({ severity: "P1", title: SKIP_ALERT[reason].title, body: SKIP_ALERT[reason].body(date) });
+}
+
+/** A syntactically valid recipient can still carry a bad checksum: encrypting nothing proves it before any read. */
+async function usableRecipient(recipient: string | undefined): Promise<boolean> {
+  if (!isAgeRecipient(recipient)) return false;
+  try {
+    await encryptAge(new Uint8Array(0), recipient);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // --- Parts of one (mode, collection) -----------------------------------------------------------
@@ -256,7 +338,6 @@ class CollectionWriter {
   private sealed = 0;
   private first: SealedPart | null = null;
   readonly parts: ManifestPart[] = [];
-  docs = 0;
 
   constructor(
     private readonly ctx: WriterContext,
@@ -267,7 +348,6 @@ class CollectionWriter {
   }
 
   async add(snapshot: QueryDocumentSnapshot): Promise<void> {
-    this.docs += 1;
     const full = this.builder.push(encodeDocument(snapshot));
     if (full) await this.seal(full);
   }
@@ -304,6 +384,13 @@ class CollectionWriter {
 
 // --- Paginated scans ---------------------------------------------------------------------------
 
+interface RunState {
+  reads: number;
+  /** Set once the read quota reached readsStopRatio: every later scan returns at once. */
+  quotaStopped: boolean;
+  readsStopRatio: number;
+}
+
 interface ScanResult {
   docs: number;
   /** True when the query returned fewer documents than asked: nothing left after `last`. */
@@ -311,28 +398,30 @@ interface ScanResult {
   last: QueryDocumentSnapshot | null;
 }
 
-/** Reads `query` in pages of `pageSize`, at most `max` documents, counting the reads (one at least per page: Firestore bills an empty result as one read). */
-async function scan(query: Query, max: number, pageSize: number, startAfter: DocumentReference | null, onDoc: (snapshot: QueryDocumentSnapshot) => Promise<void>): Promise<{ result: ScanResult; reads: number }> {
-  let remaining = max;
-  let reads = 0;
-  let cursor: DocumentReference | QueryDocumentSnapshot | null = startAfter;
+/**
+ * Reads `query` in pages of `pageSize`, at most `max` documents, from strictly after `startAfter`
+ * (values of the query's orderBy fields). Counts the reads: one at least per page, Firestore bills
+ * an empty result as one read.
+ */
+async function scan(query: Query, max: number, pageSize: number, startAfter: unknown[] | null, state: RunState, onDoc: (snapshot: QueryDocumentSnapshot) => Promise<void>): Promise<ScanResult> {
+  let docs = 0;
   let last: QueryDocumentSnapshot | null = null;
-  while (remaining > 0) {
-    const limit = Math.min(pageSize, remaining);
+  while (docs < max && !state.quotaStopped) {
+    const limit = Math.min(pageSize, max - docs);
     let page = query.limit(limit);
-    if (cursor) page = page.startAfter(cursor);
+    if (last) page = page.startAfter(last);
+    else if (startAfter) page = page.startAfter(...startAfter);
     const snapshot = await page.get();
-    reads += Math.max(1, snapshot.size);
-    await consume("firestore.reads", Math.max(1, snapshot.size));
+    const billed = Math.max(1, snapshot.size);
+    state.reads += billed;
+    const quota = await consume("firestore.reads", billed);
+    if (quota.level !== "unknown" && quota.ratio >= state.readsStopRatio) state.quotaStopped = true;
     for (const doc of snapshot.docs) await onDoc(doc);
-    remaining -= snapshot.size;
-    if (snapshot.size > 0) {
-      last = snapshot.docs[snapshot.size - 1] as QueryDocumentSnapshot;
-      cursor = last;
-    }
-    if (snapshot.size < limit) return { result: { docs: max - remaining, exhausted: true, last }, reads };
+    docs += snapshot.size;
+    if (snapshot.size > 0) last = snapshot.docs[snapshot.size - 1] as QueryDocumentSnapshot;
+    if (snapshot.size < limit) return { docs, exhausted: true, last };
   }
-  return { result: { docs: max - remaining, exhausted: false, last }, reads };
+  return { docs, exhausted: false, last };
 }
 
 function baseQuery(db: Firestore, collection: BackupCollection): Query {
@@ -341,54 +430,98 @@ function baseQuery(db: Firestore, collection: BackupCollection): Query {
 
 // --- The job -----------------------------------------------------------------------------------
 
-function skipped(reason: NonNullable<BackupResult["reason"]>, date: string): BackupResult {
-  return { status: "skipped", reason, date, manifestKey: null, counts: { incremental: {}, full: {} }, parts: 0, bytes: 0, reads: 0, truncated: false, cursors: null };
+/** A run that wrote nothing (also used by the worker job when the storage is missing). */
+export function skippedBackup(reason: BackupSkipReason, date: string, durationMs = 0): BackupResult {
+  return { status: "skipped", reason, date, manifestKey: null, counts: { incremental: {}, full: {} }, parts: 0, bytes: 0, reads: 0, truncated: false, quotaStopped: false, durationMs, cursors: null };
 }
 
 export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
+  const started = Date.now();
   const now = input.now ?? new Date();
   const date = now.toISOString().slice(0, 10);
   const config: BackupConfig = { ...DEFAULT_BACKUP_CONFIG, ...input.config };
 
-  if (!isAgeRecipient(input.recipient)) {
+  if (!(await usableRecipient(input.recipient))) {
     logger.warn({ date }, "backup-firestore: BACKUP_AGE_RECIPIENT missing or invalid, nothing written");
-    await alertNoRecipientOnce(date);
-    return skipped("no_recipient", date);
+    await alertBackupSkipped(date, "no_recipient");
+    return skippedBackup("no_recipient", date);
   }
-  const recipient = input.recipient;
+  const recipient = input.recipient as string;
   if (await isDegraded("firestore.reads")) {
     logger.warn({ date }, "backup-firestore deferred: Firestore read quota degraded");
-    return skipped("reads_degraded", date);
+    return skippedBackup("reads_degraded", date);
   }
 
   const { db, store } = input;
   const cursorDoc = input.cursorDoc ?? db.collection(COLLECTIONS.system).doc("backup");
   const previous = parseCursors((await cursorDoc.get()).data());
-  let reads = 1;
+  const state: RunState = { reads: 1, quotaStopped: false, readsStopRatio: config.readsStopRatio };
   await consume("firestore.reads", 1);
+  const key = manifestKey(date);
+  // A manifest without moved cursors (a run that failed after storing it) is kept: its cursors
+  // stayed behind, so tomorrow's run covers the same windows again.
+  if (previous.lastDate === date || (await store.head("private", key))) {
+    logger.info({ date }, "backup-firestore: already done for this date");
+    return skippedBackup("already_done", date, Date.now() - started);
+  }
 
   const ctx: WriterContext = { store, recipient, date, limits: { maxDocs: config.partMaxDocs, maxBytes: config.partMaxBytes } };
   const counts: Record<BackupMode, Record<string, number>> = { incremental: {}, full: {} };
   const parts: ManifestPart[] = [];
   const order = config.collections;
+  const known = new Set(order.map((collection) => collection.id));
 
-  // 1. Rolling full, continued from the previous night.
-  const after = Object.fromEntries(Object.entries(previous.full.after).filter(([id]) => order.some((collection) => collection.id === id)));
-  const startIndex = Math.max(0, previous.full.next ? order.findIndex((collection) => collection.id === previous.full.next) : 0);
-  const cycleStartedAt = previous.full.next ? (previous.full.cycleStartedAt ?? now) : now;
+  // 1. Incremental, from each collection's cursor, starting where the previous pass stopped.
+  const incremental = Object.fromEntries(Object.entries(previous.incremental).filter(([id]) => known.has(id)));
+  const firstSince = Timestamp.fromDate(new Date(now.getTime() - config.firstRunWindowMs));
+  const overlapSince = Timestamp.fromDate(new Date(now.getTime() - config.overlapMs));
+  const timed = order.filter((collection) => collection.timeField !== null);
+  const startAt = Math.max(0, timed.findIndex((collection) => collection.id === previous.incrementalNext));
+  let budget = config.incrementalMax;
+  let incrementalNext: string | null = null;
+  for (let step = 0; step < timed.length; step += 1) {
+    const collection = timed[(startAt + step) % timed.length] as BackupCollection;
+    const field = collection.timeField as TimeField;
+    if (budget <= 0 || state.quotaStopped) {
+      incrementalNext ??= collection.id;
+      continue;
+    }
+    const cursor = incremental[collection.id] ?? { since: firstSince, after: null };
+    const writer = new CollectionWriter(ctx, "incremental", collection.id);
+    const query = baseQuery(db, collection).where(field, ">=", cursor.since).orderBy(field).orderBy(FieldPath.documentId());
+    const result = await scan(query, budget, config.pageSize, cursor.after ? [cursor.since, db.doc(cursor.after)] : null, state, (doc) => writer.add(doc));
+    await writer.finish();
+    budget -= result.docs;
+    counts.incremental[collection.id] = result.docs;
+    parts.push(...writer.parts);
+    if (result.exhausted) {
+      incremental[collection.id] = { since: overlapSince, after: null };
+      continue;
+    }
+    incrementalNext ??= collection.id;
+    const lastAt: unknown = result.last?.get(field);
+    // Nothing read (quota stop before the first page): the cursor stays where it was.
+    if (result.last && lastAt instanceof Timestamp) incremental[collection.id] = { since: lastAt, after: result.last.ref.path };
+  }
+  const truncated = incrementalNext !== null;
+
+  // 2. Rolling full, continued from the previous night (a new cycle forgets stray cursors).
+  const continuing = previous.full.next !== null && known.has(previous.full.next);
+  const after = continuing ? Object.fromEntries(Object.entries(previous.full.after).filter(([id]) => known.has(id))) : {};
+  const startIndex = continuing ? order.findIndex((collection) => collection.id === previous.full.next) : 0;
+  const cycleStartedAt = continuing ? (previous.full.cycleStartedAt ?? now) : now;
   let remaining = config.fullBudget;
-  let next: string | null = null;
+  let fullNext: string | null = null;
   for (let index = startIndex; index < order.length; index += 1) {
     const collection = order[index] as BackupCollection;
-    if (remaining <= 0) {
-      next = collection.id;
+    if (remaining <= 0 || state.quotaStopped) {
+      fullNext = collection.id;
       break;
     }
     const writer = new CollectionWriter(ctx, "full", collection.id);
     const resume = after[collection.id];
-    const { result, reads: pageReads } = await scan(baseQuery(db, collection).orderBy(FieldPath.documentId()), remaining, config.pageSize, resume ? db.doc(resume) : null, (doc) => writer.add(doc));
+    const result = await scan(baseQuery(db, collection).orderBy(FieldPath.documentId()), remaining, config.pageSize, resume ? [db.doc(resume)] : null, state, (doc) => writer.add(doc));
     await writer.finish();
-    reads += pageReads;
     remaining -= result.docs;
     counts.full[collection.id] = result.docs;
     parts.push(...writer.parts);
@@ -396,47 +529,18 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
       delete after[collection.id];
     } else {
       if (result.last) after[collection.id] = result.last.ref.path;
-      next = collection.id;
+      fullNext = collection.id;
       break;
     }
   }
-  const cycleComplete = next === null;
-
-  // 2. Incremental: documents touched since the previous run (first run: the last 24 h).
-  const since = previous.incrementalSince ?? new Date(now.getTime() - config.firstRunWindowMs);
-  const sinceTs = Timestamp.fromDate(since);
-  let incrementalBudget = config.incrementalMax;
-  let truncatedAt: Date | null = null;
-  for (const collection of order) {
-    if (!collection.timeField) continue;
-    if (incrementalBudget <= 0) {
-      truncatedAt ??= since;
-      break;
-    }
-    const field = collection.timeField;
-    const writer = new CollectionWriter(ctx, "incremental", collection.id);
-    const query = baseQuery(db, collection).where(field, ">=", sinceTs).orderBy(field).orderBy(FieldPath.documentId());
-    const { result, reads: pageReads } = await scan(query, incrementalBudget, config.pageSize, null, (doc) => writer.add(doc));
-    await writer.finish();
-    reads += pageReads;
-    incrementalBudget -= result.docs;
-    counts.incremental[collection.id] = result.docs;
-    parts.push(...writer.parts);
-    if (!result.exhausted) {
-      // The cursor stops at the last exported document (">=" re-exports its instant): nothing is lost.
-      const lastAt = toDate(result.last?.get(field)) ?? since;
-      truncatedAt = truncatedAt && truncatedAt < lastAt ? truncatedAt : lastAt;
-    }
-  }
-  const overlapSince = new Date(now.getTime() - config.overlapMs);
-  const nextSince = truncatedAt && truncatedAt < overlapSince ? truncatedAt : overlapSince;
-  const truncated = truncatedAt !== null;
-  if (truncated) logger.warn({ date, incrementalMax: config.incrementalMax }, "backup-firestore: incremental capped, the cursor stays behind");
+  const cycleComplete = fullNext === null;
+  if (truncated || state.quotaStopped) logger.warn({ date, incrementalNext, quotaStopped: state.quotaStopped }, "backup-firestore: incremental stopped early, the cursors stay behind");
 
   // 3. Manifest, then the cursors (a failed upload leaves the cursors untouched: the next run redoes the work).
   const cursors: BackupCursors = {
-    incrementalSince: nextSince,
-    full: { next, after, cycleStartedAt, cycleCompletedAt: cycleComplete ? now : previous.full.cycleCompletedAt },
+    incremental,
+    incrementalNext,
+    full: { next: fullNext, after, cycleStartedAt, cycleCompletedAt: cycleComplete ? now : previous.full.cycleCompletedAt },
     lastRunAt: now,
     lastDate: date,
   };
@@ -447,26 +551,22 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
     date,
     startedAt: now.toISOString(),
     finishedAt: finishedAt.toISOString(),
-    since: since.toISOString(),
-    nextSince: nextSince.toISOString(),
     counts,
     parts,
     bytes,
-    reads,
+    reads: state.reads,
     truncated,
-    cursors: {
-      incrementalSince: nextSince.toISOString(),
-      full: { next, after, cycleStartedAt: cycleStartedAt.toISOString(), cycleCompletedAt: cursors.full.cycleCompletedAt?.toISOString() ?? null },
-    },
+    quotaStopped: state.quotaStopped,
+    cursors: cursorsJson(cursors),
     collections: [...order],
   };
   // The manifest is age only (no gzip), as its name says: `age -d` prints it.
-  const key = manifestKey(date);
   await store.put("private", key, await encryptAge(Buffer.from(JSON.stringify(manifest), "utf8"), recipient), { contentType: CONTENT_TYPE });
-  await cursorDoc.set(cursorDocData(cursors, finishedAt));
+  await cursorDoc.set(serializeCursors(cursors, finishedAt));
   await consume("firestore.writes", 1);
 
-  const result: BackupResult = { status: "done", date, manifestKey: key, counts, parts: parts.length, bytes, reads, truncated, cursors };
-  logger.info({ date, counts, parts: parts.length, bytes, reads, truncated, fullNext: next, cycleComplete }, "backup-firestore");
+  const durationMs = Date.now() - started;
+  const result: BackupResult = { status: "done", date, manifestKey: key, counts, parts: parts.length, bytes, reads: state.reads, truncated, quotaStopped: state.quotaStopped, durationMs, cursors };
+  logger.info({ date, counts, parts: parts.length, bytes, reads: state.reads, truncated, quotaStopped: state.quotaStopped, fullNext, cycleComplete, durationMs }, "backup-firestore");
   return result;
 }

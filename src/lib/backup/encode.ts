@@ -34,11 +34,20 @@ export interface DecodedDocument {
   updateTime: Date | null;
 }
 
+/** What decoding needs from Firestore: references are rebuilt in the target database. */
+export type RefResolver = Pick<Firestore, "doc">;
+
 export class BackupFormatError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "BackupFormatError";
   }
+}
+
+/** "collection/doc[/collection/doc...]": an even number of non-empty segments. */
+export function isDocumentPath(path: string): boolean {
+  const segments = path.split("/");
+  return path.length <= 1_500 && segments.length >= 2 && segments.length % 2 === 0 && segments.every((segment) => segment.length > 0);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -95,7 +104,7 @@ function expectMap(value: EncodedValue | undefined, what: string): EncodedMap {
   return value;
 }
 
-function decodeEntries(map: EncodedMap, db: Firestore): Record<string, unknown> {
+function decodeEntries(map: EncodedMap, db: RefResolver): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(map)) out[key] = decodeValue(value, db);
   return out;
@@ -104,7 +113,7 @@ function decodeEntries(map: EncodedMap, db: Firestore): Record<string, unknown> 
 const NON_FINITE: Record<string, number> = { NaN: Number.NaN, Infinity: Number.POSITIVE_INFINITY, "-Infinity": Number.NEGATIVE_INFINITY, "-0": -0 };
 
 /** Inverse of encodeValue; `db` resolves document references. Throws BackupFormatError on a malformed value. */
-export function decodeValue(value: EncodedValue, db: Firestore): unknown {
+export function decodeValue(value: EncodedValue, db: RefResolver): unknown {
   if (value === null || typeof value !== "object") return value;
   if (Array.isArray(value)) return value.map((item) => decodeValue(item, db));
   const tag = value[TAG];
@@ -115,8 +124,11 @@ export function decodeValue(value: EncodedValue, db: Firestore): unknown {
       return new Timestamp(expectNumber(value["s"], "ts.s"), expectNumber(value["n"], "ts.n"));
     case "geo":
       return new GeoPoint(expectNumber(value["lat"], "geo.lat"), expectNumber(value["lng"], "geo.lng"));
-    case "ref":
-      return db.doc(expectString(value["path"], "ref.path"));
+    case "ref": {
+      const path = expectString(value["path"], "ref.path");
+      if (!isDocumentPath(path)) throw new BackupFormatError(`ref.path: "${path}" is not a document path`);
+      return db.doc(path);
+    }
     case "bytes":
       return Buffer.from(expectString(value["b64"], "bytes.b64"), "base64");
     case "num": {
@@ -155,15 +167,14 @@ export function parseBackupLine(line: string): BackupLine {
   if (!isPlainObject(parsed)) throw new BackupFormatError("line must be a JSON object");
   const { p, d, u } = parsed;
   if (typeof p !== "string" || p.length === 0 || p.length > 1_500) throw new BackupFormatError("p: document path expected");
-  const segments = p.split("/");
-  if (segments.length < 2 || segments.length % 2 !== 0 || segments.some((segment) => segment.length === 0)) throw new BackupFormatError(`p: "${p}" is not a document path`);
+  if (!isDocumentPath(p)) throw new BackupFormatError(`p: "${p}" is not a document path`);
   if (!isPlainObject(d)) throw new BackupFormatError("d: object expected");
   if (u !== null && (typeof u !== "string" || Number.isNaN(Date.parse(u)))) throw new BackupFormatError("u: ISO date or null expected");
   return { p, d: d as EncodedMap, u };
 }
 
 /** NDJSON line -> reference, data ready for set(), update time. */
-export function decodeDocument(line: string, db: Firestore): DecodedDocument {
+export function decodeDocument(line: string, db: RefResolver): DecodedDocument {
   const parsed = parseBackupLine(line);
   const segments = parsed.p.split("/");
   const ref = db.doc(parsed.p);
