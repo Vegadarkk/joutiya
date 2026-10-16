@@ -73,6 +73,12 @@ interface Binding {
   normalize?: (value: string) => string;
   /** Values of another shape are rejected before the comparison: "<variable> must be <description>". */
   shape?: { pattern: RegExp; description: string };
+  /**
+   * Local development runs with a dummy value (docs/phase-2.md §5, playwright.config.ts): while no
+   * identifier is recorded for dev, "set but not recorded" is tolerated there outside strict mode.
+   * A recorded identifier is still compared.
+   */
+  devPlaceholder?: boolean;
 }
 
 const firebaseProject = (variable: string): Binding => ({
@@ -178,6 +184,7 @@ const BINDINGS: Binding[] = [
     variable: "WHATSAPP_PHONE_NUMBER_ID",
     target: "environments.<env>.whatsapp.phoneNumberId",
     expected: (t, env) => t.environments[env].whatsapp.phoneNumberId,
+    devPlaceholder: true,
   },
   {
     variable: "REVENUECAT_PROJECT_ID",
@@ -414,6 +421,7 @@ export function assertTargets(targets: Targets, env: Env, options: AssertOptions
     const expected = binding.expected(targets, appEnv);
     const actual = binding.normalize ? binding.normalize(value(binding.variable)) : value(binding.variable);
     if (expected === null) {
+      if (binding.devPlaceholder && appEnv === "dev" && !options.strict) continue;
       errors.push(`${binding.variable} is set but ${target} is not recorded in infra/targets.json`);
     } else if (actual !== expected) {
       errors.push(`${binding.variable} does not match ${target} (${expected})`);

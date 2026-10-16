@@ -230,6 +230,24 @@ describe("assertTargets", () => {
     ]);
   });
 
+  it("lets dev run with a dummy WhatsApp number id while none is recorded, and nowhere else", () => {
+    const targets = recorded();
+    targets.environments.dev.whatsapp.phoneNumberId = null;
+    targets.environments.staging.whatsapp.phoneNumberId = null;
+    assert.deepEqual(assertTargets(targets, { APP_ENV: "dev", WHATSAPP_PHONE_NUMBER_ID: "100000000000001" }), []);
+    assert.deepEqual(assertTargets(targets, { APP_ENV: "dev", WHATSAPP_PHONE_NUMBER_ID: "100000000000001" }, { strict: true }).filter((e) => e.includes("WHATSAPP")), [
+      "WHATSAPP_PHONE_NUMBER_ID is set but environments.dev.whatsapp.phoneNumberId is not recorded in infra/targets.json",
+    ]);
+    assert.deepEqual(assertTargets(targets, { ...staging, WHATSAPP_PHONE_NUMBER_ID: "100000000000001" }), [
+      "WHATSAPP_PHONE_NUMBER_ID is set but environments.staging.whatsapp.phoneNumberId is not recorded in infra/targets.json",
+    ]);
+    // A recorded dev identifier is still compared.
+    targets.environments.dev.whatsapp.phoneNumberId = "100000000000002";
+    assert.deepEqual(assertTargets(targets, { APP_ENV: "dev", WHATSAPP_PHONE_NUMBER_ID: "100000000000001" }), [
+      "WHATSAPP_PHONE_NUMBER_ID does not match environments.dev.whatsapp.phoneNumberId (100000000000002)",
+    ]);
+  });
+
   it("requires the EU endpoint of the recorded R2 account", () => {
     const errors = assertTargets(recorded(), { ...staging, R2_S3_ENDPOINT: `https://${ACCOUNT}.r2.cloudflarestorage.com` });
     assert.equal(errors.length, 1);
