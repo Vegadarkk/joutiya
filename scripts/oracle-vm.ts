@@ -24,6 +24,12 @@
 //   node scripts/oracle-vm.ts sync [--apply] [--deploy-staging-key=<file.pub>]
 //       installs infra/vm and docker/ on joutiya-vm (infra/vm/install.sh) through Run Command, and
 //       the CI's public key for deploy-staging when given.
+//   node scripts/oracle-vm.ts env <staging|prod> --from=<file> [--from=<file>…] [--apply]
+//       merges /etc/joutiya/<env>/app.env through Run Command (scripts/vm-env.ts): values from
+//       infra/targets.json and the --from files (- reads stdin), CSRF_SECRET and the Valkey
+//       passwords generated once on the VM. Prints names and sources, never a value. Oracle keeps
+//       the text 7 days, readable only by the tenancy's administrators and joutiya-claude, who can
+//       read these files as root anyway.
 //   node scripts/oracle-vm.ts deploy-status
 //       releases and image IDs running in staging and production (read only).
 //   node scripts/oracle-vm.ts promote [--apply]
@@ -43,6 +49,7 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { tunnelTokenErrors, validateTargets, type Targets } from "./assert-target.ts";
+import { DEPLOYED_ENVS, envPayload, envScripts, namesScript, parseMissing, parseNames, planEnv, type DeployedEnv, type Source } from "./vm-env.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 
@@ -623,6 +630,42 @@ async function sync(oci: Oci, compartmentId: string, stagingKeyFile?: string): P
   }
 }
 
+/** `env`: plans app.env from the registry and the --from files, then merges it on the VM. */
+async function envFiles(oci: Oci, targets: Targets, compartmentId: string, env: DeployedEnv, froms: string[]): Promise<void> {
+  if (froms.length === 0) throw new Error("env needs at least one --from=<file> (- reads stdin)");
+  const sources: Source[] = froms.map((from) => ({ label: from === "-" ? "stdin" : basename(from), text: readFileSync(from === "-" ? 0 : from, "utf8") }));
+  const instance = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance);
+  const running = instance?.lifecycleState === "RUNNING" ? instance : undefined;
+  let existing = new Set<string>();
+  if (running) existing = parseNames(await runCommand(oci, compartmentId, running.id, `joutiya-env ${env} names`, rootCommand(namesScript(env)), 300, true));
+  else console.log(`instance ${NAMES.instance}: ${instance?.lifecycleState ?? "none"}, so the names already in app.env are unknown`);
+  const plan = planEnv({ env, targets, example: readFileSync(join(root, ".env.example"), "utf8"), sources, existing });
+  console.log(`app.env of ${env}: ${Object.keys(plan.values).length} values from this run (never shown)`);
+  for (const [name, where] of Object.entries(plan.sources)) console.log(`  ${name.padEnd(28)} ${where}`);
+  console.log("  generated once on the VM: CSRF_SECRET and the Valkey passwords (QUEUE_REDIS_URL, RATE_LIMIT_REDIS_URL)");
+  for (const line of plan.ignored) console.log(`ignored  ${line}`);
+  if (plan.missing.length > 0) console.log(`missing  ${plan.missing.join(", ")}`);
+  if (plan.errors.length > 0) {
+    for (const error of plan.errors) console.error(`error    ${error}`);
+    throw new Error(`${plan.errors.length} problem(s): nothing sent`);
+  }
+  const commands = envScripts(env, envPayload(plan.values)).map((script) => rootCommand(script));
+  if (!running) {
+    if (oci.apply) throw new Error(`instance ${NAMES.instance} is not running: nothing sent`);
+    console.log(`${commands.length} Run Command(s) to send once the VM runs`);
+    return;
+  }
+  let output = "";
+  for (const [index, text] of commands.entries()) {
+    output = await runCommand(oci, compartmentId, running.id, `joutiya-env ${env} ${index + 1}/${commands.length}`, text);
+  }
+  if (!oci.apply) return;
+  console.log(output.trimEnd());
+  const missing = parseMissing(output);
+  if (missing === undefined) console.warn("warning: the VM's report is incomplete; rerun the dry run to see what is missing");
+  else console.log(missing.length > 0 ? `still missing: ${missing.join(", ")} (the app does not start without them)` : "every required variable is set");
+}
+
 // ---------------------------------------------------------------------------------------------
 // Production releases (§2), run by root through Run Command with the forced command of the deploy
 // users (infra/vm/deploy-forced-command.sh, environment prod). Production only runs images already
@@ -735,9 +778,12 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);
-  const actions = ["create", "status", "reboot", "agent", "run", "sync", "deploy-status", "promote", "rollback"];
-  if (!action || !actions.includes(action) || (action === "run") !== (file !== undefined)) {
-    throw new Error("usage: scripts/oracle-vm.ts <create|status|reboot|agent|sync|run <script>|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>]");
+  const actions = ["create", "status", "reboot", "agent", "run", "sync", "env", "deploy-status", "promote", "rollback"];
+  const argument = action === "run" || action === "env";
+  if (!action || !actions.includes(action) || argument !== (file !== undefined) || (action === "env" && !(DEPLOYED_ENVS as readonly string[]).includes(file ?? ""))) {
+    throw new Error(
+      "usage: scripts/oracle-vm.ts <create|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>]",
+    );
   }
 
   const raw: unknown = JSON.parse(readFileSync(new URL("../infra/targets.json", import.meta.url), "utf8"));
@@ -757,6 +803,7 @@ async function main(): Promise<void> {
   else if (action === "agent") await agent(oci, compartment);
   else if (action === "run") await run(oci, compartment, file as string);
   else if (action === "sync") await sync(oci, compartment, args.find((arg) => arg.startsWith("--deploy-staging-key="))?.split("=").slice(1).join("="));
+  else if (action === "env") await envFiles(oci, targets, compartment, file as DeployedEnv, args.filter((arg) => arg.startsWith("--from=")).map((arg) => arg.slice("--from=".length)));
   else if (action === "deploy-status") await release(oci, targets, compartment, "status");
   else if (action === "promote" || action === "rollback") await release(oci, targets, compartment, action);
   else await status(oci, targets, compartment);

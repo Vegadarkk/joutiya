@@ -18,6 +18,8 @@ const HEX32 = /^[0-9a-f]{32}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const META_ID = /^[0-9]{5,25}$/;
 const R2_BUCKET = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/;
+// <project number>-<hash>.apps.googleusercontent.com
+const OAUTH_CLIENT = /^[0-9]{6,20}-[0-9a-z]{32}\.apps\.googleusercontent\.com$/;
 
 // Format of each recorded identifier; null means "not created yet".
 const SHARED_SHAPE = {
@@ -27,6 +29,9 @@ const SHARED_SHAPE = {
     accessTeamDomain: /^[a-z0-9][a-z0-9-]*\.cloudflareaccess\.com$/,
     // Tunnel of the host's cloudflared (SSH only), independent of Docker.
     sshTunnelId: UUID,
+    // Google OAuth client of Access's Google login: in joutiya-staging, never in production, whose
+    // brand verification an authorized cloudflareaccess.com domain would block (§6).
+    accessOauthClientId: OAUTH_CLIENT,
   },
   oracle: {
     homeRegion: /^eu-(paris|marseille)-1$/,
@@ -52,7 +57,14 @@ const ENV_SHAPE = {
     // Numeric project number: prefix of the web app id and of the OAuth client id.
     projectNumber: /^[0-9]{6,20}$/,
     firestoreLocation: /^europe-west[19]$/,
+    // Web app: 1:<project number>:web:<hash>.
+    appId: /^1:[0-9]{6,20}:web:[0-9a-f]{16,40}$/,
   },
+  // Public by design, sent to browsers through /api/config: the joutiya-site OAuth client of Google
+  // sign-in, the Turnstile widget and the Sentry DSN (EU region) of this environment.
+  google: { oauthClientId: OAUTH_CLIENT },
+  turnstile: { siteKey: /^0x[0-9A-Za-z_-]{16,40}$/ },
+  sentry: { dsn: /^https:\/\/[0-9a-f]{32}@o[0-9]{1,20}\.ingest\.de\.sentry\.io\/[0-9]{1,20}$/ },
   r2: { quarantine: R2_BUCKET, media: R2_BUCKET, private: R2_BUCKET },
   whatsapp: { wabaId: META_ID, phoneNumberId: META_ID },
   // Tunnel of this environment and AUD tag of the Access application protecting its back office.
@@ -247,9 +259,29 @@ function checkDistinct(targets: Targets): string[] {
     claim("firebase-number", `environments.${env}.firebase.projectNumber`, t.firebase.projectNumber);
     claim("tunnel", `environments.${env}.cloudflare.tunnelId`, t.cloudflare.tunnelId);
     claim("access", `environments.${env}.cloudflare.accessAud`, t.cloudflare.accessAud);
+    claim("firebase-app", `environments.${env}.firebase.appId`, t.firebase.appId);
+    claim("oauth", `environments.${env}.google.oauthClientId`, t.google.oauthClientId);
+    claim("turnstile", `environments.${env}.turnstile.siteKey`, t.turnstile.siteKey);
+    claim("sentry", `environments.${env}.sentry.dsn`, t.sentry.dsn);
     for (const role of ["quarantine", "media", "private"] as const) {
       claim("r2", `environments.${env}.r2.${role}`, t.r2[role]);
     }
+    // The web app and the OAuth client carry the number of the project they belong to.
+    const number = t.firebase.projectNumber;
+    const appNumber = t.firebase.appId?.split(":")[1];
+    const clientNumber = t.google.oauthClientId?.split("-")[0];
+    if (number !== null && appNumber !== undefined && appNumber !== number) {
+      errors.push(`environments.${env}.firebase.appId: project number ${appNumber} is not environments.${env}.firebase.projectNumber`);
+    }
+    if (number !== null && clientNumber !== undefined && clientNumber !== number) {
+      errors.push(`environments.${env}.google.oauthClientId: project number ${clientNumber} is not environments.${env}.firebase.projectNumber`);
+    }
+  }
+  const accessClient = targets.shared.cloudflare.accessOauthClientId;
+  claim("oauth", "shared.cloudflare.accessOauthClientId", accessClient);
+  const prodProject = targets.environments.prod.firebase.projectNumber;
+  if (accessClient !== null && prodProject !== null && accessClient.startsWith(`${prodProject}-`)) {
+    errors.push("shared.cloudflare.accessOauthClientId: a production client (Access's login lives in joutiya-staging, §6)");
   }
   // dev and staging share Meta's test number; production must use its own.
   const prodNumber = targets.environments.prod.whatsapp.phoneNumberId;
