@@ -49,16 +49,16 @@ Leurs ID sont dans `infra/targets.json`, leurs règles dans `infra/cloudflare/tu
 
 ## 3. Réseau et VM Oracle
 
-Claude lance `node scripts/oracle-vm.ts create --apply --retry-minutes=120` depuis son environnement cloud (variables `JOUTIYA_OCI_*` et `JOUTIYA_CLOUDFLARE_API_TOKEN`) :
+Claude lance `node scripts/oracle-vm.ts create --apply --retry-minutes=4800 --small-fallback` depuis son environnement cloud (variables `JOUTIYA_OCI_*` et `JOUTIYA_CLOUDFLARE_API_TOKEN`) :
 - réseau `joutiya-vcn` sans aucune règle d'entrée, ni SSH ni ICMP (`infra/vm/oci-security-list.json`), passerelle `joutiya-igw` pour la sortie, sous-réseau `joutiya-public` ;
 - VM `joutiya-vm` : `VM.Standard.A1.Flex`, 2 OCPU, 12 Go, Ubuntu 24.04 aarch64, disque de 100 Go, service de métadonnées v2 seulement, aucune clé SSH ;
 - démarrage (`infra/vm/bootstrap.sh`, rempli en mémoire) : agent Oracle, tunnel SSH, Docker, mémoire d'échange, mises à jour automatiques, puis les fichiers du dépôt (`infra/vm/install.sh`) et les jetons des tunnels Compose ;
-- si Oracle manque de capacité A1, le script réessaie chaque minute. Jamais de forme payante ;
+- si Oracle manque de capacité A1, le script réessaie chaque minute, en demandant une fois sur deux 1 OCPU et 6 Go (la même forme gratuite, plus facile à placer). Une VM créée ainsi suffit au staging et à la production avant le lancement ; elle passe à 2 OCPU et 12 Go avant le lancement (un redémarrage). Jamais de forme payante, jamais de seconde VM ;
 - chaque étape du démarrage peut être rejouée : si l'une échoue, tout le démarrage repart au redémarrage suivant (`node scripts/oracle-vm.ts reboot --apply`), sans perdre la VM. À la fin, il vérifie lui-même qu'aucun jeton n'est lisible par un autre utilisateur que root.
 
 `node scripts/oracle-vm.ts status` montre l'état de la VM, les connexions du tunnel SSH et la progression du démarrage, lue sur la console série. Aucun secret n'y est écrit.
 
-État au 16 octobre : réseau créé. La première création de la VM a été refusée par le quota `joutiya-free-tier` : ses lignes `zero` mettaient à 0 les quotas A1 régionaux, que ses lignes `set` ne relevaient pas. Nav a ajouté les deux lignes régionales (2 OCPU, 12 Go) à 01:31 UTC ; Claude relance la création.
+État au 16 octobre : réseau créé. La première création de la VM a été refusée par le quota `joutiya-free-tier` : ses lignes `zero` mettaient à 0 les quotas A1 régionaux, que ses lignes `set` ne relevaient pas. Nav a ajouté les deux lignes régionales (2 OCPU, 12 Go) à 01:31 UTC ; Claude relance la création. Depuis 01:47 UTC, Oracle n'a plus de place A1 libre à Paris et le paiement à l'usage est exclu (16 octobre) : Claude réessaie chaque minute, en alternant 2 OCPU / 12 Go et 1 OCPU / 6 Go depuis 13:13 UTC.
 
 Oracle peut reprendre une VM gratuite inactive 7 jours de suite (processeur, réseau et mémoire sous 20 %). Le staging et la sonde réduisent ce risque. Ne passez pas en *Pay As You Go* sans en parler dans le projet.
 
