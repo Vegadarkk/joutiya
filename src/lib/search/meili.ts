@@ -30,13 +30,15 @@ export interface MeiliEngineOptions {
 
 /** Meilisearch answered a 4xx that is not an availability problem (bad request: a bug). */
 export class MeiliError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string | undefined,
-    message: string,
-  ) {
+  readonly status: number;
+  readonly code: string | undefined;
+
+  // No parameter properties: scripts load this file with Node's type stripping.
+  constructor(status: number, code: string | undefined, message: string) {
     super(message);
     this.name = "MeiliError";
+    this.status = status;
+    this.code = code;
   }
 }
 

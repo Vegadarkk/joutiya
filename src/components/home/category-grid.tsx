@@ -32,7 +32,7 @@ export function CategoryGrid({ className }: { className?: string }) {
   const names = useTranslations("Categories");
   type Key = Parameters<typeof names>[0];
   return (
-    <section aria-labelledby="home-categories" className={cn("flex flex-col gap-4", className)}>
+    <section aria-labelledby="home-categories" data-testid="home-categories" className={cn("flex flex-col gap-4", className)}>
       <h2 id="home-categories" className="text-xl font-semibold">
         {t("title")}
       </h2>

@@ -43,12 +43,13 @@ await build({
 
 await build({
   ...common,
-  entryPoints: { "worker/index": "src/worker/index.ts" },
+  // reindex-search runs in the worker image: `node dist/worker/reindex-search.mjs` (design D12).
+  entryPoints: { "worker/index": "src/worker/index.ts", "worker/reindex-search": "scripts/reindex-search.ts" },
   packages: "external",
 });
 
 const worker = "dist/worker/index.mjs";
-const { fileList, warnings } = await nodeFileTrace([worker], { base: root });
+const { fileList, warnings } = await nodeFileTrace([worker, "dist/worker/reindex-search.mjs"], { base: root });
 for (const warning of warnings) {
   // Expected: optional dependencies that are not installed, and non-JS assets (proto LICENSE files).
   if (!/Cannot find module|Failed to resolve dependency|Failed to parse/.test(warning.message)) console.warn(`trace: ${warning.message}`);

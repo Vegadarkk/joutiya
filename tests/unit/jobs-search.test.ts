@@ -10,7 +10,7 @@ import { SearchUnavailableError, type SearchEngine } from "@/lib/search/types";
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/quota", () => ({ consume: vi.fn(async () => ({ level: "ok" })) }));
 vi.mock("@/lib/firebase/admin", () => ({ db: vi.fn() }));
-vi.mock("@/lib/search/indexer", () => ({ indexListing: vi.fn(async () => ({ acked: true })), processOutbox: vi.fn(async () => ({ pending: 0, lagSeconds: 0, alerted: false })) }));
+vi.mock("@/lib/search/indexer", () => ({ OUTBOX_POLL_LIMIT: 200, indexListing: vi.fn(async () => ({ acked: true })), processOutbox: vi.fn(async () => ({ pending: 0, lagSeconds: 0, alerted: false })) }));
 vi.mock("@/lib/search/boosts", async (importOriginal) => ({ ...(await importOriginal<typeof Boosts>()), expireBoost: vi.fn(async () => true) }));
 vi.mock("@/lib/search/queue", async (importOriginal) => ({ ...(await importOriginal<typeof Queue>()), enqueueIndexJobs: vi.fn(async () => undefined) }));
 const ensureReady = vi.fn<() => Promise<{ created: boolean; settingsUpdated: boolean }>>(async () => ({ created: false, settingsUpdated: false }));
