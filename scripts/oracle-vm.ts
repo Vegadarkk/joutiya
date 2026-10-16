@@ -35,6 +35,11 @@
 //   node scripts/oracle-vm.ts search-setup <staging|prod> [--reindex=<max reads>] [--apply]
 //       Meilisearch's index and the app's two keys in app.env, then web and worker recreated
 //       (infra/vm/search-setup.sh); --reindex also rebuilds the index from Firestore (new VM).
+//   node scripts/oracle-vm.ts wif <staging|prod> [--apply]
+//       keyless Google access of web and worker (§9): each gets a new EC key made on the VM, whose
+//       request this machine signs with the CA of scripts/google-wif.ts (owner's PC only), then its
+//       certificate and Workload Identity Federation files in /etc/joutiya/<env>/gcp/<service>;
+//       running containers are recreated. Valid 365 days: the same command renews them.
 //   node scripts/oracle-vm.ts deploy-status
 //       releases and image IDs running in staging and production (read only).
 //   node scripts/oracle-vm.ts promote [--apply]
@@ -54,6 +59,7 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { tunnelTokenErrors, validateTargets, type Targets } from "./assert-target.ts";
+import { LEAF_DAYS, WIF_SERVICES, caFiles, certificateConfig, credentialConfig, csrFromOutput, readCa, signCsr, subjectName, type WifService } from "./google-wif.ts";
 import { DEPLOYED_ENVS, envPayload, envScripts, namesScript, parseMissing, parseNames, planEnv, type DeployedEnv, type Source } from "./vm-env.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -795,6 +801,101 @@ async function searchSetup(oci: Oci, compartmentId: string, env: DeployedEnv, re
   if (oci.apply) console.log(output.trimEnd());
 }
 
+// ---------------------------------------------------------------------------------------------
+// Keyless Google access of web and worker (§9): X.509 Workload Identity Federation. Each key is
+// made on the VM and never leaves it; only its request and the signed certificate travel.
+
+/** Credentials of one container on the host, mounted at the same path (docker/compose.yml). */
+export function wifDir(env: DeployedEnv, service: WifService): string {
+  return `/etc/joutiya/${env}/gcp/${service}`;
+}
+
+/** Root script: a new EC P-256 key beside the current one, and its request as `csr <base64 DER>`. */
+export function wifKeyScript(env: DeployedEnv, service: WifService): string {
+  return [
+    `dir=${wifDir(env, service)}`,
+    `[[ -d /etc/joutiya/${env} ]] || { echo "/etc/joutiya/${env} is missing: the bootstrap has not run" >&2; exit 1; }`,
+    `install -d -m 0750 -o root -g joutiya-${env} /etc/joutiya/${env}/gcp "$dir"`,
+    "umask 027",
+    'openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$dir/key.next.pem"',
+    `chgrp joutiya-${env} "$dir/key.next.pem"`,
+    'chmod 0640 "$dir/key.next.pem"',
+    `csr="$(openssl req -new -key "$dir/key.next.pem" -subj /CN=${subjectName(env, service)} -outform DER | base64 -w0)"`,
+    `printf 'csr %s\\n' "$csr"`,
+  ].join("\n");
+}
+
+const CERTIFICATE_END = "JOUTIYA_CERTIFICATE";
+
+/**
+ * Root script: the signed certificate, checked against key.next.pem, then the certificate and
+ * credential configurations (google-wif.ts); the four files replace the current ones together.
+ */
+export function wifInstallScript(env: DeployedEnv, service: WifService, certificate: string, files: { credentials: string; certificateConfig: string }): string {
+  if (!/^-----BEGIN CERTIFICATE-----\n[A-Za-z0-9+/=\n]+\n-----END CERTIFICATE-----\n?$/.test(certificate)) throw new Error("not a PEM certificate");
+  if (Object.values(files).some((text) => /['\n]/.test(text))) throw new Error("a configuration file holds a quote or a line break");
+  return [
+    `dir=${wifDir(env, service)}`,
+    "umask 027",
+    '[[ -s "$dir/key.next.pem" ]] || { echo "no key.next.pem: the key step has not run" >&2; exit 1; }',
+    `cat > "$dir/cert.next.pem" << '${CERTIFICATE_END}'`,
+    certificate.trimEnd(),
+    CERTIFICATE_END,
+    'pub="$(openssl x509 -in "$dir/cert.next.pem" -noout -pubkey)"',
+    '[[ "$pub" == "$(openssl pkey -in "$dir/key.next.pem" -pubout)" ]] || { echo "the certificate does not match key.next.pem" >&2; exit 1; }',
+    `printf '%s\\n' '${files.certificateConfig}' > "$dir/certificate_config.json.next"`,
+    `printf '%s\\n' '${files.credentials}' > "$dir/credentials.json.next"`,
+    'next=("$dir/key.next.pem" "$dir/cert.next.pem" "$dir/certificate_config.json.next" "$dir/credentials.json.next")',
+    `chgrp joutiya-${env} "\${next[@]}"`,
+    'chmod 0640 "${next[@]}"',
+    'mv -f "$dir/key.next.pem" "$dir/key.pem"',
+    'mv -f "$dir/cert.next.pem" "$dir/cert.pem"',
+    'mv -f "$dir/certificate_config.json.next" "$dir/certificate_config.json"',
+    'mv -f "$dir/credentials.json.next" "$dir/credentials.json"',
+    `echo "${service}: ${subjectName(env, service)} installed, valid until $(openssl x509 -in "$dir/cert.pem" -noout -enddate | cut -d= -f2)"`,
+  ].join("\n");
+}
+
+/** Root script: running web and worker recreated, so that they load the new certificates. */
+export function wifRecreateScript(env: DeployedEnv): string {
+  return [
+    `release="$(cat /var/lib/joutiya/${env}.release 2>/dev/null || true)"`,
+    `[[ "$release" =~ ^[0-9a-f]{12,40}$ ]] || { echo "${env} runs no release yet: its first deploy reads the new files"; exit 0; }`,
+    `APP_ENV=${env} RELEASE="$release" docker compose --project-directory /opt/joutiya/docker -f /opt/joutiya/docker/compose.yml -f /opt/joutiya/docker/compose.${env}.yml \\`,
+    "  up -d --no-deps --force-recreate --wait --wait-timeout 240 web worker",
+    'echo "web and worker recreated on the new certificates"',
+  ].join("\n");
+}
+
+async function wif(oci: Oci, targets: Targets, compartmentId: string, env: DeployedEnv): Promise<void> {
+  const { projectId: project, projectNumber } = targets.environments[env].firebase;
+  if (project === null || projectNumber === null) throw new Error(`environments.${env}.firebase is not recorded in infra/targets.json`);
+  const ca = caFiles();
+  readCa(ca);
+  const instance = await runningInstance(oci, compartmentId);
+  for (const service of WIF_SERVICES) {
+    const subject = subjectName(env, service);
+    const output = await runCommand(oci, compartmentId, instance.id, `joutiya-wif ${env} ${service} key`, rootCommand(wifKeyScript(env, service)), 300);
+    if (!oci.apply) {
+      console.log(`then: ${subject}'s request signed with ${ca.cert} (${LEAF_DAYS} days), certificate and configuration installed`);
+      continue;
+    }
+    const certificate = signCsr({ csr: csrFromOutput(output), subject, days: LEAF_DAYS, ca });
+    const dir = wifDir(env, service);
+    const files = {
+      credentials: JSON.stringify(credentialConfig({ projectNumber, project, service, certificateConfigPath: `${dir}/certificate_config.json` })),
+      certificateConfig: JSON.stringify(certificateConfig(`${dir}/cert.pem`, `${dir}/key.pem`)),
+    };
+    const installed = await runCommand(oci, compartmentId, instance.id, `joutiya-wif ${env} ${service} install`, rootCommand(wifInstallScript(env, service, certificate, files)), 300);
+    console.log(installed.trimEnd());
+  }
+  const recreated = await runCommand(oci, compartmentId, instance.id, `joutiya-wif ${env} recreate`, rootCommand(wifRecreateScript(env)), 600);
+  if (!oci.apply) return;
+  console.log(recreated.trimEnd());
+  const renew = new Date(Date.now() + (LEAF_DAYS - 30) * 86_400_000).toISOString().slice(0, 10);
+  console.log(`certificates valid ${LEAF_DAYS} days: renew them with the same command before ${renew}`);
+}
+
 async function reboot(oci: Oci, compartmentId: string): Promise<void> {
   const instance = await runningInstance(oci, compartmentId);
   await oci.write("POST", `/20160918/instances/${instance.id}${query({ action: "SOFTRESET" })}`, undefined, { action: "SOFTRESET" });
@@ -821,12 +922,12 @@ async function main(): Promise<void> {
   const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);
   const smallFallback = args.includes("--small-fallback");
-  const actions = ["create", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "deploy-status", "promote", "rollback"];
-  const argument = action === "run" || action === "env" || action === "search-setup";
-  const perEnv = action === "env" || action === "search-setup";
+  const actions = ["create", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback"];
+  const perEnv = action === "env" || action === "search-setup" || action === "wif";
+  const argument = action === "run" || perEnv;
   if (!action || !actions.includes(action) || argument !== (file !== undefined) || (perEnv && !(DEPLOYED_ENVS as readonly string[]).includes(file ?? ""))) {
     throw new Error(
-      "usage: scripts/oracle-vm.ts <create|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|search-setup <staging|prod> [--reindex=<n>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
+      "usage: scripts/oracle-vm.ts <create|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod>|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
     );
   }
 
@@ -848,6 +949,7 @@ async function main(): Promise<void> {
   else if (action === "run") await run(oci, compartment, file as string);
   else if (action === "sync") await sync(oci, compartment, args.find((arg) => arg.startsWith("--deploy-staging-key="))?.split("=").slice(1).join("="));
   else if (action === "search-setup") await searchSetup(oci, compartment, file as DeployedEnv, args.find((arg) => arg.startsWith("--reindex="))?.slice("--reindex=".length));
+  else if (action === "wif") await wif(oci, targets, compartment, file as DeployedEnv);
   else if (action === "env") await envFiles(oci, targets, compartment, file as DeployedEnv, args.filter((arg) => arg.startsWith("--from=")).map((arg) => arg.slice("--from=".length)));
   else if (action === "deploy-status") await release(oci, targets, compartment, "status");
   else if (action === "promote" || action === "rollback") await release(oci, targets, compartment, action);

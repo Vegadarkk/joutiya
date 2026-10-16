@@ -46,6 +46,9 @@ const SHARED_SHAPE = {
     runCommandPolicyId: /^ocid1\.policy\.oc1\.\.[a-z0-9]{20,}$/,
   },
   anthropic: { organizationId: UUID },
+  // The repository whose deploy-staging.yml on main alone may deploy staging's Firestore rules
+  // (Workload Identity Federation condition on its numeric id, which a rename does not change).
+  github: { repository: /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9._-]{1,100}$/, repositoryId: /^[0-9]{1,20}$/ },
   stripe: { accountId: /^acct_[A-Za-z0-9]{8,}$/ },
   revenuecat: { projectId: /^proj[A-Za-z0-9]{4,251}$/ },
   meta: { businessId: META_ID, appId: META_ID },

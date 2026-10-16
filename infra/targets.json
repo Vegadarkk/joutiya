@@ -18,6 +18,10 @@
     "anthropic": {
       "organizationId": "de60375e-fd8c-47a8-bbbc-c40672c4eee5"
     },
+    "github": {
+      "repository": "Vegadarkk/joutiya",
+      "repositoryId": "1406007525"
+    },
     "stripe": {
       "accountId": "acct_1UQxR07tCjk226ma"
     },
