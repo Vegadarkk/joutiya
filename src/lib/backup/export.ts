@@ -80,6 +80,8 @@ export interface BackupConfig {
   firstRunWindowMs: number;
   /** Share of the daily Firestore read quota at which the scans stop. */
   readsStopRatio: number;
+  /** A rolling full cycle older than this alerts: past the 98-day retention some documents would have no copy. */
+  maxCycleMs: number;
 }
 
 export const DEFAULT_BACKUP_CONFIG: BackupConfig = {
@@ -92,6 +94,7 @@ export const DEFAULT_BACKUP_CONFIG: BackupConfig = {
   overlapMs: 10 * 60_000,
   firstRunWindowMs: 24 * 3_600_000,
   readsStopRatio: 0.9,
+  maxCycleMs: 60 * 86_400_000,
 };
 
 export interface IncrementalCursor {
@@ -428,6 +431,13 @@ function baseQuery(db: Firestore, collection: BackupCollection): Query {
   return collection.scope === "group" ? db.collectionGroup(collection.id) : db.collection(collection.id);
 }
 
+/** A cursor path the collection's query can resume after (a stray hand-edited path would make every run throw). */
+function resumable(collection: BackupCollection, path: string | null | undefined): path is string {
+  if (!path) return false;
+  const segments = path.split("/");
+  return collection.scope === "root" ? segments.length === 2 && segments[0] === collection.id : segments[segments.length - 2] === collection.id;
+}
+
 // --- The job -----------------------------------------------------------------------------------
 
 /** A run that wrote nothing (also used by the worker job when the storage is missing). */
@@ -490,7 +500,7 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
     }
     const writer = new CollectionWriter(ctx, "incremental", collection.id);
     const query = baseQuery(db, collection).where(field, ">=", cursor.since).orderBy(field).orderBy(FieldPath.documentId());
-    const result = await scan(query, budget, config.pageSize, cursor.after ? [cursor.since, db.doc(cursor.after)] : null, state, (doc) => writer.add(doc));
+    const result = await scan(query, budget, config.pageSize, resumable(collection, cursor.after) ? [cursor.since, db.doc(cursor.after)] : null, state, (doc) => writer.add(doc));
     await writer.finish();
     budget -= result.docs;
     counts.incremental[collection.id] = result.docs;
@@ -521,7 +531,7 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
     }
     const writer = new CollectionWriter(ctx, "full", collection.id);
     const resume = after[collection.id];
-    const result = await scan(baseQuery(db, collection).orderBy(FieldPath.documentId()), remaining, config.pageSize, resume ? [db.doc(resume)] : null, state, (doc) => writer.add(doc));
+    const result = await scan(baseQuery(db, collection).orderBy(FieldPath.documentId()), remaining, config.pageSize, resumable(collection, resume) ? [db.doc(resume)] : null, state, (doc) => writer.add(doc));
     await writer.finish();
     remaining -= result.docs;
     counts.full[collection.id] = result.docs;
@@ -565,6 +575,17 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
   await store.put("private", key, await encryptAge(Buffer.from(JSON.stringify(manifest), "utf8"), recipient), { contentType: CONTENT_TYPE });
   await cursorDoc.set(serializeCursors(cursors, finishedAt));
   await consume("firestore.writes", 1);
+
+  if (state.quotaStopped) {
+    await alert({ severity: "P2", title: "Sauvegarde Firestore incomplète : quota de lectures", body: `Le ${date}, les lectures Firestore ont atteint ${Math.round(config.readsStopRatio * 100)} % du quota du jour : sauvegarde arrêtée, reprise la nuit suivante depuis les curseurs.` });
+  }
+  if (!cycleComplete && now.getTime() - cycleStartedAt.getTime() > config.maxCycleMs) {
+    await alert({
+      severity: "P2",
+      title: "Sauvegarde Firestore : rotation complète trop lente",
+      body: `La rotation complète commencée le ${cycleStartedAt.toISOString().slice(0, 10)} n'est pas terminée : au-delà de 98 jours, des documents n'auraient plus aucune copie. Augmenter le budget de nuit ou réduire les lectures de l'application.`,
+    });
+  }
 
   const durationMs = Date.now() - started;
   const result: BackupResult = { status: "done", date, manifestKey: key, counts, parts: parts.length, bytes, reads: state.reads, truncated, quotaStopped: state.quotaStopped, durationMs, cursors };

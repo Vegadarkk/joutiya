@@ -120,6 +120,18 @@ describe("restore-firestore under plain Node", () => {
     expect(`${stdout}${stderr}`).not.toContain("Contenu privé");
   });
 
+  it("refuses a damaged key file without printing it", async () => {
+    const damaged = identity.slice(0, -1) + (identity.endsWith("Q") ? "P" : "Q");
+    await writeFile(join(dir, "damaged.txt"), `${damaged}\n`);
+    await chmod(join(dir, "damaged.txt"), 0o600);
+    const failure = await run(process.execPath, ["scripts/restore-firestore.ts", "--identity", join(dir, "damaged.txt"), "--from", join(dir, "dl"), "--project", "demo-joutiya"], {
+      env: { NODE_ENV: "test", PATH: process.env.PATH ?? "", FIRESTORE_EMULATOR_HOST: "127.0.0.1:1" },
+    }).catch((error: { code: number; stdout: string; stderr: string }) => error);
+    expect(failure).toMatchObject({ code: 1, stderr: expect.stringContaining("the key is damaged") });
+    const output = `${(failure as { stdout: string }).stdout}${(failure as { stderr: string }).stderr}`;
+    expect(output).not.toContain(damaged.slice(16, 40));
+  });
+
   it("refuses a project that is not recorded outside the emulator", async () => {
     const failure = await run(process.execPath, ["scripts/restore-firestore.ts", "--identity", join(dir, "key.txt"), "--from", join(dir, "dl"), "--project", "some-real-project", "--apply"], { env: { NODE_ENV: "test", PATH: process.env.PATH ?? "" } }).catch(
       (error: { code: number; stderr: string }) => error,

@@ -30,11 +30,22 @@ export async function encryptAge(bytes: Uint8Array, recipient: string): Promise<
   return encrypter.encrypt(bytes);
 }
 
-/** Decrypts an age file with one identity. Rejects (age error) when no recipient of the file matches. */
+const SECRET_KEY = /age-secret-key-1[0-9a-z]*/gi;
+
+/** Masks anything shaped like an age secret key: the library's checksum errors echo the invalid key. */
+export function redactSecrets(message: string): string {
+  return message.replace(SECRET_KEY, "AGE-SECRET-KEY-1<redacted>");
+}
+
+/** Decrypts an age file with one identity. Rejects when no recipient of the file matches; the message never carries the identity. */
 export async function decryptAge(bytes: Uint8Array, identity: string): Promise<Uint8Array> {
-  const decrypter = new Decrypter();
-  decrypter.addIdentity(identity.trim());
-  return decrypter.decrypt(bytes, "uint8array");
+  try {
+    const decrypter = new Decrypter();
+    decrypter.addIdentity(identity.trim());
+    return await decrypter.decrypt(bytes, "uint8array");
+  } catch (error) {
+    throw new Error(redactSecrets((error as Error).message));
+  }
 }
 
 /**
@@ -48,6 +59,16 @@ export function parseAgeIdentityFile(text: string): string {
     .filter((line) => line.length > 0 && !line.startsWith("#"));
   if (keys.length !== 1 || !AGE_IDENTITY_PATTERN.test(keys[0] as string)) throw new Error("age identity file: exactly one AGE-SECRET-KEY-1... line expected");
   return keys[0] as string;
+}
+
+/** parseAgeIdentityFile plus the checksum: the identity and its public key. Errors never carry the key. */
+export async function loadAgeIdentity(text: string): Promise<{ identity: string; recipient: string }> {
+  const identity = parseAgeIdentityFile(text);
+  try {
+    return { identity, recipient: await identityToRecipient(identity) };
+  } catch {
+    throw new Error("age identity file: the key is damaged (checksum)");
+  }
 }
 
 /** Test key pairs (nothing committed): `const identity = await generateIdentity(); const recipient = await identityToRecipient(identity);`. */

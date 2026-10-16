@@ -19,7 +19,7 @@ import { readFileSync, realpathSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { bucketSource } from "../src/lib/backup/bucket-source.ts";
-import { identityToRecipient, parseAgeIdentityFile } from "../src/lib/backup/crypto.ts";
+import { loadAgeIdentity, redactSecrets } from "../src/lib/backup/crypto.ts";
 import { applyRestore, checkRestore, directorySource, planRestore, type BackupSource } from "../src/lib/backup/restore.ts";
 import { APP_ENVS, validateTargets, type Targets } from "./assert-target.ts";
 
@@ -102,7 +102,7 @@ function readTargets(): Targets {
   return raw as Targets;
 }
 
-function readIdentity(path: string): string {
+async function readIdentity(path: string): Promise<{ identity: string; recipient: string }> {
   let text: string;
   try {
     text = readFileSync(path, "utf8");
@@ -110,7 +110,7 @@ function readIdentity(path: string): string {
     throw new Error(`--identity: cannot read the file (${(error as NodeJS.ErrnoException).code ?? "error"})`);
   }
   if (process.platform !== "win32" && (statSync(path).mode & 0o077) !== 0) console.warn("Warning: the identity file is readable by other users (chmod 600 it).");
-  return parseAgeIdentityFile(text);
+  return loadAgeIdentity(text);
 }
 
 async function main(): Promise<void> {
@@ -130,9 +130,9 @@ async function main(): Promise<void> {
     source = directorySource(args.from as string);
   }
 
-  const identity = readIdentity(args.identity);
+  const { identity, recipient } = await readIdentity(args.identity);
   // The public key only: compare it with BACKUP_AGE_RECIPIENT.
-  console.log(`Identity for ${await identityToRecipient(identity)}`);
+  console.log(`Identity for ${recipient}`);
   console.log(`Source ${source.label}; target ${args.project} (${emulated ? "Firestore emulator" : "Application Default Credentials"})`);
 
   const plan = await planRestore(source, identity, { collections: args.collections, until: args.until });
@@ -162,7 +162,7 @@ async function main(): Promise<void> {
 const self = fileURLToPath(import.meta.url);
 if (/[\\/]restore-firestore\.(?:ts|mjs)$/.test(self) && process.argv[1] !== undefined && realpathSync(process.argv[1]) === self) {
   main().catch((error: unknown) => {
-    console.error(`restore-firestore: ${(error as Error).message}`);
+    console.error(`restore-firestore: ${redactSecrets((error as Error).message)}`);
     process.exit(1);
   });
 }

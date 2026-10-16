@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { gunzipSync } from "node:zlib";
 import { beforeAll, describe, expect, it } from "vitest";
-import { AgeRecipientError, decryptAge, encryptAge, generateIdentity, identityToRecipient, isAgeRecipient, parseAgeIdentityFile } from "@/lib/backup/crypto";
+import { AgeRecipientError, decryptAge, encryptAge, generateIdentity, identityToRecipient, isAgeRecipient, loadAgeIdentity, parseAgeIdentityFile, redactSecrets } from "@/lib/backup/crypto";
 import { PartBuilder, manifestKey, openPart, parseBackupKey, partKey, sealPart } from "@/lib/backup/parts";
 
 // Parts of a backup (D17): NDJSON -> gzip -> age with a key pair generated in memory (nothing on
@@ -45,6 +45,24 @@ describe("age", () => {
     } catch (error) {
       expect((error as Error).message).not.toContain(identity);
     }
+  });
+});
+
+describe("identity hygiene", () => {
+  const damaged = () => identity.slice(0, -1) + (identity.endsWith("Q") ? "P" : "Q");
+
+  it("loads an identity with its public key, and refuses a damaged one without echoing it", async () => {
+    expect(await loadAgeIdentity(`# public key: ${recipient}\n${identity}\n`)).toEqual({ identity, recipient });
+    const error = await loadAgeIdentity(`${damaged()}\n`).catch((caught: Error) => caught);
+    expect((error as Error).message).toBe("age identity file: the key is damaged (checksum)");
+  });
+
+  it("never lets the library echo a key through decryption errors", async () => {
+    const sealed = await encryptAge(Buffer.from("x"), recipient);
+    const error = await decryptAge(sealed, damaged()).catch((caught: Error) => caught);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).not.toMatch(/AGE-SECRET-KEY-1[0-9A-Z]{10}/i);
+    expect(redactSecrets(`Invalid checksum in ${identity.toLowerCase()}: expected "abc"`)).toBe('Invalid checksum in AGE-SECRET-KEY-1<redacted>: expected "abc"');
   });
 });
 

@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 import type { DocumentReference, Firestore } from "firebase-admin/firestore";
-import { decryptAge } from "./crypto.ts";
+import { decryptAge, redactSecrets } from "./crypto.ts";
 import { BackupFormatError, decodeDocument, parseBackupLine, type DecodedDocument, type RefResolver } from "./encode.ts";
 import { openPart, parseBackupKey, type BackupMode } from "./parts.ts";
 
@@ -135,7 +135,7 @@ async function decryptManifest(source: BackupSource, key: string, identity: stri
     return Buffer.from(await decryptAge(await readSource(source, key), identity)).toString("utf8");
   } catch (error) {
     if (error instanceof RestoreError) throw error;
-    throw new RestoreError(`${key}: cannot be decrypted, wrong identity? (${(error as Error).message})`);
+    throw new RestoreError(`${key}: cannot be decrypted, wrong identity? (${redactSecrets((error as Error).message)})`);
   }
 }
 
@@ -225,7 +225,7 @@ async function openChecked(source: BackupSource, part: RestorePart, identity: st
   try {
     opened = await openPart(body, identity);
   } catch (error) {
-    throw new RestoreError(`${part.key}: cannot be decrypted or decompressed, wrong identity? (${(error as Error).message})`);
+    throw new RestoreError(`${part.key}: cannot be decrypted or decompressed, wrong identity? (${redactSecrets((error as Error).message)})`);
   }
   const { expected } = part;
   if (expected && (opened.sha256 !== expected.sha256 || opened.lines.length !== expected.docs || opened.plainBytes !== expected.plainBytes)) {

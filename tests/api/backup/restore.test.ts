@@ -15,6 +15,7 @@ vi.mock("@/lib/quota", () => ({
 }));
 vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => true) }));
 
+const { alert } = await import("@/lib/alert");
 const { runBackup } = await import("@/lib/backup/export");
 const { generateIdentity, identityToRecipient } = await import("@/lib/backup/crypto");
 const { applyRestore, checkRestore, planRestore } = await import("@/lib/backup/restore");
@@ -125,6 +126,7 @@ beforeAll(async () => {
 beforeEach(() => {
   quota.ratio = 0;
   quota.level = "unknown";
+  vi.mocked(alert).mockClear();
 });
 
 describe("backup and restore round trip", () => {
@@ -256,6 +258,7 @@ describe("cursors across nights", () => {
       ],
       fullBudget: 3,
       pageSize: 2,
+      maxCycleMs: 1.5 * 86_400_000,
     };
     const store = new MemoryObjectStore();
     const start = new Date("2026-10-10T03:30:00Z");
@@ -264,6 +267,8 @@ describe("cursors across nights", () => {
     for (let index = 0; index < 4; index += 1) results.push(await runBackup({ db, store, recipient, now: night(index), config }));
     expect(results.map((result) => result.counts.full)).toEqual([{ auditLogs: 3 }, { auditLogs: 2, connectionLogs: 1 }, { connectionLogs: 2, private: 1 }, { private: 1 }]);
     expect(results.map((result) => result.cursors?.full.next)).toEqual(["auditLogs", "connectionLogs", "private", null]);
+    // Night 3 (index 2): the unfinished cycle is older than maxCycleMs.
+    expect(vi.mocked(alert).mock.calls.map(([event]) => event.title)).toEqual(["Sauvegarde Firestore : rotation complète trop lente"]);
     expect(results[3]?.cursors?.full.cycleStartedAt).toEqual(night(0));
     expect(results[3]?.cursors?.full.cycleCompletedAt).toEqual(night(3));
     const { check } = await restore(store, database());
@@ -317,6 +322,7 @@ describe("cursors across nights", () => {
     expect(stopped.counts.incremental).toEqual({ listings: 2 });
     expect(stopped.counts.full).toEqual({});
     expect(stopped.cursors?.full.next).toBe("listings");
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({ severity: "P2", title: "Sauvegarde Firestore incomplète : quota de lectures" }));
 
     quota.level = "ok";
     quota.ratio = 0.2;
@@ -326,5 +332,19 @@ describe("cursors across nights", () => {
     expect(next.counts.full).toEqual({ listings: 5, users: 2 });
     const { check } = await restore(store, database());
     expect(check.documents).toBe(7);
+  });
+
+  it("ignores hand-edited cursor paths that do not belong to their collection", async () => {
+    const db = database();
+    const now = new Date("2026-10-10T03:30:00Z");
+    await db.doc("listings/l1").set({ updatedAt: ago(now, 60_000) });
+    await db.doc("system/backup").set({
+      incremental: { listings: { since: ago(now, 3_600_000), after: "users/u1" } },
+      full: { next: "listings", after: { listings: "users/u1/private/account" } },
+    });
+    const result = await runBackup({ db, store: new MemoryObjectStore(), recipient, now, config: { collections: listingsAndUsers } });
+    expect(result).toMatchObject({ status: "done" });
+    expect(result.counts.incremental["listings"]).toBe(1);
+    expect(result.counts.full["listings"]).toBe(1);
   });
 });
