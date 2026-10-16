@@ -4,7 +4,8 @@ import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 // Breadcrumb of the listing page: home > category > subcategory > city > listing. The intermediate
-// steps open the search page filtered on them (phase 4 reads the same query names, SEARCH_QUERY).
+// steps open the crawlable category landing pages (`landingHref`, phase 4 D15); `searchHref` builds the
+// equivalent search page link (robots-disallowed, so never used for crawl paths).
 
 /** Query names of the search page for the breadcrumb filters (to keep in step with phase 4). */
 export const SEARCH_QUERY = { category: "categorie", subcategory: "sous-categorie", city: "ville" } as const;
@@ -23,9 +24,14 @@ export function searchHref(filters: SearchFilters): { pathname: "/recherche"; qu
   return { pathname: "/recherche", query };
 }
 
+/** Category landing page `/c/{category}[/{subcategory}][/{city}]` (src/lib/search/seo.ts `seoPath`). */
+export function landingHref(filters: SearchFilters & { category: string }): `/c/${string}` {
+  return `/c/${[filters.category, filters.subcategory, filters.city].filter(Boolean).join("/")}`;
+}
+
 export interface BreadcrumbItem {
   label: string;
-  href?: ReturnType<typeof searchHref> | "/";
+  href?: ReturnType<typeof searchHref> | ReturnType<typeof landingHref> | "/";
 }
 
 export function Breadcrumb({ items, current, className }: { items: BreadcrumbItem[]; current: string; className?: string }) {

@@ -2,8 +2,10 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { useTranslations } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Container } from "@/components/layout/container";
+import { SaveSearchButton } from "@/components/saved-searches/save-search-button";
 import { ActiveFilterChips } from "@/components/search/active-filter-chips";
 import { FeaturedRow } from "@/components/search/featured-row";
 import { FiltersSheet } from "@/components/search/filters-sheet";
@@ -21,6 +23,8 @@ import { pageLocale } from "@/i18n/params";
 import { parseSearchParams, SEARCH_MAX_TOTAL_HITS, SEARCH_PATH, searchPath } from "@/lib/search/params";
 import type { SearchCard, SearchResponse } from "@/lib/search/types";
 import { loadSearch, pageRequest, searchPageTitle } from "./search-state";
+
+const favoriteAction = (card: SearchCard) => <FavoriteButton listingId={card.id} />;
 
 // Search results (design §2 L3b, D2, D6-D8, D13). Dynamic: the query string is the whole state,
 // rendered on the server from the engine; the filters only navigate (client islands). Same limits
@@ -120,7 +124,12 @@ export default async function SearchPage({ params, searchParams }: Props) {
           ) : null}
         </header>
         {outcome.kind === "results" ? (
-          <Results response={outcome.response} locale={locale} />
+          <Results
+            response={outcome.response}
+            locale={locale}
+            toolbarAction={<SaveSearchButton params={outcome.response.params} />}
+            renderAction={favoriteAction}
+          />
         ) : outcome.kind === "challenge" ? (
           <SearchChallenge params={applied} />
         ) : (

@@ -3,9 +3,10 @@ import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { CalendarDays, MapPin } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { Container } from "@/components/layout/container";
 import { AdSlot } from "@/components/listing/ad-slot";
-import { Breadcrumb, searchHref } from "@/components/listing/breadcrumb";
+import { Breadcrumb, landingHref } from "@/components/listing/breadcrumb";
 import { ContactBar } from "@/components/listing/contact-bar";
 import { CriteriaSection } from "@/components/listing/criteria-grid";
 import { Gallery } from "@/components/listing/gallery";
@@ -27,6 +28,7 @@ import { photoUrl } from "@/lib/listings/client/photo-url";
 import { listingJsonLd } from "@/lib/listings/jsonld";
 import { getPublishedBySlugId, getSeller, listingPath, toPublicListing, type PublicListing, type PublicSeller } from "@/lib/listings/public";
 import { logger } from "@/lib/logging/logger";
+import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
 import { mediaBaseUrl } from "@/lib/storage/keys";
 
 // Public listing page (design D1, D10, D14, §5, §8): ISR, rendered on the first visit and kept 5
@@ -131,18 +133,30 @@ export default async function ListingPage({ params }: { params: Params }) {
   const published = listing.state === "published";
 
   const jsonLd = listingJsonLd({ listing, url: canonicalUrl, images, categoryName: subcategoryName ?? categoryName, cityName: cityLabel, regionName: regionLabel });
+  // Crawlable steps: the category landing pages (/recherche is robots-disallowed).
+  const trail = [
+    ...(categoryName ? [{ label: categoryName, href: landingHref({ category: listing.categoryId }) }] : []),
+    ...(categoryName && subcategoryName ? [{ label: subcategoryName, href: landingHref({ category: listing.categoryId, subcategory: listing.subcategoryId }) }] : []),
+    ...(categoryName && cityLabel
+      ? [{ label: cityLabel, href: landingHref({ category: listing.categoryId, subcategory: listing.subcategoryId, city: listing.location.citySlug }) }]
+      : []),
+  ];
+  const breadcrumbLd = breadcrumbJsonLd([
+    { name: t("home"), url: `${CANONICAL_ORIGIN}/${locale}` },
+    ...trail.map((step) => ({ name: step.label, url: `${CANONICAL_ORIGIN}/${locale}${step.href}` })),
+    { name: listing.title },
+  ]);
 
   return (
     <>
       <JsonLd data={jsonLd} />
+      {breadcrumbLd ? <JsonLd data={breadcrumbLd} /> : null}
       <Container className="flex flex-col gap-5 pt-3 pb-12 sm:pt-5 lg:pb-16">
         <Breadcrumb
           current={listing.title}
           items={[
             { label: t("home"), href: "/" },
-            ...(categoryName ? [{ label: categoryName, href: searchHref({ category: listing.categoryId }) }] : []),
-            ...(subcategoryName ? [{ label: subcategoryName, href: searchHref({ category: listing.categoryId, subcategory: listing.subcategoryId }) }] : []),
-            ...(cityLabel ? [{ label: cityLabel, href: searchHref({ subcategory: listing.subcategoryId, city: listing.location.citySlug }) }] : []),
+            ...trail.map((step) => ({ label: step.label, href: step.href })),
           ]}
         />
         <ListingStatusBanner state={listing.state} />
@@ -167,6 +181,7 @@ export default async function ListingPage({ params }: { params: Params }) {
                 <time dateTime={listing.publishedAt}>{t("publishedOn", { date: formatDate(new Date(listing.publishedAt), locale) })}</time>
               </span>
             </div>
+            {published ? <FavoriteButton listingId={listing.id} variant="inline" className="self-start" /> : null}
           </header>
 
           <aside aria-label={t("sellerLabel")} className="min-w-0 lg:[grid-area:aside]">

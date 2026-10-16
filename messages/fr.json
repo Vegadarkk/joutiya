@@ -36,11 +36,7 @@
     "subtitle": "Des petites annonces entre particuliers et professionnels, de Tanger à Dakhla.",
     "searchLabel": "Que cherchez-vous ?",
     "searchPlaceholder": "Téléphone, vélo, appartement…",
-    "cityLabel": "Ville ou région",
-    "cityPlaceholder": "Toute la région",
     "submit": "Rechercher",
-    "openingTitle": "Joutiya ouvre bientôt",
-    "openingBody": "Le dépôt d'annonces et la recherche arrivent dans les prochaines semaines. Le site que vous voyez est en préparation.",
     "pillars": {
       "free": {
         "title": "Déposer est gratuit",
@@ -68,10 +64,6 @@
     }
   },
   "Search": {
-    "title": "Recherche",
-    "emptyTitle": "La recherche ouvre bientôt",
-    "emptyBody": "Les annonces apparaîtront ici dès l'ouverture du dépôt.",
-    "backHome": "Revenir à l'accueil",
     "bar": {
       "label": "Rechercher des annonces",
       "queryLabel": "Que recherchez-vous ?",

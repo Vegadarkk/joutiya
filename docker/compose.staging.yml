@@ -23,6 +23,12 @@ services:
     deploy:
       resources:
         limits: { cpus: "0.25", memory: 96M }
+  meilisearch:
+    environment:
+      MEILI_MAX_INDEXING_MEMORY: 512MiB
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 1024M }
   cloudflared:
     deploy:
       resources:

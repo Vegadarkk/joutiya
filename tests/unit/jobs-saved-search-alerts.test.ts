@@ -1,8 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetServerEnv } from "@/lib/env";
-import type { MailInput } from "@/lib/mail/types";
+import type { TemplateMail } from "@/lib/mail/types";
 import type { AlertSearchRecord, DailySearchPage } from "@/lib/saved-searches/repository";
-import type { FilterExpr, SearchCard, SearchResponse } from "@/lib/search/types";
+import type { SearchCard, SearchResponse } from "@/lib/search/types";
 
 // saved-search-alerts (07:00 UTC, design D19): one bulk digest per account with news, at most 40
 // a run, account groups kept whole across collection-group pages, rotation through the stored
@@ -86,13 +86,13 @@ function news(ids: string[], count = 1): void {
 
 const pad = (index: number) => String(index).padStart(4, "0");
 
-function mails(): MailInput[] {
-  return vi.mocked(sendMail).mock.calls.map(([mail]) => mail);
+function mails(): TemplateMail[] {
+  return vi.mocked(sendMail).mock.calls.map(([mail]) => mail as TemplateMail);
 }
 
-function digestOf(uid: string) {
+function digestOf(uid: string): TemplateMail<"savedSearchAlert"> | undefined {
   const mail = mails().find((item) => item.to === `${uid}@example.com`);
-  return mail?.template === "savedSearchAlert" ? mail : undefined;
+  return mail?.template === "savedSearchAlert" ? (mail as TemplateMail<"savedSearchAlert">) : undefined;
 }
 
 beforeAll(() => {
@@ -115,7 +115,7 @@ beforeEach(() => {
   vi.mocked(runSearch)
     .mockReset()
     .mockImplementation(async (params, options = {}) => {
-      const filter = options.extraFilter as Extract<FilterExpr, { op: "gt" }>;
+      const filter = options.extraFilter as { value: number };
       const id = params.district ?? "";
       const matching = [...(listings.get(id) ?? [])].filter((hit) => Date.parse(hit.sortAt) > filter.value).sort((a, b) => b.sortAt.localeCompare(a.sortAt));
       const approximate = approximateFor.has(id);

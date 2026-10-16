@@ -23,6 +23,13 @@ services:
     deploy:
       resources:
         limits: { cpus: "0.25", memory: 128M }
+  meilisearch:
+    environment:
+      # Indexing memory stays under the limit; the rest is the memory-mapped index (page cache).
+      MEILI_MAX_INDEXING_MEMORY: 1GiB
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 2048M }
   cloudflared:
     deploy:
       resources:

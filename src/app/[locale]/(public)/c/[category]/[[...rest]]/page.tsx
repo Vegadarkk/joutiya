@@ -2,6 +2,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { Container } from "@/components/layout/container";
 import { JsonLd } from "@/components/listing/json-ld";
@@ -19,6 +20,9 @@ import { SEARCH_PATH, searchQueryObject } from "@/lib/search/params";
 import { cityLinks, resolveSeoSegments, SEO_PAGE_SIZE, seoCounts, seoPath, seoSearchParams, seoVerdict, type SeoTarget } from "@/lib/search/seo";
 import { runSearch } from "@/lib/search/service";
 import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import type { SearchCard } from "@/lib/search/types";
+
+const favoriteAction = (card: SearchCard) => <FavoriteButton listingId={card.id} />;
 
 // Category landing pages (design D15): /c/{category}, /c/{category}/{subcategory|city},
 // /c/{category}/{subcategory}/{city}. ISR on first visit, kept 10 minutes; segments are checked
@@ -159,14 +163,14 @@ export default async function CategoryLandingPage({ params }: { params: Params }
 
         {chips.length > 1 ? <SubcategoryChips chips={chips} locale={locale} label={t("subcategoriesLabel")} /> : null}
 
-        {response.featured.length > 0 ? <FeaturedRow cards={response.featured} locale={locale} /> : null}
+        {response.featured.length > 0 ? <FeaturedRow cards={response.featured} locale={locale} renderAction={favoriteAction} /> : null}
 
         {response.hits.length > 0 ? (
           <section aria-labelledby="landing-recent" className="flex flex-col gap-5">
             <h2 id="landing-recent" className="text-xl font-semibold">
               {t("recentTitle")}
             </h2>
-            <ResultsGrid cards={response.hits} locale={locale} priorityCount={4} />
+            <ResultsGrid cards={response.hits} locale={locale} priorityCount={4} renderAction={favoriteAction} />
             {total > response.hits.length ? (
               <div className="flex justify-center pt-2">
                 <Button asChild variant="outline" size="lg">

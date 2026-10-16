@@ -50,6 +50,8 @@ services:
     depends_on:
       valkey-queue: { condition: service_healthy }
       valkey-ratelimit: { condition: service_healthy }
+      # Search down = /api/search 503 and /api/health reports it, never a web outage (D2).
+      meilisearch: { condition: service_started, required: false }
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then((r)=>process.exit(r.status===200?0:1),()=>process.exit(1))"]
       interval: 30s
@@ -75,6 +77,7 @@ services:
     networks: [data, egress]
     depends_on:
       valkey-queue: { condition: service_healthy }
+      meilisearch: { condition: service_started, required: false }
     # Heartbeat file touched by the worker after each successful write to valkey-queue (30 s).
     healthcheck:
       test: ["CMD", "node", "-e", "process.exit(Date.now()-require('fs').statSync('/tmp/joutiya-worker-heartbeat').mtimeMs<90000?0:1)"]
@@ -112,6 +115,34 @@ services:
     networks: [data]
     healthcheck: *valkey-health
 
+  meilisearch:
+    <<: *service
+    # The image starts through its own tini.
+    init: false
+    image: getmeili/meilisearch:v1.55.0@sha256:ff546679970126f8822e15d1b6a06bfbff1f2ce2e43f810cfb5258012f92de5c
+    # MEILI_MASTER_KEY only (16 bytes at least: production mode refuses to start without it). The app
+    # holds two scoped keys created from it by scripts/search-setup.ts (app.env), never the master key.
+    env_file:
+      - /etc/joutiya/${APP_ENV}/meilisearch.env
+    environment:
+      MEILI_ENV: production
+      MEILI_NO_ANALYTICS: "true"
+      MEILI_MAX_INDEXING_THREADS: "1"
+    read_only: true
+    # Request payloads are spooled to /tmp before they reach the task queue on the volume.
+    tmpfs:
+      - /tmp:size=256m
+    volumes:
+      - meilisearch-data:/meili_data
+    networks: [data]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7700/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    stop_grace_period: 30s
+
   cloudflared:
     <<: *service
     image: cloudflare/cloudflared:2026.10.0@sha256:9b49eed8f62806d5d45ddf59ecefb5710429598ea6d3fcccd2af938f621b2b07
@@ -134,10 +165,12 @@ services:
 networks:
   # cloudflared <-> web only.
   edge: { internal: true }
-  # Valkey: no route outside the project.
+  # Valkey, Meilisearch: no route outside the project.
   data: { internal: true }
   # Outbound internet (Firestore, Telegram, Cloudflare edge).
   egress: {}
 
 volumes:
   valkey-queue-data: {}
+  # Rebuildable from Firestore (scripts/reindex-search.ts): not unique data.
+  meilisearch-data: {}

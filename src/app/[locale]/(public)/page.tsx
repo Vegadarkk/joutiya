@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { HandCoins, MapPinned, ShieldCheck } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ErrorBanner } from "@/components/feedback/error-banner";
+import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { CategoryGrid } from "@/components/home/category-grid";
 import { FeaturedCarousel } from "@/components/home/featured-carousel";
 import { SearchPanel } from "@/components/home/search-panel";
@@ -16,6 +16,8 @@ import { FEATURED_HOME_SLOTS } from "@/lib/search/featured";
 import { SEARCH_PATH } from "@/lib/search/params";
 import { featuredListings, latestListings } from "@/lib/search/service";
 import type { SearchCard } from "@/lib/search/types";
+
+const favoriteAction = (card: SearchCard) => <FavoriteButton listingId={card.id} />;
 
 // Home (design D21): search hero, the eleven categories, À la Une (8 drawn) and the 12 newest
 // listings. ISR every 5 minutes; an engine failure hides the two listing sections (D2) and the
@@ -62,21 +64,18 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       </Container>
       <Container className="flex flex-col gap-12 py-10 sm:gap-14 sm:py-14">
         <CategoryGrid />
-        {featured && featured.length > 0 ? <FeaturedCarousel cards={featured} locale={locale} /> : null}
+        {featured && featured.length > 0 ? <FeaturedCarousel cards={featured} locale={locale} renderAction={favoriteAction} /> : null}
         {recent && recent.length > 0 ? (
           <section aria-labelledby="home-recent" data-testid="home-recent" className="flex flex-col gap-5">
             <h2 id="home-recent" className="text-xl font-semibold">
               {t("recent.title")}
             </h2>
-            <ResultsGrid cards={recent} locale={locale} />
+            <ResultsGrid cards={recent} locale={locale} renderAction={favoriteAction} />
             <Button asChild variant="outline" className="self-center">
               <Link href={SEARCH_PATH}>{t("recent.all")}</Link>
             </Button>
           </section>
         ) : null}
-        <ErrorBanner tone="info" title={t("openingTitle")}>
-          {t("openingBody")}
-        </ErrorBanner>
         <ul className="grid gap-8 sm:grid-cols-3">
           {PILLARS.map(({ key, icon: Icon }) => (
             <li key={key} className="flex gap-4">
