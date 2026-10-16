@@ -88,6 +88,46 @@ describe("uploadListingPhoto", () => {
     expect(calls).toEqual([]);
   });
 
+  it("a cancelled upload deletes its signed record and rejects with aborted", async () => {
+    stubFetch({ "POST /api/uploads/sign": { body: { uploadId: "upload0003", url: "https://q/put", method: "PUT", headers: { "Content-Type": "image/jpeg" }, expiresAt: "x" } } });
+    const controller = new AbortController();
+    const discard = vi.fn(async (_id: string) => {});
+    const put = vi.fn(async () => {
+      controller.abort();
+      throw new DOMException("aborted", "AbortError");
+    });
+    await expect(uploadListingPhoto("abcdefgh", new Blob([new Uint8Array([1])]), { prepare: async () => prepared(), put, discard, signal: controller.signal })).rejects.toMatchObject({ code: "aborted" });
+    expect(discard).toHaveBeenCalledWith("upload0003");
+  });
+
+  it("a cancellation before signing sends nothing", async () => {
+    const calls = stubFetch({});
+    const controller = new AbortController();
+    const discard = vi.fn(async (_id: string) => {});
+    await expect(
+      uploadListingPhoto("abcdefgh", new Blob([new Uint8Array([1])]), {
+        prepare: async () => {
+          controller.abort();
+          return prepared();
+        },
+        discard,
+        signal: controller.signal,
+      }),
+    ).rejects.toMatchObject({ code: "aborted" });
+    expect(calls).toEqual([]);
+    expect(discard).not.toHaveBeenCalled();
+  });
+
+  it("a failure that is not a cancellation keeps the upload for a retry", async () => {
+    stubFetch({ "POST /api/uploads/sign": { body: { uploadId: "upload0004", url: "https://q/put", method: "PUT", headers: { "Content-Type": "image/jpeg" }, expiresAt: "x" } } });
+    const discard = vi.fn(async (_id: string) => {});
+    const put = vi.fn(async () => {
+      throw new ApiError(0, "network");
+    });
+    await expect(uploadListingPhoto("abcdefgh", new Blob([new Uint8Array([1])]), { prepare: async () => prepared(), put, discard, signal: new AbortController().signal })).rejects.toMatchObject({ code: "network" });
+    expect(discard).not.toHaveBeenCalled();
+  });
+
   it("names the error code for the tile", () => {
     expect(uploadErrorCode(new ApiError(507, "storage_full"))).toBe("storage_full");
     expect(uploadErrorCode(new Error("?"))).toBe("internal");

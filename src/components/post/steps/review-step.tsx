@@ -8,7 +8,6 @@ import { InlineError } from "@/components/feedback/inline-error";
 import { FormMessage } from "@/components/auth/form-message";
 import { TurnstileWidget, type TurnstileHandle } from "@/components/auth/turnstile-widget";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { criterionById, subcategoryById } from "@/config/categories";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import type { Locale } from "@/config/site";
@@ -339,9 +338,6 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
         </section>
       ) : null}
       {saveState === "error" ? <ErrorBanner tone="warning" title={t("wizard.saveError")} /> : null}
-      <Button type="submit" size="lg" loading={publishing} className="w-full sm:hidden" disabled={editable && (photosBusy || (turnstileNeeded && !token))}>
-        {editable ? t("review.publish") : t("review.save")}
-      </Button>
     </form>
   );
 }

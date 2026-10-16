@@ -329,6 +329,8 @@ interface WizardProviderProps {
   maxPhotos: number;
   mediaBaseUrl: string | null;
   children: ReactNode;
+  /** A live listing left inside the app with unsaved changes: they are handed over (to offer saving them). */
+  onUnsavedLeave?: (patch: ListingPatch) => void;
   /** Injected in tests. */
   upload?: typeof uploadListingPhoto;
   save?: (id: string, patch: ListingPatch) => Promise<{ listing: OwnerListing }>;
@@ -338,7 +340,7 @@ function revokePreview(item: PhotoItem | undefined): void {
   if (item?.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(item.previewUrl);
 }
 
-export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, upload = uploadListingPhoto, save = patchListing }: WizardProviderProps) {
+export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onUnsavedLeave, upload = uploadListingPhoto, save = patchListing }: WizardProviderProps) {
   const [state, dispatch] = useReducer(reducer, undefined, () => ({
     listing,
     saveState: "idle" as AutosaveState,
@@ -373,11 +375,16 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, upl
   const [runner] = useState(() => createUploadRunner(UPLOAD_CONCURRENCY));
   const polls = useRef<AbortController | null>(null);
   const photosRef = useRef(state.photos);
+  const onLeaveRef = useRef(onUnsavedLeave);
   const lastSentReady = useRef<string>(readyPhotoIds(state.photos).join(","));
 
   useEffect(() => {
     photosRef.current = state.photos;
   }, [state.photos]);
+
+  useEffect(() => {
+    onLeaveRef.current = onUnsavedLeave;
+  }, [onUnsavedLeave]);
 
   useEffect(() => {
     autosave.setManual(saveMode === "manual");
@@ -408,8 +415,12 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, upl
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", onHide);
       window.removeEventListener("beforeunload", onBeforeUnload);
-      // Leaving the wizard inside the app (header link): a draft keeps what was typed.
-      void instance.flush();
+      // Leaving the wizard inside the app (header link): a draft keeps what was typed; a live
+      // listing's changes are handed to the page, which offers to save them.
+      if (instance.isManual) {
+        const pending = instance.takePending();
+        if (pending && Object.keys(pending).length > 0) onLeaveRef.current?.(pending);
+      } else void instance.flush();
       instance.dispose();
       for (const controller of controllers.values()) controller.abort();
       pollsController.abort();
@@ -599,8 +610,12 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, upl
         dispatch({ type: "photo-remove", key });
       };
       if (isPhotoBusy(item) || !item.uploadId) {
+        const controller = controllers.get(key);
         // An upload in flight is cancelled; once signed, upload.ts deletes its record itself.
-        controllers.get(key)?.abort();
+        if (controller) controller.abort();
+        // Processing without an upload of this visit (restored or refreshed): its record goes too,
+        // or the pipeline would attach it after all.
+        else if (item.uploadId) void deleteUpload(item.uploadId).catch(() => undefined);
         drop();
         return;
       }

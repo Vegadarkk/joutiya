@@ -395,7 +395,9 @@
       "unsaved": "Modifications non enregistrées",
       "saveBlocked": "Modifications non enregistrées : corrigez les points signalés.",
       "saveStopped": "Enregistrement interrompu.",
-      "saveNow": "Enregistrer"
+      "saveNow": "Enregistrer",
+      "unsavedLeftTitle": "Modifications non enregistrées",
+      "unsavedLeftBody": "Vous avez quitté l'annonce sans enregistrer vos dernières modifications."
     },
     "start": {
       "title": "Déposer une annonce",

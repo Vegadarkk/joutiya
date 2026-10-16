@@ -1,7 +1,8 @@
 // Draft autosave with coalescing (design D2): writes happen on step change, on blur and after
 // 5 s without typing, never per keystroke. Patches queued while a save is in flight are merged
 // and sent once it completes; a failed save keeps its patch (or what `recover` keeps of it).
-// Retries follow `retryAfter`: transient failures back off, refusals wait for a manual retry.
+// Retries follow `retryAfter`: a delay up to QUICK_RETRY_MS (version race, dropped field) is
+// retried inside the same save, longer ones back off, refusals wait for a manual retry.
 // "Manual" mode (a live listing: every write re-screens it) never saves on its own: only
 // `flush({ force: true })` sends. Pure TypeScript, unit-tested with fake timers.
 
@@ -28,6 +29,10 @@ export interface AutosaveOptions<P extends object> {
 
 export const AUTOSAVE_IDLE_MS = 5_000;
 const MAX_RETRY_MS = 120_000;
+/** Retries this close are part of the save: no error state, the caller's flush waits for them. */
+export const QUICK_RETRY_MS = 1_000;
+
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export class Autosave<P extends object> {
   private pending: P | null = null;
@@ -102,29 +107,44 @@ export class Autosave<P extends object> {
     this.pending = null;
     this.flushAfter = false;
     this.setState("saving");
-    this.inflight = this.save(patch).then(
-      () => {
-        this.inflight = null;
-        this.failures = 0;
-        this.setState(this.pending ? "pending" : "saved");
-      },
-      (error: unknown) => {
-        this.inflight = null;
-        this.failures += 1;
-        // The failed patch goes back under whatever was typed since: nothing is lost.
-        const kept = this.recover(patch, error);
-        if (kept) this.pending = this.pending ? this.merge(kept, this.pending) : kept;
-        this.setState("error", error);
-        const delay = this.retryAfter(error, this.failures);
-        if (delay === null) this.halted = true;
-        else if (this.pending && !this.disposed && !this.manual) this.armTimer(delay);
-      },
-    );
+    this.inflight = this.send(patch).finally(() => {
+      this.inflight = null;
+    });
     return this.inflight.then(() => {
       const failed = this.state === "error";
       if (this.pending && !failed && !this.halted && (this.flushAfter || options.force)) return this.flush(options);
       return this.pending === null && !failed;
     });
+  }
+
+  /** One save, with its quick retries; a failure leaves the state "error" and schedules what comes next. */
+  private async send(patch: P): Promise<void> {
+    let current = patch;
+    for (;;) {
+      try {
+        await this.save(current);
+        this.failures = 0;
+        this.setState(this.pending ? "pending" : "saved");
+        return;
+      } catch (error) {
+        this.failures += 1;
+        // The failed patch goes back under whatever was typed since: nothing is lost.
+        const kept = this.recover(current, error);
+        if (kept) this.pending = this.pending ? this.merge(kept, this.pending) : kept;
+        const delay = this.retryAfter(error, this.failures);
+        if (delay !== null && delay <= QUICK_RETRY_MS && this.pending) {
+          await wait(delay);
+          if (!this.pending) return;
+          current = this.pending;
+          this.pending = null;
+          continue;
+        }
+        this.setState("error", error);
+        if (delay === null) this.halted = true;
+        else if (this.pending && !this.disposed && !this.manual) this.armTimer(delay);
+        return;
+      }
+    }
   }
 
   /** Stops the timers; pending changes are not sent (the caller flushes first when it wants them saved). */

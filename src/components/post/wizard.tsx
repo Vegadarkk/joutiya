@@ -11,9 +11,9 @@ import { Link, getPathname, usePathname, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/config/site";
 import { isApiError } from "@/lib/auth/client";
 import { usePublicConfig } from "@/lib/config/client";
-import { WIZARD_DONE, WIZARD_STEPS, type ListingStatus, type OwnerListing, type PublishListingResponse, type WizardStep } from "@/lib/contracts/listings";
+import { WIZARD_DONE, WIZARD_STEPS, type ListingPatch, type ListingStatus, type OwnerListing, type PublishListingResponse, type WizardStep } from "@/lib/contracts/listings";
 import { MAX_PHOTOS_INDIVIDUAL } from "@/lib/contracts/media";
-import { getListing } from "@/lib/listings/client/api";
+import { getListing, patchListing } from "@/lib/listings/client/api";
 import { parseWizardPath, wizardPath, type WizardScreen } from "@/lib/listings/client/routes";
 import { WizardProvider, useWizard } from "@/lib/listings/client/store";
 import { firstIncompleteStep, nextStep, previousStep, stepState, type StepState } from "@/lib/listings/client/validation";
@@ -46,6 +46,26 @@ export function PostWizard({ listingId, nonce }: { listingId: string; nonce?: st
   const apiMessage = useApiErrorMessage();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const started = useRef(false);
+
+  // A live listing left with unsaved changes (header link): one toast offers to save them.
+  const onUnsavedLeave = useCallback(
+    (patch: ListingPatch) => {
+      toast.warning(t("unsavedLeftTitle"), {
+        description: t("unsavedLeftBody"),
+        duration: 20_000,
+        action: {
+          label: t("saveNow"),
+          onClick: () => {
+            patchListing(listingId, patch).then(
+              () => toast.success(t("savedLive")),
+              (error: unknown) => toast.error(apiMessage(error)),
+            );
+          },
+        },
+      });
+    },
+    [apiMessage, listingId, t],
+  );
 
   const load = useCallback(async () => {
     try {
@@ -126,7 +146,7 @@ export function PostWizard({ listingId, nonce }: { listingId: string; nonce?: st
     );
   }
   return (
-    <WizardProvider listing={state.listing} maxPhotos={config?.upload.maxPhotos ?? MAX_PHOTOS_INDIVIDUAL} mediaBaseUrl={config?.mediaBaseUrl ?? null}>
+    <WizardProvider listing={state.listing} maxPhotos={config?.upload.maxPhotos ?? MAX_PHOTOS_INDIVIDUAL} mediaBaseUrl={config?.mediaBaseUrl ?? null} onUnsavedLeave={onUnsavedLeave}>
       <WizardScreens nonce={nonce} />
     </WizardProvider>
   );
