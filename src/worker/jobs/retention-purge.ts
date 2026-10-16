@@ -7,7 +7,7 @@ import { deleteUploadDocument, listPastPurge, listUploadsByTarget, updateUpload,
 import { COLLECTIONS, type ListingStatus } from "@/lib/db/schemas";
 import { isFirestoreConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
-import { mediaObjectKey } from "@/lib/media/urls";
+import { mediaObjectKey, quarantineObjectKey } from "@/lib/media/urls";
 import { isDegraded } from "@/lib/quota";
 import { isStorageNotConfigured, objectStore, type ObjectStore } from "@/lib/storage";
 import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
@@ -87,7 +87,13 @@ async function purgeListingMedia(store: ObjectStore, listing: ListingRecord, sta
   const uploads = await listUploadsByTarget(listing.id);
   try {
     const known = new Set(uploads.map((upload) => upload.id));
-    for (const photo of listing.photos) if (!known.has(photo.id)) await deleteVariants(store, listing.id, photo.id, state);
+    // A photo id is its upload id: without the document, its keys are still derivable.
+    for (const photo of listing.photos) {
+      if (known.has(photo.id)) continue;
+      await deleteVariants(store, listing.id, photo.id, state);
+      await store.delete("quarantine", quarantineObjectKey(photo.id));
+      state.result.objects += 1;
+    }
     for (const upload of uploads) await deleteUpload(store, upload, state);
   } catch (error) {
     // The listing is a tombstone now: hand what is left to purge-quarantine (orphan uploads past purgeAt).
