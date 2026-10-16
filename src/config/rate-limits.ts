@@ -67,6 +67,8 @@ export const RATE_LIMITS = {
   // Closed: every signed upload costs R2 operations and storage.
   "upload.sign.uid": { points: 30, duration: HOUR, policy: "closed", key: "uid" },
   "upload.bytes.uid": { points: 200 * MIB, duration: DAY, policy: "closed", key: "uid" },
+  // GET /api/uploads/{id} (polling) and repeated completes: one Firestore read each.
+  "upload.status.uid": { points: 900, duration: HOUR, policy: "open", key: "uid" },
   // POST /api/listings/{id}/phone (§6): 10 per hour and 30 per day per account, 20 per day per
   // device, 60 per day per IP then Turnstile. Closed: the number is personal data.
   "reveal.uid.hour": { points: 10, duration: HOUR, policy: "closed", key: "uid" },

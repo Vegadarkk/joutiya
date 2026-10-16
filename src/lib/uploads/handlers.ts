@@ -3,6 +3,7 @@ import { requireUser, type AuthContext } from "@/lib/auth/guards";
 import { signUploadSchema, UPLOAD_ID_PATTERN, type SignUploadResponse, type UploadStatusResponse } from "@/lib/contracts/media";
 import { notFound } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
+import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { json, noContent } from "@/lib/http/route";
 import { requestIdentity } from "@/lib/rate-limit/keys";
 import { z } from "@/lib/zod";
@@ -36,6 +37,7 @@ export async function handleSign(request: Request): Promise<Response> {
 
 export async function handleComplete(request: Request, params: Params): Promise<Response> {
   const auth = await requireUser(request, { mutation: true });
+  await enforceLimit("upload.status.uid", auth.user.uid);
   const id = await uploadIdOf(params);
   if (request.headers.get("content-type")) await readJson(request, completeSchema);
   const body: UploadStatusResponse = await completeUpload(uploaderOf(request, auth), id);
@@ -44,6 +46,7 @@ export async function handleComplete(request: Request, params: Params): Promise<
 
 export async function handleStatus(request: Request, params: Params): Promise<Response> {
   const auth = await requireUser(request);
+  await enforceLimit("upload.status.uid", auth.user.uid);
   const id = await uploadIdOf(params);
   const body: UploadStatusResponse = await uploadStatus(uploaderOf(request, auth), id);
   return json(body);
