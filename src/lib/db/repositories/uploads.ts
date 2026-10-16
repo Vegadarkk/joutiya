@@ -349,8 +349,21 @@ export async function sumStoredBytes(): Promise<number> {
   return totals.reduce((sum, bytes) => sum + bytes, 0);
 }
 
-/** Tests and the retention job. */
-export async function deleteUploadDocument(id: string): Promise<void> {
-  await uploadRef(id).delete();
-  void consume("firestore.deletes", 1);
+/**
+ * Deletes an upload document and returns it as this call removed it, or null when it was already
+ * gone. Two paths can delete the same upload at once (an owner DELETE retried or tapped twice,
+ * purge-quarantine, retention-purge): the storage gauge takes back the bytes of the record returned
+ * here (still `ready`, or `heldObjects`), so they come off once, by the state at deletion, not by a
+ * snapshot another path has since ended or removed.
+ */
+export async function deleteUploadDocument(id: string): Promise<UploadRecord | null> {
+  return db().runTransaction(async (tx) => {
+    const snapshot = await tx.get(uploadRef(id));
+    void consume("firestore.reads", 1);
+    const upload = fromSnapshot(snapshot);
+    if (!upload) return null;
+    tx.delete(uploadRef(id));
+    void consume("firestore.deletes", 1);
+    return upload;
+  });
 }

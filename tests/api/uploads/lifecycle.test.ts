@@ -19,6 +19,11 @@ vi.mock("@/lib/uploads/storage-gauge", async (importOriginal) => {
   const actual = await importOriginal<typeof StorageGauge>();
   return { ...actual, recordMediaBytes: vi.fn(actual.recordMediaBytes) };
 });
+// Wrapped so a test can run a second DELETE of the same photo at a chosen point of the first (races).
+vi.mock("@/lib/db/repositories/uploads", async (importOriginal) => {
+  const actual = await importOriginal<typeof UploadsRepo>();
+  return { ...actual, deleteUploadDocument: vi.fn(actual.deleteUploadDocument), transitionUpload: vi.fn(actual.transitionUpload) };
+});
 const classifier = vi.hoisted(() => ({ nsfw: 0.02, faces: 0, calls: 0, during: null as null | (() => Promise<void>) }));
 vi.mock("@/lib/media/classify", async (importOriginal) => ({
   ...(await importOriginal<typeof Classify>()),
@@ -44,7 +49,7 @@ import type { ListingResponse } from "@/lib/contracts/listings";
 import { listContentOps } from "@/lib/db/repositories/content-ops";
 import { getListing } from "@/lib/db/repositories/listings";
 import { getSearchOutbox, searchOutboxRef } from "@/lib/db/repositories/search-outbox";
-import { getUpload, sumStoredBytes } from "@/lib/db/repositories/uploads";
+import { deleteUploadDocument, getUpload, sumStoredBytes, transitionUpload } from "@/lib/db/repositories/uploads";
 import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { resetServerEnv } from "@/lib/env";
@@ -52,6 +57,7 @@ import { db } from "@/lib/firebase/admin";
 import type * as Classify from "@/lib/media/classify";
 import type * as Revalidate from "@/lib/listings/revalidate";
 import type * as StorageGauge from "@/lib/uploads/storage-gauge";
+import type * as UploadsRepo from "@/lib/db/repositories/uploads";
 import { revalidateListingPaths } from "@/lib/listings/revalidate";
 import { sharp } from "@/lib/media/sharp-setup";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
@@ -447,6 +453,95 @@ describe("DELETE /api/uploads/{id} under a legal hold", () => {
     expect(await sumStoredBytes()).toBe(bytesBefore - heldSize);
     expect(recordMediaBytes).toHaveBeenCalledExactlyOnceWith(-heldSize, expect.any(Date));
     expect(store.keys("media").filter((key) => key.includes(held))).toEqual([]);
+  });
+});
+
+describe("DELETE /api/uploads/{id} twice at once (a retry, a double tap)", () => {
+  const actual = () => vi.importActual<typeof UploadsRepo>("@/lib/db/repositories/uploads");
+
+  it("gives the bytes of a photo back to the storage gauge once, whichever request removes the document", async () => {
+    const owner = await member();
+    const live = await publishedListing(owner, 3, { title: "Commode en cèdre sculpté" });
+    const [ready, held] = live.photoIds as [string, string, string];
+    const sizes = { ready: (await getUpload(ready))!.size!, held: (await getUpload(held))!.size! };
+    // `held` is deleted under a hold, then the hold is lifted: its variants are still counted.
+    await db().collection(COLLECTIONS.listings).doc(live.id).update({ legalHold: ["requisition-1"] });
+    expect((await call(remove, "DELETE", `/api/uploads/${held}`, { member: owner })).status).toBe(204);
+    await db().collection(COLLECTIONS.listings).doc(live.id).update({ legalHold: [] });
+    const bytesBefore = await sumStoredBytes();
+    const { deleteUploadDocument: removeDocument } = await actual();
+    vi.mocked(recordMediaBytes).mockClear();
+
+    for (const id of [held, ready]) {
+      // The second request runs to its end while the first is about to remove the document.
+      vi.mocked(deleteUploadDocument).mockImplementationOnce(async (photoId) => {
+        expect((await call(remove, "DELETE", `/api/uploads/${photoId}`, { member: owner })).status).toBe(204);
+        return removeDocument(photoId);
+      });
+      expect((await call(remove, "DELETE", `/api/uploads/${id}`, { member: owner })).status).toBe(204);
+      expect(await getUpload(id)).toBeNull();
+    }
+    // `held`: removed by the second request, still counted then. `ready`: the first request took it
+    // out of `ready`, the second found it ended and freed nothing.
+    expect(vi.mocked(recordMediaBytes).mock.calls).toEqual([
+      [-sizes.held, expect.any(Date)],
+      [-sizes.ready, expect.any(Date)],
+    ]);
+    expect(await sumStoredBytes()).toBe(bytesBefore - sizes.ready - sizes.held);
+  });
+
+  it("frees nothing in the request that lost the transition out of `ready`", async () => {
+    const owner = await member();
+    const live = await publishedListing(owner, 2, { title: "Pouf en cuir de Fès" });
+    const [photo] = live.photoIds as [string, string];
+    const { transitionUpload: transition } = await actual();
+    vi.mocked(recordMediaBytes).mockClear();
+    // Both requests read the photo `ready`; the other one ends it first, before this one's transition.
+    vi.mocked(transitionUpload).mockImplementationOnce(async (...args) => {
+      expect((await transition(photo, ["ready"], { status: "rejected", rejectReason: "expired" })).ok).toBe(true);
+      return transition(...args);
+    });
+
+    expect((await call(remove, "DELETE", `/api/uploads/${photo}`, { member: owner })).status).toBe(204);
+    expect(await getUpload(photo)).toBeNull();
+    // The other request's transition took the bytes: this one gives none back.
+    expect(recordMediaBytes).not.toHaveBeenCalled();
+  });
+});
+
+describe("DELETE /api/uploads/{id} cut short by a storage error", () => {
+  it("takes the bytes off with the transition: the retry that removes the objects and the document frees nothing more", async () => {
+    const owner = await member();
+    const live = await publishedListing(owner, 2, { title: "Lanterne en laiton ciselé" });
+    const [photo] = live.photoIds as [string, string];
+    const size = (await getUpload(photo))!.size!;
+    const bytesBefore = await sumStoredBytes();
+    vi.mocked(recordMediaBytes).mockClear();
+    vi.spyOn(store, "delete").mockRejectedValueOnce(new Error("storage unavailable"));
+
+    expect((await call(remove, "DELETE", `/api/uploads/${photo}`, { member: owner })).status).toBe(500);
+    expect((await getUpload(photo))!.status).toBe("rejected");
+    // Off the gauge already, as the nightly recount sees it.
+    expect(await sumStoredBytes()).toBe(bytesBefore - size);
+    expect(recordMediaBytes).toHaveBeenCalledExactlyOnceWith(-size, expect.any(Date));
+
+    expect((await call(remove, "DELETE", `/api/uploads/${photo}`, { member: owner })).status).toBe(204);
+    expect(await getUpload(photo)).toBeNull();
+    expect(store.keys("media").filter((key) => key.includes(photo))).toEqual([]);
+    expect(recordMediaBytes).toHaveBeenCalledOnce();
+  });
+});
+
+describe("deleteUploadDocument", () => {
+  it("returns the document it removed, then null: one caller removes it", async () => {
+    const owner = await member();
+    const live = await publishedListing(owner, 1, { title: "Théière en argent ciselé" });
+    const [photo] = live.photoIds as [string];
+    const { deleteUploadDocument: removeDocument } = await vi.importActual<typeof UploadsRepo>("@/lib/db/repositories/uploads");
+    const removed = await Promise.all([removeDocument(photo), removeDocument(photo)]);
+    expect(removed.filter(Boolean)).toEqual([expect.objectContaining({ id: photo, status: "ready" })]);
+    expect(removed.filter((record) => record === null)).toHaveLength(1);
+    expect(await getUpload(photo)).toBeNull();
   });
 });
 
