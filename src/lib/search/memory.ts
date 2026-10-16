@@ -21,6 +21,7 @@ const MAX_QUERY_WORDS = 10;
 const ARTICLE = "ال";
 const STOP = new Set<string>(STOP_WORDS);
 const EARTH_RADIUS_M = 6_371_000;
+const ARABIC = /[؀-ۿ]/;
 
 /** Words of a text as the engine indexes them (folded, article split, stop words dropped). */
 export function searchTokens(text: string): string[] {
@@ -217,8 +218,11 @@ export class MemoryEngine implements SearchEngine {
 
   constructor(options: MemoryEngineOptions = {}) {
     for (const [term, others] of Object.entries(options.synonyms ?? SEARCH_SETTINGS.synonyms)) {
-      const key = searchTokens(term).join(" ");
-      if (!key) continue;
+      const tokens = searchTokens(term);
+      // Meilisearch 1.55.0 does not trigger multi-word Arabic keys (normalizeQuery rewrites those
+      // phrases): skip them so development matches production.
+      if (tokens.length === 0 || (tokens.length > 1 && ARABIC.test(term))) continue;
+      const key = tokens.join(" ");
       const list = this.synonyms.get(key) ?? [];
       for (const other of others) {
         const phrase = searchTokens(other);

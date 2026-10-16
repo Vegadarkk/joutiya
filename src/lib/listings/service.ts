@@ -39,6 +39,7 @@ import { logger } from "@/lib/logging/logger";
 import { sendMail } from "@/lib/mail";
 import type { ModerationStatement, TemplateData } from "@/lib/mail/types";
 import { consumeLimit } from "@/lib/rate-limit/limiter";
+import { notifySearchIndex } from "@/lib/search/queue";
 import { escalateOnIp } from "./escalation";
 import { buildSlugId, newListingId } from "./ids";
 import { IllegalTransitionError, canRenew, canTransition, renew, renewForReview, transition, type Lifetime, type TransitionContext, type TransitionEffects, type TransitionResult } from "./lifecycle";
@@ -503,6 +504,7 @@ async function commit(listing: ListingRecord, patch: ListingFieldPatch, effects:
     if (error instanceof DraftLimitError) throw new HttpError(409, "draft_limit");
     throw error;
   }
+  if (effects.search) await notifySearchIndex([listing.id]);
   const updated = applyPatch(listing, full);
   if (effects.audit) {
     await audit({

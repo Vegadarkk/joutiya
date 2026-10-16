@@ -9,6 +9,7 @@ import { isFirestoreConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
 import { mediaObjectKey, quarantineObjectKey } from "@/lib/media/urls";
 import { isDegraded } from "@/lib/quota";
+import { notifySearchIndex } from "@/lib/search/queue";
 import { isStorageNotConfigured, objectStore, type ObjectStore } from "@/lib/storage";
 import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 
@@ -137,6 +138,7 @@ async function purgeListings(state: RunState): Promise<void> {
           continue;
         }
         result.listings += 1;
+        await notifySearchIndex([listing.id]);
         await audit({ actorUid: "system", actorRole: "system", action: "listing.purge", target: { type: "listing", id: listing.id }, automated: true, at: now });
         if (state.store) await purgeListingMedia(state.store, listing, state);
       } catch (error) {

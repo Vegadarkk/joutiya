@@ -1,13 +1,30 @@
-import { use } from "react";
 import type { Metadata } from "next";
 import { HandCoins, MapPinned, ShieldCheck } from "lucide-react";
-import { useTranslations } from "next-intl";
-import { setRequestLocale } from "next-intl/server";
-import { Container } from "@/components/layout/container";
-import { SearchPanel } from "@/components/home/search-panel";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ErrorBanner } from "@/components/feedback/error-banner";
-import { alternates } from "@/lib/i18n/metadata";
+import { CategoryGrid } from "@/components/home/category-grid";
+import { FeaturedCarousel } from "@/components/home/featured-carousel";
+import { SearchPanel } from "@/components/home/search-panel";
+import { Container } from "@/components/layout/container";
+import { ResultsGrid } from "@/components/search/results-grid";
+import { Button } from "@/components/ui/button";
+import { Link } from "@/i18n/navigation";
 import { pageLocale } from "@/i18n/params";
+import { alternates } from "@/lib/i18n/metadata";
+import { logger } from "@/lib/logging/logger";
+import { FEATURED_HOME_SLOTS } from "@/lib/search/featured";
+import { SEARCH_PATH } from "@/lib/search/params";
+import { featuredListings, latestListings } from "@/lib/search/service";
+import type { SearchCard } from "@/lib/search/types";
+
+// Home (design D21): search hero, the eleven categories, À la Une (8 drawn) and the 12 newest
+// listings. ISR every 5 minutes; an engine failure hides the two listing sections (D2) and the
+// page still renders.
+
+export const revalidate = 300;
+
+/** "Annonces récentes" on the home page. */
+const HOME_RECENT_COUNT = 12;
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
@@ -20,20 +37,47 @@ const PILLARS = [
   { key: "safe", icon: ShieldCheck },
 ] as const;
 
-export default function HomePage({ params }: { params: Promise<{ locale: string }> }) {
-  const locale = pageLocale(use(params).locale);
+/** Cards of a section, or null when the engine failed (the section is then left out). */
+async function section(name: string, load: () => Promise<SearchCard[]>): Promise<SearchCard[] | null> {
+  try {
+    return await load();
+  } catch (error) {
+    logger.warn({ section: name, err: (error as Error).message }, "home: search section unavailable");
+    return null;
+  }
+}
+
+export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
+  const locale = pageLocale((await params).locale);
   setRequestLocale(locale);
-  const t = useTranslations("Home");
+  const [t, featured, recent] = await Promise.all([
+    getTranslations({ locale, namespace: "Home" }),
+    section("featured", () => featuredListings({}, FEATURED_HOME_SLOTS)),
+    section("recent", () => latestListings({}, HOME_RECENT_COUNT)),
+  ]);
   return (
     <>
       <Container className="pt-6 sm:pt-10">
         <SearchPanel locale={locale} />
       </Container>
-      <Container className="py-10 sm:py-14">
+      <Container className="flex flex-col gap-12 py-10 sm:gap-14 sm:py-14">
+        <CategoryGrid />
+        {featured && featured.length > 0 ? <FeaturedCarousel cards={featured} locale={locale} /> : null}
+        {recent && recent.length > 0 ? (
+          <section aria-labelledby="home-recent" data-testid="home-recent" className="flex flex-col gap-5">
+            <h2 id="home-recent" className="text-xl font-semibold">
+              {t("recent.title")}
+            </h2>
+            <ResultsGrid cards={recent} locale={locale} />
+            <Button asChild variant="outline" className="self-center">
+              <Link href={SEARCH_PATH}>{t("recent.all")}</Link>
+            </Button>
+          </section>
+        ) : null}
         <ErrorBanner tone="info" title={t("openingTitle")}>
           {t("openingBody")}
         </ErrorBanner>
-        <ul className="mt-10 grid gap-8 sm:grid-cols-3">
+        <ul className="grid gap-8 sm:grid-cols-3">
           {PILLARS.map(({ key, icon: Icon }) => (
             <li key={key} className="flex gap-4">
               <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-surface-brand text-structure dark:text-gold-300">

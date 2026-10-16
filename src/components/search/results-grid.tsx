@@ -5,6 +5,7 @@ import type { SearchCard } from "@/lib/search/types";
 import { mediaBaseUrl } from "@/lib/storage/keys";
 import { cn } from "@/lib/utils";
 import { cardBadge } from "./filter-model";
+import { RESULTS_GRID_CLASS } from "./grid";
 
 // Grid of engine cards (search page, home, /c pages of L4): 2 columns on phones, 3 from sm, 4 from
 // lg, the ListingGridSkeleton footprint. Server component (reads the media host). `renderAction`
@@ -19,8 +20,6 @@ export interface ResultsGridProps {
   headingLevel?: "h2" | "h3";
   className?: string;
 }
-
-export const RESULTS_GRID_CLASS = "grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4";
 
 export function ResultsGrid({ cards, locale, renderAction, priorityCount = 0, headingLevel, className }: ResultsGridProps) {
   const media = mediaBaseUrl();

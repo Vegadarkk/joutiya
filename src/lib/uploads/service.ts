@@ -35,6 +35,7 @@ import { dispatchUpload, enqueueMediaJob, isMediaQueueEnabled } from "@/lib/medi
 import { mediaObjectKey, quarantineObjectKey } from "@/lib/media/urls";
 import { captureServerException } from "@/lib/observability/capture";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
+import { notifySearchIndex } from "@/lib/search/queue";
 import { isStorageNotConfigured, objectStore, type ObjectStore } from "@/lib/storage";
 import { LIVE_STATUSES, PHOTO_TARGET_STATUSES, RETAINED_STATUSES, maxPhotosOf, toStatusResponse } from "./policy";
 import { isStorageFull, recordMediaBytes } from "./storage-gauge";
@@ -192,6 +193,7 @@ async function detach(uploader: Uploader, listingId: string, id: string, keepOne
     throw error;
   }
   const { listing, changed } = detached;
+  if (changed && listing?.status === "published") await notifySearchIndex([listingId]);
   if (!changed || !listing || !(PUBLIC_STATES as readonly ListingStatus[]).includes(listing.status)) return;
   revalidateListingPaths({ slugId: listing.slugId, publicId: listing.sellerPublicId });
 }

@@ -169,7 +169,7 @@ describe("GET /api/search words", () => {
     expect(ids(latin)).toContain(docs.logan.id);
     expect(ids(await ok(`q=${encodeURIComponent("سيارة")}`))).toContain(docs.logan.id);
     expect(ids(await ok("q=tlaja"))).toEqual([docs.fridge.id]);
-    expect(ids(await ok("q=chi9a"))).toEqual([docs.flat.id]);
+    expect(ids(await ok("q=ch9a"))).toEqual([docs.flat.id]);
   });
 
   it("falls back to approximate results when every word finds nothing", async () => {

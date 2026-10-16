@@ -9,6 +9,7 @@ import { logger } from "@/lib/logging/logger";
 import { sendMail } from "@/lib/mail";
 import { recipientCache, type ListingRecipient } from "@/lib/mail/recipients";
 import { isDegraded } from "@/lib/quota";
+import { notifySearchIndex } from "@/lib/search/queue";
 
 // Nightly at 02:30 UTC (design D16): published (and paused) listings whose expiresAt passed go
 // `expired` through the lifecycle transition (version + 1, purgeAt = now + listingPurgeMonths,
@@ -91,6 +92,7 @@ export async function expireListings(now = new Date()): Promise<ExpireResult> {
           continue;
         }
         result.expired += 1;
+        await notifySearchIndex([candidate.id]);
         if (done.audit) await audit({ actorUid: "system", actorRole: "system", action: done.audit, target: { type: "listing", id: candidate.id }, automated: true, at: now });
         if (await notify(done.listing, recipients)) result.mailed += 1;
       } catch (error) {

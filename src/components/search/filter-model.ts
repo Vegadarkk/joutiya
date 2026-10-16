@@ -1,5 +1,5 @@
 import { CATEGORIES, categoryById, criterionById, subcategoryById, type Condition, type CriterionUnit } from "@/config/categories";
-import { cityBySlug, regionByCode } from "@/config/regions";
+import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { formatPrice, groupDigits } from "@/lib/listings/client/format";
 import { canonicalSearchParams, SEARCH_MAX_PAGE, SEARCH_PATH, searchQueryObject, type CriterionFilter, type SearchParams, type SearchSort } from "@/lib/search/params";
@@ -345,6 +345,25 @@ export function setCriterion(criteria: Record<string, CriterionFilter> | undefin
   if (empty) delete next[id];
   else next[id] = filter;
   return Object.keys(next).length ? next : undefined;
+}
+
+/** Messages of `SearchPage.title`. */
+export type TitleKey = "all" | "query" | "inCity" | "inRegion";
+
+/** Heading of a search: the words, else the (sub)category, else "all listings"; then the place. */
+export function searchTitle(params: SearchParams, locale: Locale, labels: FilterLabels, title: (key: TitleKey, values?: Record<string, string>) => string): string {
+  const what = params.q
+    ? title("query", { query: params.q })
+    : params.subcategory
+      ? labels.subcategory(params.category ?? subcategoryById(params.subcategory)?.categoryId ?? "", params.subcategory)
+      : params.category
+        ? labels.category(params.category)
+        : title("all");
+  const city = params.city ? cityBySlug(params.city) : undefined;
+  if (city) return title("inCity", { what, place: cityName(city, locale) });
+  const region = params.region ? regionByCode(params.region) : undefined;
+  if (region) return title("inRegion", { what, place: regionName(region, locale) });
+  return what;
 }
 
 export type CardBadge = "featured" | "bumped";

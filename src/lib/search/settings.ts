@@ -1,7 +1,7 @@
 import { CRITERIA } from "@/config/categories";
-import { cityBySlug } from "@/config/regions";
-import { CITY_VARIANTS, DARIJA_LEXICON } from "@/config/search/darija";
-import { normalizeText } from "@/lib/text/normalize";
+import { CITIES } from "@/config/regions";
+import { CITY_LEXICON, DARIJA_LEXICON, SYNONYM_GUARDED, citySpellings, entrySpellings } from "@/config/search/darija";
+import { foldArabicWord, foldToken } from "./normalize";
 import { SEARCH_MAX_TOTAL_HITS } from "./params";
 import { attributeField } from "./types";
 
@@ -68,30 +68,69 @@ export const STOP_WORDS = ["ال"] as const;
 /** Facet values returned per facet: every city (CITIES has 100) and every subcategory. */
 export const MAX_VALUES_PER_FACET = 200;
 
-/** Meilisearch limit of synonyms per term. */
+/** Meilisearch limits: synonyms per term, words per synonym term. */
 export const MAX_SYNONYMS_PER_TERM = 50;
+export const MAX_SYNONYM_WORDS = 3;
 
-/** One spelling per accent/case-folded form, lower case, single spaces. */
+/** Meilisearch-like fold of a term: accents, case, Arabic letter variants; hyphens and apostrophes split words. */
+export function synonymKey(term: string): string {
+  return term
+    .split(/[\s\-'’`]+/)
+    .filter(Boolean)
+    .map((word) => foldArabicWord(foldToken(word), false))
+    .join(" ");
+}
+
+/** Word as the engine indexes it: folded, Arabic article split off. */
+function indexedWord(word: string): string {
+  const folded = foldArabicWord(foldToken(word)).replace(/[أإآٱ]/g, "ا");
+  return folded.length > 2 && folded.startsWith("ال") ? folded.slice(2) : folded;
+}
+
+let placeWords: Set<string> | undefined;
+/** Every word of every city name and city variant (fr, ar). */
+function cityWords(): Set<string> {
+  placeWords ??= new Set(
+    [...CITIES.flatMap((city) => [city.nameFr, city.nameAr]), ...CITY_LEXICON.flatMap(citySpellings)].flatMap((name) => name.split(/[\s\-'’`]+/).filter(Boolean).map(indexedWord)),
+  );
+  return placeWords;
+}
+
+/** Meilisearch folds ڭ ڤ پ to nothing else: list the ك ف ب spelling too. */
+function withRegionalDuplicates(spellings: readonly string[]): string[] {
+  return spellings.flatMap((spelling) => {
+    const plain = spelling.replace(/[ڭݣگ]/g, "ك").replace(/ڤ/g, "ف").replace(/پ/g, "ب");
+    return plain === spelling ? [spelling] : [spelling, plain];
+  });
+}
+
+/** One spelling per folded form, lower case, single spaces, at most MAX_SYNONYM_WORDS words. */
 function spellings(terms: readonly string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const term of terms) {
+  for (const term of withRegionalDuplicates(terms)) {
     const spelling = term.toLowerCase().replace(/\s+/g, " ").trim();
-    const key = normalizeText(spelling);
-    if (!key || seen.has(key)) continue;
+    const key = synonymKey(spelling);
+    if (!key || seen.has(key) || key.split(" ").length > MAX_SYNONYM_WORDS) continue;
     seen.add(key);
     out.push(spelling);
   }
   return out;
 }
 
-/** Groups of equivalent spellings: the Darija lexicon, then each city's French name with its variants. */
+/** True when an entry spelling must stay out of the synonyms (guard list, or a word of a city name). */
+export function isGuardedSpelling(spelling: string): boolean {
+  if (SYNONYM_GUARDED.has(spelling)) return true;
+  const words = spelling.split(/[\s\-'’`]+/).filter(Boolean);
+  return words.length === 1 && cityWords().has(indexedWord(words[0] ?? ""));
+}
+
+/** Groups of equivalent spellings: one per lexicon entry (guards applied), one per city. */
 export function synonymGroups(): string[][] {
-  const groups = DARIJA_LEXICON.map((group) => spellings([...group.fr, ...group.latin, ...group.ar]));
-  for (const { slug, variants } of CITY_VARIANTS) {
-    const city = cityBySlug(slug);
-    if (city) groups.push(spellings([city.nameFr, ...variants]));
-  }
+  const groups = [
+    ...DARIJA_LEXICON.map((entry) => spellings(entrySpellings(entry).filter((spelling) => !isGuardedSpelling(spelling)))),
+    ...CITY_LEXICON.map((city) => spellings(citySpellings(city))),
+  ];
   return groups.filter((group) => group.length > 1);
 }
 

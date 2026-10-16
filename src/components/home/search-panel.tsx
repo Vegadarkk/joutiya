@@ -1,12 +1,15 @@
-import { MapPin, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { LocationField } from "@/components/search/location-field";
 import { inputClassName } from "@/components/ui/input";
+import { SEARCH_PATH, SEARCH_Q_MAX, SEARCH_QUERY_KEYS } from "@/lib/search/params";
 import { cn } from "@/lib/utils";
 
 /**
  * Home hero: the bab of the logo as a wide pointed arch over the search, standing on the gold
- * threshold. The one bold element of the page; everything around it stays quiet.
+ * threshold. The one bold element of the page; everything around it stays quiet. A GET form to
+ * /recherche: words as `q`, the place from the location combobox as `ville` (slug) or `region`.
  */
 export function SearchPanel({ locale }: { locale: string }) {
   const t = useTranslations("Home");
@@ -19,7 +22,7 @@ export function SearchPanel({ locale }: { locale: string }) {
         <h1 className="mx-auto max-w-2xl text-center text-2xl font-semibold text-balance sm:text-4xl">{t("title")}</h1>
         <p className="mx-auto mt-3 max-w-xl text-center text-structure-foreground/80 text-pretty sm:text-lg">{t("subtitle")}</p>
         <form
-          action={`/${locale}/recherche`}
+          action={`/${locale}${SEARCH_PATH}`}
           method="get"
           role="search"
           className="mx-auto mt-7 grid max-w-3xl gap-2 rounded-lg bg-surface p-2 text-foreground shadow-xl shadow-bab-950/20 sm:grid-cols-[1.6fr_1fr_auto]"
@@ -31,29 +34,15 @@ export function SearchPanel({ locale }: { locale: string }) {
             <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-foreground-muted" aria-hidden="true" />
             <input
               id="home-q"
-              name="q"
+              name={SEARCH_QUERY_KEYS.q}
               type="search"
               enterKeyHint="search"
-              maxLength={100}
+              maxLength={SEARCH_Q_MAX}
               placeholder={t("searchPlaceholder")}
               className={cn(inputClassName, "h-12 border-transparent bg-surface-muted ps-9")}
             />
           </div>
-          <div className="relative">
-            <label htmlFor="home-city" className="sr-only">
-              {t("cityLabel")}
-            </label>
-            <MapPin className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-foreground-muted" aria-hidden="true" />
-            <input
-              id="home-city"
-              name="ville"
-              type="text"
-              autoComplete="address-level2"
-              maxLength={60}
-              placeholder={t("cityPlaceholder")}
-              className={cn(inputClassName, "h-12 border-transparent bg-surface-muted ps-9")}
-            />
-          </div>
+          <LocationField inputClassName="h-12 border-transparent bg-surface-muted" />
           <Button type="submit" size="lg" className="h-12">
             <Search aria-hidden="true" />
             {t("submit")}
