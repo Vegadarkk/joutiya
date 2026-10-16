@@ -11,9 +11,11 @@ Encrypted nightly export of Firestore (DESIGN D17). Code: `src/lib/backup/`, job
   after the collection's cursor, in (time, path) order, up to 20 000 a night. A cut scan resumes strictly
   after the last exported (time, path), so documents sharing a timestamp are never skipped. The next pass
   starts with the collection that was cut (round robin).
-- Pass 2, rolling full: 10 000 documents a night in document-path order, continued per collection; one
-  cycle covers every collection in the backup table (`export.ts`, `TABLE`).
-- Scans stop when the daily read quota reaches 90 %; the cursors keep the progress.
+- Pass 2, rolling full: up to 10 000 documents a night in document-path order, continued per collection;
+  one cycle covers every collection in the backup table (`export.ts`, `TABLE`). It gets what the incremental
+  left of the run limit below.
+- One run reads at most 20 000 documents (40 % of the Spark daily read quota) across both passes, and scans
+  stop when the daily read quota reaches 75 %; the cursors keep the progress.
 - Cursors live in `system/backup` and move only after the manifest is stored: a failed run is redone the
   next night. One run per UTC date (a second run, or a manifest already there, is skipped).
 - Alerts: P1 when `BACKUP_AGE_RECIPIENT` is missing or invalid, or R2 is not configured (once a day,
@@ -78,8 +80,10 @@ node scripts/restore-firestore.ts ... --apply
 
 After a restore:
 
-1. Deletions are not in the backups: documents deleted or purged after a backup are back. Run
-   `retention-purge` and `purge-unactivated`, and check legal holds, before reopening.
+1. Deletions are not in the backups: documents deleted outright after a backup are back. A purged listing
+   comes back as its tombstone (it carries `updatedAt`) once the incremental that followed the purge is
+   restored; before that, its full text is back. Run `retention-purge` and `purge-unactivated`, and check
+   legal holds, before reopening.
 2. Not in the backups: Firebase Auth accounts (export them separately), `config/legal`
    (`scripts/legal-config.ts`), `quotaDaily`, `system/*` cursors (rebuilt), R2 objects (photos).
 3. Rebuild the search index from Firestore (phase 4).

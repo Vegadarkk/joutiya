@@ -10,9 +10,10 @@ même chose à la construction de l'image `worker` (étape `models`, réseau né
 uniquement ; l'image `web` ne les contient pas). Dans le conteneur : `/app/models`,
 `MEDIA_MODELS_DIR=/app/models`. En local : `./models` par défaut.
 
-Sans les fichiers, `createImageClassifier` bascule sur un classifieur factice (score 0, aucun
-visage) et journalise un avertissement hors développement : la photo passe alors sans contrôle
-local jusqu'à l'agent de modération, plutôt que de bloquer toutes les annonces.
+Sans les fichiers, `createImageClassifier` utilise un classifieur factice (score 0, aucun visage) en
+développement seulement. Hors développement, chaque contrôle échoue : le job média réessaie, puis
+l'envoi finit refusé (`expired`) et une alerte P1 part (une par heure au plus). Aucune photo n'est
+publiée sans les deux contrôles (nudité et visages).
 
 ## Tableau
 
