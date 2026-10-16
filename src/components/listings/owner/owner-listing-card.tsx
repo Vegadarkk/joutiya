@@ -38,7 +38,7 @@ export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, bu
   const href = listing.status === "published" && listing.slugId ? null : wizardPath(listing.id);
   // The public page is a full page load (public pages have their own CSP), in the language on screen.
   const publicHref = listing.slugId ? getPathname({ href: `/annonce/${listing.slugId}`, locale }) : null;
-  const primary = primaryAction(listing);
+  const primary = primaryAction(listing, now);
   const expiry = listing.expiresAt ? daysUntil(new Date(listing.expiresAt), now) : null;
   const price = listing.isDonation ? t("donation") : listing.price !== null ? formatPrice(listing.price, locale) : t("toDiscuss");
 
@@ -73,7 +73,7 @@ export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, bu
               </a>
             )}
           </h3>
-          <ListingActions listing={listing} onAction={onAction} onDelete={onDelete} busy={busy} publicHref={publicHref} />
+          <ListingActions listing={listing} onAction={onAction} onDelete={onDelete} busy={busy} publicHref={publicHref} now={now} />
         </div>
         <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
           <span className="font-semibold tabular-nums">{price}</span>

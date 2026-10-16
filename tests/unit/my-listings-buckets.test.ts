@@ -48,7 +48,9 @@ describe("primaryAction", () => {
   it("puts forward the next useful step of each status", () => {
     expect(primaryAction(summary("draft"))).toEqual({ kind: "continue" });
     expect(primaryAction(summary("rejected"))).toEqual({ kind: "fix" });
-    expect(primaryAction(summary("paused"))).toEqual({ kind: "resume" });
+    expect(primaryAction(summary("paused", { expiresAt: "2099-01-01T00:00:00.000Z" }))).toEqual({ kind: "resume" });
+    // Past expiry the server refuses resume (409) until the nightly job turns it expired.
+    expect(primaryAction(summary("paused", { expiresAt: "2026-10-16T02:00:00.000Z" }), new Date("2026-10-16T12:00:00.000Z"))).toBeNull();
     expect(primaryAction(summary("published"))).toBeNull();
     expect(primaryAction(summary("published", { canRenew: true }))).toEqual({ kind: "renew" });
     expect(primaryAction(summary("expired", { canRenew: true }))).toEqual({ kind: "renew" });

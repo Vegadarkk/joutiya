@@ -22,15 +22,23 @@ export function visibleListings(bucket: OwnerListBucket, listings: readonly Owne
 
 export type PrimaryAction = { kind: "continue" } | { kind: "fix" } | { kind: "resume" } | { kind: "renew" };
 
+/**
+ * A paused listing resumes only before its expiry (lifecycle: the server answers 409 after it, even
+ * while the nightly expire job has not turned it `expired` yet; renewal then takes over).
+ */
+export function canResume(listing: Pick<OwnerListingSummary, "status" | "expiresAt">, now = new Date()): boolean {
+  return listing.status === "paused" && listing.expiresAt !== null && Date.parse(listing.expiresAt) > now.getTime();
+}
+
 /** The action a row shows as a button (the others stay in its menu); null when none stands out. */
-export function primaryAction(listing: OwnerListingSummary): PrimaryAction | null {
+export function primaryAction(listing: OwnerListingSummary, now = new Date()): PrimaryAction | null {
   switch (listing.status) {
     case "draft":
       return { kind: "continue" };
     case "rejected":
       return { kind: "fix" };
     case "paused":
-      return { kind: "resume" };
+      return canResume(listing, now) ? { kind: "resume" } : null;
     case "published":
     case "expired":
       return listing.canRenew ? { kind: "renew" } : null;

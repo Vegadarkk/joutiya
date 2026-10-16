@@ -10,6 +10,7 @@ import type { OwnerListingSummary } from "@/lib/contracts/listings";
 import type { OwnerAction } from "@/lib/listings/client/api";
 import { wizardPath } from "@/lib/listings/client/routes";
 import { cn } from "@/lib/utils";
+import { canResume } from "./buckets";
 import { ConfirmDialog } from "@/components/post/controls/confirm-dialog";
 
 interface ListingActionsProps {
@@ -22,13 +23,7 @@ interface ListingActionsProps {
   now?: Date;
 }
 
-/**
- * A paused listing resumes only before its expiry (lifecycle: the server answers 409 after it, even
- * while the nightly expire job has not turned it `expired` yet; renewal then takes over).
- */
-export function canResume(listing: Pick<OwnerListingSummary, "status" | "expiresAt">, now = new Date()): boolean {
-  return listing.status === "paused" && listing.expiresAt !== null && Date.parse(listing.expiresAt) > now.getTime();
-}
+export { canResume };
 
 /** Which actions a status allows (design D16 and the lifecycle table). */
 export function allowedActions(listing: OwnerListingSummary, now = new Date()): { edit: boolean; view: boolean; pause: boolean; resume: boolean; sold: boolean; renew: boolean; remove: boolean } {
