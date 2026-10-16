@@ -85,10 +85,9 @@ describe("createObjectStore", () => {
     expect(() => createObjectStore(parseEnv({ APP_ENV: "staging", SITE_URL: "https://staging.joutiya.ma" }).env)).toThrow(StorageNotConfiguredError);
   });
 
-  it("picks the (not yet implemented) S3 adapter when R2 is configured", async () => {
+  it("picks the S3 adapter when R2 is configured", () => {
     const store = createObjectStore(parseEnv({ APP_ENV: "staging", SITE_URL: "https://staging.joutiya.ma", ...r2 }).env);
     expect(store.name).toBe("s3");
-    await expect(store.head("media", "k")).rejects.toThrow(/S3ObjectStore\.head is not implemented/);
     expect(quota.consume).not.toHaveBeenCalled();
   });
 });
