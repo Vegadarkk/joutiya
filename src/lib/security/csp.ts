@@ -15,6 +15,11 @@ export interface CspOptions {
   variant: CspVariant;
   /** Required for the private variant: base64 nonce of this request. */
   nonce?: string;
+  /**
+   * Private variant: base64 SHA-256 of constant inline scripts rendered without the nonce (the
+   * theme script of a public layout on a dynamic public page). Hashes stay valid under 'strict-dynamic'.
+   */
+  scriptHashes?: readonly string[];
   /** `next dev` needs 'unsafe-eval' (React error overlays) and no upgrade of http://localhost. */
   dev?: boolean;
   /** Public media host, e.g. https://media.joutiya.ma. */
@@ -83,7 +88,14 @@ export function buildCsp(options: CspOptions): string {
   // WebAssembly; it never ships on public pages, whose script-src the hash hook rebuilds anyway.
   const scriptSrc =
     variant === "private"
-      ? [`'nonce-${options.nonce}'`, "'strict-dynamic'", "'wasm-unsafe-eval'", "https:", "'unsafe-inline'"]
+      ? [
+          `'nonce-${options.nonce}'`,
+          ...(options.scriptHashes ?? []).map((hash) => `'sha256-${hash}'`),
+          "'strict-dynamic'",
+          "'wasm-unsafe-eval'",
+          "https:",
+          "'unsafe-inline'",
+        ]
       : ["'self'", "'unsafe-inline'", TURNSTILE_ORIGIN, GIS_SCRIPT];
   if (dev) scriptSrc.push("'unsafe-eval'");
 

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { proxy } from "@/proxy";
 import { INLINE_HASH_MARKER } from "@/lib/security/csp";
+import { PINNED_SCRIPT_HASHES } from "@/lib/security/inline-hashes";
 import * as proxyLimits from "@/lib/rate-limit/proxy-limits";
 
 // Page-view limits (D14): the decision itself is unit-tested in proxy-limits.test.ts; here the
@@ -175,6 +176,10 @@ describe("proxy", () => {
     // Streamed per request: React's inline scripts need the nonce, not the hash of shared pages.
     expect(fresh.headers.get(INLINE_HASH_MARKER)).toBeNull();
     expect(fresh.headers.get("content-security-policy")).toMatch(/script-src[^;]*'nonce-/);
+    // The public layout's theme script carries no nonce: its pinned hash is allowed.
+    const [themeHash] = [...PINNED_SCRIPT_HASHES];
+    expect(fresh.headers.get("content-security-policy")).toContain(`'sha256-${themeHash}'`);
+    expect((await proxy(request("/fr/connexion"))).headers.get("content-security-policy")).not.toContain("'sha256-");
     const kept = await proxy(new NextRequest("https://joutiya.ma/fr/recherche", { headers: { host: "joutiya.ma", cookie: `__Host-did=${value}` } }));
     expect(kept.headers.get("set-cookie")).toBeNull();
     expect((await proxy(request("/fr/c/vehicules"))).headers.get("set-cookie")).toBeNull();

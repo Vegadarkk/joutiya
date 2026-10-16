@@ -9,6 +9,7 @@ import { routing } from "@/i18n/routing";
 import { PRIVATE_SEGMENTS } from "@/config/site";
 import { DEVICE_COOKIE, setDeviceCookie } from "@/lib/security/cookies";
 import { buildCsp, createNonce, INLINE_HASH_MARKER, type CspVariant } from "@/lib/security/csp";
+import { PINNED_SCRIPT_HASHES } from "@/lib/security/inline-hashes";
 import { newDeviceCookie, readDeviceId } from "@/lib/security/device";
 import { coopFor } from "@/lib/security/headers";
 import { checkPageLimits, isMeteredPath, pathLocale, tooManyPagesHtml, TOO_MANY_CSP } from "@/lib/rate-limit/proxy-limits";
@@ -45,10 +46,11 @@ function cspHeaderName(): string {
   return process.env.CSP_REPORT_ONLY === "true" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy";
 }
 
-function csp(variant: CspVariant, nonce?: string): string {
+function csp(variant: CspVariant, nonce?: string, scriptHashes?: readonly string[]): string {
   return buildCsp({
     variant,
     nonce,
+    scriptHashes,
     dev: process.env.NODE_ENV === "development",
     mediaOrigin: process.env.MEDIA_BASE_URL,
     r2Origin: process.env.R2_S3_ENDPOINT,
@@ -128,7 +130,8 @@ function isPrivatePath(pathname: string): boolean {
 /**
  * Public pages rendered per request and streamed (Suspense): React's inline streaming scripts
  * ($RC...) change with every response and match no framework shape of the hash CSP, so these
- * pages take the nonce CSP of private pages. They are never cached anyway.
+ * pages take the nonce CSP of private pages. They are never cached anyway. Their layout is the
+ * public one, whose theme script has no nonce: its pinned hash is allowed instead.
  */
 const DYNAMIC_PUBLIC_SEGMENTS: readonly string[] = ["recherche"];
 
@@ -195,7 +198,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const dynamicPublic = DYNAMIC_PUBLIC_SEGMENTS.includes(pageSegment(pathname));
   if (isPrivatePath(pathname) || dynamicPublic) {
     const nonce = createNonce();
-    const policy = csp("private", nonce);
+    const policy = csp("private", nonce, dynamicPublic ? [...PINNED_SCRIPT_HASHES] : undefined);
     const response = decorate(forwardWithNonce(routed, request, policy, nonce), "public", policy);
     if (dynamicPublic) {
       // Like shared pages, no locale cookie. The device cookie makes the per-device search limits
