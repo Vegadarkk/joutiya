@@ -2,13 +2,15 @@
 // recorded in infra/targets.json and nowhere else. Run from Claude's cloud environment (or any
 // shell holding the JOUTIYA_OCI_* and JOUTIYA_CLOUDFLARE_API_TOKEN variables). Dry run by default.
 //
-//   node scripts/oracle-vm.ts create [--apply] [--retry-minutes=<n>]
+//   node scripts/oracle-vm.ts create [--apply] [--retry-minutes=<n>] [--small-fallback]
 //       joutiya-vcn (no ingress rule anywhere), joutiya-igw, joutiya-public, then joutiya-vm
 //       (VM.Standard.A1.Flex, 2 OCPU, 12 GB, Ubuntu 24.04 aarch64, 100 GB boot volume) whose
 //       cloud-init is infra/vm/bootstrap.sh filled in memory with the three tunnel tokens (read from
 //       the Cloudflare API) and a tarball of infra/vm and docker/. Out of host capacity, throttling,
 //       OCI server and network errors: retried every minute for <n> minutes (default 0), never
-//       launching a second VM. Never a paid shape.
+//       launching a second VM. Never a paid shape. --small-fallback asks for 1 OCPU and 6 GB every
+//       other attempt, which fragmented capacity may still hold; such a VM is resized to 2 OCPU and
+//       12 GB (one reboot) before launch.
 //   node scripts/oracle-vm.ts status
 //       instance state, SSH tunnel connections, bootstrap progress from the serial console.
 //   node scripts/oracle-vm.ts reboot [--apply]
@@ -58,6 +60,20 @@ export const VCN_CIDR = "10.0.0.0/16";
 export const SUBNET_CIDR = "10.0.0.0/24";
 /** Always Free: Ampere A1, at most 4 OCPU and 24 GB per tenancy; the joutiya-free-tier quota allows 2 and 12. */
 export const SHAPE = { shape: "VM.Standard.A1.Flex", ocpus: 2, memoryInGBs: 12 } as const;
+export interface ShapeConfig {
+  ocpus: number;
+  memoryInGBs: number;
+}
+/**
+ * The same free shape at half size, for --small-fallback: Paris has had no room for 2 OCPU since
+ * 16 October and pay-as-you-go is not an option. Both environments fit in it before launch.
+ */
+export const SMALL_SHAPE_CONFIG: ShapeConfig = { ocpus: 1, memoryInGBs: 6 };
+
+/** Shape asked for at a given attempt (1-based): with the fallback, every other one is the small one. */
+export function shapeForAttempt(attempt: number, smallFallback: boolean): ShapeConfig {
+  return smallFallback && attempt % 2 === 0 ? SMALL_SHAPE_CONFIG : { ocpus: SHAPE.ocpus, memoryInGBs: SHAPE.memoryInGBs };
+}
 export const BOOT_VOLUME_GB = 100;
 export const IMAGE = { operatingSystem: "Canonical Ubuntu", operatingSystemVersion: "24.04" } as const;
 /** OCI limit on the metadata of an instance (user_data included, base64). */
@@ -282,6 +298,7 @@ interface Vcn extends Resource {
 interface Instance extends Resource {
   availabilityDomain: string;
   timeCreated: string;
+  shapeConfig?: ShapeConfig;
 }
 interface Image extends Resource {
   operatingSystem: string;
@@ -376,13 +393,20 @@ async function ensureNetwork(oci: Oci, compartmentId: string): Promise<string> {
   return subnet.id;
 }
 
-export function launchDetails(input: { availabilityDomain: string; compartmentId: string; subnetId: string; imageId: string; userData: string }): Record<string, unknown> {
+export function launchDetails(input: {
+  availabilityDomain: string;
+  compartmentId: string;
+  subnetId: string;
+  imageId: string;
+  userData: string;
+  shapeConfig?: ShapeConfig;
+}): Record<string, unknown> {
   return {
     availabilityDomain: input.availabilityDomain,
     compartmentId: input.compartmentId,
     displayName: NAMES.instance,
     shape: SHAPE.shape,
-    shapeConfig: { ocpus: SHAPE.ocpus, memoryInGBs: SHAPE.memoryInGBs },
+    shapeConfig: { ...(input.shapeConfig ?? shapeForAttempt(1, false)) },
     sourceDetails: { sourceType: "image", imageId: input.imageId, bootVolumeSizeInGBs: BOOT_VOLUME_GB },
     createVnicDetails: { subnetId: input.subnetId, assignPublicIp: true, displayName: NAMES.instance, hostnameLabel: NAMES.instance },
     // No SSH key: administration goes through OCI Run Command; ssh.joutiya.ma serves the CI only.
@@ -398,7 +422,7 @@ export function launchDetails(input: { availabilityDomain: string; compartmentId
   };
 }
 
-async function create(oci: Oci, targets: Targets, compartmentId: string, retryMinutes: number): Promise<void> {
+async function create(oci: Oci, targets: Targets, compartmentId: string, retryMinutes: number, smallFallback: boolean): Promise<void> {
   const existing = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance);
   if (existing) {
     console.log(`instance ${NAMES.instance} already exists (${existing.lifecycleState}): nothing to create`);
@@ -420,31 +444,34 @@ async function create(oci: Oci, targets: Targets, compartmentId: string, retryMi
     prodTunnelToken: await tunnelToken(targets, "prod"),
     vmFiles: vmFilesTarball(),
   });
-  const details = launchDetails({ availabilityDomain: ad.name, compartmentId, subnetId, imageId: image.id, userData });
-  const shown = { ...details, metadata: { user_data: `<bootstrap.sh with tokens, ${userData.length} bytes>` } };
+  const details = (shapeConfig: ShapeConfig) => launchDetails({ availabilityDomain: ad.name, compartmentId, subnetId, imageId: image.id, userData, shapeConfig });
+  const shown = { ...details(shapeForAttempt(1, false)), metadata: { user_data: `<bootstrap.sh with tokens, ${userData.length} bytes>` } };
+  const size = ({ ocpus, memoryInGBs }: ShapeConfig) => `${ocpus} OCPU, ${memoryInGBs} GB`;
+  if (smallFallback) console.log(`every other attempt asks for ${size(SMALL_SHAPE_CONFIG)}`);
   if (!oci.apply) {
-    await oci.write("POST", "/20160918/instances", details, shown);
+    await oci.write("POST", "/20160918/instances", details(shapeForAttempt(1, false)), shown);
     return;
   }
   const deadline = Date.now() + retryMinutes * 60_000;
   for (let attempt = 1; ; attempt += 1) {
+    const shapeConfig = shapeForAttempt(attempt, smallFallback);
     let launched: Instance | undefined;
     try {
-      launched = await oci.write<Instance>("POST", "/20160918/instances", details, attempt === 1 ? shown : { attempt });
+      launched = await oci.write<Instance>("POST", "/20160918/instances", details(shapeConfig), attempt === 1 ? shown : { attempt, ...shapeConfig });
     } catch (error) {
       const capacity = isCapacityError(error);
       if ((!capacity && !isTransientError(error)) || Date.now() > deadline) throw error;
       // A request cut off may still have launched the VM (the quota allows one): look before retrying.
       if (!capacity) launched = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance).catch(() => undefined);
       if (!launched) {
-        console.log(`${capacity ? "no A1 capacity" : `transient error (${(error as Error).message})`} (attempt ${attempt}): retrying in 60 s`);
+        console.log(`${capacity ? `no A1 capacity for ${size(shapeConfig)}` : `transient error (${(error as Error).message})`} (attempt ${attempt}): retrying in 60 s`);
         await sleep(60_000);
         continue;
       }
     }
     if (!launched) return;
     const running = await waitFor<Instance>(oci, `/20160918/instances/${launched.id}`, "RUNNING", 15);
-    console.log(`instance ${NAMES.instance} ${running.lifecycleState} (${running.id})`);
+    console.log(`instance ${NAMES.instance} ${running.lifecycleState} (${running.id}), ${size(running.shapeConfig ?? shapeConfig)}`);
     return;
   }
 }
@@ -778,11 +805,12 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);
+  const smallFallback = args.includes("--small-fallback");
   const actions = ["create", "status", "reboot", "agent", "run", "sync", "env", "deploy-status", "promote", "rollback"];
   const argument = action === "run" || action === "env";
   if (!action || !actions.includes(action) || argument !== (file !== undefined) || (action === "env" && !(DEPLOYED_ENVS as readonly string[]).includes(file ?? ""))) {
     throw new Error(
-      "usage: scripts/oracle-vm.ts <create|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>]",
+      "usage: scripts/oracle-vm.ts <create|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
     );
   }
 
@@ -798,7 +826,7 @@ async function main(): Promise<void> {
   }
   const oci = new Oci(credentials, args.includes("--apply"));
   const compartment = compartmentId as string;
-  if (action === "create") await create(oci, targets, compartment, retry);
+  if (action === "create") await create(oci, targets, compartment, retry, smallFallback);
   else if (action === "reboot") await reboot(oci, compartment);
   else if (action === "agent") await agent(oci, compartment);
   else if (action === "run") await run(oci, compartment, file as string);
