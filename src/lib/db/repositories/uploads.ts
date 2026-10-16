@@ -88,16 +88,23 @@ export type UploadTransition = { ok: true; upload: UploadRecord } | { ok: false;
 /**
  * Applies `patch` only while the upload is in one of the `from` statuses (transaction): the
  * complete route, the pipeline, DELETE and the purge race on the same document, and exactly one
- * of them wins each step. `ok: false` carries the current record (null when deleted).
+ * of them wins each step. `patch` may depend on the record read in the transaction. `ok: false`
+ * carries the current record (null when deleted).
  */
-export async function transitionUpload(id: string, from: readonly UploadStatus[], patch: UploadFieldPatch, now = new Date()): Promise<UploadTransition> {
+export async function transitionUpload(
+  id: string,
+  from: readonly UploadStatus[],
+  patch: UploadFieldPatch | ((current: UploadRecord) => UploadFieldPatch),
+  now = new Date(),
+): Promise<UploadTransition> {
   return db().runTransaction(async (tx) => {
     const snapshot = await tx.get(uploadRef(id));
     void consume("firestore.reads", 1);
     const upload = fromSnapshot(snapshot);
     if (!upload || !from.includes(upload.status)) return { ok: false, upload } as const;
-    const next = applyUploadPatch(upload, patch, now);
-    tx.update(uploadRef(id), { ...toUpdate(patch), updatedAt: Timestamp.fromDate(now) });
+    const fields = typeof patch === "function" ? patch(upload) : patch;
+    const next = applyUploadPatch(upload, fields, now);
+    tx.update(uploadRef(id), { ...toUpdate(fields), updatedAt: Timestamp.fromDate(now) });
     void consume("firestore.writes", 1);
     return { ok: true, upload: next } as const;
   });
@@ -325,15 +332,21 @@ export async function writeRetainedScanCursor(cursor: RetainedScanCursor, now = 
 }
 
 /**
- * Bytes of every `ready` upload (nightly recount of the R2 storage gauge, D15), wherever its
- * variants are: the media bucket, or the private bucket for a removed listing's (same account
- * total, so a move between buckets changes nothing).
+ * Bytes of every upload whose variants are stored (nightly recount of the R2 storage gauge, D15):
+ * the `ready` ones and those deleted under a legal hold (`heldObjects`), wherever the variants
+ * are: the media bucket, or the private bucket for a removed listing's (same account total, so a
+ * move between buckets changes nothing).
  */
-export async function sumReadyBytes(): Promise<number> {
-  const result = await uploads().where("status", "==", "ready").aggregate({ bytes: AggregateField.sum("size"), entries: AggregateField.count() }).get();
-  // Aggregations bill one read per batch of up to 1 000 index entries (at least one).
-  void consume("firestore.reads", 1 + Math.floor(Number(result.data().entries ?? 0) / 1000));
-  return Number(result.data().bytes ?? 0);
+export async function sumStoredBytes(): Promise<number> {
+  const totals = await Promise.all(
+    [uploads().where("status", "==", "ready"), uploads().where("heldObjects", "==", true)].map(async (query) => {
+      const result = await query.aggregate({ bytes: AggregateField.sum("size"), entries: AggregateField.count() }).get();
+      // Aggregations bill one read per batch of up to 1 000 index entries (at least one).
+      void consume("firestore.reads", 1 + Math.floor(Number(result.data().entries ?? 0) / 1000));
+      return Number(result.data().bytes ?? 0);
+    }),
+  );
+  return totals.reduce((sum, bytes) => sum + bytes, 0);
 }
 
 /** Tests and the retention job. */

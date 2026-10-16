@@ -145,6 +145,20 @@ describe("retention-purge: listings", () => {
     expect(recordMediaBytes).toHaveBeenCalledWith(-90_000, NOW);
   });
 
+  it("frees the bytes of a photo its owner deleted under a legal hold (variants kept), not those of a plain refusal", async () => {
+    const record = listing("held2345", { photos: [] });
+    seed(record.id, "heldphoto0000001");
+    vi.mocked(uploadsRepo.listUploadsByTarget).mockResolvedValue([
+      upload("heldphoto0000001", record.id, { status: "rejected", rejectReason: "expired", heldObjects: true, size: 40_000 }),
+      upload("rejected00000002", record.id, { status: "rejected", size: 5_000 }),
+    ]);
+    vi.mocked(retention.listListingsPastPurge).mockResolvedValueOnce(page([record]));
+
+    expect(await retentionPurge(NOW, { store })).toMatchObject({ listings: 1, uploads: 2, failed: 0 });
+    expect(store.keys("media")).toEqual([]);
+    expect(recordMediaBytes).toHaveBeenCalledWith(-40_000, NOW);
+  });
+
   it("never touches another listing's objects", async () => {
     seed("other234", "photo00000000009");
     const record = listing("abcd2345");

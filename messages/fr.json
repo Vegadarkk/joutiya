@@ -2101,10 +2101,12 @@
         "rate_limited": "Vous avez consulté de nombreux numéros. Réessayez {wait}.",
         "later": "plus tard",
         "unavailable": "L'affichage des numéros est momentanément indisponible. Réessayez dans quelques minutes.",
-        "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez."
+        "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez.",
+        "outdated": "Cette partie de la page n'a pas pu se charger. Rechargez la page pour continuer."
       },
       "challenge": "Beaucoup de numéros ont été consultés depuis votre connexion internet : confirmez que vous n'êtes pas un robot pour afficher celui-ci.",
-      "challengeFailed": "La vérification n'a pas abouti. Réessayez."
+      "challengeFailed": "La vérification n'a pas abouti. Réessayez.",
+      "reload": "Recharger la page"
     },
     "safety": {
       "title": "Conseils de sécurité",

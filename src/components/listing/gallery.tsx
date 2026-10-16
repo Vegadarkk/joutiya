@@ -1,12 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { ChevronLeft, ChevronRight, Expand, ImageOff } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { loadWithRetry } from "@/components/layout/chunk-retry";
 import { isolate } from "@/lib/i18n/bidi";
 import { cn } from "@/lib/utils";
 import { scrollToIndex, useTrackNavigation, useTrackIndex } from "./gallery-track";
+import type { LightboxProps } from "./lightbox";
 import { blurhashPlaceholder, photoSources, type PhotoLike } from "./photo";
 
 export { clampIndex, stepForKey, targetIndex, type GalleryStep } from "./gallery-track";
@@ -18,10 +20,23 @@ export { clampIndex, stepForKey, targetIndex, type GalleryStep } from "./gallery
 // Each track is held in state (callback ref), not in a ref: the lightbox track only exists once the
 // dialog's portal has mounted, a commit after `open` flips, and its scroll listener must follow it.
 // The lightbox (dialog primitives) loads on the first open, warmed up when the visitor reaches for
-// the photos: it is not part of the page's first JavaScript.
+// the photos: it is not part of the page's first JavaScript. When its chunk cannot be downloaded
+// (dropped connection, tab opened before a redeploy) the download is tried again on that first open
+// (chunk-retry.tsx); if it fails again the click closes it, and the gallery stays usable.
 
 const loadLightbox = () => import("./lightbox");
-const Lightbox = dynamic(() => loadLightbox().then((module) => module.Lightbox), { ssr: false });
+
+/** Stands in for the lightbox while its chunk cannot be downloaded: closes at once. */
+export function LightboxUnavailable({ open, start, onClose }: LightboxProps) {
+  useEffect(() => {
+    if (open) onClose(start);
+  }, [open, start, onClose]);
+  return null;
+}
+
+export const loadLightboxView = loadWithRetry<LightboxProps>(() => loadLightbox().then((module) => module.Lightbox), LightboxUnavailable);
+
+const Lightbox = dynamic(() => loadLightboxView(), { ssr: false });
 
 /** Starts the lightbox download ahead of the click (pointer over or touching the photos, keyboard focus). */
 function warmLightbox(): void {

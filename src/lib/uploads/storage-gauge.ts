@@ -8,8 +8,8 @@ import { isValkeyConfigured, valkey } from "@/lib/valkey/clients";
 
 // R2 storage gauge (D15): R2 exposes no cheap usage API, so the app counts the bytes it stores.
 // valkey-queue (noeviction, AOF) holds the running total of the photos, moved by every ready photo
-// and every deletion; the nightly r2-storage-gauge job replaces it with the sum of the `ready`
-// uploads. A removed listing's photos move from the media bucket to the private one
+// and every deletion; the nightly r2-storage-gauge job replaces it with the sum of the uploads
+// whose variants are stored (`ready`, and deleted by their owner under a legal hold). A removed listing's photos move from the media bucket to the private one
 // (purge-quarantine): they stay `ready` with the same size, so neither counter moves (the quota is
 // the account total, whatever the bucket). It also holds the encrypted backups still in the
 // private bucket (98 days, set by the backup job and the nightly recount from system/backup). The

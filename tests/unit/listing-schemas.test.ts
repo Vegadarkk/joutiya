@@ -248,6 +248,7 @@ describe("firestore.indexes.json", () => {
     expect(keys).toContain("moderationDecisions:affectedUid ASCENDING,createdAt DESCENDING");
     expect(keys).toContain("uploads:status ASCENDING,createdAt ASCENDING");
     expect(keys).toContain("uploads:status ASCENDING,size ASCENDING");
+    expect(keys).toContain("uploads:heldObjects ASCENDING,size ASCENDING");
     expect(keys).toContain("uploads:targetId ASCENDING,status ASCENDING");
     expect(new Set(keys).size).toBe(keys.length);
   });

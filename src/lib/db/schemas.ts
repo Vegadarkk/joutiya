@@ -283,6 +283,11 @@ export const uploadSchema = z
     checks: z.object({ nsfw: z.number().min(0).max(1).optional(), faces: z.number().int().min(0).optional() }).strict(),
     variants: z.array(z.enum(PHOTO_VARIANTS)).max(PHOTO_VARIANTS.length).optional(),
     rejectReason: z.enum(UPLOAD_REJECT_REASONS).optional(),
+    /**
+     * Deleted by its owner under a legal hold once ready: `rejected`, but its variants stay as
+     * evidence until the document purge, so the R2 storage gauge still counts its `size`.
+     */
+    heldObjects: z.literal(true).optional(),
     /** 7 days (retention-purge). */
     purgeAt: ts,
     createdAt: ts,

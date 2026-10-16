@@ -1,13 +1,14 @@
 import { readRetainedBackupBytes } from "@/lib/backup/export";
-import { sumReadyBytes } from "@/lib/db/repositories/uploads";
+import { sumStoredBytes } from "@/lib/db/repositories/uploads";
 import { serverEnv } from "@/lib/env";
 import { db, isFirestoreConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
 import type { QuotaStatus } from "@/lib/quota";
 import { MAP_TILES_RESERVE_BYTES, readBackupBytes, readMediaBytes, resetMediaBytes, setBackupBytes } from "@/lib/uploads/storage-gauge";
 
-// Nightly at 03:10 UTC (D15): recount of the photos from the `ready` uploads (one Firestore
-// aggregation; a removed listing's photos count once, from the private bucket they moved to), which
+// Nightly at 03:10 UTC (D15): recount of the photos from the uploads whose variants are stored
+// (two Firestore aggregations: `ready`, and deleted under a legal hold; a removed listing's photos
+// count once, from the private bucket they moved to), which
 // replaces the running Valkey counter, and of the encrypted backups still in
 // the private bucket (98 days, from the bytes the backup job records in system/backup: one read).
 // The r2.storage gauge = media + backups + map tiles reserve + R2_STORAGE_BASELINE_BYTES. setGauge
@@ -41,7 +42,7 @@ export async function r2StorageGauge(now = new Date()): Promise<R2StorageGaugeRe
     logger.warn("r2-storage-gauge skipped: Firebase not configured");
     return null;
   }
-  const mediaBytes = await sumReadyBytes();
+  const mediaBytes = await sumStoredBytes();
   const backupBytes = await backupBytesNow(now);
   const baselineBytes = serverEnv().R2_STORAGE_BASELINE_BYTES;
   const counterBefore = await readMediaBytes();

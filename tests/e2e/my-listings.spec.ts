@@ -208,10 +208,13 @@ test.describe("my listings", () => {
     const ended = page.getByRole("tab", { name: /Terminées/ });
     await expect(ended).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("heading", { name: "Aucune annonce terminée" })).toBeVisible({ timeout: 15_000 });
-    const strip = (await page.getByRole("tablist").boundingBox())!;
-    const tab = (await ended.boundingBox())!;
-    expect(tab.x).toBeGreaterThanOrEqual(strip.x);
-    expect(tab.x + tab.width).toBeLessThanOrEqual(strip.x + strip.width);
+    // Measured once the strip has settled (a late font swap widens the tabs, then the tab is revealed again).
+    await expect(async () => {
+      const strip = (await page.getByRole("tablist").boundingBox())!;
+      const tab = (await ended.boundingBox())!;
+      expect(tab.x).toBeGreaterThanOrEqual(strip.x);
+      expect(tab.x + tab.width).toBeLessThanOrEqual(strip.x + strip.width);
+    }).toPass({ timeout: 5_000 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.getByRole("tab", { name: /Brouillons/ }).click();
     await expect(page.getByRole("link", { name: `Reprendre « ${isolate(draft.title)} »` })).toBeVisible({ timeout: 15_000 });
