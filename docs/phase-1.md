@@ -16,7 +16,7 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | 6 | Applications Access et jetons de service | Claude (API), Nav | Après les étapes 5 et 7 (Access exige une zone active) |
 | 7 | Serveurs DNS chez Cloudflare | Nav (Hostinger) | Après la validation du .MA, avant le 12 novembre |
 | 8 | Déploiement automatique du staging | Claude (API), vous pour un jeton | Après les étapes 6 et 7 |
-| 9 | Accès sans clé de la VM à Firestore | Claude (outil), Nav sur le PC2 pour la partie Google | Prompt P lancé le 16 octobre ; certificats de la VM dès qu'elle existe |
+| 9 | Accès sans clé de la VM à Firestore | Claude (outil), Nav sur le PC2 pour la partie Google | Partie Google faite le 16 octobre (staging et production testés) ; certificats de la VM dès qu'elle existe |
 | 10 | Mentions légales de la production | Claude | Après Firebase |
 | 11 | Alertes | Claude (API), Nav pour un filtre Gmail | Code en phase 2 ; après l'étape 7 (domaine Resend) |
 | 12 | Mise en production et contrôles | Claude | Après l'étape 8 |
@@ -28,7 +28,6 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 ## Ce qui reste à vous
 
 - **Étape 8** : sur la page de jeton GitHub préparée par Nav, cliquer sur **Generate token**, puis l'enregistrer dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
-- **Étape 9** : Nav lance le prompt P sur le PC2 ; vous choisissez dans le navigateur le compte Google de vos projets Firebase.
 - **Étape 16**, quand la VM existera : lancer le prompt O dans Cody, qui envoie les clés de votre `.env.local` sur la VM.
 
 Rien d'autre : ni clé SSH, ni commande, ni console.
@@ -122,7 +121,7 @@ Les variables `FIREBASE_STAGING_WIF_PROVIDER` et `FIREBASE_STAGING_DEPLOYER` (ri
 
 ## 9. Accès sans clé de la VM à Firestore
 
-Fédération d'identité X.509 (§9) : web et worker prouvent qui ils sont par un certificat, sans clé JSON. `scripts/google-wif.ts` tourne sur la machine de l'autorité : votre PC2, par Nav (16 octobre). L'autorité qui signe les certificats y reste (`~/.joutiya/wif-ca`), et gcloud s'y connecte dans une configuration à part (`~/.joutiya/gcloud`), sans toucher à celle de vos autres projets. Ce dossier `~/.joutiya` ne doit pas se perdre : sans lui, il faut une nouvelle autorité et refaire `setup`.
+Fédération d'identité X.509 (§9) : web et worker prouvent qui ils sont par un certificat, sans clé JSON. `scripts/google-wif.ts` tourne sur la machine de l'autorité : votre PC2, par Nav (16 octobre). L'autorité qui signe les certificats y reste (`~/.joutiya/wif-ca`), et gcloud s'y connecte dans une configuration à part (`~/.joutiya/gcloud`), sans toucher à celle de vos autres projets. Ce dossier `~/.joutiya` ne doit pas se perdre : sans lui, il faut une nouvelle autorité et refaire `setup`. Points 1 à 4 faits par Nav le 16 octobre : les tests du staging et de la production passent.
 
 1. `ca` crée l'autorité (EC P-256, 10 ans), une seule fois.
 2. `login` ouvre la connexion Google. **Vous :** choisir le compte de vos projets Firebase et accepter.
@@ -130,7 +129,7 @@ Fédération d'identité X.509 (§9) : web et worker prouvent qui ils sont par u
 4. `test staging` puis `test prod` : des certificats d'un jour signés sur votre PC prouvent toute la chaîne (lecture Firestore et custom token pour web, lecture Firestore et Firebase Auth pour worker), puis leurs clés sont effacées. IAM met quelques minutes à appliquer les droits : l'outil réessaie seul.
 5. Quand la VM existe, après ses variables et avant le premier déploiement : Claude lance `node scripts/oracle-vm.ts wif <env> --apply`, qui crée sur la VM une clé par conteneur (elle n'en sort jamais) et affiche leurs demandes de certificat, publiques. Nav les signe sur le PC2 (`node scripts/google-wif.ts sign <fichier>`) et renvoie les lignes `certificate` ; Claude les pose (`wif <env> --certificates=<fichier> --apply`) et relance web et worker. Ni clé Oracle ni `.env.local` sur le PC2. Sans ces fichiers, web et worker refusent de démarrer.
 
-Le certificat d'un conteneur vaut un an : les mêmes étapes le renouvellent, et Claude programme un rappel. Si Google exige la facturation pour ces API, `setup` s'arrête avant toute création : la solution de repli (une clé JSON par conteneur, renouvelée tous les 90 jours) demande votre accord. Nouvelle autorité (fin de projet, fuite) : `ca --new`, puis `setup` et `wif` pour les deux environnements.
+Le certificat d'un conteneur vaut un an : les mêmes étapes le renouvellent, et Claude programme un rappel (Renouvellements, plus bas). Si Google exige la facturation pour ces API, `setup` s'arrête avant toute création : la solution de repli (une clé JSON par conteneur, renouvelée tous les 90 jours) demande votre accord. Nouvelle autorité (fin de projet, fuite) : `ca --new`, puis `setup` et `wif` pour les deux environnements.
 
 **P. Accès Google sans clé** (prompt pour l'agent de la machine de l'autorité : Nav, sur le PC2)
 
