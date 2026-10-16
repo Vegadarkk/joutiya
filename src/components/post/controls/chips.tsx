@@ -65,7 +65,7 @@ interface MultiProps extends ChipGroupProps {
 /** Several values (checkbox semantics). */
 export function ChipCheckboxGroup({ options, values, onChange, label, labelledBy, describedBy, invalid, className }: MultiProps) {
   return (
-    <div role="group" aria-label={labelledBy ? undefined : label} aria-labelledby={labelledBy} aria-describedby={describedBy} aria-invalid={invalid || undefined} className={cn("flex flex-wrap gap-2", className)}>
+    <div role="group" aria-label={labelledBy ? undefined : label} aria-labelledby={labelledBy} aria-describedby={describedBy} data-invalid={invalid || undefined} className={cn("flex flex-wrap gap-2", className)}>
       {options.map((option) => {
         const checked = values.includes(option.value);
         return (

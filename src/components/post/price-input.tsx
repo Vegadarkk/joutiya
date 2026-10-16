@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -37,12 +37,8 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
   const locale = localeProp ?? hookLocale;
   // "À discuter": the person asked for no amount (distinct from "not typed yet").
   const [toDiscuss, setToDiscuss] = useState(priceOptional && value === null && !isDonation);
-  const [text, setText] = useState(value === null ? "" : groupDigits(String(value)));
-
-  // Keep the typed text in sync when the value changes from outside (hydration, donation toggle).
-  useEffect(() => {
-    setText((current) => (parsePriceInput(current) === value ? current : value === null ? "" : groupDigits(String(value))));
-  }, [value]);
+  // Digits only, grouped as you type: the text is a pure function of the integer value.
+  const text = value === null ? "" : groupDigits(String(value));
 
   const disabled = isDonation || toDiscuss;
 
@@ -61,9 +57,7 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
             className={cn("h-14 pe-20 text-start text-2xl font-semibold tabular-nums", disabled && "text-foreground-muted")}
             onChange={(event) => {
               const parsed = parsePriceInput(event.target.value);
-              const clamped = parsed === null ? null : Math.min(parsed, PRICE_MAX * 10);
-              setText(clamped === null ? "" : groupDigits(String(clamped)));
-              onChange(clamped);
+              onChange(parsed === null ? null : Math.min(parsed, PRICE_MAX * 10));
             }}
           />
           <span className="pointer-events-none absolute end-4 top-1/2 flex -translate-y-1/2 flex-col items-end leading-tight" aria-hidden="true">
@@ -82,10 +76,7 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
             disabled={isDonation}
             onCheckedChange={(checked) => {
               setToDiscuss(checked);
-              if (checked) {
-                setText("");
-                onChange(null);
-              }
+              if (checked) onChange(null);
             }}
             className="py-3"
           />
@@ -100,7 +91,6 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
               onDonation(checked);
               if (checked) {
                 setToDiscuss(false);
-                setText("");
                 onChange(null);
                 onNegotiable(false);
               }

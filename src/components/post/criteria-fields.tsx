@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { ChipCheckboxGroup, ChipRadioGroup } from "./controls/chips";
 import { Select } from "./controls/select";
 import { SwitchField } from "./controls/switch";
+import { useCriteriaLabels } from "./labels";
 
 // Step 2: the criteria of the chosen subcategory, generated from src/config/categories.ts.
 // select -> chips (few options) or native select; multiselect -> chips; number -> numeric input
@@ -34,12 +35,12 @@ interface CriteriaFieldsProps {
 const CHIP_MAX_OPTIONS = 8;
 
 export function CriteriaFields({ subcategory, attributes, condition, errors = {}, onAttribute, onCondition, onBlur }: CriteriaFieldsProps) {
-  const t = useTranslations("Criteria");
+  const labels = useCriteriaLabels();
   const w = useTranslations("Listing.wizard");
   const f = useTranslations("Listing.fields");
   const units = useTranslations("Listing.units");
-  const label = (id: string) => (t.has(`${id}.label`) ? t(`${id}.label`) : id);
-  const optionLabel = (id: string, option: string) => (t.has(`${id}.options.${option}`) ? t(`${id}.options.${option}`) : option);
+  const label = labels.label;
+  const optionLabel = labels.option;
 
   return (
     <div className="flex flex-col gap-5" onBlur={onBlur}>

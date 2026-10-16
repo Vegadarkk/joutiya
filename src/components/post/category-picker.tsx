@@ -1,11 +1,12 @@
 "use client";
 
-import { Baby, Bike, Building2, Car, Check, ChevronRight, Dumbbell, Handshake, Package, PawPrint, Shirt, Smartphone, Sofa, Wrench, type LucideIcon } from "lucide-react";
+import { Baby, Building2, Car, Check, ChevronRight, Dumbbell, Handshake, Package, PawPrint, Shirt, Smartphone, Sofa, Wrench, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Button } from "@/components/ui/button";
 import { CATEGORIES, categoryById, type Subcategory } from "@/config/categories";
 import { cn } from "@/lib/utils";
+import { useCategoryLabels } from "./labels";
 
 /** One icon per category (lucide); ids from src/config/categories.ts. */
 export const CATEGORY_ICONS: Record<string, LucideIcon> = {
@@ -34,7 +35,7 @@ interface CategoryPickerProps {
 /** Step 1: the eleven categories as a grid of tiles, then the subcategories of the chosen one. */
 export function CategoryPicker({ categoryId, subcategoryId, onCategory, onSubcategory, isPro = false }: CategoryPickerProps) {
   const t = useTranslations("Listing.category");
-  const names = useTranslations("Categories");
+  const names = useCategoryLabels();
   const category = categoryId ? categoryById(categoryId) : undefined;
 
   if (!category) {
@@ -56,7 +57,7 @@ export function CategoryPicker({ categoryId, subcategoryId, onCategory, onSubcat
               )}
             >
               <Icon className="size-6 text-structure" aria-hidden="true" strokeWidth={1.75} />
-              <span className="font-medium leading-tight">{names(`${item.id}.name`)}</span>
+              <span className="font-medium leading-tight">{names.category(item.id)}</span>
             </button>
           );
         })}
@@ -72,14 +73,14 @@ export function CategoryPicker({ categoryId, subcategoryId, onCategory, onSubcat
           <Icon className="size-6 shrink-0 text-structure" aria-hidden="true" strokeWidth={1.75} />
           <div className="flex min-w-0 flex-col">
             <span className="text-xs text-foreground-muted">{t("chosen")}</span>
-            <span className="truncate font-semibold">{names(`${category.id}.name`)}</span>
+            <span className="truncate font-semibold">{names.category(category.id)}</span>
           </div>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={() => onCategory(null)} className="shrink-0">
           {t("change")}
         </Button>
       </div>
-      <ul role="radiogroup" aria-label={t("subcategories", { category: names(`${category.id}.name`) })} className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface">
+      <ul role="radiogroup" aria-label={t("subcategories", { category: names.category(category.id) })} className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface">
         {category.subcategories.map((subcategory) => {
           const checked = subcategory.id === subcategoryId;
           const locked = Boolean(subcategory.proOnly) && !isPro;
@@ -99,7 +100,7 @@ export function CategoryPicker({ categoryId, subcategoryId, onCategory, onSubcat
                 )}
               >
                 <span className="flex min-w-0 flex-col">
-                  <span className="truncate font-medium">{names(`${category.id}.sub.${subcategory.id}`)}</span>
+                  <span className="truncate font-medium">{names.subcategory(category.id, subcategory.id)}</span>
                   {locked ? <span className="text-xs">{t("proOnly")}</span> : null}
                 </span>
                 {checked ? <Check className="size-5 shrink-0" aria-hidden="true" /> : <ChevronRight className="size-5 shrink-0 text-foreground-muted rtl:-scale-x-100" aria-hidden="true" />}

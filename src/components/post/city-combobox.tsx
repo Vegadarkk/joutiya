@@ -67,10 +67,6 @@ export function CityCombobox({ value, onSelect, error, required, locale: localeP
     if (editing && autoFocus) input.current?.focus();
   }, [editing, autoFocus]);
 
-  useEffect(() => {
-    setActive(0);
-  }, [query]);
-
   function choose(city: City) {
     onSelect(city);
     setQuery("");
@@ -148,6 +144,7 @@ export function CityCombobox({ value, onSelect, error, required, locale: localeP
           className="ps-10"
           onChange={(event) => {
             setQuery(event.target.value);
+            setActive(0);
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type DragEvent } from "react";
+import { useRef, useState, type DragEvent, type ReactNode } from "react";
 import { Camera, ChevronLeft, ChevronRight, ImagePlus, RefreshCw, RotateCcw, Star, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { ErrorBanner } from "@/components/feedback/error-banner";
@@ -143,13 +143,6 @@ function PhotoTile({ item, index, total, onRemove, onRetry, onRefresh, onMove }:
           ? t("timeout")
           : null;
 
-  const icon = (
-    <button
-      type="button"
-      className="flex size-9 items-center justify-center rounded-full bg-surface/90 text-foreground shadow-sm transition-colors duration-150 hover:bg-surface focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25 disabled:opacity-40"
-    />
-  );
-  void icon;
 
   return (
     <figure className={cn("group relative overflow-hidden rounded-lg border bg-surface-muted", failureMessage ? "border-danger/50" : "border-border")}>
@@ -228,7 +221,7 @@ function PhotoTile({ item, index, total, onRemove, onRetry, onRefresh, onMove }:
   );
 }
 
-function TileButton({ label, disabled, onClick, children }: { label: string; disabled?: boolean; onClick: () => void; children: React.ReactNode }) {
+function TileButton({ label, disabled, onClick, children }: { label: string; disabled?: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
       type="button"

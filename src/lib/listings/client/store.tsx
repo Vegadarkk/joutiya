@@ -158,6 +158,34 @@ const WizardContext = createContext<WizardContextValue | null>(null);
 /** Uploads at once: resizing is CPU-bound, so two in parallel is plenty on a phone. */
 const UPLOAD_CONCURRENCY = 2;
 
+interface UploadRunner {
+  enqueue(job: () => Promise<void>): void;
+}
+
+/** Small job queue with a concurrency cap; jobs start in order and never throw out of the runner. */
+export function createUploadRunner(concurrency: number): UploadRunner {
+  const queue: (() => Promise<void>)[] = [];
+  let running = 0;
+  const pump = () => {
+    while (running < concurrency && queue.length > 0) {
+      const job = queue.shift()!;
+      running += 1;
+      void job()
+        .catch(() => undefined)
+        .finally(() => {
+          running -= 1;
+          pump();
+        });
+    }
+  };
+  return {
+    enqueue(job) {
+      queue.push(job);
+      pump();
+    },
+  };
+}
+
 interface WizardProviderProps {
   listing: OwnerListing;
   maxPhotos: number;
@@ -189,18 +217,19 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, upl
     });
   }
   const controllers = useRef(new Map<string, AbortController>());
-  const running = useRef(0);
-  const queue = useRef<(() => Promise<void>)[]>([]);
+  const runner = useRef<UploadRunner | null>(null);
+  runner.current ??= createUploadRunner(UPLOAD_CONCURRENCY);
   const lastSentPhotos = useRef<string>(JSON.stringify(readyPhotoIds(state.photos)));
 
   useEffect(() => {
     const instance = autosave.current;
+    const aborters = controllers.current;
     const onHide = () => void instance?.flush();
     window.addEventListener("pagehide", onHide);
     return () => {
       window.removeEventListener("pagehide", onHide);
       instance?.dispose();
-      for (const controller of controllers.current.values()) controller.abort();
+      for (const controller of aborters.values()) controller.abort();
     };
   }, []);
 
@@ -221,22 +250,11 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, upl
     update({ photos: JSON.parse(readyIds) as string[] }, { flush: true });
   }, [readyIds, update]);
 
-  const pump = useCallback(() => {
-    while (running.current < UPLOAD_CONCURRENCY && queue.current.length > 0) {
-      const job = queue.current.shift()!;
-      running.current += 1;
-      void job().finally(() => {
-        running.current -= 1;
-        pump();
-      });
-    }
-  }, []);
-
   const startUpload = useCallback(
     (key: string, file: File) => {
       const controller = new AbortController();
       controllers.current.set(key, controller);
-      queue.current.push(async () => {
+      runner.current?.enqueue(async () => {
         if (controller.signal.aborted) return;
         try {
           await upload(listingId, file, {
@@ -271,9 +289,8 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, upl
           controllers.current.delete(key);
         }
       });
-      pump();
     },
-    [listingId, pump, upload],
+    [listingId, upload],
   );
 
   const addFiles = useCallback(
