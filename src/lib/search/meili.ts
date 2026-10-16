@@ -120,7 +120,8 @@ export class MeiliEngine implements SearchEngine {
         headers: { ...(init.key ? { authorization: `Bearer ${init.key}` } : {}), ...(init.body === undefined ? {} : { "content-type": "application/json" }) },
         body: init.body === undefined ? undefined : JSON.stringify(init.body),
         signal: AbortSignal.timeout(init.timeoutMs),
-        cache: "no-store",
+        // No `cache` option: Next's default fetches every time without storing, while an explicit
+        // "no-store" would turn the ISR pages that read the index (home, /c) into dynamic ones.
       });
     } catch (error) {
       throw new SearchUnavailableError(`meilisearch unreachable (${method} ${path.split("?")[0]})`, { cause: error });
