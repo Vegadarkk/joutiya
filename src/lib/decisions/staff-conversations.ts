@@ -3,10 +3,11 @@ import { audit } from "@/lib/audit";
 import { cidSchema } from "@/lib/contracts/messaging";
 import { forbidden, notFound } from "@/lib/http/errors";
 import { getConversationForStaff } from "@/lib/messaging";
+import { consume } from "@/lib/quota";
 import { splitMessageId } from "@/lib/reports/target-key";
 import { openAuthorityIds } from "./authorities";
 import type { StaffConversationView } from "./contracts";
-import { reportsOnConversation } from "./repository";
+import { conversationRef, reportsOnConversation } from "./repository";
 
 // Staff access to a conversation (design D18): only when a report (open or decided) targets one
 // of its messages, or an open authority request holds it; a reason (10-300 characters) is given
@@ -25,9 +26,13 @@ export async function staffConversation(reader: StaffReader, cid: string, reason
   if (!cidSchema.safeParse(cid).success) throw notFound();
   const reports = await reportsOnConversation(cid);
   const reportedMids = [...new Set(reports.flatMap((report) => splitMessageId(report.target.id)?.mid ?? []))];
-  const first = await getConversationForStaff(cid, 1, { evidenceFor: [] });
-  if (!first) throw notFound();
-  const authorityIds = first.conversation.legalHold.filter((hold) => hold.startsWith(AUTHORITY_PREFIX)).map((hold) => hold.slice(AUTHORITY_PREFIX.length));
+  const snapshot = await conversationRef(cid).get();
+  void consume("firestore.reads", 1);
+  if (!snapshot.exists) throw notFound();
+  const holds: unknown = snapshot.get("legalHold");
+  const authorityIds = (Array.isArray(holds) ? holds : [])
+    .filter((hold): hold is string => typeof hold === "string" && hold.startsWith(AUTHORITY_PREFIX))
+    .map((hold) => hold.slice(AUTHORITY_PREFIX.length));
   const openAuthorities = await openAuthorityIds(authorityIds);
   if (reports.length === 0 && openAuthorities.length === 0) throw forbidden("no report or authority request on this conversation");
 

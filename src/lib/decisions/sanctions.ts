@@ -5,7 +5,7 @@ import { audit } from "@/lib/audit";
 import { getListingTx, listOwnerListingsByStatus, updateListingTx, type ListingFieldPatch, type ListingRecord } from "@/lib/db/repositories/listings";
 import { enqueueSearchOutboxTx } from "@/lib/db/repositories/search-outbox";
 import { auth, db } from "@/lib/firebase/admin";
-import { getClaims, setClaims, type Claims } from "@/lib/firebase/claims";
+import { getClaims, setClaims } from "@/lib/firebase/claims";
 import { getLegalConfig } from "@/lib/legal/config";
 import { purgeAtFor, transition, type Lifetime } from "@/lib/listings/lifecycle";
 import { revalidateListingPaths } from "@/lib/listings/revalidate";
@@ -83,14 +83,6 @@ export async function undoQuietly(undo: Undo, context: Record<string, unknown>):
   } catch (error) {
     logger.error({ ...context, err: (error as Error).message }, "decisions: sanction rollback failed");
   }
-}
-
-/** Drops the `st` claim (lift, reversal); revokes the tokens through setClaims only when it changes. */
-export async function clearSuspendedClaim(uid: string): Promise<void> {
-  const claims: Claims = await getClaims(uid);
-  if (claims.st !== "suspended") return;
-  const { st: _st, ...rest } = claims;
-  await setClaims(uid, rest);
 }
 
 export async function lifetime(): Promise<Lifetime> {
@@ -260,40 +252,54 @@ export interface LiftOptions {
 }
 
 /**
- * Ends a suspension (lift-suspensions job, or an appeal reversal): the claim first (a failure
- * leaves the document, so the next run retries), then one transaction (suspension document
- * deleted, `suspended` -> `active`, `strikes.suspendedUntil` dropped), then the listings. False
- * when there is nothing to lift (no document, another decision's, or a ban since).
+ * Ends a suspension (lift-suspensions job): the claim first, then one transaction (suspension
+ * document deleted, `suspended` -> `active`, `strikes.suspendedUntil` dropped), then the listings.
+ * The claim comes back when the transaction fails or finds the suspension extended (the document
+ * stays: the next run retries). False when there is nothing to lift (no document, another
+ * decision's, not ended yet). An appeal reversal lifts inside its own decision (decide()).
  */
 export async function liftSuspension(uid: string, options: LiftOptions): Promise<boolean> {
   const now = options.now ?? new Date();
   const current = suspensionFromSnapshot(await suspensionRef(uid).get());
   void consume("firestore.reads", 1);
   if (!current || (options.decisionId && current.decisionId !== options.decisionId)) return false;
+  // The job lifts ended suspensions only (one extended meanwhile runs on).
+  const due = (suspension: { until: Date }) => options.decisionId !== undefined || suspension.until.getTime() <= now.getTime();
+  if (!due(current)) return false;
   const status = (await userRef(uid).get()).get("status");
   void consume("firestore.reads", 1);
-  if (status !== "banned") await clearSuspendedClaim(uid);
-  const lifted = await db().runTransaction(async (tx) => {
-    const [suspensionSnap, userSnap, privateSnap] = await Promise.all([tx.get(suspensionRef(uid)), tx.get(userRef(uid)), tx.get(privateRef(uid))]);
-    void consume("firestore.reads", 3);
-    const suspension = suspensionFromSnapshot(suspensionSnap);
-    if (!suspension || suspension.decisionId !== current.decisionId) return false;
-    tx.delete(suspensionRef(uid));
-    let writes = 1;
-    if (userSnap.exists && userSnap.get("status") === "suspended") {
-      tx.update(userRef(uid), { status: "active", updatedAt: Timestamp.fromDate(now) });
-      writes += 1;
-    }
-    const account = privateFromSnapshot(privateSnap);
-    if (account) {
-      const level = options.reduceStrikes ? levelAfterReversal(account.strikes.level) : account.strikes.level;
-      tx.update(privateRef(uid), { "strikes.level": level, "strikes.suspendedUntil": FieldValue.delete() });
-      writes += 1;
-    }
-    void consume("firestore.writes", writes);
-    return true;
-  });
-  if (!lifted) return false;
+  const undo = status === "banned" ? null : await reverseAuthSanction(uid, "suspend_account");
+  let lifted: boolean;
+  try {
+    lifted = await db().runTransaction(async (tx) => {
+      const [suspensionSnap, userSnap, privateSnap] = await Promise.all([tx.get(suspensionRef(uid)), tx.get(userRef(uid)), tx.get(privateRef(uid))]);
+      void consume("firestore.reads", 3);
+      const suspension = suspensionFromSnapshot(suspensionSnap);
+      if (!suspension || suspension.decisionId !== current.decisionId || !due(suspension)) return false;
+      tx.delete(suspensionRef(uid));
+      let writes = 1;
+      if (userSnap.exists && userSnap.get("status") === "suspended") {
+        tx.update(userRef(uid), { status: "active", updatedAt: Timestamp.fromDate(now) });
+        writes += 1;
+      }
+      const account = privateFromSnapshot(privateSnap);
+      if (account) {
+        const level = options.reduceStrikes ? levelAfterReversal(account.strikes.level) : account.strikes.level;
+        tx.update(privateRef(uid), { "strikes.level": level, "strikes.suspendedUntil": FieldValue.delete() });
+        writes += 1;
+      }
+      void consume("firestore.writes", writes);
+      return true;
+    });
+  } catch (error) {
+    if (undo) await undoQuietly(undo, { job: "lift" });
+    throw error;
+  }
+  if (!lifted) {
+    // Extended or lifted meanwhile: the claim follows the document again.
+    if (undo) await undoQuietly(undo, { job: "lift" });
+    return false;
+  }
   const resumed = status === "banned" ? [] : await resumeModerationPaused(uid, now);
   await audit({
     actorUid: options.actor.uid,
