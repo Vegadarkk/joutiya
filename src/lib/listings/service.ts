@@ -438,10 +438,20 @@ export async function changeStatus(actor: Actor, id: string, action: OwnerAction
 }
 
 /**
+ * A moderator approved this content and no screened edit came since: patchListing replaces
+ * `moderation.state` on every edit of a screened field, other edits and photo removals keep it.
+ */
+function approvedByModerator(listing: Pick<ListingDoc, "moderation">): boolean {
+  return listing.moderation.state === "human_ok";
+}
+
+/**
  * Renewal of an expired listing (D16): back on a public page and in search, so screened like a
  * publication: readiness and pre-moderation blockers (422), active quota (409), then `published`
  * with a fresh lifetime, or `pending_review` when flagged (or rejected by a moderator before);
- * the approval then dates its new lifetime.
+ * the approval then dates its new lifetime. Content a moderator approved and unchanged since is
+ * not held again (project decision): a person already reviewed it, so a flag only repeats what
+ * they saw; readiness and hard blockers still apply, and the approval stays on the listing.
  */
 async function renewExpired(actor: Actor, listing: ListingRecord, seller: SellerContext, ctx: TransitionContext): Promise<ListingRecord> {
   const { now } = ctx;
@@ -453,9 +463,10 @@ async function renewExpired(actor: Actor, listing: ListingRecord, seller: Seller
   await assertWithinQuota(actor.auth.user.uid, seller.quotas);
 
   const rejectedBefore = rejectedByModerator(listing);
-  const held = screening.state === "needs_review" || rejectedBefore;
+  const approved = approvedByModerator(listing);
+  const held = (screening.state === "needs_review" && !approved) || rejectedBefore;
   const { patch, effects } = step(() => (held ? renewForReview(listing, ctx) : renew(listing, ctx)));
-  patch.moderation = moderationPatch(listing.moderation, screening, held);
+  if (!approved) patch.moderation = moderationPatch(listing.moderation, screening, held);
   patch.adsEligible = !held && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy;
   const hold = held ? holdRecord(listing, screening, now, rejectedBefore) : undefined;
   const updated = await commit(listing, patch, effects, { actor, user: seller.user, now, hold });

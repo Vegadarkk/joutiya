@@ -21,7 +21,7 @@ import { POST as sold } from "@/app/api/listings/[id]/sold/route";
 import type { CreateListingResponse, OwnerListingsResponse } from "@/lib/contracts/listings";
 import { getListing, listOwnerListings } from "@/lib/db/repositories/listings";
 import { resetServerEnv } from "@/lib/env";
-import { changeStatus, createDraft } from "@/lib/listings/service";
+import { changeStatus, createDraft, publish as publishListing } from "@/lib/listings/service";
 import { consumeLimit, limitState, resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { api, member, readyPatch, seedReadyUpload, type ApiResult, type ErrorBody, type Handler, type ListingBody, type Member, type PublishBody } from "./helpers";
 
@@ -107,6 +107,34 @@ describe("DELETE /api/listings/{id} and pause / resume / sold / renew (listing.s
     expect((await act(pause, other, draft, "pause")).status).toBe(404);
     expect((await limitState("listing.status.uid", owner.uid))?.consumedPoints).toBe(1);
     expect((await limitState("listing.status.uid", other.uid))?.consumedPoints).toBe(1);
+  });
+});
+
+describe("POST /api/listings/{id}/publish (listing.publish.uid)", () => {
+  it("counts every attempt, refused ones included, then 429 before the listing is read", async () => {
+    expect(RATE_LIMITS["listing.publish.uid"]).toMatchObject({ points: 60, policy: "open" });
+    const owner = await member();
+    const draft = (await newDraft(owner)).body.id;
+    const attempt = () => api<PublishBody & ErrorBody>(publish, "POST", `/api/listings/${draft}/publish`, { member: owner, body: { acceptRules: true } });
+    // An empty draft: refused (422) after reading it, still one attempt.
+    expect((await attempt()).status).toBe(422);
+    expect((await limitState("listing.publish.uid", owner.uid))?.consumedPoints).toBe(1);
+    // A malformed body is refused first and costs nothing.
+    expect((await api<ErrorBody>(publish, "POST", `/api/listings/${draft}/publish`, { member: owner, body: { acceptRules: false } })).status).toBe(400);
+    expect((await limitState("listing.publish.uid", owner.uid))?.consumedPoints).toBe(1);
+
+    await spend("listing.publish.uid", owner);
+    vi.mocked(getListing).mockClear();
+    vi.mocked(publishListing).mockClear();
+    expectLimited(await attempt());
+    expect(getListing).not.toHaveBeenCalled();
+    expect(publishListing).not.toHaveBeenCalled();
+    expect((await getListing(draft))?.status).toBe("draft");
+    // Refused attempts never reach the 5 publications a day.
+    expect((await limitState("listing.create.uid", owner.uid))?.consumedPoints ?? 0).toBe(0);
+
+    // Another account is not affected (published() expects the publication to go through).
+    await published(await member());
   });
 });
 

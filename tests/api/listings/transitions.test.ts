@@ -3,7 +3,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 // Owner actions on a published listing (lifecycle §5, D16): pause / resume / sold / renew / remove
 // through the API, the forbidden transitions (409 conflict), the search outbox and audit effects;
 // edits after publication (paused, expired: screened, held, revalidated), the screened renewal of
-// an expired listing and the active quota on resume and renewal.
+// an expired listing (not held again when a moderator approved the unchanged content) and the
+// active quota on resume and renewal.
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/listings/revalidate", { spy: true });
@@ -311,6 +312,58 @@ describe("renewal of an expired listing (screened like a publication)", () => {
     expect(stored.purgeAt).toEqual(before.purgeAt);
     expect(await decisionsFor(id)).toEqual([stored.moderation.lastDecisionId]);
     expect(lastMail(sendMail, "listingPendingReview", owner.email)?.data).toMatchObject({ listingId: id, statement: { measure: "hold", facts: ["prohibited_soft"] } });
+  });
+});
+
+describe("renewal of content a moderator approved", () => {
+  /** Expired, flagged content a moderator approved (an edit held then approved back to expired). */
+  async function approvedExpired(owner: Member, overrides: { title?: string; description?: string } = {}): Promise<string> {
+    const { id } = await published(owner);
+    await expire(id);
+    const current = (await getListing(id))!;
+    await updateListing(id, { title: SOFT_TITLE, ...overrides, moderation: { ...current.moderation, state: "human_ok", flags: ["prohibited_soft"], reviewedBy: "moderator-1", reviewedAt: new Date() } });
+    return id;
+  }
+
+  it("publishes it again without a new hold while nobody edited it since; other edits keep the approval", async () => {
+    const owner = await member();
+    const id = await approvedExpired(owner);
+    // Not a screened field: the approval still covers the content.
+    const edited = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { priceNegotiable: false } });
+    expect(edited.status).toBe(200);
+    const before = (await getListing(id))!;
+    expect([before.status, before.moderation.state]).toEqual(["expired", "human_ok"]);
+
+    const renewed = await act(renew, owner, id, "renew");
+    expect(renewed.status).toBe(200);
+    expect(renewed.body.listing.status).toBe("published");
+    const stored = (await getListing(id))!;
+    expect(stored).toMatchObject({ status: "published", sortSource: "renew", adsEligible: true });
+    expect(stored.moderation).toEqual(before.moderation);
+    expect(stored.expiresAt!.getTime()).toBeGreaterThan(Date.now() + 59 * DAY_MS);
+    expect(await decisionsFor(id)).toEqual([]);
+    expect(lastMail(sendMail, "listingPendingReview", owner.email)).toBeUndefined();
+    expect(await getSearchOutbox(id)).toMatchObject({ op: "upsert", version: stored.version });
+  });
+
+  it("still refuses a hard blocker (422)", async () => {
+    const owner = await member();
+    const id = await approvedExpired(owner, { description: PHONE_TEXT });
+    const before = (await getListing(id))!;
+    const refused = await act(renew, owner, id, "renew");
+    expect(refused.status).toBe(422);
+    expect(codesOf((refused.body as unknown as Invalid).error.details)).toEqual(["description:phone_in_text"]);
+    expect(await getListing(id)).toMatchObject({ status: "expired", version: before.version });
+  });
+
+  it("screens an edit made after the approval again: a flagged one is held, the approval is gone", async () => {
+    const owner = await member();
+    const id = await approvedExpired(owner);
+    const edited = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { price: 1400 } });
+    expect(edited.status).toBe(200);
+    const stored = (await getListing(id))!;
+    expect(stored).toMatchObject({ status: "pending_review", moderation: expect.objectContaining({ state: "needs_review", flags: ["prohibited_soft"] }) });
+    expect(await decisionsFor(id)).toEqual([stored.moderation.lastDecisionId]);
   });
 });
 

@@ -55,6 +55,8 @@ export async function handleStatus(request: Request, params: Params): Promise<Re
 export async function handleDelete(request: Request, params: Params): Promise<Response> {
   const auth = await requireUser(request, { mutation: true });
   const id = await uploadIdOf(params);
+  // Before the first Firestore read: the Spark daily quotas are shared by the whole site.
+  await enforceLimit("upload.delete.uid", auth.user.uid);
   await deleteUpload(uploaderOf(request, auth), id);
   return noContent();
 }

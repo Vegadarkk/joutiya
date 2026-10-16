@@ -360,7 +360,8 @@
       "upload_not_ready": "Une photo est encore en cours de traitement. Patientez quelques secondes, puis réessayez.",
       "phone_required": "Vérifiez votre numéro de téléphone pour afficher ce moyen de contact.",
       "listing_unavailable": "Cette annonce n'est plus disponible.",
-      "reveal_not_allowed": "Le numéro ne peut pas être affiché pour le moment. Vérifiez votre adresse e-mail ou réessayez plus tard."
+      "reveal_not_allowed": "Le numéro ne peut pas être affiché pour le moment. Vérifiez votre adresse e-mail ou réessayez plus tard.",
+      "upload_limit": "Trop de photos ont été envoyées pour cette annonce, photos refusées comprises. Supprimez les photos refusées pour en ajouter d'autres, ou patientez : elles sont effacées automatiquement 7 jours après leur envoi."
     },
     "wizard": {
       "title": "Déposer une annonce",
@@ -542,7 +543,8 @@
       "moved": "Photo déplacée en position {position} sur {count}.",
       "movedCover": "Photo placée en couverture.",
       "dropHint": "ou déposez-les ici",
-      "progressLabel": "Envoi de la photo {index}"
+      "progressLabel": "Envoi de la photo {index}",
+      "uploadLimit": "Trop de photos envoyées pour cette annonce."
     },
     "review": {
       "title": "Vérifiez votre annonce",

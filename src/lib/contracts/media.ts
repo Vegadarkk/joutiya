@@ -11,12 +11,11 @@ export const MAX_PHOTOS_INDIVIDUAL = 10;
 export const MAX_PHOTOS_PRO = 20;
 /**
  * Upload documents one listing may hold at once (attached, in flight, refused ones kept 7 days):
- * this many times its photo limit. Past it, signing answers 409 `photo_limit` with
- * `details.reason` = UPLOAD_LIMIT_REASON: the owner removes refused photos (DELETE frees the slot).
+ * this many times its photo limit. Past it, signing answers 409 `upload_limit` (not `photo_limit`:
+ * the listing may still have room for photos): the owner removes refused photos (DELETE frees the
+ * slot) or waits for purge-quarantine to delete them.
  */
 export const UPLOADS_PER_PHOTO_SLOT = 3;
-/** `details.reason` of the 409 `photo_limit` answered by the upload cap (not the photo limit itself). */
-export const UPLOAD_LIMIT_REASON = "upload_limit";
 /** Longest edge the browser sends; anything larger is resized client-side first. */
 export const MAX_CLIENT_EDGE_PX = 2048;
 /** Presigned PUT validity (architecture §6). */

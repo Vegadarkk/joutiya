@@ -113,6 +113,8 @@ export async function handlePublish(request: Request, params: Params): Promise<R
   const auth = await requireUser(request, { mutation: true });
   const id = await listingIdOf(params);
   const input = await readJson(request, publishListingSchema);
+  // Every attempt, before the listing is read; the 5 publications a day are counted inside publish().
+  await enforceLimit("listing.publish.uid", auth.user.uid);
   const device = deviceOf(request);
   const outcome = await publish(actorOf(request, auth), request, id, { turnstileToken: input.turnstileToken, device });
   const response = applyDevice(jsonResponse(outcome.response), device);

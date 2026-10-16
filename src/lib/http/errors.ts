@@ -40,6 +40,8 @@ export type ErrorCode =
   | "listing_daily_limit"
   /** Photos per listing (10, Pro 20). */
   | "photo_limit"
+  /** Upload documents per listing (UPLOADS_PER_PHOTO_SLOT x the photo limit, refused ones included). */
+  | "upload_limit"
   /** Declared or real size above MAX_UPLOAD_BYTES. */
   | "file_too_large"
   /** Declared type or sniffed bytes outside JPEG/WebP/PNG. */
