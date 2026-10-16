@@ -1,5 +1,5 @@
 {
-  "description": "Zero Trust Access applications (Free, up to 50 users). ${VAR} values come from the environment of scripts/cloudflare.ts, never from this file; ACCESS_GOOGLE_IDP_ID is looked up by the script (the account's only Google login method). Staff sign in with Google only, on an account with 2-step verification (§6). Service tokens are created in the dashboard (secret shown once). Only the CI token reaches sshd, where its key is only accepted for deploy-staging (forced command): nobody else has an SSH user, administration goes through OCI Run Command. The AUD tag of admin.joutiya.ma and admin-staging.joutiya.ma goes to CF_ACCESS_AUD of each environment and to infra/targets.json.",
+  "description": "Zero Trust Access applications (Free, up to 50 users). ${VAR} values come from the environment of scripts/cloudflare.ts, never from this file; ACCESS_GOOGLE_IDP_ID is looked up by the script (the account's only Google login method). Staff sign in with Google only, on an account with 2-step verification (§6). Service tokens are created in the dashboard (secret shown once). Only the CI token reaches sshd, where its key is only accepted for deploy-staging (forced command): nobody else has an SSH user, administration goes through OCI Run Command. The AUD tag of admin.joutiya.ma and admin-staging.joutiya.ma goes to CF_ACCESS_AUD of each environment and to infra/targets.json. Resend and Meta webhooks cannot sign in: staging.joutiya.ma/api/webhooks/* bypasses Access (the routes check each sender's signature, the WAF skips the path); the production site is public.",
   "apps": [
     {
       "name": "Joutiya back-office",
@@ -76,6 +76,23 @@
               "email": {
                 "email": "${ACCESS_OWNER_EMAIL}"
               }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Joutiya staging webhooks",
+      "domain": "staging.joutiya.ma/api/webhooks/*",
+      "type": "self_hosted",
+      "session_duration": "24h",
+      "policies": [
+        {
+          "name": "Signed webhooks (Resend, Meta)",
+          "decision": "bypass",
+          "include": [
+            {
+              "everyone": {}
             }
           ]
         }

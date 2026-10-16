@@ -8,13 +8,14 @@ services:
     deploy:
       resources:
         limits: { cpus: "1.5", memory: 1536M }
+  # sharp (libvips) and the ONNX moderation models allocate outside the V8 heap: half the limit stays native.
   worker:
     user: "1000:2001"
     environment:
-      NODE_OPTIONS: --max-old-space-size=576
+      NODE_OPTIONS: --max-old-space-size=512
     deploy:
       resources:
-        limits: { cpus: "0.75", memory: 768M }
+        limits: { cpus: "0.75", memory: 1024M }
   valkey-queue:
     deploy:
       resources:

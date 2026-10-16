@@ -62,13 +62,19 @@ export interface AccessApp {
   domain: string;
   type: string;
   session_duration: string;
-  allowed_idps: string[];
-  auto_redirect_to_identity: boolean;
+  allowed_idps?: string[];
+  auto_redirect_to_identity?: boolean;
   policies: { name: string; decision: string; include: unknown[] }[];
 }
 
 /** Staff sign in with Google only (§6); the identity provider is looked up in the account. */
 export const GOOGLE_IDP = "${ACCESS_GOOGLE_IDP_ID}";
+/**
+ * Resend and Meta cannot sign in, so their webhooks reach the staging site through this path
+ * without Access; the routes check each sender's signature and the WAF skips the path. The
+ * production site is public: it needs no such path.
+ */
+export const WEBHOOK_BYPASS = "staging.joutiya.ma/api/webhooks/*";
 export interface DnsRecord {
   id: string;
   type: string;
@@ -106,7 +112,12 @@ export function validateEdge(read: <T>(name: string) => T = readEdgeFile): strin
   const access = read<{ apps: AccessApp[] }>("access-apps.json").apps;
   const guarded = new Set(access.map((app) => app.domain));
   for (const app of access) {
-    if (app.allowed_idps?.length !== 1 || app.allowed_idps[0] !== GOOGLE_IDP || app.auto_redirect_to_identity !== true) {
+    const bypass = app.policies.some((policy) => policy.decision === "bypass");
+    if (app.domain === WEBHOOK_BYPASS) {
+      if (app.policies.length !== 1 || !bypass) errors.push(`access-apps.json: ${app.domain} must have a single bypass policy`);
+    } else if (bypass || app.domain.includes("/")) {
+      errors.push(`access-apps.json: ${app.domain}: only ${WEBHOOK_BYPASS} may bypass Access`);
+    } else if (app.allowed_idps?.length !== 1 || app.allowed_idps[0] !== GOOGLE_IDP || app.auto_redirect_to_identity !== true) {
       errors.push(`access-apps.json: ${app.domain} must allow the Google login method only (§6)`);
     }
   }
@@ -272,9 +283,12 @@ export function googleIdp(providers: { id: string; type: string }[]): string {
 }
 
 async function accessApp(api: CloudflareApi, accountId: string, domain: string): Promise<{ id: string; domain: string; aud: string } | undefined> {
+  // The API documents exact matching of the domain filter, not whether a path takes part in it:
+  // the partial filter on the hostname also returns its path applications, compared exactly here.
+  const hostname = domain.split("/")[0] ?? domain;
   const found = await api.call<{ id: string; domain: string; aud: string }[]>({
     method: "GET",
-    path: `/accounts/${accountId}/access/apps?domain=${encodeURIComponent(domain)}&exact=true`,
+    path: `/accounts/${accountId}/access/apps?domain=${encodeURIComponent(hostname)}`,
   });
   return found.find((item) => item.domain === domain);
 }
@@ -308,6 +322,8 @@ export interface R2CorsRule {
 }
 export interface R2Settings {
   jurisdiction: string;
+  /** Cloudflare's own rule on every bucket, kept: a lifecycle PUT by API would have to repeat it. */
+  defaultMultipartAbort: { name: string; abortAfterDays: number };
   buckets: Record<string, { cors?: R2CorsRule[]; lifecycle?: { name: string; prefix: string; deleteAfterDays: number }[] }>;
 }
 type BucketRole = keyof EnvTargets["r2"];
@@ -347,9 +363,12 @@ export function validateR2(settings: R2Settings, targets: Targets): string[] {
   return errors;
 }
 
+/** Browsers accept any 2xx answer to a preflight; R2 sends 204. */
+const okStatus = (status: number): boolean => status >= 200 && status <= 299;
+
 /** What a preflight answer lacks to let `origin` send `method` under `rule`; [] when it is allowed. */
 export function preflightErrors(rule: R2CorsRule, origin: string, method: string, status: number, headers: Headers): string[] {
-  if (status !== 200) return [`HTTP ${status}`];
+  if (!okStatus(status)) return [`HTTP ${status}`];
   const list = (name: string) => (headers.get(name) ?? "").split(",").map((value) => value.trim().toLowerCase());
   const errors: string[] = [];
   if (headers.get("access-control-allow-origin") !== origin) errors.push(`allow-origin ${headers.get("access-control-allow-origin") ?? "missing"}`);
@@ -390,11 +409,12 @@ async function checkR2(targets: Targets): Promise<void> {
     const firstMethod = cors[0]?.AllowedMethods[0];
     if (firstMethod !== undefined) {
       const foreign = await preflight(url, "https://example.org", firstMethod, []);
-      const admitted = foreign.status === 200 && foreign.headers.get("access-control-allow-origin") !== null;
+      const admitted = okStatus(foreign.status) && foreign.headers.get("access-control-allow-origin") !== null;
       if (admitted) failed += 1;
       console.log(`${admitted ? "FAIL" : "ok  "}  ${bucket}: a foreign origin is ${admitted ? "admitted" : "refused"}`);
     }
     for (const rule of lifecycle) console.log(`      ${bucket}: lifecycle ${rule.name} (prefix "${rule.prefix}", ${rule.deleteAfterDays} d), read back by Nav`);
+    console.log(`      ${bucket}: lifecycle ${settings.defaultMultipartAbort.name} (abort after ${settings.defaultMultipartAbort.abortAfterDays} d), read back by Nav`);
   }
   if (failed > 0) throw new Error(`${failed} CORS check(s) failed: apply r2-buckets.json in the dashboard (docs/phase-1.md, step 14)`);
 }

@@ -21,13 +21,12 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | 11 | Alertes | Claude (API), Nav pour un filtre Gmail | Code en phase 2 ; après l'étape 7 (domaine Resend) |
 | 12 | Mise en production et contrôles | Claude | Après l'étape 8 |
 | 13 | Test de reconstruction de la VM | Claude | Avant le lancement |
-| 14 | Réglages des buckets R2 | Nav, sur votre « J'accepte » ; Claude vérifie | Prête : n'attend ni la VM ni la zone |
+| 14 | Réglages des buckets R2 | Nav, sur votre « J'accepte » ; Claude vérifie | Fait le 16 octobre, vérifié |
 | 15 | Domaines des médias | Nav | À l'activation de la zone (étape 7) |
 
 ## Ce qui reste à vous
 
 - **Étape 5** : cliquer sur **Create** du client Google préparé par Nav (Google n'affiche le secret qu'à ce moment), puis coller l'ID et le secret dans le formulaire Zero Trust que Nav a ouvert. Vérifier que la validation en deux étapes de votre compte Google est active.
-- **Étape 14** : répondre « J'accepte » sous le message qui la nomme.
 - **Étape 8** : sur la page de jeton GitHub préparée par Nav, cliquer sur **Generate token**, puis l'enregistrer dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
 
 Rien d'autre : ni clé SSH, ni commande, ni console.
@@ -97,7 +96,7 @@ Cloudflare n'accepte une application Access que sur une zone active ([doc](https
 
 1. Nav ajoute au jeton `joutiya-edge`, sans changer sa valeur, deux permissions : **Access: Service Tokens : Edit** (compte) et **Cache Purge : Purge** (zone `joutiya.ma`).
 2. Claude crée par API les jetons de service `joutiya-ci` (déploiement du staging, étape 8) et `joutiya-probe` (la sonde ; son secret sera renouvelé par API quand la sonde sera déployée). Un secret va directement de l'API à sa destination, jamais dans un fichier ni dans le chat.
-3. Claude lance `node scripts/cloudflare.ts access --apply`, avec `ACCESS_OWNER_EMAIL` (votre Gmail), `ACCESS_CI_TOKEN_ID` et `ACCESS_PROBE_TOKEN_ID` : `admin`, `staging` et `admin-staging` n'acceptent que votre compte Google (plus le jeton de la sonde pour `staging`), et `ssh` seulement le jeton de la CI.
+3. Claude lance `node scripts/cloudflare.ts access --apply`, avec `ACCESS_OWNER_EMAIL` (votre Gmail), `ACCESS_CI_TOKEN_ID` et `ACCESS_PROBE_TOKEN_ID` : `admin`, `staging` et `admin-staging` n'acceptent que votre compte Google (plus le jeton de la sonde pour `staging`), et `ssh` seulement le jeton de la CI. Seul `staging.joutiya.ma/api/webhooks/*` laisse passer sans Access les webhooks de Resend et de Meta, qui ne peuvent pas se connecter : le site vérifie la signature de chaque envoi.
 4. Claude relance les parties `tunnel:*` : les noms protégés reçoivent leur enregistrement DNS.
 5. Claude inscrit par PR les tags AUD de `admin.joutiya.ma` et `admin-staging.joutiya.ma` dans `infra/targets.json`. L'image de l'application embarque ce fichier.
 
@@ -173,6 +172,8 @@ Cloudflare → **R2** (buckets EU) → bucket → **Settings**. Seulement ces bu
 Hors champ : aucun changement de jeton, ni accès public, ni `r2.dev`, ni domaine personnalisé (étape 15), ni autre bucket.
 
 Ensuite, Claude vérifie le CORS par des requêtes préliminaires, sans jeton (`node scripts/cloudflare.ts r2`) : chaque origine du site doit passer, une origine étrangère doit être refusée. Il compare les règles de cycle de vie rapportées par Nav à `r2-buckets.json`.
+
+Fait le 16 octobre : Nav a appliqué la fiche à 11:35 UTC, sur votre « J'accepte » de 10:47. Toutes les requêtes préliminaires passent (R2 répond 204) et les origines étrangères sont refusées ; les règles relues par Nav sont celles du fichier, plus la règle par défaut de Cloudflare qui abandonne après 7 jours les envois multipart inachevés, présente sur chaque bucket.
 
 ## 15. Domaines des médias
 
