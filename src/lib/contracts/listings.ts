@@ -53,20 +53,7 @@ export const WIZARD_DONE = "termine";
 export const OWNER_LIST_BUCKETS = ["drafts", "active", "pending", "ended"] as const;
 export type OwnerListBucket = (typeof OWNER_LIST_BUCKETS)[number];
 
-export const LISTING_API = {
-  /** POST create a draft; GET is not served (use `mine`). */
-  listings: "/api/listings",
-  mine: (bucket: OwnerListBucket) => `/api/listings/mine?status=${bucket}`,
-  /** GET (owner), PATCH, DELETE. */
-  listing: (id: string) => `/api/listings/${id}`,
-  publish: (id: string) => `/api/listings/${id}/publish`,
-  pause: (id: string) => `/api/listings/${id}/pause`,
-  resume: (id: string) => `/api/listings/${id}/resume`,
-  sold: (id: string) => `/api/listings/${id}/sold`,
-  renew: (id: string) => `/api/listings/${id}/renew`,
-  /** POST, answer `Cache-Control: no-store`. */
-  phone: (id: string) => `/api/listings/${id}/phone`,
-} as const;
+export { LISTING_API } from "./endpoints";
 
 export const listingIdSchema = z.string().regex(LISTING_ID_PATTERN);
 export const slugIdSchema = z.string().max(SLUG_ID_MAX).regex(SLUG_ID_PATTERN);

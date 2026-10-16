@@ -1,5 +1,5 @@
 import "server-only";
-import { smallWidth, type PhotoLike, type PhotoSources } from "@/components/listing/photo";
+import { srcSetOf, type PhotoLike, type PhotoSources } from "@/components/listing/photo";
 import { listingIdSchema, type ListingStatus } from "@/lib/contracts/listings";
 import { PHOTO_VARIANTS, uploadIdSchema, type PhotoVariant } from "@/lib/contracts/media";
 import { photoObjectKey, type PhotoBucket } from "@/lib/media/urls";
@@ -26,12 +26,11 @@ export function staffPhotoPath(listingId: string, photoId: string, variant: Phot
   return `/photos/${listingId}/${photoId}/${variant}`;
 }
 
-/** photoSources() through the staff route: both variants as `src` + `srcSet`. */
+/** photoSources() through the staff route: the photo's variants as `src` + `srcSet`. */
 export function staffPhotoSources(listingId: string, photo: PhotoLike, prefer: PhotoVariant = "s"): PhotoSources {
   const small = staffPhotoPath(listingId, photo.id, "s");
   const large = staffPhotoPath(listingId, photo.id, "l");
-  const sw = smallWidth(photo);
-  const srcSet = sw >= photo.w ? `${large} ${photo.w}w` : `${small} ${sw}w, ${large} ${photo.w}w`;
+  const srcSet = srcSetOf(photo, (variant) => staffPhotoPath(listingId, photo.id, variant));
   return { src: prefer === "s" ? small : large, srcSet, width: photo.w, height: photo.h, large };
 }
 

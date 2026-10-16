@@ -1,4 +1,4 @@
-import type { PhotoVariant } from "@/lib/contracts/media";
+import type { PhotoVariant } from "@/lib/contracts/photo-variants";
 
 /** `listings/{listingId}/{photoId}-{variant}.webp` under the public media base (design D6). */
 export function photoUrl(mediaBaseUrl: string | null, listingId: string, photoId: string, variant: PhotoVariant): string | null {

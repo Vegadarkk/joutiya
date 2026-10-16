@@ -407,6 +407,26 @@ describe("purge-quarantine: photos of removed listings leave the public bucket",
     expect(logger.warn).toHaveBeenCalledWith({ uploadId: photo.id, missing: 1 }, expect.stringContaining("neither bucket"));
   });
 
+  it("moves the m variant too, and only counts a variant missing when the record lists it (legacy photos have no m)", async () => {
+    const removed = removedListing("removedd");
+    const current = upload("photo0000001", { status: "ready", targetId: removed.id, variants: ["l", "m", "s"] });
+    const legacy = upload("photo0000002", { status: "ready", targetId: removed.id });
+    seedVariants(removed.id, current.id, "media", ["l", "m", "s"]);
+    seedVariants(removed.id, legacy.id);
+    vi.mocked(listListingsChangedBefore).mockResolvedValueOnce(scanPage([removed]));
+    vi.mocked(repo.listUploadsByTarget).mockResolvedValue([current, legacy]);
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ retained: 2, failed: 0 });
+    expect(store.keys("media")).toEqual([]);
+    expect(store.keys("private")).toEqual([
+      privateKey(removed.id, current.id, "l"),
+      privateKey(removed.id, current.id, "m"),
+      privateKey(removed.id, current.id, "s"),
+      privateKey(removed.id, legacy.id, "l"),
+      privateKey(removed.id, legacy.id, "s"),
+    ]);
+    expect(logger.warn).not.toHaveBeenCalledWith(expect.anything(), expect.stringContaining("neither bucket"));
+  });
+
   it("keeps the public copy when the private copy does not check out, and hands the upload to the document purge", async () => {
     const removed = removedListing("removedd");
     const photo = upload("photo0000001", { status: "ready", targetId: removed.id, purgeAt: new Date(NOW.getTime() + 30 * 86_400_000) });

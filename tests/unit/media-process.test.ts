@@ -1,7 +1,7 @@
 import { isBlurhashValid } from "blurhash";
 import zlib from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { PHOTO_VARIANT_SPECS } from "@/lib/contracts/media";
+import { PHOTO_VARIANTS, PHOTO_VARIANT_SPECS } from "@/lib/contracts/media";
 import { MediaError, isMediaError } from "@/lib/media/errors";
 import { processImage, toMediaError } from "@/lib/media/process";
 import { MAX_INPUT_PIXELS, sharp } from "@/lib/media/sharp-setup";
@@ -84,7 +84,7 @@ describe("processImage", () => {
     // 100x50 with orientation 6 (rotate 90 CW) -> 50x100; nothing enlarged.
     expect([result.sourceWidth, result.sourceHeight]).toEqual([50, 100]);
     expect([result.width, result.height]).toEqual([50, 100]);
-    for (const variant of ["l", "s"] as const) {
+    for (const variant of PHOTO_VARIANTS) {
       const buffer = result.variants[variant];
       const meta = await sharp(buffer).metadata();
       expect(meta.format).toBe("webp");
@@ -110,7 +110,10 @@ describe("processImage", () => {
     expect([large.width, large.height]).toEqual([PHOTO_VARIANT_SPECS.l.maxEdge, 1200]);
     const small = await sharp(large.variants.s).metadata();
     expect([small.width, small.height]).toEqual([PHOTO_VARIANT_SPECS.s.maxEdge, 360]);
-    expect(large.variants.s.byteLength).toBeLessThan(large.variants.l.byteLength);
+    const medium = await sharp(large.variants.m).metadata();
+    expect([medium.width, medium.height, medium.format]).toEqual([PHOTO_VARIANT_SPECS.m.maxEdge, 720, "webp"]);
+    expect(large.variants.s.byteLength).toBeLessThan(large.variants.m.byteLength);
+    expect(large.variants.m.byteLength).toBeLessThan(large.variants.l.byteLength);
 
     const portrait = await processImage(await create(1200, 2400).webp().toBuffer());
     expect([portrait.width, portrait.height]).toEqual([800, PHOTO_VARIANT_SPECS.l.maxEdge]);
@@ -119,6 +122,7 @@ describe("processImage", () => {
     const tiny = await processImage(await create(300, 200).png().toBuffer());
     expect([tiny.width, tiny.height]).toEqual([300, 200]);
     expect(await sharp(tiny.variants.s).metadata()).toMatchObject({ width: 300, height: 200, format: "webp" });
+    expect(await sharp(tiny.variants.m).metadata()).toMatchObject({ width: 300, height: 200, format: "webp" });
   });
 
   it("flattens transparency on white", async () => {

@@ -1,5 +1,6 @@
 import { z } from "@/lib/zod";
 import { LISTING_ID_PATTERN } from "@/lib/listings/ids";
+import { PHOTO_VARIANTS } from "./photo-variants";
 
 // Shared client/server contracts of the uploads API (phase 3, design §3 and D6). Client-safe: no
 // env, no db. The browser resizes (<= 2048 px JPEG/WebP, HEIC converted locally), asks for a
@@ -35,13 +36,8 @@ export type UploadRejectReason = (typeof UPLOAD_REJECT_REASONS)[number];
 export const UPLOAD_PURPOSES = ["listing"] as const;
 export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
 
-/** WebP variants published under `listings/{listingId}/{photoId}-{variant}.webp` (D6). */
-export const PHOTO_VARIANTS = ["l", "s"] as const;
-export type PhotoVariant = (typeof PHOTO_VARIANTS)[number];
-export const PHOTO_VARIANT_SPECS: Record<PhotoVariant, { maxEdge: number; quality: number }> = {
-  l: { maxEdge: 1600, quality: 80 },
-  s: { maxEdge: 480, quality: 75 },
-};
+/** WebP variants published under `listings/{listingId}/{photoId}-{variant}.webp` (D6); zod-free module for the browser. */
+export { LEGACY_PHOTO_VARIANTS, PHOTO_VARIANTS, PHOTO_VARIANT_SPECS, type PhotoVariant } from "./photo-variants";
 
 export const MEDIA_API = {
   sign: "/api/uploads/sign",
@@ -62,6 +58,8 @@ export const listingPhotoSchema = z
     h: z.number().int().min(1).max(MAX_CLIENT_EDGE_PX * 4),
     blurhash: z.string().min(6).max(120),
     hash: z.string().regex(/^[0-9a-f]{16}$/).optional(),
+    /** Variants stored for it (set by the pipeline); absent on photos from before `m`: LEGACY_PHOTO_VARIANTS. */
+    variants: z.array(z.enum(PHOTO_VARIANTS)).min(1).max(PHOTO_VARIANTS.length).optional(),
   })
   .strict();
 export type ListingPhoto = z.infer<typeof listingPhotoSchema>;

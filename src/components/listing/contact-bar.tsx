@@ -2,23 +2,29 @@
 
 import { useId, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { LogIn, MessageCircle, MessageSquare, Phone, Settings2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { formatWait, useApiErrorMessage } from "@/components/auth/form-message";
-import { TurnstileWidget } from "@/components/auth/turnstile-widget";
-import { InlineError } from "@/components/feedback/inline-error";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
-import { ApiError, apiPost, loadSession, useSession, type ApiErrorCode } from "@/lib/auth/client";
-import { LISTING_API, type PhoneRevealResponse } from "@/lib/contracts/listings";
+import { ApiError, apiPost, loadSession, useSession } from "@/lib/auth/client";
+import { LISTING_API } from "@/lib/contracts/endpoints";
+import type { PhoneRevealResponse } from "@/lib/contracts/listings";
 import { isolateLtr } from "@/lib/i18n/bidi";
 import { cn } from "@/lib/utils";
+import { isWhatsappUrl, revealFailure } from "./reveal";
+
+export { isWhatsappUrl, REVEAL_ERROR_KEYS, revealFailure, type RevealErrorKey } from "./reveal";
 
 // Contact actions of a published listing (design §5): the phone reveal island (POST
 // /api/listings/{id}/phone with the phase 2 CSRF header; the number is never in the ISR HTML),
 // WhatsApp once revealed, and the message button kept visible but disabled until the messaging of
 // phase 6. Anonymous visitors get a sign-in link that brings them back here. On phones the actions
-// sit in a bar fixed to the bottom of the screen; from lg they sit in the seller card.
+// sit in a bar fixed to the bottom of the screen; from lg they sit in the seller card. The challenge
+// and the refusal messages load on demand (contact-feedback.tsx): most visitors never need them.
+
+const RevealChallenge = dynamic(() => import("./contact-feedback").then((module) => module.RevealChallenge), { ssr: false });
+const RevealError = dynamic(() => import("./contact-feedback").then((module) => module.RevealError), { ssr: false });
 
 export interface ContactBarProps {
   listingId: string;
@@ -40,39 +46,6 @@ type RevealState =
   | { kind: "challenge"; failed: boolean }
   | { kind: "revealed"; phone: Phone }
   | { kind: "error"; error: unknown };
-
-/** Reveal refusals with a message of their own (src/lib/listings/phone-reveal.ts, escalation.ts, limiter). */
-export const REVEAL_ERROR_KEYS = ["reveal_not_allowed", "listing_unavailable", "not_found", "turnstile_required", "turnstile_failed", "rate_limited", "unavailable", "network"] as const;
-export type RevealErrorKey = (typeof REVEAL_ERROR_KEYS)[number];
-
-/**
- * What the island does with a failed reveal: `signin` (session gone), one of the reveal messages,
- * or `null` for the generic API message (account suspended, internal error).
- */
-export function revealFailure(error: unknown): "signin" | RevealErrorKey | null {
-  const code: ApiErrorCode = error instanceof ApiError ? error.code : "internal";
-  if (code === "unauthenticated") return "signin";
-  // Both escalation answers share one message (shown only when the challenge cannot help).
-  if (code === "turnstile_failed") return "turnstile_required";
-  return (REVEAL_ERROR_KEYS as readonly string[]).includes(code) ? (code as RevealErrorKey) : null;
-}
-
-function useRevealMessage(): (error: unknown) => string {
-  const t = useTranslations("ListingPage.contact.errors");
-  const generic = useApiErrorMessage();
-  const locale = useLocale();
-  return (error: unknown) => {
-    const key = revealFailure(error);
-    if (key === null || key === "signin") return generic(error);
-    if (key === "rate_limited") return t("rate_limited", { wait: formatWait(locale, error instanceof ApiError ? error.retryAfter : undefined, t("later")) });
-    return t(key);
-  };
-}
-
-/** The API builds `https://wa.me/<digits>`; anything else is never turned into a link. */
-export function isWhatsappUrl(url: string): boolean {
-  return /^https:\/\/wa\.me\/\d{8,15}$/.test(url);
-}
 
 const subscribeNever = () => () => {};
 
@@ -103,7 +76,6 @@ export function ContactBar({ listingId, slugId, sellerPublicId, showPhone, whats
   const t = useTranslations("ListingPage.contact");
   const locale = useLocale();
   const { status, session } = useSession();
-  const message = useRevealMessage();
   const hintId = useId();
   const [state, setState] = useState<RevealState>({ kind: "idle" });
   const desktop = useDesktop();
@@ -192,18 +164,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, showPhone, whats
   const feedback = (inDesktopBlock: boolean) =>
     state.kind === "challenge" ? (
       inDesktopBlock === desktop ? (
-        <div data-testid="reveal-challenge" className="flex flex-col gap-2 rounded-md bg-surface-muted p-3 text-sm">
-          <p className="text-pretty">{t("challenge")}</p>
-          <TurnstileWidget
-            key={state.failed ? "retry" : "first"}
-            action="listing"
-            cData="listing-reveal"
-            onToken={(token) => {
-              if (token) void reveal(token);
-            }}
-            error={state.failed ? t("challengeFailed") : undefined}
-          />
-        </div>
+        <RevealChallenge failed={state.failed} onToken={(token) => void reveal(token)} />
       ) : null
     ) : state.kind === "signin" ? (
       <div className="flex flex-col gap-2 rounded-md bg-surface-muted p-3 text-sm">
@@ -216,7 +177,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, showPhone, whats
         </Button>
       </div>
     ) : state.kind === "error" ? (
-      <InlineError>{message(state.error)}</InlineError>
+      <RevealError error={state.error} />
     ) : null;
 
   const hint = (

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
-import { AUTH_API, type GoogleInput, type GoogleResponse, type SessionSummary } from "@/lib/contracts/auth";
+import type { GoogleInput, GoogleResponse, SessionSummary } from "@/lib/contracts/auth";
+import { AUTH_API } from "@/lib/contracts/endpoints";
 import type { ErrorCode } from "@/lib/http/errors";
 import { CSRF_COOKIE, CSRF_HEADER } from "@/lib/security/cookies";
 

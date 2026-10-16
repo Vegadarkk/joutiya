@@ -1,10 +1,11 @@
 import { decode } from "blurhash";
-import { PHOTO_VARIANT_SPECS } from "@/lib/contracts/media";
+import { LEGACY_PHOTO_VARIANTS, PHOTO_VARIANT_SPECS, type PhotoVariant } from "@/lib/contracts/photo-variants";
 import { photoUrl } from "@/lib/listings/client/photo-url";
 
 // Image attributes of listing photos (design §8 Option A): plain <img srcSet sizes width height>
-// over the two WebP variants, and a blurhash placeholder computed where the HTML is rendered (no
-// script needed: it is in the ISR HTML, so it paints before hydration). Isomorphic and pure.
+// over the WebP variants a photo has (D6: s, m and l; s and l before m existed), and a blurhash
+// placeholder computed where the HTML is rendered (no script needed: it is in the ISR HTML, so it
+// paints before hydration). Isomorphic and pure.
 
 export interface PhotoLike {
   id: string;
@@ -12,12 +13,34 @@ export interface PhotoLike {
   w: number;
   h: number;
   blurhash: string;
+  /** Variants stored for the photo; absent on photos processed before `m` (LEGACY_PHOTO_VARIANTS). */
+  variants?: readonly PhotoVariant[];
 }
 
-/** Width of the `s` variant: the `l` size scaled to a 480 px longest edge, never enlarged. */
-export function smallWidth(photo: Pick<PhotoLike, "w" | "h">): number {
-  const scale = Math.min(1, PHOTO_VARIANT_SPECS.s.maxEdge / Math.max(photo.w, photo.h));
+/** Width of a variant: the `l` size scaled to the variant's longest edge, never enlarged. */
+export function variantWidth(photo: Pick<PhotoLike, "w" | "h">, variant: PhotoVariant): number {
+  const scale = Math.min(1, PHOTO_VARIANT_SPECS[variant].maxEdge / Math.max(photo.w, photo.h));
   return Math.max(1, Math.round(photo.w * scale));
+}
+
+/** Width of the `s` variant. */
+export function smallWidth(photo: Pick<PhotoLike, "w" | "h">): number {
+  return variantWidth(photo, "s");
+}
+
+const SRCSET_ORDER: readonly PhotoVariant[] = ["s", "m", "l"];
+
+/**
+ * `srcset` over the variants the photo has, narrowest first. A variant as wide as the next one is
+ * left out (a photo smaller than its maxEdge): the wider one is the same image at a higher quality.
+ */
+export function srcSetOf(photo: Pick<PhotoLike, "w" | "h" | "variants">, url: (variant: PhotoVariant) => string): string {
+  const stored = photo.variants ?? LEGACY_PHOTO_VARIANTS;
+  const candidates = SRCSET_ORDER.filter((variant) => variant === "l" || stored.includes(variant)).map((variant) => ({ variant, width: variant === "l" ? photo.w : variantWidth(photo, variant) }));
+  return candidates
+    .filter((candidate, index) => index === candidates.length - 1 || candidate.width < (candidates[index + 1]?.width ?? Infinity))
+    .map(({ variant, width }) => `${url(variant)} ${width}w`)
+    .join(", ");
 }
 
 export interface PhotoSources {
@@ -30,15 +53,25 @@ export interface PhotoSources {
   large: string;
 }
 
-/** Both variants as `src` + `srcSet`; null when no media host is configured. */
+/** The photo's variants as `src` + `srcSet`; null when no media host is configured. */
 export function photoSources(mediaBaseUrl: string | null, listingId: string, photo: PhotoLike, prefer: "s" | "l" = "s"): PhotoSources | null {
   const small = photoUrl(mediaBaseUrl, listingId, photo.id, "s");
   const large = photoUrl(mediaBaseUrl, listingId, photo.id, "l");
   if (!small || !large) return null;
-  const sw = smallWidth(photo);
-  // A photo smaller than 480 px has two variants of the same width: one candidate is enough.
-  const srcSet = sw >= photo.w ? `${large} ${photo.w}w` : `${small} ${sw}w, ${large} ${photo.w}w`;
+  const srcSet = srcSetOf(photo, (variant) => photoUrl(mediaBaseUrl, listingId, photo.id, variant) ?? large);
   return { src: prefer === "s" ? small : large, srcSet, width: photo.w, height: photo.h, large };
+}
+
+/**
+ * `photos` with the variant list of their stored record (by id): the public view keeps the four
+ * display fields only, and the gallery needs to know which photos have `m`.
+ */
+export function withStoredVariants<T extends PhotoLike>(photos: readonly T[], stored: readonly { id: string; variants?: readonly PhotoVariant[] }[]): T[] {
+  const byId = new Map(stored.map((photo) => [photo.id, photo.variants]));
+  return photos.map((photo) => {
+    const variants = byId.get(photo.id);
+    return variants ? { ...photo, variants } : photo;
+  });
 }
 
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

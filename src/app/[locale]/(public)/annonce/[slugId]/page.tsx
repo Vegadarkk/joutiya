@@ -9,6 +9,7 @@ import { Breadcrumb, searchHref } from "@/components/listing/breadcrumb";
 import { ContactBar } from "@/components/listing/contact-bar";
 import { CriteriaSection } from "@/components/listing/criteria-grid";
 import { Gallery } from "@/components/listing/gallery";
+import { withStoredVariants } from "@/components/listing/photo";
 import { JsonLd } from "@/components/listing/json-ld";
 import { ListingStatusBanner } from "@/components/listing/listing-status-banner";
 import { PriceTag } from "@/components/listing/price-tag";
@@ -19,6 +20,7 @@ import { ListingMapBlock } from "@/components/map/listing-map-block";
 import { categoryById, subcategoryById } from "@/config/categories";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
+import type { PhotoVariant } from "@/lib/contracts/photo-variants";
 import { pageLocale } from "@/i18n/params";
 import { isolate } from "@/lib/i18n/bidi";
 import { alternates } from "@/lib/i18n/metadata";
@@ -48,6 +50,8 @@ interface Loaded {
   listing: PublicListing;
   /** Server side only: the seller lookup. Never rendered, never passed to a client component. */
   ownerUid: string;
+  /** The variants each stored photo has (D6: `m` since its introduction), for the gallery's srcset. */
+  storedPhotos: { id: string; variants?: readonly PhotoVariant[] }[];
   redirect: boolean;
 }
 
@@ -56,7 +60,9 @@ const load = cache(async (segment: string): Promise<Loaded | null> => {
   const found = await getPublishedBySlugId(segment);
   if (!found) return null;
   const listing = toPublicListing(found.listing, found.state, found.canonicalSlugId);
-  return listing ? { listing, ownerUid: found.listing.ownerUid, redirect: found.redirect } : null;
+  if (!listing) return null;
+  const storedPhotos = found.listing.photos.map(({ id, variants }) => ({ id, variants }));
+  return { listing, ownerUid: found.listing.ownerUid, storedPhotos, redirect: found.redirect };
 });
 
 async function sellerOf(ownerUid: string): Promise<PublicSeller | null> {
@@ -152,7 +158,7 @@ export default async function ListingPage({ params }: { params: Params }) {
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-x-10 lg:[grid-template-areas:'gallery_aside'_'header_aside'_'body_aside'] xl:grid-cols-[minmax(0,1fr)_24rem]">
           <div className="-mx-4 sm:mx-0 lg:[grid-area:gallery]">
-            <Gallery listingId={listing.id} title={listing.title} photos={listing.photos} mediaBaseUrl={media} />
+            <Gallery listingId={listing.id} title={listing.title} photos={withStoredVariants(listing.photos, found.storedPhotos)} mediaBaseUrl={media} />
           </div>
 
           <header className="flex min-w-0 flex-col gap-3 lg:[grid-area:header]">

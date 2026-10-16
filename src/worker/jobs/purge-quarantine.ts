@@ -1,4 +1,4 @@
-import { PHOTO_VARIANTS } from "@/lib/contracts/media";
+import { LEGACY_PHOTO_VARIANTS, PHOTO_VARIANTS, type PhotoVariant } from "@/lib/contracts/media";
 import { getListings, type ListingRecord } from "@/lib/db/repositories/listings";
 import { listListingsChangedBefore, type ListingCursor } from "@/lib/db/repositories/retention";
 import {
@@ -148,8 +148,12 @@ export function isPublicPhoto(upload: Pick<UploadRecord, "purpose" | "status" | 
   return upload.status === "ready" || (upload.status === "rejected" && (upload.variants?.length ?? 0) > 0);
 }
 
-/** Moves a photo's variants from the media bucket to the private one; returns how many are in neither. */
-async function moveVariantsToPrivate(store: ObjectStore, listingId: string, photoId: string): Promise<number> {
+/**
+ * Moves a photo's variants from the media bucket to the private one: every variant name, since a
+ * record may not list one it has (no public copy may stay). Returns how many of `expected` (the
+ * variants the record lists) are in neither bucket.
+ */
+async function moveVariantsToPrivate(store: ObjectStore, listingId: string, photoId: string, expected: readonly PhotoVariant[]): Promise<number> {
   let missing = 0;
   for (const variant of PHOTO_VARIANTS) {
     const outcome = await moveObject(
@@ -158,7 +162,7 @@ async function moveVariantsToPrivate(store: ObjectStore, listingId: string, phot
       { bucket: "private", key: photoObjectKey("private", listingId, photoId, variant) },
       { contentType: MEDIA_CONTENT_TYPE, maxBytes: MAX_VARIANT_BYTES },
     );
-    if (outcome === "missing") missing += 1;
+    if (outcome === "missing" && expected.includes(variant)) missing += 1;
   }
   return missing;
 }
@@ -170,7 +174,7 @@ async function moveVariantsToPrivate(store: ObjectStore, listingId: string, phot
  * is not checked yet is still in place. False when the upload changed meanwhile (not recorded).
  */
 export async function retainUpload(store: ObjectStore, upload: UploadRecord, now: Date): Promise<boolean> {
-  const missing = await moveVariantsToPrivate(store, upload.targetId, upload.id);
+  const missing = await moveVariantsToPrivate(store, upload.targetId, upload.id, upload.variants ?? LEGACY_PHOTO_VARIANTS);
   if (missing > 0) logger.warn({ uploadId: upload.id, missing }, "retained photo: variant found in neither bucket");
   const marked = await transitionUpload(upload.id, RETAINABLE_UPLOAD_STATUSES, { bucket: "private", finalKey: photoFinalKey("private", upload.targetId, upload.id) }, now);
   if (!marked.ok) logger.warn({ uploadId: upload.id }, "retained photo: upload changed meanwhile, location not recorded");
@@ -195,7 +199,7 @@ async function retainListingPhotos(store: ObjectStore, listing: ListingRecord, n
   // An attached photo without an upload document (lost): its keys are still derivable. A failure
   // stops the scan here (no document to hand over).
   const known = new Set(uploads.map((upload) => upload.id));
-  for (const photo of listing.photos) if (!known.has(photo.id)) await moveVariantsToPrivate(store, listing.id, photo.id);
+  for (const photo of listing.photos) if (!known.has(photo.id)) await moveVariantsToPrivate(store, listing.id, photo.id, photo.variants ?? LEGACY_PHOTO_VARIANTS);
 }
 
 async function retainRemovedPhotos(store: ObjectStore, now: Date, result: PurgeQuarantineResult): Promise<void> {

@@ -42,10 +42,14 @@ describe("staff photo route helpers", () => {
       large: `/photos/${LISTING}/${PHOTO}/l`,
     });
     expect(staffPhotoSources(LISTING, { id: PHOTO, w: 300, h: 200, blurhash: "LEHV6nWB2yk8" }, "l").srcSet).toBe(`/photos/${LISTING}/${PHOTO}/l 300w`);
+    expect(staffPhotoSources(LISTING, { id: PHOTO, w: 1600, h: 1200, blurhash: "LEHV6nWB2yk8", variants: ["l", "m", "s"] }).srcSet).toBe(
+      `/photos/${LISTING}/${PHOTO}/s 480w, /photos/${LISTING}/${PHOTO}/m 960w, /photos/${LISTING}/${PHOTO}/l 1600w`,
+    );
   });
 
   it("accepts only valid ids and known variants", () => {
     expect(parseStaffPhotoParams({ listingId: LISTING, photoId: PHOTO, variant: "l" })).toEqual({ listingId: LISTING, photoId: PHOTO, variant: "l" });
+    expect(parseStaffPhotoParams({ listingId: LISTING, photoId: PHOTO, variant: "m" })).toEqual({ listingId: LISTING, photoId: PHOTO, variant: "m" });
     expect(parseStaffPhotoParams({ listingId: LISTING, photoId: PHOTO, variant: "xl" })).toBeNull();
     expect(parseStaffPhotoParams({ listingId: "ABCD2345", photoId: PHOTO, variant: "s" })).toBeNull();
     expect(parseStaffPhotoParams({ listingId: LISTING, photoId: "../../etc", variant: "s" })).toBeNull();

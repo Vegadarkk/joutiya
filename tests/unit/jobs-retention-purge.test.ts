@@ -248,7 +248,7 @@ describe("retention-purge: removed listings keep their photos until their own pu
     vi.mocked(retention.listListingsPastPurge).mockResolvedValueOnce(page([record]));
     await retentionPurge(NOW, { store });
     expect(store.calls.filter((call) => call.bucket === "private")).toEqual([]);
-    expect(store.calls.filter((call) => call.bucket === "media").map((call) => call.key)).toEqual(["listings/abcd2345/photo00000000001-l.webp", "listings/abcd2345/photo00000000001-s.webp"]);
+    expect(store.calls.filter((call) => call.bucket === "media").map((call) => call.key)).toEqual(["listings/abcd2345/photo00000000001-l.webp", "listings/abcd2345/photo00000000001-m.webp", "listings/abcd2345/photo00000000001-s.webp"]);
   });
 
   it("reads the uploads of a purged listing page after page until a short page", async () => {
