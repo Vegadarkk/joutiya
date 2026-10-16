@@ -449,6 +449,20 @@ describe("processUpload: idempotency and races", () => {
     expect(store.keys("media")).toEqual([keyL(record.id), keyS(record.id)]);
   });
 
+  it("leaves the objects of a concurrent run that finished first when its own run is refused", async () => {
+    const record = upload();
+    seed(record, await plainJpeg());
+    listing({ photos: Array.from({ length: 10 }, (_, i) => photo(`full${String(i).padStart(5, "0")}x`)) });
+    // This run is refused (draft full) after the other run marked the same upload ready.
+    const ready = { ...record, status: "ready", width: 64, height: 48, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", hash: "0123456789abcdef", variants: ["l", "s"] };
+    vi.mocked(markUploadReady).mockImplementationOnce(async (id) => {
+      fake.uploads.set(id, ready);
+      return { ok: false, reason: "photo_limit", upload: structuredClone(record) };
+    });
+    expect(await processUpload(record.id, { store, classifier: clean() })).toMatchObject({ status: "ready", photo: { id: record.id } });
+    expect(store.keys("media")).toEqual([keyL(record.id), keyS(record.id)]);
+  });
+
   it("does not attach to a draft published while it was processing (the owner's PATCH re-screens it)", async () => {
     const record = upload();
     seed(record, await plainJpeg());

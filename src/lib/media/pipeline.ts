@@ -81,14 +81,18 @@ interface RejectExtras {
 }
 
 async function reject(upload: UploadRecord, reason: UploadRejectReason, ctx: Context, extras: RejectExtras = {}): Promise<UploadStatusResponse | null> {
-  await deleteQuietly(ctx.store, "quarantine", [upload.quarantineKey], upload.id);
-  if (extras.variants) await deleteQuietly(ctx.store, "media", variantKeys(upload), upload.id);
   const marked = await transitionUpload(
     upload.id,
     ["signed", "processing"],
     { status: "rejected", rejectReason: reason, ...(extras.size !== undefined ? { size: extras.size } : {}), ...(extras.checks ? { checks: extras.checks } : {}) },
     ctx.now(),
   );
+  // A concurrent run that finished owns the same keys: its objects stay. Otherwise they go (the
+  // purge retries a deletion that fails here); never read, whatever the order.
+  if (marked.ok || marked.upload?.status !== "ready") {
+    await deleteQuietly(ctx.store, "quarantine", [upload.quarantineKey], upload.id);
+    if (extras.variants) await deleteQuietly(ctx.store, "media", variantKeys(upload), upload.id);
+  }
   if (!marked.ok) return marked.upload ? toStatusResponse(marked.upload) : null;
   logger.info({ uploadId: upload.id, listingId: upload.targetId, reason }, "upload rejected");
   return { status: "rejected", rejectReason: reason };

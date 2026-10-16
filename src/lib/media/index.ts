@@ -26,5 +26,5 @@ export { listingMediaPrefix, MEDIA_CACHE_CONTROL, MEDIA_CONTENT_TYPE, mediaObjec
 export { MAX_INPUT_PIXELS, PIPELINE_TIMEOUT_SECONDS } from "./sharp-setup";
 export { expireUpload, processUpload } from "./pipeline";
 export type { PipelineDeps } from "./pipeline";
-export { closeMediaQueue, dispatchUpload, enqueueMediaJob, isMediaJobData, isMediaQueueEnabled, MEDIA_CONCURRENCY, MEDIA_JOB, MEDIA_JOB_OPTIONS, MEDIA_QUEUE, mediaJobId } from "./queue";
+export { closeMediaQueue, dispatchUpload, ENQUEUE_TIMEOUT_MS, enqueueMediaJob, isMediaJobData, isMediaQueueEnabled, MEDIA_CONCURRENCY, MEDIA_JOB, MEDIA_JOB_OPTIONS, MEDIA_QUEUE, mediaJobId } from "./queue";
 export type { MediaJobData } from "./queue";
