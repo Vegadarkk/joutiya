@@ -344,7 +344,8 @@
       "phone_not_mobile": "Seul un numéro de mobile marocain (06 ou 07) peut être vérifié.",
       "unavailable": "Le service est momentanément indisponible. Réessayez dans quelques minutes.",
       "internal": "Une erreur technique est survenue. Réessayez.",
-      "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez."
+      "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez.",
+      "quota_exhausted": "Cette action est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc)."
     }
   },
   "Listing": {

@@ -9,8 +9,12 @@ import { firstDegraded, nextReset } from "./index";
 // failing half-way (an Auth record without its documents, a 500 in the wizard). Reports stay open.
 // Unknown counters (Valkey down) count as available, like everywhere else.
 
-/** Listing deposit: create, edit, publish, renew, photo uploads ("Dépôt d'annonces suspendu"). */
-export const DEPOSIT_QUOTAS = ["firestore.writes", "firestore.storage"] as const satisfies readonly QuotaId[];
+/**
+ * Listing deposit: create, edit, publish, renew and resume, photo uploads ("Dépôt d'annonces
+ * suspendu"). Not firestore.storage: nothing measures it on Spark, and it does not reset at night
+ * (a full store would need its own code and message, like storage_full for R2).
+ */
+export const DEPOSIT_QUOTAS = ["firestore.writes"] as const satisfies readonly QuotaId[];
 
 /** New account (password or Google): three documents, then the connection log. */
 export const SIGNUP_QUOTAS = ["firestore.writes"] as const satisfies readonly QuotaId[];
@@ -21,10 +25,14 @@ export const SIGNUP_QUOTAS = ["firestore.writes"] as const satisfies readonly Qu
  */
 export const PUBLIC_READ_QUOTAS = ["firestore.reads"] as const satisfies readonly QuotaId[];
 
-/** API code of a refusal (the client shows the matching Listing.errors or Auth.errors message). */
+/**
+ * API code of a refusal. Auth.errors.quota_exhausted (messages/*.json) says to retry after 9 h,
+ * Morocco time (the Pacific midnight is 07:00 to 09:00 there): switch to "quota_exhausted" once
+ * that code is in ErrorCode (src/lib/http/errors.ts).
+ */
 export const QUOTA_ERROR_CODE: ErrorCode = "unavailable";
 
-/** At least a minute: a gauge measured at its reset may still be full. */
+/** Never below a minute: a refusal just before the reset must not invite a tight retry loop. */
 const MIN_RETRY_SECONDS = 60;
 
 /** Seconds until the provider resets `id` (Retry-After). */
@@ -34,7 +42,7 @@ export function retryAfterSeconds(id: QuotaId, at = new Date()): number {
 
 /** 503 for a degraded quota, retryable at the provider's reset. */
 export function quotaUnavailable(id: QuotaId, at = new Date()): HttpError {
-  return new HttpError(503, QUOTA_ERROR_CODE, `${id} quota degraded until its reset`, { headers: { "Retry-After": String(retryAfterSeconds(id, at)) } });
+  return new HttpError(503, QUOTA_ERROR_CODE, "daily quota reached, retry after the reset", { headers: { "Retry-After": String(retryAfterSeconds(id, at)) } });
 }
 
 /** Throws quotaUnavailable for the first degraded quota of `ids`; one Valkey round trip. */

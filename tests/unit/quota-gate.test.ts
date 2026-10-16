@@ -14,7 +14,7 @@ beforeEach(() => {
 
 describe("quota gate", () => {
   it("names the quotas each degraded mode watches (src/config/quotas.ts degradedMode)", () => {
-    expect(DEPOSIT_QUOTAS).toEqual(["firestore.writes", "firestore.storage"]);
+    expect(DEPOSIT_QUOTAS).toEqual(["firestore.writes"]);
     expect(SIGNUP_QUOTAS).toEqual(["firestore.writes"]);
     expect(PUBLIC_READ_QUOTAS).toEqual(["firestore.reads"]);
   });
