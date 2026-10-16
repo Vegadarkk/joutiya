@@ -215,18 +215,27 @@ export async function deleteUpload(uploader: Uploader, id: string, now = new Dat
   const listing = await getListing(upload.targetId);
   if (listing && !PHOTO_TARGET_STATUSES.includes(listing.status)) throw new HttpError(409, "conflict", `the photos of a ${listing.status} listing are retained with it`);
   if (listing) await detach(uploader, listing.id, id, LIVE_STATUSES, now);
-  let freedBytes = upload.status === "ready" ? (upload.size ?? 0) : 0;
+  const held = listing !== null && listing.legalHold.length > 0;
+  // A photo deleted earlier under a hold now lifted still has its variants, and its bytes counted.
+  let freedBytes = upload.status === "ready" || upload.heldObjects ? (upload.size ?? 0) : 0;
   if (upload.status !== "rejected") {
     // Out of `ready` first, hold or not: a document kept as evidence is never attached or offered
-    // for the next save again (the owner's view lists it as refused until it is purged).
-    const ended = await transitionUpload(id, ["signed", "processing", "ready"], { status: "rejected", rejectReason: "expired" }, now);
+    // for the next save again (the owner's view lists it as refused until it is purged). Its
+    // variants stay under a hold: `heldObjects` (set from the record the transaction reads, so a
+    // pipeline run that finished meanwhile is caught) keeps them in the storage gauge's recount.
+    const ended = await transitionUpload(
+      id,
+      ["signed", "processing", "ready"],
+      (current) => ({ status: "rejected", rejectReason: "expired", ...(held && current.status === "ready" ? { heldObjects: true as const } : {}) }),
+      now,
+    );
     if (!ended.ok && !ended.upload) throw notFound();
     // Finished by the pipeline between the read and the transition: its bytes were counted.
     if (ended.ok && upload.status !== "ready" && ended.upload.variants) freedBytes = ended.upload.size ?? 0;
     // Past the point of no return: the photo goes even if it was the last one.
     if (listing && upload.status !== "ready") await detach(uploader, listing.id, id, [], now);
   }
-  if (listing && listing.legalHold.length > 0) {
+  if (held) {
     logger.info({ uploadId: id, listingId: listing.id }, "upload kept under legal hold");
     return;
   }

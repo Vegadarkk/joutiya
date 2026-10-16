@@ -12,6 +12,17 @@
         "edge_ttl": { "mode": "respect_origin" },
         "browser_ttl": { "mode": "respect_origin" }
       }
+    },
+    {
+      "ref": "media_edge_ttl",
+      "description": "R2 media hosts (photos, PMTiles map): the origin sends max-age=31536000, immutable, which browsers keep, but the edge keeps a copy one day at most, so the photos of a removed listing leave the CDN within a day of their move to the private bucket; an urgent removal is purged by URL.",
+      "expression": "http.host in {\"media.joutiya.ma\" \"media-staging.joutiya.ma\"}",
+      "action": "set_cache_settings",
+      "action_parameters": {
+        "cache": true,
+        "edge_ttl": { "mode": "override_origin", "default": 86400 },
+        "browser_ttl": { "mode": "respect_origin" }
+      }
     }
   ]
 }

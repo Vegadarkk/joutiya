@@ -16,7 +16,7 @@ import { DELETE as remove, PATCH as patch } from "@/app/api/listings/[id]/route"
 import { POST as publish } from "@/app/api/listings/[id]/publish/route";
 import type { CreateListingResponse } from "@/lib/contracts/listings";
 import { getListing } from "@/lib/db/repositories/listings";
-import { getUpload, readRetainedScanCursor, sumReadyBytes, writeRetainedScanCursor } from "@/lib/db/repositories/uploads";
+import { getUpload, readRetainedScanCursor, sumStoredBytes, writeRetainedScanCursor } from "@/lib/db/repositories/uploads";
 import { resetServerEnv } from "@/lib/env";
 import { auth } from "@/lib/firebase/admin";
 import { setClaims, type Role } from "@/lib/firebase/claims";
@@ -93,7 +93,7 @@ describe("photos of a removed listing", () => {
     expect(removed.status).toBe("removed");
     // The scan resumes just before this removal (removed listings of other test files are older).
     await writeRetainedScanCursor({ at: new Date(removed.updatedAt.getTime() - 1), id });
-    const bytesBefore = await sumReadyBytes();
+    const bytesBefore = await sumStoredBytes();
 
     // Within the scan lag the listing is not read yet; once past it, the scan moves its photo.
     const early = await purgeQuarantine(new Date(removed.updatedAt.getTime() + RETAINED_SCAN_LAG_MS - 1_000), { store });
@@ -113,8 +113,9 @@ describe("photos of a removed listing", () => {
     expect((await getListing(id))!.photos.map((photo) => photo.id)).toEqual([upload]);
     expect(store.has("media", mediaObjectKey(kept.id, kept.upload, "l"))).toBe(true);
     expect((await getUpload(kept.upload))?.bucket).toBe("media");
-    // Same bytes, other bucket: the gauge recount does not move.
-    expect(await sumReadyBytes()).toBe(bytesBefore);
+    // Same bytes, other bucket: the gauge recount does not move (other than for the unattached
+    // uploads of earlier test files that these runs purged).
+    expect(await sumStoredBytes()).toBe(bytesBefore - early.freedBytes - result.freedBytes);
     const cursor = (await readRetainedScanCursor())!;
     expect(cursor.at.getTime()).toBeGreaterThanOrEqual(removed.updatedAt.getTime());
 

@@ -70,7 +70,8 @@ vi.mock("@/lib/db/repositories/listings", () => ({
 
 const { expireUpload, processUpload } = await import("@/lib/media/pipeline");
 const { MemoryObjectStore } = await import("@/lib/storage/memory");
-const { ClassifierUnavailableError, StubImageClassifier, UnavailableImageClassifier } = await import("@/lib/media/classify");
+const { ClassifierUnavailableError, resetImageClassifier, StubImageClassifier, UnavailableImageClassifier } = await import("@/lib/media/classify");
+const { resetServerEnv } = await import("@/lib/env");
 const { alert } = await import("@/lib/alert");
 const { sharp } = await import("@/lib/media/sharp-setup");
 const { markUploadReady, transitionUpload } = await import("@/lib/db/repositories/uploads");
@@ -258,9 +259,19 @@ describe("processUpload: happy path", () => {
   it("does not store the zeros of the stand-in classifier as checks (models missing)", async () => {
     const record = upload();
     seed(record, await plainJpeg());
-    // No classifier injected: the factory falls back to the stub (no model files in tests).
-    expect(await processUpload(record.id, { store })).toMatchObject({ status: "ready" });
-    expect(stored(record.id).checks).toEqual({});
+    // No classifier injected: the factory falls back to the stub (no model files there, even on a
+    // machine that fetched them into ./models).
+    vi.stubEnv("MEDIA_MODELS_DIR", "/nonexistent/joutiya-models");
+    resetServerEnv();
+    await resetImageClassifier();
+    try {
+      expect(await processUpload(record.id, { store })).toMatchObject({ status: "ready" });
+      expect(stored(record.id).checks).toEqual({});
+    } finally {
+      vi.unstubAllEnvs();
+      resetServerEnv();
+      await resetImageClassifier();
+    }
   });
 });
 

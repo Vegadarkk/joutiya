@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// r2-storage-gauge (03:10 UTC, D15): the sum of the ready uploads replaces the Valkey counter, the
-// encrypted backups still in the private bucket (98 days, from system/backup) replace theirs, and
-// the gauge becomes media + backups + map tiles reserve + R2_STORAGE_BASELINE_BYTES.
+// r2-storage-gauge (03:10 UTC, D15): the sum of the stored photos (ready uploads, and those deleted
+// under a legal hold) replaces the Valkey counter, the encrypted backups still in the private bucket
+// (98 days, from system/backup) replace theirs, and the gauge becomes media + backups + map tiles
+// reserve + R2_STORAGE_BASELINE_BYTES.
 
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 const configured = { value: true };
 vi.mock("@/lib/firebase/admin", () => ({ isFirestoreConfigured: () => configured.value, isFirebaseConfigured: () => configured.value, db: vi.fn(() => ({ fake: "db" })) }));
-vi.mock("@/lib/db/repositories/uploads", () => ({ sumReadyBytes: vi.fn(async () => 2_500_000_000) }));
+vi.mock("@/lib/db/repositories/uploads", () => ({ sumStoredBytes: vi.fn(async () => 2_500_000_000) }));
 vi.mock("@/lib/backup/export", () => ({ readRetainedBackupBytes: vi.fn(async () => 300_000_000) }));
 vi.mock("@/lib/uploads/storage-gauge", () => ({
   MAP_TILES_RESERVE_BYTES: 64_000_000,
@@ -17,7 +18,7 @@ vi.mock("@/lib/uploads/storage-gauge", () => ({
   resetMediaBytes: vi.fn(async (total: number) => ({ id: "r2.storage", period: "2026-10-16", used: total + 4_504_000_000, limit: 10_000_000_000, ratio: 0.7, level: "ok" })),
 }));
 
-const { sumReadyBytes } = await import("@/lib/db/repositories/uploads");
+const { sumStoredBytes } = await import("@/lib/db/repositories/uploads");
 const { readRetainedBackupBytes } = await import("@/lib/backup/export");
 const { readMediaBytes, resetMediaBytes, setBackupBytes } = await import("@/lib/uploads/storage-gauge");
 const { resetServerEnv } = await import("@/lib/env");
@@ -29,7 +30,7 @@ beforeEach(() => {
   configured.value = true;
   delete process.env.R2_STORAGE_BASELINE_BYTES;
   resetServerEnv();
-  vi.mocked(sumReadyBytes).mockClear();
+  vi.mocked(sumStoredBytes).mockClear();
   vi.mocked(resetMediaBytes).mockClear();
   vi.mocked(setBackupBytes).mockClear();
   vi.mocked(readRetainedBackupBytes).mockClear();
@@ -41,7 +42,7 @@ afterEach(() => {
 });
 
 describe("r2-storage-gauge", () => {
-  it("recounts the ready uploads and the retained backups, replaces both counters and reports the account total", async () => {
+  it("recounts the stored photos and the retained backups, replaces both counters and reports the account total", async () => {
     expect(await r2StorageGauge(NOW)).toEqual({
       mediaBytes: 2_500_000_000,
       backupBytes: 300_000_000,
@@ -51,7 +52,7 @@ describe("r2-storage-gauge", () => {
       counterBefore: 2_400_000_000,
       level: "ok",
     });
-    expect(sumReadyBytes).toHaveBeenCalledTimes(1);
+    expect(sumStoredBytes).toHaveBeenCalledTimes(1);
     expect(readRetainedBackupBytes).toHaveBeenCalledWith({ fake: "db" }, NOW);
     expect(setBackupBytes).toHaveBeenCalledWith(300_000_000, NOW);
     expect(resetMediaBytes).toHaveBeenCalledWith(2_500_000_000, NOW);
@@ -77,6 +78,6 @@ describe("r2-storage-gauge", () => {
   it("skips without Firebase", async () => {
     configured.value = false;
     expect(await r2StorageGauge(NOW)).toBeNull();
-    expect(sumReadyBytes).not.toHaveBeenCalled();
+    expect(sumStoredBytes).not.toHaveBeenCalled();
   });
 });

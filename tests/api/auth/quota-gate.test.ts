@@ -70,6 +70,32 @@ describe("sign-up with degraded Firestore writes", () => {
     expect(await findUidByEmail(email)).not.toBeNull();
   });
 
+  it("does not use up the device's sign-up allowance (3 a day) on refusals: the retry after the reset goes through", async () => {
+    vi.mocked(firstDegraded).mockResolvedValue("firestore.writes");
+    const jar = new Jar();
+    const body = { email: uniqueEmail("qd"), password: PASSWORD, displayName: "Yasmine Test", locale: "fr", consents: CONSENTS, turnstileToken: "t" };
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      const refused = await call<ErrorBody>(signup, SIGNUP, { jar, body });
+      expect([refused.status, refused.body.error.code], `attempt ${attempt}`).toEqual([503, QUOTA_ERROR_CODE]);
+    }
+    vi.mocked(firstDegraded).mockResolvedValue(null);
+    const accepted = await call(signup, SIGNUP, { jar, body });
+    expect(accepted.status).toBe(202);
+  });
+
+  it("does not use up the device's sign-up allowance on refused Google consent passes either", async () => {
+    vi.mocked(firstDegraded).mockResolvedValue("firestore.writes");
+    const jar = new Jar();
+    const email = uniqueEmail("qe");
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      const refused = await call<ErrorBody>(google, GOOGLE, { jar, body: googleBody(email) });
+      expect([refused.status, refused.body.error.code], `attempt ${attempt}`).toEqual([503, QUOTA_ERROR_CODE]);
+    }
+    vi.mocked(firstDegraded).mockResolvedValue(null);
+    const created = await call<SignedInBody>(google, GOOGLE, { jar, body: googleBody(email, { consents: CONSENTS, turnstileToken: "t", locale: "fr" }) });
+    expect(created.body.status).toBe("signed_in");
+  });
+
   it("refuses a new Google account before the consent step, and still signs a member in", async () => {
     const member = uniqueEmail("qg");
     const created = await call<SignedInBody>(google, GOOGLE, { jar: new Jar(), body: googleBody(member, { consents: CONSENTS, turnstileToken: "t", locale: "fr" }) });

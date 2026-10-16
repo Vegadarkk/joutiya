@@ -6,7 +6,7 @@ Le code de la phase 2 est dans la PR de la branche `claude/mvp-phase-2-fable-xd8
 
 - Phase 0 : étapes 5 (projets Firebase), 7 (Resend, Brevo) et 9 (app Meta) faites, ou au moins le projet Firebase de l'environnement visé.
 - Phase 1 : étapes 1 à 7 faites pour l'environnement visé (VM, tunnels, Access, fédération d'identité X.509 : le compte de service `joutiya-web` existe déjà avec `roles/iam.serviceAccountTokenCreator` sur lui-même, c'est lui qui signe les jetons de session).
-- Les clés vont dans `.env.local` sous les noms de `.env.example`, puis dans `/etc/joutiya/<env>/app.env` sur la VM (prompt G de la phase 1, complété par le prompt L ci-dessous). Jamais dans le dépôt ni dans le chat.
+- Les clés vont dans `.env.local` sous les noms de `.env.example` suffixés `_STAGING` ou `_PROD` (sauf les paires déjà rangées par Nav), puis dans `/etc/joutiya/<env>/app.env` sur la VM (prompt O de la phase 1, étape 16). Jamais dans le dépôt ni dans le chat.
 - Aucune variable `NEXT_PUBLIC_*` : la configuration du navigateur est servie à l'exécution (`/api/config`). Une image sert le staging et la production. Un nom `NEXT_PUBLIC_*` empêche l'application de démarrer.
 
 ## Qui fait quoi (règle n°1)
@@ -14,7 +14,7 @@ Le code de la phase 2 est dans la PR de la branche `claude/mvp-phase-2-fable-xd8
 - **Claude** agit par API avec les jetons `JOUTIYA_*` de votre environnement cloud : clés d'envoi Resend, enregistrement des identifiants dans `infra/targets.json`, mise à jour du guide.
 - **Nav** (Claude dans votre navigateur) fait les réglages des consoles : Firebase Authentication, client OAuth Google, widget Turnstile, clés Brevo, webhook et secret Meta, compte Sentry. Il prépare chaque secret jusqu'à l'écran qui le crée et ne le voit jamais.
 - **Vous :** mots de passe, codes de double authentification, CAPTCHA, le clic qui révèle un secret, son rangement dans `.env.local` ou sur la VM, et la phrase d'autorisation dans le fil de Nav avant toute création (celle du 15 octobre couvre N1 à N10 ; les étapes N11 à N13 ci-dessous demandent une phrase de plus). Ces moments sont signalés par **Vous :**.
-- **Cody** : les prompts en fin de page (variables de la VM, premier administrateur).
+- **Cody** : le prompt O de la phase 1 (variables de la VM) et le prompt M en fin de page (premier administrateur).
 
 ## Les jetons de la phase 2, service par service
 
@@ -23,7 +23,7 @@ Le code de la phase 2 est dans la PR de la branche `claude/mvp-phase-2-fable-xd8
 | Firebase | `FIREBASE_API_KEY` (clé navigateur de l'app web) | Restrictions : référents `https://joutiya.ma/*`, `https://www.joutiya.ma/*` (staging : `https://staging.joutiya.ma/*`) ; API Identity Toolkit, Token Service, Cloud Firestore | `.env.local`, `app.env` (publique par conception, mais hors du dépôt) | Nav crée, vous copiez |
 | Firebase | `FIREBASE_SERVER_API_KEY` (clé `joutiya-server`, optionnelle) | Sans restriction de référent ; API Identity Toolkit uniquement | `app.env` | Nav crée, **Vous :** copie |
 | Firebase | `FIREBASE_APP_ID` | Identifiant public `1:<numéro>:web:<hash>` | `.env.local`, `app.env`, `infra/targets.json` | Nav rapporte, Claude consigne |
-| Firebase | `FIREBASE_SERVICE_ACCOUNT` | `joutiya-web@<projet>.iam.gserviceaccount.com` (créé en phase 1, prompt H) | `app.env` | Cody (prompt L) |
+| Firebase | `FIREBASE_SERVICE_ACCOUNT` | `joutiya-web@<projet>.iam.gserviceaccount.com` (créé en phase 1, étape 9) | `app.env` | Claude, depuis le registre (étape 16 de la phase 1) |
 | Google | `GOOGLE_OAUTH_CLIENT_ID` (client `joutiya-site`) | Origines JavaScript du site uniquement, aucun secret utilisé | `.env.local`, `app.env`, `infra/targets.json` | Nav rapporte, Claude consigne |
 | Cloudflare | `TURNSTILE_SITE_KEY` (publique), `TURNSTILE_SECRET_KEY` | Un widget par environnement, limité à ses noms d'hôte | `.env.local`, `app.env` | Nav crée, **Vous :** la clé secrète |
 | Resend | `MAIL_API_KEY` (clé `joutiya-web-<env>`) | *Sending access*, domaine `notif.joutiya.ma` seulement | `app.env` | Claude par API, rangée directement sur la VM par le fil de déploiement |
@@ -34,7 +34,7 @@ Le code de la phase 2 est dans la PR de la branche `claude/mvp-phase-2-fable-xd8
 | Meta | `WHATSAPP_VERIFY_TOKEN` | Chaîne aléatoire d'au moins 32 caractères, la même dans `app.env` et la console Meta (sert seulement à la poignée de main du webhook) | `.env.local`, `app.env`, console Meta | **Vous :** la générez et la collez dans la console ; Cody la copie sur la VM |
 | Meta | `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_DISPLAY_NUMBER` | Identifiant public du numéro, numéro en chiffres sans `+` (numéro de test, puis la ligne professionnelle d'Adark Prime en production, `33…`) | `app.env`, `infra/targets.json` | Nav rapporte |
 | Sentry | `SENTRY_DSN` | DSN public d'un projet de l'organisation Joutiya, région UE (`*.ingest.de.sentry.io`) | `app.env` | Nav rapporte |
-| VM | `CSRF_SECRET` | 32 caractères aléatoires, différent de `HASH_PEPPER`, un par environnement | `app.env` | Cody (prompt L) |
+| VM | `CSRF_SECRET` | 32 caractères aléatoires, différent de `HASH_PEPPER`, un par environnement | `app.env` | Généré sur la VM (étape 16 de la phase 1) |
 
 Aucun autre jeton n'est créé en phase 2 : pas de clé JSON de compte de service, pas de jeton Meta (le site ne fait que recevoir), pas de clé Console Claude (phase 5).
 
@@ -50,8 +50,8 @@ Dans chaque projet (`joutiya-dev`, `joutiya-staging`, `joutiya-prod`), sur conso
 5. **Paramètres du projet** → **Général** → **Vos applications** → **Ajouter une application** → **Web** (icône `</>`) → pseudo `joutiya-web`, sans Firebase Hosting → **Enregistrer**. Nav rapporte l'`appId` (`1:<numéro>:web:<hash>`) ; la valeur `apiKey` est la clé navigateur de l'étape 6.
 6. console.cloud.google.com → même projet → **API et services** → **Identifiants** :
    - clé **Browser key (auto created by Firebase)** : la renommer `joutiya-browser` ; **Restrictions relatives aux applications** → *Référents HTTP* : `https://joutiya.ma/*`, `https://www.joutiya.ma/*` (staging : `https://staging.joutiya.ma/*` ; dev : `http://localhost:3000/*`) ; **Restrictions relatives aux API** → *Restreindre la clé* : Identity Toolkit API, Token Service API, Cloud Firestore API. C'est `FIREBASE_API_KEY`.
-   - **Créer des identifiants** → **Clé API** → nom `joutiya-server` : aucune restriction d'application (le serveur appelle depuis la VM ; une restriction par adresse IP viendra quand l'adresse de sortie sera stable), **Restrictions relatives aux API** : Identity Toolkit API seule. C'est `FIREBASE_SERVER_API_KEY`. **Vous :** copie de la valeur dans `.env.local`, puis `app.env` (prompt L). Si vous ne la créez pas, le serveur utilise `FIREBASE_API_KEY` en envoyant le référent du site ; la clé serveur est recommandée pour garder la clé navigateur restreinte indépendamment.
-7. **API et services** → **Bibliothèque** : vérifier que **IAM Service Account Credentials API** et **Identity Toolkit API** sont activées (la phase 1, prompt H, active déjà `iamcredentials`). Sans la première, le serveur ne peut pas signer les jetons de session.
+   - **Créer des identifiants** → **Clé API** → nom `joutiya-server` : aucune restriction d'application (le serveur appelle depuis la VM ; une restriction par adresse IP viendra quand l'adresse de sortie sera stable), **Restrictions relatives aux API** : Identity Toolkit API seule. C'est `FIREBASE_SERVER_API_KEY`. **Vous :** copie de la valeur dans `.env.local`, puis `app.env` (prompt O de la phase 1). Si vous ne la créez pas, le serveur utilise `FIREBASE_API_KEY` en envoyant le référent du site ; la clé serveur est recommandée pour garder la clé navigateur restreinte indépendamment.
+7. **API et services** → **Bibliothèque** : vérifier que **IAM Service Account Credentials API** et **Identity Toolkit API** sont activées (déjà activée, relevé de Nav du 16 octobre). Sans la première, le serveur ne peut pas signer les jetons de session.
 8. **Vous :** le mot de passe Google ou un code si demandé.
 
 Nav rapporte, par projet : l'`appId`, le nom de la clé navigateur (pas sa valeur si elle est restreinte aux référents : elle est publique, mais inutile dans le chat), et confirme les trois réglages Authentication.
@@ -77,7 +77,7 @@ dash.cloudflare.com → **Turnstile** → **Add widget**, deux fois :
 - `joutiya-prod` : noms d'hôte `joutiya.ma`, `www.joutiya.ma`, `admin.joutiya.ma` ; mode **Managed** ; *pre-clearance* désactivée.
 - `joutiya-staging` : `staging.joutiya.ma`, `admin-staging.joutiya.ma`.
 
-Nav rapporte la **Site Key** de chaque widget (publique, `TURNSTILE_SITE_KEY`). **Vous :** le clic qui affiche la **Secret Key**, copie dans `.env.local` sous `TURNSTILE_SECRET_KEY` puis `app.env` (prompt L). Le développement local utilise la paire de test de Cloudflare (`1x00000000000000000000AA` / `1x0000000000000000000000000000000AA`), refusée en production au démarrage.
+Nav rapporte la **Site Key** de chaque widget (publique, `TURNSTILE_SITE_KEY`). **Vous :** le clic qui affiche la **Secret Key**, copie dans `.env.local` sous `TURNSTILE_SECRET_KEY` puis `app.env` (prompt O de la phase 1). Le développement local utilise la paire de test de Cloudflare (`1x00000000000000000000AA` / `1x0000000000000000000000000000000AA`), refusée en production au démarrage.
 
 Le site demande Turnstile à l'inscription, à la demande de réinitialisation, au renvoi de l'e-mail de vérification, à l'inscription par Google, à la connexion à partir du troisième échec sur un compte, et à chaque connexion du personnel au back-office.
 
@@ -97,7 +97,7 @@ Offre Resend Free : 100 e-mails par jour, 3 000 par mois ; alerte à 70 %, mode 
 
 Le site ne fait que recevoir : l'utilisateur envoie un code à 6 chiffres depuis son WhatsApp au numéro de Joutiya, le webhook de Meta le remet au site, qui valide le téléphone. Aucun envoi, aucun coût, aucun jeton Meta côté site. Un numéro ne peut être vérifié que sur un compte à la fois : s'il est prouvé depuis le même téléphone par un autre compte, il change de compte et l'ancien titulaire est prévenu par e-mail.
 
-Ordre : **Vous :** générez d'abord `WHATSAPP_VERIFY_TOKEN` (`openssl rand -hex 32` dans un terminal, ou toute chaîne aléatoire d'au moins 32 caractères) dans `.env.local` ; puis la VM avec `WHATSAPP_VERIFY_TOKEN` et `WHATSAPP_APP_SECRET` dans `app.env` et l'application redémarrée (prompt L) ; ensuite seulement le webhook : Meta appelle l'URL immédiatement pour vérifier le jeton.
+Ordre : **Vous :** générez d'abord `WHATSAPP_VERIFY_TOKEN` (`openssl rand -hex 32` dans un terminal, ou toute chaîne aléatoire d'au moins 32 caractères) dans `.env.local` ; puis la VM avec `WHATSAPP_VERIFY_TOKEN` et `WHATSAPP_APP_SECRET` dans `app.env` et l'application redémarrée (prompt O de la phase 1) ; ensuite seulement le webhook : Meta appelle l'URL immédiatement pour vérifier le jeton.
 
 Dans developers.facebook.com → app **Joutiya** (phase 0, étape 9) :
 1. **Paramètres de l'app** → **Général** → **Clé secrète** → **Afficher**. **Vous :** cette révélation et la copie sous `WHATSAPP_APP_SECRET`.
@@ -113,18 +113,13 @@ sentry.io → **Get started** avec votre Gmail (ou l'alias `+joutiya`) → **Dat
 
 Nav rapporte le **DSN** de chaque projet (**Settings** → **Projects** → projet → **Client Keys (DSN)**) : valeur publique, `SENTRY_DSN`, dont l'hôte finit par `.ingest.de.sentry.io` (le site refuse les autres régions). Le serveur web, le worker et le navigateur partagent le projet de leur environnement ; aucune donnée personnelle, adresse IP ni cookie n'est envoyé (nettoyage dans `src/lib/observability/scrub.ts`). Pas de traçage de performance : il consommerait le quota gratuit.
 
-## 7. Variables de la VM et redémarrage (Cody, prompt L)
+## 7. Variables de la VM et redémarrage (étape 16 de la phase 1)
 
-Pour le staging puis la production, dans `/etc/joutiya/<env>/app.env`, en plus des variables de la phase 1 :
-- les anciens noms `NEXT_PUBLIC_SITE_URL` et `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, s'ils y sont encore, renommés `SITE_URL` et `FIREBASE_PROJECT_ID` (le site refuse toute variable `NEXT_PUBLIC_*` hors développement : une seule image sert le staging et la prod, la configuration est lue au démarrage) ;
-- `CSRF_SECRET` généré par environnement (`openssl rand -hex 32`), différent de `HASH_PEPPER` ;
-- `FIREBASE_API_KEY`, `FIREBASE_SERVER_API_KEY`, `FIREBASE_APP_ID`, `FIREBASE_SERVICE_ACCOUNT=joutiya-web@<projet>.iam.gserviceaccount.com` ;
-- `GOOGLE_OAUTH_CLIENT_ID` ;
-- `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` ;
-- `MAIL_API_KEY` et `MAIL_WEBHOOK_SECRET` (créés par API par le fil de déploiement, jamais dans `.env.local`), `MAIL_FALLBACK_API_KEY`, `MAIL_FROM="Joutiya <no-reply@notif.joutiya.ma>"` ;
-- `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_DISPLAY_NUMBER` ;
-- `SENTRY_DSN` ;
-- `MEDIA_BASE_URL=https://media.joutiya.ma` (vide tant que la phase 3 n'a pas branché R2).
+Pour le staging puis la production, `/etc/joutiya/<env>/app.env` s'écrit avec `node scripts/oracle-vm.ts env <env>` (`docs/phase-1.md`, étape 16), qui ne montre jamais une valeur :
+- du registre `infra/targets.json` : `SITE_URL`, `ADMIN_HOST`, `FIREBASE_PROJECT_ID`, `FIREBASE_APP_ID`, `FIREBASE_SERVICE_ACCOUNT`, `GOOGLE_OAUTH_CLIENT_ID`, `TURNSTILE_SITE_KEY`, `SENTRY_DSN`, `MAIL_FROM`, et `WHATSAPP_PHONE_NUMBER_ID` une fois consigné ;
+- générés sur la VM : `CSRF_SECRET` et les mots de passe Valkey ;
+- de votre `.env.local`, par Cody (prompt O de la phase 1) : `HASH_PEPPER`, `FIREBASE_API_KEY`, `FIREBASE_SERVER_API_KEY`, `TURNSTILE_SECRET_KEY`, `MAIL_FALLBACK_API_KEY`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_DISPLAY_NUMBER`, sous `NOM_STAGING` ou `NOM_PROD` (ou dans la paire déjà rangée par Nav) ;
+- par le fil de déploiement : `MAIL_API_KEY` et `MAIL_WEBHOOK_SECRET` (créés par API, jamais dans `.env.local`).
 
 Sans les variables obligatoires (`src/lib/env.ts`, liste `REQUIRED_DEPLOYED`), l'application refuse de démarrer et le journal nomme la variable manquante ; sans une variable recommandée (WhatsApp, Sentry, Brevo), elle démarre et désactive la fonction correspondante avec un avertissement.
 
@@ -138,18 +133,14 @@ Le back-office (`admin.joutiya.ma`) exige deux choses : passer Cloudflare Access
 ## 9. Contrôles
 
 - Dépôt : `npm run check`, `npm run test:api` et `npm run test:rules` (Auth + Firestore en émulateur), `npm run build` puis `npm run test:e2e`.
-- Staging, après le prompt L : inscription avec une vraie adresse (l'e-mail arrive de `no-reply@notif.joutiya.ma`), lien de vérification, connexion, connexion Google, mot de passe oublié, vérification WhatsApp avec le numéro de test, connexion au back-office, invitation d'un modérateur, page **Quotas**. Sentry reçoit une erreur de test (`/fr/parametres` avec un cookie corrompu renvoie une erreur gérée, sans événement ; un événement se provoque depuis le back-office à la phase 5).
+- Staging, après le prompt O de la phase 1 : inscription avec une vraie adresse (l'e-mail arrive de `no-reply@notif.joutiya.ma`), lien de vérification, connexion, connexion Google, mot de passe oublié, vérification WhatsApp avec le numéro de test, connexion au back-office, invitation d'un modérateur, page **Quotas**. Sentry reçoit une erreur de test (`/fr/parametres` avec un cookie corrompu renvoie une erreur gérée, sans événement ; un événement se provoque depuis le back-office à la phase 5).
 - `infra/targets.json` : Claude consigne par PR l'`appId` Firebase et `GOOGLE_OAUTH_CLIENT_ID` de chaque environnement, et les identifiants Meta (`appId` de chaque app, `wabaId`, `phoneNumberId`) ; Sentry n'a pas d'entrée dans le registre (le DSN est une valeur publique propre à chaque environnement, dans `app.env`). `node scripts/assert-target.ts` reste vert.
 
 ## Prompts Cody
 
 À coller dans Cody, depuis le dossier du dépôt à jour (`git pull`), Node 24 ou plus récent.
 
-**L. Variables de la phase 2 sur la VM** (étape 7)
-
-```text
-Complète les fichiers de la VM de Joutiya pour la phase 2 (docs/phase-2.md, étape 7). Ne lis ni n'affiche aucune valeur secrète : pour copier une variable de mon .env.local, utilise `grep '^NOM=' .env.local` redirigé vers l'entrée standard de `ssh joutiya "sudo sh -c 'umask 077 && cat >> <fichier>'"` (jamais par la ligne de commande, jamais sudo tee, jamais cat, head, tail ni sed sur .env.local : ta configuration les bloque). Pour le staging puis la prod : 1) dans /etc/joutiya/<env>/app.env, renomme NEXT_PUBLIC_SITE_URL en SITE_URL et NEXT_PUBLIC_FIREBASE_PROJECT_ID en FIREBASE_PROJECT_ID si ces anciens noms y sont encore ; 2) génère CSRF_SECRET (openssl rand -hex 32, différent de HASH_PEPPER) directement dans le fichier ; 3) ajoute les variables listées à l'étape 7 depuis mon .env.local (FIREBASE_API_KEY, FIREBASE_SERVER_API_KEY, FIREBASE_APP_ID, GOOGLE_OAUTH_CLIENT_ID, TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY, MAIL_WEBHOOK_SECRET, MAIL_FALLBACK_API_KEY, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_APP_SECRET, WHATSAPP_VERIFY_TOKEN, WHATSAPP_DISPLAY_NUMBER, SENTRY_DSN) et FIREBASE_SERVICE_ACCOUNT=joutiya-web@<projectId de infra/targets.json>.iam.gserviceaccount.com ; laisse MAIL_API_KEY telle que le fil de déploiement l'a écrite ; 4) redémarre (`docker compose … up -d web worker`), vérifie dans `docker compose … logs web` la ligne « startup checks passed » (sinon le journal nomme la variable fautive : corrige et recommence) puis `curl -s https://<hôte>/api/health`. Ne me donne aucune valeur, seulement les noms des variables écrites.
-```
+**L. Variables de la phase 2 sur la VM** (étape 7) : remplacé par le prompt O de `docs/phase-1.md` (étape 16), qui envoie toutes les clés de votre `.env.local` d'un coup.
 
 **M. Premier administrateur** (étape 8)
 

@@ -16,7 +16,10 @@ const run = promisify(execFile);
 
 function targets(projects: { dev?: string | null; staging?: string | null; prod?: string | null }): Targets {
   const env = (name: "dev" | "staging" | "prod") => ({
-    firebase: { projectId: projects[name] ?? null, projectNumber: null, firestoreLocation: null },
+    firebase: { projectId: projects[name] ?? null, projectNumber: null, firestoreLocation: null, appId: null },
+    google: { oauthClientId: null },
+    turnstile: { siteKey: null },
+    sentry: { dsn: null },
     r2: { quarantine: `joutiya-${name}-quarantine`, media: `joutiya-${name}-media`, private: `joutiya-${name}-private` },
     whatsapp: { wabaId: null, phoneNumberId: null },
     cloudflare: { tunnelId: null, accessAud: null },
