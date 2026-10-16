@@ -16,6 +16,7 @@ import {
   deployScript,
   deployStagingKey,
   isCapacityError,
+  isTransientError,
   launchDetails,
   parseStatus,
   pickImage,
@@ -107,6 +108,15 @@ describe("instance", () => {
     expect(isCapacityError(new OciError(429, "TooManyRequests", "slow down"))).toBe(true);
     expect(isCapacityError(new OciError(400, "LimitExceeded", "quota"))).toBe(false);
     expect(isCapacityError(new Error("Out of host capacity"))).toBe(false);
+  });
+
+  it("also retries OCI server and network errors, never a client error", () => {
+    expect(isTransientError(new OciError(502, "", "Bad Gateway"))).toBe(true);
+    expect(isTransientError(new TypeError("fetch failed"))).toBe(true);
+    expect(isTransientError(new TypeError("Cannot read properties of undefined"))).toBe(false);
+    expect(isTransientError(new OciError(400, "LimitExceeded", "quota"))).toBe(false);
+    expect(isTransientError(new OciError(401, "NotAuthenticated", "signature"))).toBe(false);
+    expect(isTransientError(new Error("boom"))).toBe(false);
   });
 
   it("reads the bootstrap progress from the serial console", () => {

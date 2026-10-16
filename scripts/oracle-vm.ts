@@ -6,8 +6,9 @@
 //       joutiya-vcn (no ingress rule anywhere), joutiya-igw, joutiya-public, then joutiya-vm
 //       (VM.Standard.A1.Flex, 2 OCPU, 12 GB, Ubuntu 24.04 aarch64, 100 GB boot volume) whose
 //       cloud-init is infra/vm/bootstrap.sh filled in memory with the three tunnel tokens (read from
-//       the Cloudflare API) and a tarball of infra/vm and docker/. Out of host capacity: retried
-//       every minute for <n> minutes (default 0). Never a paid shape.
+//       the Cloudflare API) and a tarball of infra/vm and docker/. Out of host capacity, throttling,
+//       OCI server and network errors: retried every minute for <n> minutes (default 0), never
+//       launching a second VM. Never a paid shape.
 //   node scripts/oracle-vm.ts status
 //       instance state, SSH tunnel connections, bootstrap progress from the serial console.
 //   node scripts/oracle-vm.ts reboot [--apply]
@@ -106,6 +107,13 @@ export class OciError extends Error {
 export function isCapacityError(error: unknown): boolean {
   if (!(error instanceof OciError)) return false;
   return error.status === 429 || (error.status === 500 && /out of (host )?capacity/i.test(error.message));
+}
+
+/** Also worth retrying: an OCI server error or a network failure, which may hide a launch. */
+export function isTransientError(error: unknown): boolean {
+  if (error instanceof OciError) return error.status >= 500;
+  // Node's fetch: "fetch failed" (no response), "terminated" (connection lost mid-body).
+  return error instanceof TypeError && /^(fetch failed|terminated)$/.test(error.message);
 }
 
 class Oci {
@@ -413,17 +421,24 @@ async function create(oci: Oci, targets: Targets, compartmentId: string, retryMi
   }
   const deadline = Date.now() + retryMinutes * 60_000;
   for (let attempt = 1; ; attempt += 1) {
+    let launched: Instance | undefined;
     try {
-      const instance = await oci.write<Instance>("POST", "/20160918/instances", details, attempt === 1 ? shown : { attempt });
-      if (!instance) return;
-      const running = await waitFor<Instance>(oci, `/20160918/instances/${instance.id}`, "RUNNING", 15);
-      console.log(`instance ${NAMES.instance} ${running.lifecycleState} (${running.id})`);
-      return;
+      launched = await oci.write<Instance>("POST", "/20160918/instances", details, attempt === 1 ? shown : { attempt });
     } catch (error) {
-      if (!isCapacityError(error) || Date.now() > deadline) throw error;
-      console.log(`no A1 capacity (attempt ${attempt}): retrying in 60 s`);
-      await sleep(60_000);
+      const capacity = isCapacityError(error);
+      if ((!capacity && !isTransientError(error)) || Date.now() > deadline) throw error;
+      // A request cut off may still have launched the VM (the quota allows one): look before retrying.
+      if (!capacity) launched = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance).catch(() => undefined);
+      if (!launched) {
+        console.log(`${capacity ? "no A1 capacity" : `transient error (${(error as Error).message})`} (attempt ${attempt}): retrying in 60 s`);
+        await sleep(60_000);
+        continue;
+      }
     }
+    if (!launched) return;
+    const running = await waitFor<Instance>(oci, `/20160918/instances/${launched.id}`, "RUNNING", 15);
+    console.log(`instance ${NAMES.instance} ${running.lifecycleState} (${running.id})`);
+    return;
   }
 }
 
