@@ -5,6 +5,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 // edits after publication (paused, expired: screened, held, revalidated), the screened renewal of
 // an expired listing and the active quota on resume and renewal.
 
+// Search fast lane off: these tests read the searchOutbox entries it would drain (phase 4).
+vi.mock("@/lib/search/queue", () => ({ notifySearchIndex: vi.fn(async () => undefined) }));
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/listings/revalidate", { spy: true });
 

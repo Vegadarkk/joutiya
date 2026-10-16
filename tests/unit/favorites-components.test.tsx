@@ -90,7 +90,7 @@ describe("FavoriteCard", () => {
     expect(html).toContain('href="/fr/annonce/velo-de-ville-casablanca-abcd2345"');
     expect(html).toContain(`${MEDIA}/`);
     expect(html).toContain(`aria-label="${fr.Favorites.page.removeOf.replace("{title}", "Vélo de ville").replace(/'/g, "&#x27;")}"`);
-    expect(text(html)).toContain("1 500 DH");
+    expect(html).toContain("1 500 DH");
     expect(text(html)).toContain("Casablanca");
     expect(text(html)).toContain(`Ajoutée le ${formatSavedDate(FAVORITE.createdAt, "fr")}`);
     expect(text(html)).not.toContain(fr.Favorites.page.unavailable);
