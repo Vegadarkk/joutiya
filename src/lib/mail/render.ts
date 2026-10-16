@@ -13,6 +13,7 @@ import { passwordChanged } from "./templates/passwordChanged";
 import { phoneRemoved } from "./templates/phoneRemoved";
 import { phoneVerified } from "./templates/phoneVerified";
 import { resetPassword } from "./templates/resetPassword";
+import { savedSearchAlert } from "./templates/savedSearchAlert";
 import { signupExisting } from "./templates/signupExisting";
 import { staffInvite } from "./templates/staffInvite";
 import { verifyEmail } from "./templates/verifyEmail";
@@ -35,6 +36,7 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   listingChangesApproved,
   listingExpiringSoon,
   listingExpired,
+  savedSearchAlert,
 };
 
 export const TEMPLATE_IDS = Object.keys(TEMPLATES) as TemplateId[];
@@ -70,6 +72,7 @@ export function renderMail(mail: TemplateMail): RenderedMail {
     text: built.text,
     html: built.html,
     ...(built.replyTo ? { replyTo: built.replyTo } : {}),
+    ...(built.headers ? { headers: built.headers } : {}),
     tags: { template: mail.template, env: env.APP_ENV },
     meta: { template: mail.template, locale: mail.locale, data: mail.data },
   };

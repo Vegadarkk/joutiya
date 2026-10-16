@@ -17,7 +17,6 @@ export class InvalidFilterError extends Error {
 
 /** Double-quoted Meilisearch string literal. */
 export function quoteFilterValue(value: string): string {
-  // eslint-disable-next-line no-control-regex
   return `"${value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 

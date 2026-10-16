@@ -1,6 +1,7 @@
 // BullMQ worker (§4) on valkey-queue. Receives no connection. Queues: "system" (heartbeat, nightly
-// quota report, hourly purge of unactivated accounts), "mail" (deliveries with retries) and
-// "media" (photo pipeline, one upload at a time, D12).
+// quota report, hourly purge of unactivated accounts), "mail" (deliveries with retries), "media"
+// (photo pipeline, one upload at a time, D12) and "search" (phase 4 D9: the search index's only
+// writer, one job at a time, fed by the web's fast lane, the searchOutbox watch and a 60 s poll).
 
 import { writeFile } from "node:fs/promises";
 import { DelayedError, Queue, UnrecoverableError, Worker } from "bullmq";
@@ -15,10 +16,14 @@ import { isTemplateMail } from "@/lib/mail/render";
 import { closeMailQueue, MAIL_QUEUE } from "@/lib/mail/send";
 import { resetImageClassifier } from "@/lib/media/classify";
 import { closeMediaQueue, MEDIA_CONCURRENCY, MEDIA_QUEUE } from "@/lib/media/queue";
+import { isFirebaseConfigured } from "@/lib/firebase/admin";
+import { SearchUnavailableError } from "@/lib/search/types";
+import { closeSearchQueue, enqueueIndexJobs, OUTBOX_POLL_JOB, SEARCH_QUEUE } from "@/lib/search/queue";
 import { runStartupChecks } from "@/lib/startup/checks";
 import { clientOptions } from "@/lib/valkey/clients";
 import { JOBS, SYSTEM_QUEUE, SCHEDULES } from "./jobs";
 import { onMediaJobFailed, processMediaJob } from "./jobs/media";
+import { ensureEngineReady, OUTBOX_POLL_EVERY_MS, OUTBOX_POLL_SCHEDULER, processSearchJob, watchSearchOutbox } from "./jobs/search";
 
 /** Touched after each successful heartbeat; the container healthcheck reads its age. */
 const HEARTBEAT_FILE = "/tmp/joutiya-worker-heartbeat";
@@ -88,6 +93,20 @@ async function main(): Promise<void> {
     });
   });
 
+  // Search index (D9): concurrency 1 keeps a single engine writer; the poll is a job of the same
+  // queue. A job's final failure reaches Sentry unless the engine is just down (the lag alert
+  // reports that); the outbox entry stays for the poll either way.
+  const searchQueue = new Queue(SEARCH_QUEUE, { connection });
+  await searchQueue.upsertJobScheduler(OUTBOX_POLL_SCHEDULER, { every: OUTBOX_POLL_EVERY_MS }, { name: OUTBOX_POLL_JOB, opts: { removeOnComplete: true, removeOnFail: 50 } });
+  const searchWorker = new Worker(SEARCH_QUEUE, (job) => processSearchJob(job), { connection, concurrency: 1 });
+  searchWorker.on("failed", (job, error) => {
+    logger.error({ queue: SEARCH_QUEUE, job: job?.name, attempt: job?.attemptsMade, err: error.message }, "search job failed");
+    const final = !job || job.attemptsMade >= (job.opts.attempts ?? 1) || error instanceof UnrecoverableError;
+    if (final && !(error instanceof SearchUnavailableError)) captureServerException(error, { queue: SEARCH_QUEUE, job: job?.name });
+  });
+  void ensureEngineReady().catch((error: unknown) => logger.warn({ err: (error as Error).message }, "search index not prepared yet: the first search job retries"));
+  const outboxWatch = isFirebaseConfigured() ? watchSearchOutbox({ dispatch: (ids) => enqueueIndexJobs(ids) }) : null;
+
   const beat = async () => {
     try {
       await connection.set(WORKER_HEARTBEAT_KEY, new Date().toISOString(), "EX", WORKER_HEARTBEAT_TTL);
@@ -102,15 +121,16 @@ async function main(): Promise<void> {
   const stop = async (signal: string) => {
     logger.info({ signal }, "worker stopping");
     clearInterval(heartbeat);
-    await Promise.allSettled([systemWorker.close(), mailWorker.close(), mediaWorker.close()]);
-    await Promise.allSettled([queue.close(), closeMailQueue(), closeMediaQueue(), resetImageClassifier()]);
+    outboxWatch?.stop();
+    await Promise.allSettled([systemWorker.close(), mailWorker.close(), mediaWorker.close(), searchWorker.close()]);
+    await Promise.allSettled([queue.close(), searchQueue.close(), closeMailQueue(), closeMediaQueue(), closeSearchQueue(), resetImageClassifier()]);
     await connection.quit().catch(() => undefined);
     await flushObservability(2_000);
     process.exit(0);
   };
   process.on("SIGTERM", () => void stop("SIGTERM"));
   process.on("SIGINT", () => void stop("SIGINT"));
-  logger.info({ queues: [SYSTEM_QUEUE, MAIL_QUEUE, MEDIA_QUEUE] }, "worker started");
+  logger.info({ queues: [SYSTEM_QUEUE, MAIL_QUEUE, MEDIA_QUEUE, SEARCH_QUEUE] }, "worker started");
 }
 
 main().catch(async (error: unknown) => {

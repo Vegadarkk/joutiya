@@ -11,7 +11,7 @@ import { NOW, doc, search, serve, type ErrorBody } from "./search-helpers";
 // À la Une slots, canonical parameters in the answer, and the honest 503 when the engine is down.
 
 const HOUR = 60 * 60 * 1000;
-const PRO = "pr0shop2kz";
+const PRO = "prxshp2kzm";
 
 const docs = {
   logan: doc({

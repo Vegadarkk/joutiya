@@ -3,12 +3,11 @@ import { cityBySlug } from "@/config/regions";
 import { GET } from "@/app/api/search/route";
 import { setSearchEngineForTests } from "@/lib/search/engine";
 import { MemoryEngine } from "@/lib/search/memory";
-import { SEARCH_SYNONYMS } from "@/lib/search/settings";
 import { sitemapShardOf, type SearchDocument } from "@/lib/search/types";
 import { Jar, ORIGIN, type ErrorBody } from "../auth/helpers";
 
 // Plumbing of the /api/search tests: index documents built by hand (no Firestore listing, no
-// indexer), served by the memory engine with the production synonyms, and a GET helper that keeps
+// indexer), served by the memory engine (production synonyms by default), and a GET helper that keeps
 // the device and pass cookies in a jar like a browser.
 
 export { Jar };
@@ -68,7 +67,7 @@ export function doc(input: DocInput): SearchDocument {
 
 /** Fresh memory engine holding `documents`, installed as the search engine. */
 export async function serve(documents: SearchDocument[]): Promise<MemoryEngine> {
-  const engine = new MemoryEngine({ synonyms: SEARCH_SYNONYMS });
+  const engine = new MemoryEngine();
   await engine.upsert(documents);
   setSearchEngineForTests(engine);
   return engine;

@@ -25,15 +25,14 @@ let ready: Promise<void> | undefined;
  * success; a failure is retried by the next job.
  */
 export function ensureEngineReady(): Promise<void> {
-  ready ??= searchEngine()
-    .ensureReady()
-    .then((outcome) => {
-      if (outcome.created || outcome.settingsUpdated) logger.info({ ...outcome }, "search index prepared");
-    })
-    .catch((error: unknown) => {
-      ready = undefined;
-      throw error;
-    });
+  ready ??= (async () => {
+    // Inside the async body: an engine that is not configured rejects instead of throwing.
+    const outcome = await searchEngine().ensureReady();
+    if (outcome.created || outcome.settingsUpdated) logger.info({ ...outcome }, "search index prepared");
+  })().catch((error: unknown) => {
+    ready = undefined;
+    throw error;
+  });
   return ready;
 }
 

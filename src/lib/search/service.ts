@@ -24,6 +24,8 @@ export interface RunSearchOptions {
   now?: Date;
   /** ANDed with the parameters' filter (alerts: `sortAt > lastNotifiedSortAt`). */
   extraFilter?: FilterExpr;
+  /** One "last" retry when every word finds nothing (default true); alerts skip it (exact news only). */
+  approximate?: boolean;
 }
 
 /** Upper bound of `hitsPerPage` and `limit` arguments. */
@@ -176,7 +178,7 @@ export async function runSearch(input: SearchParams, options: RunSearchOptions =
   const results = await engine.search(withFeatured ? [main, featuredQuery(params, now)] : [main]);
   let result = firstResult(results);
   let approximate = false;
-  if (result.totalHits === 0 && wordCount(q) >= 2) {
+  if (options.approximate !== false && result.totalHits === 0 && wordCount(q) >= 2) {
     const retry = firstResult(await engine.search([{ ...main, matchingStrategy: "last" }]));
     if (retry.totalHits > 0) {
       result = retry;

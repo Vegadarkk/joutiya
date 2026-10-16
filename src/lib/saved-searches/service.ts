@@ -40,8 +40,7 @@ export function storedParams(params: SearchParams): StoredSearchParams {
 /** sortAt of the newest listing matching now (exact matches only); the save time when the engine is down. */
 export async function newestSortAt(params: StoredSearchParams, now: Date): Promise<number> {
   try {
-    const response = await runSearch({ ...params, sort: "recent" }, { hitsPerPage: 1, featured: false, facets: false, now });
-    if (response.approximate) return 0;
+    const response = await runSearch({ ...params, sort: "recent" }, { hitsPerPage: 1, featured: false, facets: false, approximate: false, now });
     return response.hits.reduce((newest, hit) => Math.max(newest, Date.parse(hit.sortAt) || 0), 0);
   } catch (error) {
     if (!(error instanceof SearchUnavailableError)) throw error;

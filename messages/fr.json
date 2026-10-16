@@ -2164,5 +2164,41 @@
       "title": "Annonces de {name}",
       "description": "{name}, membre depuis {date} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya."
     }
+  },
+  "Seo": {
+    "breadcrumb": "Fil d'Ariane",
+    "home": "Accueil",
+    "heading": {
+      "category": "{category} au Maroc",
+      "categoryCity": "{category} à {city}",
+      "subcategory": "{subcategory} au Maroc",
+      "subcategoryCity": "{subcategory} à {city}"
+    },
+    "metaTitle": "{heading} : petites annonces",
+    "metaDescription": "{heading} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya. Achetez et vendez entre particuliers et professionnels, sans afficher votre numéro.",
+    "metaDescriptionEmpty": "{heading} : achetez et vendez entre particuliers et professionnels sur Joutiya. Déposez votre annonce gratuitement.",
+    "lead": "{count, plural, one {# annonce en ligne} other {# annonces en ligne}}, les plus récentes en premier.",
+    "seeOne": "Voir l'annonce",
+    "seeAll": "Voir les {count} annonces",
+    "subcategoriesLabel": "Sous-catégories",
+    "allChip": "Toutes",
+    "recentTitle": "Annonces récentes",
+    "citiesTitle": "{scope} par ville",
+    "nearbyTitle": "{scope} dans les villes proches",
+    "emptyTitle": "Pas encore d'annonce dans cette catégorie",
+    "emptyBody": "Les annonces publiées ici apparaîtront sur cette page. Vous avez quelque chose à vendre ?",
+    "post": "Déposer une annonce"
+  },
+  "Challenge": {
+    "metaTitle": "Vérification anti-robots",
+    "title": "Une vérification avant de continuer",
+    "lead": "Beaucoup de pages ont été ouvertes depuis votre connexion en peu de temps. Confirmez que vous êtes une personne : la page demandée s'ouvre juste après.",
+    "waiting": "La vérification démarre d'elle-même ; cochez la case si elle apparaît.",
+    "checking": "Vérification en cours…",
+    "done": "C'est fait, retour à votre page…",
+    "failedTitle": "La vérification n'a pas abouti",
+    "continue": "Continuer vers la page",
+    "why": "Cette étape protège les annonces contre la copie automatique et reste valable 30 minutes.",
+    "home": "Revenir à l'accueil"
   }
 }

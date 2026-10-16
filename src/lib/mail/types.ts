@@ -21,7 +21,9 @@ export type TemplateId =
   | "listingApproved"
   | "listingChangesApproved"
   | "listingExpiringSoon"
-  | "listingExpired";
+  | "listingExpired"
+  // Search (phase 4): the daily digest of the saved searches with an alert (design D19).
+  | "savedSearchAlert";
 
 /**
  * Statement of reasons (art. 17 DSA, design D8) carried by the hold and rejection mails. The
@@ -68,6 +70,31 @@ export interface TemplateData {
   listingExpiringSoon: { displayName: string; title: string; url: string; expiresAt: string };
   /** Expired: renewable from "Mes annonces" until `purgeAt` (ISO), then deleted. */
   listingExpired: { displayName: string; title: string; purgeAt: string };
+  /**
+   * Daily digest (bulk): the saved searches with new listings since the last digest.
+   * `unsubscribeToken` (src/lib/alerts/unsubscribe-token.ts, every alert of the account) builds the
+   * List-Unsubscribe header and the "Se désabonner" link.
+   */
+  savedSearchAlert: { displayName: string; searches: SavedSearchAlertSection[]; unsubscribeToken: string };
+}
+
+/** One saved search of the digest: its results page, the count of new listings and the newest few. */
+export interface SavedSearchAlertSection {
+  name: string;
+  /** Results page of the search (absolute, recipient's locale). */
+  url: string;
+  /** New listings since the last digest (the ones listed included). */
+  total: number;
+  listings: SavedSearchAlertListing[];
+}
+
+export interface SavedSearchAlertListing {
+  title: string;
+  /** Listing page (absolute, recipient's locale). */
+  url: string;
+  price: number | null;
+  isDonation: boolean;
+  citySlug: string | null;
 }
 
 /** Security mails bypass the suppression list and fall back to Brevo when Resend is exhausted. */

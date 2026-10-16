@@ -257,6 +257,14 @@ describe("runSearch", () => {
     expect(response.hits.map((hit) => hit.id)).toEqual(["p1"]);
   });
 
+  it("skips the retry when approximate results are not wanted", async () => {
+    script([result([])]);
+    const response = await runSearch({ q: "canapé cuir rouge" }, { featured: false, approximate: false, now: NOW });
+    expect(engine.search).toHaveBeenCalledTimes(1);
+    expect(queriesOf(0)[0]?.matchingStrategy).toBe("all");
+    expect(response).toMatchObject({ approximate: false, total: 0, hits: [] });
+  });
+
   it("does not retry a single word, a match, or report an empty retry as approximate", async () => {
     script([result([]), result([])]);
     expect((await runSearch({ q: "canapé" }, { now: NOW })).approximate).toBe(false);
