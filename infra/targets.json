@@ -10,7 +10,9 @@
       "homeRegion": "eu-paris-1",
       "tenancyId": "ocid1.tenancy.oc1..aaaaaaaa2vsndafj3yo4p7ndkzbuexxlx7y3v4ji7rcznprjoqeaxknn543q",
       "compartmentId": "ocid1.compartment.oc1..aaaaaaaag4vrrhtajdpxdtzd4mfv4g5nceyoth4nsvs42ehebb65g2yo4iua",
-      "userId": "ocid1.user.oc1..aaaaaaaapcgofwhegeb4jkc3xzmd6kqsug5zlhunsgxyuwlqbnk7udeqgiiq"
+      "userId": "ocid1.user.oc1..aaaaaaaapcgofwhegeb4jkc3xzmd6kqsug5zlhunsgxyuwlqbnk7udeqgiiq",
+      "vmDynamicGroupId": "ocid1.dynamicgroup.oc1..aaaaaaaaak5yk4fgam3ptrq2sfwexkny26bmca6nq7iv57c4mpcxfbi25pqa",
+      "runCommandPolicyId": "ocid1.policy.oc1..aaaaaaaay54vhb66dno3sf4645wxjxjde6ujkldrfwdhvypx2a34smssu4fq"
     },
     "anthropic": {
       "organizationId": "de60375e-fd8c-47a8-bbbc-c40672c4eee5"

@@ -35,6 +35,10 @@ const SHARED_SHAPE = {
     compartmentId: /^ocid1\.compartment\.oc1\.\.[a-z0-9]{20,}$/,
     // OCID of the IAM user `joutiya-claude` (API keys only), checked against JOUTIYA_OCI_USER.
     userId: /^ocid1\.user\.oc1\.\.[a-z0-9]{20,}$/,
+    // OCI Run Command, Claude's admin channel to the VM: dynamic group `joutiya-vm` (the
+    // compartment's instances) and policy `joutiya-run-command-policy`.
+    vmDynamicGroupId: /^ocid1\.dynamicgroup\.oc1\.\.[a-z0-9]{20,}$/,
+    runCommandPolicyId: /^ocid1\.policy\.oc1\.\.[a-z0-9]{20,}$/,
   },
   anthropic: { organizationId: UUID },
   stripe: { accountId: /^acct_[A-Za-z0-9]{8,}$/ },
