@@ -1,5 +1,5 @@
 import "server-only";
-import { FieldValue, Timestamp, type DocumentSnapshot, type Transaction } from "firebase-admin/firestore";
+import { FieldPath, FieldValue, Timestamp, type DocumentSnapshot, type Transaction } from "firebase-admin/firestore";
 import type { OwnerListBucket } from "@/lib/contracts/listings";
 import type { ListingPhoto } from "@/lib/contracts/media";
 import { db } from "@/lib/firebase/admin";
@@ -136,6 +136,15 @@ export async function listOwnerListings(uid: string, bucket: OwnerListBucket, li
     .get();
   void consume("firestore.reads", Math.max(1, snapshot.size));
   return snapshot.docs.map(fromSnapshot).filter((record): record is ListingRecord => record !== null);
+}
+
+/** One page of a seller's listing ids, every status, in id order (bulk retag of a new Pro; `after` = last id seen). */
+export async function listOwnerListingIds(uid: string, limit: number, after?: string): Promise<string[]> {
+  let query = listings().where("ownerUid", "==", uid).orderBy(FieldPath.documentId()).select().limit(limit);
+  if (after) query = query.startAfter(after);
+  const snapshot = await query.get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  return snapshot.docs.map((doc) => doc.id);
 }
 
 /** Published listings of a seller, newest `sortAt` first (public profile; index ownerUid, status, sortAt). */

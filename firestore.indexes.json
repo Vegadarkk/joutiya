@@ -203,6 +203,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "proProfiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "kybc.status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "kybc.submittedAt",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

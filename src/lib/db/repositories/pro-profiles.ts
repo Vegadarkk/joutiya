@@ -41,3 +41,10 @@ export async function findProProfileByOwner(uid: string): Promise<ProProfileReco
   const first = query.docs[0];
   return first ? proProfileFromSnapshot(first) : null;
 }
+
+/** Applications by KYBC status, oldest submission first (index kybc.status, kybc.submittedAt). */
+export async function listProApplications(status: ProProfileDoc["kybc"]["status"], limit: number): Promise<ProProfileRecord[]> {
+  const query = await db().collection(COLLECTIONS.proProfiles).where("kybc.status", "==", status).orderBy("kybc.submittedAt", "asc").limit(limit).get();
+  void consume("firestore.reads", Math.max(1, query.size));
+  return query.docs.map(proProfileFromSnapshot).filter((record): record is ProProfileRecord => record !== null);
+}

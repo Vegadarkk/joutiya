@@ -12,6 +12,8 @@ import { listingRejected } from "./templates/listingRejected";
 import { passwordChanged } from "./templates/passwordChanged";
 import { phoneRemoved } from "./templates/phoneRemoved";
 import { phoneVerified } from "./templates/phoneVerified";
+import { proApproved } from "./templates/proApproved";
+import { proRejected } from "./templates/proRejected";
 import { resetPassword } from "./templates/resetPassword";
 import { savedSearchAlert } from "./templates/savedSearchAlert";
 import { signupExisting } from "./templates/signupExisting";
@@ -37,6 +39,8 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   listingExpiringSoon,
   listingExpired,
   savedSearchAlert,
+  proApproved,
+  proRejected,
 };
 
 export const TEMPLATE_IDS = Object.keys(TEMPLATES) as TemplateId[];

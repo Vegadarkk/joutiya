@@ -23,7 +23,10 @@ export type TemplateId =
   | "listingExpiringSoon"
   | "listingExpired"
   // Search (phase 4): the daily digest of the saved searches with an alert (design D19).
-  | "savedSearchAlert";
+  | "savedSearchAlert"
+  // Pro accounts (phase 7): the moderator's decision on the application.
+  | "proApproved"
+  | "proRejected";
 
 /**
  * Statement of reasons (art. 17 DSA, design D8) carried by the hold and rejection mails. The
@@ -76,6 +79,10 @@ export interface TemplateData {
    * List-Unsubscribe header and the "Se désabonner" link.
    */
   savedSearchAlert: { displayName: string; searches: SavedSearchAlertSection[]; unsubscribeToken: string };
+  /** `launchOffer`: Essentiel offered until sales open, `noticeDays` of notice before any payment. */
+  proApproved: { displayName: string; shopName: string; launchOffer: boolean; noticeDays: number };
+  /** The moderator's reason; `contact` is where to object (legal configuration). */
+  proRejected: { displayName: string; shopName: string; reason: string; contact: string };
 }
 
 /** One saved search of the digest: its results page, the count of new listings and the newest few. */

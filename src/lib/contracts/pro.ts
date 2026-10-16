@@ -26,3 +26,78 @@ export interface ProApplyResponse {
   proId: string;
   status: "pending_verification";
 }
+
+// Back office (admin.joutiya.ma/pros): the KYBC queue and the moderator's decision. `submittedAt`
+// pins the application the moderator reviewed: a resubmission meanwhile answers 409.
+
+export const PRO_REGISTRY_SOURCES = ["ompic", "directinfo"] as const;
+export const PRO_REJECT_REASON_MIN = 10;
+export const PRO_REJECT_REASON_MAX = 1000;
+
+export const proDecisionSchema = z.discriminatedUnion("action", [
+  z
+    .object({
+      action: z.literal("verify"),
+      /** Register the moderator checked the identifiers against. */
+      registrySource: z.enum(PRO_REGISTRY_SOURCES),
+      submittedAt: z.iso.datetime({ offset: true }),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("reject"),
+      /** Sent to the applicant as written: motivated and specific. */
+      reason: z.string().trim().min(PRO_REJECT_REASON_MIN).max(PRO_REJECT_REASON_MAX),
+      submittedAt: z.iso.datetime({ offset: true }),
+    })
+    .strict(),
+]);
+export type ProDecisionInput = z.infer<typeof proDecisionSchema>;
+
+export interface ProQueueItem {
+  proId: string;
+  name: string;
+  legalForm: string;
+  citySlug: string;
+  ice: string;
+  iceFormatOk: boolean;
+  pieces: number;
+  owner: { displayName: string; publicId: string } | null;
+  /** ISO. */
+  submittedAt: string;
+}
+
+export interface ProQueueResponse {
+  items: ProQueueItem[];
+  hasMore: boolean;
+}
+
+export interface ProReviewPiece {
+  id: string;
+  status: string;
+  declaredType: string;
+  size: number | null;
+}
+
+export interface ProReview {
+  proId: string;
+  name: string;
+  slug: string;
+  description: string;
+  regionCode: string;
+  citySlug: string;
+  legal: Record<string, string>;
+  kybc: { status: string; iceFormatOk: boolean; submittedAt: string | null; rejectReason: string | null; registrySource: string | null };
+  lifecycle: string;
+  plan: string;
+  planSource: string;
+  owner: { uid: string; displayName: string; publicId: string; status: string; emailVerified: boolean; phoneVerified: boolean; createdAt: string } | null;
+  pieces: ProReviewPiece[];
+}
+
+export interface ProDecisionResponse {
+  proId: string;
+  lifecycle: string;
+  /** Listings of the owner retagged as Pro (verify only). */
+  retagged: number;
+}

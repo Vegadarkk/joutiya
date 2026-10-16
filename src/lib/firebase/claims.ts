@@ -49,6 +49,30 @@ export async function setClaims(uid: string, claims: Claims | null): Promise<voi
   await auth().revokeRefreshTokens(uid);
 }
 
+export type ClaimsPatch = { [K in keyof Omit<Claims, "v">]?: Claims[K] | null };
+
+/** `current` with `patch` applied: a null value removes the claim, an absent key keeps it. */
+export function mergeClaims(current: Claims, patch: ClaimsPatch): Claims {
+  const next: Record<string, unknown> = { ...current };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) delete next[key];
+    else if (value !== undefined) next[key] = value;
+  }
+  return claimsSchema.parse({ ...next, v: CLAIMS_VERSION });
+}
+
+/**
+ * Read-merge-write of the claims (one helper for every partial change: the Pro grant of phase 7,
+ * the `st` suspension of phase 5), then the same revocation as `setClaims`. Firebase Auth has no
+ * compare-and-set: two concurrent callers on one account still race, so callers serialise their
+ * own changes (the Pro review transaction, the sanction transaction) before calling this.
+ */
+export async function updateClaims(uid: string, patch: ClaimsPatch): Promise<Claims> {
+  const next = mergeClaims(await getClaims(uid), patch);
+  await setClaims(uid, next);
+  return next;
+}
+
 /** Current claims of an account, from the Auth user record. */
 export async function getClaims(uid: string): Promise<Claims> {
   const record = await auth().getUser(uid);
