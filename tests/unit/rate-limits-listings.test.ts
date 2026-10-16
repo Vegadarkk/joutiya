@@ -12,6 +12,7 @@ const MIB = 1024 * 1024;
 
 const expected: Record<string, RateLimitDefinition> = {
   "listing.draft.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
+  "listing.edit.uid": { points: 30, duration: DAY, policy: "open", key: "uid" },
   "listing.create.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },
   "listing.create.ip": { points: 30, duration: HOUR, policy: "open", key: "ip" },
   "listing.new.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
@@ -57,6 +58,7 @@ describe("phase 3 rate-limit table", () => {
     expect(RATE_LIMITS["upload.bytes.uid"].policy).toBe("closed");
     expect(RATE_LIMITS["reveal.ip"].policy).toBe("closed");
     expect(RATE_LIMITS["listing.draft.uid"].policy).toBe("open");
+    expect(RATE_LIMITS["listing.edit.uid"].policy).toBe("open");
   });
 });
 

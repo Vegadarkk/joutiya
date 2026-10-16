@@ -7,6 +7,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/db/repositories/listings", { spy: true });
+vi.mock("@/lib/db/repositories/profiles", { spy: true });
 vi.mock("@/lib/listings/service", { spy: true });
 
 import { RATE_LIMITS } from "@/config/rate-limits";
@@ -19,9 +20,10 @@ import { POST as renew } from "@/app/api/listings/[id]/renew/route";
 import { POST as resume } from "@/app/api/listings/[id]/resume/route";
 import { POST as sold } from "@/app/api/listings/[id]/sold/route";
 import type { CreateListingResponse, OwnerListingsResponse } from "@/lib/contracts/listings";
-import { getListing, listOwnerListings } from "@/lib/db/repositories/listings";
+import { getListing, listOwnerListings, listOwnerListingsByStatus } from "@/lib/db/repositories/listings";
+import { getUserRecord } from "@/lib/db/repositories/profiles";
 import { resetServerEnv } from "@/lib/env";
-import { changeStatus, createDraft, publish as publishListing } from "@/lib/listings/service";
+import { changeStatus, createDraft, patchListing, publish as publishListing } from "@/lib/listings/service";
 import { consumeLimit, limitState, resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { api, member, readyPatch, seedReadyUpload, type ApiResult, type ErrorBody, type Handler, type ListingBody, type Member, type PublishBody } from "./helpers";
 
@@ -110,6 +112,38 @@ describe("DELETE /api/listings/{id} and pause / resume / sold / renew (listing.s
   });
 });
 
+describe("PATCH /api/listings/{id} on a listing that is not a draft (listing.edit.uid)", () => {
+  it("allows 30 saves a day per account, then 429 before the account or the other listings are read; drafts keep the autosave budget", async () => {
+    expect(RATE_LIMITS["listing.edit.uid"]).toMatchObject({ points: 30, policy: "open" });
+    const owner = await member();
+    const id = await published(owner);
+    // Saving the draft before publication did not count.
+    expect((await limitState("listing.edit.uid", owner.uid))?.consumedPoints ?? 0).toBe(0);
+    const draft = (await newDraft(owner)).body.id;
+    const edit = (body: unknown) => api<ListingBody & ErrorBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body });
+    expect((await edit({ priceNegotiable: false })).status).toBe(200);
+    // A save that changes nothing writes nothing, yet counts (it read the listing and the account).
+    expect((await edit({ priceNegotiable: false })).status).toBe(200);
+    expect((await limitState("listing.edit.uid", owner.uid))?.consumedPoints).toBe(2);
+    expect((await api(patch, "PATCH", `/api/listings/${draft}`, { member: owner, body: { title: "Vélo" } })).status).toBe(200);
+    expect((await limitState("listing.edit.uid", owner.uid))?.consumedPoints).toBe(2);
+
+    await spend("listing.edit.uid", owner);
+    const version = (await getListing(id))!.version;
+    vi.mocked(getUserRecord).mockClear();
+    vi.mocked(listOwnerListingsByStatus).mockClear();
+    expectLimited(await edit({ price: 1400 }));
+    expect(getUserRecord).not.toHaveBeenCalled();
+    expect(listOwnerListingsByStatus).not.toHaveBeenCalled();
+    expect((await getListing(id))?.version).toBe(version);
+    // Drafts still save; another account is not affected.
+    expect((await api(patch, "PATCH", `/api/listings/${draft}`, { member: owner, body: { title: "Vélo de ville" } })).status).toBe(200);
+    const other = await member();
+    const otherId = await published(other);
+    expect((await api(patch, "PATCH", `/api/listings/${otherId}`, { member: other, body: { price: 1400 } })).status).toBe(200);
+  });
+});
+
 describe("POST /api/listings/{id}/publish (listing.publish.uid)", () => {
   it("counts every attempt, refused ones included, then 429 before the listing is read", async () => {
     expect(RATE_LIMITS["listing.publish.uid"]).toMatchObject({ points: 60, policy: "open" });
@@ -149,19 +183,46 @@ describe("GET /api/listings/{id} and /mine (listing.owner.read.uid)", () => {
     expect((await api<ListingBody>(read, "GET", `/api/listings/${id}`, { member: owner })).status).toBe(200);
     expect(await used()).toBe(1);
     const photos = [await seedReadyUpload(owner, id), await seedReadyUpload(owner, id)];
+    // The save answers with the owner view: charged like a GET.
     expect((await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { photos } })).status).toBe(200);
+    expect(await used()).toBe(1 + 3);
     const withPhotos = await api<ListingBody>(read, "GET", `/api/listings/${id}`, { member: owner });
     expect(withPhotos.body.listing.photos).toHaveLength(2);
-    expect(await used()).toBe(1 + 3);
+    expect(await used()).toBe(4 + 3);
 
     const drafts = await api<OwnerListingsResponse>(mine, "GET", "/api/listings/mine?status=drafts", { member: owner });
     expect(drafts.body.listings).toHaveLength(2);
-    expect(await used()).toBe(4 + 2);
+    expect(await used()).toBe(7 + 2);
     // An empty tab still costs one read; someone else's listing (404) costs the lookup.
     expect((await api<OwnerListingsResponse>(mine, "GET", "/api/listings/mine?status=ended", { member: owner })).body.listings).toEqual([]);
-    expect(await used()).toBe(6 + 1);
+    expect(await used()).toBe(9 + 1);
     expect((await api(read, "GET", `/api/listings/${(await newDraft(await member())).body.id}`, { member: owner })).status).toBe(404);
-    expect(await used()).toBe(7 + 1);
+    expect(await used()).toBe(10 + 1);
+  });
+
+  it("charge the owner view a status change answers with; once spent, saves and status changes are refused before any read", async () => {
+    const owner = await member();
+    const id = await published(owner);
+    const used = async () => (await limitState("listing.owner.read.uid", owner.uid))?.consumedPoints ?? 0;
+    const start = await used();
+    expect((await act(pause, owner, id, "pause")).status).toBe(200);
+    expect(await used()).toBe(start + 2);
+    expect((await act(resume, owner, id, "resume")).status).toBe(200);
+    expect(await used()).toBe(start + 4);
+    // A refused change still costs the up-front point, like a 404 GET.
+    expect((await act(resume, owner, id, "resume")).status).toBe(409);
+    expect(await used()).toBe(start + 5);
+
+    await spend("listing.owner.read.uid", owner);
+    vi.mocked(getListing).mockClear();
+    vi.mocked(changeStatus).mockClear();
+    vi.mocked(patchListing).mockClear();
+    expectLimited(await act(pause, owner, id, "pause"));
+    expectLimited(await api<ErrorBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { priceNegotiable: false } }));
+    expect(getListing).not.toHaveBeenCalled();
+    expect(changeStatus).not.toHaveBeenCalled();
+    expect(patchListing).not.toHaveBeenCalled();
+    expect(await getListing(id)).toMatchObject({ status: "published", priceNegotiable: true });
   });
 
   it("answers 429 once the daily budget is spent, before any Firestore read", async () => {

@@ -10,7 +10,8 @@ import { datesToTimestamps, timestampsToDates } from "./timestamps";
 // listings/{listingId} (§5, design §4). The server is the only writer; every read and write counts
 // against the Firestore Spark quotas (`consume`). Dates: Timestamp in Firestore, Date in memory
 // (staff.ts converter pattern, deep). Partial updates take `ListingFieldPatch`: `null` deletes an
-// optional field, so the lifecycle stays pure (no FieldValue import outside this module).
+// optional field (`price` keeps it: null is its "à discuter" value), so the lifecycle stays pure
+// (no FieldValue import outside this module).
 
 export interface ListingRecord extends ListingDoc {
   id: string;
@@ -30,6 +31,9 @@ export const ACTIVE_STATUSES: readonly ListingStatus[] = ["published", "pending_
 /** A partial update: `undefined` leaves the field alone, `null` deletes an optional field. */
 export type ListingFieldPatch = { [K in keyof ListingDoc]?: ListingDoc[K] | null };
 
+/** Required fields where `null` is a value, written as such: deleting one would make the document unreadable. */
+const NULL_VALUED_FIELDS: ReadonlySet<string> = new Set<keyof ListingDoc>(["price"]);
+
 export class DraftLimitError extends Error {
   constructor() {
     super("draft limit reached");
@@ -41,6 +45,13 @@ export class PhotoLimitError extends Error {
   constructor() {
     super("photo limit reached");
     this.name = "PhotoLimitError";
+  }
+}
+
+export class ActiveLimitError extends Error {
+  constructor() {
+    super("active listing limit reached");
+    this.name = "ActiveLimitError";
   }
 }
 
@@ -70,18 +81,19 @@ export function applyPatch<T extends ListingDoc>(listing: T, patch: ListingField
   const next: Record<string, unknown> = { ...listing };
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue;
-    if (value === null) delete next[key];
+    if (value === null && !NULL_VALUED_FIELDS.has(key)) delete next[key];
     else next[key] = value;
   }
   return next as T;
 }
 
-/** Firestore update map of a field patch: Dates to Timestamps, `null` to a deletion. */
+/** Firestore update map of a field patch: Dates to Timestamps, `null` to a deletion (or null, NULL_VALUED_FIELDS). */
 function toUpdate(patch: ListingFieldPatch): Record<string, unknown> {
   const update: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue;
-    update[key] = value === null ? FieldValue.delete() : datesToTimestamps(value);
+    if (value === null) update[key] = NULL_VALUED_FIELDS.has(key) ? null : FieldValue.delete();
+    else update[key] = datesToTimestamps(value);
   }
   return update;
 }
@@ -136,6 +148,17 @@ export async function listPublishedByOwner(uid: string, limit = 24): Promise<Lis
 /** Listings holding an active slot (published or awaiting review). */
 export async function countActive(uid: string): Promise<number> {
   const result = await listings().where("ownerUid", "==", uid).where("status", "in", [...ACTIVE_STATUSES]).count().get();
+  void consume("firestore.reads", 1);
+  return result.data().count;
+}
+
+/**
+ * Listings holding an active slot, inside a transaction: the `activeListings` quota of a change
+ * that gives the listing a slot (publish, resume, renewal, held edit). countActive is the fast
+ * path before it; this one sees what concurrent changes committed.
+ */
+export async function countActiveTx(tx: Transaction, uid: string): Promise<number> {
+  const result = await tx.get(listings().where("ownerUid", "==", uid).where("status", "in", [...ACTIVE_STATUSES]).count());
   void consume("firestore.reads", 1);
   return result.data().count;
 }

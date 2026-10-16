@@ -2,7 +2,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Drafts of the listings API against the emulators (design §3): create (5 per account), owner-only
 // GET / PATCH / DELETE (404 for anyone else, 401 anonymous, 403 without CSRF), the wizard patch and
-// its server-side checks (city, region, photos filtered to the owner's ready uploads), removal.
+// its server-side checks (city, region, photos filtered to the owner's ready uploads), saves that
+// change nothing (no write), dropped photos handed to the purge, removal.
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 
@@ -11,12 +12,13 @@ import { GET as mine } from "@/app/api/listings/mine/route";
 import { DELETE as remove, GET as get, PATCH as patch } from "@/app/api/listings/[id]/route";
 import { MAX_DRAFTS, type CreateListingResponse, type OwnerListingsResponse } from "@/lib/contracts/listings";
 import { listContentOps, listingContentRef } from "@/lib/db/repositories/content-ops";
-import { getListing, updateListing } from "@/lib/db/repositories/listings";
-import { getUpload } from "@/lib/db/repositories/uploads";
+import { getListing, listingRef, updateListing } from "@/lib/db/repositories/listings";
+import { getUpload, newUploadId } from "@/lib/db/repositories/uploads";
 import { resetServerEnv } from "@/lib/env";
 import { LISTING_ID_PATTERN } from "@/lib/listings/ids";
+import { logger } from "@/lib/logging/logger";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
-import { api, member, readyPatch, seedReadyUpload, type ErrorBody, type ListingBody, type Member } from "./helpers";
+import { api, attachPhoto, member, readyPatch, seedReadyUpload, type ErrorBody, type ListingBody, type Member } from "./helpers";
 
 beforeAll(() => resetServerEnv());
 beforeEach(() => resetRateLimiters());
@@ -153,6 +155,68 @@ describe("PATCH /api/listings/{id}", () => {
     expect(trimmed.body.listing.photos.filter((photo) => photo.status === "ready").map((photo) => photo.id)).toEqual([first]);
   });
 
+  it("hands the photos a save drops to the purge (purgeAt now); a lost upload document does not fail the save", async () => {
+    const owner = await member();
+    const id = await draft(owner);
+    const kept = await seedReadyUpload(owner, id);
+    const dropped = await seedReadyUpload(owner, id);
+    expect((await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { photos: [kept, dropped] } })).status).toBe(200);
+    const keptPurge = (await getUpload(kept))!.purgeAt;
+    const before = Date.now();
+    const saved = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { photos: [kept] } });
+    expect(saved.status).toBe(200);
+    // Due now: the hourly purge-quarantine deletes it once it checks no listing holds it again.
+    const purgeAt = (await getUpload(dropped))!.purgeAt.getTime();
+    expect(purgeAt).toBeGreaterThanOrEqual(before);
+    expect(purgeAt).toBeLessThanOrEqual(Date.now());
+    expect((await getUpload(kept))?.purgeAt).toEqual(keptPurge);
+
+    // A photo on the listing without its upload document: the save still goes through, logged.
+    const lost = newUploadId();
+    await attachPhoto(id, lost);
+    const warn = vi.spyOn(logger, "warn");
+    const trimmed = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { photos: [kept] } });
+    expect(trimmed.status).toBe(200);
+    expect((await getListing(id))?.photos.map((photo) => photo.id)).toEqual([kept]);
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({ listingId: id, uploadId: lost }), "dropped photo not handed to the purge");
+  });
+
+  it("stores a null price (to discuss, a donation) as null: the listing stays readable", async () => {
+    const owner = await member();
+    const id = await draft(owner);
+    expect((await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { price: 1500 } })).body.listing.price).toBe(1500);
+    const cleared = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { price: null } });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.listing.price).toBeNull();
+    expect((await listingRef(id).get()).get("price")).toBeNull();
+    expect((await api<ListingBody>(get, "GET", `/api/listings/${id}`, { member: owner })).body.listing.price).toBeNull();
+    // A donation clears the price the same way.
+    expect((await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { price: 900 } })).body.listing.price).toBe(900);
+    const donation = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { isDonation: true } });
+    expect(donation.body.listing).toMatchObject({ isDonation: true, price: null });
+    expect(await getListing(id)).toMatchObject({ isDonation: true, price: null });
+  });
+
+  it("writes nothing when a save changes nothing: resent values, an empty body, the same declaration", async () => {
+    const owner = await member();
+    const id = await draft(owner);
+    expect((await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: readyPatch({ sensitiveDeclaration: { kind: "self" } }) })).body.listing.version).toBe(1);
+    const stored = (await getListing(id))!;
+    for (const body of [readyPatch(), {}, { title: stored.title, price: 1500, condition: "good" }, { sensitiveDeclaration: { kind: "self" } }, { subcategoryId: "velos" }]) {
+      const same = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body });
+      expect(same.status, JSON.stringify(body)).toBe(200);
+      expect(same.body.listing).toMatchObject({ version: 1, title: stored.title, sensitiveDeclaration: { kind: "self" } });
+    }
+    expect(await getListing(id)).toEqual(stored);
+    // One changed field among resent ones is saved.
+    const changed = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: readyPatch({ price: 1400 }) });
+    expect(changed.body.listing).toMatchObject({ version: 2, price: 1400 });
+    // Another declaration is a new one, dated now.
+    const other = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { sensitiveDeclaration: { kind: "explicit_consent" } } });
+    expect(other.body.listing.version).toBe(3);
+    expect((await getListing(id))?.moderation.sensitiveDeclaration).toEqual({ kind: "explicit_consent", at: expect.any(Date) });
+  });
+
   it("refuses more photos than the quota (photo_limit)", async () => {
     const owner = await member();
     const id = await draft(owner);
@@ -222,5 +286,17 @@ describe("rejected listings reopened as drafts", () => {
     expect(reopened.status).toBe(200);
     expect(reopened.body.listing).toMatchObject({ status: "draft", title: "Vélo de ville corrigé" });
     expect((await getListing(rejected))?.purgeAt).toBeUndefined();
+  });
+
+  it("reopens it on an empty save too (the wizard's reopen); the draft then writes nothing on one", async () => {
+    const owner = await member();
+    const rejected = await draft(owner);
+    await updateListing(rejected, { status: "rejected", purgeAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) });
+    const version = (await getListing(rejected))!.version;
+    const reopened = await api<ListingBody>(patch, "PATCH", `/api/listings/${rejected}`, { member: owner, body: {} });
+    expect(reopened.status).toBe(200);
+    expect(reopened.body.listing).toMatchObject({ status: "draft", version: version + 1 });
+    expect(await getListing(rejected)).toMatchObject({ status: "draft", version: version + 1 });
+    expect((await api<ListingBody>(patch, "PATCH", `/api/listings/${rejected}`, { member: owner, body: {} })).body.listing.version).toBe(version + 1);
   });
 });
