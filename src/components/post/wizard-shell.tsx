@@ -33,6 +33,8 @@ interface WizardShellProps {
   onRetrySave: () => void;
   /** Live listing: saves the pending changes from any step. */
   onSaveNow?: () => void;
+  /** A typed field is not sendable yet (under its minimum length). */
+  held?: boolean;
   children: ReactNode;
 }
 
@@ -41,7 +43,7 @@ interface WizardShellProps {
  * bottom on a phone). The Next button submits the step's form (`form` attribute), so each step
  * validates itself before the wizard moves on.
  */
-export function WizardShell({ step, title, lead, states, reachable, onSelect, onBack, nextLabel, nextDisabled, nextLoading, saveState, saveError, saveMode = "auto", onRetrySave, onSaveNow, children }: WizardShellProps) {
+export function WizardShell({ step, title, lead, states, reachable, onSelect, onBack, nextLabel, nextDisabled, nextLoading, saveState, saveError, saveMode = "auto", onRetrySave, onSaveNow, held = false, children }: WizardShellProps) {
   const t = useTranslations("Listing.wizard");
   const heading = useRef<HTMLHeadingElement>(null);
   const first = useRef(true);
@@ -78,7 +80,7 @@ export function WizardShell({ step, title, lead, states, reachable, onSelect, on
             "pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:backdrop-blur-none",
           )}
         >
-          <SaveIndicator state={saveState} error={saveError} mode={saveMode} onRetry={onRetrySave} onSave={onSaveNow} />
+          <SaveIndicator state={saveState} error={saveError} mode={saveMode} held={held} onRetry={onRetrySave} onSave={onSaveNow} />
           <div className="flex items-center justify-between gap-3">
             {onBack ? (
               <Button type="button" variant="outline" onClick={onBack} className="min-w-28">
@@ -113,6 +115,7 @@ interface SaveIndicatorProps {
   mode?: SaveMode;
   onRetry: () => void;
   onSave?: () => void;
+  held?: boolean;
 }
 
 /**
@@ -120,10 +123,19 @@ interface SaveIndicatorProps {
  * listing: "Modifications non enregistrées" with its Save button. A failure says whether the
  * browser keeps retrying, and offers a retry.
  */
-export function SaveIndicator({ state, error, mode = "auto", onRetry, onSave }: SaveIndicatorProps) {
+export function SaveIndicator({ state, error, mode = "auto", onRetry, onSave, held = false }: SaveIndicatorProps) {
   const t = useTranslations("Listing.wizard");
   const apiMessage = useApiErrorMessage();
   const live = mode === "manual";
+  // A field under its minimum length is not sent: say so rather than "saved".
+  if (held && (state === "idle" || state === "saved")) {
+    return (
+      <p role="status" aria-live="polite" className="flex min-h-5 items-center gap-1.5 text-sm text-foreground-muted">
+        <CircleDot className="size-4 shrink-0" aria-hidden="true" />
+        <span className="min-w-0">{t("held")}</span>
+      </p>
+    );
+  }
   if (state === "idle") return <p className="h-5" aria-hidden="true" />;
   const message =
     state === "saving"

@@ -50,6 +50,8 @@ interface WizardState {
   photos: PhotoItem[];
   blockers: FieldIssue[];
   publishResult: PublishListingResponse | null;
+  /** Fields typed but not sendable yet (a title under its minimum length): kept on screen only. */
+  held: string[];
 }
 
 type Action =
@@ -61,6 +63,7 @@ type Action =
   | { type: "photo-remove"; key: string }
   | { type: "photo-move"; key: string; to: number }
   | { type: "blockers"; blockers: FieldIssue[] }
+  | { type: "held"; add: string[]; remove: string[] }
   | { type: "published"; result: PublishListingResponse };
 
 function applyPatch(listing: OwnerListing, patch: ListingPatch): OwnerListing {
@@ -154,6 +157,10 @@ function reducer(state: WizardState, action: Action): WizardState {
     }
     case "blockers":
       return { ...state, blockers: action.blockers };
+    case "held": {
+      const held = [...new Set([...state.held.filter((key) => !action.remove.includes(key)), ...action.add])];
+      return held.length === state.held.length && held.every((key) => state.held.includes(key)) ? state : { ...state, held };
+    }
     case "published":
       return {
         ...state,
@@ -348,6 +355,7 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
     photos: photoItemsFromListing(listing, mediaBaseUrl),
     blockers: [],
     publishResult: null,
+    held: [],
   }));
   const listingId = listing.id;
   const saveMode = saveModeOf(state.listing.status);
@@ -376,6 +384,7 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
   const polls = useRef<AbortController | null>(null);
   const photosRef = useRef(state.photos);
   const onLeaveRef = useRef(onUnsavedLeave);
+  const heldRef = useRef<string[]>([]);
   const lastSentReady = useRef<string>(readyPhotoIds(state.photos).join(","));
 
   useEffect(() => {
@@ -385,6 +394,10 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
   useEffect(() => {
     onLeaveRef.current = onUnsavedLeave;
   }, [onUnsavedLeave]);
+
+  useEffect(() => {
+    heldRef.current = state.held;
+  }, [state.held]);
 
   useEffect(() => {
     autosave.setManual(saveMode === "manual");
@@ -404,9 +417,9 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
       const pending = instance.takePending();
       if (pending) patchListingOnUnload(listingId, pending);
     };
-    // A live listing with unsaved changes: the browser asks before leaving.
+    // Unsaved changes (a live listing's, or a field too short to be saved): the browser asks first.
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (instance.isManual && instance.hasPending()) event.preventDefault();
+      if ((instance.isManual && instance.hasPending()) || heldRef.current.length > 0) event.preventDefault();
     };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", onHide);
@@ -440,7 +453,9 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
       dispatch({ type: "patch", patch });
       // Half-typed values stay on screen but are not sent (the API would refuse the whole patch).
       const payload = sanitizePatch(patch);
-      if (Object.keys(payload).length > 0) autosave.queue(payload);
+      const sent = Object.keys(payload);
+      dispatch({ type: "held", add: Object.keys(patch).filter((key) => !sent.includes(key)), remove: sent });
+      if (sent.length > 0) autosave.queue(payload);
       if (options.flush) void autosave.flush();
     },
     [autosave],

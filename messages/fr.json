@@ -397,7 +397,8 @@
       "saveStopped": "Enregistrement interrompu.",
       "saveNow": "Enregistrer",
       "unsavedLeftTitle": "Modifications non enregistrées",
-      "unsavedLeftBody": "Vous avez quitté l'annonce sans enregistrer vos dernières modifications."
+      "unsavedLeftBody": "Vous avez quitté l'annonce sans enregistrer vos dernières modifications.",
+      "held": "Ce champ sera enregistré dès qu'il sera complet."
     },
     "start": {
       "title": "Déposer une annonce",

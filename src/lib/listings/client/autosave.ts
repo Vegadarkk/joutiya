@@ -43,6 +43,7 @@ export class Autosave<P extends object> {
   private halted = false;
   private manual: boolean;
   private failures = 0;
+  private lastError: unknown = undefined;
   private state: AutosaveState = "idle";
   private readonly idleMs: number;
   private readonly save: (patch: P) => Promise<void>;
@@ -85,7 +86,9 @@ export class Autosave<P extends object> {
   queue(patch: P): void {
     if (this.disposed) return;
     this.pending = this.pending ? this.merge(this.pending, patch) : patch;
-    this.setState("pending");
+    // Halted automatic saves keep showing why (and the retry); a live listing shows its Save button.
+    if (this.halted && !this.manual) this.setState("error", this.lastError);
+    else this.setState("pending");
     if (!this.manual && !this.halted) this.armTimer();
   }
 
@@ -124,10 +127,12 @@ export class Autosave<P extends object> {
       try {
         await this.save(current);
         this.failures = 0;
+        this.lastError = undefined;
         this.setState(this.pending ? "pending" : "saved");
         return;
       } catch (error) {
         this.failures += 1;
+        this.lastError = error;
         // The failed patch goes back under whatever was typed since: nothing is lost.
         const kept = this.recover(current, error);
         if (kept) this.pending = this.pending ? this.merge(kept, this.pending) : kept;

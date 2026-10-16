@@ -137,6 +137,25 @@ describe("Autosave", () => {
     expect(save).toHaveBeenLastCalledWith({ title: "a", price: 5 });
   });
 
+  it("while halted, new changes keep the error visible (a draft) or show the Save state (a live listing)", async () => {
+    const refusal = new Error("refused");
+    const save = vi.fn(async (_patch: Patch) => {});
+    save.mockRejectedValueOnce(refusal).mockRejectedValueOnce(refusal);
+    const errors: unknown[] = [];
+    const draft = new Autosave<Patch>({ save, retryAfter: () => null, onState: (state, error) => state === "error" && errors.push(error) });
+    draft.queue({ title: "a" });
+    await draft.flush();
+    draft.queue({ title: "ab" });
+    expect(draft.currentState).toBe("error");
+    expect(errors.at(-1)).toBe(refusal);
+
+    const live = new Autosave<Patch>({ save, retryAfter: () => null, manual: true });
+    live.queue({ title: "a" });
+    await live.flush({ force: true });
+    live.queue({ title: "ab" });
+    expect(live.currentState).toBe("pending");
+  });
+
   it("keeps only what recover returns after a failure", async () => {
     const save = vi.fn(async (_patch: Patch) => {});
     save.mockRejectedValueOnce(new Error("invalid title"));

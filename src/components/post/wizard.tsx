@@ -154,7 +154,7 @@ export function PostWizard({ listingId, nonce }: { listingId: string; nonce?: st
 }
 
 function WizardScreens({ nonce }: { nonce?: string }) {
-  const { listing, listingId, saveState, saveError, saveMode, retrySave, save, publishResult, setPublished, flush } = useWizard();
+  const { listing, listingId, saveState, saveError, saveMode, retrySave, save, publishResult, setPublished, flush, held } = useWizard();
   const t = useTranslations("Listing");
   const locale = useLocale() as Locale;
   const pathname = usePathname();
@@ -250,6 +250,7 @@ function WizardScreens({ nonce }: { nonce?: string }) {
       saveMode={saveMode}
       onRetrySave={retrySave}
       onSaveNow={() => void onSaveNow()}
+      held={held.length > 0}
     >
       {step === "categorie" ? <CategoryStep onNext={onNext} /> : null}
       {step === "criteres" ? <CriteriaStep onNext={onNext} /> : null}

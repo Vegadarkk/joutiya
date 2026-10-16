@@ -13,10 +13,10 @@ import type { SaveMode } from "@/lib/listings/client/store";
 
 const noop = () => undefined;
 
-function render(state: AutosaveState, options: { error?: unknown; mode?: SaveMode } = {}) {
+function render(state: AutosaveState, options: { error?: unknown; mode?: SaveMode; held?: boolean } = {}) {
   return renderToStaticMarkup(
     <NextIntlClientProvider locale="fr" messages={fr}>
-      <SaveIndicator state={state} error={options.error} mode={options.mode} onRetry={noop} onSave={noop} />
+      <SaveIndicator state={state} error={options.error} mode={options.mode} held={options.held} onRetry={noop} onSave={noop} />
     </NextIntlClientProvider>,
   );
 }
@@ -28,6 +28,12 @@ describe("SaveIndicator", () => {
     expect(text(render("saved"))).toBe(fr.Listing.wizard.saved);
     expect(text(render("pending"))).toBe(fr.Listing.wizard.pending);
     expect(render("idle")).not.toContain('role="status"');
+  });
+
+  it("never says saved while a typed field is too short to be sent", () => {
+    expect(text(render("saved", { held: true }))).toBe(fr.Listing.wizard.held);
+    expect(text(render("idle", { held: true }))).toBe(fr.Listing.wizard.held);
+    expect(text(render("saving", { held: true }))).toBe(fr.Listing.wizard.saving);
   });
 
   it("a live listing shows its unsaved changes with a Save button", () => {
