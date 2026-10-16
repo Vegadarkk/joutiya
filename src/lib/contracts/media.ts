@@ -25,6 +25,12 @@ export const UPLOAD_URL_TTL_SECONDS = 5 * 60;
 export const UPLOAD_DECLARED_TYPES = ["image/jpeg", "image/webp", "image/png"] as const;
 export type UploadDeclaredType = (typeof UPLOAD_DECLARED_TYPES)[number];
 
+/** KYBC pieces (phase 7): scans or photos of registry documents, or the PDF the registry issued. */
+export const KYBC_DECLARED_TYPES = ["image/jpeg", "image/png", "application/pdf"] as const;
+export type KybcDeclaredType = (typeof KYBC_DECLARED_TYPES)[number];
+/** Every type an upload document may record (photos and KYBC pieces). */
+export const UPLOAD_DOC_DECLARED_TYPES = ["image/jpeg", "image/webp", "image/png", "application/pdf"] as const;
+
 /** `uploads/{id}.status`: signed -> processing -> ready | rejected. */
 export const UPLOAD_STATUSES = ["signed", "processing", "ready", "rejected"] as const;
 export type UploadStatus = (typeof UPLOAD_STATUSES)[number];

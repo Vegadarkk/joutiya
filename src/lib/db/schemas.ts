@@ -15,7 +15,7 @@ import {
   regionCodeSchema,
   slugIdSchema,
 } from "@/lib/contracts/listings";
-import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, UPLOAD_DECLARED_TYPES, UPLOAD_REJECT_REASONS, UPLOAD_STATUSES, listingPhotoSchema, uploadIdSchema } from "@/lib/contracts/media";
+import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, UPLOAD_DOC_DECLARED_TYPES, UPLOAD_REJECT_REASONS, UPLOAD_STATUSES, listingPhotoSchema, uploadIdSchema } from "@/lib/contracts/media";
 import { ROLES } from "@/lib/firebase/claims";
 import { SAVED_SEARCH_ALERTS, SAVED_SEARCH_NAME_MAX } from "@/lib/contracts/search";
 import { storedSearchParamsSchema } from "@/lib/search/params";
@@ -262,10 +262,10 @@ export const uploadSchema = z
   .object({
     ownerUid: uid,
     purpose: z.enum(UPLOAD_DOC_PURPOSES),
-    /** Listing id for photos. */
+    /** Listing id for photos; the applicant's uid for KYBC pieces (phase 7). */
     targetId: z.string().min(1).max(128),
     declaredSize: z.number().int().min(1).max(MAX_UPLOAD_BYTES),
-    declaredType: z.enum(UPLOAD_DECLARED_TYPES),
+    declaredType: z.enum(UPLOAD_DOC_DECLARED_TYPES),
     status: z.enum(UPLOAD_STATUSES),
     quarantineKey: z.string().min(1).max(200),
     /**

@@ -93,6 +93,8 @@ export const RATE_LIMITS = {
   // Closed: every signed upload costs R2 operations and storage.
   "upload.sign.uid": { points: 30, duration: HOUR, policy: "closed", key: "uid" },
   "upload.bytes.uid": { points: 200 * MIB, duration: DAY, policy: "closed", key: "uid" },
+  // KYBC pieces of a Pro application (phase 7): a few documents, resent after a rejection.
+  "pro.kybc.sign.uid": { points: 20, duration: DAY, policy: "closed", key: "uid" },
   // GET /api/uploads/{id} (polling) and repeated completes: one Firestore read each.
   "upload.status.uid": { points: 900, duration: HOUR, policy: "open", key: "uid" },
   // DELETE /api/uploads/{id} (~3 reads, the detach transaction, the document delete and up to 3

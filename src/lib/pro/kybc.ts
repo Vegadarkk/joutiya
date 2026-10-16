@@ -54,3 +54,27 @@ export type KybcStatus = (typeof KYBC_STATUSES)[number];
 /** Pieces uploaded with an application (private bucket, purpose `kyb`). */
 export const KYBC_MIN_PIECES = 1;
 export const KYBC_MAX_PIECES = 6;
+
+/** Upload documents an applicant may hold at once (pieces in flight, attached or refused, kept 7 days unless attached). */
+export const KYBC_UPLOADS_PER_ACCOUNT = 3 * KYBC_MAX_PIECES;
+
+/** Bytes read to check a piece's real type. */
+export const KYBC_SNIFF_BYTES = 16;
+
+/**
+ * Real type of a KYBC piece from its first bytes: JPEG, PNG or PDF (`%PDF-` at offset 0, stricter
+ * than readers that search the first kilobyte), null otherwise. Never the declared type.
+ */
+export function sniffKybcType(bytes: Uint8Array): "image/jpeg" | "image/png" | "application/pdf" | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (bytes.length >= png.length && png.every((byte, index) => bytes[index] === byte)) return "image/png";
+  const pdf = [0x25, 0x50, 0x44, 0x46, 0x2d];
+  if (bytes.length >= pdf.length && pdf.every((byte, index) => bytes[index] === byte)) return "application/pdf";
+  return null;
+}
+
+/** Private bucket key of a piece (never served publicly; staff read it through the admin app). */
+export function kybcObjectKey(uid: string, uploadId: string): string {
+  return `kyb/${uid}/${uploadId}`;
+}

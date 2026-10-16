@@ -1,6 +1,7 @@
 import { z } from "@/lib/zod";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
 import { citySlugSchema, regionCodeSchema } from "@/lib/contracts/listings";
+import { KYBC_DECLARED_TYPES, MAX_UPLOAD_BYTES, type KybcDeclaredType } from "@/lib/contracts/media";
 import { KYBC_MAX_PIECES, KYBC_MIN_PIECES, proLegalSchema } from "@/lib/pro/kybc";
 import { PRO_DESCRIPTION_MAX, PRO_NAME_MAX } from "@/lib/pro/profile-schema";
 
@@ -101,3 +102,32 @@ export interface ProDecisionResponse {
   /** Listings of the owner retagged as Pro (verify only). */
   retagged: number;
 }
+
+// KYBC pieces (design §4): POST /api/pro/kybc/uploads signs a presigned PUT to the quarantine
+// bucket; POST /api/pro/kybc/uploads/{id}/complete checks the bytes and moves the piece to the
+// private bucket. The piece's upload id then goes in the application's `uploadIds`.
+
+export const PRO_API = {
+  apply: "/api/pro/apply",
+  kybcSign: "/api/pro/kybc/uploads",
+  kybcComplete: (id: string) => `/api/pro/kybc/uploads/${id}/complete`,
+} as const;
+
+export const kybcSignSchema = z
+  .object({
+    declaredSize: z.number().int().min(1).max(MAX_UPLOAD_BYTES),
+    declaredType: z.enum(KYBC_DECLARED_TYPES),
+  })
+  .strict();
+export type KybcSignInput = z.infer<typeof kybcSignSchema>;
+
+export interface KybcSignResponse {
+  uploadId: string;
+  url: string;
+  method: "PUT";
+  headers: { "Content-Type": KybcDeclaredType };
+  /** ISO 8601. */
+  expiresAt: string;
+}
+
+export type KybcCompleteResponse = { status: "ready"; uploadId: string } | { status: "rejected"; uploadId: string; reason: "too_large" | "bad_type" | "expired" };
