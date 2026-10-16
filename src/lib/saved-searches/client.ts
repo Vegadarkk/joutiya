@@ -1,5 +1,6 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/auth/client";
-import { SEARCH_API, type SavedSearchAlert, type SavedSearchPatch, type SavedSearchView } from "@/lib/contracts/search";
+import { SEARCH_API } from "@/lib/contracts/endpoints";
+import type { SavedSearchAlert, SavedSearchPatch, SavedSearchView } from "@/lib/contracts/search";
 import { canonicalSearchParams, type SearchParams, type StoredSearchParams } from "@/lib/search/params";
 
 // Browser side of the saved searches (design D18): thin wrappers over /api/saved-searches.

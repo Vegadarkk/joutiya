@@ -18,24 +18,7 @@ export const FAVORITES_PAGE_SIZE = 48;
 /** Header carrying a solved Turnstile token on GET /api/search (no body on a GET). */
 export const TURNSTILE_HEADER = "x-turnstile-token";
 
-export const SEARCH_API = {
-  /** GET ?<search params> -> SearchApiResponse. Over the limits: 403 turnstile_required, then 429. */
-  search: "/api/search",
-  /** GET -> { ids: string[] } (hearts state; Valkey cache over the subcollection). */
-  favoriteIds: "/api/favorites/ids",
-  /** GET ?cursor= -> FavoritesPage. */
-  favorites: "/api/favorites",
-  /** PUT -> 201/200 { favorite } ; DELETE -> 204. */
-  favorite: (listingId: string) => `/api/favorites/${listingId}`,
-  /** GET -> { searches: SavedSearchView[] } ; POST SavedSearchCreate -> 201 { search }. */
-  savedSearches: "/api/saved-searches",
-  /** PATCH SavedSearchPatch -> { search } ; DELETE -> 204. */
-  savedSearch: (id: string) => `/api/saved-searches/${id}`,
-  /** POST { token } (and RFC 8058 one-click POST with ?t=) -> 204. No session, no CSRF: the token authenticates. */
-  unsubscribe: "/api/alerts/unsubscribe",
-  /** POST { token } -> 204 + __Host-tsv pass (page challenge of /anti-robot). */
-  challengePass: "/api/challenge/pass",
-} as const;
+export { SEARCH_API } from "./endpoints";
 
 export type SearchApiResponse = SearchResponse;
 

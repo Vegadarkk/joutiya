@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { ApiError, apiDelete, apiGet, csrfToken, type ApiErrorCode } from "@/lib/auth/client";
-import { SEARCH_API, type FavoriteView, type FavoritesPage } from "@/lib/contracts/search";
+import { SEARCH_API } from "@/lib/contracts/endpoints";
+import type { FavoriteView, FavoritesPage } from "@/lib/contracts/search";
 import { CSRF_HEADER } from "@/lib/security/cookies";
 
 // Browser side of the favorites (design D17): one module store of the favorite ids, fetched once
