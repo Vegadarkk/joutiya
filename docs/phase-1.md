@@ -159,7 +159,7 @@ Prérequis : le domaine `notif.joutiya.ma` vérifié chez Resend, après la basc
 2. Claude déploie le Worker et pose ses secrets par l'API Cloudflare : `RESEND_API_KEY`, `ALERT_EMAIL_TO` (votre Gmail), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ALERT_RELAY_SECRET`, `ACCESS_CLIENT_ID` et `ACCESS_CLIENT_SECRET` (jeton `joutiya-probe`). L'expéditeur, `Joutiya alertes <alertes@notif.joutiya.ma>`, est dans `workers/uptime-probe/wrangler.jsonc`.
 3. Test : une alerte signée arrive dans votre Gmail depuis `alertes@notif.joutiya.ma`, avec SPF, DKIM et DMARC à PASS (« Afficher l'original ») ; Nav ajoute un filtre Gmail « Ne jamais envoyer dans le spam » pour cet expéditeur.
 
-Garde-fous : au plus 20 e-mails relayés par jour UTC (au-delà, l'application reçoit une erreur 429 et la note dans ses journaux), et un seul avis Telegram par jour quand le quota Resend du jour est épuisé. Sans `ALERT_EMAIL_TO` ni `RESEND_API_KEY`, le Worker n'envoie aucun e-mail et l'écrit dans ses journaux ; avec un seul des deux, il signale une erreur.
+Garde-fous : au plus 20 e-mails relayés par jour UTC, dont les 5 derniers gardés pour les alertes P0 (au-delà, l'application reçoit une erreur 429 et la note dans ses journaux), et un seul avis Telegram par jour quand le quota Resend du jour est épuisé. Sans `ALERT_EMAIL_TO` ni `RESEND_API_KEY`, le Worker n'envoie aucun e-mail et l'écrit dans ses journaux ; avec un seul des deux, il signale une erreur.
 
 ## 12. Mise en production et contrôles
 
