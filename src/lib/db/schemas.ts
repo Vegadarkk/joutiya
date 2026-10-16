@@ -56,6 +56,7 @@ export const userSchema = z
     displayName: displayNameSchema,
     avatarKey: z.string().max(200).optional(),
     type: z.enum(["individual", "pro"]),
+    /** The account's shop, set by the Pro application (phase 7); `type` and the claims turn pro at the KYBC verification. */
     proId: z.string().max(64).optional(),
     regionCode: z.string().regex(/^(0[1-9]|1[0-2])$/).optional(),
     citySlug: z.string().max(64).optional(),

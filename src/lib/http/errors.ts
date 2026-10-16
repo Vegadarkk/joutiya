@@ -67,6 +67,15 @@ export type ErrorCode =
   | "saved_search_exists"
   /** Unsubscribe link token invalid or for another account. */
   | "invalid_token"
+  // Pro accounts (phase 7, design §4). Messages: Pro.errors.<code> (with the wizard UI).
+  /** config/flags.proSignupEnabled is off. */
+  | "pro_signup_closed"
+  /** The account is already a Pro. */
+  | "already_pro"
+  /** An application is pending or accepted for this account (409). */
+  | "pro_application_exists"
+  /** KYBC pieces that are not the applicant's `kyb` uploads. */
+  | "invalid_pieces"
   /** Firestore daily quota degraded (src/lib/quota/gate.ts): deposit or sign-up suspended until the reset. */
   | "quota_exhausted"
   | "unavailable"

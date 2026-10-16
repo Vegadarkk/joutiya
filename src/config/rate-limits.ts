@@ -71,6 +71,9 @@ export const RATE_LIMITS = {
   // 50 000 reads a day). POST /api/listings (a new draft; the 5 above count publications, at
   // publish): 20 per day per account. MAX_DRAFTS caps live drafts, this caps create-delete loops.
   "listing.new.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
+  // POST /api/pro/apply (phase 7): a few attempts a day per account (reads the account, the
+  // owner's shop and up to 6 uploads, then one transaction).
+  "pro.apply.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },
   // DELETE /api/listings/{id} and pause / resume / sold / renew (~4 writes and an ISR
   // revalidation each): 120 per day per account (an individual has at most 20 active listings).
   "listing.status.uid": { points: 120, duration: DAY, policy: "open", key: "uid" },
