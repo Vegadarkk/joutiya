@@ -8,6 +8,7 @@ import fr from "../../messages/fr.json";
 import type { ListingStatus } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UserRecord } from "@/lib/db/repositories/profiles";
+import type * as Quota from "@/lib/quota";
 
 // The public listing page module (lot D2: D1 canonical redirect, D14 404, §8 ISR settings, §5
 // content, metadata and JSON-LD). Firestore, next/navigation and the request-scoped next-intl API
@@ -19,7 +20,7 @@ const repo = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db/repositories/listings", () => ({ getListing: repo.getListing, listPublishedByOwner: vi.fn() }));
 vi.mock("@/lib/db/repositories/profiles", () => ({ findUserByPublicId: vi.fn(), getUserRecord: repo.getUserRecord }));
-vi.mock("@/lib/quota", () => ({ consume: vi.fn() }));
+vi.mock("@/lib/quota", async (importOriginal) => ({ ...(await importOriginal<typeof Quota>()), consume: vi.fn(), firstDegraded: vi.fn(async () => null) }));
 vi.mock("@/lib/firebase/admin", () => {
   const query = { where: () => query, count: () => ({ get: async () => ({ data: () => ({ count: 4 }) }) }) };
   return { db: () => ({ collection: () => query }) };
@@ -48,6 +49,7 @@ vi.mock("next-intl/server", async () => {
   };
 });
 
+const { firstDegraded } = await import("@/lib/quota");
 const page = await import("@/app/[locale]/(public)/annonce/[slugId]/page");
 const { default: ListingPage, generateMetadata, generateStaticParams } = page;
 
@@ -133,6 +135,8 @@ beforeEach(() => {
   repo.getListing.mockReset();
   repo.getUserRecord.mockReset();
   repo.getUserRecord.mockResolvedValue(user());
+  vi.mocked(firstDegraded).mockReset();
+  vi.mocked(firstDegraded).mockResolvedValue(null);
 });
 
 describe("route settings (design §8)", () => {
@@ -175,6 +179,18 @@ describe("D1 canonical URL and D14 404", () => {
   it("answers 404 for an unknown locale", async () => {
     repo.getListing.mockResolvedValue(record());
     await expect(ListingPage(params(SLUG_ID, "en"))).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+});
+
+describe("degraded Firestore reads (ISR cache)", () => {
+  it("fails the render before any read, so Next keeps serving the last generated page", async () => {
+    repo.getListing.mockResolvedValue(record());
+    vi.mocked(firstDegraded).mockResolvedValue("firestore.reads");
+    await expect(ListingPage(params(SLUG_ID))).rejects.toMatchObject({ status: 503, code: "quota_exhausted" });
+    await expect(generateMetadata(params(SLUG_ID))).rejects.toMatchObject({ status: 503, code: "quota_exhausted" });
+    expect(firstDegraded).toHaveBeenCalledWith(["firestore.reads"]);
+    expect(repo.getListing).not.toHaveBeenCalled();
+    expect(repo.getUserRecord).not.toHaveBeenCalled();
   });
 });
 

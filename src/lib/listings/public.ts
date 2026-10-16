@@ -5,7 +5,8 @@ import { COLLECTIONS } from "@/lib/db/schemas";
 import { getListing, listPublishedByOwner, type ListingRecord } from "@/lib/db/repositories/listings";
 import { findUserByPublicId, getUserRecord, type UserRecord } from "@/lib/db/repositories/profiles";
 import { db } from "@/lib/firebase/admin";
-import { consume } from "@/lib/quota";
+import { aggregationReads, consume } from "@/lib/quota";
+import { assertQuotas, PUBLIC_READ_QUOTAS } from "@/lib/quota/gate";
 import { buildSlugId, parseSlugId } from "./ids";
 
 // Public reads (design §4 public.ts): the listing page by its `{slug}-{id}` segment and the
@@ -33,12 +34,15 @@ function isPublicState(status: ListingStatus): status is PublicState {
 
 /**
  * The listing behind a URL segment: null (404) when the id is malformed, the document missing, or
- * the listing never/no longer public (draft, pending_review, rejected, removed, purged).
+ * the listing never/no longer public (draft, pending_review, rejected, removed, purged). Throws
+ * once Firestore reads are degraded (src/lib/quota/gate.ts): an ISR revalidation then fails and
+ * Next keeps serving the last page it generated. Only the ISR listing page calls it.
  */
 export async function getPublishedBySlugId(segment: string): Promise<PublicListingLookup | null> {
   // Ids are lower case: a segment retyped in capitals still finds its listing (then 301s).
   const parsed = parseSlugId(segment.toLowerCase());
   if (!parsed) return null;
+  await assertQuotas(PUBLIC_READ_QUOTAS);
   const listing = await getListing(parsed.id);
   if (!listing || !isPublicState(listing.status)) return null;
   const canonicalSlugId = listing.slugId ?? buildSlugId({ id: listing.id, title: listing.title, categoryId: listing.categoryId });
@@ -200,7 +204,7 @@ export interface PublicSeller {
   badges: UserRecord["badges"];
   /** The city the member chose to show on the profile, if any. */
   citySlug: string | null;
-  /** Listings online right now (count aggregation: one read). */
+  /** Listings online right now (count aggregation: one read per 1 000). */
   publishedCount: number;
 }
 
@@ -210,8 +214,9 @@ export interface PublicSeller {
  */
 export async function countPublishedByOwner(uid: string): Promise<number> {
   const result = await db().collection(COLLECTIONS.listings).where("ownerUid", "==", uid).where("status", "==", "published").count().get();
-  void consume("firestore.reads", 1);
-  return result.data().count;
+  const count = result.data().count;
+  void consume("firestore.reads", aggregationReads(count));
+  return count;
 }
 
 function toSeller(user: UserRecord, publishedCount: number): PublicSeller {
@@ -239,8 +244,13 @@ export interface PublicProfileView extends PublicSeller {
   listings: PublicListingCard[];
 }
 
-/** The profile page: the seller header and the cards of the published listings, or null (404). */
+/**
+ * The profile page: the seller header and the cards of the published listings, or null (404).
+ * Throws once Firestore reads are degraded, like getPublishedBySlugId (only the ISR profile page
+ * calls it).
+ */
 export async function getPublicProfile(publicId: string, limit = 24): Promise<PublicProfileView | null> {
+  await assertQuotas(PUBLIC_READ_QUOTAS);
   const user = await findUserByPublicId(publicId);
   if (!user || !isVisibleAccount(user)) return null;
   if (user.status === "suspended") return { ...toSeller(user, 0), listings: [] };

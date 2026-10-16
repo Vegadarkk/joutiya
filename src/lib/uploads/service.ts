@@ -33,6 +33,7 @@ import { expireUpload } from "@/lib/media/pipeline";
 import { dispatchUpload, enqueueMediaJob, isMediaQueueEnabled } from "@/lib/media/queue";
 import { mediaObjectKey, quarantineObjectKey } from "@/lib/media/urls";
 import { captureServerException } from "@/lib/observability/capture";
+import { assertQuotas, DEPOSIT_QUOTAS } from "@/lib/quota/gate";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { isStorageNotConfigured, objectStore, type ObjectStore } from "@/lib/storage";
 import { LIVE_STATUSES, PHOTO_TARGET_STATUSES, maxPhotosOf, toStatusResponse } from "./policy";
@@ -79,15 +80,18 @@ async function ownedUpload(uploader: Uploader, id: string): Promise<UploadRecord
 export const uploadContentRef = (id: string) => `${COLLECTIONS.uploads}/${id}`;
 
 /**
- * POST /api/uploads/sign: the caller's editable listing, room for one more photo, storage not
- * degraded, 30 signatures an hour and 200 MiB declared a day; then the `signed` document and a
- * presigned PUT bound to the declared type (and length, where the adapter signs it), 5 minutes.
+ * POST /api/uploads/sign: the caller's editable listing, room for one more photo, storage and
+ * Firestore writes not degraded, 30 signatures an hour and 200 MiB declared a day; then the
+ * `signed` document and a presigned PUT bound to the declared type (and length, where the adapter
+ * signs it), 5 minutes.
  */
 export async function signUpload(uploader: Uploader, input: SignUploadInput, now = new Date()): Promise<SignUploadResponse> {
   const { uid } = uploader.auth.user;
   const objects = store();
   if (await isStorageFull()) throw new HttpError(503, "storage_full", undefined, { headers: { "Retry-After": "3600" } });
   await enforceLimit("upload.sign.uid", uid);
+  // Deposit suspended (src/lib/quota/gate.ts): before the listing read and the upload document.
+  await assertQuotas(DEPOSIT_QUOTAS);
 
   const listing = await ownedListing(uploader, input.targetId);
   if (!PHOTO_TARGET_STATUSES.includes(listing.status)) throw notFound();

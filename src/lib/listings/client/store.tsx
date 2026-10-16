@@ -260,6 +260,8 @@ const backoff = (attempt: number) => Math.min(120_000, 15_000 * 2 ** Math.max(0,
 /** Automatic retry after a failed save (Autosave `retryAfter`); null waits for "Réessayer". */
 export function saveRetryDelay(error: unknown, attempt: number): number | null {
   if (!(error instanceof ApiError)) return backoff(attempt);
+  // Firestore quota spent for the day (503 until the reset, hours away): retrying only spends reads.
+  if (error.code === "quota_exhausted") return null;
   if (error.code === "network" || error.code === "unavailable" || error.code === "internal" || error.status >= 500) return backoff(attempt);
   if (error.code === "rate_limited") return Math.min(10 * 60_000, Math.max(1, error.retryAfter ?? 60) * 1000);
   // Version race with the photo pipeline (it bumps `version` when it attaches a photo): once, quickly.

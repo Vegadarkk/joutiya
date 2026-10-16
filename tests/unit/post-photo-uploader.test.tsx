@@ -47,4 +47,9 @@ describe("PhotoUploader errors", () => {
     expect(html).not.toContain(fr.Listing.errors.upload_limit);
     expect(html).not.toContain(fr.Listing.photos.uploadLimit);
   });
+
+  it("says when to come back on a spent daily Firestore quota (503 quota_exhausted)", () => {
+    expect(text(render([failed("a", "quota_exhausted")]))).toContain(fr.Listing.errors.quota_exhausted);
+    expect(text(render([failed("a", "quota_exhausted")], "ar"))).toContain(ar.Listing.errors.quota_exhausted);
+  });
 });

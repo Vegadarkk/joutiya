@@ -25,6 +25,8 @@ describe("quota gate", () => {
   });
 
   it("answers 503 with a Retry-After until the provider's reset", async () => {
+    // Its own code: clients neither retry it like "unavailable" nor show a generic error.
+    expect(QUOTA_ERROR_CODE).toBe("quota_exhausted");
     vi.mocked(firstDegraded).mockResolvedValue("firestore.writes");
     const refusal = await assertQuotas(SIGNUP_QUOTAS).catch((error: unknown) => error);
     expect(refusal).toBeInstanceOf(HttpError);

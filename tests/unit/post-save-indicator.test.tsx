@@ -55,6 +55,13 @@ describe("SaveIndicator", () => {
     expect(blocked).toContain(fr.Listing.wizard.saveBlocked);
     expect(blocked).not.toContain(fr.Listing.wizard.retrySave);
   });
+
+  it("a spent daily quota stops with the deposit wording instead of promising a retry", () => {
+    const html = text(render("error", { error: new ApiError(503, "quota_exhausted", { retryAfter: 7_200 }) }));
+    expect(html).toContain(`${fr.Listing.wizard.saveStopped} ${fr.Listing.errors.quota_exhausted}`);
+    expect(html).not.toContain(fr.Listing.wizard.saveError);
+    expect(html).toContain(fr.Listing.wizard.retrySave);
+  });
 });
 
 describe("radioKeyTarget", () => {

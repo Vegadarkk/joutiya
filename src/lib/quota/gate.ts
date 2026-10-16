@@ -26,11 +26,11 @@ export const SIGNUP_QUOTAS = ["firestore.writes"] as const satisfies readonly Qu
 export const PUBLIC_READ_QUOTAS = ["firestore.reads"] as const satisfies readonly QuotaId[];
 
 /**
- * API code of a refusal. Auth.errors.quota_exhausted (messages/*.json) says to retry after 9 h,
- * Morocco time (the Pacific midnight is 07:00 to 09:00 there): switch to "quota_exhausted" once
- * that code is in ErrorCode (src/lib/http/errors.ts).
+ * API code of a refusal: its own code, so clients neither retry it like a transient "unavailable"
+ * nor show a generic error. Auth.errors and Listing.errors (messages/*.json) say to retry after
+ * 9 h, Morocco time (the Pacific midnight is 07:00 to 09:00 there).
  */
-export const QUOTA_ERROR_CODE: ErrorCode = "unavailable";
+export const QUOTA_ERROR_CODE: ErrorCode = "quota_exhausted";
 
 /** Never below a minute: a refusal just before the reset must not invite a tight retry loop. */
 const MIN_RETRY_SECONDS = 60;

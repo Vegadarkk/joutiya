@@ -56,6 +56,8 @@ export type ErrorCode =
   | "listing_unavailable"
   /** Phone reveal refused: account too young, e-mail unverified or quota reached. */
   | "reveal_not_allowed"
+  /** Firestore daily quota degraded (src/lib/quota/gate.ts): deposit or sign-up suspended until the reset. */
+  | "quota_exhausted"
   | "unavailable"
   | "internal";
 

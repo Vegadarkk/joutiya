@@ -36,7 +36,13 @@ function weakPasswordReason(error: ApiError): WeakPasswordReason | null {
   return typeof reason === "string" && (WEAK_PASSWORD_REASONS as readonly string[]).includes(reason) ? (reason as WeakPasswordReason) : null;
 }
 
-export function useApiErrorMessage(): (error: unknown) => string {
+/**
+ * Which wording a code found in both Auth.errors and Listing.errors takes (quota_exhausted):
+ * "listing" for the deposit (wizard saves and publication), the generic Auth one elsewhere.
+ */
+export type ApiMessageScope = "auth" | "listing";
+
+export function useApiErrorMessage(scope: ApiMessageScope = "auth"): (error: unknown) => string {
   const t = useTranslations("Auth.errors");
   const listing = useTranslations("Listing.errors");
   const common = useTranslations("Auth.common");
@@ -47,7 +53,8 @@ export function useApiErrorMessage(): (error: unknown) => string {
       // Listing and media codes (phase 3) live in their own namespace; the keys are typed from
       // messages/fr.json, so an API code that is in neither namespace falls back to "internal".
       const listingKey = code as Parameters<typeof listing.has>[0];
-      if (listing.has(listingKey)) return listing(listingKey);
+      const authKey = code as Parameters<typeof t.has>[0];
+      if (listing.has(listingKey) && (scope === "listing" || !t.has(authKey))) return listing(listingKey);
       if (code === "rate_limited" || code === "account_locked") {
         return t(code, { wait: formatWait(locale, error instanceof ApiError ? error.retryAfter : undefined, common("waitLater")) });
       }
@@ -59,10 +66,9 @@ export function useApiErrorMessage(): (error: unknown) => string {
         if (length === "too_short") return common("validation.passwordMin", { min: PASSWORD_MIN });
         if (length === "too_long") return common("validation.passwordMax", { max: PASSWORD_MAX });
       }
-      const authKey = code as Parameters<typeof t.has>[0];
       return t.has(authKey) && !WITH_WAIT.includes(code) ? t(authKey) : t("internal");
     },
-    [t, listing, common, locale],
+    [t, listing, common, locale, scope],
   );
 }
 
@@ -104,14 +110,16 @@ interface FormMessageProps {
   tone?: "danger" | "warning" | "info";
   /** Overrides the translated code. */
   title?: ReactNode;
+  /** Wording of a code shared by Auth.errors and Listing.errors (useApiErrorMessage). */
+  scope?: ApiMessageScope;
   children?: ReactNode;
   action?: ReactNode;
   className?: string;
 }
 
 /** Form-level message; focus moves to it when it appears, so screen readers and keyboards land on the explanation. */
-export function FormMessage({ error, tone = "danger", title, children, action, className }: FormMessageProps) {
-  const message = useApiErrorMessage();
+export function FormMessage({ error, tone = "danger", title, scope, children, action, className }: FormMessageProps) {
+  const message = useApiErrorMessage(scope);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (error) box.current?.focus({ preventScroll: false });

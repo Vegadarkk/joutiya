@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ListingStatus } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UserRecord } from "@/lib/db/repositories/profiles";
+import type * as Quota from "@/lib/quota";
 
 // Views of the public pages (lot D2): what the listing page and the profile render, and only that
 // (no uid, no moderation data, no contact data beyond the two booleans), plus the seller lookup and
@@ -15,10 +16,11 @@ const repo = vi.hoisted(() => ({
   count: vi.fn<() => number>(),
   where: vi.fn(),
   consume: vi.fn(),
+  firstDegraded: vi.fn(async (): Promise<string | null> => null),
 }));
 vi.mock("@/lib/db/repositories/listings", () => ({ getListing: repo.getListing, listPublishedByOwner: repo.listPublishedByOwner }));
 vi.mock("@/lib/db/repositories/profiles", () => ({ findUserByPublicId: repo.findUserByPublicId, getUserRecord: repo.getUserRecord }));
-vi.mock("@/lib/quota", () => ({ consume: repo.consume }));
+vi.mock("@/lib/quota", async (importOriginal) => ({ ...(await importOriginal<typeof Quota>()), consume: repo.consume, firstDegraded: repo.firstDegraded }));
 vi.mock("@/lib/firebase/admin", () => {
   const query = {
     where: (...args: unknown[]) => {
@@ -92,6 +94,7 @@ function user(overrides: Partial<UserRecord> = {}): UserRecord {
 beforeEach(() => {
   for (const fn of Object.values(repo)) fn.mockReset();
   repo.count.mockReturnValue(7);
+  repo.firstDegraded.mockResolvedValue(null);
 });
 
 describe("toPublicListing", () => {
@@ -172,6 +175,13 @@ describe("getSeller", () => {
     expect(repo.consume).toHaveBeenCalledWith("firestore.reads", 1);
   });
 
+  it("bills the count like Firestore: one read per 1 000 index entries", async () => {
+    repo.getUserRecord.mockResolvedValue(user());
+    repo.count.mockReturnValue(2_500);
+    expect((await getSeller("uid-secret-1"))?.publishedCount).toBe(2_500);
+    expect(repo.consume).toHaveBeenCalledWith("firestore.reads", 3);
+  });
+
   it("hides closed, banned and unactivated accounts; a suspended one counts no listing", async () => {
     repo.getUserRecord.mockResolvedValue(null);
     expect(await getSeller("uid-secret-1")).toBeNull();
@@ -212,5 +222,14 @@ describe("getPublicProfile", () => {
     repo.findUserByPublicId.mockResolvedValue(user({ status: "suspended" }));
     expect(await getPublicProfile("abcdefghjk")).toMatchObject({ listings: [], publishedCount: 0 });
     expect(repo.listPublishedByOwner).not.toHaveBeenCalled();
+  });
+
+  it("throws before any read once Firestore reads are degraded (ISR keeps the last page)", async () => {
+    repo.findUserByPublicId.mockResolvedValue(user());
+    repo.firstDegraded.mockResolvedValue("firestore.reads");
+    await expect(getPublicProfile("abcdefghjk")).rejects.toMatchObject({ status: 503, code: "quota_exhausted" });
+    expect(repo.firstDegraded).toHaveBeenCalledWith(["firestore.reads"]);
+    expect(repo.findUserByPublicId).not.toHaveBeenCalled();
+    expect(repo.consume).not.toHaveBeenCalled();
   });
 });

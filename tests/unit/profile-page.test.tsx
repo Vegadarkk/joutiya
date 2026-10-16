@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import fr from "../../messages/fr.json";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UserRecord } from "@/lib/db/repositories/profiles";
+import type * as Quota from "@/lib/quota";
 
 // The public profile page module (lot D2, §5 /profil/{publicId}): ISR settings, 404 for unknown or
 // hidden accounts, header, listing grid, empty state, metadata. Firestore and the request-scoped
@@ -17,7 +18,7 @@ const repo = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db/repositories/listings", () => ({ getListing: vi.fn(), listPublishedByOwner: repo.listPublishedByOwner }));
 vi.mock("@/lib/db/repositories/profiles", () => ({ findUserByPublicId: repo.findUserByPublicId, getUserRecord: vi.fn() }));
-vi.mock("@/lib/quota", () => ({ consume: vi.fn() }));
+vi.mock("@/lib/quota", async (importOriginal) => ({ ...(await importOriginal<typeof Quota>()), consume: vi.fn(), firstDegraded: vi.fn(async () => null) }));
 vi.mock("@/lib/firebase/admin", () => {
   const query = { where: () => query, count: () => ({ get: async () => ({ data: () => ({ count: repo.count() }) }) }) };
   return { db: () => ({ collection: () => query }) };
@@ -40,6 +41,7 @@ vi.mock("next-intl/server", async () => {
   };
 });
 
+const { firstDegraded } = await import("@/lib/quota");
 const page = await import("@/app/[locale]/(public)/profil/[publicId]/page");
 const { default: ProfilePage, generateMetadata, generateStaticParams } = page;
 
@@ -113,6 +115,8 @@ beforeEach(() => {
   repo.findUserByPublicId.mockReset();
   repo.listPublishedByOwner.mockReset();
   repo.count.mockReset();
+  vi.mocked(firstDegraded).mockReset();
+  vi.mocked(firstDegraded).mockResolvedValue(null);
 });
 
 describe("profile page", () => {
@@ -130,6 +134,15 @@ describe("profile page", () => {
       repo.findUserByPublicId.mockResolvedValue(user(overrides));
       await expect(ProfilePage(params(PUBLIC_ID))).rejects.toThrow("NEXT_NOT_FOUND");
     }
+  });
+
+  it("fails the render before any read on a degraded-reads day, so Next keeps serving the last generated page", async () => {
+    repo.findUserByPublicId.mockResolvedValue(user());
+    vi.mocked(firstDegraded).mockResolvedValue("firestore.reads");
+    await expect(ProfilePage(params(PUBLIC_ID))).rejects.toMatchObject({ status: 503, code: "quota_exhausted" });
+    await expect(generateMetadata(params(PUBLIC_ID))).rejects.toMatchObject({ status: 503, code: "quota_exhausted" });
+    expect(firstDegraded).toHaveBeenCalledWith(["firestore.reads"]);
+    expect(repo.findUserByPublicId).not.toHaveBeenCalled();
   });
 
   it("shows the header and the grid of published listings, linked to their pages", async () => {

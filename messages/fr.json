@@ -362,7 +362,8 @@
       "phone_required": "Vérifiez votre numéro de téléphone pour afficher ce moyen de contact.",
       "listing_unavailable": "Cette annonce n'est plus disponible.",
       "reveal_not_allowed": "Le numéro ne peut pas être affiché pour le moment. Vérifiez votre adresse e-mail ou réessayez plus tard.",
-      "upload_limit": "Trop de photos ont été envoyées pour cette annonce, photos refusées comprises. Supprimez les photos refusées pour en ajouter d'autres, ou patientez : elles sont effacées automatiquement 7 jours après leur envoi."
+      "upload_limit": "Trop de photos ont été envoyées pour cette annonce, photos refusées comprises. Supprimez les photos refusées pour en ajouter d'autres, ou patientez : elles sont effacées automatiquement 7 jours après leur envoi.",
+      "quota_exhausted": "Le dépôt et la modification d'annonces sont momentanément suspendus : la limite quotidienne de notre service est atteinte. Votre annonce est conservée ; réessayez après 9 h (heure du Maroc)."
     },
     "wizard": {
       "title": "Déposer une annonce",

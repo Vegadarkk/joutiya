@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/auth/client";
 import type { OwnerListing } from "@/lib/contracts/listings";
+import { Autosave } from "@/lib/listings/client/autosave";
 import { blockersAfterPatch, blockersOf, isPhotoBusy, ownerPhotosOf, photoItemsFromListing, photoOrder, readyPhotoIds, recoverPatch, saveModeOf, saveRetryDelay, type PhotoItem } from "@/lib/listings/client/store";
 
 // Pure parts of the wizard store: save mode per status, the retry policy of a failed save, what a
@@ -75,6 +76,29 @@ describe("saveRetryDelay", () => {
     expect(saveRetryDelay(new ApiError(400, "invalid_body"), 1)).toBe(0);
     expect(saveRetryDelay(new ApiError(422, "invalid_listing"), 1)).toBeNull();
     expect(saveRetryDelay(new ApiError(403, "forbidden"), 1)).toBeNull();
+  });
+
+  it("stops on a spent daily quota although it is a 503: the changes stay in the page until a manual retry", async () => {
+    const quota = new ApiError(503, "quota_exhausted", { retryAfter: 7_200 });
+    expect(saveRetryDelay(quota, 1)).toBeNull();
+    expect(saveRetryDelay(quota, 3)).toBeNull();
+    vi.useFakeTimers();
+    try {
+      // Wired into the autosave: one request, then none however long the page stays open.
+      const save = vi.fn(async (_patch: { title?: string; price?: number }) => {});
+      save.mockRejectedValueOnce(quota);
+      const autosave = new Autosave<{ title?: string; price?: number }>({ save, retryAfter: saveRetryDelay });
+      autosave.queue({ title: "Vélo" });
+      expect(await autosave.flush()).toBe(false);
+      autosave.queue({ price: 900 });
+      await vi.advanceTimersByTimeAsync(3 * 3_600_000);
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(autosave.currentState).toBe("error");
+      expect(await autosave.flush({ force: true })).toBe(true);
+      expect(save).toHaveBeenLastCalledWith({ title: "Vélo", price: 900 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
