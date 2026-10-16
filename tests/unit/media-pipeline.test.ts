@@ -65,20 +65,13 @@ vi.mock("@/lib/db/repositories/uploads", () => ({
 }));
 vi.mock("@/lib/db/repositories/listings", () => ({
   getListing: vi.fn(async (id: string) => structuredClone(fake.listings.get(id) ?? null)),
-  removePhoto: vi.fn(async (listingId: string, photoId: string) => {
-    const listing = fake.listings.get(listingId) as { photos: { id: string }[] } | undefined;
-    if (!listing) return null;
-    listing.photos = listing.photos.filter((item) => item.id !== photoId);
-    return structuredClone(listing);
-  }),
 }));
 
 const { expireUpload, processUpload } = await import("@/lib/media/pipeline");
 const { MemoryObjectStore } = await import("@/lib/storage/memory");
 const { StubImageClassifier } = await import("@/lib/media/classify");
 const { sharp } = await import("@/lib/media/sharp-setup");
-const { removePhoto } = await import("@/lib/db/repositories/listings");
-const { markUploadReady } = await import("@/lib/db/repositories/uploads");
+const { markUploadReady, transitionUpload } = await import("@/lib/db/repositories/uploads");
 const { recordModerationDecision } = await import("@/lib/db/repositories/moderation-decisions");
 const { recordMediaBytes } = await import("@/lib/uploads/storage-gauge");
 const { MEDIA_CACHE_CONTROL, MEDIA_CONTENT_TYPE } = await import("@/lib/media/urls");
@@ -179,7 +172,6 @@ beforeEach(() => {
   fake.readyOutcome = null;
   store = new MemoryObjectStore();
   vi.mocked(markUploadReady).mockClear();
-  vi.mocked(removePhoto).mockClear();
   vi.mocked(recordModerationDecision).mockClear();
   vi.mocked(recordMediaBytes).mockClear();
   listing();
@@ -484,24 +476,22 @@ describe("processUpload: idempotency and races", () => {
 });
 
 describe("expireUpload", () => {
-  it("rejects a stuck upload as expired, detaches it from the draft and deletes its objects", async () => {
-    listing({ photos: [photo("upl99999abcdefgh")] });
-    const record = upload({ id: "upl99999abcdefgh" });
+  it("rejects a stuck upload as expired, then deletes its objects", async () => {
+    const record = upload();
     seed(record, await plainJpeg());
     store.seed("media", keyL(record.id), Buffer.from("x"), { contentType: "image/webp" });
     expect(await expireUpload(record.id, { store })).toEqual({ status: "rejected", rejectReason: "expired" });
     expect(stored(record.id)).toMatchObject({ status: "rejected", rejectReason: "expired" });
-    expect(removePhoto).toHaveBeenCalled();
     expect(store.keys("quarantine")).toEqual([]);
     expect(store.keys("media")).toEqual([]);
   });
 
-  it("keeps the variants of a photo already shown on a live listing", async () => {
-    listing({ status: "published", photos: [photo("upl88888abcdefgh"), photo("other0001x")] });
-    const record = upload({ id: "upl88888abcdefgh" });
+  it("keeps the result and the objects of a run that finished meanwhile", async () => {
+    const record = upload();
     store.seed("media", keyL(record.id), Buffer.from("x"), { contentType: "image/webp" });
-    expect(await expireUpload(record.id, { store })).toEqual({ status: "rejected", rejectReason: "expired" });
-    expect(removePhoto).not.toHaveBeenCalled();
+    const ready = { ...record, status: "ready", width: 64, height: 48, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", variants: ["l", "s"] };
+    vi.mocked(transitionUpload).mockImplementationOnce(async () => ({ ok: false, upload: structuredClone(ready) as UploadRecord }));
+    expect(await expireUpload(record.id, { store })).toMatchObject({ status: "ready", photo: { id: record.id } });
     expect(store.keys("media")).toEqual([keyL(record.id)]);
   });
 

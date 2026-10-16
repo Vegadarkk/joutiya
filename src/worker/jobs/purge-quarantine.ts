@@ -20,15 +20,16 @@ import { isStorageNotConfigured, objectStore, type ObjectStore } from "@/lib/sto
 import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 
 // Hourly at :20 (design §4, architecture §6 "Les objets non traités sont purgés après 24 h"):
-// 1. uploads still `signed` or `processing` 24 h after signing: quarantine object (and any variant)
-//    deleted, upload `rejected` with reason `expired`;
+// 1. uploads still `signed` or `processing` 24 h after signing: upload `rejected` with reason
+//    `expired`, then its quarantine object (and any variant) deleted;
 // 2. `rejected` uploads: their quarantine object deleted once no presigned PUT can land any more
 //    (the pipeline deletes it at once; this catches failed deletions and a PUT sent after
 //    complete), swept in creation order behind a cursor (system/purgeQuarantine);
 // 3. documents past purgeAt (7 days) not attached to a listing: objects and document deleted. An
 //    attached photo lives with its listing: its purgeAt moves 30 days on. Listings removed or
 //    purged are left to retention-purge, and a legal hold keeps everything.
-// A storage failure leaves the upload for the next run; nothing is marked before its objects go.
+// Steps 2 and 3 never mark anything before its objects go: a storage failure leaves the upload
+// for the next run.
 
 export const QUARANTINE_TTL_MS = 24 * 3_600_000;
 /** Presigned URLs live 5 minutes: an hour after signing nothing can land in quarantine. */
@@ -67,10 +68,14 @@ async function expireStale(store: ObjectStore, now: Date, result: PurgeQuarantin
   const stale = await listExpiredQuarantine(new Date(now.getTime() - QUARANTINE_TTL_MS), PURGE_QUARANTINE_BATCH);
   for (const upload of stale) {
     try {
-      // A processing run may have put variants before stalling.
-      await deleteObjects(store, upload, upload.status === "processing");
+      // Marked first: a run that finished meanwhile (a media backlog drained after an outage) keeps
+      // its objects, and a run still going finds the upload rejected and removes what it stored.
       const marked = await transitionUpload(upload.id, ["signed", "processing"], { status: "rejected", rejectReason: "expired" }, now);
-      if (marked.ok) result.expired += 1;
+      if (!marked.ok) continue;
+      result.expired += 1;
+      // A processing run may have put variants before stalling. A failed deletion is retried by
+      // the document purge (step 3) at purgeAt, and the quarantine lifecycle rule backs it up.
+      await deleteObjects(store, upload, upload.status === "processing");
     } catch (error) {
       result.failed += 1;
       logger.warn({ uploadId: upload.id, err: (error as Error).message }, "stale upload not expired");

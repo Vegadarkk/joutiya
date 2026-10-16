@@ -1,7 +1,7 @@
 import "server-only";
 import { DEFAULT_AI, type AiConfig } from "@/config/ai";
 import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, type ListingPhoto, type UploadRejectReason, type UploadStatusResponse } from "@/lib/contracts/media";
-import { getListing, removePhoto, type ListingRecord } from "@/lib/db/repositories/listings";
+import { getListing, type ListingRecord } from "@/lib/db/repositories/listings";
 import { recordModerationDecision } from "@/lib/db/repositories/moderation-decisions";
 import { getUpload, markUploadReady, transitionUpload, type UploadRecord } from "@/lib/db/repositories/uploads";
 import { serverEnv } from "@/lib/env";
@@ -217,30 +217,27 @@ async function publish(upload: UploadRecord, listing: ListingRecord, processed: 
 
 /**
  * Gives up on an upload after an infrastructure failure (last worker attempt, inline error):
- * `rejected` with reason `expired` (the wizard offers a retry), objects deleted best effort.
+ * `rejected` with reason `expired` (the wizard offers a retry), then its objects deleted best
+ * effort. A `processing` upload is never attached (the attach and `ready` share a transaction),
+ * and a run that finished meanwhile keeps its result and its objects.
  */
 export async function expireUpload(uploadId: string, deps: Pick<PipelineDeps, "store" | "now"> = {}): Promise<UploadStatusResponse | null> {
   const upload = await getUpload(uploadId);
   if (!upload) return null;
   if (upload.status === "ready" || upload.status === "rejected") return toStatusResponse(upload);
+  const now = deps.now ?? (() => new Date());
+  const marked = await transitionUpload(upload.id, ["signed", "processing"], { status: "rejected", rejectReason: "expired" }, now());
+  if (!marked.ok && marked.upload?.status === "ready") return toStatusResponse(marked.upload);
   let store: ObjectStore | undefined = deps.store;
   try {
     store ??= objectStore();
   } catch {
     store = undefined;
   }
-  const now = deps.now ?? (() => new Date());
-  const listing = await getListing(upload.targetId).catch(() => null);
-  const attached = listing?.photos.some((photo) => photo.id === upload.id) ?? false;
-  // Attached to a listing that went live meanwhile: its variants stay (the page shows them);
-  // purge-quarantine keeps attached photos. Otherwise the photo goes entirely.
-  const keepVariants = attached && !AUTO_ATTACH_STATUSES.includes(listing!.status);
-  if (attached && !keepVariants) await removePhoto(listing!.id, upload.id, now());
   if (store) {
     await deleteQuietly(store, "quarantine", [upload.quarantineKey], upload.id);
-    if (!keepVariants) await deleteQuietly(store, "media", variantKeys(upload), upload.id);
+    await deleteQuietly(store, "media", variantKeys(upload), upload.id);
   }
-  const marked = await transitionUpload(upload.id, ["signed", "processing"], { status: "rejected", rejectReason: "expired" }, now());
   if (!marked.ok) return marked.upload ? toStatusResponse(marked.upload) : null;
   return { status: "rejected", rejectReason: "expired" };
 }

@@ -77,7 +77,7 @@ beforeEach(() => {
 });
 
 describe("purge-quarantine: stale uploads", () => {
-  it("deletes the objects of uploads unprocessed after 24 h, then marks them rejected (expired)", async () => {
+  it("marks uploads unprocessed after 24 h rejected (expired), then deletes their objects", async () => {
     const signed = upload("signed000001");
     const processing = upload("processing01", { status: "processing" });
     seedObjects(signed);
@@ -95,12 +95,24 @@ describe("purge-quarantine: stale uploads", () => {
     expect(repo.transitionUpload).toHaveBeenCalledWith("processing01", ["signed", "processing"], { status: "rejected", rejectReason: "expired" }, NOW);
   });
 
-  it("does not mark an upload whose object deletion failed (retried next hour)", async () => {
-    const stale = upload("stale0000001");
-    vi.mocked(repo.listExpiredQuarantine).mockResolvedValue([stale]);
+  it("leaves the objects of an upload that a run finished meanwhile", async () => {
+    const finished = upload("finished0001", { status: "processing" });
+    seedObjects(finished);
+    vi.mocked(repo.listExpiredQuarantine).mockResolvedValue([finished]);
+    vi.mocked(repo.transitionUpload).mockResolvedValueOnce({ ok: false, upload: { ...finished, status: "ready" } });
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ expired: 0, failed: 0 });
+    expect(store.calls.filter((call) => call.op === "delete")).toEqual([]);
+  });
+
+  it("counts a failed deletion and goes on (the document purge retries it at purgeAt)", async () => {
+    const a = upload("stale0000001");
+    const b = upload("stale0000002");
+    seedObjects(a);
+    seedObjects(b);
+    vi.mocked(repo.listExpiredQuarantine).mockResolvedValue([a, b]);
     vi.spyOn(store, "delete").mockRejectedValueOnce(new Error("R2 500"));
-    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ expired: 0, failed: 1 });
-    expect(repo.transitionUpload).not.toHaveBeenCalled();
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ expired: 2, failed: 1 });
+    expect(store.has("quarantine", b.quarantineKey)).toBe(false);
   });
 });
 
