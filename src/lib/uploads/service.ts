@@ -124,7 +124,10 @@ export async function completeUpload(uploader: Uploader, id: string, now = new D
   const started = await transitionUpload(id, ["signed"], { status: "processing" }, now);
   if (!started.ok) {
     if (!started.upload) throw notFound();
-    if (started.upload.status === "processing" && isMediaQueueEnabled()) await enqueueMediaJob(id);
+    if (started.upload.status === "processing" && isMediaQueueEnabled()) {
+      // Usually still queued (same job id, ignored); re-added if it was lost. The answer stays `processing`.
+      await enqueueMediaJob(id).catch((error: unknown) => logger.warn({ uploadId: id, err: (error as Error).message }, "media job not re-enqueued"));
+    }
     return toStatusResponse(started.upload);
   }
   let result: UploadStatusResponse | null;

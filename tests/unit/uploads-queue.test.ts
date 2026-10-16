@@ -10,6 +10,7 @@ vi.mock("@/lib/media/pipeline", () => ({
   expireUpload: vi.fn(async () => ({ status: "rejected", rejectReason: "expired" })),
 }));
 const added: { name: string; data: unknown; opts: Record<string, unknown> }[] = [];
+const valkeyDown = { value: false };
 const queues: string[] = [];
 vi.mock("bullmq", async (importOriginal) => {
   const actual = await importOriginal<typeof BullMq>();
@@ -18,6 +19,8 @@ vi.mock("bullmq", async (importOriginal) => {
       queues.push(name);
     }
     async add(name: string, data: unknown, opts: Record<string, unknown>) {
+      // Offline queue of the producer connection: the command waits for a reconnection.
+      if (valkeyDown.value) return new Promise(() => undefined);
       added.push({ name, data, opts });
       return { id: opts.jobId };
     }
@@ -35,12 +38,13 @@ vi.mock("ioredis", () => ({
 const { UnrecoverableError } = await import("bullmq");
 const { resetServerEnv } = await import("@/lib/env");
 const { processUpload, expireUpload } = await import("@/lib/media/pipeline");
-const { MEDIA_CONCURRENCY, MEDIA_JOB, MEDIA_JOB_OPTIONS, MEDIA_QUEUE, closeMediaQueue, dispatchUpload, enqueueMediaJob, isMediaJobData, isMediaQueueEnabled, mediaJobId } = await import("@/lib/media/queue");
+const { ENQUEUE_TIMEOUT_MS, MEDIA_CONCURRENCY, MEDIA_JOB, MEDIA_JOB_OPTIONS, MEDIA_QUEUE, closeMediaQueue, dispatchUpload, enqueueMediaJob, isMediaJobData, isMediaQueueEnabled, mediaJobId } = await import("@/lib/media/queue");
 const { onMediaJobFailed, processMediaJob } = await import("@/worker/jobs/media");
 
 const ID = "upl00001abcdefgh";
 
 beforeEach(() => {
+  valkeyDown.value = false;
   added.length = 0;
   queues.length = 0;
   vi.mocked(processUpload).mockClear();
@@ -91,6 +95,20 @@ describe("media queue", () => {
     // One producer per process.
     expect(queues).toEqual([MEDIA_QUEUE]);
     await expect(enqueueMediaJob("bad id")).rejects.toThrow();
+  });
+
+  it("gives up on an add that waits for Valkey, so the complete route can answer 503", async () => {
+    process.env.QUEUE_REDIS_URL = "redis://127.0.0.1:6399";
+    resetServerEnv();
+    valkeyDown.value = true;
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const pending = expect(dispatchUpload(ID)).rejects.toThrow(/not enqueued/);
+      await vi.advanceTimersByTimeAsync(ENQUEUE_TIMEOUT_MS);
+      await pending;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

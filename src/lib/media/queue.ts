@@ -24,6 +24,13 @@ export const MEDIA_JOB_OPTIONS = {
   removeOnFail: { age: 7 * 24 * 3_600, count: 500 },
 } as const;
 
+/**
+ * The complete route waits this long for the add: the producer connection queues commands while
+ * Valkey is away, so without a bound a Valkey outage would hang the request instead of answering
+ * 503. An add that lands later is harmless (the job finds the upload back in `signed`).
+ */
+export const ENQUEUE_TIMEOUT_MS = 5_000;
+
 export interface MediaJobData {
   uploadId: string;
 }
@@ -57,7 +64,15 @@ export async function enqueueMediaJob(uploadId: string): Promise<void> {
   const url = serverEnv().QUEUE_REDIS_URL;
   if (!url) throw new Error("QUEUE_REDIS_URL is not set: the media queue is disabled");
   const data: MediaJobData = { uploadId: uploadIdSchema.parse(uploadId) };
-  await mediaQueue(url).add(MEDIA_JOB, data, { ...MEDIA_JOB_OPTIONS, jobId: mediaJobId(uploadId) });
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("media job not enqueued in time")), ENQUEUE_TIMEOUT_MS);
+  });
+  try {
+    await Promise.race([mediaQueue(url).add(MEDIA_JOB, data, { ...MEDIA_JOB_OPTIONS, jobId: mediaJobId(uploadId) }), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
