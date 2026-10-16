@@ -1,3 +1,4 @@
+import type * as BullMq from "bullmq";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Queue "media" (D12): job payload validation, one job id per upload, inline processing without
@@ -11,7 +12,7 @@ vi.mock("@/lib/media/pipeline", () => ({
 const added: { name: string; data: unknown; opts: Record<string, unknown> }[] = [];
 const queues: string[] = [];
 vi.mock("bullmq", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("bullmq")>();
+  const actual = await importOriginal<typeof BullMq>();
   class Queue {
     constructor(readonly name: string) {
       queues.push(name);
