@@ -3,11 +3,12 @@
 import { Suspense, useId, useState } from "react";
 import { Globe } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { Link, usePathname } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
 import { LOCALES, type Locale } from "@/config/site";
 import { cn } from "@/lib/utils";
 import type { LocaleMenuProps } from "./locale-menu";
 import { lazyIsland } from "./lazy-island";
+import { useSamePageHref } from "./same-page-href";
 
 // Header language switcher. The menu (locale-menu.tsx, dropdown primitives) is a separate chunk:
 // a plain trigger renders first, its download starts when the pointer or the focus reaches it, and
@@ -68,7 +69,7 @@ export function LocaleSwitcher({ className }: { className?: string }) {
 export function LocaleLinks({ triggerClassName, label, children }: LocaleMenuProps) {
   const t = useTranslations("Locale");
   const current = useLocale() as Locale;
-  const pathname = usePathname();
+  const href = useSamePageHref();
   const [open, setOpen] = useState(true);
   const listId = useId();
   return (
@@ -86,7 +87,7 @@ export function LocaleLinks({ triggerClassName, label, children }: LocaleMenuPro
           {LOCALES.map((locale) => (
             <li key={locale}>
               <Link
-                href={pathname}
+                href={href}
                 locale={locale}
                 lang={locale === "rif" ? "rif-Latn" : locale}
                 aria-current={locale === current ? "true" : undefined}

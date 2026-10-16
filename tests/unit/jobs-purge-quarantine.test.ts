@@ -10,6 +10,7 @@ import type { UploadRecord } from "@/lib/db/repositories/uploads";
 // purgeAt) left alone, never read again before then. Repositories are mocked; a MemoryObjectStore
 // records the storage calls.
 
+const stored = vi.hoisted(() => new Map<string, UploadRecord>());
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/quota", () => ({ isDegraded: vi.fn(async () => false), consume: vi.fn(async () => ({ level: "ok" })) }));
 vi.mock("@/lib/uploads/storage-gauge", () => ({ recordMediaBytes: vi.fn(async () => null) }));
@@ -29,7 +30,8 @@ vi.mock("@/lib/db/repositories/uploads", () => ({
   listPastPurge: vi.fn(async () => []),
   transitionUpload: vi.fn(async (id: string) => ({ ok: true, upload: { id } })),
   updateUpload: vi.fn(async () => undefined),
-  deleteUploadDocument: vi.fn(async () => undefined),
+  // Returns the document as stored, like the transaction: every fixture built by upload() below.
+  deleteUploadDocument: vi.fn(async (id: string): Promise<UploadRecord | null> => stored.get(id) ?? null),
 }));
 
 const repo = await import("@/lib/db/repositories/uploads");
@@ -61,7 +63,7 @@ const LISTING = "abcdefgh";
 let store: InstanceType<typeof MemoryObjectStore>;
 
 function upload(id: string, overrides: Partial<UploadRecord> = {}): UploadRecord {
-  return {
+  const record: UploadRecord = {
     id,
     ownerUid: "owner-1",
     purpose: "listing",
@@ -77,6 +79,8 @@ function upload(id: string, overrides: Partial<UploadRecord> = {}): UploadRecord
     updatedAt: NOW,
     ...overrides,
   };
+  stored.set(id, record);
+  return record;
 }
 
 function listing(overrides: Partial<ListingRecord> = {}): ListingRecord {
@@ -89,6 +93,7 @@ function seedObjects(record: UploadRecord): void {
 }
 
 beforeEach(() => {
+  stored.clear();
   configured.value = true;
   store = new MemoryObjectStore();
   for (const fn of Object.values(repo)) if (vi.isMockFunction(fn)) fn.mockClear();
@@ -203,6 +208,24 @@ describe("purge-quarantine: documents past purgeAt", () => {
     expect(recordMediaBytes).toHaveBeenCalledWith(-50_000, NOW);
   });
 
+  it("frees the bytes of the document as it removed it: none for one another path removed or ended meanwhile, which is not counted", async () => {
+    const gone = upload("readygone001", { ...past, status: "ready", size: 50_000 });
+    const ended = upload("readyended01", { ...past, status: "ready", size: 30_000 });
+    const kept = upload("readykept001", { ...past, status: "ready", size: 20_000 });
+    for (const record of [gone, ended, kept]) seedObjects(record);
+    vi.mocked(repo.listPastPurge).mockResolvedValue([gone, ended, kept]);
+    vi.mocked(getListings).mockResolvedValue([listing({ photos: [] })]);
+    // Removed by retention-purge or a second owner DELETE; then ended by an owner DELETE, whose
+    // transition took its bytes off the gauge already.
+    vi.mocked(repo.deleteUploadDocument)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ ...ended, status: "rejected", rejectReason: "expired" });
+
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: 2, freedBytes: 20_000, failed: 0 });
+    expect(store.keys("media")).toEqual([]);
+    expect(recordMediaBytes).toHaveBeenCalledExactlyOnceWith(-20_000, NOW);
+  });
+
   it("moves the purgeAt of attached photos 30 days on and keeps their objects", async () => {
     const attached = upload("attached0001", { ...past, status: "ready", size: 50_000 });
     seedObjects(attached);
@@ -280,6 +303,14 @@ describe("purge-quarantine: documents past purgeAt", () => {
     expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: PURGE_QUARANTINE_BATCH + 1 });
     expect(vi.mocked(repo.listPastPurge).mock.calls[1]?.[2]).toEqual({ purgeAt: past.purgeAt, id: page[page.length - 1]!.id });
     expect(repo.listPastPurge).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives the bytes of the documents already removed back to the gauge when a later page's query fails", async () => {
+    const page = Array.from({ length: PURGE_QUARANTINE_BATCH }, (_, i) => upload(`page${String(i).padStart(8, "0")}`, { ...past, status: "ready", size: 1_000 }));
+    vi.mocked(repo.listPastPurge).mockResolvedValueOnce(page).mockRejectedValueOnce(new Error("deadline exceeded"));
+
+    await expect(purgeQuarantine(NOW, { store })).rejects.toThrow("deadline exceeded");
+    expect(recordMediaBytes).toHaveBeenCalledExactlyOnceWith(-PURGE_QUARANTINE_BATCH * 1_000, NOW);
   });
 
   it("defers the document purge while the Firestore delete quota is degraded", async () => {

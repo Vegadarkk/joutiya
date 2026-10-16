@@ -50,3 +50,11 @@ export function toStatusResponse(upload: Pick<UploadRecord, "id" | "status" | "w
   const photo = listingPhotoSchema.safeParse({ id: upload.id, w: upload.width, h: upload.height, blurhash: upload.blurhash, ...(upload.hash ? { hash: upload.hash } : {}), ...(upload.variants?.length ? { variants: upload.variants } : {}) });
   return photo.success ? { status: "ready", photo: photo.data } : { status: "processing" };
 }
+
+/**
+ * Bytes an upload record holds in the storage gauge: its variants, stored while `ready` or kept
+ * under a hold (`heldObjects`), the same rule as the nightly recount (sumStoredBytes).
+ */
+export function storedBytes(upload: Pick<UploadRecord, "status" | "heldObjects" | "size"> | null): number {
+  return upload && (upload.status === "ready" || upload.heldObjects) ? (upload.size ?? 0) : 0;
+}

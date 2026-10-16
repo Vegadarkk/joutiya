@@ -1,6 +1,7 @@
-// Edge of the app (§4): admin host routing, locale routing and the page CSP.
+// Edge of the app (§4): admin host routing, locale routing, the page CSP and the page-view
+// limits of the server-rendered pages (§6, design D14).
 // NOT an authorization barrier (CVE-2025-29927): every route handler and protected layout
-// runs its own guards. SSR rate limiting arrives in phase 4.
+// runs its own guards.
 
 import { NextResponse, type NextRequest } from "next/server";
 import createMiddleware from "next-intl/middleware";
@@ -8,8 +9,11 @@ import { routing } from "@/i18n/routing";
 import { PRIVATE_SEGMENTS } from "@/config/site";
 import { DEVICE_COOKIE, setDeviceCookie } from "@/lib/security/cookies";
 import { buildCsp, createNonce, INLINE_HASH_MARKER, type CspVariant } from "@/lib/security/csp";
+import { PINNED_SCRIPT_HASHES } from "@/lib/security/inline-hashes";
 import { newDeviceCookie, readDeviceId } from "@/lib/security/device";
 import { coopFor } from "@/lib/security/headers";
+import { checkPageLimits, isMeteredPath, pathLocale, tooManyPagesHtml, TOO_MANY_CSP } from "@/lib/rate-limit/proxy-limits";
+import { challengeUrlPath } from "@/lib/security/challenge-path";
 import { mediaBaseUrl } from "@/lib/storage/keys";
 
 const handleI18nRouting = createMiddleware(routing);
@@ -55,10 +59,11 @@ function cspHeaderName(): string {
   return process.env.CSP_REPORT_ONLY === "true" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy";
 }
 
-function csp(variant: CspVariant, nonce?: string): string {
+function csp(variant: CspVariant, nonce?: string, scriptHashes?: readonly string[]): string {
   return buildCsp({
     variant,
     nonce,
+    scriptHashes,
     dev: process.env.NODE_ENV === "development",
     mediaOrigin: mediaOrigin(),
     r2Origin: process.env.R2_S3_ENDPOINT,
@@ -126,13 +131,57 @@ function adminHost(request: NextRequest): NextResponse {
   return decorate(NextResponse.rewrite(url, { request: { headers } }), "admin", policy);
 }
 
-function isPrivatePath(pathname: string): boolean {
-  // "/fr/connexion/..." -> ["", "fr", "connexion", ...]
-  const segment = pathname.split("/")[2] ?? "";
-  return PRIVATE_SEGMENTS.includes(segment);
+/** Second path segment: "/fr/connexion/..." -> "connexion". */
+function pageSegment(pathname: string): string {
+  return pathname.split("/")[2] ?? "";
 }
 
-export function proxy(request: NextRequest): NextResponse {
+function isPrivatePath(pathname: string): boolean {
+  return PRIVATE_SEGMENTS.includes(pageSegment(pathname));
+}
+
+/**
+ * Public pages rendered per request and streamed (Suspense): React's inline streaming scripts
+ * ($RC...) change with every response and match no framework shape of the hash CSP, so these
+ * pages take the nonce CSP of private pages. They are never cached anyway. Their layout is the
+ * public one, whose theme script has no nonce: its pinned hash is allowed instead.
+ */
+const DYNAMIC_PUBLIC_SEGMENTS: readonly string[] = ["recherche"];
+
+/** Device cookie as a raw header: the cookies API would also write back a removed locale cookie. */
+function appendDeviceCookie(response: NextResponse): void {
+  const device = new NextResponse(null);
+  setDeviceCookie(device, newDeviceCookie().value);
+  for (const cookie of device.headers.getSetCookie()) response.headers.append("set-cookie", cookie);
+}
+
+/**
+ * Over the page-view limits (D14): without a pass, GET and HEAD go to the Turnstile page (302);
+ * otherwise a small 429 page. Never cached (Cloudflare would cache a bare 302 for 20 minutes).
+ */
+async function pageLimitResponse(request: NextRequest): Promise<NextResponse | null> {
+  const decision = await checkPageLimits(request);
+  if (decision.kind === "allow") return null;
+  const locale = pathLocale(request.nextUrl.pathname) ?? "fr";
+  if (decision.kind === "challenge" && (request.method === "GET" || request.method === "HEAD")) {
+    const target = new URL(challengeUrlPath(locale, `${request.nextUrl.pathname}${request.nextUrl.search}`), request.url);
+    const response = NextResponse.redirect(target, 302);
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
+  return new NextResponse(tooManyPagesHtml(locale), {
+    status: 429,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Retry-After": String(Math.max(1, decision.retryAfterSeconds)),
+      "Content-Security-Policy": TOO_MANY_CSP,
+      "X-Robots-Tag": "noindex",
+    },
+  });
+}
+
+export async function proxy(request: NextRequest): Promise<NextResponse> {
   const host = normalizeHost(request.headers.get("host"));
   const adminHostName = normalizeHost(process.env.ADMIN_HOST);
   if (adminHostName && host === adminHostName) return adminHost(request);
@@ -145,10 +194,34 @@ export function proxy(request: NextRequest): NextResponse {
   const routed = handleI18nRouting(request);
   if (routed.status >= 300 && routed.status < 400) return routed;
 
-  if (isPrivatePath(pathname)) {
+  // Category pages take no query (D15): `?x=` would bypass the edge cache, so it goes to the clean
+  // path. Next strips `_rsc` from nextUrl before the proxy, so client navigations never loop here.
+  if (pageSegment(pathname) === "c" && request.nextUrl.search) {
+    const clean = request.nextUrl.clone();
+    clean.search = "";
+    return NextResponse.redirect(clean, 308);
+  }
+
+  // Page-view limits (D14). RSC and prefetch requests count too: a scraper can send `RSC: 1`.
+  if (isMeteredPath(pathname)) {
+    const limited = await pageLimitResponse(request);
+    if (limited) return limited;
+  }
+
+  const dynamicPublic = DYNAMIC_PUBLIC_SEGMENTS.includes(pageSegment(pathname));
+  if (isPrivatePath(pathname) || dynamicPublic) {
     const nonce = createNonce();
-    const policy = csp("private", nonce);
+    const policy = csp("private", nonce, dynamicPublic ? [...PINNED_SCRIPT_HASHES] : undefined);
     const response = decorate(forwardWithNonce(routed, request, policy, nonce), "public", policy);
+    if (dynamicPublic) {
+      // Like shared pages, no locale cookie. The device cookie makes the per-device search limits
+      // apply (D13) instead of the anonymous bucket of the IP. It is not forwarded to this render:
+      // a request without it is an unknown device on its IP (§6), or dropping cookies would skip
+      // the device limits; over that bucket, a first search escalates to Turnstile.
+      response.headers.delete("set-cookie");
+      if (!readDeviceId(request.cookies.get(DEVICE_COOKIE)?.value)) appendDeviceCookie(response);
+      return response;
+    }
     // The device cookie exists before the first API call: sign-up and sign-in limits are counted
     // per device, and a browser without the cookie would share the anonymous bucket of its IP
     // (src/lib/rate-limit/keys.ts). Private pages are dynamic, so the cookie costs no cache.

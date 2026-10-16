@@ -116,6 +116,12 @@ const schema = z.object({
   BACKUP_AGE_RECIPIENT: optional,
   /** Development only: keeps sent e-mails in memory, readable at /api/dev/mailbox (e2e tests). */
   DEV_MAILBOX: flag,
+  // Search (phase 4): Meilisearch on the internal Docker network (http://meilisearch:7700).
+  // The web reads with the search-only key, the worker indexes with the indexing key; the master
+  // key never reaches the app (meilisearch.env, scripts/search-setup.ts). Unset in dev = in-memory engine.
+  MEILI_URL: optionalUrl,
+  MEILI_SEARCH_KEY: optional,
+  MEILI_INDEX_KEY: optional,
 });
 
 export type ServerEnv = z.infer<typeof schema>;
@@ -174,6 +180,10 @@ export const RECOMMENDED_DEPLOYED = [
   // Photos and backups (phase 3): recommended, not required, until the bucket tokens exist.
   ...R2_STORAGE_VARS,
   "BACKUP_AGE_RECIPIENT",
+  // Search (phase 4): without it the site serves pages but search answers 503 (design D2).
+  "MEILI_URL",
+  "MEILI_SEARCH_KEY",
+  "MEILI_INDEX_KEY",
 ] as const satisfies readonly (keyof ServerEnv)[];
 
 /** Cloudflare's documented dummy Turnstile keys: never in production. */
@@ -216,6 +226,8 @@ export function parseEnv(source: Record<string, string | undefined>): ParsedEnv 
       const missing = R2_STORAGE_VARS.filter((name) => !env[name]);
       errors.push(`R2 storage needs all of ${R2_STORAGE_VARS.join(", ")} or none (missing: ${missing.join(", ")})`);
     }
+    if (env.MEILI_URL && !env.MEILI_SEARCH_KEY && !env.MEILI_INDEX_KEY) errors.push("MEILI_URL needs MEILI_SEARCH_KEY (web) or MEILI_INDEX_KEY (worker)");
+    if ((env.MEILI_SEARCH_KEY || env.MEILI_INDEX_KEY) && !env.MEILI_URL) errors.push("MEILI_SEARCH_KEY and MEILI_INDEX_KEY need MEILI_URL");
     for (const name of ["MEDIA_BASE_URL", "MAP_PMTILES_URL"] as const) {
       if (env[name] && !env[name].startsWith("https://")) errors.push(`${name} must be https outside dev`);
     }

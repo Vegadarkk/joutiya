@@ -3,7 +3,7 @@ import { X509Certificate } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import {
   APIS,
@@ -15,6 +15,7 @@ import {
   createCa,
   credentialConfig,
   csrFromOutput,
+  derBase64,
   githubProviderBody,
   githubProviderName,
   missingGrants,
@@ -23,14 +24,16 @@ import {
   readCa,
   setup,
   signCsr,
+  signRequests,
   vmPrincipal,
   vmProviderBody,
+  wifLines,
   withGrants,
   type IamPolicy,
   type Provider,
   type Waits,
 } from "../../scripts/google-wif";
-import { RUN_COMMAND_MAX_BYTES, rootCommand, wifDir, wifInstallScript, wifKeyScript, wifRecreateScript } from "../../scripts/oracle-vm";
+import { RUN_COMMAND_MAX_BYTES, rootCommand, wifCertificates, wifDir, wifInstallScript, wifKeyScript, wifRecreateScript } from "../../scripts/oracle-vm";
 
 const work = mkdtempSync(join(tmpdir(), "joutiya-wif-"));
 afterAll(() => rmSync(work, { recursive: true, force: true }));
@@ -83,6 +86,8 @@ describe("what setup wants", () => {
     expect(prod.attributeMapping).toEqual({ "google.subject": "assertion.subject.dn.cn" });
     expect(prod.attributeCondition).toBe('assertion.subject.dn.cn in ["joutiya-prod-web", "joutiya-prod-worker"]');
     expect(prod.x509?.trustStore?.trustAnchors).toEqual([{ pemCertificate: caPem.trim() }]);
+    // A CA written by openssl on Windows (CRLF) reaches Google with LF line endings.
+    expect(vmProviderBody("prod", caPem.replace(/\n/g, "\r\n")).x509).toEqual(prod.x509);
     expect(prod.displayName?.length).toBeLessThanOrEqual(32);
   });
 
@@ -203,6 +208,48 @@ describe("the CA and the certificates", () => {
     expect(() => csrFromOutput("csr \n")).toThrow(/no certificate request/);
     expect(() => csrFromOutput("nothing")).toThrow(/no certificate request/);
   });
+
+  it("signs the request lines relayed as text, whatever surrounds them, for the four subjects only", () => {
+    const der = (cn: string) => derBase64(request(join(work, "lines", cn), cn).csr);
+    const text = [
+      "Requests from the VM (copied from a chat):",
+      `request joutiya-staging-web ${der("joutiya-staging-web")}\r`,
+      `request joutiya-staging-worker ${der("joutiya-staging-worker")}`,
+      `request joutiya-dev-web ${der("joutiya-dev-web")}`,
+      `certificate joutiya-prod-web ${der("joutiya-prod-web")}`,
+      "",
+    ].join("\n");
+    expect(wifLines(text, "request").map((line) => line.subject)).toEqual(["joutiya-staging-web", "joutiya-staging-worker"]);
+    const certificates = signRequests(text, ca);
+    expect(certificates.map((line) => line.split(" ").slice(0, 2).join(" "))).toEqual(["certificate joutiya-staging-web", "certificate joutiya-staging-worker"]);
+    expect(wifCertificates(certificates.join("\n"), "staging").size).toBe(2);
+
+    // A CA written by openssl on Windows (CRLF files) signs CRLF text the same way.
+    const windows = caFiles(join(work, "windows"));
+    mkdirSync(windows.dir, { recursive: true });
+    for (const file of [ca.key, ca.cert]) writeFileSync(join(windows.dir, basename(file)), readFileSync(file, "utf8").replace(/\n/g, "\r\n"));
+    const signed = signRequests(text.replace(/\r?\n/g, "\r\n"), windows);
+    expect(wifCertificates(signed.join("\r\n"), "staging").size).toBe(2);
+
+    expect(() => signRequests("no request here", ca)).toThrow(/no `request/);
+    const twice = `request joutiya-prod-web ${der("joutiya-prod-web")}\nrequest joutiya-prod-web ${der("joutiya-prod-web")}`;
+    expect(() => wifLines(twice, "request")).toThrow(/joutiya-prod-web is given twice/);
+    // A line may only carry its own subject's request.
+    expect(() => signRequests(`request joutiya-prod-web ${der("joutiya-prod-worker")}`, ca)).toThrow(/refused: subject CN=joutiya-prod-worker/);
+  });
+
+  it("checks the certificate lines before they travel to the VM", () => {
+    const sign = (cn: string, days = LEAF_DAYS) => derBase64(signCsr({ csr: request(join(work, "certs", cn), cn).csr, subject: cn, days, ca }));
+    const web = sign("joutiya-prod-web");
+    const worker = sign("joutiya-prod-worker");
+    expect([...wifCertificates(`certificate joutiya-prod-web ${web}\ncertificate joutiya-prod-worker ${worker}`, "prod").keys()]).toEqual(["web", "worker"]);
+    expect(() => wifCertificates(`certificate joutiya-prod-web ${web}`, "prod")).toThrow(/no `certificate joutiya-prod-worker/);
+    expect(() => wifCertificates(`certificate joutiya-prod-web ${web}\ncertificate joutiya-prod-worker ${worker}`, "staging")).toThrow(/no `certificate joutiya-staging-web/);
+    expect(() => wifCertificates(`certificate joutiya-prod-web ${worker}\ncertificate joutiya-prod-worker ${worker}`, "prod")).toThrow(/joutiya-prod-web: the certificate is for CN=joutiya-prod-worker/);
+    const later = new Date(Date.now() + 2 * 86_400_000);
+    const shortLived = sign("joutiya-prod-worker", 1);
+    expect(() => wifCertificates(`certificate joutiya-prod-web ${web}\ncertificate joutiya-prod-worker ${shortLived}`, "prod", later)).toThrow(/joutiya-prod-worker: the certificate has expired/);
+  });
 });
 
 describe("the VM side (oracle-vm.ts wif)", () => {
@@ -235,7 +282,10 @@ describe("the VM side (oracle-vm.ts wif)", () => {
   it("makes the key on the VM, installs the signed certificate, and google-auth-library reads the result", async () => {
     const key = run(wifKeyScript("staging", "web"));
     expect(key.status, key.stderr).toBe(0);
-    const certificate = signCsr({ csr: csrFromOutput(key.stdout), subject: "joutiya-staging-web", days: LEAF_DAYS, ca });
+    // The text hand-off: request line from the VM, certificate line from the CA machine.
+    const signed = signRequests(`request joutiya-staging-web ${derBase64(csrFromOutput(key.stdout))}`, ca).join("\n");
+    const worker = signRequests(`request joutiya-staging-worker ${derBase64(request(join(work, "e2e-worker"), "joutiya-staging-worker").csr)}`, ca).join("\n");
+    const certificate = wifCertificates(`${signed}\n${worker}`, "staging").get("web") ?? "";
     const install = run(wifInstallScript("staging", "web", certificate, files));
     expect(install.status, install.stderr).toBe(0);
     expect(install.stdout).toMatch(/^web: joutiya-staging-web installed, valid until /);

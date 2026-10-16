@@ -23,6 +23,8 @@ const repo = vi.hoisted(() => ({
 vi.mock("@/lib/db/repositories/listings", () => ({ getListing: repo.getListing, listPublishedByOwner: vi.fn() }));
 vi.mock("@/lib/db/repositories/profiles", () => ({ findUserByPublicId: vi.fn(), getUserRecord: repo.getUserRecord }));
 vi.mock("@/lib/quota", async (importOriginal) => ({ ...(await importOriginal<typeof Quota>()), consume: vi.fn(), firstDegraded: vi.fn(async () => null) }));
+// The heart is a client island (app router hooks): its own tests cover it (phase 4).
+vi.mock("@/components/favorites/favorite-button", () => ({ FavoriteButton: ({ listingId }: { listingId: string }) => <span data-favorite={listingId} /> }));
 vi.mock("@/lib/firebase/admin", () => {
   const query = { where: () => query, count: () => ({ get: async () => ({ data: () => ({ count: 4 }) }) }) };
   return { db: () => ({ collection: () => query }) };
@@ -131,6 +133,17 @@ function jsonLd(html: string): Record<string, unknown> {
   const body = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html)?.[1];
   if (!body) throw new Error("no JSON-LD block");
   return JSON.parse(body) as Record<string, unknown>;
+}
+
+/** Landing pages the breadcrumb links: the HTML hrefs and the BreadcrumbList `item` URLs. */
+function crumbLinks(html: string): { html: string[]; ld: string[] } {
+  const nav = /<nav[^>]*>([\s\S]*?)<\/nav>/.exec(html)?.[1] ?? "";
+  const blocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((match) => JSON.parse(match[1] ?? "{}") as Record<string, unknown>);
+  const list = blocks.find((block) => block["@type"] === "BreadcrumbList") as { itemListElement: { item?: string }[] } | undefined;
+  return {
+    html: [...nav.matchAll(/href="([^"]+)"/g)].map((match) => match[1] ?? ""),
+    ld: (list?.itemListElement ?? []).flatMap((step) => (step.item ? [step.item] : [])),
+  };
 }
 
 beforeEach(() => {
@@ -261,13 +274,41 @@ describe("page content", () => {
     for (const secret of ["uid-secret-1", "new_account", "auto_ok", "33.57", "-7.59", "0123456789abcdef", "tel:", "+212"]) expect(html, secret).not.toContain(secret);
   });
 
-  it("links the breadcrumb to the filtered search", async () => {
+  it("links the breadcrumb to the category landing pages, with a BreadcrumbList and the heart", async () => {
     repo.getListing.mockResolvedValue(record());
     const html = await renderPage();
-    expect(html).toContain('href="/fr/recherche?categorie=vehicules"');
-    expect(html).toContain('href="/fr/recherche?categorie=vehicules&amp;sous-categorie=velos"');
-    expect(html).toContain('href="/fr/recherche?sous-categorie=velos&amp;ville=casablanca"');
+    expect(html).toContain('href="/fr/c/vehicules"');
+    expect(html).toContain('href="/fr/c/vehicules/velos"');
+    expect(html).toContain('href="/fr/c/vehicules/velos/casablanca"');
+    expect(html).not.toContain("/recherche?");
     expect(html).toContain('aria-current="page"');
+    expect(html).toContain('"@type":"BreadcrumbList"');
+    expect(html).toMatch(/data-favorite="[^"]+"/);
+    expect(crumbLinks(html)).toEqual({
+      html: ["/fr", "/fr/c/vehicules", "/fr/c/vehicules/velos", "/fr/c/vehicules/velos/casablanca"],
+      ld: ["https://joutiya.ma/fr", "https://joutiya.ma/fr/c/vehicules", "https://joutiya.ma/fr/c/vehicules/velos", "https://joutiya.ma/fr/c/vehicules/velos/casablanca"],
+    });
+  });
+
+  it("links only /c/{category} for a listing its deeper landing pages do not count (they may 404, D15)", async () => {
+    const outOfIndex = [
+      ...(["sold", "paused", "expired"] as const).map((status) => record(status)),
+      record("published", { moderation: { state: "auto_ok", score: 12, flags: [], openReports: 1, hiddenBy: { reportId: "r1", signal: "multi", at: NOW } } }),
+    ];
+    for (const listing of outOfIndex) {
+      repo.getListing.mockResolvedValue(listing);
+      const html = await renderPage();
+      expect(crumbLinks(html), listing.status).toEqual({ html: ["/fr", "/fr/c/vehicules"], ld: ["https://joutiya.ma/fr", "https://joutiya.ma/fr/c/vehicules"] });
+    }
+  });
+
+  it("skips a subcategory /c no longer resolves: the city step falls back to /c/{category}/{city}", async () => {
+    repo.getListing.mockResolvedValue(record("published", { subcategoryId: "retiree", attributes: {} }));
+    const html = await renderPage();
+    expect(crumbLinks(html).html).toEqual(["/fr", "/fr/c/vehicules", "/fr/c/vehicules/casablanca"]);
+    // A subcategory of another category is not a step of this one either.
+    repo.getListing.mockResolvedValue(record("published", { subcategoryId: "colocation", attributes: {} }));
+    expect(crumbLinks(await renderPage()).html).toEqual(["/fr", "/fr/c/vehicules", "/fr/c/vehicules/casablanca"]);
   });
 
   it("shows a banner and no contact action for a sold, paused or expired listing", async () => {
@@ -305,8 +346,8 @@ describe("JSON-LD", () => {
     });
     const block = JSON.stringify(data);
     for (const secret of ["Salma", "abcdefghjk", "uid-secret-1", "33.57", "telephone", "+212"]) expect(block, secret).not.toContain(secret);
-    // The seller's text cannot close the data block.
-    expect(html.match(/<\/script>/g)).toHaveLength(1);
+    // The seller's text cannot close the data blocks (Product + BreadcrumbList).
+    expect(html.match(/<\/script>/g)).toHaveLength(2);
     expect(html).toContain("\\u003cscript\\u003ealert(1)\\u003c/script\\u003e");
   });
 

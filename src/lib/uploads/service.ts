@@ -35,8 +35,9 @@ import { photoObjectKey, quarantineObjectKey, type PhotoBucket } from "@/lib/med
 import { captureServerException } from "@/lib/observability/capture";
 import { assertQuotas, DEPOSIT_QUOTAS } from "@/lib/quota/gate";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
+import { notifySearchIndex } from "@/lib/search/queue";
 import { isStorageNotConfigured, objectStore, type ObjectStore } from "@/lib/storage";
-import { LIVE_STATUSES, PHOTO_TARGET_STATUSES, maxPhotosOf, toStatusResponse } from "./policy";
+import { LIVE_STATUSES, PHOTO_TARGET_STATUSES, maxPhotosOf, storedBytes, toStatusResponse } from "./policy";
 import { isStorageFull, recordMediaBytes } from "./storage-gauge";
 
 // Uploads service (design §3 MEDIA_API, architecture §6 "Uploads"): signing a presigned PUT to
@@ -193,6 +194,7 @@ async function detach(uploader: Uploader, listingId: string, id: string, keepOne
     throw error;
   }
   const { listing, changed } = detached;
+  if (changed && listing?.status === "published") await notifySearchIndex([listingId]);
   if (!changed || !listing || !(PUBLIC_STATES as readonly ListingStatus[]).includes(listing.status)) return;
   revalidateListingPaths({ slugId: listing.slugId, publicId: listing.sellerPublicId });
 }
@@ -214,8 +216,9 @@ export async function deleteUpload(uploader: Uploader, id: string, now = new Dat
   if (listing && !PHOTO_TARGET_STATUSES.includes(listing.status)) throw new HttpError(409, "conflict", `the photos of a ${listing.status} listing are retained with it`);
   if (listing) await detach(uploader, listing.id, id, LIVE_STATUSES, now);
   const held = listing !== null && listing.legalHold.length > 0;
-  // A photo deleted earlier under a hold now lifted still has its variants, and its bytes counted.
-  let freedBytes = upload.status === "ready" || upload.heldObjects ? (upload.size ?? 0) : 0;
+  // Bytes come off the storage gauge once even when the same upload is deleted twice at once (a
+  // retry, a double tap, purge-quarantine): those of the photo this call's transition took out of
+  // `ready`, then those of a document still counted when this call removes it.
   if (upload.status !== "rejected") {
     // Out of `ready` first, hold or not: a document kept as evidence is never attached or offered
     // for the next save again (the owner's view lists it as refused until it is purged). Its
@@ -228,8 +231,11 @@ export async function deleteUpload(uploader: Uploader, id: string, now = new Dat
       now,
     );
     if (!ended.ok && !ended.upload) throw notFound();
-    // Finished by the pipeline between the read and the transition: its bytes were counted.
-    if (ended.ok && upload.status !== "ready" && ended.upload.variants) freedBytes = ended.upload.size ?? 0;
+    // Ready when read, or finished by the pipeline before the transition: its bytes were counted, and
+    // come off now, as the nightly recount no longer counts them (a failed object delete below must
+    // not keep them: a retry finds the upload rejected). A concurrent DELETE that lost the transition
+    // frees nothing; under a hold they stay (heldObjects).
+    if (ended.ok && !held && (upload.status === "ready" || ended.upload.variants) && ended.upload.size) await recordMediaBytes(-ended.upload.size, now);
     // Past the point of no return: the photo goes even if it was the last one.
     if (listing && upload.status !== "ready") await detach(uploader, listing.id, id, [], now);
   }
@@ -242,6 +248,7 @@ export async function deleteUpload(uploader: Uploader, id: string, now = new Dat
   // short may have left its public copy too, so both go (as in retention-purge).
   const buckets: readonly PhotoBucket[] = upload.bucket === "private" ? ["private", "media"] : ["media"];
   for (const bucket of buckets) for (const variant of PHOTO_VARIANTS) await objects.delete(bucket, photoObjectKey(bucket, upload.targetId, id, variant));
-  await deleteUploadDocument(id);
+  // A photo deleted earlier under a hold now lifted still has its variants, and its bytes counted.
+  const freedBytes = storedBytes(await deleteUploadDocument(id));
   if (freedBytes > 0) await recordMediaBytes(-freedBytes, now);
 }

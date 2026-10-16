@@ -9,8 +9,9 @@ import { isFirestoreConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
 import { photoObjectKey, quarantineObjectKey, type PhotoBucket } from "@/lib/media/urls";
 import { isDegraded } from "@/lib/quota";
+import { notifySearchIndex } from "@/lib/search/queue";
 import { isStorageNotConfigured, objectStore, type ObjectStore } from "@/lib/storage";
-import { RETAINED_STATUSES } from "@/lib/uploads/policy";
+import { RETAINED_STATUSES, storedBytes } from "@/lib/uploads/policy";
 import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 
 // Nightly at 03:00 UTC (architecture §5 "Purges sans TTL", table of §7 retention, design D16):
@@ -86,10 +87,13 @@ async function deleteUpload(store: ObjectStore, listing: ListingRecord, upload: 
   await deleteVariants(store, upload.targetId, upload.id, photoBuckets(listing, upload), state);
   await store.delete("quarantine", upload.quarantineKey);
   state.result.objects += 1;
-  await deleteUploadDocument(upload.id);
+  // By the document as this run removed it: an owner DELETE or purge-quarantine may have ended or
+  // removed it since the listing, and then its bytes were theirs (no delete either: none counted).
+  const removed = await deleteUploadDocument(upload.id);
+  state.freedBytes += storedBytes(removed);
+  if (!removed) return;
   state.result.uploads += 1;
   state.budget -= 1;
-  if ((upload.status === "ready" || upload.heldObjects) && upload.size) state.freedBytes += upload.size;
 }
 
 /**
@@ -147,6 +151,7 @@ async function purgeListings(state: RunState): Promise<void> {
           continue;
         }
         result.listings += 1;
+        await notifySearchIndex([listing.id]);
         await audit({ actorUid: "system", actorRole: "system", action: "listing.purge", target: { type: "listing", id: listing.id }, automated: true, at: now });
         if (state.store) await purgeListingMedia(state.store, listing, state);
       } catch (error) {

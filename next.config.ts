@@ -35,6 +35,11 @@ const nextConfig: NextConfig = {
   },
   // Native and runtime-resolved packages stay outside the server bundle (Sentry hooks Node modules).
   serverExternalPackages: ["@sentry/node", "pino", "firebase-admin"],
+  // The sitemap index lives with its files under /sitemaps/ (design D16): one ISR route handler,
+  // no metadata sitemap.ts (generateSitemaps runs at build and conflicts with this route).
+  async rewrites() {
+    return [{ source: "/sitemap.xml", destination: "/sitemaps/index.xml" }];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: staticSecurityHeaders() },
