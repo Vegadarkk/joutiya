@@ -25,6 +25,7 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
   listingChangesApproved: { displayName: "Nadia", title: "Vélo de ville", status: "paused", url: `${SITE}/fr/mes-annonces?onglet=active`, until: "2026-12-15T09:30:00.000Z" },
   listingExpiringSoon: { displayName: "Nadia", title: "Vélo de ville", url: `${SITE}/fr/annonce/velo-de-ville-casablanca-abcd2345`, expiresAt: "2026-12-15T09:30:00.000Z" },
   listingExpired: { displayName: "Nadia", title: "Vélo de ville", purgeAt: "2027-12-15T09:30:00.000Z" },
+  reportReceived: { displayName: "Nadia", reportId: "AbCdEf0123456789wxyz", targetType: "listing", reasonId: "scam", slaHours: 24, receivedAt: "2026-10-16T09:30:00.000Z", urgent: false },
   savedSearchAlert: {
     displayName: "Nadia",
     searches: [

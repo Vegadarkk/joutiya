@@ -22,6 +22,8 @@ export type TemplateId =
   | "listingChangesApproved"
   | "listingExpiringSoon"
   | "listingExpired"
+  // Reports (phase 5, L2): acknowledgement of a notice (art. 16(4) DSA).
+  | "reportReceived"
   // Search (phase 4): the daily digest of the saved searches with an alert (design D19).
   | "savedSearchAlert";
 
@@ -70,6 +72,12 @@ export interface TemplateData {
   listingExpiringSoon: { displayName: string; title: string; url: string; expiresAt: string };
   /** Expired: renewable from "Mes annonces" until `purgeAt` (ISO), then deleted. */
   listingExpired: { displayName: string; title: string; purgeAt: string };
+  /**
+   * Notice received (art. 16(4) DSA): reference, target type, reason id (labels in
+   * src/config/report-reasons.ts), target delay in hours, reception date (ISO). `displayName` is
+   * null for a visitor who gave no name (P0); `urgent` adds the emergency numbers.
+   */
+  reportReceived: { displayName: string | null; reportId: string; targetType: "listing" | "user" | "message" | "pro"; reasonId: string; slaHours: number; receivedAt: string; urgent: boolean };
   /**
    * Daily digest (bulk): the saved searches with new listings since the last digest.
    * `unsubscribeToken` (src/lib/alerts/unsubscribe-token.ts, every alert of the account) builds the

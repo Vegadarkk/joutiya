@@ -43,9 +43,13 @@ export async function handleLogout(request: Request): Promise<Response> {
   return withDevice(response, request);
 }
 
-/** Custom token for the browser SDK (realtime messaging only, in-memory persistence); never for a revoked cookie. */
+/**
+ * Custom token for the browser SDK (realtime messaging only, in-memory persistence); never for a
+ * revoked cookie. A suspended account gets one too: it still reads its conversations (phase 5 D9;
+ * the rules ignore `st`, the write routes refuse it).
+ */
 export async function handleClientToken(request: Request): Promise<Response> {
-  const context = await requireUser(request, { mutation: true, checkRevoked: true });
+  const context = await requireUser(request, { mutation: true, checkRevoked: true, allowSuspended: true });
   await enforceLimit("clientToken.uid", context.user.uid);
   const body: ClientTokenResponse = { token: await auth().createCustomToken(context.user.uid) };
   return withDevice(jsonResponse(body), request);

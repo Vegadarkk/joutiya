@@ -12,6 +12,7 @@ import { listingRejected } from "./templates/listingRejected";
 import { passwordChanged } from "./templates/passwordChanged";
 import { phoneRemoved } from "./templates/phoneRemoved";
 import { phoneVerified } from "./templates/phoneVerified";
+import { reportReceived } from "./templates/reportReceived";
 import { resetPassword } from "./templates/resetPassword";
 import { savedSearchAlert } from "./templates/savedSearchAlert";
 import { signupExisting } from "./templates/signupExisting";
@@ -36,6 +37,7 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   listingChangesApproved,
   listingExpiringSoon,
   listingExpired,
+  reportReceived,
   savedSearchAlert,
 };
 
