@@ -162,7 +162,7 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
 
   return (
     <form id={STEP_FORM_ID} onSubmit={(event) => void onSubmit(event)} noValidate className="flex flex-col gap-6">
-      <FormMessage error={serverError} />
+      <FormMessage error={serverError} scope="listing" />
       {!editable ? <ErrorBanner tone="info" title={t("review.publishedListing")} /> : null}
 
       {serverBlockers.length > 0 ? (

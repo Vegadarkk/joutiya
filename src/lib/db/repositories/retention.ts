@@ -8,7 +8,8 @@ import { applyPatch, fromSnapshot, getListingTx, listingRef, updateListingTx, ty
 import { enqueueSearchOutboxTx } from "./search-outbox";
 
 // Time-driven listing jobs (design D16, architecture §5 "Purges sans TTL"): the expiry and
-// reminder queries (index listings status asc, expiresAt asc), the reminder cursor
+// reminder queries (index listings status asc, expiresAt asc), the scan of removed listings
+// (index listings status asc, updatedAt asc), the reminder cursor
 // (system/listingReminders), the purge of listings past purgeAt (tombstone) and the batch
 // deletion of journals past purgeAt (contentOps, revealLogs: single-field purgeAt index).
 // Pages carry a cursor taken from the raw snapshot, so a document that fails to parse never
@@ -30,7 +31,7 @@ export interface ListingPage {
 
 const listings = () => db().collection(COLLECTIONS.listings);
 
-async function page(query: Query, field: "expiresAt" | "purgeAt", limit: number, cursor?: ListingCursor): Promise<ListingPage> {
+async function page(query: Query, field: "expiresAt" | "purgeAt" | "updatedAt", limit: number, cursor?: ListingCursor): Promise<ListingPage> {
   let ordered = query.orderBy(field, "asc").orderBy(FieldPath.documentId(), "asc");
   if (cursor) ordered = ordered.startAfter(Timestamp.fromDate(cursor.at), cursor.id);
   const snapshot = await ordered.limit(limit).get();
@@ -61,6 +62,14 @@ export function listListingsExpiringBetween(from: Date, to: Date, limit: number,
 /** Listings whose purgeAt is <= now, any status (the job decides), oldest first, after `cursor`. */
 export function listListingsPastPurge(now: Date, limit: number, cursor?: ListingCursor): Promise<ListingPage> {
   return page(listings().where("purgeAt", "<=", Timestamp.fromDate(now)), "purgeAt", limit, cursor);
+}
+
+/**
+ * Listings in `statuses` whose updatedAt is <= before, oldest change first, after `cursor` (index
+ * listings status asc, updatedAt asc): purge-quarantine's scan of newly removed listings.
+ */
+export function listListingsChangedBefore(statuses: readonly ListingStatus[], before: Date, limit: number, cursor?: ListingCursor): Promise<ListingPage> {
+  return page(listings().where("status", "in", [...statuses]).where("updatedAt", "<=", Timestamp.fromDate(before)), "updatedAt", limit, cursor);
 }
 
 export interface TransitionWrite {

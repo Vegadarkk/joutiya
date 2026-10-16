@@ -2,6 +2,7 @@ import "server-only";
 import { Timestamp, type DocumentSnapshot } from "firebase-admin/firestore";
 import { z } from "@/lib/zod";
 import { db } from "@/lib/firebase/admin";
+import { consume } from "@/lib/quota";
 import { COLLECTIONS, displayNameSchema } from "../schemas";
 
 // staff/{uid} (§6 "Personnel"): the back-office roster, one document per moderator or admin
@@ -75,20 +76,25 @@ export async function upsertStaff(input: UpsertStaffInput): Promise<StaffRecord>
     createdAt: existing?.createdAt ?? now,
   });
   await staffRef(input.uid).set(toFirestore(doc));
+  void consume("firestore.writes", 1);
   return { uid: input.uid, ...doc };
 }
 
 /** Marks the member revoked (the claims, sessions and Auth record are handled by the caller). */
 export async function revokeStaff(uid: string, now = new Date()): Promise<void> {
   await staffRef(uid).update({ revokedAt: Timestamp.fromDate(now) });
+  void consume("firestore.writes", 1);
 }
 
 export async function getStaff(uid: string): Promise<StaffRecord | null> {
-  return fromSnapshot(await staffRef(uid).get());
+  const snapshot = await staffRef(uid).get();
+  void consume("firestore.reads", 1);
+  return fromSnapshot(snapshot);
 }
 
 /** Every roster entry, oldest first (revoked members included: the page shows their status). */
 export async function listStaff(): Promise<StaffRecord[]> {
   const snapshot = await db().collection(STAFF_COLLECTION).orderBy("createdAt", "asc").get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
   return snapshot.docs.map(fromSnapshot).filter((record): record is StaffRecord => record !== null);
 }

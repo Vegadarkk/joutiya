@@ -3,7 +3,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 // Owner actions on a published listing (lifecycle §5, D16): pause / resume / sold / renew / remove
 // through the API, the forbidden transitions (409 conflict), the search outbox and audit effects;
 // edits after publication (paused, expired: screened, held, revalidated), the screened renewal of
-// an expired listing and the active quota on resume and renewal.
+// an expired listing (not held again when a moderator approved the unchanged content), saves that
+// change nothing (no write, no screening) and the active quota on resume and renewal.
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/listings/revalidate", { spy: true });
@@ -267,6 +268,48 @@ describe("edits after publication", () => {
   });
 });
 
+describe("saves that change nothing", () => {
+  it("write nothing on a published listing: no version, searchOutbox or contentOps entry, no revalidation", async () => {
+    const owner = await member();
+    const { id, upload } = await published(owner);
+    const before = (await getListing(id))!;
+    const outbox = await getSearchOutbox(id);
+    const ops = (await listContentOps(listingContentRef(id))).length;
+    revalidateMock.mockClear();
+    for (const body of [{}, readyPatch(), { photos: [upload] }, { location: { regionCode: "06", citySlug: "casablanca" } }]) {
+      const result = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body });
+      expect(result.status, JSON.stringify(body)).toBe(200);
+      expect(result.body.listing).toMatchObject({ status: "published", version: before.version });
+    }
+    expect(await getListing(id)).toEqual(before);
+    expect(await getSearchOutbox(id)).toEqual(outbox);
+    expect(await listContentOps(listingContentRef(id))).toHaveLength(ops);
+    expect(revalidateMock).not.toHaveBeenCalled();
+  });
+
+  it("do not screen or hold a paused or expired listing again; a changed screened field is screened", async () => {
+    const owner = await member();
+    const { id } = await published(owner);
+    expect((await act(pause, owner, id, "pause")).status).toBe(200);
+    // Stored before the rule applied: resending it unchanged is not an edit to review.
+    await updateListing(id, { title: SOFT_TITLE });
+    const paused = (await getListing(id))!;
+    const same = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { title: SOFT_TITLE } });
+    expect(same.body.listing).toMatchObject({ status: "paused", version: paused.version });
+    await expire(id);
+    const expired = (await getListing(id))!;
+    const resent = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { title: SOFT_TITLE, price: 1500 } });
+    expect(resent.body.listing).toMatchObject({ status: "expired", version: expired.version });
+    expect(await decisionsFor(id)).toEqual([]);
+    expect(lastMail(sendMail, "listingPendingReview", owner.email)).toBeUndefined();
+
+    // A changed screened field screens the listing, the stored title with it.
+    const held = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { title: SOFT_TITLE, price: 1400 } });
+    expect(held.body.listing).toMatchObject({ status: "pending_review", price: 1400 });
+    expect(await decisionsFor(id)).toEqual([(await getListing(id))!.moderation.lastDecisionId]);
+  });
+});
+
 describe("renewal of an expired listing (screened like a publication)", () => {
   it("publishes a clean edited listing again (auto_ok)", async () => {
     const owner = await member();
@@ -311,6 +354,58 @@ describe("renewal of an expired listing (screened like a publication)", () => {
     expect(stored.purgeAt).toEqual(before.purgeAt);
     expect(await decisionsFor(id)).toEqual([stored.moderation.lastDecisionId]);
     expect(lastMail(sendMail, "listingPendingReview", owner.email)?.data).toMatchObject({ listingId: id, statement: { measure: "hold", facts: ["prohibited_soft"] } });
+  });
+});
+
+describe("renewal of content a moderator approved", () => {
+  /** Expired, flagged content a moderator approved (an edit held then approved back to expired). */
+  async function approvedExpired(owner: Member, overrides: { title?: string; description?: string } = {}): Promise<string> {
+    const { id } = await published(owner);
+    await expire(id);
+    const current = (await getListing(id))!;
+    await updateListing(id, { title: SOFT_TITLE, ...overrides, moderation: { ...current.moderation, state: "human_ok", flags: ["prohibited_soft"], reviewedBy: "moderator-1", reviewedAt: new Date() } });
+    return id;
+  }
+
+  it("publishes it again without a new hold while nobody edited it since; other edits keep the approval", async () => {
+    const owner = await member();
+    const id = await approvedExpired(owner);
+    // Not a screened field: the approval still covers the content.
+    const edited = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { priceNegotiable: false } });
+    expect(edited.status).toBe(200);
+    const before = (await getListing(id))!;
+    expect([before.status, before.moderation.state]).toEqual(["expired", "human_ok"]);
+
+    const renewed = await act(renew, owner, id, "renew");
+    expect(renewed.status).toBe(200);
+    expect(renewed.body.listing.status).toBe("published");
+    const stored = (await getListing(id))!;
+    expect(stored).toMatchObject({ status: "published", sortSource: "renew", adsEligible: true });
+    expect(stored.moderation).toEqual(before.moderation);
+    expect(stored.expiresAt!.getTime()).toBeGreaterThan(Date.now() + 59 * DAY_MS);
+    expect(await decisionsFor(id)).toEqual([]);
+    expect(lastMail(sendMail, "listingPendingReview", owner.email)).toBeUndefined();
+    expect(await getSearchOutbox(id)).toMatchObject({ op: "upsert", version: stored.version });
+  });
+
+  it("still refuses a hard blocker (422)", async () => {
+    const owner = await member();
+    const id = await approvedExpired(owner, { description: PHONE_TEXT });
+    const before = (await getListing(id))!;
+    const refused = await act(renew, owner, id, "renew");
+    expect(refused.status).toBe(422);
+    expect(codesOf((refused.body as unknown as Invalid).error.details)).toEqual(["description:phone_in_text"]);
+    expect(await getListing(id)).toMatchObject({ status: "expired", version: before.version });
+  });
+
+  it("screens an edit made after the approval again: a flagged one is held, the approval is gone", async () => {
+    const owner = await member();
+    const id = await approvedExpired(owner);
+    const edited = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { price: 1400 } });
+    expect(edited.status).toBe(200);
+    const stored = (await getListing(id))!;
+    expect(stored).toMatchObject({ status: "pending_review", moderation: expect.objectContaining({ state: "needs_review", flags: ["prohibited_soft"] }) });
+    expect(await decisionsFor(id)).toEqual([stored.moderation.lastDecisionId]);
   });
 });
 

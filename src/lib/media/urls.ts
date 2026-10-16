@@ -21,6 +21,31 @@ export function listingMediaPrefix(listingId: string): string {
   return `listings/${listingId}/`;
 }
 
+/**
+ * Prefix of a removed listing's photos in the private bucket (never public). purge-quarantine
+ * moves them there, keeping the rest of the key; retention-purge deletes them with the listing
+ * (removal + 12 months). No lifecycle rule may cover it: a legal hold extends the retention.
+ */
+export const RETAINED_MEDIA_PREFIX = "removed/";
+
+/** Buckets that hold photo variants: `media` (public) or `private` (a removed listing's). */
+export type PhotoBucket = "media" | "private";
+
+/** `removed/listings/{listingId}/{photoId}-{variant}.webp` in the private bucket. */
+export function retainedObjectKey(listingId: string, photoId: string, variant: PhotoVariant): string {
+  return `${RETAINED_MEDIA_PREFIX}${mediaObjectKey(listingId, photoId, variant)}`;
+}
+
+/** Key of a variant in either photo bucket. */
+export function photoObjectKey(bucket: PhotoBucket, listingId: string, photoId: string, variant: PhotoVariant): string {
+  return bucket === "media" ? mediaObjectKey(listingId, photoId, variant) : retainedObjectKey(listingId, photoId, variant);
+}
+
+/** `finalKey` of an upload document (variants add `-{variant}.webp`) for the bucket its variants are in. */
+export function photoFinalKey(bucket: PhotoBucket, listingId: string, photoId: string): string {
+  return `${bucket === "media" ? "" : RETAINED_MEDIA_PREFIX}${listingMediaPrefix(listingId)}${photoId}`;
+}
+
 /** The browser's original in the quarantine bucket, deleted once processed. */
 export function quarantineObjectKey(uploadId: string): string {
   return `uploads/${uploadId}`;

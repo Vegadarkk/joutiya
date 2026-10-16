@@ -2,6 +2,7 @@ import "server-only";
 import { Timestamp } from "firebase-admin/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
+import { consume } from "@/lib/quota";
 import { COLLECTIONS, auditLogSchema, type AuditLogDoc } from "@/lib/db/schemas";
 import { pepperedHash } from "@/lib/security/hash";
 
@@ -24,6 +25,7 @@ export async function audit(input: AuditInput): Promise<void> {
     await db()
       .collection(COLLECTIONS.auditLogs)
       .add({ ...document, at: Timestamp.fromDate(at) });
+    void consume("firestore.writes", 1);
   } catch (error) {
     logger.error({ err: (error as Error).message, action: input.action }, "audit log failed");
   }

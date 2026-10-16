@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it } from "vitest";
+import ar from "../../messages/ar.json";
 import fr from "../../messages/fr.json";
 import { radioKeyTarget } from "@/components/post/controls/chips";
 import { SaveIndicator } from "@/components/post/wizard-shell";
@@ -54,6 +55,17 @@ describe("SaveIndicator", () => {
     const blocked = text(render("error", { error: new ApiError(422, "invalid_listing"), mode: "manual" }));
     expect(blocked).toContain(fr.Listing.wizard.saveBlocked);
     expect(blocked).not.toContain(fr.Listing.wizard.retrySave);
+  });
+
+  it("a spent daily quota stops instead of promising a retry, and says the latest changes are not saved yet", () => {
+    const html = text(render("error", { error: new ApiError(503, "quota_exhausted", { retryAfter: 7_200 }) }));
+    expect(html).toContain(`${fr.Listing.wizard.saveStopped} ${fr.Listing.wizard.saveQuota}`);
+    expect(html).not.toContain(fr.Listing.wizard.saveError);
+    expect(html).toContain(fr.Listing.wizard.retrySave);
+    // The deposit wording ("votre annonce est conservée") would read as if the changes were kept.
+    expect(html).not.toContain(fr.Listing.errors.quota_exhausted);
+    expect(fr.Listing.wizard.saveQuota).toContain("pas encore enregistrées");
+    expect(ar.Listing.wizard.saveQuota).toBeTruthy();
   });
 });
 

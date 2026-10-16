@@ -5,6 +5,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import sharp from "sharp";
+import { isolate } from "../../src/lib/i18n/bidi";
 
 // Public listing page and seller profile (phase 3 lot D2) against the production build and the
 // Firebase emulators (npm run test:e2e). The fixtures are written straight into the emulator (a
@@ -155,11 +156,12 @@ test.describe("listing page", () => {
     await expect(page.getByTestId("listing-description")).toContainText("pneus neufs.");
     await expect(page.getByRole("navigation", { name: "Fil d'Ariane" })).toContainText("Vélos");
 
-    // Gallery: the first photo is the LCP image and actually loads from the media host.
-    const first = page.getByRole("img", { name: `${title}, photo 1 sur 2` });
+    // Gallery: the first photo is the LCP image and actually loads from the media host. The title is
+    // bidi-isolated inside the translated alt text.
+    const first = page.getByRole("img", { name: `${isolate(title)}, photo 1 sur 2` });
     await expect(first).toHaveAttribute("fetchpriority", "high");
     await expect.poll(() => first.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
-    await expect(page.getByRole("img", { name: `${title}, photo 2 sur 2` })).toHaveAttribute("loading", "lazy");
+    await expect(page.getByRole("img", { name: `${isolate(title)}, photo 2 sur 2` })).toHaveAttribute("loading", "lazy");
     await expect(page.getByTestId("gallery-counter")).toHaveText("1 / 2");
 
     const seller = page.getByTestId("seller-card");
@@ -191,14 +193,37 @@ test.describe("listing page", () => {
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /-l\.webp$/);
   });
 
-  test("opens the photos full screen and closes with Escape", async ({ page }) => {
+  test("opens the photos full screen, moves with the arrow keys and closes with Escape on the photo shown", async ({ page }) => {
     await page.goto(`/fr/annonce/${fixture.published.slugId}`);
     await page.getByRole("button", { name: "Agrandir la photo" }).first().click();
     const dialog = page.getByRole("dialog", { name: fixture.published.title });
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText("Photo 1 sur 2");
+    // The counter follows the track (its scroll listener attaches once the portal has mounted).
+    await page.keyboard.press("ArrowRight");
+    await expect(dialog).toContainText("Photo 2 sur 2");
+    await page.keyboard.press("ArrowRight");
+    await expect(dialog).toContainText("Photo 2 sur 2");
+    await page.keyboard.press("ArrowLeft");
+    await expect(dialog).toContainText("Photo 1 sur 2");
+    await page.keyboard.press("End");
+    await expect(dialog).toContainText("Photo 2 sur 2");
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
+    // The page gallery resumes on the photo the lightbox was closed on.
+    await expect(page.getByTestId("gallery-counter")).toHaveText("2 / 2");
+  });
+
+  test("mirrors the arrow keys in Arabic", async ({ page }) => {
+    await page.goto(`/ar/annonce/${fixture.published.slugId}`);
+    await page.getByRole("button", { name: "تكبير الصورة" }).first().click();
+    const dialog = page.getByRole("dialog", { name: fixture.published.title });
+    await expect(dialog).toContainText("الصورة 1 من 2");
+    // Right to left: the next photo is on the left.
+    await page.keyboard.press("ArrowLeft");
+    await expect(dialog).toContainText("الصورة 2 من 2");
+    await page.keyboard.press("ArrowRight");
+    await expect(dialog).toContainText("الصورة 1 من 2");
   });
 
   test("sends an anonymous visitor to sign-in before showing the number, then back here", async ({ page }) => {

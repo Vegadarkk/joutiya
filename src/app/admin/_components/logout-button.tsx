@@ -23,10 +23,11 @@ export function LogoutButton() {
     }
   }
 
+  // 44 px target; on a phone the icon alone shows (the header row is full), the name stays.
   return (
-    <Button type="button" variant="ghost" size="sm" loading={loading} onClick={onClick}>
+    <Button type="button" variant="ghost" size="sm" loading={loading} onClick={onClick} className="h-11 min-w-11 max-sm:px-0">
       <LogOut aria-hidden="true" />
-      Se déconnecter
+      <span className="max-sm:sr-only">Se déconnecter</span>
     </Button>
   );
 }

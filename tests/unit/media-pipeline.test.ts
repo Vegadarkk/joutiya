@@ -124,6 +124,7 @@ function listing(overrides: Partial<ListingRecord> = {}): void {
 const photo = (id: string): ListingPhoto => ({ id, w: 100, h: 100, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj" });
 const stored = (id: string) => fake.uploads.get(id) as UploadRecord;
 const keyL = (id: string) => `listings/${LISTING_ID}/${id}-l.webp`;
+const keyM = (id: string) => `listings/${LISTING_ID}/${id}-m.webp`;
 const keyS = (id: string) => `listings/${LISTING_ID}/${id}-s.webp`;
 
 function seed(record: UploadRecord, body: Buffer, contentType: string = record.declaredType): void {
@@ -190,8 +191,8 @@ describe("processUpload: happy path", () => {
     // Quarantine: size first, then the read, then the deletion (last: retries redo the run).
     expect(store.opsFor("quarantine", record.quarantineKey)).toEqual(["head", "get", "delete"]);
     expect(store.has("quarantine", record.quarantineKey)).toBe(false);
-    expect(store.keys("media")).toEqual([keyL(record.id), keyS(record.id)]);
-    for (const key of [keyL(record.id), keyS(record.id)]) {
+    expect(store.keys("media")).toEqual([keyL(record.id), keyM(record.id), keyS(record.id)]);
+    for (const key of [keyL(record.id), keyM(record.id), keyS(record.id)]) {
       const body = (await store.get("media", key))!;
       const meta = await sharp(body).metadata();
       expect(meta.format).toBe("webp");
@@ -204,12 +205,13 @@ describe("processUpload: happy path", () => {
     expect(classifier.calls).toBe(1);
 
     const doc = stored(record.id);
-    const bytes = (await store.get("media", keyL(record.id)))!.byteLength + (await store.get("media", keyS(record.id)))!.byteLength;
-    expect(doc).toMatchObject({ status: "ready", width: 50, height: 100, size: bytes, variants: ["l", "s"], checks: { nsfw: 0.1, faces: 1 }, finalKey: `listings/${LISTING_ID}/${record.id}` });
+    let bytes = 0;
+    for (const key of [keyL(record.id), keyM(record.id), keyS(record.id)]) bytes += (await store.get("media", key))!.byteLength;
+    expect(doc).toMatchObject({ status: "ready", width: 50, height: 100, size: bytes, variants: ["l", "m", "s"], checks: { nsfw: 0.1, faces: 1 }, finalKey: `listings/${LISTING_ID}/${record.id}` });
     expect(doc.blurhash).toMatch(/^.{6,}$/);
     expect(doc.hash).toMatch(/^[0-9a-f]{16}$/);
-    const attached = { id: record.id, w: 50, h: 100, blurhash: doc.blurhash, hash: doc.hash };
-    expect(markUploadReady).toHaveBeenCalledWith(record.id, expect.objectContaining({ size: bytes, variants: ["l", "s"] }), expect.objectContaining({ listingId: LISTING_ID, photo: attached, maxPhotos: 10 }), NOW);
+    const attached = { id: record.id, w: 50, h: 100, blurhash: doc.blurhash, hash: doc.hash, variants: ["l", "m", "s"] };
+    expect(markUploadReady).toHaveBeenCalledWith(record.id, expect.objectContaining({ size: bytes, variants: ["l", "m", "s"] }), expect.objectContaining({ listingId: LISTING_ID, photo: attached, maxPhotos: 10 }), NOW);
     expect((fake.listings.get(LISTING_ID) as ListingRecord).photos).toEqual([attached]);
     expect(recordMediaBytes).toHaveBeenCalledWith(bytes, NOW);
     expect(recordModerationDecision).not.toHaveBeenCalled();
@@ -226,6 +228,7 @@ describe("processUpload: happy path", () => {
     await processUpload(record.id, { store, classifier: clean() });
     expect(puts).toEqual([
       { key: keyL(record.id), contentType: MEDIA_CONTENT_TYPE, cacheControl: MEDIA_CACHE_CONTROL },
+      { key: keyM(record.id), contentType: MEDIA_CONTENT_TYPE, cacheControl: MEDIA_CACHE_CONTROL },
       { key: keyS(record.id), contentType: MEDIA_CONTENT_TYPE, cacheControl: MEDIA_CACHE_CONTROL },
     ]);
     spy.mockRestore();
@@ -416,7 +419,7 @@ describe("processUpload: idempotency and races", () => {
     const ready = upload({ status: "ready", width: 800, height: 600, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", hash: "0123456789abcdef", size: 1234, variants: ["l", "s"] });
     const rejected = upload({ status: "rejected", rejectReason: "nsfw" });
     const signed = upload({ status: "signed" });
-    expect(await processUpload(ready.id, { store, classifier: clean() })).toEqual({ status: "ready", photo: { id: ready.id, w: 800, h: 600, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", hash: "0123456789abcdef" } });
+    expect(await processUpload(ready.id, { store, classifier: clean() })).toEqual({ status: "ready", photo: { id: ready.id, w: 800, h: 600, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", hash: "0123456789abcdef", variants: ["l", "s"] } });
     expect(await processUpload(rejected.id, { store, classifier: clean() })).toEqual({ status: "rejected", rejectReason: "nsfw" });
     expect(await processUpload(signed.id, { store, classifier: clean() })).toEqual({ status: "processing" });
     expect(await processUpload("doesnotexist1", { store, classifier: clean() })).toBeNull();
@@ -458,7 +461,7 @@ describe("processUpload: idempotency and races", () => {
     seed(record, await plainJpeg());
     fake.readyOutcome = { ok: false, reason: "stale", upload: { ...record, status: "ready", width: 64, height: 48, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", hash: "0123456789abcdef" } };
     expect(await processUpload(record.id, { store, classifier: clean() })).toMatchObject({ status: "ready", photo: { id: record.id } });
-    expect(store.keys("media")).toEqual([keyL(record.id), keyS(record.id)]);
+    expect(store.keys("media")).toEqual([keyL(record.id), keyM(record.id), keyS(record.id)]);
   });
 
   it("leaves the objects of a concurrent run that finished first when its own run is refused", async () => {
@@ -472,7 +475,7 @@ describe("processUpload: idempotency and races", () => {
       return { ok: false, reason: "photo_limit", upload: structuredClone(record) };
     });
     expect(await processUpload(record.id, { store, classifier: clean() })).toMatchObject({ status: "ready", photo: { id: record.id } });
-    expect(store.keys("media")).toEqual([keyL(record.id), keyS(record.id)]);
+    expect(store.keys("media")).toEqual([keyL(record.id), keyM(record.id), keyS(record.id)]);
   });
 
   it("does not attach to a draft published while it was processing (the owner's PATCH re-screens it)", async () => {
@@ -482,7 +485,7 @@ describe("processUpload: idempotency and races", () => {
     expect(await processUpload(record.id, { store, classifier: listingBecomes("published") })).toMatchObject({ status: "ready" });
     expect((fake.listings.get(LISTING_ID) as ListingRecord).photos.map((item) => item.id)).toEqual(["first0001x"]);
     expect(stored(record.id).status).toBe("ready");
-    expect(store.keys("media")).toEqual([keyL(record.id), keyS(record.id)]);
+    expect(store.keys("media")).toEqual([keyL(record.id), keyM(record.id), keyS(record.id)]);
   });
 
   it("expires the upload and removes its variants when the listing was removed while it was processing", async () => {

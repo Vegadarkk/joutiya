@@ -6,6 +6,7 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
 import { getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import sharp from "sharp";
+import { isolate } from "../../src/lib/i18n/bidi";
 
 // "Mes annonces" (phase 3 lot C) against the production build and the Firebase emulators
 // (npm run test:e2e): a fresh individual signs up through the UI; a published listing (with its
@@ -159,18 +160,18 @@ test.describe("my listings", () => {
     await expect(row.getByText("En ligne", { exact: true })).toBeVisible();
 
     // Pause from the row menu: the toast confirms, the row shows the new status at once.
-    await page.getByRole("button", { name: `Actions pour « ${published.title} »` }).click();
+    await page.getByRole("button", { name: `Actions pour « ${isolate(published.title)} »` }).click();
     await page.getByRole("menuitem", { name: "Mettre en pause" }).click();
     await expect(page.getByText("Annonce mise en pause")).toBeVisible();
     await expect(row.getByText("En pause", { exact: true })).toBeVisible();
 
     // Resume with the row's own button (a paused listing puts it forward).
-    await row.getByRole("button", { name: `Remettre en ligne « ${published.title} »` }).click();
+    await row.getByRole("button", { name: `Remettre en ligne « ${isolate(published.title)} »` }).click();
     await expect(page.getByText("Annonce remise en ligne")).toBeVisible();
     await expect(row.getByText("En ligne", { exact: true })).toBeVisible();
 
     // Delete: a confirmation dialog first; cancelling keeps the listing.
-    await page.getByRole("button", { name: `Actions pour « ${published.title} »` }).click();
+    await page.getByRole("button", { name: `Actions pour « ${isolate(published.title)} »` }).click();
     await page.getByRole("menuitem", { name: "Supprimer" }).click();
     const dialog = page.getByRole("alertdialog", { name: "Supprimer cette annonce ?" }).or(page.getByRole("dialog", { name: "Supprimer cette annonce ?" }));
     await expect(dialog).toBeVisible();
@@ -178,7 +179,7 @@ test.describe("my listings", () => {
     await expect(dialog).toBeHidden();
     await expect(row).toBeVisible();
 
-    await page.getByRole("button", { name: `Actions pour « ${published.title} »` }).click();
+    await page.getByRole("button", { name: `Actions pour « ${isolate(published.title)} »` }).click();
     await page.getByRole("menuitem", { name: "Supprimer" }).click();
     await dialog.getByRole("button", { name: "Supprimer l'annonce" }).click();
     await expect(page.getByText("Annonce supprimée")).toBeVisible();
@@ -199,7 +200,22 @@ test.describe("my listings", () => {
     // The draft waits under "Brouillons" with its "Reprendre" button into the wizard.
     await page.getByRole("tab", { name: /Brouillons/ }).click();
     await expect(page.getByText("1 brouillon sur 5 possibles")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole("link", { name: `Reprendre « ${draft.title} »` })).toHaveAttribute("href", `/fr/deposer/${draft.id}`);
+    await expect(page.getByRole("link", { name: `Reprendre « ${isolate(draft.title)} »` })).toHaveAttribute("href", `/fr/deposer/${draft.id}`);
+
+    // On a 360 px phone nothing scrolls sideways, and a link to the last tab shows it in full.
+    await page.setViewportSize({ width: 360, height: 780 });
+    await page.goto("/fr/mes-annonces?onglet=ended");
+    const ended = page.getByRole("tab", { name: /Terminées/ });
+    await expect(ended).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("heading", { name: "Aucune annonce terminée" })).toBeVisible({ timeout: 15_000 });
+    const strip = (await page.getByRole("tablist").boundingBox())!;
+    const tab = (await ended.boundingBox())!;
+    expect(tab.x).toBeGreaterThanOrEqual(strip.x);
+    expect(tab.x + tab.width).toBeLessThanOrEqual(strip.x + strip.width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.getByRole("tab", { name: /Brouillons/ }).click();
+    await expect(page.getByRole("link", { name: `Reprendre « ${isolate(draft.title)} »` })).toBeVisible({ timeout: 15_000 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
     // The server agrees: the deleted listing is no longer the owner's to edit.
     const gone = await page.request.get(`/api/listings/${published.id}`);

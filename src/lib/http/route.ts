@@ -1,6 +1,7 @@
 import "server-only";
 import type { NextRequest } from "next/server";
 import { captureServerException } from "@/lib/observability/capture";
+import { fromResourceExhausted } from "@/lib/quota/gate";
 import { HttpError } from "./errors";
 
 // Route handler wrapper: typed errors become JSON problem responses, anything else is logged,
@@ -17,8 +18,10 @@ export function apiRoute(handler: RouteHandler): (request: NextRequest, context:
       return response;
     } catch (error) {
       if (error instanceof HttpError) return error.toResponse();
+      // Reported either way: a Spark refusal (RESOURCE_EXHAUSTED) the counters missed raised no
+      // quota alert. It answers like a degraded quota (503 quota_exhausted until the reset).
       captureServerException(error, { route: new URL(request.url).pathname, method: request.method });
-      return new HttpError(500, "internal").toResponse();
+      return (fromResourceExhausted(error) ?? new HttpError(500, "internal")).toResponse();
     }
   };
 }

@@ -13,6 +13,8 @@ export { assertObjectKey, bucketName, bucketRole, isValidObjectKey, mediaBaseUrl
 export { MemoryObjectStore } from "./memory";
 export type { MemoryCall, MemoryOp } from "./memory";
 export { MeteredObjectStore } from "./metered";
+export { ObjectMoveError, moveObject } from "./move";
+export type { MoveOptions, MoveOutcome, ObjectLocation } from "./move";
 export { S3ObjectStore, StorageError } from "./s3";
 export type { S3ObjectStoreConfig, S3Operation } from "./s3";
 

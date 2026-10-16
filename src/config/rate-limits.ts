@@ -60,6 +60,10 @@ export const RATE_LIMITS = {
   // --- Listings and media (phase 3, design §4) ---------------------------------------------
   // Draft autosave (PATCH /api/listings/{id}): coalesced client-side, never per keystroke.
   "listing.draft.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
+  // PATCH /api/listings/{id} on a listing that is not a draft (live listings save on request): a
+  // save may screen again (photos, up to 50 other listings) and commits ~3 writes (listing,
+  // searchOutbox, contentOps). 30 per day per account, besides listing.draft.uid.
+  "listing.edit.uid": { points: 30, duration: DAY, policy: "open", key: "uid" },
   // POST /api/listings: 5 per day per account (individuals, D5), 30 per hour per IP then Turnstile.
   "listing.create.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },
   "listing.create.ip": { points: 30, duration: HOUR, policy: "open", key: "ip" },
@@ -70,8 +74,14 @@ export const RATE_LIMITS = {
   // DELETE /api/listings/{id} and pause / resume / sold / renew (~4 writes and an ISR
   // revalidation each): 120 per day per account (an individual has at most 20 active listings).
   "listing.status.uid": { points: 120, duration: DAY, policy: "open", key: "uid" },
+  // POST /api/listings/{id}/publish, every attempt (a refused one still reads the listing, the
+  // account and the seller's other listings for the screening): 60 per day per account, before
+  // any read. The 5 publications a day (listing.create.uid) are counted inside, at the transition.
+  "listing.publish.uid": { points: 60, duration: DAY, policy: "open", key: "uid" },
   // GET /api/listings/{id} and /mine, points = documents read (a /mine tab reads up to 100, the
-  // owner view the listing and its uploads): 5 000 per day per account, a tenth of the Spark day.
+  // owner view the listing and its uploads, also when PATCH and the status routes answer with it):
+  // 5 000 per day per account, a tenth of the Spark day. Pause and sold (they take a listing down)
+  // are charged without being refused.
   "listing.owner.read.uid": { points: 5000, duration: DAY, policy: "open", key: "uid" },
   // POST /api/uploads/sign: 30 per hour; bytes declared per day (points = bytes, 200 MiB).
   // Closed: every signed upload costs R2 operations and storage.
@@ -79,6 +89,9 @@ export const RATE_LIMITS = {
   "upload.bytes.uid": { points: 200 * MIB, duration: DAY, policy: "closed", key: "uid" },
   // GET /api/uploads/{id} (polling) and repeated completes: one Firestore read each.
   "upload.status.uid": { points: 900, duration: HOUR, policy: "open", key: "uid" },
+  // DELETE /api/uploads/{id} (~3 reads, the detach transaction, the document delete and up to 3
+  // object deletions): 300 per day per account (20 active listings of 10 photos is 200).
+  "upload.delete.uid": { points: 300, duration: DAY, policy: "open", key: "uid" },
   // POST /api/listings/{id}/phone (§6): 10 per hour and 30 per day per account, 20 per day per
   // device, 60 per day per IP then Turnstile. Closed: the number is personal data.
   "reveal.uid.hour": { points: 10, duration: HOUR, policy: "closed", key: "uid" },

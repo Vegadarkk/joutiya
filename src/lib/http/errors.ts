@@ -40,6 +40,8 @@ export type ErrorCode =
   | "listing_daily_limit"
   /** Photos per listing (10, Pro 20). */
   | "photo_limit"
+  /** Upload documents per listing (UPLOADS_PER_PHOTO_SLOT x the photo limit, refused ones included). */
+  | "upload_limit"
   /** Declared or real size above MAX_UPLOAD_BYTES. */
   | "file_too_large"
   /** Declared type or sniffed bytes outside JPEG/WebP/PNG. */
@@ -54,6 +56,8 @@ export type ErrorCode =
   | "listing_unavailable"
   /** Phone reveal refused: account too young, e-mail unverified or quota reached. */
   | "reveal_not_allowed"
+  /** Firestore daily quota degraded (src/lib/quota/gate.ts): deposit or sign-up suspended until the reset. */
+  | "quota_exhausted"
   | "unavailable"
   | "internal";
 

@@ -14,6 +14,7 @@ import { cityBySlug, cityName } from "@/config/regions";
 import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
 import { pageLocale } from "@/i18n/params";
+import { isolate } from "@/lib/i18n/bidi";
 import { alternates } from "@/lib/i18n/metadata";
 import { getLegalConfig } from "@/lib/legal/config";
 import { getPublicProfile, profilePath } from "@/lib/listings/public";
@@ -75,7 +76,9 @@ export default async function ProfilePage({ params }: { params: Params }) {
         <div className="flex min-w-0 flex-col gap-2">
           <p className="text-sm text-foreground-muted">{profile.sellerType === "pro" ? t("roleBusiness") : t("roleIndividual")}</p>
           <h1 className="flex flex-wrap items-center gap-3 text-3xl font-semibold text-balance break-words">
-            {profile.displayName}
+            <span dir="auto" className="min-w-0">
+              {profile.displayName}
+            </span>
             {profile.sellerType === "pro" ? <span className="rounded-sm bg-structure px-2 py-0.5 text-sm font-medium text-structure-foreground">{t("pro")}</span> : null}
           </h1>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-foreground-muted">
@@ -115,7 +118,7 @@ export default async function ProfilePage({ params }: { params: Params }) {
               </Button>
             }
           >
-            {t("emptyBody", { name: profile.displayName })}
+            {t("emptyBody", { name: isolate(profile.displayName) })}
           </EmptyState>
         )}
         {hidden > 0 ? <p className="text-sm text-foreground-muted">{t("newest", { shown: profile.listings.length })}</p> : null}

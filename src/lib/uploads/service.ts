@@ -2,7 +2,6 @@ import "server-only";
 import { requireOwner, type AuthContext } from "@/lib/auth/guards";
 import {
   PHOTO_VARIANTS,
-  UPLOAD_LIMIT_REASON,
   UPLOAD_URL_TTL_SECONDS,
   UPLOADS_PER_PHOTO_SLOT,
   type SignUploadInput,
@@ -32,11 +31,12 @@ import { revalidateListingPaths } from "@/lib/listings/revalidate";
 import { logger } from "@/lib/logging/logger";
 import { expireUpload } from "@/lib/media/pipeline";
 import { dispatchUpload, enqueueMediaJob, isMediaQueueEnabled } from "@/lib/media/queue";
-import { mediaObjectKey, quarantineObjectKey } from "@/lib/media/urls";
+import { photoObjectKey, quarantineObjectKey, type PhotoBucket } from "@/lib/media/urls";
 import { captureServerException } from "@/lib/observability/capture";
+import { assertQuotas, DEPOSIT_QUOTAS } from "@/lib/quota/gate";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { isStorageNotConfigured, objectStore, type ObjectStore } from "@/lib/storage";
-import { LIVE_STATUSES, PHOTO_TARGET_STATUSES, RETAINED_STATUSES, maxPhotosOf, toStatusResponse } from "./policy";
+import { LIVE_STATUSES, PHOTO_TARGET_STATUSES, maxPhotosOf, toStatusResponse } from "./policy";
 import { isStorageFull, recordMediaBytes } from "./storage-gauge";
 
 // Uploads service (design §3 MEDIA_API, architecture §6 "Uploads"): signing a presigned PUT to
@@ -80,23 +80,24 @@ async function ownedUpload(uploader: Uploader, id: string): Promise<UploadRecord
 export const uploadContentRef = (id: string) => `${COLLECTIONS.uploads}/${id}`;
 
 /**
- * POST /api/uploads/sign: the caller's editable listing, room for one more photo, storage not
- * degraded, 30 signatures an hour and 200 MiB declared a day; then the `signed` document and a
- * presigned PUT bound to the declared type (and length, where the adapter signs it), 5 minutes.
+ * POST /api/uploads/sign: the caller's editable listing, room for one more photo, storage and
+ * Firestore writes not degraded, 30 signatures an hour and 200 MiB declared a day; then the
+ * `signed` document and a presigned PUT bound to the declared type (and length, where the adapter
+ * signs it), 5 minutes.
  */
 export async function signUpload(uploader: Uploader, input: SignUploadInput, now = new Date()): Promise<SignUploadResponse> {
   const { uid } = uploader.auth.user;
   const objects = store();
   if (await isStorageFull()) throw new HttpError(503, "storage_full", undefined, { headers: { "Retry-After": "3600" } });
   await enforceLimit("upload.sign.uid", uid);
+  // Deposit suspended (src/lib/quota/gate.ts): before the listing read and the upload document.
+  await assertQuotas(DEPOSIT_QUOTAS);
 
   const listing = await ownedListing(uploader, input.targetId);
   if (!PHOTO_TARGET_STATUSES.includes(listing.status)) throw notFound();
   // Every upload document of the listing is read by the owner's view: their number is capped
   // (refused ones stay 7 days unless removed), one aggregation read.
-  if ((await countUploadsByTarget(listing.id)) >= UPLOADS_PER_PHOTO_SLOT * maxPhotosOf(listing)) {
-    throw new HttpError(409, "photo_limit", "too many uploads on this listing", { details: { reason: UPLOAD_LIMIT_REASON } });
-  }
+  if ((await countUploadsByTarget(listing.id)) >= UPLOADS_PER_PHOTO_SLOT * maxPhotosOf(listing)) throw new HttpError(409, "upload_limit", "too many uploads on this listing");
   const attached = new Set(listing.photos.map((photo) => photo.id));
   const inFlight = (await listUploadsByTarget(listing.id, ["signed", "processing"])).filter(
     (upload) => !attached.has(upload.id) && (upload.status === "processing" || now.getTime() - upload.createdAt.getTime() < SIGNED_HOLD_MS),
@@ -201,21 +202,21 @@ async function detach(uploader: Uploader, listingId: string, id: string, keepOne
  * photo: 422, like a PATCH), ends the upload, deletes the quarantine object and the variants, then
  * the document. The upload leaves `processing` before anything is deleted, so a pipeline run still
  * in flight finds it gone and removes what it stored; the second detach catches a photo that run
- * attached in between. Under a legal hold the objects and the document stay as evidence; the
- * photos of a removed listing are kept with it until retention-purge (409, nothing changes).
+ * attached in between. Under a legal hold the upload ends the same way, then nothing more is
+ * deleted: its objects and its document stay as evidence (purge-quarantine deletes them past
+ * purgeAt once the hold is lifted). A read-only listing keeps its photos: sold and removed ones
+ * are retained with their text until retention-purge (§7 retention table): 409, nothing changes.
  */
 export async function deleteUpload(uploader: Uploader, id: string, now = new Date()): Promise<void> {
   const upload = await ownedUpload(uploader, id);
   const objects = store();
   const listing = await getListing(upload.targetId);
-  if (listing && RETAINED_STATUSES.includes(listing.status)) throw new HttpError(409, "conflict", "the photos of a removed listing are retained with it");
+  if (listing && !PHOTO_TARGET_STATUSES.includes(listing.status)) throw new HttpError(409, "conflict", `the photos of a ${listing.status} listing are retained with it`);
   if (listing) await detach(uploader, listing.id, id, LIVE_STATUSES, now);
-  if (listing && listing.legalHold.length > 0) {
-    logger.info({ uploadId: id, listingId: listing.id }, "upload kept under legal hold");
-    return;
-  }
   let freedBytes = upload.status === "ready" ? (upload.size ?? 0) : 0;
   if (upload.status !== "rejected") {
+    // Out of `ready` first, hold or not: a document kept as evidence is never attached or offered
+    // for the next save again (the owner's view lists it as refused until it is purged).
     const ended = await transitionUpload(id, ["signed", "processing", "ready"], { status: "rejected", rejectReason: "expired" }, now);
     if (!ended.ok && !ended.upload) throw notFound();
     // Finished by the pipeline between the read and the transition: its bytes were counted.
@@ -223,8 +224,15 @@ export async function deleteUpload(uploader: Uploader, id: string, now = new Dat
     // Past the point of no return: the photo goes even if it was the last one.
     if (listing && upload.status !== "ready") await detach(uploader, listing.id, id, [], now);
   }
+  if (listing && listing.legalHold.length > 0) {
+    logger.info({ uploadId: id, listingId: listing.id }, "upload kept under legal hold");
+    return;
+  }
   await objects.delete("quarantine", upload.quarantineKey);
-  for (const variant of PHOTO_VARIANTS) await objects.delete("media", mediaObjectKey(upload.targetId, id, variant));
+  // A photo moved off the public bucket (removed listing, now an orphan) is in `private`; a move cut
+  // short may have left its public copy too, so both go (as in retention-purge).
+  const buckets: readonly PhotoBucket[] = upload.bucket === "private" ? ["private", "media"] : ["media"];
+  for (const bucket of buckets) for (const variant of PHOTO_VARIANTS) await objects.delete(bucket, photoObjectKey(bucket, upload.targetId, id, variant));
   await deleteUploadDocument(id);
   if (freedBytes > 0) await recordMediaBytes(-freedBytes, now);
 }

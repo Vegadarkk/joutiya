@@ -17,6 +17,8 @@ import "@/styles/globals.css";
 export const metadata: Metadata = {
   title: { default: "Back-office", template: "%s · Back-office Joutiya" },
   robots: { index: false, follow: false },
+  // Same file as the public pages (src/lib/i18n/metadata.ts), served as is on the admin host.
+  icons: { icon: "/brand/joutiya-icon.svg" },
 };
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {

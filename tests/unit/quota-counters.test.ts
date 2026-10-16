@@ -41,7 +41,7 @@ const configured = { value: true };
 vi.mock("@/lib/valkey/clients", () => ({ isValkeyConfigured: () => configured.value, valkey: () => fake }));
 
 const { alert } = await import("@/lib/alert");
-const { consume, isDegraded, isExhausted, nextReset, readQuotas, setGauge } = await import("@/lib/quota");
+const { aggregationReads, consume, firstDegraded, headroom, isDegraded, isExhausted, nextReset, readQuotas, setGauge } = await import("@/lib/quota");
 
 const AT = new Date("2026-10-16T10:00:00Z");
 const TOMORROW = new Date("2026-10-17T10:00:00Z");
@@ -116,6 +116,46 @@ describe("isDegraded and isExhausted", () => {
     const quotas = await readQuotas();
     expect(quotas.find((quota) => quota.id === "r2.storage")).toMatchObject({ level: "degraded", used: 9_600_000_000 });
     expect(quotas.find((quota) => quota.id === "claude.budget")).toMatchObject({ used: 0, level: "ok" });
+  });
+});
+
+describe("firstDegraded and headroom", () => {
+  it("name the first degraded quota of a list in one MGET, unknown counting as available", async () => {
+    fake.mget.mockClear();
+    expect(await firstDegraded(["firestore.writes", "firestore.storage"])).toBeNull();
+    await consume("firestore.writes", 19_999);
+    expect(await firstDegraded(["firestore.writes", "firestore.storage"])).toBeNull();
+    await consume("firestore.writes", 1);
+    await setGauge("firestore.storage", 1_000_000_000);
+    expect(await firstDegraded(["firestore.writes", "firestore.storage"])).toBe("firestore.writes");
+    expect(await firstDegraded(["firestore.reads", "firestore.storage"])).toBe("firestore.storage");
+    expect(fake.mget).toHaveBeenCalledTimes(4);
+    expect(await firstDegraded([])).toBeNull();
+    configured.value = false;
+    expect(await firstDegraded(["firestore.writes"])).toBeNull();
+    configured.value = true;
+    fake.mget.mockRejectedValueOnce(new Error("connection closed"));
+    expect(await firstDegraded(["firestore.writes"])).toBeNull();
+  });
+
+  it("is what is left below a share of the limit, never negative, null when unreadable", async () => {
+    expect(await headroom("firestore.deletes", 0.9)).toBe(18_000);
+    await consume("firestore.deletes", 15_000);
+    expect(await headroom("firestore.deletes", 0.9)).toBe(3_000);
+    expect(await headroom("firestore.deletes")).toBe(5_000);
+    await consume("firestore.deletes", 4_000);
+    expect(await headroom("firestore.deletes", 0.9)).toBe(0);
+    configured.value = false;
+    expect(await headroom("firestore.deletes", 0.9)).toBeNull();
+    configured.value = true;
+    fake.get.mockRejectedValueOnce(new Error("connection closed"));
+    expect(await headroom("firestore.deletes", 0.9)).toBeNull();
+  });
+});
+
+describe("aggregationReads", () => {
+  it("bills one read per 1 000 index entries, at least one", () => {
+    expect([0, 1, 1_000, 1_001, 25_000].map(aggregationReads)).toEqual([1, 1, 1, 2, 25]);
   });
 });
 

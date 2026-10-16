@@ -23,7 +23,8 @@
       "fr": "FR",
       "ar": "ع",
       "rif": "RIF"
-    }
+    },
+    "trigger": "{short}, {label}"
   },
   "Theme": {
     "label": "Apparence",
@@ -344,7 +345,8 @@
       "phone_not_mobile": "Seul un numéro de mobile marocain (06 ou 07) peut être vérifié.",
       "unavailable": "Le service est momentanément indisponible. Réessayez dans quelques minutes.",
       "internal": "Une erreur technique est survenue. Réessayez.",
-      "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez."
+      "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez.",
+      "quota_exhausted": "Cette action est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc)."
     }
   },
   "Listing": {
@@ -360,7 +362,9 @@
       "upload_not_ready": "Une photo est encore en cours de traitement. Patientez quelques secondes, puis réessayez.",
       "phone_required": "Vérifiez votre numéro de téléphone pour afficher ce moyen de contact.",
       "listing_unavailable": "Cette annonce n'est plus disponible.",
-      "reveal_not_allowed": "Le numéro ne peut pas être affiché pour le moment. Vérifiez votre adresse e-mail ou réessayez plus tard."
+      "reveal_not_allowed": "Le numéro ne peut pas être affiché pour le moment. Vérifiez votre adresse e-mail ou réessayez plus tard.",
+      "upload_limit": "Trop de photos ont été envoyées pour cette annonce, photos refusées comprises. Supprimez les photos refusées pour en ajouter d'autres, ou patientez : elles sont effacées automatiquement 7 jours après leur envoi.",
+      "quota_exhausted": "Le dépôt et la modification d'annonces sont momentanément suspendus : la limite quotidienne de notre service est atteinte. Votre annonce est conservée ; réessayez après 9 h (heure du Maroc)."
     },
     "wizard": {
       "title": "Déposer une annonce",
@@ -399,7 +403,8 @@
       "unsavedLeftTitle": "Modifications non enregistrées",
       "unsavedLeftBody": "Vous avez quitté l'annonce sans enregistrer vos dernières modifications.",
       "held": "Ce champ sera enregistré dès qu'il sera complet.",
-      "saveLimit": "Cette modification doit être vérifiée par notre équipe, et une annonce en cours de vérification compte parmi vos annonces actives : vous avez atteint le maximum. Mettez en pause ou supprimez une autre annonce, puis enregistrez à nouveau."
+      "saveLimit": "Cette modification doit être vérifiée par notre équipe, et une annonce en cours de vérification compte parmi vos annonces actives : vous avez atteint le maximum. Mettez en pause ou supprimez une autre annonce, puis enregistrez à nouveau.",
+      "saveQuota": "La limite quotidienne de notre service est atteinte : vos dernières modifications ne sont pas encore enregistrées. Gardez cette page ouverte et réessayez après 9 h (heure du Maroc)."
     },
     "start": {
       "title": "Déposer une annonce",
@@ -542,7 +547,8 @@
       "moved": "Photo déplacée en position {position} sur {count}.",
       "movedCover": "Photo placée en couverture.",
       "dropHint": "ou déposez-les ici",
-      "progressLabel": "Envoi de la photo {index}"
+      "progressLabel": "Envoi de la photo {index}",
+      "uploadLimit": "Trop de photos envoyées pour cette annonce."
     },
     "review": {
       "title": "Vérifiez votre annonce",
@@ -1959,7 +1965,7 @@
       "continueDraftOf": "Reprendre « {title} »",
       "editOf": "Modifier « {title} »",
       "resumeOf": "Remettre en ligne « {title} »",
-      "renewOf": "Renouveler « {title} » pour 60 jours"
+      "renewOf": "Renouveler pour 60 jours « {title} »"
     },
     "confirm": {
       "deleteTitle": "Supprimer cette annonce ?",
@@ -2143,7 +2149,8 @@
       },
       "body": "Adresse de la page : {url}\n\nMotif du signalement :\n",
       "hint": "Le signalement part par e-mail vers notre équipe de modération. Indiquez le motif : nous vous informerons de la suite donnée."
-    }
+    },
+    "cityDistrict": "{city}, {district}"
   },
   "Profile": {
     "roleIndividual": "Particulier",

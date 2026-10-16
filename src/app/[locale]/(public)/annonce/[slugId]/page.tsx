@@ -20,6 +20,7 @@ import { categoryById, subcategoryById } from "@/config/categories";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
 import { pageLocale } from "@/i18n/params";
+import { isolate } from "@/lib/i18n/bidi";
 import { alternates } from "@/lib/i18n/metadata";
 import { getLegalConfig } from "@/lib/legal/config";
 import { formatDate, formatPrice } from "@/lib/listings/client/format";
@@ -55,7 +56,8 @@ const load = cache(async (segment: string): Promise<Loaded | null> => {
   const found = await getPublishedBySlugId(segment);
   if (!found) return null;
   const listing = toPublicListing(found.listing, found.state, found.canonicalSlugId);
-  return listing ? { listing, ownerUid: found.listing.ownerUid, redirect: found.redirect } : null;
+  if (!listing) return null;
+  return { listing, ownerUid: found.listing.ownerUid, redirect: found.redirect };
 });
 
 async function sellerOf(ownerUid: string): Promise<PublicSeller | null> {
@@ -125,7 +127,10 @@ export default async function ListingPage({ params }: { params: Params }) {
   const subcategoryName = category && subcategory ? names(`${category.id}.sub.${subcategory.id}` as CategoryKey) : undefined;
   const cityLabel = city ? cityName(city, locale) : undefined;
   const regionLabel = region ? regionName(region, locale) : undefined;
-  const place = [cityLabel, listing.location.district].filter(Boolean).join(", ");
+  // The district is the seller's text: isolated, so a Latin name keeps its place in Arabic (and the reverse).
+  // The separator is the locale's ("، " in Arabic).
+  const district = listing.location.district ? isolate(listing.location.district) : undefined;
+  const place = cityLabel && district ? t("cityDistrict", { city: cityLabel, district }) : (cityLabel ?? district ?? "");
   const canonicalUrl = `${CANONICAL_ORIGIN}${listingPath(locale, listing.slugId)}`;
   const images = listing.photos.map((photo) => photoUrl(media, listing.id, photo.id, "l")).filter((url): url is string => url !== null);
   const published = listing.state === "published";
@@ -153,7 +158,9 @@ export default async function ListingPage({ params }: { params: Params }) {
           </div>
 
           <header className="flex min-w-0 flex-col gap-3 lg:[grid-area:header]">
-            <h1 className="text-2xl font-semibold text-balance break-words sm:text-3xl">{listing.title}</h1>
+            <h1 dir="auto" className="text-2xl font-semibold text-balance break-words sm:text-3xl">
+              {listing.title}
+            </h1>
             <PriceTag price={listing.price} isDonation={listing.isDonation} negotiable={listing.priceNegotiable} unit={subcategory?.priceUnit} locale={locale} size="lg" />
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-foreground-muted">
               {place ? (
@@ -187,8 +194,9 @@ export default async function ListingPage({ params }: { params: Params }) {
               <h2 id="description-title" className="text-lg font-semibold">
                 {t("descriptionTitle")}
               </h2>
-              {/* Plain text: React escapes it; line breaks and spacing kept as the seller typed them. */}
-              <div data-testid="listing-description" className="max-w-prose whitespace-pre-wrap break-words text-pretty">
+              {/* Plain text: React escapes it; line breaks and spacing kept as the seller typed them. Each
+                  paragraph takes the direction of its own first letter (French and Arabic may alternate). */}
+              <div data-testid="listing-description" dir="auto" className="max-w-prose whitespace-pre-wrap break-words text-pretty [unicode-bidi:plaintext]">
                 {listing.description}
               </div>
             </section>

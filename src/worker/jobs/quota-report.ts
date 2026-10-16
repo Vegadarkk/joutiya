@@ -1,7 +1,7 @@
 import { alert } from "@/lib/alert";
 import { db, isFirestoreConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
-import { readQuotas } from "@/lib/quota";
+import { consume, readQuotas } from "@/lib/quota";
 
 /**
  * Nightly snapshot of the free-quota counters (§5 `quotaDaily/{date}`): the day that just ended
@@ -16,6 +16,7 @@ export async function quotaReport(): Promise<void> {
   );
   if (isFirestoreConfigured()) {
     await db().collection("quotaDaily").doc(date).set({ date, quotas: snapshot, createdAt: new Date() }, { merge: true });
+    void consume("firestore.writes", 1);
   }
   const unknown = quotas.filter((quota) => quota.level === "unknown");
   if (unknown.length > 0) {

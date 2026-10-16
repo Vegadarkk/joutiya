@@ -24,7 +24,7 @@ import { db } from "@/lib/firebase/admin";
 import { getLegalConfig } from "@/lib/legal/config";
 import { purgeAtFor } from "@/lib/listings/lifecycle";
 import { sendMail } from "@/lib/mail";
-import { mediaObjectKey } from "@/lib/media/urls";
+import { mediaObjectKey, retainedObjectKey } from "@/lib/media/urls";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { MemoryObjectStore } from "@/lib/storage/memory";
 import { expireListings } from "@/worker/jobs/expire-listings";
@@ -171,7 +171,7 @@ describe("retention-purge", () => {
     expect((await getListingDocument(gone.id)).data()).toEqual(tombstone);
   });
 
-  it("keeps a removed listing's photos until its own purgeAt: purge-quarantine moves their purgeAt there", async () => {
+  it("keeps a removed listing's photos until its own purgeAt, out of the public bucket: purge-quarantine moves them to the private one and their purgeAt there", async () => {
     const now = new Date();
     const removed = await publishedListing("Vélo de ville retiré par son vendeur");
     const listingPurgeAt = new Date(now.getTime() + 300 * DAY_MS);
@@ -183,10 +183,18 @@ describe("retention-purge", () => {
 
     await retentionPurge(now, { store });
     expect(await getUpload(removed.upload)).not.toBeNull();
+    // Changed seconds ago: the scan of removed listings has not reached it, the document purge moves it.
     await purgeQuarantine(now, { store });
-    expect((await getUpload(removed.upload))!.purgeAt).toEqual(listingPurgeAt);
-    expect(store.keys("media").filter((key) => key.includes(removed.id))).toHaveLength(2);
+    expect(await getUpload(removed.upload)).toMatchObject({ purgeAt: listingPurgeAt, bucket: "private", finalKey: `removed/listings/${removed.id}/${removed.upload}` });
+    expect(store.keys("media").filter((key) => key.includes(removed.id))).toEqual([]);
+    expect(store.keys("private")).toEqual([retainedObjectKey(removed.id, removed.upload, "l"), retainedObjectKey(removed.id, removed.upload, "s")]);
     expect((await getListing(removed.id))!.photos.map((photo) => photo.id)).toEqual([removed.upload]);
+
+    // At the listing's purgeAt, retention-purge deletes them from the private bucket with the listing.
+    await setFields(removed.id, { purgeAt: new Date(now.getTime() - DAY_MS) });
+    expect((await retentionPurge(now, { store })).failed).toBe(0);
+    expect(await getUpload(removed.upload)).toBeNull();
+    expect(store.keys("private")).toEqual([]);
   });
 
   it("deletes contentOps and revealLogs past purgeAt, keeps the recent ones", async () => {

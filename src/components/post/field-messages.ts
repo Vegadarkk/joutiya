@@ -18,11 +18,16 @@ type Params = Record<string, string | number>;
  * Why a save of the listing failed. A 409 `listing_limit` on a save only comes from an edit of a
  * paused or expired listing that the pre-moderation holds: in review it takes an active slot, so
  * the generic "to publish a new one" sentence would not fit; this one says why and what to do.
+ * A degraded Firestore day (quota_exhausted) halts the autosave: the changes since are only in
+ * the page, and the message says so instead of the deposit wording ("votre annonce est conservée").
  */
 export function useSaveErrorMessage(): (error: unknown) => string {
   const t = useTranslations("Listing.wizard");
-  const apiMessage = useApiErrorMessage();
-  return useCallback((error) => (isApiError(error, "listing_limit") ? t("saveLimit") : apiMessage(error)), [t, apiMessage]);
+  const apiMessage = useApiErrorMessage("listing");
+  return useCallback(
+    (error) => (isApiError(error, "listing_limit") ? t("saveLimit") : isApiError(error, "quota_exhausted") ? t("saveQuota") : apiMessage(error)),
+    [t, apiMessage],
+  );
 }
 
 /** Message of a stable validation code; unknown server codes fall back to a generic sentence. */

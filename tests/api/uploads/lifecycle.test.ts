@@ -4,8 +4,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 // inline pipeline without Valkey (EXIF/GPS stripped, variants published, photo attached to the
 // draft), the size gate, the nudity refusal, owner-only access (404 for anyone else), deletion
 // rules on drafts and live listings (LCEN log, index and pages in the detach), live listings left
-// to the owner's PATCH (an unsaved ready photo stays in the owner's view), removed listings'
-// photos retained.
+// to the owner's PATCH (an unsaved ready photo stays in the owner's view), sold and removed
+// listings' photos retained, photos deleted under a legal hold kept as evidence but never offered
+// again.
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/listings/revalidate", async (importOriginal) => {
@@ -27,6 +28,7 @@ vi.mock("@/lib/media/classify", async (importOriginal) => ({
 }));
 
 import { DELETE as removeListing, GET as getListingRoute } from "@/app/api/listings/[id]/route";
+import { POST as markSold } from "@/app/api/listings/[id]/sold/route";
 import { POST as complete } from "@/app/api/uploads/[id]/complete/route";
 import { DELETE as remove, GET as status } from "@/app/api/uploads/[id]/route";
 import { POST as publishListing } from "@/app/api/listings/[id]/publish/route";
@@ -89,15 +91,15 @@ describe("POST /api/uploads/{id}/complete (inline pipeline)", () => {
     expect(done.status).toBe(200);
     expect(done.body).toMatchObject({ status: "ready", photo: { id, w: 50, h: 100 } });
     expect(store.has("quarantine", `uploads/${id}`)).toBe(false);
-    for (const variant of ["l", "s"]) {
+    for (const variant of ["l", "m", "s"]) {
       const body = (await store.get("media", `listings/${listingId}/${id}-${variant}.webp`))!;
       const meta = await sharp(body).metadata();
       expect([meta.format, meta.exif, meta.width, meta.height]).toEqual(["webp", undefined, 50, 100]);
     }
 
     const doc = (await getUpload(id))!;
-    expect(doc).toMatchObject({ status: "ready", width: 50, height: 100, variants: ["l", "s"], checks: { nsfw: 0.02, faces: 0 } });
-    expect((await getListing(listingId))!.photos).toEqual([{ id, w: 50, h: 100, blurhash: doc.blurhash, hash: doc.hash }]);
+    expect(doc).toMatchObject({ status: "ready", width: 50, height: 100, variants: ["l", "m", "s"], checks: { nsfw: 0.02, faces: 0 } });
+    expect((await getListing(listingId))!.photos).toEqual([{ id, w: 50, h: 100, blurhash: doc.blurhash, hash: doc.hash, variants: ["l", "m", "s"] }]);
     const owned = await listingApi<ListingResponse>(getListingRoute, "GET", `/api/listings/${listingId}`, { member: owner });
     expect(owned.body.listing.photos).toEqual([{ id, status: "ready", w: 50, h: 100, blurhash: doc.blurhash }]);
 
@@ -319,9 +321,9 @@ describe("DELETE /api/uploads/{id}", () => {
     expect(revalidateListingPaths).toHaveBeenCalledWith({ slugId: listing.slugId, publicId: listing.sellerPublicId });
   });
 
-  it("logs and revalidates the change on every public status (paused, sold, expired), indexing published ones only", async () => {
+  it("logs and revalidates the change on the other editable public statuses (paused, expired), indexing published ones only", async () => {
     const owner = await member();
-    for (const [index, state] of (["paused", "sold", "expired"] as const).entries()) {
+    for (const [index, state] of (["paused", "expired"] as const).entries()) {
       const listed = await publishedListing(owner, 2, { title: `Chaise en bois massif numéro ${index + 1}` });
       await db().collection(COLLECTIONS.listings).doc(listed.id).update({ status: state });
       await searchOutboxRef(listed.id).delete();
@@ -360,5 +362,90 @@ describe("DELETE /api/uploads/{id}", () => {
     expect([refused.status, refused.body.error.code]).toEqual([409, "conflict"]);
     expect((await getListing(listed.id))!.photos.map((photo) => photo.id)).toEqual(listed.photoIds);
     expect(await getUpload(listed.photoIds[0]!)).not.toBeNull();
+  });
+
+  it("keeps the photos of a sold listing (read-only, retained 12 months with its text): 409, nothing changes", async () => {
+    const owner = await member();
+    const listed = await publishedListing(owner, 2, { title: "Commode ancienne en noyer" });
+    expect((await listingApi(markSold, "POST", `/api/listings/${listed.id}/sold`, { member: owner })).status).toBe(200);
+    const unsaved = await seedReadyUpload(owner, listed.id, { status: "rejected", rejectReason: "nsfw" });
+    const before = (await getListing(listed.id))!;
+    const opsBefore = (await listContentOps(`listings/${listed.id}`)).length;
+    vi.mocked(revalidateListingPaths).mockClear();
+    store.calls.length = 0;
+
+    for (const id of [listed.photoIds[0]!, unsaved]) {
+      const refused = await call<ErrorBody>(remove, "DELETE", `/api/uploads/${id}`, { member: owner });
+      expect([refused.status, refused.body.error.code], id).toEqual([409, "conflict"]);
+      expect(await getUpload(id), id).not.toBeNull();
+    }
+    const after = (await getListing(listed.id))!;
+    expect([after.status, after.version, after.photos]).toEqual(["sold", before.version, before.photos]);
+    expect((await getUpload(listed.photoIds[0]!))!.status).toBe("ready");
+    expect(await listContentOps(`listings/${listed.id}`)).toHaveLength(opsBefore);
+    expect(revalidateListingPaths).not.toHaveBeenCalled();
+    expect(store.calls).toEqual([]);
+  });
+});
+
+describe("DELETE /api/uploads/{id} under a legal hold", () => {
+  it("detaches the photo and ends the upload but keeps its document and objects; it is never offered again", async () => {
+    const owner = await member();
+    const live = await publishedListing(owner, 2, { title: "Lampadaire en laiton doré" });
+    const [held, kept] = live.photoIds as [string, string];
+    for (const variant of ["l", "s"]) store.seed("media", `listings/${live.id}/${held}-${variant}.webp`, Buffer.from("webp"), { contentType: "image/webp" });
+    await db().collection(COLLECTIONS.listings).doc(live.id).update({ legalHold: ["requisition-1"] });
+    store.calls.length = 0;
+
+    expect((await call(remove, "DELETE", `/api/uploads/${held}`, { member: owner })).status).toBe(204);
+    expect((await getListing(live.id))!.photos.map((photo) => photo.id)).toEqual([kept]);
+    expect(await getUpload(held)).toMatchObject({ status: "rejected", rejectReason: "expired", variants: ["l", "s"] });
+    // Evidence: nothing deleted in either bucket.
+    expect(store.calls.filter((entry) => entry.op === "delete")).toEqual([]);
+    expect(store.keys("media").filter((key) => key.includes(held))).toHaveLength(2);
+
+    // An upload still waiting for its PUT ends too: completing it later cannot make it a photo.
+    const pending = await uploaded(owner, live.id);
+    expect((await call(remove, "DELETE", `/api/uploads/${pending}`, { member: owner })).status).toBe(204);
+    expect((await completeAs(owner, pending)).body).toEqual({ status: "rejected", rejectReason: "expired" });
+    expect(await getUpload(pending)).not.toBeNull();
+
+    const photosOf = async () => (await listingApi<ListingResponse>(getListingRoute, "GET", `/api/listings/${live.id}`, { member: owner })).body.listing.photos.map((photo) => [photo.id, photo.status]);
+    const expected = [
+      [kept, "ready"],
+      [held, "rejected"],
+      [pending, "rejected"],
+    ];
+    expect(await photosOf()).toEqual(expected);
+    // Hold lifted: the deleted photo is not offered for the next save (it read as an unsaved
+    // `processing` photo before), and a save naming it does not attach it.
+    await db().collection(COLLECTIONS.listings).doc(live.id).update({ legalHold: [] });
+    expect(await photosOf()).toEqual(expected);
+    expect((await listingApi(patchListing, "PATCH", `/api/listings/${live.id}`, { member: owner, body: { photos: [kept, held] } })).status).toBe(200);
+    expect((await getListing(live.id))!.photos.map((photo) => photo.id)).toEqual([kept]);
+
+    // After the hold, deleting it again removes the objects and the document.
+    expect((await call(remove, "DELETE", `/api/uploads/${held}`, { member: owner })).status).toBe(204);
+    expect(await getUpload(held)).toBeNull();
+    expect(store.keys("media").filter((key) => key.includes(held))).toEqual([]);
+  });
+});
+
+describe("DELETE /api/uploads/{id} of an orphan photo moved to the private bucket", () => {
+  it("deletes its variants from the private bucket and any public copy left by a move cut short", async () => {
+    const owner = await member();
+    const live = await publishedListing(owner, 2, { title: "Commode ancienne en noyer" });
+    const [moved] = live.photoIds as [string];
+    for (const variant of ["l", "s"]) {
+      store.seed("private", `removed/listings/${live.id}/${moved}-${variant}.webp`, Buffer.from("webp"), { contentType: "image/webp" });
+      store.seed("media", `listings/${live.id}/${moved}-${variant}.webp`, Buffer.from("webp"), { contentType: "image/webp" });
+    }
+    await db().collection(COLLECTIONS.uploads).doc(moved).update({ bucket: "private", finalKey: `removed/listings/${live.id}/${moved}` });
+    await db().collection(COLLECTIONS.listings).doc(live.id).delete();
+
+    expect((await call(remove, "DELETE", `/api/uploads/${moved}`, { member: owner })).status).toBe(204);
+    expect(await getUpload(moved)).toBeNull();
+    expect(store.keys("private").filter((key) => key.includes(moved))).toEqual([]);
+    expect(store.keys("media").filter((key) => key.includes(moved))).toEqual([]);
   });
 });

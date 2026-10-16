@@ -128,7 +128,7 @@ describe("FsObjectStore + dev route", () => {
     expect(unknown.status).toBe(404);
   });
 
-  it("serves the media bucket publicly with nosniff, and the other buckets only to a signed GET", async () => {
+  it("serves the media bucket publicly with nosniff and a cross-origin CORP, and the other buckets only to a signed GET", async () => {
     const key = "listings/lst00001/photo-s.webp";
     await store.put("media", key, bytes, { contentType: "image/webp", cacheControl: "public, max-age=31536000, immutable" });
     const base = `http://localhost:3000/api/dev/storage/${MEDIA}/${key}`;
@@ -138,8 +138,11 @@ describe("FsObjectStore + dev route", () => {
     expect(head.headers.get("content-length")).toBe(String(bytes.byteLength));
     expect(head.headers.get("x-content-type-options")).toBe("nosniff");
     expect(head.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    // Embeddable by the admin host (another origin), like media.joutiya.ma.
+    expect(head.headers.get("cross-origin-resource-policy")).toBe("cross-origin");
     const get = await call(GET, base, { method: "GET" }, MEDIA, key);
     expect(get.status).toBe(200);
+    expect(get.headers.get("cross-origin-resource-policy")).toBe("cross-origin");
     expect(Buffer.from(await get.arrayBuffer()).equals(bytes)).toBe(true);
     expect((await call(GET, `${base}-missing`, { method: "GET" }, MEDIA, `${key}-missing`)).status).toBe(404);
 
@@ -151,6 +154,7 @@ describe("FsObjectStore + dev route", () => {
     const response = await call(GET, signedGet, { method: "GET" }, QUARANTINE, key);
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("cross-origin-resource-policy")).toBe("same-origin");
   });
 
   it("refuses bodies above the dev cap before storing anything", async () => {
