@@ -12,7 +12,7 @@ Le code de la phase 2 est dans la PR de la branche `claude/mvp-phase-2-fable-xd8
 ## Qui fait quoi (règle n°1)
 
 - **Claude** agit par API avec les jetons `JOUTIYA_*` de votre environnement cloud : clés d'envoi Resend, enregistrement des identifiants dans `infra/targets.json`, mise à jour du guide.
-- **Nav** (Claude dans votre navigateur) fait les réglages des consoles : Firebase Authentication, client OAuth Google, widget Turnstile, webhook Resend, webhook et secret Meta, compte Sentry. Il prépare chaque secret jusqu'à l'écran qui le crée et ne le voit jamais.
+- **Nav** (Claude dans votre navigateur) fait les réglages des consoles : Firebase Authentication, client OAuth Google, widget Turnstile, clés Brevo, webhook et secret Meta, compte Sentry. Il prépare chaque secret jusqu'à l'écran qui le crée et ne le voit jamais.
 - **Vous :** mots de passe, codes de double authentification, CAPTCHA, le clic qui révèle un secret, son rangement dans `.env.local` ou sur la VM, et la phrase d'autorisation dans le fil de Nav avant toute création (celle du 15 octobre couvre N1 à N10 ; les étapes N11 à N13 ci-dessous demandent une phrase de plus). Ces moments sont signalés par **Vous :**.
 - **Cody** : les prompts en fin de page (variables de la VM, premier administrateur).
 
@@ -28,7 +28,7 @@ Le code de la phase 2 est dans la PR de la branche `claude/mvp-phase-2-fable-xd8
 | Cloudflare | `TURNSTILE_SITE_KEY` (publique), `TURNSTILE_SECRET_KEY` | Un widget par environnement, limité à ses noms d'hôte | `.env.local`, `app.env` | Nav crée, **Vous :** la clé secrète |
 | Resend | `MAIL_API_KEY` (clé `joutiya-web-<env>`) | *Sending access*, domaine `notif.joutiya.ma` seulement | `app.env` | Claude par API, rangée directement sur la VM par le fil de déploiement |
 | Resend | `RESEND_API_KEY` du Worker | *Sending access*, domaine `notif.joutiya.ma` | Secret du Worker `joutiya-uptime-probe`, écrit par l'API Cloudflare sans passer par vous | Claude par API, fil « Mise en ligne phase 1 » |
-| Resend | `MAIL_WEBHOOK_SECRET` (`whsec_…`) | Un webhook par environnement, événements `email.bounced` et `email.complained` | `app.env` | Nav crée, **Vous :** le secret |
+| Resend | `MAIL_WEBHOOK_SECRET` (`whsec_…`) | Un webhook par environnement, événements `email.bounced` et `email.complained` | `app.env` | Claude par API, comme la clé du Worker ; identifiant du webhook dans `infra/targets.json` |
 | Brevo | `MAIL_FALLBACK_API_KEY` (clé v3 `joutiya-web-<env>`) | Les clés Brevo couvrent tout le compte : compte dédié, une clé par environnement pour la révoquer seule | `app.env` | Nav crée, **Vous :** le secret |
 | Meta | `WHATSAPP_APP_SECRET` | Secret de l'app, vérifie la signature des webhooks | `app.env` | **Vous :** « Afficher » puis copie |
 | Meta | `WHATSAPP_VERIFY_TOKEN` | Chaîne aléatoire d'au moins 32 caractères, la même dans `app.env` et la console Meta (sert seulement à la poignée de main du webhook) | `.env.local`, `app.env`, console Meta | **Vous :** la générez et la collez dans la console ; Cody la copie sur la VM |
@@ -87,7 +87,7 @@ Prérequis : domaine `notif.joutiya.ma` vérifié chez Resend (phase 0, étape 7
 
 **Clés d'envoi (Claude, par API, avec `JOUTIYA_RESEND_API_KEY`)** : trois clés *Sending access* limitées au domaine `notif.joutiya.ma` : `joutiya-web-prod` et `joutiya-web-staging` (`MAIL_API_KEY` de chaque environnement) et `joutiya-uptime-probe` (secret `RESEND_API_KEY` du Worker, voir la phase 1, étape 9 : les alertes e-mail de la sonde partent désormais par Resend, plus par Email Routing). Le fil « Mise en ligne phase 1 » les crée au moment d'écrire les fichiers de la VM et le secret du Worker, sans les afficher ; sa documentation (`docs/phase-1.md`, étape 9) est mise à jour par ce fil pour décrire ce passage d'Email Routing à Resend.
 
-**Webhook (Nav, N13)** : resend.com → **Webhooks** → **Add Webhook** : URL `https://joutiya.ma/api/webhooks/mail`, événements **email.bounced** et **email.complained** seulement. Un second webhook pour `https://staging.joutiya.ma/api/webhooks/mail`. **Vous :** le clic qui révèle le **Signing Secret** (`whsec_…`) de chacun, copie sous `MAIL_WEBHOOK_SECRET` dans `.env.local` puis `app.env`. Le site y inscrit les adresses en rebond définitif ou en plainte : plus aucun e-mail non indispensable ne leur part.
+**Webhook (Claude, par API)** : l'API Resend crée un webhook et renvoie son secret de signature (`POST /webhooks`, puis `GET /webhooks/{id}`), donc personne ne le voit. Au moment d'écrire les fichiers de la VM (étape 7), le fil « Mise en ligne phase 1 » crée avec `JOUTIYA_RESEND_API_KEY` un webhook par environnement, URL `https://joutiya.ma/api/webhooks/mail` puis `https://staging.joutiya.ma/api/webhooks/mail`, événements **email.bounced** et **email.complained** seulement, et écrit le `signing_secret` directement sous `MAIL_WEBHOOK_SECRET` dans l'`app.env` de l'environnement, sans l'afficher ; l'identifiant du webhook (public) est consigné dans `infra/targets.json`. Rien à faire pour vous ni pour Nav. Le site y inscrit les adresses en rebond définitif ou en plainte : plus aucun e-mail non indispensable ne leur part.
 
 **Brevo (Nav, N13)** : app.brevo.com → **SMTP & API** → **Clés API** → `joutiya-web-prod` puis `joutiya-web-staging`, expiration 1 an. **Vous :** le clic qui crée la clé, copie sous `MAIL_FALLBACK_API_KEY`. Brevo ne sert qu'aux e-mails de sécurité (vérification, réinitialisation, mot de passe changé, invitation du personnel, numéro retiré) quand Resend est en panne, refuse sa clé, ou a épuisé son quota du jour ; sans clé Brevo, ces e-mails attendent la période suivante au lieu d'être perdus.
 
@@ -121,7 +121,7 @@ Pour le staging puis la production, dans `/etc/joutiya/<env>/app.env`, en plus d
 - `FIREBASE_API_KEY`, `FIREBASE_SERVER_API_KEY`, `FIREBASE_APP_ID`, `FIREBASE_SERVICE_ACCOUNT=joutiya-web@<projet>.iam.gserviceaccount.com` ;
 - `GOOGLE_OAUTH_CLIENT_ID` ;
 - `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` ;
-- `MAIL_API_KEY` (créée par le fil de déploiement), `MAIL_WEBHOOK_SECRET`, `MAIL_FALLBACK_API_KEY`, `MAIL_FROM="Joutiya <no-reply@notif.joutiya.ma>"` ;
+- `MAIL_API_KEY` et `MAIL_WEBHOOK_SECRET` (créés par API par le fil de déploiement, jamais dans `.env.local`), `MAIL_FALLBACK_API_KEY`, `MAIL_FROM="Joutiya <no-reply@notif.joutiya.ma>"` ;
 - `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_DISPLAY_NUMBER` ;
 - `SENTRY_DSN` ;
 - `MEDIA_BASE_URL=https://media.joutiya.ma` (vide tant que la phase 3 n'a pas branché R2).
