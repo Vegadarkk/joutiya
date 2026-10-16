@@ -20,6 +20,20 @@ export interface AnonymousFlow {
   userAgent: string | undefined;
   /** Whether this request passed a Turnstile check: the response then carries the pass cookie. */
   turnstilePassed: boolean;
+  /** Handler entry, milliseconds since the epoch (uniformDuration). */
+  startedAt: number;
+}
+
+/** Minimum duration of the answers that must not reveal whether an account exists (reset, resend). */
+export const UNIFORM_RESPONSE_MS = 600;
+
+/**
+ * Waits until at least `minMs` passed since the handler entry: the existing-account branch of a
+ * uniform 202 costs extra Admin round trips, which a clock would otherwise tell apart.
+ */
+export async function uniformDuration(flow: AnonymousFlow, minMs = UNIFORM_RESPONSE_MS): Promise<void> {
+  const remaining = flow.startedAt + minMs - Date.now();
+  if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
 }
 
 /** User agent for connectionLogs (schema: 200 characters at most). */
@@ -32,7 +46,7 @@ export function userAgentOf(request: Request): string | undefined {
 export function beginAnonymous(request: Request): AnonymousFlow {
   requireSameOrigin(request);
   const device = deviceOf(request);
-  const flow: AnonymousFlow = { device, identity: device.identity, userAgent: userAgentOf(request), turnstilePassed: false };
+  const flow: AnonymousFlow = { device, identity: device.identity, userAgent: userAgentOf(request), turnstilePassed: false, startedAt: Date.now() };
   flows.set(request, flow);
   return flow;
 }

@@ -3,6 +3,7 @@ import { LOCALES } from "@/config/site";
 import { serverEnv } from "@/lib/env";
 import { mailLocale, type BuiltMail, type TemplateContext } from "./templates/layout";
 import { passwordChanged } from "./templates/passwordChanged";
+import { phoneRemoved } from "./templates/phoneRemoved";
 import { phoneVerified } from "./templates/phoneVerified";
 import { resetPassword } from "./templates/resetPassword";
 import { signupExisting } from "./templates/signupExisting";
@@ -19,6 +20,7 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   passwordChanged,
   staffInvite,
   phoneVerified,
+  phoneRemoved,
 };
 
 export const TEMPLATE_IDS = Object.keys(TEMPLATES) as TemplateId[];

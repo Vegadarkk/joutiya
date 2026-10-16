@@ -40,6 +40,12 @@ export default defineConfig({
       // Turnstile test keys: always pass (Cloudflare's documented dummy pair).
       TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
       TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
+      // WhatsApp verification: dummy credentials, the tests sign the webhook payloads themselves
+      // (tests/e2e/phone.spec.ts keeps the same values); the display number is the dev placeholder.
+      WHATSAPP_APP_SECRET: "e2e-whatsapp-app-secret",
+      WHATSAPP_PHONE_NUMBER_ID: "100000000000001",
+      WHATSAPP_VERIFY_TOKEN: "e2e-whatsapp-verify-token",
+      WHATSAPP_DISPLAY_NUMBER: "212600000000",
       METADATA_SERVER_DETECTION: "none",
     },
   },

@@ -1,18 +1,27 @@
 "use client";
 
 import { BadgeCheck, LogOut, Settings, UserRound } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Link, useRouter } from "@/i18n/navigation";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { signOut, useSession } from "@/lib/auth/client";
 import type { SessionSummary } from "@/lib/contracts/auth";
 import { cn } from "@/lib/utils";
 
-// Header account state. Public pages are static and carry no session: the anonymous button
-// renders first (server and client alike) and swaps once GET /api/auth/me has answered. Both
-// states are 44 px tall, so nothing shifts.
+// Header account state. Private pages render with the session the layout already knows. Public
+// pages are static and carry no session: the anonymous button renders first (server and client
+// alike) and swaps once GET /api/auth/me has answered. Both states are 44 px tall, so nothing shifts.
+
+/** Pages of the sign-in flow itself: coming back to them after signing in makes no sense. */
+const AUTH_PATHS = ["/connexion", "/inscription", "/mot-de-passe-oublie", "/action"];
+
+/** The `?next=` of the header's sign-in link: this page (locale prefix included, as the account guard sends it). */
+function nextFor(locale: string, pathname: string): string | undefined {
+  if (AUTH_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) return undefined;
+  return `/${locale}${pathname === "/" ? "" : pathname}`;
+}
 
 export function initials(session: SessionSummary): string {
   const words = (session.displayName ?? "").trim().split(/\s+/).filter(Boolean);
@@ -25,12 +34,15 @@ export function AccountMenu() {
   const t = useTranslations("Auth.menu");
   const s = useTranslations("Auth.settings");
   const router = useRouter();
+  const locale = useLocale();
+  const pathname = usePathname();
   const { status, session } = useSession();
 
   if (status !== "ready" || !session) {
+    const next = nextFor(locale, pathname);
     return (
       <Button asChild variant="ghost" className="px-2 md:px-3">
-        <Link href="/connexion">
+        <Link href={next ? { pathname: "/connexion", query: { next } } : "/connexion"}>
           <UserRound aria-hidden="true" />
           <span className="hidden sm:inline">{nav("signIn")}</span>
           <span className="sr-only sm:hidden">{nav("signIn")}</span>

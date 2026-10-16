@@ -68,11 +68,11 @@ export function ForgotForm({ nonce }: { nonce?: string }) {
     <form onSubmit={(event) => void handleSubmit(onValid)(event)} noValidate className="flex flex-col gap-5">
       <FormMessage error={serverError} />
       <Field label={c("email")} error={fieldMessage("email", errors.email)} required>
-        <Input type="email" inputMode="email" autoComplete="username" spellCheck={false} autoFocus {...register("email")} />
+        <Input type="email" inputMode="email" autoComplete="username" spellCheck={false} autoFocus dir="ltr" className="text-start" {...register("email")} />
       </Field>
       <TurnstileWidget
         ref={turnstile}
-        action="password_reset"
+        action="reset"
         nonce={nonce}
         onToken={(token) => setValue("turnstileToken", token ?? "", { shouldValidate: submitCount > 0 })}
         error={errors.turnstileToken ? c("turnstilePending") : undefined}

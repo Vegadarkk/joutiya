@@ -22,6 +22,15 @@ export function formatWait(locale: string, seconds: number | undefined, fallback
 
 const WITH_WAIT: readonly ApiErrorCode[] = ["rate_limited", "account_locked"];
 
+/** Reasons of a 400 `weak_password` (src/lib/auth/password-rules.ts) that have their own message. */
+const WEAK_PASSWORD_REASONS = ["common", "personal", "repeated", "sequence"] as const;
+type WeakPasswordReason = (typeof WEAK_PASSWORD_REASONS)[number];
+
+function weakPasswordReason(error: ApiError): WeakPasswordReason | null {
+  const reason = typeof error.details === "object" && error.details !== null ? (error.details as { reason?: unknown }).reason : undefined;
+  return typeof reason === "string" && (WEAK_PASSWORD_REASONS as readonly string[]).includes(reason) ? (reason as WeakPasswordReason) : null;
+}
+
 export function useApiErrorMessage(): (error: unknown) => string {
   const t = useTranslations("Auth.errors");
   const common = useTranslations("Auth.common");
@@ -31,6 +40,10 @@ export function useApiErrorMessage(): (error: unknown) => string {
       const code: ApiErrorCode = error instanceof ApiError ? error.code : "internal";
       if (code === "rate_limited" || code === "account_locked") {
         return t(code, { wait: formatWait(locale, error instanceof ApiError ? error.retryAfter : undefined, common("waitLater")) });
+      }
+      if (code === "weak_password" && error instanceof ApiError) {
+        const reason = weakPasswordReason(error);
+        if (reason) return t(`weak_password_${reason}`);
       }
       return t.has(code) && !WITH_WAIT.includes(code) ? t(code) : t("internal");
     },

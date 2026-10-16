@@ -6,6 +6,7 @@ import { applyEmailVerificationCode, verifyPasswordResetCode, type OobResult } f
 import { createSessionForUid } from "@/lib/firebase/session";
 import { HttpError } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
+import { logConnection } from "@/lib/logging/connection-logs";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { userByEmail, withCodeErrors } from "./accounts";
 import { activateMember } from "./activation";
@@ -60,6 +61,8 @@ async function action(request: Request): Promise<Response> {
   const claims = readClaims(record.customClaims ?? {});
   if (!(await activateMember(uid, claims))) return respond<ActionResponse>(flow, { status: "verified", session: null });
   const minted = await createSessionForUid(uid);
+  // The verification link opens a 14-day session: a sign-in for connectionLogs like any other.
+  await logConnection({ uid, event: "login", ip: flow.identity.ip, userAgent: flow.userAgent });
   const body: ActionResponse = { status: "verified", session: await sessionSummary(minted.user) };
   return finish(flow, signedIn(minted, body));
 }

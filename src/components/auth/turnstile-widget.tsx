@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { InlineError } from "@/components/feedback/inline-error";
 import { useTheme } from "@/components/layout/theme";
 import { usePublicConfig } from "@/lib/config/client";
+import type { TurnstileAction } from "@/lib/contracts/auth";
 import { cn } from "@/lib/utils";
 import { loadScript } from "./load-script";
 
@@ -18,6 +19,8 @@ export const DEV_TURNSTILE_TOKEN = "dev";
 interface TurnstileRenderOptions {
   sitekey: string;
   action?: string;
+  /** Customer data, echoed by siteverify as `cdata` (up to 255 characters of [A-Za-z0-9_-]). */
+  cData?: string;
   theme?: "light" | "dark" | "auto";
   language?: string;
   size?: "normal" | "compact" | "flexible";
@@ -46,8 +49,13 @@ export interface TurnstileHandle {
 }
 
 interface TurnstileWidgetProps {
-  /** Turnstile action name, echoed in the server-side verification (signup, login, reset...). */
-  action: string;
+  /**
+   * Turnstile action name: the server refuses a token solved for another action, so the value is
+   * one of the shared `TURNSTILE_ACTIONS`, the same the route handler checks.
+   */
+  action: TurnstileAction;
+  /** Where the widget sits (statistics only; `cdata` in siteverify): letters, digits, `_` and `-`. */
+  cData?: string;
   nonce?: string;
   /** A token, or null when the previous one expired or the widget failed. */
   onToken: (token: string | null) => void;
@@ -57,7 +65,7 @@ interface TurnstileWidgetProps {
 }
 
 export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>(function TurnstileWidget(
-  { action, nonce, onToken, error, className },
+  { action, cData, nonce, onToken, error, className },
   ref,
 ) {
   const config = usePublicConfig();
@@ -90,6 +98,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
         widgetId.current = window.turnstile.render(container.current, {
           sitekey: siteKey,
           action,
+          ...(cData ? { cData } : {}),
           theme: resolvedTheme,
           language: locale === "ar" ? "ar" : "fr",
           size: "flexible",
@@ -123,7 +132,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
         widgetId.current = undefined;
       }
     };
-  }, [siteKey, action, nonce, locale, resolvedTheme]);
+  }, [siteKey, action, cData, nonce, locale, resolvedTheme]);
 
   useImperativeHandle(
     ref,

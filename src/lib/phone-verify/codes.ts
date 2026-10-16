@@ -19,3 +19,8 @@ export function codeHash(uid: string, code: string): string {
 export function phoneKey(e164: string): string {
   return pepperedHash("pvp", e164);
 }
+
+/** Key material of the (phone, code) -> uid index: the code in the message picks the challenge. */
+export function phoneCodeKey(e164: string, code: string): string {
+  return pepperedHash("pvc", `${e164}:${code}`);
+}

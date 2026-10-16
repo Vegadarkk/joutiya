@@ -6,13 +6,31 @@ import { hasLocale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import { RootShell } from "@/components/layout/root-shell";
+import { currentUser } from "@/lib/auth/current-user";
+import { sessionSummary } from "@/lib/auth/summary";
 import { publicConfig } from "@/lib/config/public";
+import type { SessionSummary } from "@/lib/contracts/auth";
 import { rootMetadata } from "@/lib/i18n/metadata";
 
 // Private pages (auth, account, Pro): dynamic rendering with the per-request nonce (§1, §6), and
 // the runtime browser configuration (Turnstile, Google, Firebase) handed to the client from here
 // (§2: one image for staging and prod). Not an authorization barrier: (account)/layout.tsx and
 // every API route run their own guards.
+
+/**
+ * What GET /api/auth/me would answer for this request, so the header and the account pages render
+ * the signed-in state on first paint instead of after a round trip. null = anonymous; undefined
+ * when the summary cannot be built (the browser then asks /api/auth/me itself).
+ */
+async function initialSession(): Promise<SessionSummary | null | undefined> {
+  const user = await currentUser();
+  if (!user) return null;
+  try {
+    return await sessionSummary(user);
+  } catch {
+    return undefined;
+  }
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
@@ -26,7 +44,7 @@ export default async function PrivateLayout({ children, params }: { children: Re
   setRequestLocale(locale);
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
-    <RootShell locale={locale} nonce={nonce} config={publicConfig()}>
+    <RootShell locale={locale} nonce={nonce} config={publicConfig()} initialSession={await initialSession()}>
       {children}
     </RootShell>
   );

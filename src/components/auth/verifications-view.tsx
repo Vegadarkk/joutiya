@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { BadgeCheck, Check, Copy, MessageCircle, Timer } from "lucide-react";
+import { BadgeCheck, Check, Copy, MessageCircle, Timer, TriangleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import type { z } from "@/lib/zod";
@@ -22,10 +22,12 @@ import { StatusPanel } from "./status-panel";
 // /verifications: WhatsApp phone verification (§6). The person sends the code from their own
 // WhatsApp to Joutiya's number; the webhook sets the badge; this page polls the status.
 
-const POLL_MS = 5_000;
+/** Status poll while a code is pending: 6 calls a minute, well under phone.status.uid (400/h). */
+const POLL_MS = 10_000;
 
 type State =
   | { kind: "loading" }
+  | { kind: "failed"; error: unknown }
   | { kind: "idle" }
   | { kind: "pendingUnknown"; phone: string | null }
   | { kind: "pending"; phone: string; code: string; waLink: string; number: string; expiresAt: number }
@@ -36,24 +38,34 @@ type State =
 type PhoneForm = z.input<typeof phoneStartSchema>;
 type PhoneInput = z.output<typeof phoneStartSchema>;
 
+function fromStatus(status: PhoneStatusResponse): State {
+  if (status.status === "verified") return { kind: "verified", phone: status.phone };
+  if (status.status === "pending") return { kind: "pendingUnknown", phone: status.phone };
+  if (status.status === "expired") return { kind: "expired", phone: status.phone };
+  // "none": nothing verified or pending, including a number that was since verified by another account.
+  return { kind: "idle" };
+}
+
 export function VerificationsView() {
   const t = useTranslations("Auth.verifications");
+  const apiMessage = useApiErrorMessage();
   const [state, setState] = useState<State>({ kind: "loading" });
   const started = useRef(false);
+
+  const load = useCallback(async () => {
+    setState({ kind: "loading" });
+    try {
+      setState(fromStatus(await apiGet<PhoneStatusResponse>(AUTH_API.phoneStatus)));
+    } catch (error) {
+      setState(isApiError(error, "unavailable") ? { kind: "unavailable" } : { kind: "failed", error });
+    }
+  }, []);
 
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    apiGet<PhoneStatusResponse>(AUTH_API.phoneStatus).then(
-      (status) => {
-        if (status.status === "verified") setState({ kind: "verified", phone: status.phone });
-        else if (status.status === "pending") setState({ kind: "pendingUnknown", phone: status.phone });
-        else if (status.status === "expired") setState({ kind: "expired", phone: status.phone });
-        else setState({ kind: "idle" });
-      },
-      (error: unknown) => setState(isApiError(error, "unavailable") ? { kind: "unavailable" } : { kind: "idle" }),
-    );
-  }, []);
+    void load();
+  }, [load]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -67,6 +79,18 @@ export function VerificationsView() {
           <Skeleton className="h-4 w-5/6" />
           <Skeleton className="h-11 w-full" />
         </div>
+      ) : state.kind === "failed" ? (
+        <FormMessage
+          error={state.error}
+          title={t("loadFailedTitle")}
+          action={
+            <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
+              {t("retry")}
+            </Button>
+          }
+        >
+          {apiMessage(state.error)}
+        </FormMessage>
       ) : state.kind === "unavailable" ? (
         <ErrorBanner tone="info" title={t("unavailable")} action={<BackToSettings />} />
       ) : state.kind === "verified" ? (
@@ -74,7 +98,12 @@ export function VerificationsView() {
           {t("verifiedBody", { phone: state.phone ?? "" })}
         </StatusPanel>
       ) : state.kind === "pending" ? (
-        <PendingCode state={state} onExpired={() => setState({ kind: "expired", phone: state.phone })} onVerified={() => setState({ kind: "verified", phone: state.phone })} onChange={() => setState({ kind: "idle" })} />
+        <PendingCode
+          state={state}
+          onExpired={() => setState({ kind: "expired", phone: state.phone })}
+          onVerified={() => setState({ kind: "verified", phone: state.phone })}
+          onReset={() => setState({ kind: "idle" })}
+        />
       ) : (
         <div className="flex flex-col gap-6">
           {state.kind === "expired" ? (
@@ -141,7 +170,10 @@ function PhoneForm({
       onStarted({ kind: "pending", phone, code: answer.code, waLink: answer.waLink, number: answer.number, expiresAt: Date.parse(answer.expiresAt) });
     } catch (error) {
       if (isApiError(error, "unavailable")) onUnavailable();
-      else if (isApiError(error, "phone_invalid", "phone_not_mobile", "conflict")) setError("phone", { type: "server", message: apiMessage(error) }, { shouldFocus: true });
+      // 409 here only means "this account already has a verified number" (a number held by another
+      // account is transferred by the proof of possession, not refused).
+      else if (isApiError(error, "conflict")) setError("phone", { type: "server", message: t("alreadyVerified") }, { shouldFocus: true });
+      else if (isApiError(error, "phone_invalid", "phone_not_mobile")) setError("phone", { type: "server", message: apiMessage(error) }, { shouldFocus: true });
       else setServerError(error);
     }
   });
@@ -178,17 +210,26 @@ function PendingCode({
   state,
   onExpired,
   onVerified,
-  onChange,
+  onReset,
 }: {
   state: Extract<State, { kind: "pending" }>;
   onExpired: () => void;
   onVerified: () => void;
-  onChange: () => void;
+  /** Back to the empty form: the person changes number, or the server no longer knows the request. */
+  onReset: () => void;
 }) {
   const t = useTranslations("Auth.verifications");
+  const heading = useRef<HTMLHeadingElement>(null);
   const [now, setNow] = useState(() => Date.now());
   const [copied, setCopied] = useState(false);
+  // Polling stopped on a 429: a reload asks again.
+  const [pollStopped, setPollStopped] = useState(false);
   const remaining = state.expiresAt - now;
+
+  // The code replaced the form: focus says so.
+  useEffect(() => {
+    heading.current?.focus();
+  }, []);
 
   // Countdown, one tick a second.
   useEffect(() => {
@@ -202,6 +243,7 @@ function PendingCode({
 
   // Status poll until the webhook has seen the message.
   useEffect(() => {
+    if (pollStopped) return;
     let active = true;
     const poll = async () => {
       try {
@@ -212,9 +254,13 @@ function PendingCode({
           onVerified();
         } else if (status.status === "expired") {
           onExpired();
+        } else if (status.status === "none") {
+          onReset();
         }
-      } catch {
-        // Transient failure: the next tick asks again.
+      } catch (error) {
+        if (!active) return;
+        // Rate limited: stop instead of hammering; anything else is transient and the next tick asks again.
+        if (isApiError(error, "rate_limited")) setPollStopped(true);
       }
     };
     const timer = window.setInterval(() => void poll(), POLL_MS);
@@ -222,7 +268,7 @@ function PendingCode({
       active = false;
       window.clearInterval(timer);
     };
-  }, [onVerified, onExpired]);
+  }, [onVerified, onExpired, onReset, pollStopped]);
 
   async function copyCode() {
     try {
@@ -235,9 +281,11 @@ function PendingCode({
   }
 
   return (
-    <section className="flex flex-col gap-6 rounded-lg border border-border bg-surface p-6" aria-live="polite">
+    <section aria-labelledby="phone-code-title" className="flex flex-col gap-6 rounded-lg border border-border bg-surface p-6">
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold">{t("codeTitle")}</h2>
+        <h2 id="phone-code-title" ref={heading} tabIndex={-1} className="rounded-sm text-lg font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
+          {t("codeTitle")}
+        </h2>
         <p className="text-foreground-muted text-pretty">{t("codeBody", { phone: state.phone })}</p>
       </div>
       <div className="arch flex flex-col items-center gap-3 rounded-b-lg bg-surface-brand px-6 pb-6 pt-10 text-center">
@@ -251,7 +299,8 @@ function PendingCode({
         </Button>
       </div>
       <div className="flex flex-col gap-3">
-        <Button asChild size="lg" className="w-full bg-[#1daa61] text-white hover:bg-[#178f52] dark:text-white">
+        {/* Brand green, token-based; the speech-bubble glyph carries the WhatsApp identity. */}
+        <Button asChild size="lg" variant="structure" className="w-full">
           <a href={state.waLink} target="_blank" rel="noopener noreferrer">
             <MessageCircle aria-hidden="true" />
             {t("openWhatsApp")}
@@ -265,16 +314,18 @@ function PendingCode({
         </p>
       </div>
       <div className="flex flex-col gap-2 border-t border-border pt-4 text-sm text-foreground-muted sm:flex-row sm:items-center sm:justify-between">
-        <span className="flex items-center gap-2">
-          <Spinner className="size-4 text-primary" />
-          {t("waiting")}
+        {/* The only live region: one line, which changes once (waiting -> paused). */}
+        <span role="status" className={pollStopped ? "flex items-start gap-2 text-warning" : "flex items-center gap-2"}>
+          {pollStopped ? <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> : <Spinner className="size-4 text-primary" />}
+          {pollStopped ? t("pollStopped") : t("waiting")}
         </span>
-        <span className="flex items-center gap-2 tabular-nums">
-          <Timer className="size-4" aria-hidden="true" />
+        {/* Ticks every second: kept out of the accessibility tree (the expiry itself is announced when it happens). */}
+        <span aria-hidden="true" className="flex shrink-0 items-center gap-2 tabular-nums">
+          <Timer className="size-4" />
           {t("expiresIn", { time: formatRemaining(remaining) })}
         </span>
       </div>
-      <Button type="button" variant="link" onClick={onChange} className="w-fit text-sm">
+      <Button type="button" variant="link" onClick={onReset} className="w-fit text-sm">
         {t("changeNumber")}
       </Button>
     </section>

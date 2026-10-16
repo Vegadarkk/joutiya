@@ -15,15 +15,29 @@ const IN_APP_BROWSERS: [RegExp, string][] = [
   [/WhatsApp/i, "WhatsApp"],
   [/TikTok|musical_ly|BytedanceWebview|Bytedance/i, "TikTok"],
   [/Snapchat/i, "Snapchat"],
+  [/LinkedInApp/i, "LinkedIn"],
+  [/Twitter/i, "X (Twitter)"],
+  [/\bLine\//i, "LINE"],
+  // Google app (GSA): its own in-app browser on iOS.
+  [/\bGSA\//, "Google"],
 ];
 
-/** The social app owning this webview, or null in a regular browser. */
-export function inAppBrowserName(userAgent: string): string | null {
-  for (const [pattern, name] of IN_APP_BROWSERS) if (pattern.test(userAgent)) return name;
+/** Android's generic WebView marker ("Linux; Android 14; K; wv)"): an embedded browser of an app we cannot name. */
+const ANDROID_WEBVIEW = /; wv\)/;
+
+export interface InAppBrowser {
+  /** The app owning the webview, or null when only the generic WebView marker is present. */
+  app: string | null;
+}
+
+/** The in-app browser this page runs in, or null in a regular browser. */
+export function detectInAppBrowser(userAgent: string): InAppBrowser | null {
+  for (const [pattern, app] of IN_APP_BROWSERS) if (pattern.test(userAgent)) return { app };
+  if (ANDROID_WEBVIEW.test(userAgent)) return { app: null };
   return null;
 }
 
-export function InAppBrowserNotice({ app }: { app: string }) {
+export function InAppBrowserNotice({ app }: InAppBrowser) {
   const t = useTranslations("Auth.common.inApp");
   const [copied, setCopied] = useState(false);
   async function copy() {
@@ -46,7 +60,7 @@ export function InAppBrowserNotice({ app }: { app: string }) {
         </Button>
       }
     >
-      {t("body", { app })}
+      {app ? t("body", { app }) : t("bodyGeneric")}
     </ErrorBanner>
   );
 }

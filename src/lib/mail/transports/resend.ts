@@ -1,7 +1,7 @@
 import "server-only";
 import { serverEnv } from "@/lib/env";
 import type { MailTransport, RenderedMail, SendResult } from "../types";
-import { isRetryableStatus, leadingInt, networkError, ProviderError, readErrorBody, SEND_TIMEOUT_MS } from "./errors";
+import { classifyStatus, leadingInt, networkError, providerFailure, readErrorBody, SEND_TIMEOUT_MS } from "./errors";
 
 // Resend (phase-2/research/services.md §2): POST /emails, Bearer key, mandatory User-Agent,
 // optional Idempotency-Key (24 h), `{ id }` on success, quota headers = used counts (free plan).
@@ -68,9 +68,9 @@ export class ResendTransport implements MailTransport {
     if (!response.ok) {
       const detail = await readErrorBody(response);
       // 409 concurrent_idempotent_requests: the same key is in flight, a later retry resolves it.
-      const retryable = isRetryableStatus(response.status) || (response.status === 409 && detail.name === "concurrent_idempotent_requests");
+      const kind = response.status === 409 && detail.name === "concurrent_idempotent_requests" ? "transient" : classifyStatus(response.status);
       const retryAfter = leadingInt(response.headers.get("retry-after")) ?? leadingInt(response.headers.get("ratelimit-reset"));
-      throw new ProviderError(this.name, response.status, retryable, `resend: HTTP ${response.status}${detail.name ? ` ${detail.name}` : ""}${detail.message ? ` (${detail.message})` : ""}`, retryAfter);
+      throw providerFailure(this.name, response.status, kind, detail, retryAfter);
     }
 
     let id = "";

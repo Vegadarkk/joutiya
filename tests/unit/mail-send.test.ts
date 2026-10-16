@@ -2,7 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TemplateMail } from "@/lib/mail/types";
 
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
-vi.mock("@/lib/mail/deliver", () => ({ deliverMail: vi.fn(async () => ({ provider: "memory", id: "m" })) }));
+vi.mock("@/lib/mail/deliver", () => ({
+  deliverMail: vi.fn(async () => ({ provider: "memory", id: "m" })),
+  MailDeferredError: class extends Error {
+    constructor(
+      readonly retryAt: Date,
+      message: string,
+    ) {
+      super(message);
+      this.name = "MailDeferredError";
+    }
+  },
+}));
 
 const queues: { name: string; add: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }[] = [];
 const redisClients: { url: string; options: Record<string, unknown>; quit: ReturnType<typeof vi.fn> }[] = [];
@@ -28,9 +39,10 @@ vi.mock("ioredis", () => ({
   },
 }));
 
-const { deliverMail } = await import("@/lib/mail/deliver");
+const { deliverMail, MailDeferredError } = await import("@/lib/mail/deliver");
+const { logger } = await import("@/lib/logging/logger");
 const { resetServerEnv } = await import("@/lib/env");
-const { closeMailQueue, enqueueMail, MAIL_QUEUE, sanitizeJobId } = await import("@/lib/mail/send");
+const { closeMailQueue, enqueueMail, MAIL_JOB_OPTIONS, MAIL_QUEUE, sanitizeJobId } = await import("@/lib/mail/send");
 const { sendMail } = await import("@/lib/mail");
 
 const MAIL: TemplateMail<"verifyEmail"> = {
@@ -45,7 +57,8 @@ const MAIL: TemplateMail<"verifyEmail"> = {
 beforeEach(() => {
   queues.length = 0;
   redisClients.length = 0;
-  vi.mocked(deliverMail).mockClear();
+  vi.mocked(deliverMail).mockReset();
+  vi.mocked(deliverMail).mockResolvedValue({ provider: "memory", id: "m" });
 });
 
 afterEach(async () => {
@@ -75,6 +88,15 @@ describe("enqueueMail", () => {
     expect(redisClients).toHaveLength(0);
   });
 
+  it("drops a deferred mail inline, with a warning, and rethrows anything else", async () => {
+    resetServerEnv();
+    vi.mocked(deliverMail).mockRejectedValueOnce(new MailDeferredError(new Date("2026-10-17T00:01:00Z"), "quotas exhausted"));
+    await expect(enqueueMail(MAIL)).resolves.toBeUndefined();
+    expect(logger.warn).toHaveBeenCalledWith(expect.objectContaining({ retryAt: "2026-10-17T00:01:00.000Z" }), "mail dropped: no queue to defer it");
+    vi.mocked(deliverMail).mockRejectedValueOnce(new Error("network"));
+    await expect(enqueueMail(MAIL)).rejects.toThrow("network");
+  });
+
   it("adds a prioritised, deduplicated job on the mail queue otherwise", async () => {
     process.env.QUEUE_REDIS_URL = "redis://valkey-queue:6379";
     resetServerEnv();
@@ -97,10 +119,12 @@ describe("enqueueMail", () => {
         priority: 1,
         attempts: 5,
         backoff: { type: "exponential", delay: 30_000 },
-        removeOnComplete: 1000,
-        removeOnFail: 5000,
+        // Payloads hold live action links: finished jobs leave Valkey at once, failed ones within the hour.
+        removeOnComplete: true,
+        removeOnFail: { age: 3_600, count: 200 },
       },
     ]);
+    expect(MAIL_JOB_OPTIONS.removeOnComplete).toBe(true);
     expect(add?.mock.calls[1]?.[2]).toMatchObject({ priority: 5 });
     expect(add?.mock.calls[1]?.[2]).not.toHaveProperty("jobId");
     expect(add?.mock.calls[2]?.[2]).toMatchObject({ priority: 10, jobId: "digest-1" });

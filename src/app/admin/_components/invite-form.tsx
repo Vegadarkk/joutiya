@@ -12,7 +12,8 @@ import type { StaffRole } from "@/lib/db/repositories/staff";
 import { ADMIN_API, adminFetch, errorMessage } from "./api-client";
 
 const MESSAGES: Record<string, string> = {
-  conflict: "Impossible : cet e-mail est le vôtre, ou il appartient à un compte acheteur ou vendeur. Les comptes du personnel sont séparés.",
+  conflict:
+    "Impossible : cet e-mail est le vôtre, ou un compte Joutiya existe déjà avec cette adresse (acheteur, vendeur ou inscription jamais confirmée). Les comptes du personnel sont séparés : utilisez une autre adresse.",
   invalid_body: "Vérifiez le nom (2 à 40 caractères), l'e-mail et le rôle.",
   forbidden: "Réservé aux admins.",
 };

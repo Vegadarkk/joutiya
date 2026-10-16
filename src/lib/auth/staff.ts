@@ -1,13 +1,17 @@
 import "server-only";
+import type { UserRecord } from "firebase-admin/auth";
 import { NextResponse } from "next/server";
 import { z } from "@/lib/zod";
+import { RATE_LIMITS } from "@/config/rate-limits";
 import { audit } from "@/lib/audit";
 import { accessIdentity, requireSameOrigin, type StaffContext } from "@/lib/auth/guards";
-import { displayNameSchema, emailSchema, PASSWORD_MAX, PASSWORD_MIN } from "@/lib/contracts/auth";
+import { assertPasswordPolicy } from "@/lib/auth/password-policy";
+import { displayNameSchema, emailSchema, PASSWORD_MAX } from "@/lib/contracts/auth";
 import { getStaff, listStaff, revokeStaff, staffRoleSchema, upsertStaff, type StaffRecord, type StaffRole } from "@/lib/db/repositories/staff";
 import { emailNormHash } from "@/lib/db/repositories/users";
+import { serverEnv } from "@/lib/env";
 import { auth } from "@/lib/firebase/admin";
-import { isMember, isStaff, readClaims, setClaims } from "@/lib/firebase/claims";
+import { isStaff, readClaims, setClaims } from "@/lib/firebase/claims";
 import {
   confirmPasswordReset,
   IdentityToolkitError,
@@ -18,14 +22,14 @@ import {
 } from "@/lib/firebase/rest";
 import { createSessionForUid, revokeSessions, verifySession } from "@/lib/firebase/session";
 import { readCookie } from "@/lib/http/cookies";
-import { forbidden, HttpError, notFound, unauthenticated } from "@/lib/http/errors";
+import { forbidden, HttpError, notFound, unauthenticated, unavailable } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { json } from "@/lib/http/route";
 import { logConnection } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
 import { sendMail } from "@/lib/mail";
 import { requestIdentity, type RequestIdentity } from "@/lib/rate-limit/keys";
-import { consumedPoints, consumeLimit, enforceLimit, resetLimit } from "@/lib/rate-limit/limiter";
+import { blockLimit, consumeLimit, enforceLimit, limitState, resetLimit } from "@/lib/rate-limit/limiter";
 import { clearSessionCookies, CSRF_HEADER, SESSION_COOKIE, setSessionCookies } from "@/lib/security/cookies";
 import { csrfToken } from "@/lib/security/csrf";
 import { expectedOrigin, hostKind } from "@/lib/security/origin";
@@ -41,17 +45,23 @@ export const staffLoginSchema = z
   .object({
     email: emailSchema,
     password: z.string().min(1).max(PASSWORD_MAX),
-    /** Required from the 3rd failure on this account + IP (the previous answer says `turnstile_required`). */
+    /**
+     * Required on every attempt once a Turnstile site key is configured (every deployed
+     * environment); without keys, from the 3rd failure (the previous answer says `turnstile_required`).
+     */
     turnstileToken: z.string().min(1).max(2048).optional(),
   })
   .strict();
 export type StaffLoginInput = z.infer<typeof staffLoginSchema>;
 
+/** Staff passwords are longer than member passwords (owner guide, docs/phase-2.md §8: 12 or more). */
+export const STAFF_PASSWORD_MIN = 12;
+
 /** First password of an invited member, or a later reset: the oobCode comes from the invitation link. */
 export const staffPasswordSchema = z
   .object({
     oobCode: z.string().min(10).max(512),
-    password: z.string().min(PASSWORD_MIN).max(PASSWORD_MAX),
+    password: z.string().min(STAFF_PASSWORD_MIN).max(PASSWORD_MAX),
   })
   .strict();
 export type StaffPasswordInput = z.infer<typeof staffPasswordSchema>;
@@ -97,11 +107,19 @@ export const STAFF_API = {
   staff: "/api/admin/staff",
 } as const;
 
-// Login policy (§6 table, /api/auth/login row, applied to the staff limiter).
+// Login policy (§6 table, /api/auth/login row, applied to the staff limiter): 300 attempts per hour
+// per IP, 5 failures per account + IP in 15 min then a 15 min lock, Turnstile on every attempt
+// when the widget is configured (else from the 3rd failure, or the 20th per hour on the account).
 const LOGIN_LIMIT = "staff.login.accountIp";
+const ACCOUNT_LIMIT = "login.fail.account";
 const TURNSTILE_AFTER_FAILURES = 3;
-const LOCK_AFTER_FAILURES = 5;
-const LOCK_SECONDS = 15 * 60;
+const LOCK_AFTER_FAILURES = RATE_LIMITS[LOGIN_LIMIT].points;
+const LOCK_SECONDS = RATE_LIMITS[LOGIN_LIMIT].blockDuration;
+const ACCOUNT_FAILURE_LIMIT = RATE_LIMITS[ACCOUNT_LIMIT].points;
+
+function accountLocked(retryAfterSeconds: number): HttpError {
+  return new HttpError(429, "account_locked", undefined, { headers: { "Retry-After": String(Math.max(1, Math.ceil(retryAfterSeconds))) } });
+}
 
 /** Back-office routes exist on the admin host only: 404 elsewhere, like requireStaff. */
 function requireAdminHost(request: Request): void {
@@ -124,9 +142,12 @@ function translateCodeError(error: unknown): unknown {
 }
 
 /**
- * POST /api/admin/auth/login. Access identity and body e-mail must match; 5 failures per account
- * + IP in 15 min lock the pair for 15 min, Turnstile is required from the 3rd failure; a member
- * account (individual, pro) is refused and counts as a failure. Success: 8-hour session cookie.
+ * POST /api/admin/auth/login. Access identity and body e-mail must match. Limits fail closed (503
+ * when valkey-ratelimit is down): 300 attempts per hour per IP; 5 failures per account + IP in
+ * 15 min lock the pair for 15 min from the failure that filled the window; Turnstile on every
+ * attempt when a site key is configured (without keys: from the 3rd failure on the pair or the
+ * 20th per hour on the account, any token accepted). A member account (individual, pro) is
+ * refused and counts as a failure. Success: 8-hour session cookie.
  */
 export async function login(request: Request): Promise<Response> {
   requireAdminHost(request);
@@ -136,16 +157,29 @@ export async function login(request: Request): Promise<Response> {
   if (body.email !== access.email) throw forbidden("Access identity does not match");
 
   const identity = requestIdentity(request.headers);
-  const key = `${emailNormHash(body.email)}:${identity.ipBucket}`;
-  const failures = (await consumedPoints(LOGIN_LIMIT, key)) ?? 0;
-  if (failures >= LOCK_AFTER_FAILURES) {
-    throw new HttpError(429, "account_locked", undefined, { headers: { "Retry-After": String(LOCK_SECONDS) } });
-  }
-  if (failures >= TURNSTILE_AFTER_FAILURES) {
+  await enforceLimit("login.ip", identity.ipBucket);
+  const account = emailNormHash(body.email);
+  const accountIp = `${account}:${identity.ipBucket}`;
+  const [pair, perAccount] = await Promise.all([limitState(LOGIN_LIMIT, accountIp), limitState(ACCOUNT_LIMIT, account)]);
+  // An unreadable counter never reads as "no failures": the staff limiter's policy is closed.
+  if (!pair || !perAccount) throw unavailable("rate limiter unavailable");
+  // Retry-After is the store's own time left on the block set by the failure that filled the window.
+  if (pair.consumedPoints >= LOCK_AFTER_FAILURES) throw accountLocked(pair.msBeforeNext > 0 ? pair.msBeforeNext / 1000 : LOCK_SECONDS);
+
+  const turnstileNeeded = Boolean(serverEnv().TURNSTILE_SITE_KEY) || pair.consumedPoints >= TURNSTILE_AFTER_FAILURES || perAccount.consumedPoints >= ACCOUNT_FAILURE_LIMIT;
+  if (turnstileNeeded) {
+    // Nothing counted yet: no credential has been looked at.
     if (!body.turnstileToken) return json<StaffLoginResponse>({ status: "turnstile_required" });
-    const check = await verifyTurnstile(body.turnstileToken, { action: "staff-login", remoteIp: identity.ip });
+    const hostname = new URL(expectedOrigin("admin")).hostname;
+    const check = await verifyTurnstile(body.turnstileToken, { action: "staff-login", remoteIp: identity.ip, hostname });
     if (!check.ok) throw new HttpError(400, "turnstile_failed");
   }
+
+  /** A failure on the pair and on the account; the one that fills the window locks the pair for blockDuration right away. */
+  const fail = async (): Promise<void> => {
+    const [counted] = await Promise.all([consumeLimit(LOGIN_LIMIT, accountIp), consumeLimit(ACCOUNT_LIMIT, account)]);
+    if (counted.ok && counted.remaining === 0) await blockLimit(LOGIN_LIMIT, accountIp);
+  };
 
   let localId: string;
   try {
@@ -153,13 +187,11 @@ export async function login(request: Request): Promise<Response> {
   } catch (error) {
     if (error instanceof IdentityToolkitError) {
       if (INVALID_CREDENTIAL_CODES.has(error.code)) {
-        await consumeLimit(LOGIN_LIMIT, key);
+        await fail();
         throw new HttpError(401, "invalid_credentials");
       }
       if (error.code === "USER_DISABLED") throw new HttpError(403, "account_disabled");
-      if (error.code.startsWith("TOO_MANY_ATTEMPTS")) {
-        throw new HttpError(429, "account_locked", undefined, { headers: { "Retry-After": String(LOCK_SECONDS) } });
-      }
+      if (error.code.startsWith("TOO_MANY_ATTEMPTS")) throw accountLocked(LOCK_SECONDS);
     }
     throw error;
   }
@@ -168,13 +200,13 @@ export async function login(request: Request): Promise<Response> {
   const claims = readClaims(record.customClaims ?? {});
   if (!isStaff(claims) || !claims.role) {
     // A valid password on a non-staff account is still a failed back-office login.
-    await consumeLimit(LOGIN_LIMIT, key);
+    await fail();
     throw forbidden();
   }
   const role = claims.role as StaffRole;
 
   const minted = await createSessionForUid(record.uid);
-  await resetLimit(LOGIN_LIMIT, key);
+  await resetLimit(LOGIN_LIMIT, accountIp);
   const userAgent = request.headers.get("user-agent")?.slice(0, 200);
   await logConnection({ uid: record.uid, event: "staff_login", ip: identity.ip, ...(userAgent ? { userAgent } : {}) });
 
@@ -225,6 +257,9 @@ export async function setPassword(request: Request): Promise<Response> {
   const record = await auth().getUserByEmail(email).catch(() => null);
   if (!record || !isStaff(readClaims(record.customClaims ?? {}))) throw forbidden();
   if (record.disabled) throw new HttpError(403, "account_disabled");
+  // Same policy as member passwords (common list, nothing personal, no trivial pattern), on top of
+  // the longer minimum of staffPasswordSchema; checked before the code is consumed.
+  assertPasswordPolicy(body.password, { email, displayName: record.displayName });
 
   try {
     await confirmPasswordReset(body.oobCode, body.password);
@@ -258,23 +293,33 @@ export function invitationUrl(oobCode: string, origin = expectedOrigin("admin"))
 }
 
 /**
- * POST /api/admin/staff: creates (or reuses) the Auth account, sets the staff claims, writes the
- * roster entry and mails the set-password link. Refused: the caller themself (nobody grants a role
- * to themself, §6) and a member account (staff accounts are separate from shopper accounts).
+ * An account this module or scripts/create-admin.ts created: staff claims, or a roster entry (a
+ * revoked member has no claims any more). Any other account keeps its own password and is never
+ * promoted: a sign-up never confirmed, or a member account, would otherwise become staff with the
+ * password of whoever registered that address.
+ */
+async function isStaffAccount(record: UserRecord): Promise<boolean> {
+  return isStaff(readClaims(record.customClaims ?? {})) || (await getStaff(record.uid)) !== null;
+}
+
+/**
+ * POST /api/admin/staff: creates the Auth account (or reuses a staff one, revoked included), writes
+ * the roster entry, sets the staff claims and mails the set-password link. Refused with 409: the
+ * caller themself (nobody grants a role to themself, §6) and any existing non-staff account (staff
+ * accounts are separate from shopper accounts).
  */
 export async function invite(ctx: StaffContext, input: InviteInput, identity: RequestIdentity): Promise<StaffInviteResponse> {
   const existing = await auth().getUserByEmail(input.email).catch(() => null);
   if (existing && existing.uid === ctx.user.uid) throw new HttpError(409, "conflict", "cannot invite yourself");
-  if (existing && isMember(readClaims(existing.customClaims ?? {}))) {
-    throw new HttpError(409, "conflict", "a member account cannot become staff");
-  }
+  if (existing && !(await isStaffAccount(existing))) throw new HttpError(409, "conflict", "a Joutiya account exists with this e-mail");
   const uid = existing?.uid ?? (await auth().createUser({ email: input.email, emailVerified: true, displayName: input.displayName })).uid;
   if (existing && (existing.disabled || existing.displayName !== input.displayName)) {
     // Re-invitation of a revoked or renamed member: the account is active again.
     await auth().updateUser(uid, { disabled: false, displayName: input.displayName });
   }
-  await setClaims(uid, { role: input.role, v: 2 });
+  // Roster before claims: an interrupted call leaves an entry without rights, never the reverse.
   await upsertStaff({ uid, email: input.email, displayName: input.displayName, role: input.role, invitedBy: ctx.user.uid });
+  await setClaims(uid, { role: input.role, v: 2 });
 
   const origin = expectedOrigin("admin");
   try {
@@ -304,14 +349,25 @@ export async function invite(ctx: StaffContext, input: InviteInput, identity: Re
   return { uid };
 }
 
+/** Revocation here never touches Cloudflare Access: the admin removes the person from its policy by hand. */
+export const REVOKE_ACCESS_REMINDER = "retirer aussi de Cloudflare Access";
+
 /**
  * DELETE /api/admin/staff/[uid]: clears the claims, revokes every session, disables the Auth
- * account and marks the roster entry revoked. Never on oneself (403); unknown member: 404.
+ * account and marks the roster entry revoked. Never on oneself (403); unknown member: 404. An
+ * account with staff claims but no roster entry (a bootstrap stopped halfway) is revoked all the
+ * same, with a roster tombstone so the /personnel page shows it.
  */
 export async function revoke(ctx: StaffContext, uid: string, identity: RequestIdentity): Promise<void> {
   if (uid === ctx.user.uid) throw forbidden("a member cannot revoke themself");
   const target = await getStaff(uid);
-  if (!target) throw notFound();
+  if (!target) {
+    const record = await auth().getUser(uid).catch(() => null);
+    const claims = record ? readClaims(record.customClaims ?? {}) : {};
+    if (!record?.email || !isStaff(claims) || !claims.role) throw notFound();
+    const displayName = displayNameSchema.safeParse(record.displayName);
+    await upsertStaff({ uid, email: record.email, displayName: displayName.success ? displayName.data : "Membre", role: claims.role as StaffRole, invitedBy: "script" });
+  }
   await setClaims(uid, null);
   await revokeSessions(uid);
   await auth().updateUser(uid, { disabled: true });
@@ -323,5 +379,6 @@ export async function revoke(ctx: StaffContext, uid: string, identity: RequestId
     target: { type: "staff", id: uid },
     automated: false,
     ip: identity.ip,
+    reason: REVOKE_ACCESS_REMINDER,
   });
 }

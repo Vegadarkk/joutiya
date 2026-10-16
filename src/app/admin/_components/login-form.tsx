@@ -12,12 +12,14 @@ import { SetPasswordForm } from "./set-password-form";
 import { Turnstile } from "./turnstile";
 
 // Staff sign-in. Cloudflare Access has already identified the person (e-mail prefilled, read-only);
-// the password is the second check. From the 3rd failure the API asks for Turnstile: the widget
-// appears and the attempt is resent as soon as it is solved.
+// the password is the second check. With a Turnstile site key (every deployed environment) the
+// widget is part of the form and every attempt carries its token; without keys (local development)
+// the API asks for one from the 3rd failure and accepts any value.
 
 const MESSAGES: Record<string, string> = {
   invalid_credentials: "E-mail ou mot de passe incorrect.",
   account_locked: "Trop de tentatives. Réessayez dans 15 minutes.",
+  rate_limited: "Trop de tentatives depuis votre réseau. Réessayez plus tard.",
   account_disabled: "Ce compte est désactivé. Demandez une nouvelle invitation à un admin.",
   forbidden: "Ce compte n'a pas accès au back-office, ou son e-mail diffère de votre identité Cloudflare Access.",
   unauthenticated: "Identité Cloudflare Access absente. Rechargez la page pour vous reconnecter.",
@@ -57,27 +59,38 @@ function SignInForm({ accessEmail, nonce, turnstileSiteKey }: Omit<LoginFormProp
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [challenge, setChallenge] = useState(false);
-  // Turnstile tokens are single-use: a failed attempt remounts the widget.
+  // Token of the widget (site key configured). Tokens are single-use: an answered attempt remounts
+  // the widget, keyed by `attempt`, which produces a fresh one.
+  const [token, setToken] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  // The form was sent before the widget produced its token: the attempt leaves when it arrives.
+  const [pending, setPending] = useState(false);
 
-  async function submit(turnstileToken?: string) {
+  function renewWidget() {
+    setToken(null);
+    setAttempt((value) => value + 1);
+  }
+
+  async function submit(turnstileToken: string | null) {
     setLoading(true);
+    setPending(false);
     setError(null);
     try {
-      let token = turnstileToken;
+      let current = turnstileToken;
       for (;;) {
         const result = await adminFetch<StaffLoginResponse>(ADMIN_API.login, {
           method: "POST",
-          body: { email, password, ...(token ? { turnstileToken: token } : {}) },
+          body: { email, password, ...(current ? { turnstileToken: current } : {}) },
         });
         if (result?.status === "turnstile_required") {
           // Development without Turnstile keys: the server accepts any token (dev bypass).
-          if (!turnstileSiteKey && !token) {
-            token = "dev-bypass";
+          if (!turnstileSiteKey && !current) {
+            current = "dev-bypass";
             continue;
           }
-          setChallenge(true);
+          // The token we sent was stale (expired or already used): a new widget, then resend.
+          setPending(true);
+          renewWidget();
           return;
         }
         if (result?.status === "signed_in") {
@@ -90,7 +103,7 @@ function SignInForm({ accessEmail, nonce, turnstileSiteKey }: Omit<LoginFormProp
       }
     } catch (cause) {
       setError(errorMessage(cause, MESSAGES));
-      setAttempt((value) => value + 1);
+      if (turnstileSiteKey) renewWidget();
     } finally {
       setLoading(false);
     }
@@ -99,8 +112,18 @@ function SignInForm({ accessEmail, nonce, turnstileSiteKey }: Omit<LoginFormProp
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!password) return setError("Saisissez votre mot de passe.");
-    if (challenge && turnstileSiteKey) return setError("Validez la vérification anti-robot ci-dessous.");
-    void submit();
+    if (turnstileSiteKey && !token) {
+      // The widget is still solving: the attempt leaves as soon as it has a token.
+      setError(null);
+      setPending(true);
+      return;
+    }
+    void submit(token);
+  }
+
+  function onToken(value: string) {
+    setToken(value);
+    if (pending) void submit(value);
   }
 
   return (
@@ -135,14 +158,13 @@ function SignInForm({ accessEmail, nonce, turnstileSiteKey }: Omit<LoginFormProp
           autoFocus
         />
       </Field>
-      {challenge && turnstileSiteKey ? (
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-foreground-muted">Plusieurs tentatives ont échoué : une vérification anti-robot est demandée.</p>
-          <Turnstile key={attempt} siteKey={turnstileSiteKey} action="staff-login" nonce={nonce} onToken={(token) => void submit(token)} />
+      {turnstileSiteKey ? (
+        <div className="flex flex-col gap-2" data-turnstile={token ? "ready" : "pending"}>
+          <Turnstile key={attempt} siteKey={turnstileSiteKey} action="staff-login" nonce={nonce} onToken={onToken} onReset={() => setToken(null)} />
         </div>
       ) : null}
       {error ? <ErrorBanner title={error} /> : null}
-      <Button type="submit" loading={loading} className="w-full">
+      <Button type="submit" loading={loading || pending} className="w-full">
         Se connecter
       </Button>
       <p className="text-xs text-foreground-muted">

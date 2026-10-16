@@ -192,15 +192,17 @@ describe("POST /api/auth/phone/start", () => {
     expect((await postStart(m, freshNumber().typed)).status).toBe(200);
   });
 
-  it("limits a number to one start per minute, even from another account", async () => {
+  it("limits a number to one start per minute per account, without locking other accounts out", async () => {
     const alice = await member();
     const bob = await member();
     const { typed } = freshNumber();
     expect((await postStart(alice, typed)).status).toBe(200);
-    const response = await postStart(bob, typed);
+    const response = await postStart(alice, typed);
     expect(response.status).toBe(429);
     expect(response.headers.get("retry-after")).toMatch(/^\d+$/);
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe("rate_limited");
+    // A stranger's start on the owner's number never blocks the owner.
+    expect((await postStart(bob, typed)).status).toBe(200);
   });
 
   it("limits an account to 3 starts per day", async () => {
@@ -342,14 +344,22 @@ describe("POST /api/webhooks/whatsapp", () => {
     expect((await postWebhook(payload, null)).status).toBe(403);
     expect((await postWebhook(payload, "sha256=zz")).status).toBe(403);
     expect((await postWebhook("{not json")).status).toBe(400);
-    const big = `{"pad":"${"x".repeat(64 * 1024)}"}`;
+    // A Meta batch can reach 3 MB; up to 1 MiB is read and checked, beyond that it is refused unread.
+    const large = `{"pad":"${"x".repeat(512 * 1024)}"}`;
+    expect((await postWebhook(large)).status).toBe(200);
+    const big = `{"pad":"${"x".repeat(1024 * 1024)}"}`;
     expect((await postWebhook(big)).status).toBe(413);
     expect(((await (await getStatus(m)).json()) as { status: string }).status).toBe("pending");
   });
 });
 
-describe("one verified number per account", () => {
-  it("refuses a new start for an already verified account and for a number verified elsewhere", async () => {
+async function auditActions(uid: string): Promise<string[]> {
+  const audits = await db().collection(COLLECTIONS.auditLogs).where("target.id", "==", uid).get();
+  return audits.docs.map((doc) => doc.get("action") as string);
+}
+
+describe("one verified number per account, one account per number", () => {
+  it("refuses a new start for an already verified account", async () => {
     const alice = await member();
     const number = freshNumber();
     const challenge = await startPending(alice, number.typed);
@@ -358,25 +368,58 @@ describe("one verified number per account", () => {
     const again = await postStart(alice, freshNumber().typed);
     expect(again.status).toBe(409);
     expect(((await again.json()) as { error: { code: string } }).error.code).toBe("conflict");
-
-    const bob = await member();
-    const taken = await postStart(bob, number.typed);
-    expect(taken.status).toBe(409);
-    expect(((await taken.json()) as { error: { code: string } }).error.code).toBe("conflict");
   });
 
-  it("does not verify a number claimed by another account while the challenge was pending", async () => {
+  it("moves a number verified elsewhere to the account that proves possession, and tells the previous holder", async () => {
+    const alice = await member();
+    const number = freshNumber();
+    const forAlice = await startPending(alice, number.typed);
+    expect((await postWebhook(inbound(number.from, `JOUTIYA ${forAlice.code}`, wamid()))).status).toBe(200);
+    expect(((await (await getStatus(alice)).json()) as { status: string }).status).toBe("verified");
+    sendMailMock.mockClear();
+
+    // A number verified by another account is not refused (that would reveal it is registered).
+    const bob = await member();
+    const forBob = await startPending(bob, number.typed);
+    expect((await postWebhook(inbound(number.from, `JOUTIYA ${forBob.code}`, wamid()))).status).toBe(200);
+    expect((await (await getStatus(bob)).json()) as unknown).toEqual({ status: "verified", phone: number.national });
+    expect((await (await getStatus(alice)).json()) as unknown).toEqual({ status: "none", phone: null });
+
+    const bobAccount = await getUserPrivate(bob.uid);
+    expect(bobAccount?.phoneE164).toBe(number.e164);
+    expect((await getUser(bob.uid))?.badges.phoneVerified).toBe(true);
+    const aliceAccount = await getUserPrivate(alice.uid);
+    expect(aliceAccount?.phoneE164).toBeUndefined();
+    expect(aliceAccount?.phoneVerifiedAt).toBeUndefined();
+    expect((await getUser(alice.uid))?.badges.phoneVerified).toBe(false);
+
+    expect(await auditActions(bob.uid)).toContain("phone.verified");
+    expect(await auditActions(alice.uid)).toContain("phone.transferred");
+
+    expect(sendMailMock).toHaveBeenCalledTimes(2);
+    expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({ template: "phoneRemoved", locale: "fr", to: alice.email, priority: "security", data: { displayName: "Testeur Joutiya", phone: number.national } }));
+    expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({ template: "phoneVerified", to: bob.email }));
+
+    // Alice can verify a new number (or take this one back) afterwards.
+    resetRateLimiters();
+    expect((await postStart(alice, freshNumber().typed)).status).toBe(200);
+  });
+
+  it("lets the code pick the account when two accounts hold a challenge for the same number", async () => {
     const alice = await member();
     const bob = await member();
     const number = freshNumber();
     const forAlice = await startPending(alice, number.typed);
-    resetRateLimiters();
     const forBob = await startPending(bob, number.typed);
-    // Bob's start took the number pointer: Alice's code is no longer matched.
+    // Bob started last, but Alice's code arrives: Alice is verified, Bob stays pending.
     expect((await postWebhook(inbound(number.from, `JOUTIYA ${forAlice.code}`, wamid()))).status).toBe(200);
-    expect(((await (await getStatus(alice)).json()) as { status: string }).status).toBe("pending");
+    expect(((await (await getStatus(alice)).json()) as { status: string }).status).toBe("verified");
+    expect(((await (await getStatus(bob)).json()) as { status: string }).status).toBe("pending");
+    expect(await auditActions(alice.uid)).not.toContain("phone.transferred");
+    // Bob's code then proves possession too: the number moves to Bob.
     expect((await postWebhook(inbound(number.from, `JOUTIYA ${forBob.code}`, wamid()))).status).toBe(200);
     expect(((await (await getStatus(bob)).json()) as { status: string }).status).toBe("verified");
-    expect(((await (await getStatus(alice)).json()) as { status: string }).status).toBe("pending");
+    expect(((await (await getStatus(alice)).json()) as { status: string }).status).toBe("none");
+    expect(await auditActions(alice.uid)).toContain("phone.transferred");
   });
 });

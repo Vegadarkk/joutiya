@@ -158,6 +158,8 @@ export function parseEnv(source: Record<string, string | undefined>): ParsedEnv 
     if (env.APP_ENV === "prod" && (TURNSTILE_TEST_KEY.test(env.TURNSTILE_SITE_KEY ?? "") || TURNSTILE_TEST_KEY.test(env.TURNSTILE_SECRET_KEY ?? ""))) {
       errors.push("TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY must not be Cloudflare test keys in prod");
     }
+    // §6: report-only is a staging tool; production enforces its CSP.
+    if (env.APP_ENV === "prod" && env.CSP_REPORT_ONLY) errors.push("CSP_REPORT_ONLY must not be set in prod");
     // A leftover phase 1 name would be silently ignored: refuse it so the rename is not missed.
     for (const name of legacy) errors.push(`${name} is no longer read: use ${name.replace("NEXT_PUBLIC_", "")} (runtime configuration)`);
   } else if (legacy.length > 0) {

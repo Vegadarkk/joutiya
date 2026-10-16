@@ -1,7 +1,7 @@
 import "server-only";
 import { serverEnv } from "@/lib/env";
 import type { MailTransport, RenderedMail, SendResult } from "../types";
-import { isRetryableStatus, leadingInt, networkError, ProviderError, readErrorBody, SEND_TIMEOUT_MS } from "./errors";
+import { classifyStatus, leadingInt, networkError, providerFailure, readErrorBody, SEND_TIMEOUT_MS } from "./errors";
 
 // Brevo (phase-2/research/services.md §3), the overflow for security mails only: POST /v3/smtp/email,
 // `api-key` header, `{ sender, to, subject, htmlContent, textContent }`, 201 `{ messageId }`.
@@ -73,7 +73,7 @@ export class BrevoTransport implements MailTransport {
     if (!response.ok) {
       const detail = await readErrorBody(response);
       const retryAfter = leadingInt(response.headers.get("retry-after")) ?? leadingInt(response.headers.get("x-sib-ratelimit-reset"));
-      throw new ProviderError(this.name, response.status, isRetryableStatus(response.status), `brevo: HTTP ${response.status}${detail.name ? ` ${detail.name}` : ""}${detail.message ? ` (${detail.message})` : ""}`, retryAfter);
+      throw providerFailure(this.name, response.status, classifyStatus(response.status), detail, retryAfter);
     }
 
     let id = "";

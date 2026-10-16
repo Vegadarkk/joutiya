@@ -6,6 +6,7 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
 
 // Assembled at runtime: a literal would look like a credential to the secret scan.
 const PASSWORD = ["Souk", "Tanger", "2026!"].join("-");
+const NEW_PASSWORD = ["Medina", "Fes", "2027!"].join("-");
 const uniqueEmail = (prefix = "e2e") => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@test.joutiya.ma`;
 
 interface DevMail {
@@ -61,6 +62,48 @@ async function fillSignup(page: Page, { name, email, password }: { name: string;
   await page.getByLabel("Adresse e-mail").fill(email);
   await page.getByLabel("Mot de passe", { exact: true }).fill(password);
 }
+
+/** Fills and sends the sign-in form of the current page. */
+async function signIn(page: Page, email: string, password: string) {
+  await page.getByLabel("Adresse e-mail").fill(email);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Se connecter" }).click();
+}
+
+/** Signs up through the UI, confirms the address from the mailbox, then clears the cookies: a verified, signed-out account. */
+async function createVerifiedAccount(page: Page, request: APIRequestContext, prefix: string): Promise<{ email: string; name: string }> {
+  const email = uniqueEmail(prefix);
+  const name = "Yasmine Test";
+  await page.goto("/fr/inscription");
+  await fillSignup(page, { name, email, password: PASSWORD });
+  await page.getByRole("checkbox", { name: /conditions générales d'utilisation/i }).check();
+  await page.getByRole("checkbox", { name: /transférer mes données personnelles/i }).check();
+  await waitForTurnstile(page);
+  await page.getByRole("button", { name: "Créer mon compte" }).click();
+  await expect(page.getByRole("heading", { name: "Vérifiez votre boîte mail" })).toBeVisible({ timeout: 15_000 });
+  const mail = await waitForMail(request, email, "verifyEmail");
+  await page.goto(mail.data.actionUrl!);
+  await expect(page.getByRole("heading", { name: "Adresse confirmée" })).toBeVisible({ timeout: 15_000 });
+  await page.context().clearCookies();
+  return { email, name };
+}
+
+/**
+ * Stand-in for https://accounts.google.com/gsi/client: records the `initialize` configuration and
+ * renders a button that fires the callback with a fake credential (the server rejects it).
+ */
+const GSI_STUB = `
+window.google = { accounts: { id: {
+  initialize(config) { window.__gsi = config; },
+  renderButton(parent) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "Continuer avec Google (stub)";
+    button.addEventListener("click", () => window.__gsi.callback({ credential: "stub-credential-" + "x".repeat(40), select_by: "btn" }));
+    parent.appendChild(button);
+  },
+} } };
+`;
 
 test.describe("account", () => {
   test("signs up, confirms the e-mail, edits the profile, signs out and back in", async ({ page, request }) => {
@@ -135,6 +178,120 @@ test.describe("account", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Se connecter" })).toBeVisible();
     await page.goto("/fr/verifications");
     await expect(page).toHaveURL(/\/fr\/connexion/);
+  });
+
+  test("resets a forgotten password from the e-mail link, then signs in with the new one", async ({ page, request }) => {
+    const { email } = await createVerifiedAccount(page, request, "reset");
+
+    await page.goto("/fr/mot-de-passe-oublie");
+    await page.getByLabel("Adresse e-mail").fill(email);
+    await waitForTurnstile(page);
+    await page.getByRole("button", { name: "Envoyer le lien" }).click();
+    await expect(page.getByRole("heading", { name: "Consultez votre boîte mail" })).toBeVisible({ timeout: 15_000 });
+
+    const mail = await waitForMail(request, email, "resetPassword");
+    expect(mail.data.actionUrl).toMatch(/\/fr\/action\?/);
+    expect(mail.data.actionUrl).toContain("mode=resetPassword");
+    expect(mail.data.actionUrl).toContain("oobCode=");
+    await page.goto(mail.data.actionUrl!);
+    await expect(page.getByRole("heading", { level: 1, name: "Choisir un nouveau mot de passe" })).toBeVisible();
+    await expect(page.getByText(`Pour le compte ${email}.`)).toBeVisible({ timeout: 15_000 });
+    // The single-use code leaves the address bar (and the history entry) once read.
+    await expect(page).not.toHaveURL(/oobCode=/);
+    expect(await page.evaluate(() => window.location.search)).toBe("");
+
+    await page.getByLabel("Nouveau mot de passe").fill(NEW_PASSWORD);
+    await page.getByRole("button", { name: "Enregistrer le mot de passe" }).click();
+    const done = page.locator("section").filter({ has: page.getByRole("heading", { name: "Mot de passe modifié" }) });
+    await expect(done).toBeVisible({ timeout: 15_000 });
+    await done.getByRole("link", { name: "Se connecter" }).click();
+    await expect(page).toHaveURL(/\/fr\/connexion/);
+
+    await signIn(page, email, NEW_PASSWORD);
+    await expect(page).toHaveURL(/\/fr\/parametres$/, { timeout: 15_000 });
+    await expect(page.getByRole("heading", { level: 1, name: "Mes paramètres" })).toBeVisible();
+  });
+
+  test("asks for Turnstile after three wrong passwords, then signs in with its token", async ({ page, request }) => {
+    const { email } = await createVerifiedAccount(page, request, "lock");
+    await page.goto("/fr/connexion");
+    await page.getByLabel("Adresse e-mail").fill(email);
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      await page.getByLabel("Mot de passe", { exact: true }).fill(`mauvais-${attempt}`);
+      const [response] = await Promise.all([
+        page.waitForResponse((candidate) => candidate.url().includes("/api/auth/login")),
+        page.getByRole("button", { name: "Se connecter" }).click(),
+      ]);
+      expect(response.status()).toBe(401);
+      await expect(page.getByRole("alert").filter({ hasText: "Adresse e-mail ou mot de passe incorrect." })).toBeVisible();
+    }
+    await expect(page.getByText("Encore une vérification")).toHaveCount(0);
+
+    // Fourth attempt, right password: the server wants a token first; the widget appears (test key:
+    // solved by itself) and the form goes again with the token.
+    await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+    const [challenge] = await Promise.all([
+      page.waitForResponse((candidate) => candidate.url().includes("/api/auth/login")),
+      page.getByRole("button", { name: "Se connecter" }).click(),
+    ]);
+    expect(challenge.status()).toBe(200);
+    expect(((await challenge.json()) as { status: string }).status).toBe("turnstile_required");
+    await expect(page.getByText("Encore une vérification")).toBeVisible();
+    await waitForTurnstile(page);
+    await expect(page).toHaveURL(/\/fr\/parametres$/, { timeout: 20_000 });
+  });
+
+  test("?next= brings the person back where they were", async ({ page, request }) => {
+    const { email } = await createVerifiedAccount(page, request, "next");
+
+    // Guarded page -> sign-in page carrying next -> back to the guarded page.
+    await page.goto("/fr/verifications");
+    await expect(page).toHaveURL(/\/fr\/connexion\?next=(%2F|\/)fr(%2F|\/)verifications$/);
+    await signIn(page, email, PASSWORD);
+    await expect(page).toHaveURL(/\/fr\/verifications$/, { timeout: 15_000 });
+    await expect(page.getByRole("heading", { level: 1, name: "Vérifier mon numéro" })).toBeVisible();
+
+    // Already signed in: the sign-in page honours next, and refuses a foreign target.
+    await page.goto("/fr/connexion?next=%2Ffr%2Fverifications");
+    await expect(page).toHaveURL(/\/fr\/verifications$/);
+    await page.goto("/fr/connexion?next=%2F%2Fevil.example%2F");
+    await expect(page).toHaveURL(/\/fr\/parametres$/);
+    await page.goto("/fr/inscription?next=%2Ffr%2Fverifications");
+    await expect(page).toHaveURL(/\/fr\/verifications$/);
+
+    // The header's sign-in link carries the current page.
+    await page.context().clearCookies();
+    await page.goto("/fr");
+    await page.getByRole("banner").getByRole("link", { name: "Se connecter" }).click();
+    await expect(page).toHaveURL(/\/fr\/connexion\?next=(%2F|\/)fr$/);
+    await signIn(page, email, PASSWORD);
+    await expect(page).toHaveURL(/\/fr$/, { timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Mon compte" })).toBeVisible();
+  });
+
+  test("the Google button hands a rejected credential to the form message", async ({ page, request }) => {
+    const config = (await (await request.get("/api/config")).json()) as { googleClientId: string | null };
+    // Without a client id the button never renders (playwright.config.ts sets no GOOGLE_OAUTH_CLIENT_ID).
+    test.skip(!config.googleClientId, "GOOGLE_OAUTH_CLIENT_ID is not set for the e2e server: the Google button does not render");
+    await page.route("https://accounts.google.com/gsi/client", (route) => route.fulfill({ status: 200, contentType: "application/javascript", body: GSI_STUB }));
+    await page.goto("/fr/connexion");
+    await page.getByRole("button", { name: "Continuer avec Google (stub)" }).click();
+    // The fake token is refused server side: the form says so, and the page stays.
+    await expect(page.getByRole("alert")).toBeVisible({ timeout: 15_000 });
+    await expect(page).toHaveURL(/\/fr\/connexion/);
+    // GIS was initialised with a per-page nonce (replay protection).
+    const nonce = await page.evaluate(() => (window as unknown as { __gsi?: { nonce?: string } }).__gsi?.nonce ?? "");
+    expect(nonce.length).toBeGreaterThanOrEqual(16);
+    expect(nonce).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+
+  test("/rif/connexion is consistently French, with a notice", async ({ page }) => {
+    await page.goto("/rif/connexion");
+    await expect(page.locator("html")).toHaveAttribute("lang", "rif-Latn");
+    await expect(page.getByText("Cette partie du site est en français pour le moment.")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Se connecter" })).toBeVisible();
+    await expect(page.getByLabel("Adresse e-mail")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Se connecter" })).toBeVisible();
   });
 
   test("/ar/connexion renders right to left", async ({ page }) => {

@@ -1,17 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as quota from "@/lib/quota";
 import type { TemplateMail } from "@/lib/mail/types";
 
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/mail/suppressions", () => ({ isSuppressed: vi.fn(async () => false), addSuppression: vi.fn() }));
-vi.mock("@/lib/quota", () => ({ consume: vi.fn(async () => ({ level: "ok" })), isDegraded: vi.fn(async () => false) }));
-vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => undefined) }));
+vi.mock("@/lib/quota", async (importOriginal) => ({
+  ...(await importOriginal<typeof quota>()),
+  consume: vi.fn(async () => ({ level: "ok" })),
+  isDegraded: vi.fn(async () => false),
+  isExhausted: vi.fn(async () => false),
+}));
+vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => true) }));
 vi.mock("@/lib/valkey/clients", () => ({ isValkeyConfigured: () => false, valkey: () => ({}), clientOptions: () => ({}) }));
+vi.mock("@/lib/legal/config", () => ({ getLegalConfig: vi.fn(async () => ({ companyName: "Adark Prime", hqAddress: "6 rue d'Armaillé, 75017 Paris" })) }));
 
 const { isSuppressed } = await import("@/lib/mail/suppressions");
-const { consume, isDegraded } = await import("@/lib/quota");
+const { consume, isDegraded, isExhausted } = await import("@/lib/quota");
 const { alert } = await import("@/lib/alert");
 const { resetServerEnv } = await import("@/lib/env");
-const { deliverMail } = await import("@/lib/mail/deliver");
+const { deliverMail, MailDeferredError, PROVIDER_UNAVAILABLE_RETRY_MS, resetMailAlertMarkers } = await import("@/lib/mail/deliver");
 const { memoryMailbox } = await import("@/lib/mail/transports/memory");
 
 const MAIL: TemplateMail<"verifyEmail"> = {
@@ -47,15 +54,35 @@ function stubFetch(...responses: (Response | (() => Response))[]) {
   return calls;
 }
 
+/** Quota counters as the test wants them: degraded (≥ 90 %) and exhausted (100 %) per id. */
+function quotas(state: Partial<Record<string, "degraded" | "exhausted">>): void {
+  vi.mocked(isDegraded).mockImplementation(async (id) => state[id] !== undefined);
+  vi.mocked(isExhausted).mockImplementation(async (id) => state[id] === "exhausted");
+}
+
+const NOW = new Date("2026-10-16T10:00:00Z");
+const RESET_MARGIN_MS = 60_000;
+
+function expectRetryAt(error: unknown, reset: string): void {
+  expect(error).toBeInstanceOf(MailDeferredError);
+  const retryAt = (error as InstanceType<typeof MailDeferredError>).retryAt.getTime();
+  const expected = Date.parse(reset) + RESET_MARGIN_MS;
+  // nextPeriodStart bisects to the second: at or up to 1 s after the boundary.
+  expect(retryAt).toBeGreaterThanOrEqual(expected);
+  expect(retryAt).toBeLessThanOrEqual(expected + 1_000);
+}
+
 beforeEach(() => {
   memoryMailbox().clear();
+  resetMailAlertMarkers();
   vi.mocked(isSuppressed).mockResolvedValue(false);
-  vi.mocked(isDegraded).mockResolvedValue(false);
+  quotas({});
   vi.mocked(consume).mockClear();
   vi.mocked(alert).mockClear();
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   setEnv({});
 });
@@ -75,6 +102,7 @@ describe("deliverMail in development", () => {
     expect(mine).toHaveLength(1);
     expect(mine[0]).toMatchObject({ template: "verifyEmail", locale: "fr", to: "Nadia@Example.com", data: MAIL.data });
     expect(mine[0]?.text).toContain(MAIL.data.actionUrl);
+    expect(mine[0]?.text).toContain("Adark Prime · 6 rue d'Armaillé, 75017 Paris");
     expect(mine[0]?.html).toContain(MAIL.data.actionUrl.replace("&", "&amp;"));
     expect(mine[0]?.subject.length).toBeGreaterThan(0);
     expect(typeof mine[0]?.id).toBe("string");
@@ -136,30 +164,92 @@ describe("deliverMail through Resend", () => {
     expect(alert).not.toHaveBeenCalled();
   });
 
+  it("keeps the quick retries for a transient Resend failure when Brevo is exhausted", async () => {
+    quotas({ "brevo.daily": "exhausted" });
+    stubFetch(json(503, {}));
+    await expect(deliverMail(SECURITY)).rejects.toMatchObject({ name: "ProviderError", retryable: true, status: 503 });
+  });
+
   it("drops a mail the provider rejects for good", async () => {
     stubFetch(json(422, { name: "validation_error", message: "Invalid `to` field" }));
     expect(await deliverMail(SECURITY)).toEqual({ skipped: "rejected" });
     expect(consume).not.toHaveBeenCalled();
+    expect(alert).not.toHaveBeenCalled();
   });
 
-  it("skips transactional mails when a Resend quota is degraded and routes security mails to Brevo", async () => {
-    vi.mocked(isDegraded).mockImplementation(async (id) => id === "resend.daily");
-    const calls = stubFetch(json(201, { messageId: "brevo-q" }));
+  it("skips other mails at 90 % and keeps the last 10 % of Resend for security mails", async () => {
+    quotas({ "resend.daily": "degraded" });
+    const calls = stubFetch(json(200, { id: "resend-s" }));
     expect(await deliverMail(MAIL)).toEqual({ skipped: "quota" });
     expect(calls).toHaveLength(0);
-    expect(await deliverMail(SECURITY)).toEqual({ provider: "brevo", id: "brevo-q" });
-    expect(calls[0]?.url).toBe("https://api.brevo.com/v3/smtp/email");
+    expect(await deliverMail(SECURITY)).toEqual({ provider: "resend", id: "resend-s" });
+    expect(calls[0]?.url).toBe("https://api.resend.com/emails");
+    expect(consume).toHaveBeenCalledWith("resend.daily");
   });
 
-  it("defers security mails when Brevo is exhausted too", async () => {
-    vi.mocked(isDegraded).mockResolvedValue(true);
-    stubFetch();
-    await expect(deliverMail(SECURITY)).rejects.toMatchObject({ provider: "brevo", retryable: true });
+  it("routes security mails to Brevo once Resend is exhausted", async () => {
+    quotas({ "resend.monthly": "exhausted" });
+    const calls = stubFetch(json(201, { messageId: "brevo-q" }));
+    expect(await deliverMail(SECURITY)).toEqual({ provider: "brevo", id: "brevo-q" });
+    expect(calls.map((call) => call.url)).toEqual(["https://api.brevo.com/v3/smtp/email"]);
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({ severity: "P2", title: "Mail: bascule sur Brevo" }));
+  });
+
+  it("defers security mails to the earliest reset when Brevo is exhausted too", async () => {
+    vi.useFakeTimers({ now: NOW });
+    quotas({ "resend.daily": "exhausted", "resend.monthly": "exhausted", "brevo.daily": "exhausted" });
+    const calls = stubFetch();
+    // Resend is back next month, Brevo tomorrow: the job waits for Brevo.
+    expectRetryAt(await deliverMail(SECURITY).catch((error: unknown) => error), "2026-10-17T00:00:00Z");
+    expect(calls).toHaveLength(0);
+    expect(consume).not.toHaveBeenCalled();
+    expect(alert).not.toHaveBeenCalled();
+  });
+
+  it("defers security mails to the Resend reset without a fallback key", async () => {
+    setEnv({ APP_ENV: "dev", MAIL_API_KEY: "re_test" });
+    vi.useFakeTimers({ now: NOW });
+    quotas({ "resend.daily": "exhausted" });
+    expectRetryAt(await deliverMail(SECURITY).catch((error: unknown) => error), "2026-10-17T00:00:00Z");
+    quotas({ "resend.daily": "exhausted", "resend.monthly": "exhausted" });
+    expectRetryAt(await deliverMail(SECURITY).catch((error: unknown) => error), "2026-11-01T00:00:00Z");
   });
 
   it("rethrows a retryable failure of a security mail without a fallback key", async () => {
     setEnv({ APP_ENV: "dev", MAIL_API_KEY: "re_test" });
     stubFetch(json(503, {}));
     await expect(deliverMail(SECURITY)).rejects.toMatchObject({ retryable: true, status: 503 });
+  });
+
+  it("treats a 401 as Resend unavailable: P1 alert once a day, Brevo for security mails", async () => {
+    const calls = stubFetch(json(401, { name: "restricted_api_key", message: "This API key is restricted" }), json(201, { messageId: "brevo-u" }), json(403, {}), json(201, { messageId: "brevo-u2" }));
+    expect(await deliverMail(SECURITY)).toEqual({ provider: "brevo", id: "brevo-u" });
+    expect(calls.map((call) => call.url)).toEqual(["https://api.resend.com/emails", "https://api.brevo.com/v3/smtp/email"]);
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({ severity: "P1", title: "Mail: resend indisponible (HTTP 401)" }));
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({ severity: "P2", title: "Mail: bascule sur Brevo" }));
+    const body = vi.mocked(alert).mock.calls.find(([event]) => event.severity === "P1")?.[0].body ?? "";
+    expect(body).not.toContain("This API key is restricted");
+    expect(alert).toHaveBeenCalledTimes(2);
+    // The same day: no second P1, still Brevo.
+    expect(await deliverMail(SECURITY)).toEqual({ provider: "brevo", id: "brevo-u2" });
+    expect(alert).toHaveBeenCalledTimes(2);
+    expect(consume).not.toHaveBeenCalledWith("resend.daily");
+  });
+
+  it("waits an hour (not five quick retries) when Resend is unavailable and nothing can take over", async () => {
+    vi.useFakeTimers({ now: NOW });
+    stubFetch(json(403, { name: "validation_error", message: "domain not verified" }), json(403, {}));
+    // Transactional mails never use Brevo.
+    const first = await deliverMail(MAIL).catch((error: unknown) => error);
+    expect(first).toBeInstanceOf(MailDeferredError);
+    expect((first as InstanceType<typeof MailDeferredError>).retryAt.getTime()).toBe(NOW.getTime() + PROVIDER_UNAVAILABLE_RETRY_MS);
+    expect((first as Error).message).not.toContain("domain not verified");
+    expect(alert).toHaveBeenCalledTimes(1);
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({ severity: "P1", title: "Mail: resend indisponible (HTTP 403)" }));
+    // A security mail without a fallback key waits too.
+    setEnv({ APP_ENV: "dev", MAIL_API_KEY: "re_test" });
+    const second = await deliverMail(SECURITY).catch((error: unknown) => error);
+    expect(second).toBeInstanceOf(MailDeferredError);
+    expect(consume).not.toHaveBeenCalled();
   });
 });

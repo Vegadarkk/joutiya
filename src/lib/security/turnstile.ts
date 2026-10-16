@@ -9,7 +9,8 @@ import { pepperedHash, safeEqual } from "./hash";
 
 const SITEVERIFY = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
-export type TurnstileAction = "signup" | "login" | "reset" | "google" | "verify-resend" | "staff-login" | "phone";
+export type { TurnstileAction } from "@/lib/contracts/auth";
+import type { TurnstileAction } from "@/lib/contracts/auth";
 
 export interface TurnstileResult {
   ok: boolean;

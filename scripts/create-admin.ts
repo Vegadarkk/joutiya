@@ -3,13 +3,18 @@
 // credentials (`gcloud auth application-default login`), or against the local emulators when
 // FIREBASE_AUTH_EMULATOR_HOST is set (no credentials needed then).
 //
-//   FIREBASE_PROJECT_ID=<project> SITE_URL=https://joutiya.ma ADMIN_HOST=admin.joutiya.ma \
+//   APP_ENV=prod FIREBASE_PROJECT_ID=<project> SITE_URL=https://joutiya.ma ADMIN_HOST=admin.joutiya.ma \
 //     node scripts/create-admin.ts --email <e-mail> --name <name> [--apply]
 //
-// Dry run by default: prints the planned steps and exits 0. With --apply:
-//   1. getUserByEmail, or createUser({ email, emailVerified: true, displayName });
-//   2. setCustomUserClaims({ role: "admin", v: 2 }), refresh tokens revoked;
-//   3. staff/{uid} upsert with invitedBy "script";
+// FIREBASE_PROJECT_ID must be the project recorded for APP_ENV in infra/targets.json (§9,
+// scripts/assert-target.ts); against the emulators APP_ENV defaults to dev and a demo-* project
+// passes. Dry run by default: prints the planned steps and exits 0. With --apply:
+//   1. getUserByEmail: reused only when it is already a staff account (staff claims, or a staff/{uid}
+//      entry: a revoked admin), refused for any other existing account (it keeps its own password),
+//      else createUser({ email, emailVerified: true, displayName });
+//   2. staff/{uid} upsert with invitedBy "script", BEFORE the claims: a run that stops here leaves
+//      an entry without rights, never an admin the roster does not show;
+//   3. setCustomUserClaims({ role: "admin", v: 2 }), refresh tokens revoked;
 //   4. generatePasswordResetLink(email, { url: <ADMIN_ORIGIN>/connexion }), then prints ONE line:
 //      <ADMIN_ORIGIN>/connexion?mode=setPassword&oobCode=...
 // That URL is the only way to set the first password without a mail transport: open it behind
@@ -18,9 +23,10 @@
 // ADMIN_ORIGIN is SITE_URL's scheme and port on ADMIN_HOST, like expectedOrigin("admin") in
 // src/lib/security/origin.ts (re-implemented here: that module is server-only).
 
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { assertTargets, validateTargets, type Targets } from "./assert-target.ts";
 
 export interface CreateAdminArgs {
   email: string;
@@ -63,6 +69,29 @@ export function oobCodeOf(link: string): string {
   return code;
 }
 
+/**
+ * Why FIREBASE_PROJECT_ID cannot be used: not the project recorded for APP_ENV in infra/targets.json
+ * (or no APP_ENV to look it up). Empty when it matches. The configured value is never printed.
+ */
+export function projectErrors(targets: unknown, env: { APP_ENV?: string | undefined; FIREBASE_PROJECT_ID?: string | undefined }): string[] {
+  const fileErrors = validateTargets(targets);
+  if (fileErrors.length > 0) return fileErrors.map((error) => `infra/targets.json: ${error}`);
+  return assertTargets(targets as Targets, { APP_ENV: env.APP_ENV, FIREBASE_PROJECT_ID: env.FIREBASE_PROJECT_ID });
+}
+
+export interface ExistingAccount {
+  /** `role` custom claim of the Auth record, whatever its value. */
+  role: unknown;
+  /** staff/{uid} exists (a revoked member keeps its entry while its claims are cleared). */
+  rosterExists: boolean;
+}
+
+/** Why an existing Auth account cannot become the first admin; null when it already is a staff account. */
+export function existingAccountProblem(account: ExistingAccount): string | null {
+  if (account.role === "admin" || account.role === "moderator" || account.rosterExists) return null;
+  return "a Joutiya account already exists with this e-mail (member, or a sign-up never confirmed) and keeps its own password: staff accounts are separate (§6), use another address";
+}
+
 export interface PlanInput {
   args: CreateAdminArgs;
   projectId: string;
@@ -73,13 +102,17 @@ export interface PlanInput {
 export function planSteps({ args, projectId, origin, emulated }: PlanInput): string[] {
   return [
     `Project ${projectId} (${emulated ? "Auth emulator" : "Application Default Credentials"}), admin origin ${origin}`,
-    `1. Auth account ${args.email}: reuse it, or create it verified with the name "${args.name}"`,
-    `2. Custom claims { role: "admin", v: 2 }, refresh tokens revoked`,
-    `3. staff/<uid> = { email, displayName, role: "admin", invitedBy: "script", createdAt }`,
+    `1. Auth account ${args.email}: reuse it if it is already staff (claims or staff/<uid>), refuse any other existing account, else create it verified with the name "${args.name}"`,
+    `2. staff/<uid> = { email, displayName, role: "admin", invitedBy: "script", createdAt } (before the claims)`,
+    `3. Custom claims { role: "admin", v: 2 }, refresh tokens revoked`,
     `4. Password-reset link for ${args.email} (continue URL ${origin}/connexion)`,
     `Output: ${origin}/connexion?mode=setPassword&oobCode=<code>`,
     "Dry run: nothing changed. Add --apply to run these steps.",
   ];
+}
+
+function readTargets(): unknown {
+  return JSON.parse(readFileSync(fileURLToPath(new URL("../infra/targets.json", import.meta.url)), "utf8"));
 }
 
 async function main(): Promise<void> {
@@ -87,6 +120,9 @@ async function main(): Promise<void> {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   if (!projectId) throw new Error("FIREBASE_PROJECT_ID is required");
   const emulated = Boolean(process.env.FIREBASE_AUTH_EMULATOR_HOST);
+  const appEnv = process.env.APP_ENV?.trim() || (emulated ? "dev" : undefined);
+  const problems = projectErrors(readTargets(), { APP_ENV: appEnv, FIREBASE_PROJECT_ID: projectId });
+  if (problems.length > 0) throw new Error(problems.join("\n"));
   const origin = adminOrigin(process.env.SITE_URL ?? "http://localhost:3000", process.env.ADMIN_HOST);
   if (!args.apply) {
     for (const line of planSteps({ args, projectId, origin, emulated })) console.log(line);
@@ -98,19 +134,23 @@ async function main(): Promise<void> {
   const { getFirestore } = await import("firebase-admin/firestore");
   const app = initializeApp({ projectId, ...(emulated ? {} : { credential: applicationDefault() }) });
   const auth = getAuth(app);
+  const staff = getFirestore(app).collection("staff");
 
   const existing = await auth.getUserByEmail(args.email).catch(() => null);
-  const role = existing?.customClaims?.["role"];
-  if (role === "individual" || role === "pro") throw new Error("this e-mail belongs to a member account: staff accounts are separate (§6)");
+  if (existing) {
+    const problem = existingAccountProblem({ role: existing.customClaims?.["role"], rosterExists: (await staff.doc(existing.uid).get()).exists });
+    if (problem) throw new Error(problem);
+  }
   const uid = existing?.uid ?? (await auth.createUser({ email: args.email, emailVerified: true, displayName: args.name })).uid;
   if (existing?.disabled) await auth.updateUser(uid, { disabled: false });
-  await auth.setCustomUserClaims(uid, { role: "admin", v: 2 });
-  await auth.revokeRefreshTokens(uid);
 
-  const ref = getFirestore(app).collection("staff").doc(uid);
+  // Roster first: stopping after this step leaves an entry without rights, never the reverse.
+  const ref = staff.doc(uid);
   const current = await ref.get();
   const createdAt: unknown = current.exists ? current.get("createdAt") : new Date();
   await ref.set({ email: args.email, displayName: args.name, role: "admin", invitedBy: "script", createdAt });
+  await auth.setCustomUserClaims(uid, { role: "admin", v: 2 });
+  await auth.revokeRefreshTokens(uid);
 
   const link = await auth.generatePasswordResetLink(args.email, { url: `${origin}/connexion` });
   console.log(setPasswordUrl(origin, oobCodeOf(link)));

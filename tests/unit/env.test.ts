@@ -82,6 +82,13 @@ describe("parseEnv", () => {
     expect(parseEnv({ ...prod, DEV_MAILBOX: "true" }).errors).toContain("DEV_MAILBOX must not be set outside dev");
   });
 
+  it("refuses a report-only CSP in prod and accepts it in staging", () => {
+    const prod: Record<string, string> = { ...deployed, APP_ENV: "prod", SITE_URL: "https://joutiya.ma", ADMIN_HOST: "admin.joutiya.ma" };
+    expect(parseEnv({ ...prod, CSP_REPORT_ONLY: "true" }).errors).toEqual(["CSP_REPORT_ONLY must not be set in prod"]);
+    expect(parseEnv({ ...prod, CSP_REPORT_ONLY: "false" }).errors).toEqual([]);
+    expect(parseEnv({ ...deployed, CSP_REPORT_ONLY: "true" }).errors).toEqual([]);
+  });
+
   it("rejects an unknown APP_ENV", () => {
     expect(parseEnv({ APP_ENV: "production" }).errors[0]).toMatch(/^APP_ENV/);
   });

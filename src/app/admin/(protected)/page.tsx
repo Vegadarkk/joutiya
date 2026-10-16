@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { QUOTAS } from "@/config/quotas";
 import { Badge } from "@/components/ui/badge";
+import { requirePageStaff } from "@/lib/auth/current-user";
 import { readQuotas, type QuotaStatus } from "@/lib/quota";
 
-// The free-quota board (§2), home of the signed-in back office. Moderation, reports and settings
-// arrive with phase 5.
+// The free-quota board (§2), home of the signed-in back office (moderators and admins).
+// Moderation, reports and settings arrive with phase 5.
 
 export const metadata: Metadata = { title: "Quotas" };
 
@@ -25,6 +26,7 @@ function amount(status: QuotaStatus): string {
 }
 
 export default async function AdminHome() {
+  await requirePageStaff();
   const quotas = await readQuotas();
   return (
     <>

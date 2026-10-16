@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { RATE_LIMITS } from "@/config/rate-limits";
 import { auth } from "@/lib/firebase/admin";
 import { setClaims } from "@/lib/firebase/claims";
 import { sendMail } from "@/lib/mail";
-import { resetRateLimiters } from "@/lib/rate-limit/limiter";
+import { consumeLimit, resetRateLimiters } from "@/lib/rate-limit/limiter";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 import { POST as action } from "@/app/api/auth/action/route";
@@ -89,12 +90,56 @@ describe("POST /api/auth/login", () => {
     const locked = await call<ErrorBody>(login, LOGIN, { jar, body: { email, password: PASSWORD } });
     expect(locked.status).toBe(429);
     expect(locked.body.error.code).toBe("account_locked");
-    expect(locked.header("retry-after")).toBe("900");
+    // The lock runs for the full blockDuration from the 5th failure; Retry-After is what is left of it.
+    const retryAfter = Number(locked.header("retry-after"));
+    expect(retryAfter).toBeGreaterThan(RATE_LIMITS["login.fail.accountIp"].blockDuration - 10);
+    expect(retryAfter).toBeLessThanOrEqual(RATE_LIMITS["login.fail.accountIp"].blockDuration);
 
     // The lock is per account + IP: another network signs in normally.
     const elsewhere = await call<SignedInBody>(login, LOGIN, { jar: new Jar(), body: { email, password: PASSWORD } });
     expect(elsewhere.status).toBe(200);
     expect(elsewhere.body.status).toBe("signed_in");
+  });
+
+  it("makes Turnstile mandatory after 20 failures per hour on the account, whatever the IP or the pass", async () => {
+    const { email } = await createAccount(true);
+    const wrong = { email, password: ["not", "the", "password", "2"].join("-") };
+    const limit = RATE_LIMITS["login.fail.account"].points;
+    // Spread over distinct IPs: no IP lock, no account + IP escalation.
+    for (let i = 0; i < limit; i += 1) {
+      const failed = await call<ErrorBody>(login, LOGIN, { jar: new Jar(), body: wrong });
+      expect(failed.status).toBe(401);
+    }
+    const jar = new Jar();
+    const challenge = await call<{ status: string }>(login, LOGIN, { jar, body: { email, password: PASSWORD } });
+    expect(challenge.status).toBe(200);
+    expect(challenge.body).toEqual({ status: "turnstile_required" });
+    // A solved challenge serves this request only: the 30-minute pass does not lift the account escalation.
+    const failedWithToken = await call<ErrorBody>(login, LOGIN, { jar, body: { ...wrong, turnstileToken: "solved" } });
+    expect(failedWithToken.status).toBe(401);
+    expect(jar.get("__Host-tsv")).toBeDefined();
+    const stillChallenged = await call<{ status: string }>(login, LOGIN, { jar, body: { email, password: PASSWORD } });
+    expect(stillChallenged.body).toEqual({ status: "turnstile_required" });
+    const signedIn = await call<SignedInBody>(login, LOGIN, { jar, body: { email, password: PASSWORD, turnstileToken: "solved" } });
+    expect(signedIn.status).toBe(200);
+    expect(signedIn.body.status).toBe("signed_in");
+  });
+
+  it("escalates an exhausted IP to Turnstile instead of a 429 (CGNAT: an IP is never blocked outright)", async () => {
+    const { email } = await createAccount(true);
+    const jar = new Jar();
+    // The same key the handler consumes for this IP, exhausted in one go.
+    const exhausted = await consumeLimit("login.ip", jar.ip, RATE_LIMITS["login.ip"].points);
+    expect(exhausted).toEqual({ ok: true, remaining: 0 });
+    const challenge = await call<{ status: string }>(login, LOGIN, { jar, body: { email, password: PASSWORD } });
+    expect(challenge.status).toBe(200);
+    expect(challenge.body).toEqual({ status: "turnstile_required" });
+    const signedIn = await call<SignedInBody>(login, LOGIN, { jar, body: { email, password: PASSWORD, turnstileToken: "solved" } });
+    expect(signedIn.status).toBe(200);
+    expect(signedIn.body.status).toBe("signed_in");
+    // The pass then lifts the IP escalation for this device.
+    const again = await call<SignedInBody>(login, LOGIN, { jar, body: { email, password: PASSWORD } });
+    expect(again.status).toBe(200);
   });
 
   it("answers invalid_credentials for an unknown e-mail, like a wrong password", async () => {

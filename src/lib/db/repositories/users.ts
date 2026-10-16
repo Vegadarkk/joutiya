@@ -113,19 +113,17 @@ export async function linkProvider(uid: string, provider: "password" | "google.c
   await privateRef(uid).update({ providers: FieldValue.arrayUnion(provider) });
 }
 
+/** The account can no longer sign in with this provider (a never-verified password replaced on a Google sign-in). */
+export async function unlinkProvider(uid: string, provider: "password" | "google.com"): Promise<void> {
+  await privateRef(uid).update({ providers: FieldValue.arrayRemove(provider) });
+}
+
 export async function updateDisplayName(uid: string, displayName: string, now = new Date()): Promise<void> {
   await userRef(uid).update({ displayName, updatedAt: now });
 }
 
 export async function updateLocale(uid: string, locale: Locale, now = new Date()): Promise<void> {
   await userRef(uid).update({ locale, updatedAt: now });
-}
-
-export async function setPhoneVerified(uid: string, phoneE164: string, now = new Date()): Promise<void> {
-  const batch = db().batch();
-  batch.update(privateRef(uid), { phoneE164, phoneVerifiedAt: now });
-  batch.update(userRef(uid), { "badges.phoneVerified": true, updatedAt: now });
-  await batch.commit();
 }
 
 /** Accounts still pending after `before` (purge-unactivated): uids, oldest first. */
@@ -138,6 +136,26 @@ export async function listPendingAccounts(before: Date, limit = 200): Promise<st
     .limit(limit)
     .get();
   return snapshot.docs.map((doc) => doc.id);
+}
+
+/**
+ * Deletes the documents of an account that is still pending (purge-unactivated), in one
+ * transaction: an activation that lands between the listing and the purge keeps the account.
+ * False, and nothing written, when the user document is gone or no longer pending. The Auth
+ * record is deleted by the caller.
+ */
+export async function deleteAccountDocumentsIfPending(uid: string): Promise<boolean> {
+  return db().runTransaction(async (tx) => {
+    const [user, account] = await Promise.all([tx.get(userRef(uid)), tx.get(privateRef(uid))]);
+    if (!user.exists || user.get("activation") !== "pending") return false;
+    const hash: unknown = account.exists ? account.get("emailNormHash") : undefined;
+    // The index entry goes only when it is this account's (reads before writes in a transaction).
+    const index = typeof hash === "string" && hash ? await tx.get(emailRef(hash)) : null;
+    if (index?.exists && String(index.get("uid")) === uid) tx.delete(index.ref);
+    if (account.exists) tx.delete(privateRef(uid));
+    tx.delete(userRef(uid));
+    return true;
+  });
 }
 
 /** Deletes the documents of an account (Auth record deleted by the caller). */

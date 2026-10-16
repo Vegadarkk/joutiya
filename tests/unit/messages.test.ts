@@ -30,6 +30,14 @@ describe("messages", () => {
     for (const key of flatten(rif).keys()) expect(french.has(key), key).toBe(true);
   });
 
+  it("keeps rif.json free of Auth keys until a native review", () => {
+    // Decision 2026-10-16: a partial Tarifit translation of the account pages mixed two languages
+    // word by word. The whole Auth namespace falls back to French (with a notice on those pages)
+    // until a native speaker has reviewed a complete translation; add the keys all at once then.
+    expect(Object.keys(rif)).not.toContain("Auth");
+    for (const key of flatten(rif).keys()) expect(key.startsWith("Auth."), key).toBe(false);
+  });
+
   it("keeps the same ICU placeholders in every language", () => {
     for (const messages of [ar, rif]) {
       for (const [key, text] of flatten(messages)) expect(placeholders(text), key).toEqual(placeholders(french.get(key) ?? ""));

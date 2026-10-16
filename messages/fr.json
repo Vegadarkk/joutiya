@@ -112,7 +112,6 @@
       "showPassword": "Afficher le mot de passe",
       "hidePassword": "Masquer le mot de passe",
       "or": "ou",
-      "google": "Continuer avec Google",
       "googleLoading": "Chargement du bouton Google…",
       "backHome": "Revenir à l'accueil",
       "waitLater": "dans quelques minutes",
@@ -141,16 +140,18 @@
       "hints": {
         "title": "Votre mot de passe doit :",
         "length": "faire au moins {min} caractères",
-        "common": "ne pas être un mot de passe trop courant",
-        "notEmail": "être différent de votre adresse e-mail"
+        "common": "ne pas être un mot de passe courant ni une simple suite de caractères",
+        "personal": "ne pas contenir votre nom ni votre adresse e-mail"
       },
       "inApp": {
         "title": "Ouvrez cette page dans votre navigateur",
         "body": "Google refuse la connexion depuis le navigateur intégré de {app}. Ouvrez le lien dans Chrome ou Safari, ou connectez-vous avec votre e-mail ci-dessous.",
+        "bodyGeneric": "Google refuse la connexion depuis le navigateur intégré d'une application. Ouvrez le lien dans Chrome ou Safari, ou connectez-vous avec votre e-mail ci-dessous.",
         "copy": "Copier le lien",
         "copied": "Lien copié"
       },
-      "googleError": "Le bouton Google n'a pas pu se charger. Connectez-vous avec votre adresse e-mail."
+      "googleError": "Le bouton Google n'a pas pu se charger. Connectez-vous avec votre adresse e-mail.",
+      "frenchOnly": "Cette partie du site est en français pour le moment."
     },
     "signIn": {
       "title": "Se connecter",
@@ -247,7 +248,9 @@
         "current": "Mot de passe actuel",
         "new": "Nouveau mot de passe",
         "save": "Changer le mot de passe",
-        "changed": "Mot de passe changé"
+        "changed": "Mot de passe changé",
+        "noneBody": "Ce compte se connecte avec Google et n'a pas de mot de passe. Pour en ajouter un, demandez un lien de réinitialisation à votre adresse e-mail.",
+        "noneAction": "Choisir un mot de passe"
       },
       "verification": {
         "title": "Vérifications",
@@ -287,17 +290,20 @@
       "openWhatsApp": "Ouvrir WhatsApp",
       "expiresIn": "Code valable encore {time}",
       "waiting": "En attente de votre message…",
+      "pollStopped": "Suivi automatique en pause : après avoir envoyé votre message, rechargez la page.",
       "pendingTitle": "Un code est déjà en attente",
       "pendingBody": "Un code a été demandé pour le {phone}. Si vous ne l'avez plus, demandez-en un nouveau.",
       "verifiedTitle": "Numéro vérifié",
       "verifiedBody": "Le {phone} est maintenant associé à votre compte.",
       "expiredTitle": "Le code a expiré",
       "expiredBody": "Vous avez dix minutes pour envoyer le code. Demandez-en un nouveau.",
-      "restart": "Demander un nouveau code",
       "changeNumber": "Changer de numéro",
       "badge": "Téléphone vérifié",
       "backSettings": "Retour aux paramètres",
-      "unavailable": "La vérification WhatsApp n'est pas encore ouverte. Revenez dans quelques jours."
+      "unavailable": "La vérification WhatsApp n'est pas encore ouverte. Revenez dans quelques jours.",
+      "loadFailedTitle": "L'état de la vérification n'a pas pu être chargé",
+      "retry": "Réessayer",
+      "alreadyVerified": "Votre compte a déjà un numéro vérifié."
     },
     "menu": {
       "account": "Mon compte",
@@ -328,6 +334,10 @@
       "invalid_code": "Ce lien n'est plus valable.",
       "expired_code": "Ce lien a expiré.",
       "weak_password": "Ce mot de passe est trop courant ou trop simple. Choisissez-en un autre.",
+      "weak_password_common": "Ce mot de passe est trop courant. Choisissez-en un plus personnel, que vous n'utilisez nulle part ailleurs.",
+      "weak_password_personal": "Ce mot de passe contient votre nom ou votre adresse e-mail. Choisissez-en un autre.",
+      "weak_password_repeated": "Ce mot de passe répète un seul caractère. Choisissez-en un autre.",
+      "weak_password_sequence": "Ce mot de passe est une simple suite de caractères. Choisissez-en un autre.",
       "disposable_email": "Les adresses e-mail jetables ne sont pas acceptées.",
       "consent_required": "Acceptez les conditions pour continuer.",
       "phone_invalid": "Ce numéro n'est pas valide.",

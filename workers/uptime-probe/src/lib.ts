@@ -34,10 +34,14 @@ export interface KeyValue {
 
 /** Probes that must agree before a change is announced (5-minute cron: about 10 minutes). */
 export const CONFIRMATIONS = 2;
+/** "Up" probes that must agree before a recovery is announced (about 15 minutes): a flapping target rings once. */
+export const RECOVERY_CONFIRMATIONS = 3;
 /** Signed relay requests older than this are refused (replay window). */
 export const MAX_SKEW_SECONDS = 300;
 /** Relayed app alerts e-mailed per UTC day: a flood must not spend the site's shared Resend quota (100/day). */
 export const RELAY_DAILY_CAP = 20;
+/** Probe (cron) alerts e-mailed per UTC day: a flapping target must not spend it either. Telegram stays uncapped. */
+export const PROBE_DAILY_CAP = 10;
 export const RESEND_URL = "https://api.resend.com/emails";
 /** Resend refuses requests without a User-Agent (403, Cloudflare error 1010); workerd sets none. */
 const RESEND_USER_AGENT = "joutiya-uptime-probe";
@@ -86,12 +90,21 @@ export function transition(
   }
   if (observed === previous.status) return { state: { ...previous, pending: 0 }, alert: null };
   const pending = previous.pending + 1;
-  if (pending < CONFIRMATIONS) return { state: { ...previous, pending }, alert: null };
+  // Hysteresis: a recovery needs more agreeing probes than an incident.
+  const needed = observed === "up" ? RECOVERY_CONFIRMATIONS : CONFIRMATIONS;
+  if (pending < needed) return { state: { ...previous, pending }, alert: null };
 
   const state: ProbeState = { status: observed, pending: 0, since: now };
   const minutes = Math.max(1, Math.round((now - previous.since) / 60_000));
   if (observed === "up") {
-    return { state, alert: { severity: "info", title: `${target} : rétabli`, body: `Le site répond de nouveau (incident d'environ ${minutes} min).` } };
+    return {
+      state,
+      alert: {
+        severity: "info",
+        title: `${target} : rétabli`,
+        body: `Le site répond de nouveau (${RECOVERY_CONFIRMATIONS} sondes consécutives, incident d'environ ${minutes} min).`,
+      },
+    };
   }
   return {
     state,
@@ -107,6 +120,10 @@ const encoder = new TextEncoder();
 
 function hex(buffer: ArrayBuffer): string {
   return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  return hex(await crypto.subtle.digest("SHA-256", encoder.encode(text)));
 }
 
 export async function sign(secret: string, timestamp: string, body: string): Promise<string> {
@@ -259,6 +276,11 @@ export function utcDay(nowMs: number): string {
   return new Date(nowMs).toISOString().slice(0, 10);
 }
 
+/** UTC hour, e.g. 2026-10-16T10. */
+export function utcHour(nowMs: number): string {
+  return new Date(nowMs).toISOString().slice(0, 13);
+}
+
 /** True the first time `name` is seen on the current UTC day (one notice a day). */
 export async function markOncePerDay(kv: KeyValue, name: string, nowMs: number): Promise<boolean> {
   const key = `${name}:${utcDay(nowMs)}`;
@@ -267,25 +289,48 @@ export async function markOncePerDay(kv: KeyValue, name: string, nowMs: number):
   return true;
 }
 
-/** Takes one of today's relayed e-mail slots; false once the cap is reached. */
-export async function takeRelaySlot(kv: KeyValue, nowMs: number, cap = RELAY_DAILY_CAP): Promise<boolean> {
-  const key = `relay-count:${utcDay(nowMs)}`;
+/** The two e-mail counters, one KV key each per UTC day. */
+export type DailyCounter = "relay" | "probe";
+const DAILY_CAPS: Record<DailyCounter, number> = { relay: RELAY_DAILY_CAP, probe: PROBE_DAILY_CAP };
+
+/** Takes one of today's e-mail slots of `counter`; false once its cap is reached. */
+export async function takeDailySlot(kv: KeyValue, counter: DailyCounter, nowMs: number, cap = DAILY_CAPS[counter]): Promise<boolean> {
+  const key = `${counter}-count:${utcDay(nowMs)}`;
   const used = Number((await kv.get(key)) ?? "0");
   if (used >= cap) return false;
   await kv.put(key, String(used + 1), { expirationTtl: DAY_MARKER_TTL_SECONDS });
   return true;
 }
 
+/**
+ * Coarse Resend idempotency key of a relayed alert: one title per environment per UTC hour. A
+ * repeat inside the hour reaches Resend with the same key, so one e-mail leaves (an identical
+ * payload is collapsed, a different one is refused: isIdempotentDuplicate). The app dedupes finer.
+ */
+export async function relayIdempotencyKey(alert: Pick<Alert, "title" | "env">, nowMs: number): Promise<string> {
+  return `relay/${await sha256Hex(`${alert.env ?? ""}\n${alert.title}`)}/${utcHour(nowMs)}`;
+}
+
+/** Resend refused the key: the same alert left inside this hour (or is leaving right now). */
+export function isIdempotentDuplicate(error: unknown): boolean {
+  return error instanceof Error && /^resend: HTTP 409 (invalid_idempotent_request|concurrent_idempotent_requests)$/.test(error.message);
+}
+
+export type RelayOutcome = "sent" | "duplicate" | "capped" | "off";
+
+/** 204: sent, or already sent this hour. 429: today's cap. 503: e-mail not configured on the Worker. */
+const OUTCOME_STATUS: Record<RelayOutcome, number> = { sent: 204, duplicate: 204, capped: 429, off: 503 };
+
 export interface RelayDeps {
   /** ALERT_RELAY_SECRET; empty refuses every request. */
   secret: string;
   nowMs: number;
   maxBytes: number;
-  /** E-mails the alert; false when today's relay cap refuses it. Throws when sending fails. */
-  send(alert: Alert, idempotencyKey: string): Promise<boolean>;
+  /** E-mails the alert, or says why not (see RelayOutcome). Throws when sending fails. */
+  send(alert: Alert, idempotencyKey: string): Promise<RelayOutcome>;
 }
 
-/** POST /alert, signed by the app (src/lib/alert/relay.ts): 204 sent, 429 capped, 502 send failed. */
+/** POST /alert, signed by the app (src/lib/alert/relay.ts): 204 sent, 429 capped, 502 send failed, 503 e-mail off. */
 export async function relay(request: Request, deps: RelayDeps): Promise<Response> {
   if (Number(request.headers.get("content-length") ?? "0") > deps.maxBytes) return new Response(null, { status: 413 });
   // Chunked bodies carry no Content-Length: the read itself is capped, before any signature work.
@@ -297,9 +342,8 @@ export async function relay(request: Request, deps: RelayDeps): Promise<Response
   const alert = parseAlert(body);
   if (!alert) return new Response(null, { status: 400 });
   try {
-    // Keyed on the signature: a replay inside the 300 s window reaches Resend with the same key and body, so it is sent once.
-    const sent = await deps.send(alert, `relay/${signature.toLowerCase()}`);
-    return new Response(null, { status: sent ? 204 : 429 });
+    const outcome = await deps.send(alert, await relayIdempotencyKey(alert, deps.nowMs));
+    return new Response(null, { status: OUTCOME_STATUS[outcome] });
   } catch (error) {
     console.error(`email: ${(error as Error).message}`);
     return new Response(null, { status: 502 });

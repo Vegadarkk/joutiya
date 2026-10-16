@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { ProviderError } from "@/lib/mail/transports/errors";
+import { classifyStatus, ProviderError } from "@/lib/mail/transports/errors";
 import { RESEND_ENDPOINT, ResendTransport, resendTags } from "@/lib/mail/transports/resend";
 import { BREVO_ENDPOINT, BrevoTransport } from "@/lib/mail/transports/brevo";
 import type { RenderedMail } from "@/lib/mail/types";
+
+vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 
 const MAIL: RenderedMail = {
   from: "Joutiya <no-reply@notif.joutiya.ma>",
@@ -75,7 +77,10 @@ describe("ResendTransport", () => {
     expect(provider.retryable).toBe(true);
     expect(provider.status).toBe(429);
     expect(provider.retryAfterSeconds).toBe(3600);
+    expect(provider.kind).toBe("transient");
     expect(provider.message).toContain("daily_quota_exceeded");
+    // The provider's own message may quote the recipient: it stays in the log (F10).
+    expect(provider.message).not.toContain("You have reached");
     expect(provider.message).not.toContain("k");
 
     const down = fetchMock(new Response("<html>bad gateway</html>", { status: 502 }));
@@ -84,14 +89,19 @@ describe("ResendTransport", () => {
     expect(second.status).toBe(502);
   });
 
-  it("marks 422 and 403 as not retryable", async () => {
-    for (const status of [422, 403, 401]) {
-      const { fn } = fetchMock(jsonResponse(status, { name: "validation_error", message: "Invalid `to` field", statusCode: status }));
+  it("marks 400 and 422 as rejected, 401/402/403/404 as provider unavailable: none retried in place", async () => {
+    for (const [status, kind] of [[422, "rejected"], [400, "rejected"], [401, "unavailable"], [402, "unavailable"], [403, "unavailable"], [404, "unavailable"]] as const) {
+      const { fn } = fetchMock(jsonResponse(status, { name: "validation_error", message: "Invalid `to` field nadia@example.com", statusCode: status }));
       const error = (await new ResendTransport("k", fn, "ua").send(MAIL).catch((caught: unknown) => caught)) as ProviderError;
       expect(error).toBeInstanceOf(ProviderError);
+      expect(error.kind).toBe(kind);
       expect(error.retryable).toBe(false);
       expect(error.status).toBe(status);
+      expect(error.message).toBe(`resend: HTTP ${status} validation_error`);
+      expect(classifyStatus(status)).toBe(kind);
     }
+    expect(classifyStatus(500)).toBe("transient");
+    expect(classifyStatus(429)).toBe("transient");
   });
 
   it("treats a concurrent idempotent request as retryable, a conflicting one as final", async () => {
@@ -158,7 +168,10 @@ describe("BrevoTransport", () => {
     expect(error.retryable).toBe(true);
     expect(error.retryAfterSeconds).toBe(12);
     expect(error.message).toContain("too_many_requests");
+    expect(error.message).not.toContain("Rate limit");
     const bad = fetchMock(jsonResponse(400, { code: "invalid_parameter", message: "sender" }));
-    expect(((await new BrevoTransport("k", bad.fn, "ua").send(MAIL).catch((e: unknown) => e)) as ProviderError).retryable).toBe(false);
+    expect((await new BrevoTransport("k", bad.fn, "ua").send(MAIL).catch((e: unknown) => e)) as ProviderError).toMatchObject({ kind: "rejected", retryable: false });
+    const revoked = fetchMock(jsonResponse(401, { code: "unauthorized", message: "Key not found" }));
+    expect((await new BrevoTransport("k", revoked.fn, "ua").send(MAIL).catch((e: unknown) => e)) as ProviderError).toMatchObject({ kind: "unavailable", retryable: false, message: "brevo: HTTP 401 unauthorized" });
   });
 });

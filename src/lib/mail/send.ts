@@ -3,8 +3,9 @@ import { createHash } from "node:crypto";
 import { Queue } from "bullmq";
 import { Redis } from "ioredis";
 import { serverEnv } from "@/lib/env";
+import { logger } from "@/lib/logging/logger";
 import { clientOptions } from "@/lib/valkey/clients";
-import { deliverMail } from "./deliver";
+import { deliverMail, MailDeferredError } from "./deliver";
 import type { MailPriority, TemplateId, TemplateMail } from "./types";
 
 // The web app enqueues on valkey-queue (the worker delivers, with retries and priorities); without
@@ -14,11 +15,16 @@ export const MAIL_QUEUE = "mail";
 
 const PRIORITY: Record<MailPriority, number> = { security: 1, transactional: 5, bulk: 10 };
 
+// Five quick attempts cover transient failures (429, 5xx, network); an exhausted quota or an
+// unavailable provider delays the job instead (MailDeferredError, src/worker/index.ts).
+// The payload holds the template data, action links included (live oobCodes): a finished job
+// leaves Valkey at once and a failed one within the hour (200 kept at most for diagnosis).
+// Later phase: generate the links at delivery time so the queue never holds them.
 export const MAIL_JOB_OPTIONS = {
   attempts: 5,
   backoff: { type: "exponential", delay: 30_000 },
-  removeOnComplete: 1000,
-  removeOnFail: 5000,
+  removeOnComplete: true,
+  removeOnFail: { age: 3_600, count: 200 },
 } as const;
 
 /**
@@ -44,7 +50,13 @@ function mailQueue(url: string): Queue {
 export async function enqueueMail<T extends TemplateId>(mail: TemplateMail<T>): Promise<void> {
   const env = serverEnv();
   if (!env.QUEUE_REDIS_URL) {
-    await deliverMail(mail);
+    try {
+      await deliverMail(mail);
+    } catch (error) {
+      if (!(error instanceof MailDeferredError)) throw error;
+      // Local dev only (deployed envs require the queue): nothing can hold the mail until then.
+      logger.warn({ template: mail.template, retryAt: error.retryAt.toISOString(), reason: error.message }, "mail dropped: no queue to defer it");
+    }
     return;
   }
   await mailQueue(env.QUEUE_REDIS_URL).add(mail.template, mail, {

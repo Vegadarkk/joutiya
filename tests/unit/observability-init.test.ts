@@ -58,9 +58,12 @@ describe("initServerObservability", () => {
       serverName: "worker",
       sampleRate: 1,
       maxBreadcrumbs: 30,
+      // No sentry-trace/baggage header on outgoing requests (third parties never see a trace id).
+      tracePropagationTargets: [],
       dataCollection: { userInfo: false, cookies: false, httpHeaders: false, httpBodies: [], urlQueryParams: false },
     });
     expect(typeof options.beforeSend).toBe("function");
+    expect(typeof options.beforeBreadcrumb).toBe("function");
     for (const forbidden of ["tracesSampleRate", "tracesSampler", "sendDefaultPii", "integrations", "replaysSessionSampleRate", "replaysOnErrorSampleRate", "tunnel"]) {
       expect(options).not.toHaveProperty(forbidden);
     }

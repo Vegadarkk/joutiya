@@ -1,25 +1,31 @@
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
   CONFIRMATIONS,
+  PROBE_DAILY_CAP,
+  RECOVERY_CONFIRMATIONS,
   RELAY_DAILY_CAP,
   RESEND_URL,
   emailPayload,
   emailSettings,
+  isIdempotentDuplicate,
   markOncePerDay,
   parseAlert,
   parseTargets,
   readCapped,
   relay,
+  relayIdempotencyKey,
   sendViaResend,
   sign,
-  takeRelaySlot,
+  takeDailySlot,
   transition,
+  utcHour,
   verdict,
   verifySignature,
   type Alert,
   type KeyValue,
   type ProbeState,
+  type RelayOutcome,
 } from "../../workers/uptime-probe/src/lib";
 
 const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
@@ -85,11 +91,28 @@ describe("transition", () => {
     expect(transition(blip, "up", 2, "production", "x")).toEqual({ state: up, alert: null });
   });
 
-  it("announces recovery with the incident length", () => {
-    const down: ProbeState = { status: "down", pending: CONFIRMATIONS - 1, since: 0 };
-    const { alert } = transition(down, "up", 20 * 60_000, "production", "HTTP 200");
+  it("announces recovery with the incident length after RECOVERY_CONFIRMATIONS up probes", () => {
+    expect(RECOVERY_CONFIRMATIONS).toBeGreaterThan(CONFIRMATIONS);
+    let state: ProbeState = { status: "down", pending: 0, since: 0 };
+    for (let probe = 1; probe < RECOVERY_CONFIRMATIONS; probe += 1) {
+      const step = transition(state, "up", probe * 300_000, "production", "HTTP 200");
+      expect(step.alert).toBeNull();
+      expect(step.state).toEqual({ status: "down", pending: probe, since: 0 });
+      state = step.state;
+    }
+    const { state: recovered, alert } = transition(state, "up", 20 * 60_000, "production", "HTTP 200");
+    expect(recovered).toEqual({ status: "up", pending: 0, since: 20 * 60_000 });
     expect(alert?.severity).toBe("info");
     expect(alert?.body).toContain("20 min");
+  });
+
+  it("stays silent while a site flaps between down and up", () => {
+    const down: ProbeState = { status: "down", pending: 0, since: 0 };
+    const once = transition(down, "up", 1, "production", "HTTP 200").state;
+    const twice = transition(once, "up", 2, "production", "HTTP 200").state;
+    expect(twice).toEqual({ status: "down", pending: RECOVERY_CONFIRMATIONS - 1, since: 0 });
+    // One failed probe resets the recovery count: no "rétabli" e-mail for a blip.
+    expect(transition(twice, "down", 3, "production", "HTTP 502")).toEqual({ state: down, alert: null });
   });
 
   it("alerts P1 for a degraded site and starts unknown sites as up", () => {
@@ -242,12 +265,18 @@ describe("daily KV markers", () => {
     expect([...kv.store.keys()]).toEqual(["resend-quota-notice:2026-10-16", "resend-quota-notice:2026-10-17"]);
   });
 
-  it("caps relayed e-mails per UTC day", async () => {
+  it("caps relayed and probe e-mails per UTC day, each on its own counter", async () => {
     const kv = memoryKv();
-    for (let i = 0; i < RELAY_DAILY_CAP; i += 1) expect(await takeRelaySlot(kv, day)).toBe(true);
-    expect(await takeRelaySlot(kv, day)).toBe(false);
+    for (let i = 0; i < RELAY_DAILY_CAP; i += 1) expect(await takeDailySlot(kv, "relay", day)).toBe(true);
+    expect(await takeDailySlot(kv, "relay", day)).toBe(false);
     expect(kv.store.get("relay-count:2026-10-16")).toBe(String(RELAY_DAILY_CAP));
-    expect(await takeRelaySlot(kv, day + 86_400_000)).toBe(true);
+    expect(await takeDailySlot(kv, "relay", day + 86_400_000)).toBe(true);
+    // A flapping target (up to 144 transitions a day) spends the probe counter, not the relay one.
+    for (let i = 0; i < PROBE_DAILY_CAP; i += 1) expect(await takeDailySlot(kv, "probe", day)).toBe(true);
+    expect(await takeDailySlot(kv, "probe", day)).toBe(false);
+    expect(kv.store.get("probe-count:2026-10-16")).toBe(String(PROBE_DAILY_CAP));
+    // Both caps together stay well inside Resend's 100 e-mails a day shared with the site.
+    expect(PROBE_DAILY_CAP + RELAY_DAILY_CAP).toBeLessThanOrEqual(30);
   });
 });
 
@@ -265,17 +294,21 @@ describe("relay", () => {
     return { request, signature };
   }
 
-  it("e-mails a valid alert with an idempotency key derived from the signature", async () => {
-    const send = vi.fn(async () => true);
-    const { request, signature } = await signedRequest("s3cret");
+  it("e-mails a valid alert with an idempotency key of the title, environment and UTC hour", async () => {
+    const send = vi.fn(async (): Promise<RelayOutcome> => "sent");
+    const { request } = await signedRequest("s3cret");
     const response = await relay(request, { secret: "s3cret", nowMs, maxBytes: 16_384, send });
     expect(response.status).toBe(204);
-    expect(send).toHaveBeenCalledWith({ severity: "P1", title: "Quota", body: "Firestore à 70 %", env: "prod" }, `relay/${signature}`);
+    const hash = createHash("sha256").update("prod\nQuota").digest("hex");
+    expect(utcHour(nowMs)).toBe("2025-10-09T08");
+    expect(send).toHaveBeenCalledWith({ severity: "P1", title: "Quota", body: "Firestore à 70 %", env: "prod" }, `relay/${hash}/2025-10-09T08`);
   });
 
-  it("answers 429 when the daily cap refuses, 502 when sending fails", async () => {
-    const { request: capped } = await signedRequest("s3cret");
-    expect((await relay(capped, { secret: "s3cret", nowMs, maxBytes: 16_384, send: async () => false })).status).toBe(429);
+  it("answers 429 when the daily cap refuses, 503 when e-mail is off, 204 for a repeat, 502 when sending fails", async () => {
+    const deps = { secret: "s3cret", nowMs, maxBytes: 16_384 };
+    expect((await relay((await signedRequest("s3cret")).request, { ...deps, send: async () => "capped" as const })).status).toBe(429);
+    expect((await relay((await signedRequest("s3cret")).request, { ...deps, send: async () => "off" as const })).status).toBe(503);
+    expect((await relay((await signedRequest("s3cret")).request, { ...deps, send: async () => "duplicate" as const })).status).toBe(204);
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { request: failing } = await signedRequest("s3cret");
     const response = await relay(failing, {
@@ -291,7 +324,7 @@ describe("relay", () => {
   });
 
   it("refuses bad signatures, stale requests, invalid alerts and oversized bodies without sending", async () => {
-    const send = vi.fn(async () => true);
+    const send = vi.fn(async (): Promise<RelayOutcome> => "sent");
     const deps = { secret: "s3cret", nowMs, maxBytes: 16_384, send };
     expect((await relay((await signedRequest("other")).request, deps)).status).toBe(401);
     expect((await relay((await signedRequest("s3cret", body, "1750000000")).request, deps)).status).toBe(401);
@@ -301,6 +334,27 @@ describe("relay", () => {
     const unsigned = new Request("https://probe.example/alert", { method: "POST", body });
     expect((await relay(unsigned, deps)).status).toBe(401);
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("relay idempotency", () => {
+  it("keys one title per environment per UTC hour", async () => {
+    const hour = Date.UTC(2026, 9, 16, 10, 5);
+    const key = await relayIdempotencyKey({ title: "Quota", env: "prod" }, hour);
+    expect(key).toMatch(/^relay\/[0-9a-f]{64}\/2026-10-16T10$/);
+    expect(key.length).toBeLessThanOrEqual(256);
+    expect(await relayIdempotencyKey({ title: "Quota", env: "prod" }, hour + 50 * 60_000)).toBe(key);
+    expect(await relayIdempotencyKey({ title: "Quota", env: "prod" }, hour + 60 * 60_000)).not.toBe(key);
+    // Staging and production share the Worker: their alerts never collapse into each other.
+    expect(await relayIdempotencyKey({ title: "Quota", env: "staging" }, hour)).not.toBe(key);
+    expect(await relayIdempotencyKey({ title: "Quota" }, hour)).not.toBe(key);
+  });
+
+  it("recognises Resend's refusal of a reused key", () => {
+    expect(isIdempotentDuplicate(new Error("resend: HTTP 409 invalid_idempotent_request"))).toBe(true);
+    expect(isIdempotentDuplicate(new Error("resend: HTTP 409 concurrent_idempotent_requests"))).toBe(true);
+    expect(isIdempotentDuplicate(new Error("resend: HTTP 429 daily_quota_exceeded"))).toBe(false);
+    expect(isIdempotentDuplicate("resend: HTTP 409 invalid_idempotent_request")).toBe(false);
   });
 });
 

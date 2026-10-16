@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inviteSchema, staffLoginSchema, staffPasswordSchema } from "@/lib/auth/staff";
+import { inviteSchema, STAFF_PASSWORD_MIN, staffLoginSchema, staffPasswordSchema } from "@/lib/auth/staff";
 import { staffDocSchema } from "@/lib/db/repositories/staff";
 
 describe("staffLoginSchema", () => {
@@ -19,12 +19,16 @@ describe("staffLoginSchema", () => {
 });
 
 describe("staffPasswordSchema", () => {
-  it("needs a plausible code and a password of 8 to 128 characters", () => {
-    expect(staffPasswordSchema.safeParse({ oobCode: "a".repeat(10), password: "12345678" }).success).toBe(true);
-    expect(staffPasswordSchema.safeParse({ oobCode: "short", password: "12345678" }).success).toBe(false);
-    expect(staffPasswordSchema.safeParse({ oobCode: "a".repeat(10), password: "1234567" }).success).toBe(false);
+  it("needs a plausible code and a password of 12 to 128 characters (owner guide: 12 or more)", () => {
+    expect(STAFF_PASSWORD_MIN).toBe(12);
+    const password = "x".repeat(STAFF_PASSWORD_MIN);
+    expect(staffPasswordSchema.safeParse({ oobCode: "a".repeat(10), password }).success).toBe(true);
+    expect(staffPasswordSchema.safeParse({ oobCode: "short", password }).success).toBe(false);
+    // The member minimum (8) is not enough for staff.
+    expect(staffPasswordSchema.safeParse({ oobCode: "a".repeat(10), password: "x".repeat(STAFF_PASSWORD_MIN - 1) }).success).toBe(false);
+    expect(staffPasswordSchema.safeParse({ oobCode: "a".repeat(10), password: "x".repeat(8) }).success).toBe(false);
     expect(staffPasswordSchema.safeParse({ oobCode: "a".repeat(10), password: "p".repeat(129) }).success).toBe(false);
-    expect(staffPasswordSchema.safeParse({ oobCode: "a".repeat(10), password: "12345678", email: "a@b.co" }).success).toBe(false);
+    expect(staffPasswordSchema.safeParse({ oobCode: "a".repeat(10), password, email: "a@b.co" }).success).toBe(false);
   });
 });
 

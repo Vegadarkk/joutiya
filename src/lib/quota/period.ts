@@ -25,3 +25,19 @@ export function classify(definition: Pick<QuotaDefinition, "limit" | "alertAt" |
 export function retentionSeconds(definition: Pick<QuotaDefinition, "period">): number {
   return definition.period === "day" ? 40 * 86_400 : 400 * 86_400;
 }
+
+/**
+ * First instant of the period after the one holding `at`: when the provider resets the counter.
+ * Found by bisection on `periodKey` (DST-safe, 1 s precision, always at or after the boundary).
+ */
+export function nextPeriodStart(definition: Pick<QuotaDefinition, "period" | "resetTimeZone">, at: Date): Date {
+  const current = periodKey(definition, at);
+  let inside = at.getTime();
+  let beyond = inside + (definition.period === "day" ? 2 : 33) * 86_400_000;
+  while (beyond - inside > 1_000) {
+    const middle = inside + Math.floor((beyond - inside) / 2);
+    if (periodKey(definition, new Date(middle)) === current) inside = middle;
+    else beyond = middle;
+  }
+  return new Date(beyond);
+}

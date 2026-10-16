@@ -1,6 +1,6 @@
 import type { Locale } from "@/config/site";
 import { LOCALE_TAGS } from "@/config/site";
-import { DEFAULT_LEGAL } from "@/config/legal";
+import { DEFAULT_LEGAL, type LegalConfig } from "@/config/legal";
 
 // Shared e-mail layout: table-based HTML, inline styles only, no remote image, no tracking pixel.
 // Brand tokens mirror src/styles/globals.css (ochre primary, cream surfaces, deep green text).
@@ -18,6 +18,34 @@ export interface TemplateContext {
   /** Locale of the recipient's pages (URLs keep the real locale, rif included). */
   locale: Locale;
   siteUrl: string;
+  /** Publisher of the footer; defaults to the one set by setMailPublisher(). */
+  publisher?: MailPublisher;
+}
+
+/** Publisher line of the footer: `config/legal` values, never a hardcoded identity. */
+export interface MailPublisher {
+  name: string;
+  address: string;
+}
+
+/** The only postal address ever displayed (domiciliation): the fallback when the config has none. */
+export const PUBLISHER_ADDRESS = "6 rue d'Armaillé, 75017 Paris";
+
+export function mailPublisher(legal?: Pick<LegalConfig, "companyName" | "hqAddress">): MailPublisher {
+  return {
+    name: legal?.companyName?.trim() || DEFAULT_LEGAL.companyName,
+    address: legal?.hqAddress?.trim() || PUBLISHER_ADDRESS,
+  };
+}
+
+let currentPublisher: MailPublisher = mailPublisher();
+
+/**
+ * Refreshes the publisher shown in every footer. renderMail() is synchronous, so deliverMail()
+ * calls this with the cached legal config right before rendering; without a call, the defaults.
+ */
+export function setMailPublisher(legal?: Pick<LegalConfig, "companyName" | "hqAddress">): void {
+  currentPublisher = mailPublisher(legal);
 }
 
 export interface BuiltMail {
@@ -40,6 +68,8 @@ export interface LayoutInput {
   links?: { label: string; url: string }[];
   /** Paragraphs after the button (security sentence last). */
   closing?: string[];
+  /** Footer identity; the current publisher (setMailPublisher) when omitted. */
+  publisher?: MailPublisher;
 }
 
 const COLORS = {
@@ -58,15 +88,15 @@ const COLORS = {
 
 const FONT = "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, Tahoma, sans-serif";
 
-const FOOTER: Record<MailLocale, { auto: string; publisher: string; site: string }> = {
+const FOOTER: Record<MailLocale, { auto: string; publisher: (who: MailPublisher) => string; site: string }> = {
   fr: {
     auto: "E-mail automatique, merci de ne pas répondre.",
-    publisher: `Édité par ${DEFAULT_LEGAL.companyName} · 6 rue d'Armaillé, 75017 Paris`,
+    publisher: (who) => `Édité par ${who.name} · ${who.address}`,
     site: "Aller sur Joutiya",
   },
   ar: {
     auto: "بريد إلكتروني آلي، يرجى عدم الرد عليه.",
-    publisher: `الناشر: ${DEFAULT_LEGAL.companyName} · 6 rue d'Armaillé, 75017 Paris`,
+    publisher: (who) => `الناشر: ${who.name} · ${who.address}`,
     site: "الذهاب إلى Joutiya",
   },
 };
@@ -122,6 +152,7 @@ export function renderLayout(input: LayoutInput): BuiltMail {
   const dir = rtl ? "rtl" : "ltr";
   const align = rtl ? "right" : "left";
   const footer = FOOTER[input.lang];
+  const publisher = footer.publisher(input.publisher ?? currentPublisher);
   const siteHost = hostOf(input.siteUrl);
   const body: string[] = [];
 
@@ -160,7 +191,7 @@ export function renderLayout(input: LayoutInput): BuiltMail {
     `<tr><td style="padding:32px 28px;background:${COLORS.card};border:1px solid ${COLORS.cardBorder};border-radius:16px;text-align:${align};">${body.join("")}</td></tr>` +
     // Footer
     `<tr><td style="padding:24px 8px 0;text-align:${align};">` +
-    `<p style="margin:0 0 6px;font-size:12px;line-height:1.5;color:${COLORS.muted};">${escapeHtml(footer.publisher)}</p>` +
+    `<p style="margin:0 0 6px;font-size:12px;line-height:1.5;color:${COLORS.muted};">${escapeHtml(publisher)}</p>` +
     `<p style="margin:0 0 6px;font-size:12px;line-height:1.5;color:${COLORS.muted};"><a href="${escapeHtml(input.siteUrl)}" style="color:${COLORS.link};text-decoration:underline;">${escapeHtml(footer.site)}</a> · ${escapeHtml(siteHost)}</p>` +
     `<p style="margin:0;font-size:12px;line-height:1.5;color:${COLORS.muted};">${escapeHtml(footer.auto)}</p>` +
     `</td></tr>` +
@@ -170,7 +201,7 @@ export function renderLayout(input: LayoutInput): BuiltMail {
   if (input.action) lines.push(`${input.action.label} : ${input.action.url}`, "");
   for (const link of input.links ?? []) lines.push(`${link.label} ${link.url}`, "");
   for (const text of input.closing ?? []) lines.push(text, "");
-  lines.push("—", footer.publisher, `${footer.site} : ${input.siteUrl}`, footer.auto);
+  lines.push("—", publisher, `${footer.site} : ${input.siteUrl}`, footer.auto);
   const text = lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 
   return { subject: input.subject, html, text };

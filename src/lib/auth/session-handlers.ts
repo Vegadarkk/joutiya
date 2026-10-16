@@ -20,9 +20,9 @@ import { sessionSummary } from "./summary";
 
 // Session plumbing: who am I, logout, the SDK's custom token, and the Google popup exchange.
 
-/** The session of the caller, or null; the CSRF header lets the UI recover its token. */
+/** The session of the caller, or null (a revoked cookie reads as signed out); the CSRF header lets the UI recover its token. */
 export async function handleMe(request: Request): Promise<Response> {
-  const context = await optionalUser(request);
+  const context = await optionalUser(request, { checkRevoked: true });
   const body: MeResponse = { session: context ? await sessionSummary(context.user) : null };
   const response = jsonResponse(body);
   if (context) response.headers.set(CSRF_HEADER, csrfToken(context.session));
@@ -43,9 +43,9 @@ export async function handleLogout(request: Request): Promise<Response> {
   return withDevice(response, request);
 }
 
-/** Custom token for the browser SDK (realtime messaging only, in-memory persistence). */
+/** Custom token for the browser SDK (realtime messaging only, in-memory persistence); never for a revoked cookie. */
 export async function handleClientToken(request: Request): Promise<Response> {
-  const context = await requireUser(request, { mutation: true });
+  const context = await requireUser(request, { mutation: true, checkRevoked: true });
   await enforceLimit("clientToken.uid", context.user.uid);
   const body: ClientTokenResponse = { token: await auth().createCustomToken(context.user.uid) };
   return withDevice(jsonResponse(body), request);

@@ -6,16 +6,17 @@ import { useLocale, useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { z } from "@/lib/zod";
 import { Button } from "@/components/ui/button";
-import { apiPost, setSession } from "@/lib/auth/client";
-import { AUTH_API, consentsSchema, turnstileTokenSchema, type GoogleResponse, type SessionSummary } from "@/lib/contracts/auth";
+import { googleSignIn, setSession } from "@/lib/auth/client";
+import { consentsSchema, turnstileTokenSchema, type SessionSummary } from "@/lib/contracts/auth";
 import type { Locale } from "@/config/site";
+import { cn } from "@/lib/utils";
 import { ConsentFields } from "./consent-fields";
 import { FormMessage, useFieldMessage } from "./form-message";
 import type { GoogleNeedsConsent } from "./google-button";
 import { TurnstileWidget, type TurnstileHandle } from "./turnstile-widget";
 
 // Second step of a Google sign-up: the account is created only once the consents are given
-// (§6, §7). The same credential is posted again, now with consents and a Turnstile token.
+// (§6, §7). The same credential (and its nonce) is posted again, now with consents and a Turnstile token.
 const consentStepSchema = z.object({ consents: consentsSchema, turnstileToken: turnstileTokenSchema }).strict();
 type ConsentForm = z.input<typeof consentStepSchema>;
 type ConsentInput = z.output<typeof consentStepSchema>;
@@ -47,7 +48,7 @@ export function GoogleConsentStep({ payload, nonce, onDone, onCancel }: GoogleCo
   async function onValid(values: ConsentInput) {
     setServerError(undefined);
     try {
-      const answer = await apiPost<GoogleResponse>(AUTH_API.google, { credential: payload.credential, locale, ...values });
+      const answer = await googleSignIn({ credential: payload.credential, nonce: payload.nonce, locale, ...values });
       if (answer.status === "signed_in") {
         setSession(answer.session);
         onDone(answer.session);
@@ -67,21 +68,22 @@ export function GoogleConsentStep({ payload, nonce, onDone, onCancel }: GoogleCo
         <h2 className="text-lg font-semibold">{t("consentTitle")}</h2>
         <p className="text-foreground-muted text-pretty">{t("consentBody")}</p>
       </div>
-      <dl className="rounded-md bg-surface-muted px-4 py-3">
+      <dl className="flex flex-col rounded-md bg-surface-muted px-4 py-3">
         <dt className="text-xs text-foreground-muted">{t("consentEmail")}</dt>
-        <dd className="font-medium break-all">
-          {payload.displayName ? `${payload.displayName} · ` : null}
-          <span dir="ltr">{payload.email}</span>
+        {payload.displayName ? <dd className="font-medium">{payload.displayName}</dd> : null}
+        <dd dir="ltr" className={cn("break-all text-start", payload.displayName ? "text-sm text-foreground-muted" : "font-medium")}>
+          {payload.email}
         </dd>
       </dl>
       <FormMessage error={serverError} />
       <ConsentFields
+        autoFocus
         fields={{ cgu: register("consents.cgu"), transfers: register("consents.transfers"), marketing: register("consents.marketing") }}
         errors={{ cgu: fieldMessage("consent", errors.consents?.cgu), transfers: fieldMessage("consent", errors.consents?.transfers) }}
       />
       <TurnstileWidget
         ref={turnstile}
-        action="google_signup"
+        action="google"
         nonce={nonce}
         onToken={(token) => setValue("turnstileToken", token ?? "", { shouldValidate: submitCount > 0 })}
         error={errors.turnstileToken ? c("turnstilePending") : undefined}

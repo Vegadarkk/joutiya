@@ -17,7 +17,10 @@ interface RevokeButtonProps {
   name: string;
 }
 
-/** Revocation with a confirmation dialog: the account is disabled and every session closed. */
+/**
+ * Revocation with a confirmation dialog: the account is disabled and every session closed. The
+ * Cloudflare Access policy is not touched (no API call to Zero Trust): the admin is told to do it.
+ */
 export function RevokeButton({ uid, name }: RevokeButtonProps) {
   const router = useRouter();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -31,7 +34,7 @@ export function RevokeButton({ uid, name }: RevokeButtonProps) {
     try {
       await adminFetch(`${ADMIN_API.staff}/${encodeURIComponent(uid)}`, { method: "DELETE", csrf: true });
       dialog.current?.close();
-      toast.success(`Accès de ${name} révoqué`);
+      toast.success(`Accès de ${name} révoqué`, { description: "Retirez aussi la personne de Cloudflare Access (Zero Trust)." });
       router.refresh();
     } catch (cause) {
       setError(errorMessage(cause, MESSAGES));
@@ -55,6 +58,9 @@ export function RevokeButton({ uid, name }: RevokeButtonProps) {
         </h2>
         <p className="mt-2 text-sm text-foreground-muted">
           Son compte est désactivé et ses sessions sont fermées immédiatement. Une nouvelle invitation le réactive.
+        </p>
+        <p className="mt-2 text-sm text-foreground-muted">
+          La révocation ne touche pas Cloudflare Access : retirez aussi la personne de la politique de l&apos;application dans Zero Trust.
         </p>
         {error ? <ErrorBanner title={error} className="mt-4" /> : null}
         <div className="mt-6 flex justify-end gap-2">

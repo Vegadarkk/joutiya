@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { SettingsView } from "@/components/auth/settings-view";
+import { FrenchOnlyNotice } from "@/components/auth/french-only-notice";
 import { Container } from "@/components/layout/container";
 import { pageLocale } from "@/i18n/params";
 
@@ -14,7 +15,9 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
   const locale = pageLocale((await params).locale);
   setRequestLocale(locale);
   return (
-    <Container className="max-w-3xl py-10 lg:py-14">
+    // Tarifit: the account pages are French until a native review (see FrenchOnlyNotice).
+    <Container lang={locale === "rif" ? "fr" : undefined} className="max-w-3xl py-10 lg:py-14">
+      <FrenchOnlyNotice className="mb-8" />
       <SettingsView />
     </Container>
   );

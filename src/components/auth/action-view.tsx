@@ -18,7 +18,9 @@ import { ResendVerification } from "./resend-verification";
 import { StatusPanel } from "./status-panel";
 
 // /action?mode=verifyEmail|resetPassword&oobCode=...: the code is read in the browser and posted
-// to /api/auth/action, never fetched server side (it stays out of logs and caches).
+// to /api/auth/action, never fetched server side (it stays out of logs and caches). Once read, it is
+// also removed from the address bar and the history entry: the single-use code should not survive a
+// reload, a shared screenshot or the browser history.
 
 type Mode = "verifyEmail" | "resetPassword";
 
@@ -38,8 +40,8 @@ function readMode(value: string | null): Mode | null {
 
 export function ActionView({ nonce }: { nonce?: string }) {
   const params = useSearchParams();
-  const mode = readMode(params.get("mode"));
-  const oobCode = params.get("oobCode");
+  // Read once: the URL is cleaned right after, so the search params must not be re-read.
+  const [{ mode, oobCode }] = useState(() => ({ mode: readMode(params.get("mode")), oobCode: params.get("oobCode") }));
   const t = useTranslations("Auth.action");
   const [state, setState] = useState<State>(() => (mode && oobCode ? { kind: "working" } : { kind: "missing" }));
   const started = useRef(false);
@@ -66,8 +68,9 @@ export function ActionView({ nonce }: { nonce?: string }) {
     // One call per page load (React strict mode runs effects twice in development).
     if (started.current) return;
     started.current = true;
+    if (oobCode) window.history.replaceState(null, "", window.location.pathname);
     void run();
-  }, [run]);
+  }, [run, oobCode]);
 
   if (state.kind === "missing") {
     return (
@@ -164,7 +167,7 @@ export function ActionView({ nonce }: { nonce?: string }) {
     <StatusPanel
       icon={expired ? TimerOff : LinkIcon}
       title={expired ? t("expiredTitle") : t("invalidTitle")}
-      extra={<ResendVerification nonce={nonce} action="verify_resend_action" className="mt-2 rounded-md bg-surface p-4" />}
+      extra={<ResendVerification nonce={nonce} entry="action" className="mt-2 rounded-md bg-surface p-4" />}
     >
       {expired ? t("expiredBody") : t("invalidBody")}
     </StatusPanel>

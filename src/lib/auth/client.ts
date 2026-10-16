@@ -1,7 +1,9 @@
-import { useEffect, useSyncExternalStore } from "react";
-import { AUTH_API, type SessionSummary } from "@/lib/contracts/auth";
+import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
+import { AUTH_API, type GoogleInput, type GoogleResponse, type SessionSummary } from "@/lib/contracts/auth";
 import type { ErrorCode } from "@/lib/http/errors";
 import { CSRF_COOKIE, CSRF_HEADER } from "@/lib/security/cookies";
+
+export { safeNextPath } from "./next-path";
 
 // Browser side of the authentication API (§6): same-origin JSON calls, the CSRF header on every
 // mutation, typed errors the UI translates, and one shared cache of GET /api/auth/me so the
@@ -106,6 +108,14 @@ export function apiGet<T>(path: string): Promise<T> {
   return request<T>(path, { method: "GET", headers: { accept: "application/json" } });
 }
 
+/**
+ * POST /api/auth/google: the Google Identity Services credential with the nonce the page gave GIS
+ * (the server matches it against the token's `nonce` claim: a captured token cannot be replayed).
+ */
+export function googleSignIn(input: GoogleInput): Promise<GoogleResponse> {
+  return apiPost<GoogleResponse>(AUTH_API.google, input);
+}
+
 // --- Session cache -------------------------------------------------------------------------
 
 export interface SessionState {
@@ -186,13 +196,31 @@ export function subscribeSession(listener: () => void): () => void {
 const sessionSnapshot = () => state;
 const serverSnapshot = () => INITIAL;
 
-/** The shared session state; the first subscriber triggers the fetch. */
+/**
+ * What the server already knows about the session when it rendered the page: the private layout
+ * hands it to the providers (public pages are static and pass nothing). null = anonymous;
+ * undefined = unknown, the browser asks /api/auth/me.
+ */
+export const InitialSessionContext = createContext<SessionSummary | null | undefined>(undefined);
+
+/** Fills a store that has not asked the server yet; a later answer or sign-in wins over the seed. */
+function seedSession(session: SessionSummary | null): void {
+  if (state.status === "idle" && !inflight) emit({ status: "ready", session });
+}
+
+/**
+ * The shared session state. With a server-provided initial session, the first render (server and
+ * hydration alike) is already `ready`; otherwise the first subscriber triggers the fetch.
+ */
 export function useSession(): SessionState {
+  const initial = useContext(InitialSessionContext);
   const snapshot = useSyncExternalStore(subscribeSession, sessionSnapshot, serverSnapshot);
   useEffect(() => {
-    if (snapshot.status === "idle") void loadSession();
-  }, [snapshot.status]);
-  return snapshot;
+    if (snapshot.status !== "idle") return;
+    if (initial === undefined) void loadSession();
+    else seedSession(initial);
+  }, [snapshot.status, initial]);
+  return snapshot.status === "idle" && initial !== undefined ? { status: "ready", session: initial } : snapshot;
 }
 
 /** POST /api/auth/logout, then forget the session locally whatever the server answered. */
@@ -204,11 +232,3 @@ export async function signOut(): Promise<void> {
   }
 }
 
-/**
- * A `?next=` target is followed only when it is a same-origin relative path: starts with one
- * slash, no scheme, no backslash (browsers turn `\` into `/`).
- */
-export function safeNextPath(value: string | null | undefined): string | null {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\") || /[\u0000-\u001f]/.test(value)) return null;
-  return value;
-}

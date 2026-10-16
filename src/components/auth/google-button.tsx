@@ -5,11 +5,11 @@ import { useLocale, useTranslations } from "next-intl";
 import { InlineError } from "@/components/feedback/inline-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { apiPost, setSession } from "@/lib/auth/client";
+import { googleSignIn, setSession } from "@/lib/auth/client";
 import { usePublicConfig } from "@/lib/config/client";
-import { AUTH_API, type GoogleResponse, type SessionSummary } from "@/lib/contracts/auth";
+import type { SessionSummary } from "@/lib/contracts/auth";
 import { cn } from "@/lib/utils";
-import { InAppBrowserNotice, inAppBrowserName } from "./in-app-browser-notice";
+import { detectInAppBrowser, InAppBrowserNotice, type InAppBrowser } from "./in-app-browser-notice";
 import { loadScript } from "./load-script";
 
 // Google Identity Services button (https://developers.google.com/identity/gsi/web): the Google ID
@@ -57,12 +57,26 @@ declare global {
   }
 }
 
+/**
+ * Replay protection: a fresh random value per mount, given to GIS so Google writes it in the ID
+ * token's `nonce` claim; the server accepts the token only with the same value (32 bytes, base64url).
+ */
+function randomNonce(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 const noSubscription = () => () => {};
-const readInApp = () => inAppBrowserName(navigator.userAgent);
-const readServerInApp = (): string | null | undefined => undefined;
+// The user agent never changes: one detection, cached (useSyncExternalStore wants a stable snapshot).
+let detected: InAppBrowser | null | undefined;
+const readInApp = () => (detected ??= detectInAppBrowser(navigator.userAgent));
+const readServerInApp = (): InAppBrowser | null | undefined => undefined;
 
 export interface GoogleNeedsConsent {
   credential: string;
+  /** The nonce the credential was issued with: the consent step posts it again. */
+  nonce: string;
   email: string;
   displayName: string | null;
 }
@@ -85,7 +99,7 @@ export function GoogleButton({ nonce, onSignedIn, onNeedsConsent, onError, divid
   const t = useTranslations("Auth.common");
   const slot = useRef<HTMLDivElement>(null);
   const handlers = useRef({ onSignedIn, onNeedsConsent, onError });
-  // undefined on the server and during hydration; the webview name (or null) once on the client.
+  // undefined on the server and during hydration; the webview (or null) once on the client.
   const inApp = useSyncExternalStore(noSubscription, readInApp, readServerInApp);
   const [rendered, setRendered] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -98,16 +112,17 @@ export function GoogleButton({ nonce, onSignedIn, onNeedsConsent, onError, divid
   useEffect(() => {
     if (!clientId || inApp !== null) return;
     let cancelled = false;
+    const gisNonce = randomNonce();
     async function submit(credential: string) {
       setBusy(true);
       try {
-        const answer = await apiPost<GoogleResponse>(AUTH_API.google, { credential, locale });
+        const answer = await googleSignIn({ credential, nonce: gisNonce, locale });
         if (cancelled) return;
         if (answer.status === "signed_in") {
           setSession(answer.session);
           handlers.current.onSignedIn(answer.session);
         } else {
-          handlers.current.onNeedsConsent({ credential, email: answer.email, displayName: answer.displayName });
+          handlers.current.onNeedsConsent({ credential, nonce: gisNonce, email: answer.email, displayName: answer.displayName });
         }
       } catch (error) {
         if (!cancelled) handlers.current.onError(error);
@@ -124,6 +139,7 @@ export function GoogleButton({ nonce, onSignedIn, onNeedsConsent, onError, divid
           client_id: clientId,
           ux_mode: "popup",
           use_fedcm_for_prompt: true,
+          nonce: gisNonce,
           callback: (response) => void submit(response.credential),
         });
         // GIS accepts 200 to 400 px; the form column is 448 px at most.
@@ -154,7 +170,7 @@ export function GoogleButton({ nonce, onSignedIn, onNeedsConsent, onError, divid
       {inApp === undefined ? (
         <div className="h-11" aria-hidden="true" />
       ) : inApp ? (
-        <InAppBrowserNotice app={inApp} />
+        <InAppBrowserNotice app={inApp.app} />
       ) : (
         <div className="flex flex-col gap-1.5">
           <div className="relative flex h-11 items-center justify-center" aria-busy={busy || undefined}>

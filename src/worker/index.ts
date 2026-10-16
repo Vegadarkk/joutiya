@@ -2,14 +2,14 @@
 // quota report, hourly purge of unactivated accounts) and "mail" (deliveries with retries).
 
 import { writeFile } from "node:fs/promises";
-import { Queue, UnrecoverableError, Worker } from "bullmq";
+import { DelayedError, Queue, UnrecoverableError, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import { serverEnv } from "@/lib/env";
 import { WORKER_HEARTBEAT_KEY, WORKER_HEARTBEAT_TTL } from "@/lib/health";
 import { logger } from "@/lib/logging/logger";
 import { captureServerException } from "@/lib/observability/capture";
 import { flushObservability, initServerObservability } from "@/lib/observability/sentry-server";
-import { deliverMail } from "@/lib/mail/deliver";
+import { deliverMail, MailDeferredError } from "@/lib/mail/deliver";
 import { isTemplateMail } from "@/lib/mail/render";
 import { closeMailQueue, MAIL_QUEUE } from "@/lib/mail/send";
 import { runStartupChecks } from "@/lib/startup/checks";
@@ -51,10 +51,20 @@ async function main(): Promise<void> {
 
   const mailWorker = new Worker(
     MAIL_QUEUE,
-    async (job) => {
+    async (job, token) => {
       // Job payloads are ours, but a malformed one must not burn five retries.
       if (!isTemplateMail(job.data)) throw new UnrecoverableError(`invalid mail job ${job.id ?? ""}`);
-      await deliverMail(job.data);
+      try {
+        await deliverMail(job.data);
+      } catch (error) {
+        if (!(error instanceof MailDeferredError)) throw error;
+        // Quotas exhausted or provider unavailable: the job waits for the reset instead of burning
+        // its quick retries (BullMQ: moveToDelayed with the lock token, then DelayedError, which
+        // the worker swallows without a "failed" event).
+        logger.warn({ queue: MAIL_QUEUE, job: job.name, retryAt: error.retryAt.toISOString(), reason: error.message }, "mail job deferred");
+        await job.moveToDelayed(error.retryAt.getTime(), token);
+        throw new DelayedError();
+      }
     },
     { connection, concurrency: 2 },
   );
@@ -89,7 +99,9 @@ async function main(): Promise<void> {
   logger.info({ queues: [SYSTEM_QUEUE, MAIL_QUEUE] }, "worker started");
 }
 
-main().catch((error: unknown) => {
+main().catch(async (error: unknown) => {
   logger.fatal({ err: (error as Error).message }, "worker crashed");
+  captureServerException(error, { phase: "startup" });
+  await flushObservability(2_000);
   process.exit(1);
 });

@@ -27,14 +27,15 @@ export async function sendVerificationMail(input: Recipient & { uid: string }): 
   });
 }
 
-/** Sign-up attempt on an e-mail that already has an account: the answer to the browser stays the same. */
-export async function sendSignupExistingMail(input: Recipient): Promise<void> {
+/** Sign-up attempt on an e-mail that already has an account: the answer to the browser stays the same; one mail per account and hour at most. */
+export async function sendSignupExistingMail(input: Recipient & { uid: string }): Promise<void> {
   await sendMail({
     template: "signupExisting",
     locale: input.locale,
     to: input.email,
     data: { displayName: input.displayName, loginUrl: pageUrl(input.locale, "connexion"), resetUrl: pageUrl(input.locale, "mot-de-passe-oublie") },
     priority: "security",
+    idempotencyKey: `signup-existing-${input.uid}-${hourBucket()}`,
   });
 }
 

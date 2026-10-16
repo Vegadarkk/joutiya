@@ -1,6 +1,6 @@
 import "server-only";
 import { getUserPrivate } from "@/lib/db/repositories/users";
-import { codeHash, newCode } from "./codes";
+import { codeHash, newCode, phoneCodeKey } from "./codes";
 import { whatsappDisplayNumber } from "./config";
 import { CHALLENGE_TTL_SECONDS, challengeStore, type ChallengeStore } from "./store";
 import type { PhoneVerifier, VerificationChallenge, VerificationState } from "./types";
@@ -28,7 +28,7 @@ export class WhatsAppInboundVerifier implements PhoneVerifier {
     if (!number) throw new Error("WhatsApp verification is not configured (WHATSAPP_DISPLAY_NUMBER)");
     const code = newCode();
     const expiresAt = this.now() + CHALLENGE_TTL_SECONDS * 1000;
-    await this.store().put(uid, { phoneE164, codeHash: codeHash(uid, code), expiresAt });
+    await this.store().put(uid, { phoneE164, codeHash: codeHash(uid, code), codeKey: phoneCodeKey(phoneE164, code), expiresAt });
     return { code, number, waLink: waLink(number, code), expiresAt: new Date(expiresAt) };
   }
 

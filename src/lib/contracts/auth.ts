@@ -51,6 +51,13 @@ export const localeSchema = z.enum(LOCALES);
 /** Turnstile widget token (max 2048 characters, documented). */
 export const turnstileTokenSchema = z.string().min(1).max(2048);
 
+/**
+ * Turnstile `action` names: the widget declares one, siteverify echoes it and the server refuses a
+ * token solved for another action. One list for both sides (a mismatch is a hard 403 in prod).
+ */
+export const TURNSTILE_ACTIONS = ["signup", "login", "reset", "google", "verify-resend", "staff-login", "phone"] as const;
+export type TurnstileAction = (typeof TURNSTILE_ACTIONS)[number];
+
 export const consentsSchema = z
   .object({
     /** CGU acceptance. */
@@ -87,6 +94,8 @@ export const googleSchema = z
   .object({
     /** Google ID token from Google Identity Services. */
     credential: z.string().min(20).max(4096),
+    /** Random value the page gave GIS (`initialize({ nonce })`); must match the token's `nonce` claim. */
+    nonce: z.string().min(16).max(256),
     /** Sign-up only: consents and Turnstile; absent on a first call, the answer is `needs_consent`. */
     consents: consentsSchema.optional(),
     turnstileToken: turnstileTokenSchema.optional(),

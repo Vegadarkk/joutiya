@@ -18,7 +18,7 @@
     "test:rules": "firebase emulators:exec --only firestore --project demo-joutiya \"vitest run --config vitest.rules.config.ts\"",
     "test:e2e": "firebase emulators:exec --only auth,firestore --project demo-joutiya \"playwright test\"",
     "assert-target": "node scripts/assert-target.ts",
-    "check": "npm run lint && npm run typecheck && npm run test && node --test scripts/assert-target.test.ts",
+    "check": "npm run lint && npm run typecheck && tsc -p workers/uptime-probe --noEmit && npm run test && node --test scripts/assert-target.test.ts",
     "test:api": "firebase emulators:exec --only auth,firestore --project demo-joutiya \"vitest run --config vitest.api.config.ts\"",
     "test:e2e:only": "playwright test",
     "emulators": "firebase emulators:start --only auth,firestore --project demo-joutiya",

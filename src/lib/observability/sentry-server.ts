@@ -2,12 +2,14 @@ import "server-only";
 import * as Sentry from "@sentry/node";
 import { serverEnv } from "@/lib/env";
 import { setExceptionHandler } from "./capture";
-import { RESTRICTED_DATA_COLLECTION, scrubEvent } from "./scrub";
+import { RESTRICTED_DATA_COLLECTION, scrubBreadcrumb, scrubEvent } from "./scrub";
 
 // Error tracking of `web` and `worker` (§2: Sentry, EU region, free plan). Errors only: no
-// tracing (`tracesSampleRate` stays unset, 0 would not disable it), no replay, no profiling.
-// Collection is restricted and every event passes through scrubEvent. Without SENTRY_DSN the
-// module is inert: errors are only logged by src/lib/observability/capture.ts.
+// tracing (`tracesSampleRate` stays unset, 0 would not disable it), no replay, no profiling, and
+// no sentry-trace/baggage headers on outgoing requests (third parties never see a trace id).
+// Collection is restricted, every breadcrumb passes through scrubBreadcrumb and every event
+// through scrubEvent. Without SENTRY_DSN the module is inert: errors are only logged by
+// src/lib/observability/capture.ts.
 
 export type Service = "web" | "worker";
 
@@ -24,7 +26,9 @@ export function initServerObservability(service: Service): void {
     serverName: service,
     sampleRate: 1,
     maxBreadcrumbs: 30,
+    tracePropagationTargets: [],
     dataCollection: RESTRICTED_DATA_COLLECTION,
+    beforeBreadcrumb: scrubBreadcrumb,
     beforeSend: scrubEvent,
   });
   Sentry.setTag("service", service);

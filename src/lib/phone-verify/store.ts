@@ -7,10 +7,17 @@ import { phoneKey } from "./codes";
 // pressure, §2) for the 10 minutes of their validity, plus a grace period so the account page can
 // say "expired" rather than "none". Without QUEUE_REDIS_URL (dev, tests) an in-memory store applies
 // the same semantics. Webhook message ids (wamid) are remembered 24 h to absorb Meta's retries.
+//
+// Three keys per challenge: uid -> challenge, number -> uid (the latest start for the number) and
+// (number, code) -> uid. The last one lets the code in the inbound message pick the right account
+// when several accounts hold a challenge for the same number, so nobody can block a number by
+// starting a challenge for it.
 
 export interface ChallengeInput {
   phoneE164: string;
   codeHash: string;
+  /** Key material of the (number, code) index (codes.ts phoneCodeKey); stored as a key, never the code. */
+  codeKey: string;
   /** Milliseconds since the epoch. */
   expiresAt: number;
 }
@@ -20,14 +27,18 @@ export interface StoredChallenge extends ChallengeInput {
 }
 
 export interface ChallengeStore {
-  /** Stores the challenge of `uid`, replacing any previous one (the number pointer follows). */
+  /** Stores the challenge of `uid`, replacing any previous one (the number and code indexes follow). */
   put(uid: string, challenge: ChallengeInput): Promise<void>;
   getByUid(uid: string): Promise<StoredChallenge | null>;
   /** Challenge currently attached to this number (the latest `put` for the number wins). */
   getByPhone(e164: string): Promise<StoredChallenge | null>;
+  /** Challenge of this number whose code produced `codeKey`, whichever account started it. */
+  getByCode(e164: string, codeKey: string): Promise<StoredChallenge | null>;
   delete(uid: string): Promise<void>;
   /** True when this wamid was already processed; otherwise marks it for 24 h. */
   seen(wamid: string): Promise<boolean>;
+  /** Unmarks a wamid whose processing failed, so Meta's retry is processed again. */
+  forget(wamid: string): Promise<void>;
 }
 
 /** Validity of a challenge. */
@@ -38,6 +49,7 @@ export const WAMID_TTL_SECONDS = 24 * 60 * 60;
 
 const uidKey = (uid: string) => `pv:u:${uid}`;
 const phoneRef = (e164: string) => `pv:p:${phoneKey(e164)}`;
+const codeRef = (codeKey: string) => `pv:pc:${codeKey}`;
 const wamidKey = (wamid: string) => `pv:m:${wamid}`;
 
 /** Seconds to keep a challenge: until it expires, plus the grace period. */
@@ -49,8 +61,8 @@ function parseStored(uid: string, raw: string | null): StoredChallenge | null {
   if (!raw) return null;
   try {
     const value = JSON.parse(raw) as Partial<ChallengeInput> | null;
-    if (!value || typeof value.phoneE164 !== "string" || typeof value.codeHash !== "string" || typeof value.expiresAt !== "number") return null;
-    return { uid, phoneE164: value.phoneE164, codeHash: value.codeHash, expiresAt: value.expiresAt };
+    if (!value || typeof value.phoneE164 !== "string" || typeof value.codeHash !== "string" || typeof value.codeKey !== "string" || typeof value.expiresAt !== "number") return null;
+    return { uid, phoneE164: value.phoneE164, codeHash: value.codeHash, codeKey: value.codeKey, expiresAt: value.expiresAt };
   } catch {
     return null;
   }
@@ -67,11 +79,12 @@ export class ValkeyChallengeStore implements ChallengeStore {
 
   async put(uid: string, challenge: ChallengeInput): Promise<void> {
     const previous = await this.getByUid(uid);
-    if (previous && previous.phoneE164 !== challenge.phoneE164) await this.releasePhone(previous.phoneE164, uid);
+    if (previous) await this.releaseIndexes(previous, uid, previous.phoneE164 !== challenge.phoneE164);
     const ttl = keepSeconds(challenge.expiresAt, this.now());
-    const value: ChallengeInput = { phoneE164: challenge.phoneE164, codeHash: challenge.codeHash, expiresAt: challenge.expiresAt };
+    const value: ChallengeInput = { phoneE164: challenge.phoneE164, codeHash: challenge.codeHash, codeKey: challenge.codeKey, expiresAt: challenge.expiresAt };
     await this.client.set(uidKey(uid), JSON.stringify(value), "EX", ttl);
     await this.client.set(phoneRef(challenge.phoneE164), uid, "EX", ttl);
+    await this.client.set(codeRef(challenge.codeKey), uid, "EX", ttl);
   }
 
   async getByUid(uid: string): Promise<StoredChallenge | null> {
@@ -86,10 +99,17 @@ export class ValkeyChallengeStore implements ChallengeStore {
     return challenge && challenge.phoneE164 === e164 ? challenge : null;
   }
 
+  async getByCode(e164: string, codeKey: string): Promise<StoredChallenge | null> {
+    const uid = await this.client.get(codeRef(codeKey));
+    if (!uid) return null;
+    const challenge = await this.getByUid(uid);
+    return challenge && challenge.phoneE164 === e164 && challenge.codeKey === codeKey ? challenge : null;
+  }
+
   async delete(uid: string): Promise<void> {
     const current = await this.getByUid(uid);
     await this.client.del(uidKey(uid));
-    if (current) await this.releasePhone(current.phoneE164, uid);
+    if (current) await this.releaseIndexes(current, uid, true);
   }
 
   async seen(wamid: string): Promise<boolean> {
@@ -97,9 +117,14 @@ export class ValkeyChallengeStore implements ChallengeStore {
     return result === null;
   }
 
-  /** Drops the number pointer only while it still names `uid`: another account may have claimed it. */
-  private async releasePhone(e164: string, uid: string): Promise<void> {
-    if ((await this.client.get(phoneRef(e164))) === uid) await this.client.del(phoneRef(e164));
+  async forget(wamid: string): Promise<void> {
+    await this.client.del(wamidKey(wamid));
+  }
+
+  /** Drops the indexes of `challenge` only while they still name `uid`: another account may have claimed them. */
+  private async releaseIndexes(challenge: StoredChallenge, uid: string, phone: boolean): Promise<void> {
+    if (phone && (await this.client.get(phoneRef(challenge.phoneE164))) === uid) await this.client.del(phoneRef(challenge.phoneE164));
+    if ((await this.client.get(codeRef(challenge.codeKey))) === uid) await this.client.del(codeRef(challenge.codeKey));
   }
 }
 
@@ -111,20 +136,22 @@ interface MemoryEntry extends StoredChallenge {
 export class MemoryChallengeStore implements ChallengeStore {
   private readonly byUid = new Map<string, MemoryEntry>();
   private readonly byPhone = new Map<string, string>();
+  private readonly byCode = new Map<string, string>();
   private readonly wamids = new Map<string, number>();
 
   constructor(private readonly now: () => number = Date.now) {}
 
   async put(uid: string, challenge: ChallengeInput): Promise<void> {
     const previous = this.entry(uid);
-    if (previous && previous.phoneE164 !== challenge.phoneE164 && this.byPhone.get(previous.phoneE164) === uid) this.byPhone.delete(previous.phoneE164);
-    this.byUid.set(uid, { uid, phoneE164: challenge.phoneE164, codeHash: challenge.codeHash, expiresAt: challenge.expiresAt, keepUntil: challenge.expiresAt + EXPIRED_GRACE_SECONDS * 1000 });
+    if (previous) this.releaseIndexes(previous, uid, previous.phoneE164 !== challenge.phoneE164);
+    this.byUid.set(uid, { uid, phoneE164: challenge.phoneE164, codeHash: challenge.codeHash, codeKey: challenge.codeKey, expiresAt: challenge.expiresAt, keepUntil: challenge.expiresAt + EXPIRED_GRACE_SECONDS * 1000 });
     this.byPhone.set(challenge.phoneE164, uid);
+    this.byCode.set(challenge.codeKey, uid);
   }
 
   async getByUid(uid: string): Promise<StoredChallenge | null> {
     const entry = this.entry(uid);
-    return entry ? { uid: entry.uid, phoneE164: entry.phoneE164, codeHash: entry.codeHash, expiresAt: entry.expiresAt } : null;
+    return entry ? { uid: entry.uid, phoneE164: entry.phoneE164, codeHash: entry.codeHash, codeKey: entry.codeKey, expiresAt: entry.expiresAt } : null;
   }
 
   async getByPhone(e164: string): Promise<StoredChallenge | null> {
@@ -138,10 +165,21 @@ export class MemoryChallengeStore implements ChallengeStore {
     return challenge;
   }
 
+  async getByCode(e164: string, codeKey: string): Promise<StoredChallenge | null> {
+    const uid = this.byCode.get(codeKey);
+    if (!uid) return null;
+    const challenge = await this.getByUid(uid);
+    if (!challenge || challenge.codeKey !== codeKey) {
+      this.byCode.delete(codeKey);
+      return null;
+    }
+    return challenge.phoneE164 === e164 ? challenge : null;
+  }
+
   async delete(uid: string): Promise<void> {
     const current = this.byUid.get(uid);
     this.byUid.delete(uid);
-    if (current && this.byPhone.get(current.phoneE164) === uid) this.byPhone.delete(current.phoneE164);
+    if (current) this.releaseIndexes(current, uid, true);
   }
 
   async seen(wamid: string): Promise<boolean> {
@@ -153,12 +191,21 @@ export class MemoryChallengeStore implements ChallengeStore {
     return false;
   }
 
+  async forget(wamid: string): Promise<void> {
+    this.wamids.delete(wamid);
+  }
+
+  private releaseIndexes(challenge: StoredChallenge, uid: string, phone: boolean): void {
+    if (phone && this.byPhone.get(challenge.phoneE164) === uid) this.byPhone.delete(challenge.phoneE164);
+    if (this.byCode.get(challenge.codeKey) === uid) this.byCode.delete(challenge.codeKey);
+  }
+
   private entry(uid: string): MemoryEntry | null {
     const entry = this.byUid.get(uid);
     if (!entry) return null;
     if (entry.keepUntil <= this.now()) {
       this.byUid.delete(uid);
-      if (this.byPhone.get(entry.phoneE164) === uid) this.byPhone.delete(entry.phoneE164);
+      this.releaseIndexes(entry, uid, true);
       return null;
     }
     return entry;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
@@ -31,6 +31,7 @@ export function LoginForm({ nonce }: { nonce?: string }) {
   const resubmitOnToken = useRef(false);
   // One automatic retry per click: a server that keeps asking for Turnstile never loops.
   const automatic = useRef(false);
+  const unverifiedHeading = useRef<HTMLHeadingElement>(null);
   const [serverError, setServerError] = useState<unknown>();
   const [turnstileNeeded, setTurnstileNeeded] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
@@ -41,6 +42,11 @@ export function LoginForm({ nonce }: { nonce?: string }) {
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<LoginForm, unknown, LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
+
+  // The "confirm your address" notice replaces nothing visible: focus tells the person it appeared.
+  useEffect(() => {
+    if (unverifiedEmail) unverifiedHeading.current?.focus();
+  }, [unverifiedEmail]);
 
   async function onValid(values: LoginInput) {
     setServerError(undefined);
@@ -88,18 +94,20 @@ export function LoginForm({ nonce }: { nonce?: string }) {
       <GoogleButton nonce={nonce} onSignedIn={afterSignIn} onNeedsConsent={setConsent} onError={setServerError} divider={<OrDivider label={c("or")} />} />
       {unverifiedEmail ? (
         // Its own form (resend): a sibling of the sign-in form, never nested in it.
-        <section className="flex flex-col gap-4 rounded-lg border border-warning/30 bg-warning-surface p-5" aria-live="polite">
+        <section aria-labelledby="login-unverified" className="flex flex-col gap-4 rounded-lg border border-warning/30 bg-warning-surface p-5">
           <div className="flex flex-col gap-1">
-            <h2 className="font-semibold text-warning">{t("verifyTitle")}</h2>
+            <h2 id="login-unverified" ref={unverifiedHeading} tabIndex={-1} className="rounded-sm font-semibold text-warning outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
+              {t("verifyTitle")}
+            </h2>
             <p className="text-sm text-pretty">{t("verifyBody", { email: unverifiedEmail })}</p>
           </div>
-          <ResendVerification nonce={nonce} defaultEmail={unverifiedEmail} action="verify_resend_login" />
+          <ResendVerification nonce={nonce} defaultEmail={unverifiedEmail} entry="login" />
         </section>
       ) : null}
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
         <FormMessage error={serverError} />
         <Field label={c("email")} error={fieldMessage("email", errors.email)} required>
-          <Input type="email" inputMode="email" autoComplete="username" spellCheck={false} autoFocus {...register("email")} />
+          <Input type="email" inputMode="email" autoComplete="username" spellCheck={false} autoFocus dir="ltr" className="text-start" {...register("email")} />
         </Field>
         <PasswordField
           label={c("password")}

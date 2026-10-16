@@ -105,7 +105,7 @@ Dans developers.facebook.com → app **Joutiya** (phase 0, étape 9) :
 3. **WhatsApp** → **Configuration de l'API** : Nav rapporte le **Phone number ID** et le numéro affiché du numéro de test (`WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_DISPLAY_NUMBER` en chiffres sans `+`). Ce numéro de test ne reçoit que des numéros ajoutés à sa liste de destinataires (5 au plus) : ajoutez-y les téléphones des testeurs du staging.
 4. Une app Meta n'a qu'une URL de webhook : le staging a besoin de sa propre app **Joutiya Staging** (même portefeuille, même cas d'usage WhatsApp, numéro de test, URL `https://staging.joutiya.ma/api/webhooks/whatsapp`). La production reçoit, avant le lancement, la ligne professionnelle d'Adark Prime (décision du 16 octobre 2026, à la place d'une carte SIM marocaine) : inscription du numéro sur l'API WhatsApp dans la console Meta (**Vous :** le code SMS). Attention : un numéro inscrit sur l'API peut être retiré de l'application WhatsApp du téléphone ; vérifier les options proposées par Meta à ce moment-là. Le garde-fou exige que le numéro de production diffère du numéro de test.
 
-Le développement local n'a pas besoin de Meta : sans `WHATSAPP_DISPLAY_NUMBER`, le site utilise un numéro factice et le webhook peut être simulé (voir les tests `tests/api/phone`).
+Le développement local n'a pas besoin de Meta : avec des valeurs factices pour `WHATSAPP_APP_SECRET` et `WHATSAPP_PHONE_NUMBER_ID` (et un `WHATSAPP_DISPLAY_NUMBER` quelconque), le webhook se simule avec une requête signée (voir `tests/api/phone` et `tests/e2e/phone.spec.ts`) ; sans ces trois variables, la vérification du téléphone répond « pas encore ouverte ».
 
 ## 6. Sentry : suivi des erreurs, région UE (Nav, N14)
 
@@ -132,7 +132,7 @@ Sans les variables obligatoires (`src/lib/env.ts`, liste `REQUIRED_DEPLOYED`), l
 
 Le back-office (`admin.joutiya.ma`) exige deux choses : passer Cloudflare Access avec votre compte Google (phase 1) et une session de personnel ouverte avec un mot de passe. Le premier compte administrateur est créé par `scripts/create-admin.ts` ; il invite ensuite les modérateurs depuis la page **Personnel** du back-office (ils reçoivent un e-mail avec un lien pour définir leur mot de passe). L'e-mail du compte administrateur doit être exactement celui de votre connexion Access (votre Gmail). Le compte Google de chaque membre du personnel, le vôtre compris, doit avoir la validation en deux étapes activée (myaccount.google.com → Sécurité) : Access ne l'impose pas, le cahier des charges oui.
 
-1. Cody lance le script en simulation puis avec `--apply` (prompt M) : il crée le compte, lui donne le rôle `admin` et affiche une seule ligne, l'adresse `https://admin.joutiya.ma/connexion?mode=setPassword&oobCode=…`.
+1. Cody lance le script en simulation puis avec `--apply` (prompt M), avec `APP_ENV=prod` (ou `APP_ENV=staging`) : le script vérifie que `FIREBASE_PROJECT_ID` est bien le projet enregistré pour cet environnement dans `infra/targets.json` (`environments.<env>.firebase.projectId`, consigné par la phase 0 à la création des projets) et refuse sinon ; il crée le compte, lui donne le rôle `admin` et affiche une seule ligne, l'adresse `https://admin.joutiya.ma/connexion?mode=setPassword&oobCode=…`.
 2. **Vous :** ouvrez cette adresse dans votre navigateur (connexion Access par Google), choisissez un mot de passe (12 caractères ou plus), puis connectez-vous. Le lien n'est valable qu'une heure et une seule fois.
 
 ## 9. Contrôles
@@ -154,5 +154,5 @@ Complète les fichiers de la VM de Joutiya pour la phase 2 (docs/phase-2.md, ét
 **M. Premier administrateur** (étape 8)
 
 ```text
-Crée le premier administrateur du back-office de Joutiya (docs/phase-2.md, étape 8) dans le projet Firebase de production de infra/targets.json. Je me connecte moi-même avec `gcloud auth application-default login` sur ce projet. Lance d'abord `node --env-file=.env.local scripts/create-admin.ts --email <mon Gmail> --name "<mon prénom>"` en simulation et montre-moi ce qu'il ferait ; après mon accord, relance avec --apply. N'affiche que la ligne que le script imprime (l'adresse de définition du mot de passe) ; ne crée aucune clé, ne modifie aucun autre compte. Fais de même pour le staging si je le demande.
+Crée le premier administrateur du back-office de Joutiya (docs/phase-2.md, étape 8) dans le projet Firebase de production de infra/targets.json. Je me connecte moi-même avec `gcloud auth application-default login` sur ce projet. Lance d'abord `APP_ENV=prod node --env-file=.env.local scripts/create-admin.ts --email <mon Gmail> --name "<mon prénom>"` en simulation et montre-moi ce qu'il ferait (le script refuse si le projet n'est pas celui enregistré pour prod dans infra/targets.json) ; après mon accord, relance avec --apply. N'affiche que la ligne que le script imprime (l'adresse de définition du mot de passe) ; ne crée aucune clé, ne modifie aucun autre compte. Fais de même pour le staging (`APP_ENV=staging`) si je le demande.
 ```

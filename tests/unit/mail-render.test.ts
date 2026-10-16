@@ -17,6 +17,7 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
   passwordChanged: { displayName: "Nadia", at: "2026-10-16T09:30:00.000Z" },
   staffInvite: { displayName: "Nadia", actionUrl: ACTION, role: "moderator" },
   phoneVerified: { displayName: "Nadia", phone: "+212 6 00 00 00 00" },
+  phoneRemoved: { displayName: "Nadia", phone: "+212 6 00 00 00 00" },
 };
 
 /** Every URL a template receives must appear in both bodies. */

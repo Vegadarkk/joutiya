@@ -63,13 +63,40 @@ export async function consumeLimit(id: RateLimitId, rawKey: string, points = 1):
   }
 }
 
-/** Points already consumed for `rawKey` in the current window (0 when none, null when unknown). */
-export async function consumedPoints(id: RateLimitId, rawKey: string): Promise<number | null> {
+export interface LimitState {
+  /** Points consumed in the current window (0 when the key is unknown). */
+  consumedPoints: number;
+  /** Milliseconds before the key frees itself (window end or block end; 0 when unknown). */
+  msBeforeNext: number;
+}
+
+/** Consumed points and the time left on `rawKey`, or null when the store cannot answer. */
+export async function limitState(id: RateLimitId, rawKey: string): Promise<LimitState | null> {
   try {
     const result = await withTimeout(limiter(id).get(limitKey(id, rawKey)), 500);
-    return result?.consumedPoints ?? 0;
+    return { consumedPoints: result?.consumedPoints ?? 0, msBeforeNext: Math.max(0, result?.msBeforeNext ?? 0) };
   } catch {
     return null;
+  }
+}
+
+/** Points already consumed for `rawKey` in the current window (0 when none, null when unknown). */
+export async function consumedPoints(id: RateLimitId, rawKey: string): Promise<number | null> {
+  const state = await limitState(id, rawKey);
+  return state ? state.consumedPoints : null;
+}
+
+/**
+ * Blocks `rawKey` for `seconds` (the definition's blockDuration, else its window) from now: the
+ * store marks the key as exhausted whatever its count. Best effort, like resetLimit.
+ */
+export async function blockLimit(id: RateLimitId, rawKey: string, seconds?: number): Promise<void> {
+  const definition = RATE_LIMITS[id];
+  const duration = seconds ?? ("blockDuration" in definition && definition.blockDuration > 0 ? definition.blockDuration : definition.duration);
+  try {
+    await withTimeout(limiter(id).block(limitKey(id, rawKey), duration), 500);
+  } catch (error) {
+    logger.warn({ limiter: id, err: (error as Error).message }, "rate limiter block skipped");
   }
 }
 

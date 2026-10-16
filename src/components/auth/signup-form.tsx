@@ -49,6 +49,7 @@ export function SignupForm({ nonce }: { nonce?: string }) {
   });
   const password = useWatch({ control, name: "password" });
   const email = useWatch({ control, name: "email" });
+  const displayName = useWatch({ control, name: "displayName" });
 
   async function onValid(values: SignupInput) {
     setServerError(undefined);
@@ -72,7 +73,7 @@ export function SignupForm({ nonce }: { nonce?: string }) {
         </StatusPanel>
         <div className="flex flex-col gap-3">
           <p className="text-sm text-foreground-muted">{t("sentHelp")}</p>
-          <ResendVerification nonce={nonce} defaultEmail={sentTo} action="verify_resend_signup" />
+          <ResendVerification nonce={nonce} defaultEmail={sentTo} entry="signup" />
         </div>
       </div>
     );
@@ -91,13 +92,13 @@ export function SignupForm({ nonce }: { nonce?: string }) {
           <Input autoComplete="name" maxLength={40} {...register("displayName")} />
         </Field>
         <Field label={c("email")} error={fieldMessage("email", errors.email)} required>
-          <Input type="email" inputMode="email" autoComplete="email" spellCheck={false} {...register("email")} />
+          <Input type="email" inputMode="email" autoComplete="email" spellCheck={false} dir="ltr" className="text-start" {...register("email")} />
         </Field>
         <PasswordField
           label={c("password")}
           autoComplete="new-password"
           required
-          rules={{ value: password ?? "", email: email ?? "" }}
+          rules={{ value: password ?? "", email: email ?? "", displayName: displayName ?? "" }}
           error={fieldMessage("newPassword", errors.password)}
           {...register("password")}
         />

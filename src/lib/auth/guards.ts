@@ -24,7 +24,10 @@ export interface AuthContext {
 export interface GuardOptions {
   /** Mutations need the Origin header of this host and the signed CSRF header (§6 CSRF). */
   mutation?: boolean;
-  /** Looks the account up: disabled or revoked sessions are refused (sensitive routes). */
+  /**
+   * Looks the account up: disabled or revoked sessions are refused. Defaults to `mutation`: a
+   * cookie that logout, a password change or a ban already revoked must not mutate anything.
+   */
   checkRevoked?: boolean;
   /** A suspended account may still reach the routes it is allowed (conversations, export, appeal). */
   allowSuspended?: boolean;
@@ -59,7 +62,7 @@ export async function requireUser(request: Request, options: GuardOptions = {}):
   const session = readCookie(request.headers, SESSION_COOKIE);
   if (!session) throw unauthenticated();
   if (options.mutation) requireCsrf(request, session);
-  const user = await verifySession(session, { checkRevoked: options.checkRevoked });
+  const user = await verifySession(session, { checkRevoked: options.checkRevoked ?? options.mutation === true });
   if (!user) throw unauthenticated();
   if (host !== "public") throw notFound();
   if (!isMember(user.claims)) throw new HttpError(403, "role_missing");

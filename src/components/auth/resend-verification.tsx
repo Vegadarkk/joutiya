@@ -25,13 +25,13 @@ type ResendInput = z.output<typeof resendSchema>;
 interface ResendVerificationProps {
   nonce?: string;
   defaultEmail?: string;
-  /** Turnstile action name (one per entry point, for the server's statistics). */
-  action?: string;
+  /** Which screen hosts the form (Turnstile statistics only; the action stays `verify-resend`). */
+  entry: "login" | "signup" | "action";
   className?: string;
 }
 
 /** "Receive a new link": e-mail + Turnstile -> POST verify/resend, then a neutral confirmation. */
-export function ResendVerification({ nonce, defaultEmail = "", action = "verify_resend", className }: ResendVerificationProps) {
+export function ResendVerification({ nonce, defaultEmail = "", entry, className }: ResendVerificationProps) {
   const t = useTranslations("Auth.resend");
   const c = useTranslations("Auth.common");
   const locale = useLocale() as Locale;
@@ -73,11 +73,12 @@ export function ResendVerification({ nonce, defaultEmail = "", action = "verify_
         <h3 className="font-semibold">{t("title")}</h3>
         <FormMessage error={serverError} />
         <Field label={c("email")} error={fieldMessage("email", errors.email)} required>
-          <Input type="email" inputMode="email" autoComplete="email" spellCheck={false} {...register("email")} />
+          <Input type="email" inputMode="email" autoComplete="email" spellCheck={false} dir="ltr" className="text-start" {...register("email")} />
         </Field>
         <TurnstileWidget
           ref={turnstile}
-          action={action}
+          action="verify-resend"
+          cData={`verify-resend-${entry}`}
           nonce={nonce}
           onToken={(token) => setValue("turnstileToken", token ?? "", { shouldValidate: submitCount > 0 })}
           error={errors.turnstileToken ? c("turnstilePending") : undefined}

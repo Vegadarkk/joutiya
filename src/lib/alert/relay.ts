@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { logger } from "@/lib/logging/logger";
 import type { Alert, AlertChannel } from "./types";
 
 /**
@@ -27,6 +28,13 @@ export class RelayEmailChannel implements AlertChannel {
       body,
       signal: AbortSignal.timeout(8_000),
     });
+    // 503: the Worker has no e-mail configured (ALERT_EMAIL_TO / RESEND_API_KEY unset). Telegram
+    // already carried the alert, so this is a warning, not a channel failure to retry.
+    if (response.status === 503) {
+      logger.warn("alert relay: e-mail channel off on the Worker");
+      return;
+    }
+    // 204 covers both a sent mail and a repeat of the same title within the hour (Resend idempotency).
     if (!response.ok) throw new Error(`alert relay: HTTP ${response.status}`);
   }
 }

@@ -13,8 +13,12 @@ import { safeEqual } from "@/lib/security/hash";
 // days and the dedupe on wamid absorbs its duplicates. Logs carry counts only, never numbers or texts.
 export const dynamic = "force-dynamic";
 
-/** Our own number receives a handful of short texts: far below Meta's 3 MB batches. */
-const MAX_BYTES = 64 * 1024;
+/**
+ * Meta batches can reach 3 MB; ours carry a handful of short texts. A cap below a batch would make
+ * it a permanent 413 (Meta retries it for days), so the cap is generous: one HMAC over 1 MiB costs
+ * nothing, and the signature is checked before anything is parsed.
+ */
+const MAX_BYTES = 1024 * 1024;
 
 export const GET = apiRoute(async (request) => {
   const token = serverEnv().WHATSAPP_VERIFY_TOKEN;

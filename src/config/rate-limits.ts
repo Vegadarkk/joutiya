@@ -26,6 +26,9 @@ export const RATE_LIMITS = {
   // IP: 30 per hour, Turnstile always required.
   "signup.device": { points: 3, duration: DAY, policy: "closed", key: "device" },
   "signup.ip": { points: 30, duration: HOUR, policy: "closed", key: "ip" },
+  // Sign-up attempt on an e-mail that already has an account: the warning mail to its owner is
+  // sent 3 times per hour at most per normalized e-mail (mail bombing); the answer never changes.
+  "signup.existing.email": { points: 3, duration: HOUR, policy: "closed", key: "email" },
   // Google sign-in (/api/auth/google and /api/auth/session): 10 per hour per device, 60 per hour per IP.
   "google.device": { points: 10, duration: HOUR, policy: "closed", key: "device" },
   "google.ip": { points: 60, duration: HOUR, policy: "closed", key: "ip" },
@@ -44,11 +47,11 @@ export const RATE_LIMITS = {
   "action.ip": { points: 60, duration: HOUR, policy: "closed", key: "ip" },
   // /api/auth/client-token: 120 per hour per uid.
   "clientToken.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
-  // WhatsApp verification: 3 per day per account, 5 per day per IP /64, 1 per minute per number.
+  // WhatsApp verification: 3 per day per account, 5 per day per IP /64, 1 per minute per number and account.
   "phone.uid": { points: 3, duration: DAY, policy: "closed", key: "uid" },
   "phone.ip": { points: 5, duration: DAY, policy: "closed", key: "ip" },
   "phone.number": { points: 1, duration: MINUTE, policy: "closed", key: "phone" },
-  "phone.status.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
+  "phone.status.uid": { points: 400, duration: HOUR, policy: "open", key: "uid" },
   // Staff login on the admin host (Access already in front): tight.
   "staff.login.accountIp": { points: 5, duration: 15 * MINUTE, blockDuration: 15 * MINUTE, policy: "closed", key: "account+ip" },
   // Account settings mutations (display name, password change, account closure).

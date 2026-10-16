@@ -20,7 +20,9 @@ import { toast } from "sonner";
 import { FormMessage, useApiErrorMessage, useFieldMessage } from "./form-message";
 import { PasswordField } from "./password-field";
 
-// /parametres. The layout already requires a member; the data comes from GET /api/auth/me.
+// /parametres. The layout already requires a member; the data comes from GET /api/auth/me (or the
+// session the private layout rendered with). One page, its sections separated by rules: borders
+// are kept for what they mean (a status banner, a control), not drawn around every block.
 
 export function SettingsView() {
   const t = useTranslations("Auth.settings");
@@ -35,7 +37,7 @@ export function SettingsView() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-10">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold text-balance">{t("title")}</h1>
@@ -47,27 +49,27 @@ export function SettingsView() {
         </Button>
       </header>
       {status !== "ready" ? (
-        <LoadingCards label={t("loading")} />
+        <LoadingSections label={t("loading")} />
       ) : !session ? (
         <SessionLost />
       ) : (
-        <div className="flex flex-col gap-6">
-          <ProfileCard key={`${session.uid}-${session.displayName}-${session.locale}`} session={session} />
-          {session.providers.includes("password") ? <PasswordCard email={session.email} /> : null}
-          <VerificationCard session={session} />
-          <MethodsCard session={session} />
+        <div className="flex flex-col divide-y divide-border">
+          <ProfileSection key={`${session.uid}-${session.displayName}-${session.locale}`} session={session} />
+          <PasswordSection email={session.email} displayName={session.displayName} hasPassword={session.providers.includes("password")} />
+          <VerificationSection session={session} />
+          <MethodsSection session={session} />
         </div>
       )}
     </div>
   );
 }
 
-function LoadingCards({ label }: { label: string }) {
+function LoadingSections({ label }: { label: string }) {
   return (
-    <div role="status" aria-busy="true" className="flex flex-col gap-6">
+    <div role="status" aria-busy="true" className="flex flex-col divide-y divide-border">
       <span className="sr-only">{label}</span>
       {[0, 1, 2].map((index) => (
-        <div key={index} className="grid gap-6 rounded-lg border border-border p-6 sm:grid-cols-[13rem_1fr]">
+        <div key={index} className="grid gap-6 py-8 first:pt-0 sm:grid-cols-[13rem_1fr]">
           <div className="flex flex-col gap-2">
             <Skeleton className="h-5 w-24" />
             <Skeleton className="h-4 w-40" />
@@ -97,10 +99,10 @@ function SessionLost() {
   );
 }
 
-/** Settings card: title and purpose on the start side, the control on the end side. */
-function Card({ id, title, body, children }: { id: string; title: string; body: string; children: ReactNode }) {
+/** Settings section: title and purpose on the start side, the controls on the end side. */
+function Section({ id, title, body, children }: { id: string; title: string; body: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-title`} className="grid gap-6 rounded-lg border border-border bg-surface p-6 sm:grid-cols-[13rem_1fr]">
+    <section aria-labelledby={`${id}-title`} className="grid gap-6 py-8 first:pt-0 last:pb-0 sm:grid-cols-[13rem_1fr]">
       <div className="flex flex-col gap-1">
         <h2 id={`${id}-title`} className="text-lg font-semibold">
           {title}
@@ -115,7 +117,7 @@ function Card({ id, title, body, children }: { id: string; title: string; body: 
 type ProfileForm = z.input<typeof profileSchema>;
 type ProfileInput = z.output<typeof profileSchema>;
 
-function ProfileCard({ session }: { session: SessionSummary }) {
+function ProfileSection({ session }: { session: SessionSummary }) {
   const t = useTranslations("Auth.settings.profile");
   const names = useTranslations("Locale.names");
   const fieldMessage = useFieldMessage();
@@ -144,7 +146,7 @@ function ProfileCard({ session }: { session: SessionSummary }) {
   });
 
   return (
-    <Card id="profile" title={t("title")} body={t("body")}>
+    <Section id="profile" title={t("title")} body={t("body")}>
       <form onSubmit={submit} noValidate className="flex flex-col gap-4">
         <FormMessage error={serverError} />
         <Field label={t("displayName")} error={fieldMessage("displayName", errors.displayName)} required>
@@ -163,14 +165,39 @@ function ProfileCard({ session }: { session: SessionSummary }) {
           {t("save")}
         </Button>
       </form>
-    </Card>
+    </Section>
   );
 }
 
 type PasswordForm = z.input<typeof passwordChangeSchema>;
 type PasswordInput = z.output<typeof passwordChangeSchema>;
 
-function PasswordCard({ email }: { email: string | null }) {
+function PasswordSection({ email, displayName, hasPassword }: { email: string | null; displayName: string | null; hasPassword: boolean }) {
+  const t = useTranslations("Auth.settings.password");
+  return (
+    <Section id="password" title={t("title")} body={t("body")}>
+      {hasPassword ? <PasswordChangeForm email={email} displayName={displayName} /> : <PasswordMissing />}
+    </Section>
+  );
+}
+
+/**
+ * No password on the account (Google only, or a never-verified password dropped by a Google
+ * sign-in): there is no current password to ask for, the reset link sets one.
+ */
+function PasswordMissing() {
+  const t = useTranslations("Auth.settings.password");
+  return (
+    <div className="flex flex-col items-start gap-3">
+      <p className="text-sm text-pretty">{t("noneBody")}</p>
+      <Button asChild variant="outline" size="sm">
+        <Link href="/mot-de-passe-oublie">{t("noneAction")}</Link>
+      </Button>
+    </div>
+  );
+}
+
+function PasswordChangeForm({ email, displayName }: { email: string | null; displayName: string | null }) {
   const t = useTranslations("Auth.settings.password");
   const fieldMessage = useFieldMessage();
   const apiMessage = useApiErrorMessage();
@@ -203,38 +230,36 @@ function PasswordCard({ email }: { email: string | null }) {
   });
 
   return (
-    <Card id="password" title={t("title")} body={t("body")}>
-      <form onSubmit={submit} noValidate className="flex flex-col gap-4">
-        <FormMessage error={serverError} />
-        {/* Password managers pair the new password with the account. */}
-        <input type="hidden" name="username" autoComplete="username" value={email ?? ""} readOnly />
-        <PasswordField label={t("current")} autoComplete="current-password" required error={fieldMessage("currentPassword", errors.currentPassword)} {...register("currentPassword")} />
-        <PasswordField
-          label={t("new")}
-          autoComplete="new-password"
-          required
-          rules={{ value: password ?? "", email: email ?? "" }}
-          error={fieldMessage("newPassword", errors.password)}
-          {...register("password")}
-        />
-        <Button type="submit" variant="outline" loading={isSubmitting} className="w-fit">
-          {t("save")}
-        </Button>
-      </form>
-    </Card>
+    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+      <FormMessage error={serverError} />
+      {/* Password managers pair the new password with the account. */}
+      <input type="hidden" name="username" autoComplete="username" value={email ?? ""} readOnly />
+      <PasswordField label={t("current")} autoComplete="current-password" required error={fieldMessage("currentPassword", errors.currentPassword)} {...register("currentPassword")} />
+      <PasswordField
+        label={t("new")}
+        autoComplete="new-password"
+        required
+        rules={{ value: password ?? "", email: email ?? "", displayName: displayName ?? "" }}
+        error={fieldMessage("newPassword", errors.password)}
+        {...register("password")}
+      />
+      <Button type="submit" variant="outline" loading={isSubmitting} className="w-fit">
+        {t("save")}
+      </Button>
+    </form>
   );
 }
 
-function VerificationCard({ session }: { session: SessionSummary }) {
+function VerificationSection({ session }: { session: SessionSummary }) {
   const t = useTranslations("Auth.settings.verification");
   return (
-    <Card id="verification" title={t("title")} body={t("body")}>
+    <Section id="verification" title={t("title")} body={t("body")}>
       <ul className="flex flex-col divide-y divide-border">
         <li className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0">
           <Mail className="size-5 shrink-0 text-foreground-muted" aria-hidden="true" />
           <div className="flex min-w-0 flex-1 flex-col">
             <span className="text-sm text-foreground-muted">{t("email")}</span>
-            <span className="truncate font-medium" dir="ltr">
+            <span className="truncate text-start font-medium" dir="ltr">
               {session.email ?? "—"}
             </span>
           </div>
@@ -257,33 +282,33 @@ function VerificationCard({ session }: { session: SessionSummary }) {
           </Button>
         </li>
       </ul>
-    </Card>
+    </Section>
   );
 }
 
-function MethodsCard({ session }: { session: SessionSummary }) {
+function MethodsSection({ session }: { session: SessionSummary }) {
   const t = useTranslations("Auth.settings.methods");
   return (
-    <Card id="methods" title={t("title")} body={t("body")}>
+    <Section id="methods" title={t("title")} body={t("body")}>
       {session.providers.length === 0 ? (
         <p className="text-sm text-foreground-muted">{t("none")}</p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col divide-y divide-border">
           {session.providers.map((provider) => (
-            <li key={provider} className="flex items-center gap-3 rounded-md border border-border px-4 py-3">
-              {provider === "password" ? <KeyRound className="size-5 text-foreground-muted" aria-hidden="true" /> : <GoogleGlyph />}
+            <li key={provider} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
+              {provider === "password" ? <KeyRound className="size-5 shrink-0 text-foreground-muted" aria-hidden="true" /> : <GoogleGlyph />}
               <span className="font-medium">{provider === "password" ? t("password") : t("google")}</span>
             </li>
           ))}
         </ul>
       )}
-    </Card>
+    </Section>
   );
 }
 
 function GoogleGlyph() {
   return (
-    <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="size-5 shrink-0" aria-hidden="true">
       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z" />
       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
       <path fill="#FBBC05" d="M5.84 14.1A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.34-2.1V7.06H2.18A11 11 0 0 0 1 12c0 1.78.43 3.45 1.18 4.94l3.66-2.84Z" />

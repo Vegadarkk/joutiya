@@ -4,7 +4,7 @@ import type { Locale } from "@/config/site";
 // fallback, an in-memory mailbox in development (DEV_MAILBOX). The web app only enqueues; the
 // worker sends (BullMQ queue "mail", priorities), or the web sends inline when no queue is set.
 
-export type TemplateId = "verifyEmail" | "resetPassword" | "signupExisting" | "passwordChanged" | "staffInvite" | "phoneVerified";
+export type TemplateId = "verifyEmail" | "resetPassword" | "signupExisting" | "passwordChanged" | "staffInvite" | "phoneVerified" | "phoneRemoved";
 
 export interface TemplateData {
   verifyEmail: { displayName: string; actionUrl: string };
@@ -13,6 +13,8 @@ export interface TemplateData {
   passwordChanged: { displayName: string; at: string };
   staffInvite: { displayName: string; actionUrl: string; role: "moderator" | "admin" };
   phoneVerified: { displayName: string; phone: string };
+  /** The number was verified on another account and left this one. */
+  phoneRemoved: { displayName: string; phone: string };
 }
 
 /** Security mails bypass the suppression list and fall back to Brevo when Resend is exhausted. */

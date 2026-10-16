@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { EyeOff, Flag, MessagesSquare } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { DoorMark } from "@/components/feedback/door-mark";
+import { FrenchOnlyNotice } from "./french-only-notice";
 
 interface AuthShellProps {
   title: string;
@@ -18,6 +19,7 @@ interface AuthShellProps {
  */
 export function AuthShell({ title, lead, children, footer }: AuthShellProps) {
   const t = useTranslations("Auth.common");
+  const locale = useLocale();
   const points = [
     { icon: MessagesSquare, text: t("trust.messages") },
     { icon: EyeOff, text: t("trust.phone") },
@@ -47,8 +49,10 @@ export function AuthShell({ title, lead, children, footer }: AuthShellProps) {
           <DoorMark className="-mb-1.5 w-60 [&>path:first-child]:fill-bab-500" />
         </div>
       </aside>
-      <section className="flex flex-1 justify-center px-4 py-10 sm:px-6 lg:py-16">
+      {/* Tarifit: these pages are French until a native review (see FrenchOnlyNotice). */}
+      <section lang={locale === "rif" ? "fr" : undefined} className="flex flex-1 justify-center px-4 py-10 sm:px-6 lg:py-16">
         <div className="flex w-full max-w-md flex-col">
+          <FrenchOnlyNotice className="mb-6" />
           <h1 className="text-2xl font-semibold text-balance">{title}</h1>
           {lead ? <p className="mt-2 text-foreground-muted text-pretty">{lead}</p> : null}
           <div className="mt-8">{children}</div>

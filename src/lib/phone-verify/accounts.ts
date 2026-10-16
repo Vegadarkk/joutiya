@@ -1,22 +1,41 @@
 import "server-only";
+import { FieldValue } from "firebase-admin/firestore";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { db } from "@/lib/firebase/admin";
 
-// One verified number per account (§5 users/{uid}/private.phoneE164). The lookup is a collection
-// group query on `private`: production needs the COLLECTION_GROUP single-field index on
+// One verified number per account (§5 users/{uid}/private.phoneE164), and one account per number:
+// proof of possession wins. Whoever sends the code from the phone gets the number, and the account
+// that held it before loses it in the same transaction, so a phished verification is never
+// permanent (the real owner re-verifies and takes the number back). The holder lookup is a
+// collection group query on `private`: production needs the COLLECTION_GROUP single-field index on
 // phoneE164 (firestore.indexes.json fieldOverrides); the emulator needs nothing.
 
-/** uid of the account that verified `e164`, or null. */
-export async function findUidByVerifiedPhone(e164: string): Promise<string | null> {
-  const snapshot = await db().collectionGroup(COLLECTIONS.userPrivate).where("phoneE164", "==", e164).limit(1).get();
-  const document = snapshot.docs[0];
-  if (!document) return null;
-  // users/{uid}/private/account: the uid is the grandparent document.
-  return document.ref.parent.parent?.id ?? null;
+export interface ClaimResult {
+  /** Account that held the number until now, or null (first verification, or the same account). */
+  previousUid: string | null;
 }
 
-/** True when another account than `uid` already verified `e164`. */
-export async function isPhoneVerifiedByOther(e164: string, uid: string): Promise<boolean> {
-  const owner = await findUidByVerifiedPhone(e164);
-  return owner !== null && owner !== uid;
+/**
+ * Marks `e164` verified on `uid` and removes it from any other account that held it (number,
+ * verification date and badge), in one transaction.
+ */
+export async function claimVerifiedPhone(uid: string, e164: string, now = new Date()): Promise<ClaimResult> {
+  const firestore = db();
+  const userRef = (id: string) => firestore.collection(COLLECTIONS.users).doc(id);
+  const privateRef = (id: string) => userRef(id).collection(COLLECTIONS.userPrivate).doc(COLLECTIONS.userPrivateDoc);
+  return firestore.runTransaction(async (tx) => {
+    const holders = await tx.get(firestore.collectionGroup(COLLECTIONS.userPrivate).where("phoneE164", "==", e164));
+    let previousUid: string | null = null;
+    for (const holder of holders.docs) {
+      // users/{uid}/private/account: the uid is the grandparent document.
+      const holderUid = holder.ref.parent.parent?.id;
+      if (!holderUid || holderUid === uid) continue;
+      previousUid ??= holderUid;
+      tx.update(holder.ref, { phoneE164: FieldValue.delete(), phoneVerifiedAt: FieldValue.delete() });
+      tx.update(userRef(holderUid), { "badges.phoneVerified": false, updatedAt: now });
+    }
+    tx.update(privateRef(uid), { phoneE164: e164, phoneVerifiedAt: now });
+    tx.update(userRef(uid), { "badges.phoneVerified": true, updatedAt: now });
+    return { previousUid };
+  });
 }

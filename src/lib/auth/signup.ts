@@ -7,10 +7,10 @@ import { auth } from "@/lib/firebase/admin";
 import { readJson } from "@/lib/http/json";
 import { logConnection } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
-import { enforceLimit } from "@/lib/rate-limit/limiter";
+import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
 import { HttpError } from "@/lib/http/errors";
 import { displayNameFor, errorCode, userByEmail } from "./accounts";
-import { anonymous, beginAnonymous, checkTurnstile, respond, type AnonymousFlow } from "./anonymous";
+import { anonymous, beginAnonymous, checkTurnstile, respond, uniformDuration, type AnonymousFlow } from "./anonymous";
 import { sendSignupExistingMail, sendVerificationMail } from "./mails";
 import { assertPasswordPolicy } from "./password-policy";
 
@@ -20,10 +20,17 @@ import { assertPasswordPolicy } from "./password-policy";
 
 const VERIFICATION_SENT: SignupResponse = { status: "verification_sent" };
 
-/** Same answer as a real sign-up; the owner of the address learns about the attempt by mail. */
+/**
+ * Same answer as a real sign-up; the owner of the address learns about the attempt by mail, three
+ * times per hour at most whatever the +tag or Gmail-dot variant used (mail bombing). Beyond that,
+ * or with the store down, the mail is skipped and the answer is unchanged.
+ */
 async function existingAccountAnswer(flow: AnonymousFlow, uid: string, email: string, locale: Locale): Promise<Response> {
-  const [profile, record] = await Promise.all([getUser(uid), auth().getUser(uid).catch(() => null)]);
-  await sendSignupExistingMail({ email: record?.email ?? email, displayName: displayNameFor(profile, record, email), locale });
+  const allowance = await consumeLimit("signup.existing.email", emailNormHash(email));
+  if (allowance.ok) {
+    const [profile, record] = await Promise.all([getUser(uid), auth().getUser(uid).catch(() => null)]);
+    await sendSignupExistingMail({ uid, email: record?.email ?? email, displayName: displayNameFor(profile, record, email), locale });
+  }
   return respond(flow, VERIFICATION_SENT, { status: 202 });
 }
 
@@ -87,6 +94,8 @@ async function verifyResend(request: Request): Promise<Response> {
     await sendVerificationMail({ uid: record.uid, email: record.email, displayName: displayNameFor(profile, record, record.email), locale: input.locale });
   }
   const body: VerifyResendResponse = { status: "verification_sent" };
+  // Same duration whether a pending account exists (timing enumeration).
+  await uniformDuration(flow);
   return respond(flow, body, { status: 202 });
 }
 

@@ -3,10 +3,13 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Staff authentication and roster against the Firebase emulators (vitest.api.config.ts:
 // SITE_URL http://localhost:3000, ADMIN_HOST admin.localhost, APP_ENV dev without CF_ACCESS_AUD,
-// so the Access identity is the x-dev-access-email header). Mails are captured, Turnstile passes.
+// so the Access identity is the x-dev-access-email header). Mails are captured, Turnstile passes
+// (a site key is configured: every login attempt must carry a token, like a deployed environment).
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/security/turnstile", () => ({ verifyTurnstile: vi.fn(async () => ({ ok: true, codes: [] })) }));
+// Spies around the real limiter: single tests make the store "unavailable".
+vi.mock("@/lib/rate-limit/limiter", { spy: true });
 
 import { DELETE as deleteStaff } from "@/app/api/admin/staff/[uid]/route";
 import { GET as getStaff, POST as postStaff } from "@/app/api/admin/staff/route";
@@ -15,12 +18,13 @@ import { POST as postLogout } from "@/app/api/admin/auth/logout/route";
 import { POST as postPassword } from "@/app/api/admin/auth/password/route";
 import type { StaffListResponse, StaffLoginResponse } from "@/lib/auth/staff";
 import { getStaff as readRoster, upsertStaff } from "@/lib/db/repositories/staff";
+import { COLLECTIONS } from "@/lib/db/schemas";
 import { resetServerEnv } from "@/lib/env";
-import { auth } from "@/lib/firebase/admin";
+import { auth, db } from "@/lib/firebase/admin";
 import { setClaims, type Role } from "@/lib/firebase/claims";
-import type { ErrorBody } from "@/lib/http/errors";
+import { HttpError, type ErrorBody } from "@/lib/http/errors";
 import { sendMail } from "@/lib/mail";
-import { resetRateLimiters } from "@/lib/rate-limit/limiter";
+import * as limiter from "@/lib/rate-limit/limiter";
 import { expectedOrigin } from "@/lib/security/origin";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 
@@ -32,9 +36,20 @@ const PUBLIC_HOST = new URL(PUBLIC_ORIGIN).host;
 const PASSWORD = ["Porte", "Ouverte", "2026"].join("-");
 const FIRST_PASSWORD = ["Nouveau", "Secret", "1"].join("-");
 const OTHER_PASSWORD = ["Autre", "Secret", "2"].join("-");
+const TOKEN = "turnstile-token";
 const run = Date.now().toString(36);
 const address = (name: string) => `${name}-${run}@staff.test`;
-const EMAIL = { admin: address("admin"), moderator: address("moderator"), member: address("member"), locked: address("locked"), invited: address("invited") };
+const EMAIL = {
+  admin: address("admin"),
+  moderator: address("moderator"),
+  member: address("member"),
+  locked: address("locked"),
+  invited: address("invited"),
+  /** Public sign-up never confirmed: an Auth record without claims, with the squatter's password. */
+  squatted: address("squatted"),
+  /** Staff claims without a roster entry (a bootstrap stopped halfway). */
+  ghost: address("ghost"),
+};
 
 interface RequestOptions {
   host?: string;
@@ -61,6 +76,12 @@ function call(method: string, path: string, options: RequestOptions = {}): NextR
 }
 
 const ctx = (params: Record<string, string> = {}) => ({ params: Promise.resolve(params) });
+
+/** Login call with the Access identity of `email` and a Turnstile token (required on every attempt). */
+const loginCall = (email: string, password: string, options: Partial<RequestOptions> & { token?: string | null } = {}) => {
+  const { token = TOKEN, ...rest } = options;
+  return postLogin(call("POST", "/api/admin/auth/login", { access: email, body: { email, password, ...(token ? { turnstileToken: token } : {}) }, ...rest }), ctx());
+};
 
 /**
  * Firebase compares auth_time and tokensValidAfterTime in whole seconds: a session minted and
@@ -98,7 +119,7 @@ interface Session {
 }
 
 async function signIn(email: string, password = PASSWORD): Promise<Session> {
-  const response = await postLogin(call("POST", "/api/admin/auth/login", { access: email, body: { email, password } }), ctx());
+  const response = await loginCall(email, password);
   expect(response.status).toBe(200);
   const body = (await response.json()) as StaffLoginResponse;
   if (body.status !== "signed_in") throw new Error(`unexpected status ${body.status}`);
@@ -106,7 +127,7 @@ async function signIn(email: string, password = PASSWORD): Promise<Session> {
   return { uid: body.staff.uid, cookies, csrf: cookies["__Host-csrf"] ?? "" };
 }
 
-const uids: Record<"admin" | "moderator" | "member" | "locked", string> = { admin: "", moderator: "", member: "", locked: "" };
+const uids: Record<"admin" | "moderator" | "member" | "locked" | "squatted" | "ghost", string> = { admin: "", moderator: "", member: "", locked: "", squatted: "", ghost: "" };
 
 beforeAll(async () => {
   uids.admin = await createAccount(EMAIL.admin, "admin", "Admin Test");
@@ -116,10 +137,12 @@ beforeAll(async () => {
   uids.locked = await createAccount(EMAIL.locked, "moderator", "Locked Test");
   await upsertStaff({ uid: uids.locked, email: EMAIL.locked, displayName: "Locked Test", role: "moderator", invitedBy: uids.admin });
   uids.member = await createAccount(EMAIL.member, "individual", "Membre Test");
+  uids.squatted = (await auth().createUser({ email: EMAIL.squatted, password: OTHER_PASSWORD, emailVerified: false })).uid;
+  uids.ghost = await createAccount(EMAIL.ghost, "moderator", "Ghost Test");
 });
 
 beforeEach(() => {
-  resetRateLimiters();
+  limiter.resetRateLimiters();
   vi.mocked(sendMail).mockClear();
   vi.mocked(verifyTurnstile).mockClear();
 });
@@ -127,7 +150,7 @@ beforeEach(() => {
 describe("admin host only", () => {
   it("answers 404 for every back-office route on the public host", async () => {
     const options = { host: PUBLIC_HOST, origin: PUBLIC_ORIGIN, access: EMAIL.admin };
-    const body = { email: EMAIL.admin, password: PASSWORD };
+    const body = { email: EMAIL.admin, password: PASSWORD, turnstileToken: TOKEN };
     expect((await postLogin(call("POST", "/api/admin/auth/login", { ...options, body }), ctx())).status).toBe(404);
     expect((await postLogout(call("POST", "/api/admin/auth/logout", options), ctx())).status).toBe(404);
     expect((await postPassword(call("POST", "/api/admin/auth/password", { ...options, body: { oobCode: "x".repeat(20), password: PASSWORD } }), ctx())).status).toBe(404);
@@ -143,7 +166,7 @@ describe("POST /api/admin/auth/login", () => {
     vi.stubEnv("CF_ACCESS_AUD", "test-aud");
     resetServerEnv();
     try {
-      const response = await postLogin(call("POST", "/api/admin/auth/login", { body: { email: EMAIL.admin, password: PASSWORD } }), ctx());
+      const response = await postLogin(call("POST", "/api/admin/auth/login", { body: { email: EMAIL.admin, password: PASSWORD, turnstileToken: TOKEN } }), ctx());
       expect(response.status).toBe(401);
       expect(await errorCode(response)).toBe("unauthenticated");
     } finally {
@@ -153,58 +176,82 @@ describe("POST /api/admin/auth/login", () => {
   });
 
   it("refuses an e-mail that differs from the Access identity", async () => {
-    const response = await postLogin(call("POST", "/api/admin/auth/login", { access: EMAIL.moderator, body: { email: EMAIL.admin, password: PASSWORD } }), ctx());
+    const response = await postLogin(call("POST", "/api/admin/auth/login", { access: EMAIL.moderator, body: { email: EMAIL.admin, password: PASSWORD, turnstileToken: TOKEN } }), ctx());
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({ error: { code: "forbidden", message: "Access identity does not match" } });
   });
 
   it("refuses a missing or foreign Origin", async () => {
-    const body = { email: EMAIL.admin, password: PASSWORD };
-    expect(await errorCode(await postLogin(call("POST", "/api/admin/auth/login", { access: EMAIL.admin, origin: null, body }), ctx()))).toBe("origin");
-    expect(await errorCode(await postLogin(call("POST", "/api/admin/auth/login", { access: EMAIL.admin, origin: "https://evil.example", body }), ctx()))).toBe("origin");
+    expect(await errorCode(await loginCall(EMAIL.admin, PASSWORD, { origin: null }))).toBe("origin");
+    expect(await errorCode(await loginCall(EMAIL.admin, PASSWORD, { origin: "https://evil.example" }))).toBe("origin");
     // The public origin is foreign on the admin host too.
-    expect(await errorCode(await postLogin(call("POST", "/api/admin/auth/login", { access: EMAIL.admin, origin: PUBLIC_ORIGIN, body }), ctx()))).toBe("origin");
+    expect(await errorCode(await loginCall(EMAIL.admin, PASSWORD, { origin: PUBLIC_ORIGIN }))).toBe("origin");
   });
 
   it("refuses a member account even with the right password", async () => {
-    const response = await postLogin(call("POST", "/api/admin/auth/login", { access: EMAIL.member, body: { email: EMAIL.member, password: PASSWORD } }), ctx());
+    const response = await loginCall(EMAIL.member, PASSWORD);
     expect(response.status).toBe(403);
     expect(await errorCode(response)).toBe("forbidden");
     expect(response.headers.getSetCookie()).toEqual([]);
   });
 
-  it("asks Turnstile from the 3rd failure and locks the account + IP after the 5th", async () => {
-    const attempt = (password: string, turnstileToken?: string) =>
-      postLogin(call("POST", "/api/admin/auth/login", { access: EMAIL.locked, body: { email: EMAIL.locked, password, ...(turnstileToken ? { turnstileToken } : {}) } }), ctx());
-    for (let i = 0; i < 3; i += 1) {
-      const response = await attempt("wrong-password");
-      expect(response.status).toBe(401);
-      expect(await errorCode(response)).toBe("invalid_credentials");
-    }
-    const challenge = await attempt("wrong-password");
+  it("asks for a Turnstile token on every attempt while a site key is configured, and checks it on the admin host", async () => {
+    const challenge = await loginCall(EMAIL.moderator, PASSWORD, { token: null });
     expect(challenge.status).toBe(200);
     expect(await challenge.json()).toEqual({ status: "turnstile_required" });
     expect(verifyTurnstile).not.toHaveBeenCalled();
 
-    expect((await attempt("wrong-password", "token-4")).status).toBe(401);
-    expect(verifyTurnstile).toHaveBeenCalledWith("token-4", expect.objectContaining({ action: "staff-login" }));
-    expect((await attempt("wrong-password", "token-5")).status).toBe(401);
+    vi.mocked(verifyTurnstile).mockResolvedValueOnce({ ok: false, codes: ["invalid-input-response"] });
+    const refused = await loginCall(EMAIL.moderator, PASSWORD, { token: "bad-token" });
+    expect(refused.status).toBe(400);
+    expect(await errorCode(refused)).toBe("turnstile_failed");
+    expect(verifyTurnstile).toHaveBeenCalledWith("bad-token", { action: "staff-login", remoteIp: "127.0.0.1", hostname: new URL(ADMIN_ORIGIN).hostname });
 
-    const locked = await attempt(PASSWORD, "token-6");
+    // Neither answer counted as an attempt: the right password still signs in.
+    expect((await loginCall(EMAIL.moderator, PASSWORD)).status).toBe(200);
+  });
+
+  it("locks the account + IP from the 5th failure for 15 minutes, with the store's Retry-After", async () => {
+    for (let i = 0; i < 5; i += 1) {
+      const response = await loginCall(EMAIL.locked, "wrong-password");
+      expect(response.status).toBe(401);
+      expect(await errorCode(response)).toBe("invalid_credentials");
+    }
+    // The 5th failure blocked the pair itself (not the next attempt): the right password is refused
+    // until that block expires.
+    expect(limiter.blockLimit).toHaveBeenCalledTimes(1);
+    const locked = await loginCall(EMAIL.locked, PASSWORD);
     expect(locked.status).toBe(429);
     expect(await errorCode(locked)).toBe("account_locked");
-    expect(locked.headers.get("Retry-After")).toBe("900");
+    const retryAfter = Number(locked.headers.get("Retry-After"));
+    expect(retryAfter).toBeGreaterThan(880);
+    expect(retryAfter).toBeLessThanOrEqual(900);
+    expect(locked.headers.getSetCookie()).toEqual([]);
 
     // Another IP is not locked for this account.
-    const elsewhere = await postLogin(
-      call("POST", "/api/admin/auth/login", { access: EMAIL.locked, ip: "203.0.113.9", body: { email: EMAIL.locked, password: PASSWORD } }),
-      ctx(),
-    );
+    const elsewhere = await loginCall(EMAIL.locked, PASSWORD, { ip: "203.0.113.9" });
     expect(elsewhere.status).toBe(200);
   });
 
+  it("fails closed when the rate-limit store is unavailable", async () => {
+    vi.mocked(limiter.enforceLimit).mockRejectedValueOnce(new HttpError(503, "unavailable", "rate limiter unavailable"));
+    const perIp = await loginCall(EMAIL.moderator, PASSWORD);
+    expect(perIp.status).toBe(503);
+    expect(await errorCode(perIp)).toBe("unavailable");
+
+    // An unreadable failure counter never reads as "no failures": the pair's, then the account's.
+    vi.mocked(limiter.limitState).mockResolvedValueOnce(null);
+    const unreadable = await loginCall(EMAIL.moderator, PASSWORD);
+    expect(unreadable.status).toBe(503);
+    expect(unreadable.headers.getSetCookie()).toEqual([]);
+    vi.mocked(limiter.limitState).mockResolvedValueOnce({ consumedPoints: 0, msBeforeNext: 0 }).mockResolvedValueOnce(null);
+    const unreadableAccount = await loginCall(EMAIL.moderator, PASSWORD);
+    expect(unreadableAccount.status).toBe(503);
+    expect(unreadableAccount.headers.getSetCookie()).toEqual([]);
+  });
+
   it("signs a moderator in with an 8-hour session", async () => {
-    const response = await postLogin(call("POST", "/api/admin/auth/login", { access: EMAIL.moderator, body: { email: EMAIL.moderator, password: PASSWORD } }), ctx());
+    const response = await loginCall(EMAIL.moderator, PASSWORD);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       status: "signed_in",
@@ -268,7 +315,7 @@ describe("invitation, password and revocation", () => {
     expect(vi.mocked(sendMail)).not.toHaveBeenCalled();
   });
 
-  it("refuses an invalid body, yourself and a member account", async () => {
+  it("refuses an invalid body, yourself, a member account and a sign-up never confirmed", async () => {
     expect(await errorCode(await invite({ email: EMAIL.invited, displayName: "Invitée Test", role: "individual" }))).toBe("invalid_body");
     const self = await invite({ email: EMAIL.admin, displayName: "Admin Test", role: "admin" });
     expect(self.status).toBe(409);
@@ -276,8 +323,19 @@ describe("invitation, password and revocation", () => {
     const member = await invite({ email: EMAIL.member, displayName: "Membre Test", role: "moderator" });
     expect(member.status).toBe(409);
     expect(await errorCode(member)).toBe("conflict");
+    // Whoever registered that address (and never confirmed it) chose its password: it never becomes staff.
+    const squatted = await invite({ email: EMAIL.squatted, displayName: "Squat Test", role: "admin" });
+    expect(squatted.status).toBe(409);
+    expect(await response409(squatted)).toBe("a Joutiya account exists with this e-mail");
+    const record = await auth().getUser(uids.squatted);
+    expect(record.customClaims ?? {}).toEqual({});
+    expect(await readRoster(uids.squatted)).toBeNull();
     expect(vi.mocked(sendMail)).not.toHaveBeenCalled();
   });
+
+  async function response409(response: Response): Promise<string | undefined> {
+    return ((await response.json()) as ErrorBody).error.message;
+  }
 
   it("refuses an invitation from a moderator", async () => {
     const moderator = await signIn(EMAIL.moderator);
@@ -321,6 +379,19 @@ describe("invitation, password and revocation", () => {
     expect(response.status).toBe(403);
   });
 
+  it("refuses a short, common or personal password without consuming the code", async () => {
+    const attempt = (password: string) => postPassword(call("POST", "/api/admin/auth/password", { access: EMAIL.invited, body: { oobCode, password } }), ctx());
+    // 8 characters suit members, not staff (12).
+    expect(await errorCode(await attempt("Court-12345"))).toBe("invalid_body");
+    const common = await attempt("password1234");
+    expect(common.status).toBe(400);
+    expect(await common.json()).toEqual({ error: { code: "weak_password", details: { reason: "common" } } });
+    // The e-mail's local part ("invited-<run>") must not appear in the password.
+    const personal = await attempt(`Invited-${run}-ok`);
+    expect(await personal.json()).toEqual({ error: { code: "weak_password", details: { reason: "personal" } } });
+    expect((await attempt("abcdefghijkl")).status).toBe(400);
+  });
+
   it("sets the password with the invitation code, then signs the member in", async () => {
     const response = await postPassword(call("POST", "/api/admin/auth/password", { access: EMAIL.invited, body: { oobCode, password: FIRST_PASSWORD } }), ctx());
     expect(response.status).toBe(200);
@@ -331,7 +402,7 @@ describe("invitation, password and revocation", () => {
     expect(reused.status).toBe(400);
     expect(await errorCode(reused)).toBe("invalid_code");
 
-    const session = await signIn(EMAIL.invited, "Nouveau-Secret-1");
+    const session = await signIn(EMAIL.invited, FIRST_PASSWORD);
     expect(session.uid).toBe(invitedUid);
     // A moderator: no roster access.
     expect((await getStaff(call("GET", "/api/admin/staff", { access: EMAIL.invited, cookies: session.cookies }), ctx())).status).toBe(403);
@@ -351,6 +422,10 @@ describe("invitation, password and revocation", () => {
 
     const unknown = await deleteStaff(call("DELETE", "/api/admin/staff/nobody", { access: EMAIL.admin, cookies: admin.cookies, csrf: admin.csrf }), ctx({ uid: "nobody" }));
     expect(unknown.status).toBe(404);
+    // A member account is not a staff member either (and stays untouched).
+    const member = await deleteStaff(call("DELETE", `/api/admin/staff/${uids.member}`, { access: EMAIL.admin, cookies: admin.cookies, csrf: admin.csrf }), ctx({ uid: uids.member }));
+    expect(member.status).toBe(404);
+    expect((await auth().getUser(uids.member)).disabled).toBe(false);
 
     const moderator = await signIn(EMAIL.moderator);
     const refused = await deleteStaff(
@@ -360,8 +435,8 @@ describe("invitation, password and revocation", () => {
     expect(refused.status).toBe(403);
   });
 
-  it("revokes another member: claims cleared, account disabled, sessions dead", async () => {
-    const victim = await signIn(EMAIL.invited, "Nouveau-Secret-1");
+  it("revokes another member: claims cleared, account disabled, sessions dead, Access reminder in the audit", async () => {
+    const victim = await signIn(EMAIL.invited, FIRST_PASSWORD);
     await nextSecond();
     const response = await deleteStaff(call("DELETE", `/api/admin/staff/${invitedUid}`, { access: EMAIL.admin, cookies: admin.cookies, csrf: admin.csrf }), ctx({ uid: invitedUid }));
     expect(response.status).toBe(204);
@@ -373,9 +448,26 @@ describe("invitation, password and revocation", () => {
 
     // The earlier session no longer verifies (checkRevoked), and the password no longer signs in.
     expect((await getStaff(call("GET", "/api/admin/staff", { access: EMAIL.invited, cookies: victim.cookies }), ctx())).status).toBe(401);
-    const login = await postLogin(call("POST", "/api/admin/auth/login", { access: EMAIL.invited, body: { email: EMAIL.invited, password: FIRST_PASSWORD } }), ctx());
+    const login = await loginCall(EMAIL.invited, FIRST_PASSWORD);
     expect(login.status).toBe(403);
     expect(await errorCode(login)).toBe("account_disabled");
+
+    // App-side revocation leaves the Cloudflare Access policy alone: the audit entry says so.
+    const entries = await db().collection(COLLECTIONS.auditLogs).where("action", "==", "staff.revoke").where("target.id", "==", invitedUid).get();
+    expect(entries.size).toBe(1);
+    expect(entries.docs[0]!.data()).toMatchObject({ actorUid: uids.admin, actorRole: "admin", automated: false, reason: "retirer aussi de Cloudflare Access" });
+  });
+
+  it("revokes an account carrying staff claims without a roster entry, and leaves a tombstone", async () => {
+    expect(await readRoster(uids.ghost)).toBeNull();
+    const response = await deleteStaff(call("DELETE", `/api/admin/staff/${uids.ghost}`, { access: EMAIL.admin, cookies: admin.cookies, csrf: admin.csrf }), ctx({ uid: uids.ghost }));
+    expect(response.status).toBe(204);
+    const record = await auth().getUser(uids.ghost);
+    expect(record.disabled).toBe(true);
+    expect(record.customClaims ?? {}).toEqual({});
+    const tombstone = await readRoster(uids.ghost);
+    expect(tombstone).toMatchObject({ uid: uids.ghost, email: EMAIL.ghost, displayName: "Ghost Test", role: "moderator", invitedBy: "script" });
+    expect(tombstone?.revokedAt).toBeInstanceOf(Date);
   });
 
   it("re-inviting a revoked member reactivates the account with the new role", async () => {

@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { UNIFORM_RESPONSE_MS } from "@/lib/auth/anonymous";
+import { auth } from "@/lib/firebase/admin";
+import { setClaims } from "@/lib/firebase/claims";
 import { verifySession } from "@/lib/firebase/session";
 import { sendMail } from "@/lib/mail";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
+import { csrfToken } from "@/lib/security/csrf";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { POST as action } from "@/app/api/auth/action/route";
+import { POST as clientToken } from "@/app/api/auth/client-token/route";
 import { POST as login } from "@/app/api/auth/login/route";
 import { GET as me } from "@/app/api/auth/me/route";
 import { POST as passwordChange } from "@/app/api/auth/password/change/route";
@@ -86,9 +91,12 @@ describe("password reset", () => {
     expect(fresh.body.session.uid).toBe(uid);
   });
 
-  it("answers 202 without a mail for an unknown e-mail and limits requests per e-mail", async () => {
+  it("answers 202 without a mail for an unknown e-mail, in no less time than for a real one, and limits requests per e-mail", async () => {
     const ghost = uniqueEmail("ghost");
+    const startedAt = Date.now();
     const result = await call<{ status: string }>(resetRequest, "/api/auth/password/reset", { jar: new Jar(), body: { email: ghost, turnstileToken: "t" } });
+    // Node timers never fire early beyond millisecond rounding.
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(UNIFORM_RESPONSE_MS - 5);
     expect(result.status).toBe(202);
     expect(result.body).toEqual({ status: "sent" });
     expect(capturedMails(sendMail)).toHaveLength(0);
@@ -99,6 +107,23 @@ describe("password reset", () => {
     const bad = await call<ErrorBody>(action, "/api/auth/action", { jar: new Jar(), body: { mode: "resetPassword", oobCode: "definitely-not-a-code" } });
     expect(bad.status).toBe(400);
     expect(bad.body.error.code).toBe("invalid_code");
+  });
+
+  it("never mails nor resets a staff account from the public host", async () => {
+    const email = uniqueEmail("staff");
+    const record = await auth().createUser({ email, password: PASSWORD, emailVerified: true, displayName: "Admin Person" });
+    await setClaims(record.uid, { role: "admin", v: 2 });
+    const requested = await call<{ status: string }>(resetRequest, "/api/auth/password/reset", { jar: new Jar(), body: { email, turnstileToken: "t" } });
+    expect(requested.status).toBe(202);
+    expect(requested.body).toEqual({ status: "sent" });
+    expect(lastMail(sendMail, "resetPassword", email)).toBeUndefined();
+
+    // Even with a genuine code (the back-office flow issues its own), the public confirm refuses it.
+    const oobCode = oobCodeOf(await auth().generatePasswordResetLink(email, { url: "http://localhost:3000/fr/action" }));
+    const refused = await call<ErrorBody>(resetConfirm, "/api/auth/password/confirm", { jar: new Jar(), body: { oobCode, password: NEW_PASSWORD } });
+    expect(refused.status).toBe(400);
+    expect(refused.body.error.code).toBe("invalid_code");
+    expect(lastMail(sendMail, "passwordChanged", email)).toBeUndefined();
   });
 });
 
@@ -132,5 +157,16 @@ describe("POST /api/auth/password/change", () => {
     expect((await verifySession(oldCookie, { checkRevoked: true }))).toBeNull();
     expect((await call<{ session: SignedInBody["session"] | null }>(me, "/api/auth/me", { jar })).body.session?.uid).toBe(uid);
     expect((await call<SignedInBody>(login, "/api/auth/login", { jar: new Jar(), body: { email, password: NEW_PASSWORD } })).status).toBe(200);
+
+    // The revoked cookie mutates nothing any more, even with its own CSRF token: no SDK token, signed out on /me.
+    const stale = new Jar();
+    stale.cookies.set("__Host-session", oldCookie!);
+    stale.cookies.set("__Host-csrf", csrfToken(oldCookie!));
+    const token = await call<ErrorBody>(clientToken, "/api/auth/client-token", { jar: stale, body: {} });
+    expect(token.status).toBe(401);
+    expect(token.body.error.code).toBe("unauthenticated");
+    expect((await call<{ session: SignedInBody["session"] | null }>(me, "/api/auth/me", { jar: stale })).body.session).toBeNull();
+    const otherToken = await call<ErrorBody>(clientToken, "/api/auth/client-token", { jar: other, body: {} });
+    expect(otherToken.status).toBe(401);
   });
 });
