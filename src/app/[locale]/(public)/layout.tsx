@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { hasLocale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import { RootShell } from "@/components/layout/root-shell";
 import { PUBLIC_CLIENT_NAMESPACES } from "@/i18n/client-messages";
-import { rootMetadata } from "@/lib/i18n/metadata";
+import { rootMetadata, SITE_VIEWPORT } from "@/lib/i18n/metadata";
 
 // Public anonymous pages: static or ISR, hash-based CSP, cacheable by Cloudflare (§1, §6).
 
@@ -19,12 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return hasLocale(routing.locales, locale) ? rootMetadata(locale) : {};
 }
 
-export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b1e1f" },
-  ],
-};
+export const viewport = SITE_VIEWPORT;
 
 export default async function PublicLayout({ children, params }: { children: ReactNode; params: Promise<{ locale: string }> }) {
   const { locale } = await params;

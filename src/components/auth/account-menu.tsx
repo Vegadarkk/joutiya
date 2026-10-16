@@ -73,7 +73,7 @@ export function AccountMenu() {
   // then the display name from sm; the initials are a decorative avatar.
   const triggerContent = (
     <>
-      <span className="flex size-8 items-center justify-center rounded-full bg-structure text-xs font-semibold text-structure-foreground" aria-hidden="true">
+      <span className="flex size-8 items-center justify-center rounded-full bg-structure text-xs font-semibold text-structure-foreground dark:bg-bab-700" aria-hidden="true">
         {initials(session)}
       </span>
       <span className="sr-only">{t("account")}</span>{" "}

@@ -12,8 +12,9 @@ import { Logo } from "./logo";
 
 export function SiteHeader({ locale }: { locale: string }) {
   const t = useTranslations("Nav");
+  // Opaque cream, like the footer: the light logo sits on a cream-200 plate, so a see-through tint would outline it.
   return (
-    <header className="threshold sticky top-0 z-40 bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/85">
+    <header className="threshold sticky top-0 z-40 bg-surface-brand">
       <Container className="flex h-16 items-center gap-3 md:h-20 md:gap-5">
         {/* On every page: the home payload is prefetched when the visitor reaches for the logo, not during load. */}
         <IntentLink href="/" className="flex h-11 shrink-0 items-center rounded-sm md:h-12" aria-label={t("home")}>
@@ -40,7 +41,7 @@ export function SiteHeader({ locale }: { locale: string }) {
             enterKeyHint="search"
             maxLength={100}
             placeholder={t("searchPlaceholder")}
-            className={cn(inputClassName, "bg-surface-muted ps-9")}
+            className={cn(inputClassName, "ps-9")}
           />
         </form>
 
