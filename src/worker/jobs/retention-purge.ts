@@ -1,9 +1,9 @@
 import { alert } from "@/lib/alert";
 import { audit } from "@/lib/audit";
 import { PHOTO_VARIANTS } from "@/lib/contracts/media";
-import { getListings, type ListingRecord } from "@/lib/db/repositories/listings";
+import type { ListingRecord } from "@/lib/db/repositories/listings";
 import { deleteJournalPastPurge, listListingsPastPurge, oldestPastPurge, purgeListing, type JournalCollection, type ListingCursor } from "@/lib/db/repositories/retention";
-import { deleteUploadDocument, listPastPurge, listUploadsByTarget, updateUpload, type PurgeCursor, type UploadRecord } from "@/lib/db/repositories/uploads";
+import { deleteUploadDocument, listUploadsByTarget, updateUpload, UPLOADS_BY_TARGET_LIMIT, type UploadRecord } from "@/lib/db/repositories/uploads";
 import { COLLECTIONS, type ListingStatus } from "@/lib/db/schemas";
 import { isFirestoreConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
@@ -15,19 +15,19 @@ import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 // Nightly at 03:00 UTC (architecture §5 "Purges sans TTL", table of §7 retention, design D16):
 // 1. listings past purgeAt (expired, sold, removed or rejected + listingPurgeMonths) without a
 //    legal hold: replaced by a tombstone (transaction re-checking status, hold and date, with the
-//    searchOutbox delete), then their photo variants, quarantine objects and upload documents go;
-// 2. uploads past purgeAt of removed listings (service.ts sets purgeAt = now at removal): variants
-//    and quarantine object deleted, then the document. Unattached and orphan uploads belong to
-//    purge-quarantine (hourly), which leaves removed listings to this job;
-// 3. contentOps (1 year) and revealLogs (90 days) past purgeAt.
+//    searchOutbox delete), then their photo variants, quarantine objects and upload documents go.
+//    A removed listing keeps its text and its photos until then (architecture §5: removal + 12
+//    months): purge-quarantine (hourly) moves the purgeAt of its uploads to the listing's and
+//    never deletes them; unattached and orphan uploads of other listings are its job;
+// 2. contentOps (1 year) and revealLogs (90 days) past purgeAt.
 // At most PURGE_DELETE_BUDGET document deletions a night (Spark: 20 000 a day); the rest waits a
 // night, and a backlog older than 3 days raises an alert. Idempotent: every step re-reads.
 
 export const PURGE_DELETE_BUDGET = 15_000;
 export const LISTING_PURGE_BATCH = 100;
 export const LISTING_PURGE_PAGES = 20;
-export const UPLOAD_PURGE_BATCH = 200;
-export const UPLOAD_PURGE_PAGES = 10;
+/** Pages of upload documents read for one purged listing (each page is deleted before the next query). */
+export const LISTING_MEDIA_PAGES = 5;
 export const JOURNAL_BATCH = 400;
 export const BACKLOG_ALERT_MS = 3 * 24 * 3_600_000;
 
@@ -82,23 +82,32 @@ async function deleteUpload(store: ObjectStore, upload: UploadRecord, state: Run
   if (upload.status === "ready" && upload.size) state.freedBytes += upload.size;
 }
 
-/** Media of a purged listing: every upload document of it, and any attached photo without one. */
+/**
+ * Media of a purged listing: every upload document of it (page after page, each deleted before the
+ * next query), and any attached photo without one.
+ */
 async function purgeListingMedia(store: ObjectStore, listing: ListingRecord, state: RunState): Promise<void> {
-  const uploads = await listUploadsByTarget(listing.id);
-  try {
-    const known = new Set(uploads.map((upload) => upload.id));
-    // A photo id is its upload id: without the document, its keys are still derivable.
-    for (const photo of listing.photos) {
-      if (known.has(photo.id)) continue;
-      await deleteVariants(store, listing.id, photo.id, state);
-      await store.delete("quarantine", quarantineObjectKey(photo.id));
-      state.result.objects += 1;
+  const known = new Set<string>();
+  for (let pages = 0; pages < LISTING_MEDIA_PAGES; pages += 1) {
+    const uploads = await listUploadsByTarget(listing.id);
+    try {
+      for (const upload of uploads) {
+        known.add(upload.id);
+        await deleteUpload(store, upload, state);
+      }
+    } catch (error) {
+      // The listing is a tombstone now: hand what is left to purge-quarantine (orphan uploads past purgeAt).
+      await Promise.allSettled(uploads.map((upload) => updateUpload(upload.id, { purgeAt: state.now }, state.now)));
+      throw error;
     }
-    for (const upload of uploads) await deleteUpload(store, upload, state);
-  } catch (error) {
-    // The listing is a tombstone now: hand what is left to purge-quarantine (orphan uploads past purgeAt).
-    await Promise.allSettled(uploads.map((upload) => updateUpload(upload.id, { purgeAt: state.now }, state.now)));
-    throw error;
+    if (uploads.length < UPLOADS_BY_TARGET_LIMIT) break;
+  }
+  // A photo id is its upload id: without the document, its keys are still derivable.
+  for (const photo of listing.photos) {
+    if (known.has(photo.id)) continue;
+    await deleteVariants(store, listing.id, photo.id, state);
+    await store.delete("quarantine", quarantineObjectKey(photo.id));
+    state.result.objects += 1;
   }
 }
 
@@ -140,34 +149,6 @@ async function purgeListings(state: RunState): Promise<void> {
   }
 }
 
-async function purgeRemovedUploads(store: ObjectStore, state: RunState): Promise<void> {
-  const { now, result } = state;
-  let cursor: PurgeCursor | undefined;
-  for (let pages = 0; pages < UPLOAD_PURGE_PAGES; pages += 1) {
-    const uploads = await listPastPurge(now, UPLOAD_PURGE_BATCH, cursor);
-    if (uploads.length === 0) return;
-    const ofListings = uploads.filter((upload) => upload.purpose === "listing");
-    const listings = new Map((await getListings([...new Set(ofListings.map((upload) => upload.targetId))])).map((listing) => [listing.id, listing]));
-    for (const upload of ofListings) {
-      const listing = listings.get(upload.targetId);
-      if (!listing || listing.status !== "removed" || listing.legalHold.length > 0) continue;
-      if (state.budget <= 0) {
-        result.deferred = true;
-        return;
-      }
-      try {
-        await deleteUpload(store, upload, state);
-      } catch (error) {
-        result.failed += 1;
-        logger.warn({ uploadId: upload.id, err: (error as Error).message }, "upload of a removed listing not purged");
-      }
-    }
-    const last = uploads[uploads.length - 1]!;
-    cursor = { purgeAt: last.purgeAt, id: last.id };
-    if (uploads.length < UPLOAD_PURGE_BATCH) return;
-  }
-}
-
 async function purgeJournal(collection: JournalCollection, key: "contentOps" | "revealLogs", state: RunState): Promise<void> {
   while (state.budget > 0) {
     const wanted = Math.min(JOURNAL_BATCH, state.budget);
@@ -205,9 +186,8 @@ export async function retentionPurge(now = new Date(), deps: { store?: ObjectSto
   // Without object storage the photos could not be deleted: listings and uploads wait (no orphan objects).
   if (store) {
     await step("listings", state, () => purgeListings(state));
-    await step("uploads", state, () => purgeRemovedUploads(store, state));
   } else {
-    logger.warn("retention-purge: object storage not configured, listings and uploads left for a later run");
+    logger.warn("retention-purge: object storage not configured, listings and their uploads left for a later run");
   }
   await step("contentOps", state, () => purgeJournal(COLLECTIONS.contentOps, "contentOps", state));
   await step("revealLogs", state, () => purgeJournal(COLLECTIONS.revealLogs, "revealLogs", state));

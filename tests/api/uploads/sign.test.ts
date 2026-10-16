@@ -2,8 +2,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 // POST /api/uploads/sign against the emulators (design §3 MEDIA_API, architecture §6 uploads):
 // role matrix, IDOR (someone else's or a read-only listing answers 404), body contract, photo
-// limit (attached + in flight), rate limits (30 per hour, 200 MiB declared per day), degraded
-// storage (storage_full), the `signed` document and the LCEN content operation.
+// limit (attached + in flight), upload cap (3x the photo limit, every document counted), rate
+// limits (30 per hour, 200 MiB declared per day), degraded storage (storage_full), the `signed`
+// document and the LCEN content operation.
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 const storage = vi.hoisted(() => ({ full: false }));
@@ -13,10 +14,11 @@ vi.mock("@/lib/uploads/storage-gauge", async (importOriginal) => ({
 }));
 
 import { DELETE as removeListing } from "@/app/api/listings/[id]/route";
+import { DELETE as removeUpload } from "@/app/api/uploads/[id]/route";
 import { POST as sign } from "@/app/api/uploads/sign/route";
-import { MAX_UPLOAD_BYTES, UPLOAD_ID_PATTERN, UPLOAD_URL_TTL_SECONDS, type SignUploadResponse } from "@/lib/contracts/media";
+import { MAX_UPLOAD_BYTES, UPLOAD_ID_PATTERN, UPLOAD_LIMIT_REASON, UPLOAD_URL_TTL_SECONDS, UPLOADS_PER_PHOTO_SLOT, type SignUploadResponse } from "@/lib/contracts/media";
 import { listContentOps } from "@/lib/db/repositories/content-ops";
-import { getUpload } from "@/lib/db/repositories/uploads";
+import { countUploadsByTarget, getUpload, listUploadsByTarget } from "@/lib/db/repositories/uploads";
 import { resetServerEnv } from "@/lib/env";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { MemoryObjectStore, resetObjectStore, setObjectStoreForTests } from "@/lib/storage";
@@ -132,6 +134,34 @@ describe("POST /api/uploads/sign", () => {
     const busy = await draft(owner);
     for (let i = 0; i < 10; i += 1) expect((await signFor(owner, busy)).status).toBe(201);
     expect((await signFor(owner, busy)).body.error.code).toBe("photo_limit");
+  });
+
+  it("caps the upload documents of a listing at 3x its photo limit, refused ones included, until some are removed", async () => {
+    const owner = await member();
+    const id = await draft(owner);
+    const cap = UPLOADS_PER_PHOTO_SLOT * 10;
+    // Refused photos are kept 7 days: without the cap, each one would be read by every owner GET.
+    const refused: string[] = [];
+    for (let i = 0; i < cap; i += 1) refused.push(await seedReadyUpload(owner, id, { status: "rejected", rejectReason: "nsfw" }));
+    expect(await countUploadsByTarget(id)).toBe(cap);
+
+    const capped = await call<ErrorBody & { error: { details?: unknown } }>(sign, "POST", "/api/uploads/sign", { member: owner, body: body(id) });
+    expect([capped.status, capped.body.error.code]).toEqual([409, "photo_limit"]);
+    expect(capped.body.error.details).toEqual({ reason: UPLOAD_LIMIT_REASON });
+    expect(store.calls).toEqual([]);
+
+    // Removing a refused photo (the wizard's tile) frees a slot.
+    expect((await call(removeUpload, "DELETE", `/api/uploads/${refused[0]}`, { member: owner })).status).toBe(204);
+    expect((await signFor(owner, id)).status).toBe(201);
+    expect((await signFor(owner, id)).body.error.details).toEqual({ reason: UPLOAD_LIMIT_REASON });
+  });
+
+  it("bounds the listing's upload query (backstop of the cap)", async () => {
+    const owner = await member();
+    const id = await draft(owner);
+    for (let i = 0; i < 5; i += 1) await seedReadyUpload(owner, id, { status: "rejected", rejectReason: "expired" });
+    expect(await listUploadsByTarget(id, undefined, 3)).toHaveLength(3);
+    expect(await listUploadsByTarget(id, ["rejected"])).toHaveLength(5);
   });
 
   it("limits signatures to 30 an hour per account", async () => {

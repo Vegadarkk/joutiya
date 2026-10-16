@@ -3,9 +3,10 @@ import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UploadRecord } from "@/lib/db/repositories/uploads";
 
 // retention-purge (03:00 UTC): listings past purgeAt (expired, sold, removed, rejected, no legal
-// hold) become tombstones and lose their media and upload documents; uploads of removed listings
-// past purgeAt go with their objects; contentOps and revealLogs past purgeAt are deleted in
-// batches under a nightly budget. Repositories are mocked; a MemoryObjectStore records storage.
+// hold) become tombstones and lose their media and upload documents (a removed listing keeps its
+// photos until then: no upload is deleted on its own purgeAt); contentOps and revealLogs past
+// purgeAt are deleted in batches under a nightly budget. Repositories are mocked; a
+// MemoryObjectStore records storage.
 
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/quota", () => ({ isDegraded: vi.fn(async () => false), consume: vi.fn(async () => ({ level: "ok" })) }));
@@ -16,6 +17,7 @@ const configured = { value: true };
 vi.mock("@/lib/firebase/admin", () => ({ isFirestoreConfigured: () => configured.value, isFirebaseConfigured: () => configured.value, db: vi.fn() }));
 vi.mock("@/lib/db/repositories/listings", () => ({ getListings: vi.fn(async () => []) }));
 vi.mock("@/lib/db/repositories/uploads", () => ({
+  UPLOADS_BY_TARGET_LIMIT: 100,
   listPastPurge: vi.fn(async () => []),
   listUploadsByTarget: vi.fn(async () => []),
   deleteUploadDocument: vi.fn(async () => undefined),
@@ -92,7 +94,7 @@ beforeEach(() => {
   store = new MemoryObjectStore();
   for (const mocked of [retention, uploadsRepo]) for (const fn of Object.values(mocked)) if (vi.isMockFunction(fn)) fn.mockReset();
   vi.mocked(retention.listListingsPastPurge).mockResolvedValue({ listings: [], read: 0 });
-  vi.mocked(retention.purgeListing).mockImplementation(async (id, purgeable) => (purgeable(listing(id)) ? { status: "purged", categoryId: "vehicules", purgedAt: NOW, version: 8 } : null));
+  vi.mocked(retention.purgeListing).mockImplementation(async (id, purgeable) => (purgeable(listing(id)) ? { status: "purged", categoryId: "vehicules", purgedAt: NOW, version: 8, updatedAt: NOW } : null));
   vi.mocked(retention.deleteJournalPastPurge).mockResolvedValue(0);
   vi.mocked(retention.oldestPastPurge).mockResolvedValue(null);
   vi.mocked(uploadsRepo.listPastPurge).mockResolvedValue([]);
@@ -194,35 +196,39 @@ describe("retention-purge: listings", () => {
   });
 });
 
-describe("retention-purge: uploads of removed listings", () => {
-  it("deletes uploads past purgeAt of removed listings only; others are purge-quarantine's or kept", async () => {
+describe("retention-purge: removed listings keep their photos until their own purge", () => {
+  it("never deletes an upload of a removed listing on the upload's purgeAt (no upload scan at all)", async () => {
     const removed = listing("removed2", { status: "removed", purgeAt: new Date(NOW.getTime() + 300 * DAY) });
-    const heldRemoved = listing("heldrem2", { status: "removed", legalHold: ["report:r1"] });
-    const published = listing("publish2", { status: "published" });
-    const items = [upload("upl0000000000001", removed.id), upload("upl0000000000002", heldRemoved.id), upload("upl0000000000003", published.id), upload("upl0000000000004", "missing2")];
-    for (const item of items) seed(item.targetId, item.id);
-    // Another purpose whose target id happens to be a removed listing's: never this job's.
-    const avatar = upload("avatar0000000005", removed.id, { purpose: "avatar" });
-    vi.mocked(uploadsRepo.listPastPurge).mockResolvedValueOnce([...items, avatar]);
-    vi.mocked(getListings).mockResolvedValue([removed, heldRemoved, published]);
+    seed(removed.id, "upl0000000000001");
+    vi.mocked(uploadsRepo.listPastPurge).mockResolvedValue([upload("upl0000000000001", removed.id)]);
+    vi.mocked(getListings).mockResolvedValue([removed]);
 
     const result = await retentionPurge(NOW, { store });
-    expect(result).toMatchObject({ uploads: 1, listings: 0 });
-    expect(uploadsRepo.deleteUploadDocument).toHaveBeenCalledTimes(1);
-    expect(uploadsRepo.deleteUploadDocument).toHaveBeenCalledWith("upl0000000000001");
-    expect(getListings).toHaveBeenCalledWith(["removed2", "heldrem2", "publish2", "missing2"]);
-    expect(store.keys("media").some((key) => key.startsWith("listings/removed2/"))).toBe(false);
-    expect(store.keys("media").filter((key) => !key.startsWith("listings/removed2/"))).toHaveLength(6);
-    expect(store.keys("quarantine")).not.toContain("uploads/upl0000000000001");
+    expect(result).toMatchObject({ uploads: 0, listings: 0, failed: 0 });
+    expect(uploadsRepo.listPastPurge).not.toHaveBeenCalled();
+    expect(uploadsRepo.deleteUploadDocument).not.toHaveBeenCalled();
+    expect(store.keys("media")).toHaveLength(2);
   });
 
-  it("keeps the document when its objects could not be deleted", async () => {
-    const removed = listing("removed2", { status: "removed" });
-    vi.mocked(uploadsRepo.listPastPurge).mockResolvedValueOnce([upload("upl0000000000001", removed.id)]);
-    vi.mocked(getListings).mockResolvedValue([removed]);
-    vi.spyOn(store, "delete").mockRejectedValueOnce(new Error("R2 500"));
-    expect(await retentionPurge(NOW, { store })).toMatchObject({ uploads: 0, failed: 1 });
-    expect(uploadsRepo.deleteUploadDocument).not.toHaveBeenCalled();
+  it("deletes them with the listing once the listing's purgeAt passed (removal + 12 months)", async () => {
+    const removed = listing("removed2", { status: "removed", photos: [{ id: "upl0000000000001", w: 1600, h: 1200, blurhash: "LEHV6nWB2yk8" }] });
+    seed(removed.id, "upl0000000000001");
+    vi.mocked(uploadsRepo.listUploadsByTarget).mockResolvedValue([upload("upl0000000000001", removed.id, { purgeAt: removed.purgeAt! })]);
+    vi.mocked(retention.listListingsPastPurge).mockResolvedValueOnce(page([removed]));
+
+    expect(await retentionPurge(NOW, { store })).toMatchObject({ listings: 1, uploads: 1, failed: 0 });
+    expect(uploadsRepo.deleteUploadDocument).toHaveBeenCalledWith("upl0000000000001");
+    expect(store.keys("media")).toEqual([]);
+  });
+
+  it("reads the uploads of a purged listing page after page until a short page", async () => {
+    const record = listing("abcd2345");
+    const full = Array.from({ length: 100 }, (_, index) => upload(`full${String(index).padStart(12, "0")}`, record.id, { status: "rejected" }));
+    vi.mocked(uploadsRepo.listUploadsByTarget).mockResolvedValueOnce(full).mockResolvedValueOnce([upload("last000000000001", record.id)]);
+    vi.mocked(retention.listListingsPastPurge).mockResolvedValueOnce(page([record]));
+
+    expect(await retentionPurge(NOW, { store })).toMatchObject({ listings: 1, uploads: 101, failed: 0 });
+    expect(uploadsRepo.listUploadsByTarget).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -269,7 +275,7 @@ describe("retention-purge: journals and budget", () => {
     vi.mocked(retention.deleteJournalPastPurge).mockResolvedValue(2);
     const result = await retentionPurge(NOW);
     expect(retention.listListingsPastPurge).not.toHaveBeenCalled();
-    expect(uploadsRepo.listPastPurge).not.toHaveBeenCalled();
+    expect(uploadsRepo.listUploadsByTarget).not.toHaveBeenCalled();
     expect(result).toMatchObject({ contentOps: 2, revealLogs: 2 });
   });
 

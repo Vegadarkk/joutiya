@@ -16,7 +16,7 @@ vi.mock("@/lib/quota", () => ({
 vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => true) }));
 
 const { alert } = await import("@/lib/alert");
-const { runBackup } = await import("@/lib/backup/export");
+const { BACKUP_RETENTION_DAYS, readRetainedBackupBytes, runBackup } = await import("@/lib/backup/export");
 const { generateIdentity, identityToRecipient } = await import("@/lib/backup/crypto");
 const { applyRestore, checkRestore, planRestore } = await import("@/lib/backup/restore");
 const { MemoryObjectStore } = await import("@/lib/storage/memory");
@@ -332,6 +332,59 @@ describe("cursors across nights", () => {
     expect(next.counts.full).toEqual({ listings: 5, users: 2 });
     const { check } = await restore(store, database());
     expect(check.documents).toBe(7);
+  });
+
+  it("carries a purge (tombstone with updatedAt) in the next incremental, and the restore writes it over the listing", async () => {
+    const db = database();
+    const day1 = new Date("2026-10-10T03:30:00Z");
+    await db.doc("listings/gone1").set({ title: "Vélo à purger", status: "expired", version: 4, updatedAt: ago(day1, 3_600_000) });
+    await db.doc("listings/kept1").set({ title: "Vélo gardé", status: "published", version: 2, updatedAt: ago(day1, 3_600_000) });
+    const store = new MemoryObjectStore();
+    // No rolling full: only the incremental can carry the purge.
+    const config: Partial<BackupConfig> = { collections: listingsAndUsers, fullBudget: 0 };
+    expect((await runBackup({ db, store, recipient, now: day1, config })).counts.incremental).toEqual({ listings: 2, users: 0 });
+
+    // retention-purge's tombstone (src/lib/db/repositories/retention.ts): no text, updatedAt = purgedAt.
+    const purgedAt = Timestamp.fromDate(new Date(day1.getTime() + 20 * 3_600_000));
+    await db.doc("listings/gone1").set({ status: "purged", purgedAt, version: 5, updatedAt: purgedAt });
+    const day2 = new Date(day1.getTime() + 86_400_000);
+    expect((await runBackup({ db, store, recipient, now: day2, config })).counts.incremental).toEqual({ listings: 1, users: 0 });
+
+    const target = database();
+    await restore(store, target);
+    expect((await target.doc("listings/gone1").get()).data()).toEqual({ status: "purged", purgedAt, version: 5, updatedAt: purgedAt });
+    expect((await target.doc("listings/kept1").get()).get("title")).toBe("Vélo gardé");
+  });
+
+  it("bounds one run's reads: the rolling full gets what the incremental left of maxRunReads", async () => {
+    const db = database();
+    const now = new Date("2026-10-10T03:30:00Z");
+    const batch = db.batch();
+    for (let index = 0; index < 4; index += 1) batch.set(db.doc(`listings/l${index}`), { updatedAt: ago(now, 60_000 * (index + 5)) });
+    for (let index = 0; index < 4; index += 1) batch.set(db.doc(`users/u${index}`), { updatedAt: ago(now, 60_000 * (index + 5)) });
+    await batch.commit();
+    // 1 read for the cursor document, then pages of 10: listings (4 docs) and users (4 docs) leave 1 read.
+    const result = await runBackup({ db, store: new MemoryObjectStore(), recipient, now, config: { collections: listingsAndUsers, pageSize: 10, maxRunReads: 10, fullBudget: 1_000 } });
+    expect(result.counts.incremental).toEqual({ listings: 4, users: 4 });
+    expect(result.counts.full).toEqual({ listings: 1 });
+    expect(result.reads).toBeLessThanOrEqual(11);
+    expect(result.cursors?.full.next).toBe("listings");
+  });
+
+  it("records the encrypted bytes of each night for the R2 gauge, forgetting nights past the 98-day lifecycle", async () => {
+    const db = database();
+    const now = new Date("2026-10-10T03:30:00Z");
+    await db.doc("listings/l1").set({ updatedAt: ago(now, 60_000) });
+    const expiredNight = new Date(now.getTime() - (BACKUP_RETENTION_DAYS + 1) * 86_400_000).toISOString().slice(0, 10);
+    await db.doc("system/backup").set({ storedBytes: { [expiredNight]: 9_999, "2026-10-09": 1_000 } });
+    const store = new MemoryObjectStore();
+    const result = await runBackup({ db, store, recipient, now, config: { collections: listingsAndUsers } });
+    const written = (await Promise.all(store.keys("private").map(async (key) => ((await store.get("private", key)) as Buffer).byteLength))).reduce((sum, bytes) => sum + bytes, 0);
+    expect(result.retainedBytes).toBe(1_000 + written);
+    expect((await db.doc("system/backup").get()).get("storedBytes")).toEqual({ "2026-10-09": 1_000, "2026-10-10": written });
+    expect(await readRetainedBackupBytes(db, now)).toBe(1_000 + written);
+    // 98 days later the 2026-10-09 objects are gone from the bucket.
+    expect(await readRetainedBackupBytes(db, new Date(Date.parse("2026-10-09T12:00:00Z") + (BACKUP_RETENTION_DAYS + 1) * 86_400_000))).toBe(written);
   });
 
   it("ignores hand-edited cursor paths that do not belong to their collection", async () => {

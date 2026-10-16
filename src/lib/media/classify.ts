@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import type * as Ort from "onnxruntime-node";
 import { DEFAULT_AI, type AiConfig } from "@/config/ai";
+import { alert } from "@/lib/alert";
 import type { ServerEnv } from "@/lib/env";
 import { logger } from "@/lib/logging/logger";
 import { openImage } from "./sharp-setup";
@@ -10,8 +11,10 @@ import { openImage } from "./sharp-setup";
 // Local image checks of the worker (architecture §3 step 5, design D7): a nudity probability and a
 // face count from two ONNX models (models/MANIFEST.json, docs/models.md) run on the CPU with
 // onnxruntime-node, one intra-op thread, sessions created lazily once per process. Without the
-// model files the stub answers "clean" and a deployed worker logs a warning: photos then reach the
-// moderation agent unchecked rather than blocking every listing.
+// model files, dev (and the tests) use the stub, which answers "clean" and whose zeros are never
+// stored as checks. A deployed process fails closed: every classification throws (an
+// infrastructure failure: the media job retries, then the upload ends rejected and the wizard
+// offers a retry) and an alert goes out, so no photo is ever ready without both checks.
 
 export interface ImageClassification {
   /** P(NSFW) in [0, 1]. */
@@ -230,12 +233,47 @@ export class StubImageClassifier implements ImageClassifier {
   }
 }
 
-/** ONNX when both model files exist under MEDIA_MODELS_DIR, the stub otherwise (warned outside dev). */
+/** The local checks cannot run (model files missing in a deployed process): not a media error, retried. */
+export class ClassifierUnavailableError extends Error {
+  constructor(message = "photo checks unavailable: ONNX model files missing") {
+    super(message);
+    this.name = "ClassifierUnavailableError";
+  }
+}
+
+/** Title of the alert raised while deployed photo checks cannot run (alert() sends it at most once an hour). */
+export const MODELS_MISSING_ALERT_TITLE = "Contrôle des photos indisponible : modèles ONNX absents";
+
+/** Deployed without the model files: refuses every photo instead of letting it through unchecked. */
+export class UnavailableImageClassifier implements ImageClassifier {
+  readonly name = "unavailable";
+
+  constructor(
+    readonly modelsDir: string,
+    readonly appEnv: string,
+  ) {}
+
+  async classify(): Promise<ImageClassification> {
+    logger.error({ modelsDir: this.modelsDir }, "ONNX models missing: photo refused for processing (fail closed)");
+    await alert({
+      severity: "P1",
+      title: MODELS_MISSING_ALERT_TITLE,
+      body: `Les fichiers ${MODEL_FILES.nsfw} et ${MODEL_FILES.face} sont introuvables dans ${this.modelsDir} (${this.appEnv}) : aucune photo ne passe à l'état prêt, les envois finissent refusés après les nouvelles tentatives. Lancer node scripts/fetch-models.ts --check dans l'image du worker, puis redéployer.`,
+    });
+    throw new ClassifierUnavailableError();
+  }
+}
+
+/**
+ * ONNX when both model files exist under MEDIA_MODELS_DIR; otherwise the stub in dev, and outside
+ * dev a classifier that fails closed (every call throws and alerts).
+ */
 export function createImageClassifier(env: Pick<ServerEnv, "APP_ENV" | "MEDIA_MODELS_DIR">, ai: AiConfig): ImageClassifier {
   const dir = modelsDir(env);
   if (modelsPresent(dir)) return new OnnxImageClassifier(modelPaths(dir), ai.face.minConfidence);
-  if (env.APP_ENV !== "dev") logger.warn({ modelsDir: dir }, "ONNX models missing: photo checks run with the stub classifier");
-  return new StubImageClassifier();
+  if (env.APP_ENV === "dev") return new StubImageClassifier();
+  logger.error({ modelsDir: dir }, "ONNX models missing: photo checks fail closed");
+  return new UnavailableImageClassifier(dir, env.APP_ENV);
 }
 
 let shared: ImageClassifier | undefined;

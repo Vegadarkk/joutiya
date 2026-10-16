@@ -4,8 +4,9 @@ import type { UploadRecord } from "@/lib/db/repositories/uploads";
 
 // purge-quarantine (hourly :20): stale signed/processing uploads expired with their objects,
 // rejected uploads' quarantine objects swept behind a cursor, unattached documents past purgeAt
-// deleted with their objects, attached ones pushed 30 days on, legal holds and removed listings
-// left alone. Repositories are mocked; a MemoryObjectStore records the storage calls.
+// deleted with their objects, attached ones pushed 30 days on, legal holds (rechecked a day later)
+// and removed listings (rechecked at the listing's purgeAt) left alone, never read again before
+// then. Repositories are mocked; a MemoryObjectStore records the storage calls.
 
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/quota", () => ({ isDegraded: vi.fn(async () => false), consume: vi.fn(async () => ({ level: "ok" })) }));
@@ -29,7 +30,9 @@ const { getListings } = await import("@/lib/db/repositories/listings");
 const { isDegraded } = await import("@/lib/quota");
 const { recordMediaBytes } = await import("@/lib/uploads/storage-gauge");
 const { MemoryObjectStore } = await import("@/lib/storage/memory");
-const { ATTACHED_RECHECK_MS, PURGE_QUARANTINE_BATCH, QUARANTINE_TTL_MS, REJECTED_SWEEP_DELAY_MS, REJECTED_SWEEP_LOOKBACK_MS, purgeQuarantine } = await import("@/worker/jobs/purge-quarantine");
+const { ATTACHED_RECHECK_MS, HOLD_RECHECK_MS, PURGE_QUARANTINE_BATCH, QUARANTINE_TTL_MS, REJECTED_SWEEP_DELAY_MS, REJECTED_SWEEP_LOOKBACK_MS, RETAINED_RECHECK_MS, purgeQuarantine, retainedUntil } = await import(
+  "@/worker/jobs/purge-quarantine"
+);
 
 const NOW = new Date("2026-10-16T12:20:00Z");
 const LISTING = "abcdefgh";
@@ -184,17 +187,45 @@ describe("purge-quarantine: documents past purgeAt", () => {
     expect(repo.deleteUploadDocument).not.toHaveBeenCalled();
   });
 
-  it("leaves removed listings to retention-purge and keeps everything under a legal hold", async () => {
+  it("leaves removed listings to retention-purge until the listing's purgeAt, and holds for a day", async () => {
+    const listingPurgeAt = new Date(NOW.getTime() + 300 * 86_400_000);
     const removed = upload("removed00001", { ...past, status: "ready", targetId: "removedd" });
+    const removedRejected = upload("removed00002", { ...past, status: "rejected", rejectReason: "nsfw", targetId: "removedd" });
     const held = upload("heldupload01", { ...past, status: "ready", targetId: "heldlist" });
-    vi.mocked(repo.listPastPurge).mockResolvedValue([removed, held]);
-    vi.mocked(getListings).mockResolvedValue([listing({ id: "removedd", status: "removed" }), listing({ id: "heldlist", legalHold: ["requisition-1"] })]);
+    const heldRemoved = upload("heldupload02", { ...past, status: "ready", targetId: "heldremv" });
+    vi.mocked(repo.listPastPurge).mockResolvedValue([removed, removedRejected, held, heldRemoved]);
+    vi.mocked(getListings).mockResolvedValue([
+      listing({ id: "removedd", status: "removed", purgeAt: listingPurgeAt, photos: [{ id: "removed00001", w: 1, h: 1, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj" }] }),
+      listing({ id: "heldlist", legalHold: ["requisition-1"] }),
+      listing({ id: "heldremv", status: "removed", purgeAt: listingPurgeAt, legalHold: ["requisition-2"] }),
+    ]);
 
-    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: 0, extended: 0, skipped: 2 });
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: 0, extended: 0, skipped: 4, failed: 0 });
     expect(store.calls).toEqual([]);
+    expect(repo.deleteUploadDocument).not.toHaveBeenCalled();
+    // Each skipped upload gets a later purgeAt: the next hourly runs do not read it again.
+    expect(vi.mocked(repo.updateUpload).mock.calls).toEqual([
+      ["removed00001", { purgeAt: listingPurgeAt }, NOW],
+      ["removed00002", { purgeAt: listingPurgeAt }, NOW],
+      ["heldupload01", { purgeAt: new Date(NOW.getTime() + HOLD_RECHECK_MS) }, NOW],
+      ["heldupload02", { purgeAt: new Date(NOW.getTime() + HOLD_RECHECK_MS) }, NOW],
+    ]);
   });
 
-  it("deletes the uploads of a listing that no longer exists", async () => {
+  it("rechecks a removed listing's uploads at least a day ahead (the listing's purge may be due tonight)", () => {
+    expect(retainedUntil({ purgeAt: new Date(NOW.getTime() + 90 * 86_400_000) }, NOW)).toEqual(new Date(NOW.getTime() + 90 * 86_400_000));
+    expect(retainedUntil({ purgeAt: new Date(NOW.getTime() - 1_000) }, NOW)).toEqual(new Date(NOW.getTime() + RETAINED_RECHECK_MS));
+    expect(retainedUntil({ purgeAt: undefined }, NOW)).toEqual(new Date(NOW.getTime() + ATTACHED_RECHECK_MS));
+  });
+
+  it("counts a failed reschedule and goes on", async () => {
+    vi.mocked(repo.listPastPurge).mockResolvedValue([upload("heldupload01", { ...past, status: "ready", targetId: "heldlist" }), upload("orphan000001", { ...past, status: "rejected" })]);
+    vi.mocked(getListings).mockResolvedValue([listing({ id: "heldlist", legalHold: ["requisition-1"] })]);
+    vi.mocked(repo.updateUpload).mockRejectedValueOnce(new Error("DEADLINE_EXCEEDED"));
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ skipped: 0, failed: 1, purged: 1 });
+  });
+
+  it("deletes the uploads of a listing that no longer exists (or is a tombstone: it does not read as a listing)", async () => {
     const orphan = upload("orphan000001", { ...past, status: "ready", size: 10 });
     vi.mocked(repo.listPastPurge).mockResolvedValue([orphan]);
     expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: 1 });

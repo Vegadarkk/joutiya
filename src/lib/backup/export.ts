@@ -1,5 +1,6 @@
 import "server-only";
 import { FieldPath, Timestamp, type DocumentReference, type Firestore, type Query, type QueryDocumentSnapshot } from "firebase-admin/firestore";
+import { QUOTAS } from "@/config/quotas";
 import { alert } from "@/lib/alert";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { logger } from "@/lib/logging/logger";
@@ -22,8 +23,13 @@ import { PART_MAX_BYTES, PART_MAX_DOCS, PartBuilder, manifestKey, partKey, sealP
 // Cursors live in `system/backup` and move only once the manifest is stored: a failed run is
 // redone by the next one. One run per UTC date: keys are per date, a second run would overwrite
 // the first. Scans stop when the Firestore read quota reaches `readsStopRatio` (the app keeps its
-// share). Without a valid recipient nothing is written: a backup is encrypted or does not exist.
-// Deletions are not exported: a restore resurrects purged documents (docs/backups.md).
+// share), and one run reads at most `maxRunReads` documents (incremental first, the rolling full
+// gets what is left of it). Without a valid recipient nothing is written: a backup is encrypted
+// or does not exist. Deletions are not exported: a restore resurrects deleted documents
+// (docs/backups.md); a purged listing is not deleted but replaced by a tombstone with `updatedAt`,
+// so the next incremental carries it and the restore writes it over the older captures.
+// The cursor document also keeps the encrypted bytes written per night (98 days, the private
+// bucket's lifecycle): the R2 storage gauge counts them.
 
 export type TimeField = "updatedAt" | "createdAt";
 
@@ -67,8 +73,10 @@ export const BACKUP_COLLECTIONS: readonly BackupCollection[] = (Object.keys(TABL
 
 export interface BackupConfig {
   collections: readonly BackupCollection[];
-  /** Documents the rolling full reads per run (D17: 10 000 a night, Spark 50 000 reads/day shared with the app). */
+  /** Documents the rolling full reads per run (D17: 10 000 a night, Spark 50 000 reads/day shared with the app), within maxRunReads. */
   fullBudget: number;
+  /** Reads of one run, both passes together: the incremental goes first, the rolling full gets the rest. */
+  maxRunReads: number;
   /** Documents the incremental reads per run; past it the cursors stay on the last exported document (nothing lost). */
   incrementalMax: number;
   pageSize: number;
@@ -84,16 +92,22 @@ export interface BackupConfig {
   maxCycleMs: number;
 }
 
+/** Share of the daily Firestore read quota one backup run may take (20 000 of 50 000 on Spark). */
+export const BACKUP_RUN_READS_SHARE = 0.4;
+/** Days a backup object lives in the private bucket (R2 lifecycle rule `backups-98d`, docs/backups.md). */
+export const BACKUP_RETENTION_DAYS = 98;
+
 export const DEFAULT_BACKUP_CONFIG: BackupConfig = {
   collections: BACKUP_COLLECTIONS,
   fullBudget: 10_000,
+  maxRunReads: Math.floor(QUOTAS["firestore.reads"].limit * BACKUP_RUN_READS_SHARE),
   incrementalMax: 20_000,
   pageSize: 500,
   partMaxDocs: PART_MAX_DOCS,
   partMaxBytes: PART_MAX_BYTES,
   overlapMs: 10 * 60_000,
   firstRunWindowMs: 24 * 3_600_000,
-  readsStopRatio: 0.9,
+  readsStopRatio: 0.75,
   maxCycleMs: 60 * 86_400_000,
 };
 
@@ -121,6 +135,8 @@ export interface BackupCursors {
   lastRunAt: Date | null;
   /** UTC date of the last completed run. */
   lastDate: string | null;
+  /** Encrypted bytes (parts + manifest) written per UTC date, within the retention: the R2 gauge sums them. */
+  storedBytes: Record<string, number>;
 }
 
 export interface ManifestPart {
@@ -175,6 +191,8 @@ export interface BackupResult {
   quotaStopped: boolean;
   durationMs: number;
   cursors: BackupCursors | null;
+  /** Encrypted bytes of every backup still within the retention, this run included (null when skipped). */
+  retainedBytes: number | null;
 }
 
 export interface RunBackupInput {
@@ -233,7 +251,38 @@ export const EMPTY_CURSORS: BackupCursors = {
   full: { next: null, after: {}, cycleStartedAt: null, cycleCompletedAt: null },
   lastRunAt: null,
   lastDate: null,
+  storedBytes: {},
 };
+
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+function toBytesMap(value: unknown): Record<string, number> {
+  if (!isRecord(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, number] => DATE_KEY.test(entry[0]) && typeof entry[1] === "number" && Number.isSafeInteger(entry[1]) && entry[1] >= 0));
+}
+
+/** First UTC date whose backups still exist on `now` (the lifecycle deletes objects older than the retention). */
+function retentionStart(now: Date): string {
+  return new Date(now.getTime() - BACKUP_RETENTION_DAYS * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** The entries of `storedBytes` still within the retention on `now`. */
+export function retainedStoredBytes(storedBytes: Record<string, number>, now: Date): Record<string, number> {
+  const start = retentionStart(now);
+  return Object.fromEntries(Object.entries(storedBytes).filter(([date]) => date >= start));
+}
+
+/** Encrypted bytes of the backups still in the private bucket on `now`. */
+export function sumRetainedBytes(storedBytes: Record<string, number>, now: Date): number {
+  return Object.values(retainedStoredBytes(storedBytes, now)).reduce((sum, bytes) => sum + bytes, 0);
+}
+
+/** Backup bytes for the R2 storage gauge, from the cursor document (one read). */
+export async function readRetainedBackupBytes(db: Firestore, now = new Date(), cursorDoc?: DocumentReference): Promise<number> {
+  const snapshot = await (cursorDoc ?? db.collection(COLLECTIONS.system).doc("backup")).get();
+  await consume("firestore.reads", 1);
+  return sumRetainedBytes(parseCursors(snapshot.data()).storedBytes, now);
+}
 
 /** Tolerant read of system/backup: a missing or hand-edited document never breaks the job. */
 export function parseCursors(data: unknown): BackupCursors {
@@ -249,7 +298,8 @@ export function parseCursors(data: unknown): BackupCursors {
       cycleCompletedAt: toDate(full["cycleCompletedAt"]),
     },
     lastRunAt: toDate(data["lastRunAt"]),
-    lastDate: typeof data["lastDate"] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data["lastDate"]) ? data["lastDate"] : null,
+    lastDate: typeof data["lastDate"] === "string" && DATE_KEY.test(data["lastDate"]) ? data["lastDate"] : null,
+    storedBytes: toBytesMap(data["storedBytes"]),
   };
 }
 
@@ -262,6 +312,7 @@ export function serializeCursors(cursors: BackupCursors, now: Date): Record<stri
     full: { next: cursors.full.next, after: cursors.full.after, cycleStartedAt: ts(cursors.full.cycleStartedAt), cycleCompletedAt: ts(cursors.full.cycleCompletedAt) },
     lastRunAt: ts(cursors.lastRunAt),
     lastDate: cursors.lastDate,
+    storedBytes: cursors.storedBytes,
     updatedAt: Timestamp.fromDate(now),
   };
 }
@@ -442,7 +493,7 @@ function resumable(collection: BackupCollection, path: string | null | undefined
 
 /** A run that wrote nothing (also used by the worker job when the storage is missing). */
 export function skippedBackup(reason: BackupSkipReason, date: string, durationMs = 0): BackupResult {
-  return { status: "skipped", reason, date, manifestKey: null, counts: { incremental: {}, full: {} }, parts: 0, bytes: 0, reads: 0, truncated: false, quotaStopped: false, durationMs, cursors: null };
+  return { status: "skipped", reason, date, manifestKey: null, counts: { incremental: {}, full: {} }, parts: 0, bytes: 0, reads: 0, truncated: false, quotaStopped: false, durationMs, cursors: null, retainedBytes: null };
 }
 
 export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
@@ -487,7 +538,7 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
   const overlapSince = Timestamp.fromDate(new Date(now.getTime() - config.overlapMs));
   const timed = order.filter((collection) => collection.timeField !== null);
   const startAt = Math.max(0, timed.findIndex((collection) => collection.id === previous.incrementalNext));
-  let budget = config.incrementalMax;
+  let budget = Math.min(config.incrementalMax, config.maxRunReads - state.reads);
   let incrementalNext: string | null = null;
   for (let step = 0; step < timed.length; step += 1) {
     const collection = timed[(startAt + step) % timed.length] as BackupCollection;
@@ -521,7 +572,8 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
   const after = continuing ? Object.fromEntries(Object.entries(previous.full.after).filter(([id]) => known.has(id))) : {};
   const startIndex = continuing ? order.findIndex((collection) => collection.id === previous.full.next) : 0;
   const cycleStartedAt = continuing ? (previous.full.cycleStartedAt ?? now) : now;
-  let remaining = config.fullBudget;
+  // Bounded by what the incremental left of the run's reads: a busy day shortens the rotation, never the app's share.
+  let remaining = Math.min(config.fullBudget, config.maxRunReads - state.reads);
   let fullNext: string | null = null;
   for (let index = startIndex; index < order.length; index += 1) {
     const collection = order[index] as BackupCollection;
@@ -554,6 +606,7 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
     full: { next: fullNext, after, cycleStartedAt, cycleCompletedAt: cycleComplete ? now : previous.full.cycleCompletedAt },
     lastRunAt: now,
     lastDate: date,
+    storedBytes: retainedStoredBytes(previous.storedBytes, now),
   };
   const finishedAt = new Date();
   const bytes = parts.reduce((sum, part) => sum + part.bytes, 0);
@@ -572,7 +625,10 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
     collections: [...order],
   };
   // The manifest is age only (no gzip), as its name says: `age -d` prints it.
-  await store.put("private", key, await encryptAge(Buffer.from(JSON.stringify(manifest), "utf8"), recipient), { contentType: CONTENT_TYPE });
+  const manifestBody = await encryptAge(Buffer.from(JSON.stringify(manifest), "utf8"), recipient);
+  await store.put("private", key, manifestBody, { contentType: CONTENT_TYPE });
+  cursors.storedBytes[date] = bytes + manifestBody.byteLength;
+  const retainedBytes = sumRetainedBytes(cursors.storedBytes, now);
   await cursorDoc.set(serializeCursors(cursors, finishedAt));
   await consume("firestore.writes", 1);
 
@@ -588,7 +644,7 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
   }
 
   const durationMs = Date.now() - started;
-  const result: BackupResult = { status: "done", date, manifestKey: key, counts, parts: parts.length, bytes, reads: state.reads, truncated, quotaStopped: state.quotaStopped, durationMs, cursors };
+  const result: BackupResult = { status: "done", date, manifestKey: key, counts, parts: parts.length, bytes, reads: state.reads, truncated, quotaStopped: state.quotaStopped, durationMs, cursors, retainedBytes };
   logger.info({ date, counts, parts: parts.length, bytes, reads: state.reads, truncated, quotaStopped: state.quotaStopped, fullNext, cycleComplete, durationMs }, "backup-firestore");
   return result;
 }

@@ -75,11 +75,22 @@ export function deleteUpload(id: string): Promise<void> {
   return apiDelete(MEDIA_API.upload(id));
 }
 
-export const UPLOAD_POLL_MS = 2_000;
+/**
+ * Waits between two status reads while the pipeline runs: quick at first (an inline or idle worker
+ * answers within seconds), then every 5 s (the last delay repeats). About 14 reads in 60 s, not 30:
+ * each one is a Firestore read.
+ */
+export const UPLOAD_POLL_DELAYS_MS: readonly number[] = [1_000, 2_000, 3_000, 5_000];
 export const UPLOAD_POLL_MAX_MS = 60_000;
 
+/** The wait before status read number `attempt` (0-based): the schedule, then its last delay. */
+export function pollDelay(attempt: number, delays: readonly number[] = UPLOAD_POLL_DELAYS_MS): number {
+  return delays[Math.min(attempt, delays.length - 1)] ?? UPLOAD_POLL_MAX_MS;
+}
+
 export interface PollOptions {
-  intervalMs?: number;
+  /** Backoff schedule (default UPLOAD_POLL_DELAYS_MS). */
+  delaysMs?: readonly number[];
   maxMs?: number;
   signal?: AbortSignal;
   /** Injected in tests. */
@@ -106,19 +117,19 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 }
 
 /**
- * Polls GET /api/uploads/{id} every 2 s while the pipeline runs (max 60 s). Resolves with the
- * final answer, or with the last `processing` answer when the deadline passes (the tile then
- * offers a manual refresh instead of hammering the API).
+ * Polls GET /api/uploads/{id} with a backoff (1 s, 2 s, 3 s, then every 5 s) while the pipeline
+ * runs (max 60 s). Resolves with the final answer, or with the last `processing` answer when the
+ * deadline passes (the tile then offers a manual refresh instead of hammering the API).
  */
 export async function pollUpload(id: string, options: PollOptions = {}): Promise<UploadStatusResponse> {
   if (options.signal?.aborted) throw new DOMException("aborted", "AbortError");
-  const interval = options.intervalMs ?? UPLOAD_POLL_MS;
+  const delays = options.delaysMs && options.delaysMs.length > 0 ? options.delaysMs : UPLOAD_POLL_DELAYS_MS;
   const deadline = Date.now() + (options.maxMs ?? UPLOAD_POLL_MAX_MS);
   const wait = options.sleep ?? sleep;
   const fetchStatus = options.fetchStatus ?? getUpload;
   let last: UploadStatusResponse = { status: "processing" };
-  while (Date.now() < deadline) {
-    await wait(interval, options.signal);
+  for (let attempt = 0; Date.now() < deadline; attempt += 1) {
+    await wait(pollDelay(attempt, delays), options.signal);
     last = await fetchStatus(id);
     if (last.status !== "processing") return last;
   }

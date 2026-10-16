@@ -1,11 +1,19 @@
 import "server-only";
 import { requireOwner, type AuthContext } from "@/lib/auth/guards";
-import { PHOTO_VARIANTS, UPLOAD_URL_TTL_SECONDS, type SignUploadInput, type SignUploadResponse, type UploadStatusResponse } from "@/lib/contracts/media";
+import {
+  PHOTO_VARIANTS,
+  UPLOAD_LIMIT_REASON,
+  UPLOAD_URL_TTL_SECONDS,
+  UPLOADS_PER_PHOTO_SLOT,
+  type SignUploadInput,
+  type SignUploadResponse,
+  type UploadStatusResponse,
+} from "@/lib/contracts/media";
 import { recordContentOp } from "@/lib/db/repositories/content-ops";
 import type { ListingStatus } from "@/lib/contracts/listings";
 import { getListing, type ListingRecord } from "@/lib/db/repositories/listings";
-import { enqueueSearchOutbox } from "@/lib/db/repositories/search-outbox";
 import {
+  countUploadsByTarget,
   createUpload,
   deleteUploadDocument,
   detachPhoto,
@@ -19,6 +27,7 @@ import {
 } from "@/lib/db/repositories/uploads";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { HttpError, notFound, unavailable } from "@/lib/http/errors";
+import { PUBLIC_STATES } from "@/lib/listings/public";
 import { revalidateListingPaths } from "@/lib/listings/revalidate";
 import { logger } from "@/lib/logging/logger";
 import { expireUpload } from "@/lib/media/pipeline";
@@ -27,7 +36,7 @@ import { mediaObjectKey, quarantineObjectKey } from "@/lib/media/urls";
 import { captureServerException } from "@/lib/observability/capture";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { isStorageNotConfigured, objectStore, type ObjectStore } from "@/lib/storage";
-import { LIVE_STATUSES, PHOTO_TARGET_STATUSES, maxPhotosOf, toStatusResponse } from "./policy";
+import { LIVE_STATUSES, PHOTO_TARGET_STATUSES, RETAINED_STATUSES, maxPhotosOf, toStatusResponse } from "./policy";
 import { isStorageFull, recordMediaBytes } from "./storage-gauge";
 
 // Uploads service (design §3 MEDIA_API, architecture §6 "Uploads"): signing a presigned PUT to
@@ -83,6 +92,11 @@ export async function signUpload(uploader: Uploader, input: SignUploadInput, now
 
   const listing = await ownedListing(uploader, input.targetId);
   if (!PHOTO_TARGET_STATUSES.includes(listing.status)) throw notFound();
+  // Every upload document of the listing is read by the owner's view: their number is capped
+  // (refused ones stay 7 days unless removed), one aggregation read.
+  if ((await countUploadsByTarget(listing.id)) >= UPLOADS_PER_PHOTO_SLOT * maxPhotosOf(listing)) {
+    throw new HttpError(409, "photo_limit", "too many uploads on this listing", { details: { reason: UPLOAD_LIMIT_REASON } });
+  }
   const attached = new Set(listing.photos.map((photo) => photo.id));
   const inFlight = (await listUploadsByTarget(listing.id, ["signed", "processing"])).filter(
     (upload) => !attached.has(upload.id) && (upload.status === "processing" || now.getTime() - upload.createdAt.getTime() < SIGNED_HOLD_MS),
@@ -158,18 +172,27 @@ export async function uploadStatus(uploader: Uploader, id: string): Promise<Uplo
 
 const photosRequired = () => new HttpError(422, "invalid_listing", undefined, { details: [{ path: "photos", code: "photos_required" }] });
 
-/** Detaches the photo (transaction); a published listing that lost it is re-indexed and revalidated at once. */
-async function detach(listingId: string, id: string, keepOneStatuses: readonly ListingStatus[], now: Date): Promise<void> {
+/** Listings whose photo changes are logged in contentOps like an edit (LCEN): public pages and listings held for review. */
+const LOGGED_STATUSES: readonly ListingStatus[] = [...PUBLIC_STATES, "pending_review"];
+
+/**
+ * Detaches the photo. The transaction that removes it also queues the re-indexing of a published
+ * listing and logs the change of a public or held one (contentOps `listing.update`, like a PATCH);
+ * a public page is revalidated once it is written.
+ */
+async function detach(uploader: Uploader, listingId: string, id: string, keepOneStatuses: readonly ListingStatus[], now: Date): Promise<void> {
   let detached: Awaited<ReturnType<typeof detachPhoto>>;
   try {
-    detached = await detachPhoto(listingId, id, keepOneStatuses, now);
+    detached = await detachPhoto(listingId, id, keepOneStatuses, now, {
+      searchStatuses: ["published"],
+      contentOp: { uid: uploader.auth.user.uid, ip: uploader.ip, statuses: LOGGED_STATUSES },
+    });
   } catch (error) {
     if (error instanceof LastPhotoError) throw photosRequired();
     throw error;
   }
   const { listing, changed } = detached;
-  if (!changed || listing?.status !== "published") return;
-  await enqueueSearchOutbox(listing.id, "upsert", listing.version, now);
+  if (!changed || !listing || !(PUBLIC_STATES as readonly ListingStatus[]).includes(listing.status)) return;
   revalidateListingPaths({ slugId: listing.slugId, publicId: listing.sellerPublicId });
 }
 
@@ -178,13 +201,15 @@ async function detach(listingId: string, id: string, keepOneStatuses: readonly L
  * photo: 422, like a PATCH), ends the upload, deletes the quarantine object and the variants, then
  * the document. The upload leaves `processing` before anything is deleted, so a pipeline run still
  * in flight finds it gone and removes what it stored; the second detach catches a photo that run
- * attached in between. Under a legal hold the objects and the document stay as evidence.
+ * attached in between. Under a legal hold the objects and the document stay as evidence; the
+ * photos of a removed listing are kept with it until retention-purge (409, nothing changes).
  */
 export async function deleteUpload(uploader: Uploader, id: string, now = new Date()): Promise<void> {
   const upload = await ownedUpload(uploader, id);
   const objects = store();
   const listing = await getListing(upload.targetId);
-  if (listing) await detach(listing.id, id, LIVE_STATUSES, now);
+  if (listing && RETAINED_STATUSES.includes(listing.status)) throw new HttpError(409, "conflict", "the photos of a removed listing are retained with it");
+  if (listing) await detach(uploader, listing.id, id, LIVE_STATUSES, now);
   if (listing && listing.legalHold.length > 0) {
     logger.info({ uploadId: id, listingId: listing.id }, "upload kept under legal hold");
     return;
@@ -196,7 +221,7 @@ export async function deleteUpload(uploader: Uploader, id: string, now = new Dat
     // Finished by the pipeline between the read and the transition: its bytes were counted.
     if (ended.ok && upload.status !== "ready" && ended.upload.variants) freedBytes = ended.upload.size ?? 0;
     // Past the point of no return: the photo goes even if it was the last one.
-    if (listing && upload.status !== "ready") await detach(listing.id, id, [], now);
+    if (listing && upload.status !== "ready") await detach(uploader, listing.id, id, [], now);
   }
   await objects.delete("quarantine", upload.quarantineKey);
   for (const variant of PHOTO_VARIANTS) await objects.delete("media", mediaObjectKey(upload.targetId, id, variant));

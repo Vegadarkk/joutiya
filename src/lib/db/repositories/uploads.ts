@@ -6,7 +6,9 @@ import { db } from "@/lib/firebase/admin";
 import { LISTING_ID_ALPHABET } from "@/lib/listings/ids";
 import { consume } from "@/lib/quota";
 import { COLLECTIONS, uploadSchema, type ListingStatus, type UploadDoc, type UploadStatus } from "../schemas";
+import { listingContentRef, recordContentOpTx } from "./content-ops";
 import { applyPatch, getListingTx, updateListingTx, type ListingFieldPatch, type ListingRecord } from "./listings";
+import { enqueueSearchOutboxTx } from "./search-outbox";
 import { datesToTimestamps, timestampsToDates } from "./timestamps";
 
 // uploads/{id} (§5): one document per signed upload, id = photo id. Written by the sign route
@@ -157,19 +159,40 @@ export class LastPhotoError extends Error {
   }
 }
 
+/** What a detach writes with the listing, decided on the listing's status as the transaction reads it. */
+export interface DetachEffects {
+  /** Statuses re-indexed: searchOutbox `upsert` in the same transaction. */
+  searchStatuses: readonly ListingStatus[];
+  /** contentOps `listing.update` entry (LCEN) in the same transaction, on a listing in `statuses`, when the IP is known. */
+  contentOp?: { uid: string; ip: string; statuses: readonly ListingStatus[] };
+}
+
+const NO_DETACH_EFFECTS: DetachEffects = { searchStatuses: [] };
+
 /**
- * Detaches a photo from its listing (transaction). Throws LastPhotoError when the listing is in
- * `keepOneStatuses` and the photo is its only one. `changed` is false when it was not attached.
+ * Detaches a photo from its listing (transaction, with the searchOutbox and contentOps entries of
+ * `effects`). Throws LastPhotoError when the listing is in `keepOneStatuses` and the photo is its
+ * only one. `changed` is false when it was not attached (nothing written).
  */
-export async function detachPhoto(listingId: string, photoId: string, keepOneStatuses: readonly ListingStatus[], now = new Date()): Promise<{ listing: ListingRecord | null; changed: boolean }> {
+export async function detachPhoto(
+  listingId: string,
+  photoId: string,
+  keepOneStatuses: readonly ListingStatus[],
+  now = new Date(),
+  effects: DetachEffects = NO_DETACH_EFFECTS,
+): Promise<{ listing: ListingRecord | null; changed: boolean }> {
   return db().runTransaction(async (tx) => {
     const listing = await getListingTx(tx, listingId);
     if (!listing) return { listing: null, changed: false };
     const photos = listing.photos.filter((item) => item.id !== photoId);
     if (photos.length === listing.photos.length) return { listing, changed: false };
     if (photos.length === 0 && keepOneStatuses.includes(listing.status)) throw new LastPhotoError();
-    const patch: ListingFieldPatch = { photos, version: listing.version + 1, updatedAt: now };
+    const version = listing.version + 1;
+    const patch: ListingFieldPatch = { photos, version, updatedAt: now };
     updateListingTx(tx, listingId, patch);
+    if (effects.searchStatuses.includes(listing.status)) enqueueSearchOutboxTx(tx, listingId, "upsert", version, now);
+    const log = effects.contentOp;
+    if (log?.ip && log.statuses.includes(listing.status)) recordContentOpTx(tx, { uid: log.uid, op: "listing.update", contentRef: listingContentRef(listingId), ip: log.ip, now });
     return { listing: applyPatch(listing, patch), changed: true };
   });
 }
@@ -188,13 +211,30 @@ export async function getUploads(ids: readonly string[]): Promise<UploadRecord[]
   return snapshots.map(fromSnapshot).filter((record): record is UploadRecord => record !== null);
 }
 
-/** Every upload of a listing (wizard view: processing and rejected photos next to the ready ones). */
-export async function listUploadsByTarget(targetId: string, statuses?: readonly UploadStatus[]): Promise<UploadRecord[]> {
+/**
+ * Backstop of listUploadsByTarget: signing caps a listing at UPLOADS_PER_PHOTO_SLOT x its photo
+ * limit (60 for Pro), so a page this long only happens through races or documents kept by a hold.
+ */
+export const UPLOADS_BY_TARGET_LIMIT = 100;
+
+/**
+ * Uploads of a listing, optionally in `statuses` (index uploads targetId asc, status asc), at most
+ * `limit` (any order): the wizard view, the sign check and the retention purge.
+ */
+export async function listUploadsByTarget(targetId: string, statuses?: readonly UploadStatus[], limit = UPLOADS_BY_TARGET_LIMIT): Promise<UploadRecord[]> {
   let query = uploads().where("targetId", "==", targetId);
   if (statuses) query = query.where("status", "in", [...statuses]);
-  const snapshot = await query.get();
+  const snapshot = await query.limit(limit).get();
   void consume("firestore.reads", Math.max(1, snapshot.size));
   return snapshot.docs.map(fromSnapshot).filter((record): record is UploadRecord => record !== null);
+}
+
+/** Upload documents of a listing, any status (count aggregation: one read per 1 000 entries). */
+export async function countUploadsByTarget(targetId: string): Promise<number> {
+  const result = await uploads().where("targetId", "==", targetId).count().get();
+  const count = result.data().count;
+  void consume("firestore.reads", 1 + Math.floor(count / 1000));
+  return count;
 }
 
 /**

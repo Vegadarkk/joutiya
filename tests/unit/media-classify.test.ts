@@ -11,9 +11,26 @@ import type { ServerEnv } from "@/lib/env";
 
 const logger = vi.hoisted(() => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() }));
 vi.mock("@/lib/logging/logger", () => ({ logger }));
+vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => true) }));
 
-const { createImageClassifier, decodeYunet, imageClassifier, MODEL_FILES, modelPaths, modelsDir, modelsPresent, nonMaximumSuppression, OnnxImageClassifier, resetImageClassifier, softmax2, StubImageClassifier } =
-  await import("@/lib/media/classify");
+const { alert } = await import("@/lib/alert");
+const {
+  ClassifierUnavailableError,
+  createImageClassifier,
+  decodeYunet,
+  imageClassifier,
+  MODEL_FILES,
+  MODELS_MISSING_ALERT_TITLE,
+  modelPaths,
+  modelsDir,
+  modelsPresent,
+  nonMaximumSuppression,
+  OnnxImageClassifier,
+  resetImageClassifier,
+  softmax2,
+  StubImageClassifier,
+  UnavailableImageClassifier,
+} = await import("@/lib/media/classify");
 const { sharp } = await import("@/lib/media/sharp-setup");
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
@@ -41,6 +58,8 @@ function yunetOutputs(cells: { stride: 8 | 16 | 32; index: number; cls: number; 
 
 beforeEach(() => {
   logger.warn.mockReset();
+  logger.error.mockReset();
+  vi.mocked(alert).mockClear();
 });
 
 describe("output decoding", () => {
@@ -123,16 +142,31 @@ describe("createImageClassifier", () => {
     expect(modelPaths("/app/models")).toEqual({ nsfw: "/app/models/nsfw-marqo-384.onnx", face: "/app/models/yunet-2023mar.onnx" });
   });
 
-  it("falls back to the stub without model files, silently in dev and with a warning elsewhere", () => {
+  it("falls back to the stub without model files in dev only, silently", () => {
     const dir = temp();
     expect(modelsPresent(dir)).toBe(false);
     expect(createImageClassifier(env({ MEDIA_MODELS_DIR: dir }), DEFAULT_AI)).toBeInstanceOf(StubImageClassifier);
     expect(logger.warn).not.toHaveBeenCalled();
-    expect(createImageClassifier(env({ APP_ENV: "staging", MEDIA_MODELS_DIR: dir }), DEFAULT_AI)).toBeInstanceOf(StubImageClassifier);
-    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.error).not.toHaveBeenCalled();
     // One file is not enough.
     writeFileSync(path.join(dir, MODEL_FILES.nsfw), "");
     expect(modelsPresent(dir)).toBe(false);
+    expect(createImageClassifier(env({ APP_ENV: "prod", MEDIA_MODELS_DIR: dir }), DEFAULT_AI)).toBeInstanceOf(UnavailableImageClassifier);
+  });
+
+  it("fails closed when deployed without the models: every check throws and alerts, never a clean answer", async () => {
+    const dir = temp();
+    for (const APP_ENV of ["staging", "prod"] as const) {
+      const classifier = createImageClassifier(env({ APP_ENV, MEDIA_MODELS_DIR: dir }), DEFAULT_AI);
+      expect(classifier).toBeInstanceOf(UnavailableImageClassifier);
+      expect(classifier.name).toBe("unavailable");
+      await expect(classifier.classify(Buffer.from("image"))).rejects.toBeInstanceOf(ClassifierUnavailableError);
+    }
+    expect(logger.error).toHaveBeenCalled();
+    expect(alert).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(alert).mock.calls[0]?.[0]).toMatchObject({ severity: "P1", title: MODELS_MISSING_ALERT_TITLE, body: expect.stringContaining(dir) });
+    // The process-wide instance is the failing one too.
+    expect(imageClassifier(env({ APP_ENV: "prod", MEDIA_MODELS_DIR: dir }))).toBeInstanceOf(UnavailableImageClassifier);
   });
 
   it("chooses ONNX when both files exist and shares one instance per process", async () => {

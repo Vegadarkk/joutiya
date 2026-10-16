@@ -21,8 +21,21 @@ export const PHOTO_TARGET_STATUSES: readonly ListingStatus[] = ["draft", "pendin
  */
 export const AUTO_ATTACH_STATUSES: readonly ListingStatus[] = ["draft", "rejected"];
 
+/**
+ * Listings that take photos only through the owner's save (no auto-attach): a ready upload not on
+ * the listing is shown in the owner's view so the next save attaches it.
+ */
+export const MANUAL_ATTACH_STATUSES: readonly ListingStatus[] = PHOTO_TARGET_STATUSES.filter((status) => !AUTO_ATTACH_STATUSES.includes(status));
+
 /** Live listings must keep at least one photo (readiness `photos_required`). */
 export const LIVE_STATUSES: readonly ListingStatus[] = ["published", "paused", "pending_review"];
+
+/**
+ * Listings whose uploads (text and photos, architecture §5) are kept until retention-purge deletes
+ * them with the listing at its purgeAt (removal + 12 months): never purged early, never deleted by
+ * their owner.
+ */
+export const RETAINED_STATUSES: readonly ListingStatus[] = ["removed"];
 
 /** Photos per listing from the seller type of the listing (D5: individual 10, Pro 20). */
 export function maxPhotosOf(listing: Pick<ListingRecord, "sellerType">): number {

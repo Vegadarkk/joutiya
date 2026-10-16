@@ -29,6 +29,7 @@ function applyFakePatch(current: Record<string, unknown>, patch: Record<string, 
 }
 
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
+vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => true) }));
 vi.mock("@/lib/uploads/storage-gauge", () => ({ recordMediaBytes: vi.fn(async () => null) }));
 vi.mock("@/lib/db/repositories/moderation-decisions", () => ({ recordModerationDecision: vi.fn(async () => "decision-1") }));
 vi.mock("@/lib/db/repositories/uploads", () => ({
@@ -69,7 +70,8 @@ vi.mock("@/lib/db/repositories/listings", () => ({
 
 const { expireUpload, processUpload } = await import("@/lib/media/pipeline");
 const { MemoryObjectStore } = await import("@/lib/storage/memory");
-const { StubImageClassifier } = await import("@/lib/media/classify");
+const { ClassifierUnavailableError, StubImageClassifier, UnavailableImageClassifier } = await import("@/lib/media/classify");
+const { alert } = await import("@/lib/alert");
 const { sharp } = await import("@/lib/media/sharp-setup");
 const { markUploadReady, transitionUpload } = await import("@/lib/db/repositories/uploads");
 const { recordModerationDecision } = await import("@/lib/db/repositories/moderation-decisions");
@@ -256,6 +258,24 @@ describe("processUpload: happy path", () => {
     // No classifier injected: the factory falls back to the stub (no model files in tests).
     expect(await processUpload(record.id, { store })).toMatchObject({ status: "ready" });
     expect(stored(record.id).checks).toEqual({});
+  });
+});
+
+describe("processUpload: checks unavailable (deployed without the models)", () => {
+  it("never marks the photo ready: the run fails (retried, then expired) and publishes nothing", async () => {
+    const record = upload();
+    seed(record, await plainJpeg());
+    const classifier = new UnavailableImageClassifier("/app/models", "prod");
+    await expect(processUpload(record.id, { store, classifier })).rejects.toBeInstanceOf(ClassifierUnavailableError);
+    expect(stored(record.id)).toMatchObject({ status: "processing", checks: {} });
+    expect(markUploadReady).not.toHaveBeenCalled();
+    expect(store.keys("media")).toEqual([]);
+    // The original stays for the retry; the last attempt expires the upload (expireUpload).
+    expect(store.has("quarantine", record.quarantineKey)).toBe(true);
+    expect((fake.listings.get(LISTING_ID) as ListingRecord).photos).toEqual([]);
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({ severity: "P1" }));
+    expect(await expireUpload(record.id, { store, now: () => NOW })).toEqual({ status: "rejected", rejectReason: "expired" });
+    expect(store.keys("quarantine")).toEqual([]);
   });
 });
 

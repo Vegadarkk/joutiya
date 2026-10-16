@@ -29,6 +29,7 @@ import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { MemoryObjectStore } from "@/lib/storage/memory";
 import { expireListings } from "@/worker/jobs/expire-listings";
 import { reminderWindow, sendExpiryReminders } from "@/worker/jobs/listing-expiry-reminders";
+import { purgeQuarantine } from "@/worker/jobs/purge-quarantine";
 import { retentionPurge } from "@/worker/jobs/retention-purge";
 import { capturedMails } from "../auth/helpers";
 import { DAY_MS, api, member, readyPatch, seedReadyUpload, type ListingBody, type Member, type PublishBody } from "../listings/helpers";
@@ -151,7 +152,8 @@ describe("retention-purge", () => {
     expect(result.failed).toBe(0);
 
     const tombstone = (await getListingDocument(gone.id)).data()!;
-    expect(tombstone).toEqual({ status: "purged", categoryId: before.categoryId, purgedAt: Timestamp.fromDate(now), version: before.version + 1 });
+    // updatedAt: the next incremental backup carries the purge (restore writes the tombstone over older captures).
+    expect(tombstone).toEqual({ status: "purged", categoryId: before.categoryId, purgedAt: Timestamp.fromDate(now), version: before.version + 1, updatedAt: Timestamp.fromDate(now) });
     expect(await getListing(gone.id)).toBeNull();
     expect(await getUpload(gone.upload)).toBeNull();
     expect(await getSearchOutbox(gone.id)).toMatchObject({ op: "delete", version: before.version + 1 });
@@ -167,6 +169,24 @@ describe("retention-purge", () => {
     const again = await retentionPurge(new Date(now.getTime() + 1000), { store });
     expect(again.failed).toBe(0);
     expect((await getListingDocument(gone.id)).data()).toEqual(tombstone);
+  });
+
+  it("keeps a removed listing's photos until its own purgeAt: purge-quarantine moves their purgeAt there", async () => {
+    const now = new Date();
+    const removed = await publishedListing("Vélo de ville retiré par son vendeur");
+    const listingPurgeAt = new Date(now.getTime() + 300 * DAY_MS);
+    await setFields(removed.id, { status: "removed", purgeAt: listingPurgeAt });
+    // The upload's own 7-day (or 30-day recheck) date passed long before the listing's purge.
+    await db().collection(COLLECTIONS.uploads).doc(removed.upload).update({ purgeAt: Timestamp.fromDate(new Date(now.getTime() - HOUR_MS)) });
+    const store = new MemoryObjectStore();
+    for (const variant of ["l", "s"] as const) store.seed("media", mediaObjectKey(removed.id, removed.upload, variant), Buffer.from("v"), { contentType: "image/webp" });
+
+    await retentionPurge(now, { store });
+    expect(await getUpload(removed.upload)).not.toBeNull();
+    await purgeQuarantine(now, { store });
+    expect((await getUpload(removed.upload))!.purgeAt).toEqual(listingPurgeAt);
+    expect(store.keys("media").filter((key) => key.includes(removed.id))).toHaveLength(2);
+    expect((await getListing(removed.id))!.photos.map((photo) => photo.id)).toEqual([removed.upload]);
   });
 
   it("deletes contentOps and revealLogs past purgeAt, keeps the recent ones", async () => {

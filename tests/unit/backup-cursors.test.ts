@@ -1,6 +1,6 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { describe, expect, it } from "vitest";
-import { BACKUP_COLLECTIONS, EMPTY_CURSORS, parseCursors, serializeCursors, type BackupCursors } from "@/lib/backup/export";
+import { BACKUP_COLLECTIONS, BACKUP_RETENTION_DAYS, DEFAULT_BACKUP_CONFIG, EMPTY_CURSORS, parseCursors, retainedStoredBytes, serializeCursors, sumRetainedBytes, type BackupCursors } from "@/lib/backup/export";
 import { COLLECTIONS } from "@/lib/db/schemas";
 
 // system/backup (D17): the cursors survive a write/read cycle, and a missing or hand-edited
@@ -15,6 +15,7 @@ const cursors: BackupCursors = {
   full: { next: "auditLogs", after: { auditLogs: "auditLogs/a42", private: "users/u3/private/account" }, cycleStartedAt: new Date("2026-10-10T03:30:00Z"), cycleCompletedAt: new Date("2026-10-09T03:31:00Z") },
   lastRunAt: new Date("2026-10-16T03:30:00Z"),
   lastDate: "2026-10-16",
+  storedBytes: { "2026-10-15": 1_200_000, "2026-10-16": 1_300_000 },
 };
 
 describe("backup cursors", () => {
@@ -49,6 +50,23 @@ describe("backup cursors", () => {
     expect(parsed.full).toEqual({ next: "users", after: { users: "users/u1" }, cycleStartedAt: null, cycleCompletedAt: null });
     expect(parsed.lastRunAt?.getTime()).toBe(20_000);
     expect(parsed.lastDate).toBeNull();
+    expect(parseCursors({ storedBytes: { "2026-10-15": 10, "2026-10-16": -1, "16/10/2026": 3, "2026-10-14": "9", "2026-10-13": 1.5 } }).storedBytes).toEqual({ "2026-10-15": 10 });
+  });
+
+  it("counts the backup bytes still in the private bucket (98-day lifecycle) for the R2 gauge", () => {
+    const now = new Date("2026-10-16T03:30:00Z");
+    const oldest = new Date(now.getTime() - BACKUP_RETENTION_DAYS * 86_400_000).toISOString().slice(0, 10);
+    const gone = new Date(now.getTime() - (BACKUP_RETENTION_DAYS + 1) * 86_400_000).toISOString().slice(0, 10);
+    const stored = { [gone]: 5_000, [oldest]: 100, "2026-10-15": 20, "2026-10-16": 3 };
+    expect(retainedStoredBytes(stored, now)).toEqual({ [oldest]: 100, "2026-10-15": 20, "2026-10-16": 3 });
+    expect(sumRetainedBytes(stored, now)).toBe(123);
+    expect(sumRetainedBytes({}, now)).toBe(0);
+  });
+
+  it("keeps one night's reads well below the daily quota: stop at 75 %, at most 40 % per run", () => {
+    expect(DEFAULT_BACKUP_CONFIG.readsStopRatio).toBe(0.75);
+    expect(DEFAULT_BACKUP_CONFIG.maxRunReads).toBe(20_000);
+    expect(DEFAULT_BACKUP_CONFIG.fullBudget).toBeLessThanOrEqual(DEFAULT_BACKUP_CONFIG.maxRunReads);
   });
 
   it("backs up every collection but the cursors themselves, once", () => {

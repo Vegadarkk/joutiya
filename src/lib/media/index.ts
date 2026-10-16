@@ -10,6 +10,7 @@ export { processImage, toMediaError } from "./process";
 export type { ProcessedImage } from "./process";
 export { dhash, dhashFromGrey, hammingDistance, isImageHash } from "./phash";
 export {
+  ClassifierUnavailableError,
   createImageClassifier,
   DEFAULT_MODELS_DIR,
   imageClassifier,
@@ -20,6 +21,7 @@ export {
   OnnxImageClassifier,
   resetImageClassifier,
   StubImageClassifier,
+  UnavailableImageClassifier,
 } from "./classify";
 export type { FaceBox, ImageClassification, ImageClassifier, ModelName, ModelPaths } from "./classify";
 export { listingMediaPrefix, MEDIA_CACHE_CONTROL, MEDIA_CONTENT_TYPE, mediaObjectKey, photoUrl, quarantineObjectKey } from "./urls";

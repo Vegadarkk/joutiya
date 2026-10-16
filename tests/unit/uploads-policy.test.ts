@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 
-const { AUTO_ATTACH_STATUSES, LIVE_STATUSES, PHOTO_TARGET_STATUSES, maxPhotosOf, toStatusResponse } = await import("@/lib/uploads/policy");
+const { AUTO_ATTACH_STATUSES, LIVE_STATUSES, MANUAL_ATTACH_STATUSES, PHOTO_TARGET_STATUSES, RETAINED_STATUSES, maxPhotosOf, toStatusResponse } = await import("@/lib/uploads/policy");
 const { EDITABLE_STATUSES } = await import("@/lib/listings/service");
 const { MAX_PHOTOS_INDIVIDUAL, MAX_PHOTOS_PRO } = await import("@/lib/contracts/media");
 
@@ -23,6 +23,11 @@ describe("upload policy", () => {
     expect(AUTO_ATTACH_STATUSES).toEqual(["draft", "rejected"]);
     for (const status of LIVE_STATUSES) expect(AUTO_ATTACH_STATUSES).not.toContain(status);
     expect(AUTO_ATTACH_STATUSES).not.toContain("expired");
+  });
+
+  it("leaves the other editable listings to the owner's save, and retains a removed listing's uploads", () => {
+    expect(MANUAL_ATTACH_STATUSES).toEqual(["pending_review", "published", "paused", "expired"]);
+    expect(RETAINED_STATUSES).toEqual(["removed"]);
   });
 
   it("allows 10 photos to an individual and 20 to a Pro (D5)", () => {

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/auth/client";
 import type { UploadStatusResponse } from "@/lib/contracts/media";
-import { pollUpload } from "@/lib/listings/client/api";
+import { pollDelay, pollUpload, UPLOAD_POLL_DELAYS_MS } from "@/lib/listings/client/api";
 import type { PreparedImage } from "@/lib/listings/client/prepare-image";
 import { LEAVE_REASON, uploadErrorCode, uploadListingPhoto, type PhotoUploadPhase } from "@/lib/listings/client/upload";
 import { createUploadRunner } from "@/lib/listings/client/store";
@@ -158,29 +158,45 @@ describe("uploadListingPhoto", () => {
 });
 
 describe("pollUpload", () => {
-  it("polls every interval until the pipeline answers", async () => {
-    const answers: UploadStatusResponse[] = [{ status: "processing" }, { status: "processing" }, { status: "ready", photo: PHOTO }];
+  it("backs off 1 s, 2 s, 3 s, then 5 s until the pipeline answers", async () => {
+    const answers: UploadStatusResponse[] = [{ status: "processing" }, { status: "processing" }, { status: "processing" }, { status: "processing" }, { status: "ready", photo: PHOTO }];
     const waits: number[] = [];
     const fetchStatus = vi.fn(async () => answers.shift()!);
-    const result = await pollUpload("upload0001", { intervalMs: 2000, maxMs: 60_000, sleep: async (ms) => void waits.push(ms), fetchStatus });
+    const result = await pollUpload("upload0001", { maxMs: 60_000, sleep: async (ms) => void waits.push(ms), fetchStatus });
     expect(result).toEqual({ status: "ready", photo: PHOTO });
-    expect(fetchStatus).toHaveBeenCalledTimes(3);
-    expect(waits).toEqual([2000, 2000, 2000]);
+    expect(fetchStatus).toHaveBeenCalledTimes(5);
+    expect(waits).toEqual([1000, 2000, 3000, 5000, 5000]);
+    expect(UPLOAD_POLL_DELAYS_MS).toEqual([1000, 2000, 3000, 5000]);
+    expect([0, 1, 2, 3, 4, 40].map((attempt) => pollDelay(attempt))).toEqual([1000, 2000, 3000, 5000, 5000, 5000]);
   });
 
-  it("gives up after the deadline and returns the last processing answer", async () => {
+  it("gives up after the deadline (60 s, 14 reads instead of 30) and returns the last processing answer", async () => {
     vi.useFakeTimers();
     try {
       const fetchStatus = vi.fn(async (): Promise<UploadStatusResponse> => ({ status: "processing" }));
+      const waits: number[] = [];
       const sleep = async (ms: number) => {
+        waits.push(ms);
         vi.advanceTimersByTime(ms);
       };
-      const result = await pollUpload("upload0001", { intervalMs: 2000, maxMs: 60_000, sleep, fetchStatus });
+      const result = await pollUpload("upload0001", { sleep, fetchStatus });
       expect(result).toEqual({ status: "processing" });
-      expect(fetchStatus).toHaveBeenCalledTimes(30);
+      expect(fetchStatus).toHaveBeenCalledTimes(14);
+      expect(waits.reduce((sum, ms) => sum + ms, 0)).toBe(61_000);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("takes a custom schedule, and stops at once when aborted", async () => {
+    const waits: number[] = [];
+    const answers: UploadStatusResponse[] = [{ status: "processing" }, { status: "rejected", rejectReason: "nsfw" }];
+    const result = await pollUpload("upload0001", { delaysMs: [10], sleep: async (ms) => void waits.push(ms), fetchStatus: async () => answers.shift()! });
+    expect(result).toEqual({ status: "rejected", rejectReason: "nsfw" });
+    expect(waits).toEqual([10, 10]);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(pollUpload("upload0001", { signal: controller.signal })).rejects.toThrow("aborted");
   });
 });
 

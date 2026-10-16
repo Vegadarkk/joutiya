@@ -121,10 +121,11 @@ export async function writeReminderCursor(cursor: ReminderCursor, now = new Date
 /**
  * What stays of a purged listing (architecture §5 "Fin de vie"): no text, criteria, photos or
  * owner. It does not parse as a listing, so every read answers 404 (D14), and the id is never
- * reused. `version` keeps the search outbox ordering.
+ * reused. `version` keeps the search outbox ordering; `updatedAt` (= purgedAt) puts the purge in
+ * the next incremental backup, whose restore then writes the tombstone over the older captures.
  */
 export const listingTombstoneSchema = z
-  .object({ status: z.literal("purged"), categoryId: z.string().min(1).max(40).optional(), purgedAt: z.date(), version: z.number().int().min(0) })
+  .object({ status: z.literal("purged"), categoryId: z.string().min(1).max(40).optional(), purgedAt: z.date(), version: z.number().int().min(0), updatedAt: z.date() })
   .strict();
 export type ListingTombstone = z.infer<typeof listingTombstoneSchema>;
 
@@ -136,8 +137,8 @@ export async function purgeListing(id: string, purgeable: (current: ListingRecor
   return db().runTransaction(async (tx: Transaction) => {
     const current = await getListingTx(tx, id);
     if (!current || !purgeable(current)) return null;
-    const tombstone = listingTombstoneSchema.parse({ status: "purged", ...(current.categoryId ? { categoryId: current.categoryId } : {}), purgedAt: now, version: current.version + 1 });
-    tx.set(listingRef(id), { ...tombstone, purgedAt: Timestamp.fromDate(now) });
+    const tombstone = listingTombstoneSchema.parse({ status: "purged", ...(current.categoryId ? { categoryId: current.categoryId } : {}), purgedAt: now, version: current.version + 1, updatedAt: now });
+    tx.set(listingRef(id), { ...tombstone, purgedAt: Timestamp.fromDate(now), updatedAt: Timestamp.fromDate(now) });
     void consume("firestore.writes", 1);
     enqueueSearchOutboxTx(tx, id, "delete", tombstone.version, now);
     return tombstone;

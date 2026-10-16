@@ -1,7 +1,9 @@
 import "server-only";
 import type { OwnerListing, OwnerListingSummary, OwnerPhoto } from "@/lib/contracts/listings";
+import type { UploadStatus } from "@/lib/contracts/media";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import { listUploadsByTarget, type UploadRecord } from "@/lib/db/repositories/uploads";
+import { MANUAL_ATTACH_STATUSES } from "@/lib/uploads/policy";
 import { canRenew } from "./lifecycle";
 
 // Owner's view of a listing (contracts OwnerListing / OwnerListingSummary): the document's fields
@@ -10,11 +12,29 @@ import { canRenew } from "./lifecycle";
 
 const iso = (date: Date | undefined): string | null => (date ? date.toISOString() : null);
 
-/** Photos in wizard order: the listing's ready photos first, then uploads still processing, then the rejected ones. */
-export function mergePhotos(listing: Pick<ListingRecord, "photos">, uploads: readonly UploadRecord[]): OwnerPhoto[] {
+/** Uploads the view needs besides the attached photos (those come from the listing itself). */
+const PENDING_STATUSES: readonly UploadStatus[] = ["signed", "processing", "rejected"];
+
+/**
+ * A ready upload not on the listing waits for the owner's save: listings in MANUAL_ATTACH_STATUSES
+ * (published, paused, expired, held) never get a photo from the pipeline. Under a legal hold a
+ * detached photo keeps its document as evidence: it is not offered again.
+ */
+function showsUnattachedReady(listing: Pick<ListingRecord, "status" | "legalHold">): boolean {
+  return MANUAL_ATTACH_STATUSES.includes(listing.status) && listing.legalHold.length === 0;
+}
+
+/**
+ * Photos in wizard order: the listing's ready photos first, then the other uploads by creation
+ * date. A ready upload that waits for the owner's save reads as `processing`: the wizard polls it,
+ * gets it ready and puts it in the photo order of the next save (an unsaved change, not a photo
+ * the listing already has). Signed and processing uploads read as such, rejected ones with their reason.
+ */
+export function mergePhotos(listing: Pick<ListingRecord, "photos" | "status" | "legalHold">, uploads: readonly UploadRecord[]): OwnerPhoto[] {
   const photos: OwnerPhoto[] = listing.photos.map((photo) => ({ id: photo.id, status: "ready", w: photo.w, h: photo.h, blurhash: photo.blurhash }));
   const attached = new Set(listing.photos.map((photo) => photo.id));
-  const pending = uploads.filter((upload) => !attached.has(upload.id) && upload.status !== "ready").sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const unattachedReady = showsUnattachedReady(listing);
+  const pending = uploads.filter((upload) => !attached.has(upload.id) && (upload.status !== "ready" || unattachedReady)).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   for (const upload of pending) {
     if (upload.status === "rejected") photos.push({ id: upload.id, status: "rejected", ...(upload.rejectReason ? { rejectReason: upload.rejectReason } : {}) });
     else photos.push({ id: upload.id, status: upload.status === "signed" ? "signed" : "processing" });
@@ -72,8 +92,11 @@ export function toOwnerSummary(listing: ListingRecord, now = new Date()): OwnerL
   };
 }
 
-/** Owner view with the uploads of the listing loaded. */
+/**
+ * Owner view with the uploads of the listing loaded: the pending ones only, plus the ready ones
+ * where a ready upload may wait for the owner's save (attached ones are read too, then skipped).
+ */
 export async function ownerListingView(listing: ListingRecord): Promise<OwnerListing> {
-  const uploads = await listUploadsByTarget(listing.id);
+  const uploads = await listUploadsByTarget(listing.id, showsUnattachedReady(listing) ? undefined : PENDING_STATUSES);
   return toOwnerListing(listing, uploads);
 }

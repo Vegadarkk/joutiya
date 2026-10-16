@@ -17,6 +17,7 @@ import { logger } from "@/lib/logging/logger";
 import { mediaObjectKey } from "@/lib/media/urls";
 import { isDegraded } from "@/lib/quota";
 import { isStorageNotConfigured, objectStore, type ObjectStore } from "@/lib/storage";
+import { RETAINED_STATUSES } from "@/lib/uploads/policy";
 import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 
 // Hourly at :20 (design §4, architecture §6 "Les objets non traités sont purgés après 24 h"):
@@ -26,8 +27,11 @@ import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 //    (the pipeline deletes it at once; this catches failed deletions and a PUT sent after
 //    complete), swept in creation order behind a cursor (system/purgeQuarantine);
 // 3. documents past purgeAt (7 days) not attached to a listing: objects and document deleted. An
-//    attached photo lives with its listing: its purgeAt moves 30 days on. Listings removed or
-//    purged are left to retention-purge, and a legal hold keeps everything.
+//    attached photo lives with its listing: its purgeAt moves 30 days on. The uploads of a removed
+//    listing are retention-purge's (deleted with the listing at its purgeAt, removal + 12 months):
+//    their purgeAt moves to the listing's. A legal hold keeps everything, rechecked daily. A
+//    purged listing (tombstone) does not read as a listing: its uploads are orphans, deleted.
+//    Every skipped upload gets a later purgeAt, so no run reads it again before then.
 // Steps 2 and 3 never mark anything before its objects go: a storage failure leaves the upload
 // for the next run.
 
@@ -37,11 +41,12 @@ export const REJECTED_SWEEP_DELAY_MS = 3_600_000;
 /** First sweep (no cursor yet): back to the oldest upload that can still exist. */
 export const REJECTED_SWEEP_LOOKBACK_MS = 8 * 24 * 3_600_000;
 export const ATTACHED_RECHECK_MS = 30 * 24 * 3_600_000;
+/** Uploads of a listing under a legal hold: looked at again a day later (a lifted hold is caught within a day). */
+export const HOLD_RECHECK_MS = 24 * 3_600_000;
+/** Uploads of a removed listing past its purgeAt (retention-purge runs nightly): looked at again a day later. */
+export const RETAINED_RECHECK_MS = 24 * 3_600_000;
 export const PURGE_QUARANTINE_BATCH = 200;
 export const PURGE_PAGES = 5;
-
-/** Listings whose uploads retention-purge deletes (with their objects). */
-const RETAINED_ELSEWHERE: ReadonlySet<ListingRecord["status"]> = new Set(["removed", "purged"]);
 
 export interface PurgeQuarantineResult {
   /** Stale signed/processing uploads expired (step 1). */
@@ -52,7 +57,7 @@ export interface PurgeQuarantineResult {
   purged: number;
   /** Attached photos whose purgeAt moved on (step 3). */
   extended: number;
-  /** Past purgeAt but left alone: legal hold, or removed listing (retention-purge). */
+  /** Past purgeAt but left alone (purgeAt moved on): legal hold, or removed listing (retention-purge). */
   skipped: number;
   failed: number;
 }
@@ -102,6 +107,16 @@ async function sweepRejected(store: ObjectStore, now: Date, result: PurgeQuarant
   if (cursor) await writeRejectedSweepCursor(cursor, now);
 }
 
+/**
+ * Next look at an upload of a removed listing: the listing's purgeAt (retention-purge deletes both
+ * then), at least a day ahead (the nightly job may not have run yet); 30 days without a purgeAt.
+ */
+export function retainedUntil(listing: Pick<ListingRecord, "purgeAt">, now: Date): Date {
+  const floor = now.getTime() + RETAINED_RECHECK_MS;
+  if (!listing.purgeAt) return new Date(now.getTime() + ATTACHED_RECHECK_MS);
+  return new Date(Math.max(listing.purgeAt.getTime(), floor));
+}
+
 async function purgeExpiredDocuments(store: ObjectStore, now: Date, result: PurgeQuarantineResult): Promise<void> {
   let page: PurgeCursor | undefined;
   let freedBytes = 0;
@@ -112,7 +127,11 @@ async function purgeExpiredDocuments(store: ObjectStore, now: Date, result: Purg
     for (const upload of uploads) {
       const listing = listings.get(upload.targetId);
       try {
-        if (listing && (listing.legalHold.length > 0 || RETAINED_ELSEWHERE.has(listing.status))) {
+        if (listing && listing.legalHold.length > 0) {
+          await updateUpload(upload.id, { purgeAt: new Date(now.getTime() + HOLD_RECHECK_MS) }, now);
+          result.skipped += 1;
+        } else if (listing && RETAINED_STATUSES.includes(listing.status)) {
+          await updateUpload(upload.id, { purgeAt: retainedUntil(listing, now) }, now);
           result.skipped += 1;
         } else if (listing?.photos.some((photo) => photo.id === upload.id)) {
           await updateUpload(upload.id, { purgeAt: new Date(now.getTime() + ATTACHED_RECHECK_MS) }, now);
