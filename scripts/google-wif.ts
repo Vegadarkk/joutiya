@@ -1,8 +1,9 @@
 // Keyless Google access (§9, guide phase 1, step 9): Workload Identity Federation with X.509
 // certificates for the VM's web and worker, and with GitHub's OIDC tokens for the staging CI
-// deployer. Runs on the owner's PC (Cody): the CA key never leaves it, and gcloud signs in through a
-// configuration of its own (~/.joutiya/gcloud), so the gcloud setup of his other projects stays as
-// it is. Dry run unless --apply; nothing here prints a token or a key.
+// deployer. Runs on the machine that holds the CA (the owner's PC2, by his agent): the CA key never
+// leaves it, and gcloud signs in through a configuration of its own (~/.joutiya/gcloud), so the
+// gcloud setup of his other projects stays as it is. Dry run unless --apply; nothing here prints a
+// token or a key.
 //
 //   node scripts/google-wif.ts ca [--new]
 //       the CA (EC P-256, 10 years) in ~/.joutiya/wif-ca, once; afterwards its fingerprint. --new
@@ -18,9 +19,11 @@
 //   node scripts/google-wif.ts test <staging|prod>
 //       one-day certificates signed here prove the chain end to end: a Firestore read and a custom
 //       token (web), a Firestore read and a Firebase Auth admin call (worker). Their keys are deleted.
-//
-// The VM's own certificates: `node scripts/oracle-vm.ts wif <staging|prod> --apply` (keys made on
-// the VM, requests signed here with the CA).
+//   node scripts/google-wif.ts sign <file>
+//       signs the VM's requests, the `request joutiya-<env>-<service> <base64>` lines printed by
+//       `oracle-vm.ts wif <env> --apply` (keys made on the VM), for 365 days; prints one
+//       `certificate ...` line each, for `oracle-vm.ts wif <env> --certificates=<file> --apply`.
+//       Requests and certificates are public: they travel as text, the keys never do.
 
 import { spawnSync } from "node:child_process";
 import { X509Certificate, randomBytes } from "node:crypto";
@@ -76,7 +79,7 @@ export function githubProviderName(projectNumber: string): string {
   return `${poolPath(projectNumber, GITHUB_POOL)}/providers/${GITHUB_PROVIDER}`;
 }
 
-/** The CA and the gcloud configuration live there on the owner's PC (JOUTIYA_WIF_HOME: tests only). */
+/** The CA and the gcloud configuration live there on the CA machine (JOUTIYA_WIF_HOME: tests only). */
 export function wifHome(): string {
   return process.env.JOUTIYA_WIF_HOME?.trim() || join(homedir(), ".joutiya");
 }
@@ -231,11 +234,58 @@ export function signCsr(input: { csr: string; subject: string; days: number; ca:
   return pem;
 }
 
+/** PEM of a base64 DER block. */
+export function pemBlock(label: "CERTIFICATE" | "CERTIFICATE REQUEST", der: string): string {
+  return [`-----BEGIN ${label}-----`, ...(der.match(/.{1,64}/g) ?? []), `-----END ${label}-----`, ""].join("\n");
+}
+
+/** Base64 DER of a PEM block. */
+export function derBase64(pem: string): string {
+  return pem.replace(/-----(?:BEGIN|END) [A-Z ]+-----/g, "").replace(/\s+/g, "");
+}
+
 /** The request the VM prints as `csr <base64 DER>`, as PEM. */
 export function csrFromOutput(output: string): string {
   const match = /^csr ([A-Za-z0-9+/]{100,2000}={0,2})$/m.exec(output);
   if (!match?.[1]) throw new Error("the VM sent no certificate request");
-  return ["-----BEGIN CERTIFICATE REQUEST-----", ...(match[1].match(/.{1,64}/g) ?? []), "-----END CERTIFICATE REQUEST-----", ""].join("\n");
+  return pemBlock("CERTIFICATE REQUEST", match[1]);
+}
+
+export interface WifLine {
+  env: DeployedEnv;
+  service: WifService;
+  subject: string;
+  /** Base64 DER of the request or of the certificate. */
+  der: string;
+}
+
+const WIF_LINE = /^(request|certificate) joutiya-(staging|prod)-(web|worker) ([A-Za-z0-9+/]{100,4000}={0,2})$/gm;
+
+/**
+ * The `request` or `certificate` lines of a text relayed by hand: other lines (and the other kind)
+ * are ignored, a subject given twice is refused.
+ */
+export function wifLines(text: string, kind: "request" | "certificate"): WifLine[] {
+  const lines: WifLine[] = [];
+  for (const match of text.replace(/\r\n/g, "\n").matchAll(WIF_LINE)) {
+    if (match[1] !== kind) continue;
+    const env = match[2] as DeployedEnv;
+    const service = match[3] as WifService;
+    const subject = subjectName(env, service);
+    if (lines.some((line) => line.subject === subject)) throw new Error(`${subject} is given twice`);
+    lines.push({ env, service, subject, der: match[4] as string });
+  }
+  return lines;
+}
+
+/** Signs every request line of `text` (LEAF_DAYS days) and returns the certificate lines. */
+export function signRequests(text: string, ca: CaFiles): string[] {
+  const requests = wifLines(text, "request");
+  if (requests.length === 0) throw new Error("no `request joutiya-<env>-<web|worker> <base64>` line found");
+  return requests.map(({ subject, der }) => {
+    const certificate = signCsr({ csr: pemBlock("CERTIFICATE REQUEST", der), subject, days: LEAF_DAYS, ca });
+    return `certificate ${subject} ${derBase64(certificate)}`;
+  });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -641,7 +691,8 @@ function gcloud(args: string[], capture: boolean): { status: number | null; stdo
   return { status: result.status, stdout: result.stdout ?? "" };
 }
 
-function accessToken(): string {
+/** Access token of the gcloud sign-in made by `login` (also used by scripts/legal-config.ts). */
+export function gcloudAccessToken(): string {
   const { status, stdout } = gcloud(["auth", "print-access-token"], true);
   const token = stdout.trim();
   if (status !== 0 || !/^[\w.-]{20,}$/.test(token)) throw new Error(`no gcloud sign-in in ${gcloudConfigDir()}: run \`node scripts/google-wif.ts login\` first`);
@@ -746,11 +797,17 @@ async function main(): Promise<void> {
     return;
   }
   const perEnv = action === "setup" || action === "test";
-  if (!action || !["ca", "login", "setup", "test"].includes(action) || perEnv !== (env !== undefined) || (perEnv && !(DEPLOYED_ENVS as readonly string[]).includes(env ?? ""))) {
-    throw new Error("usage: scripts/google-wif.ts <ca [--new]|login|setup <staging|prod> [--apply]|test <staging|prod>>");
+  const argument = perEnv || action === "sign";
+  if (!action || !["ca", "login", "setup", "test", "sign"].includes(action) || argument !== (env !== undefined) || (perEnv && !(DEPLOYED_ENVS as readonly string[]).includes(env ?? ""))) {
+    throw new Error("usage: scripts/google-wif.ts <ca [--new]|login|setup <staging|prod> [--apply]|test <staging|prod>|sign <file>>");
   }
   if (action === "ca") return createCa(caFiles(), args.includes("--new"));
   if (action === "login") return login();
+  if (action === "sign") {
+    console.log(signRequests(readFileSync(env as string, "utf8"), caFiles()).join("\n"));
+    console.log(`\nValid ${LEAF_DAYS} days. These lines are public: send them back as they are.`);
+    return;
+  }
 
   const raw: unknown = JSON.parse(readFileSync(new URL("../infra/targets.json", import.meta.url), "utf8"));
   const errors = validateTargets(raw);
@@ -761,7 +818,7 @@ async function main(): Promise<void> {
 
   const ca = caFiles();
   readCa(ca);
-  const google = new Google(accessToken(), args.includes("--apply"));
+  const google = new Google(gcloudAccessToken(), args.includes("--apply"));
   await setup(google, { env: deployed, ...recorded(targets, deployed), caPem: readFileSync(ca.cert, "utf8"), repositoryId: targets.shared.github.repositoryId });
   console.log(google.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
 }
