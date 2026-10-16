@@ -138,7 +138,7 @@ describe("backup and restore round trip", () => {
     const result = await runBackup({ db: source, store, recipient, now });
     expect(result).toMatchObject({ status: "done", truncated: false, quotaStopped: false });
     expect(result.counts.full).toMatchObject({ users: 2, private: 2, listings: 3, auditLogs: 3, emailIndex: 1, staff: 0, uploads: 0 });
-    expect(result.counts.incremental).toEqual({ users: 2, emailIndex: 1, staff: 0, listings: 3, uploads: 0, moderationDecisions: 0 });
+    expect(result.counts.incremental).toEqual({ users: 2, emailIndex: 1, staff: 0, listings: 3, uploads: 0, moderationDecisions: 0, favorites: 0, savedSearches: 0 });
     const date = now.toISOString().slice(0, 10);
     expect(store.keys("private")).toContain(`backups/${date}/manifest.json.age`);
     expect(store.keys("private")).toContain(`backups/${date}/full/private.ndjson.gz.age`);

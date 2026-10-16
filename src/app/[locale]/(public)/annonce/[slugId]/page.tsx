@@ -3,9 +3,10 @@ import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { CalendarDays, MapPin } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { Container } from "@/components/layout/container";
 import { AdSlot } from "@/components/listing/ad-slot";
-import { Breadcrumb, searchHref } from "@/components/listing/breadcrumb";
+import { Breadcrumb, landingHref } from "@/components/listing/breadcrumb";
 import { ContactBar } from "@/components/listing/contact-bar";
 import { CriteriaSection } from "@/components/listing/criteria-grid";
 import { Gallery } from "@/components/listing/gallery";
@@ -28,6 +29,8 @@ import { photoUrl } from "@/lib/listings/client/photo-url";
 import { listingJsonLd } from "@/lib/listings/jsonld";
 import { getPublishedBySlugId, getSeller, listingPath, toPublicListing, type PublicListing, type PublicSeller } from "@/lib/listings/public";
 import { logger } from "@/lib/logging/logger";
+import { isIndexable } from "@/lib/search/document";
+import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
 import { mediaBaseUrl } from "@/lib/storage/keys";
 
 // Public listing page (design D1, D10, D14, §5, §8): ISR, rendered on the first visit and kept 5
@@ -49,6 +52,8 @@ interface Loaded {
   /** Server side only: the seller lookup. Never rendered, never passed to a client component. */
   ownerUid: string;
   redirect: boolean;
+  /** In the search index (D9), so counted by its deeper category landing pages. */
+  indexed: boolean;
 }
 
 /** One Firestore read per render, shared by generateMetadata and the page. */
@@ -57,7 +62,7 @@ const load = cache(async (segment: string): Promise<Loaded | null> => {
   if (!found) return null;
   const listing = toPublicListing(found.listing, found.state, found.canonicalSlugId);
   if (!listing) return null;
-  return { listing, ownerUid: found.listing.ownerUid, redirect: found.redirect };
+  return { listing, ownerUid: found.listing.ownerUid, redirect: found.redirect, indexed: isIndexable(found.listing) };
 });
 
 async function sellerOf(ownerUid: string): Promise<PublicSeller | null> {
@@ -124,7 +129,7 @@ export default async function ListingPage({ params }: { params: Params }) {
   const region = regionByCode(listing.location.regionCode);
   type CategoryKey = Parameters<typeof names>[0];
   const categoryName = category ? names(`${category.id}.name` as CategoryKey) : undefined;
-  const subcategoryName = category && subcategory ? names(`${category.id}.sub.${subcategory.id}` as CategoryKey) : undefined;
+  const subcategoryName = category && subcategory?.categoryId === category.id ? names(`${category.id}.sub.${subcategory.id}` as CategoryKey) : undefined;
   const cityLabel = city ? cityName(city, locale) : undefined;
   const regionLabel = region ? regionName(region, locale) : undefined;
   // The district is the seller's text: isolated, so a Latin name keeps its place in Arabic (and the reverse).
@@ -136,18 +141,34 @@ export default async function ListingPage({ params }: { params: Params }) {
   const published = listing.state === "published";
 
   const jsonLd = listingJsonLd({ listing, url: canonicalUrl, images, categoryName: subcategoryName ?? categoryName, cityName: cityLabel, regionName: regionLabel });
+  // Crawlable steps: the category landing pages (/recherche is robots-disallowed). /c/{category}
+  // always answers 200, a deeper page 404s without listings (D15): those are linked only while this
+  // listing counts in them (indexed, so not paused, sold or expired), and with a known subcategory.
+  const deep = found.indexed;
+  const landingSubcategory = subcategoryName ? listing.subcategoryId : undefined;
+  const trail = [
+    ...(categoryName ? [{ label: categoryName, href: landingHref({ category: listing.categoryId }) }] : []),
+    ...(deep && categoryName && subcategoryName ? [{ label: subcategoryName, href: landingHref({ category: listing.categoryId, subcategory: landingSubcategory }) }] : []),
+    ...(deep && categoryName && cityLabel
+      ? [{ label: cityLabel, href: landingHref({ category: listing.categoryId, subcategory: landingSubcategory, city: listing.location.citySlug }) }]
+      : []),
+  ];
+  const breadcrumbLd = breadcrumbJsonLd([
+    { name: t("home"), url: `${CANONICAL_ORIGIN}/${locale}` },
+    ...trail.map((step) => ({ name: step.label, url: `${CANONICAL_ORIGIN}/${locale}${step.href}` })),
+    { name: listing.title },
+  ]);
 
   return (
     <>
       <JsonLd data={jsonLd} />
+      {breadcrumbLd ? <JsonLd data={breadcrumbLd} /> : null}
       <Container className="flex flex-col gap-5 pt-3 pb-12 sm:pt-5 lg:pb-16">
         <Breadcrumb
           current={listing.title}
           items={[
             { label: t("home"), href: "/" },
-            ...(categoryName ? [{ label: categoryName, href: searchHref({ category: listing.categoryId }) }] : []),
-            ...(subcategoryName ? [{ label: subcategoryName, href: searchHref({ category: listing.categoryId, subcategory: listing.subcategoryId }) }] : []),
-            ...(cityLabel ? [{ label: cityLabel, href: searchHref({ subcategory: listing.subcategoryId, city: listing.location.citySlug }) }] : []),
+            ...trail.map((step) => ({ label: step.label, href: step.href })),
           ]}
         />
         <ListingStatusBanner state={listing.state} />
@@ -174,6 +195,7 @@ export default async function ListingPage({ params }: { params: Params }) {
                 <time dateTime={listing.publishedAt}>{t("publishedOn", { date: formatDate(new Date(listing.publishedAt), locale) })}</time>
               </span>
             </div>
+            {published ? <FavoriteButton listingId={listing.id} variant="inline" className="self-start" /> : null}
           </header>
 
           <aside aria-label={t("sellerLabel")} className="min-w-0 lg:[grid-area:aside]">

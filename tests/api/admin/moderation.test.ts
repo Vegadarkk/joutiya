@@ -6,6 +6,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 // decision), approve / reject of a listing held by the pre-moderation, the decision record
 // (art. 17 DSA), the audit log, the search outbox and the seller mails (captured).
 
+// Search fast lane off: these tests read the searchOutbox entries it would drain (phase 4).
+vi.mock("@/lib/search/queue", () => ({ notifySearchIndex: vi.fn(async () => undefined) }));
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/security/turnstile", () => ({ verifyTurnstile: vi.fn(async () => ({ ok: true, codes: [] })) }));
 vi.mock("@/lib/rate-limit/limiter", { spy: true });

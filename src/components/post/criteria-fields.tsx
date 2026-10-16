@@ -175,8 +175,10 @@ interface NumberInputProps {
 /** Integer input (numeric keypad) with the unit as a suffix; negatives only when the minimum allows them. */
 export function NumberInput({ value, min, max, unit, onChange, ...aria }: NumberInputProps) {
   const allowNegative = min !== undefined && min < 0;
+  // The whole field is LTR (digits, then the unit at the end): with an RTL wrapper the unit's end-3
+  // would sit on the left, over the digits of the LTR input.
   return (
-    <div className="relative">
+    <div className="relative" dir="ltr">
       <Input
         type="text"
         inputMode={allowNegative ? "text" : "numeric"}

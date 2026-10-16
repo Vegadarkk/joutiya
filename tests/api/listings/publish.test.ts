@@ -4,6 +4,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 // slugId, url, searchOutbox, contentOps, mail), the 422 blockers (readiness and pre-moderation),
 // the hold to pending_review with its statement, the 5-per-day limiter and the IP escalation.
 
+// Search fast lane off: these tests read the searchOutbox entries it would drain (phase 4).
+vi.mock("@/lib/search/queue", () => ({ notifySearchIndex: vi.fn(async () => undefined) }));
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/rate-limit/limiter", { spy: true });
 vi.mock("@/lib/security/turnstile", async (importOriginal) => ({

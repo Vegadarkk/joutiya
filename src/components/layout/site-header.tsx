@@ -10,6 +10,9 @@ import { IntentLink } from "./intent-link";
 import { LocaleSwitcher } from "./locale-switcher";
 import { Logo } from "./logo";
 
+// Every header control is a 44 px touch target (logo link included). The header search hides on
+// pages whose main content has its own search form (home, /recherche): never two fields at once.
+
 export function SiteHeader({ locale }: { locale: string }) {
   const t = useTranslations("Nav");
   // Opaque cream, like the footer: the light logo sits on a cream-200 plate, so a see-through tint would outline it.
@@ -28,8 +31,15 @@ export function SiteHeader({ locale }: { locale: string }) {
           </Link>
         </Button>
 
-        {/* Named: the home page has a second search landmark (its search panel). */}
-        <form action={`/${locale}/recherche`} method="get" role="search" aria-label={t("searchLabel")} className="relative hidden min-w-0 flex-1 md:block">
+        {/* Named: the home page has a second search landmark (its search panel). Hidden where the
+            page shows its own search bar (home, /recherche): one search field at a time. */}
+        <form
+          action={`/${locale}/recherche`}
+          method="get"
+          role="search"
+          aria-label={t("searchLabel")}
+          className="relative hidden min-w-0 flex-1 md:block [:root:has(#main_[role=search])_&]:hidden"
+        >
           <label htmlFor="header-search" className="sr-only">
             {t("searchLabel")}
           </label>
@@ -45,7 +55,7 @@ export function SiteHeader({ locale }: { locale: string }) {
           />
         </form>
 
-        <div className="ms-auto flex items-center gap-1 md:ms-0">
+        <div className="ms-auto flex items-center gap-1 *:min-w-11">
           <LocaleSwitcher />
           <Button asChild variant="ghost" size="icon" className="md:hidden">
             <Link href="/deposer" aria-label={t("post")}>

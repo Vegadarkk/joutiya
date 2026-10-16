@@ -37,11 +37,7 @@
     "subtitle": "Des petites annonces entre particuliers et professionnels, de Tanger à Dakhla.",
     "searchLabel": "Que cherchez-vous ?",
     "searchPlaceholder": "Téléphone, vélo, appartement…",
-    "cityLabel": "Ville ou région",
-    "cityPlaceholder": "Toute la région",
     "submit": "Rechercher",
-    "openingTitle": "Joutiya ouvre bientôt",
-    "openingBody": "Le dépôt d'annonces et la recherche arrivent dans les prochaines semaines. Le site que vous voyez est en préparation.",
     "pillars": {
       "free": {
         "title": "Déposer est gratuit",
@@ -55,13 +51,34 @@
         "title": "Des échanges sûrs",
         "body": "Messagerie interne, signalement en un clic, numéro jamais affiché en clair."
       }
+    },
+    "categories": {
+      "title": "Parcourir les catégories"
+    },
+    "featured": {
+      "previous": "Annonces À la Une précédentes",
+      "next": "Annonces À la Une suivantes"
+    },
+    "recent": {
+      "title": "Annonces récentes",
+      "all": "Voir toutes les annonces"
     }
   },
   "Search": {
-    "title": "Recherche",
-    "emptyTitle": "La recherche ouvre bientôt",
-    "emptyBody": "Les annonces apparaîtront ici dès l'ouverture du dépôt.",
-    "backHome": "Revenir à l'accueil"
+    "bar": {
+      "label": "Rechercher des annonces",
+      "queryLabel": "Que recherchez-vous ?",
+      "queryPlaceholder": "Téléphone, vélo, appartement…",
+      "submit": "Rechercher"
+    },
+    "location": {
+      "label": "Ville ou région",
+      "all": "Tout le Maroc",
+      "wholeRegion": "Toute la région",
+      "results": "Villes et régions",
+      "noMatch": "Aucune ville ni région ne correspond à « {query} ».",
+      "clear": "Effacer le lieu"
+    }
   },
   "Private": {
     "postTitle": "Le dépôt d'annonces ouvre bientôt",
@@ -310,7 +327,9 @@
       "account": "Mon compte",
       "settings": "Mes paramètres",
       "verifications": "Vérifications",
-      "signOut": "Déconnexion"
+      "signOut": "Déconnexion",
+      "favorites": "Mes favoris",
+      "savedSearches": "Mes recherches"
     },
     "errors": {
       "invalid_body": "Certaines informations sont incorrectes. Vérifiez le formulaire, puis réessayez.",
@@ -363,6 +382,11 @@
       "phone_required": "Vérifiez votre numéro de téléphone pour afficher ce moyen de contact.",
       "listing_unavailable": "Cette annonce n'est plus disponible.",
       "reveal_not_allowed": "Le numéro ne peut pas être affiché pour le moment. Vérifiez votre adresse e-mail ou réessayez plus tard.",
+      "search_unavailable": "La recherche est momentanément indisponible. Réessayez dans quelques instants.",
+      "favorite_limit": "Vous avez atteint le nombre maximal de favoris (300). Retirez-en quelques-uns pour en ajouter d'autres.",
+      "saved_search_limit": "Vous avez déjà 10 recherches sauvegardées. Supprimez-en une pour en ajouter une autre.",
+      "saved_search_exists": "Cette recherche est déjà sauvegardée.",
+      "invalid_token": "Ce lien n'est plus valide.",
       "upload_limit": "Trop de photos ont été envoyées pour cette annonce, photos refusées comprises. Supprimez les photos refusées pour en ajouter d'autres, ou patientez : elles sont effacées automatiquement 7 jours après leur envoi.",
       "quota_exhausted": "Le dépôt et la modification d'annonces sont momentanément suspendus : la limite quotidienne de notre service est atteinte. Votre annonce est conservée ; réessayez après 9 h (heure du Maroc)."
     },
@@ -2025,7 +2049,11 @@
     },
     "photos": "{count, plural, one {# photo} other {# photos}}",
     "pro": "Pro",
-    "noPhoto": "Pas de photo"
+    "noPhoto": "Pas de photo",
+    "featured": "À la Une · Sponsorisé",
+    "featuredInfo": "Emplacement payé par l'annonceur. Il ne modifie pas le classement des autres résultats.",
+    "bumped": "Remontée",
+    "bumpedInfo": "Cette annonce a été remontée par son auteur, contre paiement."
   },
   "ListingPage": {
     "home": "Accueil",
@@ -2169,6 +2197,295 @@
     "meta": {
       "title": "Annonces de {name}",
       "description": "{name}, membre depuis {date} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya."
+    }
+  },
+  "Seo": {
+    "breadcrumb": "Fil d'Ariane",
+    "home": "Accueil",
+    "heading": {
+      "category": "{category} au Maroc",
+      "categoryCity": "{category} à {city}",
+      "subcategory": "{subcategory} au Maroc",
+      "subcategoryCity": "{subcategory} à {city}"
+    },
+    "metaTitle": "{heading} : petites annonces",
+    "metaDescription": "{heading} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya. Achetez et vendez entre particuliers et professionnels, sans afficher votre numéro.",
+    "metaDescriptionEmpty": "{heading} : achetez et vendez entre particuliers et professionnels sur Joutiya. Déposez votre annonce gratuitement.",
+    "lead": "{count, plural, one {# annonce en ligne} other {# annonces en ligne}}, les plus récentes en premier.",
+    "seeOne": "Voir l'annonce",
+    "seeAll": "Voir les {count} annonces",
+    "subcategoriesLabel": "Sous-catégories",
+    "allChip": "Toutes",
+    "recentTitle": "Annonces récentes",
+    "citiesTitle": "{scope} par ville",
+    "nearbyTitle": "{scope} dans les villes proches",
+    "emptyTitle": "Pas encore d'annonce dans cette catégorie",
+    "emptyBody": "Les annonces publiées ici apparaîtront sur cette page. Vous avez quelque chose à vendre ?",
+    "post": "Déposer une annonce"
+  },
+  "Challenge": {
+    "metaTitle": "Vérification anti-robots",
+    "title": "Une vérification avant de continuer",
+    "lead": "Beaucoup de pages ont été ouvertes depuis votre connexion en peu de temps. Confirmez que vous êtes une personne : la page demandée s'ouvre juste après.",
+    "waiting": "La vérification démarre d'elle-même ; cochez la case si elle apparaît.",
+    "checking": "Vérification en cours…",
+    "done": "C'est fait, retour à votre page…",
+    "failedTitle": "La vérification n'a pas abouti",
+    "again": "Réessayer",
+    "continue": "Continuer vers la page",
+    "why": "Cette étape protège les annonces contre la copie automatique et reste valable 30 minutes.",
+    "home": "Revenir à l'accueil"
+  },
+  "Favorites": {
+    "button": {
+      "label": "Favori",
+      "add": "Ajouter aux favoris",
+      "saved": "Dans vos favoris",
+      "added": "Annonce ajoutée à vos favoris",
+      "view": "Voir"
+    },
+    "page": {
+      "title": "Mes favoris",
+      "lead": "Les annonces que vous gardez de côté, les dernières ajoutées en premier.",
+      "count": "{count, plural, one {# favori} other {# favoris}} sur {max}",
+      "loading": "Chargement de vos favoris",
+      "loadFailedTitle": "Vos favoris n'ont pas pu être chargés",
+      "retry": "Réessayer",
+      "more": "Afficher plus de favoris",
+      "unavailable": "Plus disponible",
+      "remove": "Retirer des favoris",
+      "removeOf": "Retirer des favoris : « {title} »",
+      "savedOn": "Ajoutée le {date}",
+      "removed": "Annonce retirée de vos favoris",
+      "undo": "Annuler",
+      "emptyTitle": "Aucun favori pour l'instant",
+      "emptyBody": "Touchez le cœur d'une annonce pour la retrouver ici, sur tous vos appareils.",
+      "browse": "Parcourir les annonces"
+    }
+  },
+  "SavedSearches": {
+    "button": {
+      "save": "Sauvegarder la recherche",
+      "saved": "Recherche sauvegardée",
+      "done": "Recherche sauvegardée",
+      "exists": "Cette recherche était déjà sauvegardée",
+      "view": "Voir"
+    },
+    "dialog": {
+      "title": "Sauvegarder cette recherche",
+      "body": "Retrouvez-la dans « Mes recherches » et recevez les nouvelles annonces par e-mail.",
+      "criteria": "Critères enregistrés",
+      "name": "Nom de la recherche",
+      "nameHint": "Pour la reconnaître dans votre liste.",
+      "nameRequired": "Donnez un nom à cette recherche.",
+      "alert": "Alerte e-mail quotidienne",
+      "alertHint": "Un e-mail le matin quand de nouvelles annonces correspondent, jamais plus d'un par jour.",
+      "manage": "Gérer mes recherches",
+      "cancel": "Annuler",
+      "submit": "Sauvegarder"
+    },
+    "summary": {
+      "words": "« {q} »",
+      "fallbackName": "Ma recherche"
+    },
+    "page": {
+      "title": "Mes recherches",
+      "lead": "Relancez vos recherches en un geste et recevez chaque matin les nouvelles annonces qui y correspondent.",
+      "count": "{count} sur {max}",
+      "loading": "Chargement de vos recherches",
+      "loadFailedTitle": "Vos recherches n'ont pas pu être chargées",
+      "retry": "Réessayer",
+      "emptyTitle": "Aucune recherche sauvegardée",
+      "emptyBody": "Lancez une recherche, puis touchez « Sauvegarder la recherche » : les nouvelles annonces vous arrivent chaque matin.",
+      "browse": "Lancer une recherche",
+      "criteriaOf": "Critères de « {name} »",
+      "savedOn": "Sauvegardée le {date}",
+      "alert": "Alerte e-mail quotidienne",
+      "alertFor": "pour « {name} »",
+      "lastAlert": "Dernier e-mail le {date}",
+      "alertPending": "Un e-mail part le matin dès qu'une nouvelle annonce correspond.",
+      "alertOff": "Aucun e-mail pour cette recherche.",
+      "open": "Voir les annonces",
+      "openOf": "Voir les annonces de « {name} »",
+      "rename": "Renommer",
+      "renameOf": "Renommer « {name} »",
+      "delete": "Supprimer",
+      "deleteOf": "Supprimer « {name} »",
+      "toasts": {
+        "alertOn": "Alerte activée",
+        "alertOff": "Alerte désactivée",
+        "renamed": "Recherche renommée",
+        "deleted": "Recherche supprimée"
+      },
+      "confirm": {
+        "title": "Supprimer « {name} » ?",
+        "body": "La recherche et son alerte disparaissent de votre compte. Les annonces, elles, ne changent pas.",
+        "cancel": "Annuler",
+        "confirm": "Supprimer la recherche"
+      }
+    },
+    "rename": {
+      "title": "Renommer la recherche",
+      "body": "Le nouveau nom apparaît dans votre liste et dans les e-mails d'alerte.",
+      "label": "Nom",
+      "required": "Donnez un nom à cette recherche.",
+      "cancel": "Annuler",
+      "submit": "Renommer"
+    }
+  },
+  "Alerts": {
+    "unsubscribe": {
+      "metaTitle": "Alertes e-mail",
+      "titleAll": "Ne plus recevoir d'alertes ?",
+      "bodyAll": "Les e-mails de toutes vos recherches sauvegardées s'arrêtent. Vos recherches restent dans votre compte : vous pourrez réactiver une alerte à tout moment.",
+      "titleOne": "Arrêter l'alerte « {name} » ?",
+      "bodyOne": "Vous ne recevrez plus d'e-mail pour cette recherche. Elle reste dans « Mes recherches ».",
+      "alreadyOff": "L'alerte « {name} » est déjà arrêtée",
+      "alreadyOffBody": "Aucun e-mail ne part plus pour cette recherche.",
+      "goneTitle": "Cette recherche n'existe plus",
+      "goneBody": "Elle a été supprimée : aucun e-mail ne part plus pour elle.",
+      "invalidTitle": "Ce lien n'est plus valide",
+      "invalidBody": "Gérez vos alertes depuis « Mes recherches », après connexion.",
+      "confirm": "Me désabonner",
+      "manage": "Gérer mes alertes",
+      "doneAll": "Vous ne recevrez plus d'alertes",
+      "doneOne": "Alerte arrêtée",
+      "doneBody": "Vous pouvez réactiver une alerte à tout moment depuis « Mes recherches »."
+    }
+  },
+  "SearchPage": {
+    "title": {
+      "all": "Toutes les annonces",
+      "query": "« {query} »",
+      "inCity": "{what} à {place}",
+      "inRegion": "{what}, région {place}"
+    },
+    "count": "{count, plural, one {# annonce} other {# annonces}}",
+    "countAtLeast": "Plus de {count, plural, other {# annonces}}",
+    "toolbar": "Filtres et tri",
+    "results": "Résultats",
+    "loading": "Chargement des annonces…",
+    "refine": {
+      "categories": "Affiner par catégorie",
+      "subcategories": "Affiner par sous-catégorie"
+    },
+    "approximate": {
+      "title": "Aucune annonce ne contient tous vos mots",
+      "body": "Voici les annonces qui en contiennent une partie."
+    },
+    "featured": {
+      "title": "À la Une",
+      "sponsored": "Sponsorisé",
+      "infoLabel": "À propos des annonces À la Une",
+      "info": "Emplacement payé par l'annonceur. Il ne modifie pas le classement des autres résultats."
+    },
+    "empty": {
+      "title": "Aucune annonce ne correspond à votre recherche",
+      "body": "Retirez un filtre ou élargissez le lieu pour voir plus d'annonces.",
+      "bodyWords": "Vérifiez l'orthographe, essayez un mot plus général ou retirez un filtre.",
+      "removeFilter": "Retirer un filtre :",
+      "widenRegion": "Chercher dans toute la région {region}",
+      "widenCountry": "Chercher dans tout le Maroc",
+      "clearAll": "Effacer tous les filtres",
+      "blankTitle": "Aucune annonce en ligne pour le moment",
+      "blankBody": "Les premières annonces arrivent. Déposez la vôtre : c'est gratuit.",
+      "post": "Déposer une annonce",
+      "outOfRangeTitle": "Cette page de résultats n'existe plus",
+      "firstPage": "Revenir à la première page"
+    },
+    "error": {
+      "title": "La recherche est momentanément indisponible",
+      "body": "Les annonces n'ont pas pu être chargées. Vos critères sont conservés : réessayez dans quelques instants.",
+      "retry": "Réessayer",
+      "home": "Revenir à l'accueil"
+    },
+    "rateLimited": {
+      "title": "Trop de recherches en peu de temps",
+      "body": "Patientez un instant, puis réessayez {wait}.",
+      "later": "plus tard"
+    },
+    "challenge": {
+      "title": "Une vérification avant les résultats",
+      "body": "De nombreuses recherches viennent de votre connexion. Confirmez que vous n'êtes pas un robot pour continuer.",
+      "checking": "Vérification en cours…",
+      "failed": "La vérification a échoué.",
+      "error": "Les résultats n'ont pas pu s'afficher.",
+      "again": "Réessayer",
+      "limited": "Trop de recherches depuis votre connexion. Réessayez {wait}.",
+      "later": "plus tard"
+    },
+    "pagination": {
+      "label": "Pages de résultats",
+      "previous": "Page précédente",
+      "next": "Page suivante",
+      "page": "Page {page}",
+      "status": "Page {page} sur {total}",
+      "capped": "Seules les {pages} premières pages s'affichent. Affinez votre recherche pour voir les autres annonces."
+    }
+  },
+  "SearchFilters": {
+    "open": "Filtres",
+    "openCount": "Filtres, {count, plural, one {# actif} other {# actifs}}",
+    "title": "Filtres",
+    "close": "Fermer les filtres",
+    "apply": "Voir les résultats",
+    "reset": "Tout effacer",
+    "sections": {
+      "category": "Catégorie",
+      "location": "Localisation",
+      "radius": "Rayon autour de la ville",
+      "district": "Quartier",
+      "price": "Prix",
+      "seller": "Vendeur",
+      "condition": "État",
+      "options": "Options",
+      "criteria": "Critères : {subcategory}"
+    },
+    "allCategories": "Toutes les catégories",
+    "allOfCategory": "Toute la catégorie {category}",
+    "criteriaHint": "Choisissez une sous-catégorie pour filtrer sur ses critères (marque, année, surface…).",
+    "radiusNone": "Ville uniquement",
+    "radiusKm": "Jusqu'à {km} km",
+    "radiusHint": "Choisissez une ville pour chercher autour d'elle ou par quartier.",
+    "allDistricts": "Tous les quartiers",
+    "districtCount": "{district} ({count})",
+    "priceMin": "Prix minimum",
+    "priceMax": "Prix maximum",
+    "min": "Minimum",
+    "max": "Maximum",
+    "sellerAll": "Tous",
+    "sellerIndividual": "Particuliers",
+    "sellerPro": "Professionnels",
+    "withPhoto": "Avec photos uniquement",
+    "donation": "Dons uniquement",
+    "sort": {
+      "label": "Trier par",
+      "recent": "Plus récentes",
+      "relevance": "Pertinence",
+      "price_asc": "Prix croissant",
+      "price_desc": "Prix décroissant",
+      "distance": "Plus proches"
+    },
+    "active": "Filtres actifs",
+    "remove": "Retirer le filtre {filter}",
+    "clearAll": "Tout effacer",
+    "chips": {
+      "priceRange": "{min} – {max}",
+      "priceFrom": "Dès {min}",
+      "priceTo": "Jusqu'à {max}",
+      "radius": "{place} + {km} km",
+      "district": "Quartier {district}",
+      "sellerIndividual": "Particuliers",
+      "sellerPro": "Professionnels",
+      "seller": "Annonces de ce vendeur",
+      "shop": "Boutique",
+      "donation": "Dons",
+      "withPhoto": "Avec photos",
+      "conditions": "État : {values}",
+      "range": "{label} : {min} – {max}",
+      "rangeFrom": "{label} : dès {min}",
+      "rangeTo": "{label} : jusqu'à {max}",
+      "options": "{label} : {values}"
     }
   }
 }

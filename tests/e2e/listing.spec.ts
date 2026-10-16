@@ -184,8 +184,12 @@ test.describe("listing page", () => {
 
   test("publishes Product structured data without any contact data", async ({ page }) => {
     await page.goto(`/fr/annonce/${fixture.published.slugId}`);
-    const block = await page.locator('script[type="application/ld+json"]').textContent();
+    // Product first, then the breadcrumb trail (phase 4).
+    const blocks = page.locator('script[type="application/ld+json"]');
+    await expect(blocks).toHaveCount(2);
+    const block = await blocks.first().textContent();
     const data = JSON.parse(block ?? "{}") as { "@type": string; offers: Record<string, string>; image: string[] };
+    expect(JSON.parse((await blocks.nth(1).textContent()) ?? "{}")).toMatchObject({ "@type": "BreadcrumbList" });
     expect(data["@type"]).toBe("Product");
     expect(data.offers).toMatchObject({ price: "1500", priceCurrency: "MAD", availability: "https://schema.org/InStock" });
     expect(data.image).toHaveLength(2);

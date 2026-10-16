@@ -17,6 +17,8 @@ const repo = vi.hoisted(() => ({
   listPublishedByOwner: vi.fn<(uid: string, limit?: number) => Promise<ListingRecord[]>>(),
   count: vi.fn<() => number>(),
 }));
+// The heart is a client island (app router hooks): its own tests cover it (phase 4).
+vi.mock("@/components/favorites/favorite-button", () => ({ FavoriteButton: ({ listingId }: { listingId: string }) => <span data-favorite={listingId} /> }));
 vi.mock("@/lib/db/repositories/listings", () => ({ getListing: vi.fn(), listPublishedByOwner: repo.listPublishedByOwner }));
 vi.mock("@/lib/db/repositories/profiles", () => ({ findUserByPublicId: repo.findUserByPublicId, getUserRecord: vi.fn() }));
 vi.mock("@/lib/quota", async (importOriginal) => ({ ...(await importOriginal<typeof Quota>()), consume: vi.fn(), firstDegraded: vi.fn(async () => null) }));

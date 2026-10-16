@@ -18,6 +18,7 @@ import type { SessionSummary } from "@/lib/contracts/auth";
 vi.mock("next/navigation", async (importOriginal) => ({
   ...(await importOriginal<typeof NextNavigation>()),
   usePathname: () => "/fr/annonce/velo-abcd2345",
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn(), back: vi.fn(), forward: vi.fn() }),
 }));
 // The account menu's chunk is gone (404 after a redeploy).

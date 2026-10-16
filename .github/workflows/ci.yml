@@ -24,6 +24,19 @@ jobs:
     name: Lint, types, unit and rules tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      # Real engine for the search contract suite and the latency benchmark (D1, D24). The master key only
+      # lives in this runner; the app keys are created from it by scripts/search-setup.ts.
+      meilisearch:
+        image: getmeili/meilisearch:v1.55.0@sha256:ff546679970126f8822e15d1b6a06bfbff1f2ce2e43f810cfb5258012f92de5c
+        ports: ["7700:7700"]
+        env:
+          MEILI_ENV: production
+          MEILI_NO_ANALYTICS: "true"
+          MEILI_MASTER_KEY: ci-${{ github.run_id }}-${{ github.run_attempt }}-meilisearch
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://127.0.0.1:7700/health"
+          --health-interval 5s --health-timeout 3s --health-retries 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -56,13 +69,26 @@ jobs:
         run: npm run test:rules
       - name: API tests (Auth + Firestore emulators)
         run: npm run test:api
+      # Step-scoped keys: the other steps keep the memory engine.
+      - name: Search engine contract and benchmark (Meilisearch)
+        env:
+          MEILI_URL: http://localhost:7700
+          MEILI_MASTER_KEY: ci-${{ github.run_id }}-${{ github.run_attempt }}-meilisearch
+        run: |
+          node scripts/search-setup.ts --write-env "$RUNNER_TEMP/meilisearch.env" --apply
+          set -a; . "$RUNNER_TEMP/meilisearch.env"; set +a
+          echo "::add-mask::$MEILI_SEARCH_KEY"
+          echo "::add-mask::$MEILI_INDEX_KEY"
+          unset MEILI_MASTER_KEY
+          npm run test:search
+          node scripts/bench-search.ts --docs 20000 --requests 300 --concurrency 4
       - name: VM scripts
         run: shellcheck infra/vm/*.sh
       - name: Compose projects
         run: |
           for env in staging prod; do
             sudo mkdir -p /etc/joutiya/$env/gcp/web /etc/joutiya/$env/gcp/worker
-            for file in app valkey-queue valkey-ratelimit tunnel; do sudo touch /etc/joutiya/$env/$file.env; done
+            for file in app valkey-queue valkey-ratelimit meilisearch tunnel; do sudo touch /etc/joutiya/$env/$file.env; done
             APP_ENV=$env RELEASE=0123456789ab docker compose -f docker/compose.yml -f docker/compose.$env.yml config --quiet
           done
 
@@ -70,6 +96,19 @@ jobs:
     name: Build and end-to-end tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      # The standalone build searches a real Meilisearch, as staging and production do. The master key only
+      # lives in this runner; the app keys are created from it by scripts/search-setup.ts.
+      meilisearch:
+        image: getmeili/meilisearch:v1.55.0@sha256:ff546679970126f8822e15d1b6a06bfbff1f2ce2e43f810cfb5258012f92de5c
+        ports: ["7700:7700"]
+        env:
+          MEILI_ENV: production
+          MEILI_NO_ANALYTICS: "true"
+          MEILI_MASTER_KEY: ci-${{ github.run_id }}-${{ github.run_attempt }}-meilisearch
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://127.0.0.1:7700/health"
+          --health-interval 5s --health-timeout 3s --health-retries 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -95,6 +134,21 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
       - run: npx playwright install --with-deps chromium
+      # The web server inherits these (playwright.config.ts): web and dev rebuild route use both keys.
+      - name: Search keys
+        env:
+          MEILI_URL: http://localhost:7700
+          MEILI_MASTER_KEY: ci-${{ github.run_id }}-${{ github.run_attempt }}-meilisearch
+        run: |
+          node scripts/search-setup.ts --write-env "$RUNNER_TEMP/meilisearch.env" --apply
+          set -a; . "$RUNNER_TEMP/meilisearch.env"; set +a
+          echo "::add-mask::$MEILI_SEARCH_KEY"
+          echo "::add-mask::$MEILI_INDEX_KEY"
+          {
+            echo "MEILI_URL=$MEILI_URL"
+            echo "MEILI_SEARCH_KEY=$MEILI_SEARCH_KEY"
+            echo "MEILI_INDEX_KEY=$MEILI_INDEX_KEY"
+          } >> "$GITHUB_ENV"
       - run: npm run test:e2e
       # Static map baseline (design D10): it must come from this Linux image (fonts), so while none is
       # committed this job renders it and publishes it as the "visual-baseline" artifact (and in the log,
