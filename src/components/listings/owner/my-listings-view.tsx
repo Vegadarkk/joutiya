@@ -6,20 +6,26 @@ import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { FormMessage, useApiErrorMessage } from "@/components/auth/form-message";
 import { EmptyState } from "@/components/feedback/empty-state";
+import { stashBlockers } from "@/components/post/blockers-handoff";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isRtl, type Locale } from "@/config/site";
-import { Link } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
+import { isApiError } from "@/lib/auth/client";
 import { usePublicConfig } from "@/lib/config/client";
 import { MAX_DRAFTS, OWNER_LIST_BUCKETS, type OwnerListBucket, type OwnerListing, type OwnerListingSummary } from "@/lib/contracts/listings";
 import { deleteListing, listMine, listingAction, type OwnerAction } from "@/lib/listings/client/api";
+import { wizardPath } from "@/lib/listings/client/routes";
+import { blockersOf } from "@/lib/listings/client/store";
 import { cn } from "@/lib/utils";
 import { BUCKET_STATUSES, tabKeyTarget, visibleListings } from "./buckets";
 import { OwnerListingCard } from "./owner-listing-card";
 
 // /mes-annonces: four tabs over GET /api/listings/mine?status=..., one list per bucket (cached per
 // visit). After an action the row changes at once (the API answers with the listing), the visible
-// tab reloads behind the list and the other tabs reload when opened.
+// tab reloads behind the list and the other tabs reload when opened. Renewing an expired listing
+// re-checks it like a publication: it may be held for review (200, pending_review), refused with
+// blockers (422: the wizard's review step lists them) or refused by the active quota (409).
 
 type Bucket = { kind: "loading" } | { kind: "failed"; error: unknown } | { kind: "ready"; listings: OwnerListingSummary[]; refreshing?: boolean };
 
@@ -47,6 +53,7 @@ export function MyListingsView() {
   const locale = useLocale() as Locale;
   const rtl = isRtl(locale);
   const apiMessage = useApiErrorMessage();
+  const router = useRouter();
   const config = usePublicConfig();
   const params = useSearchParams();
   const initial = params.get("onglet");
@@ -111,7 +118,8 @@ export function MyListingsView() {
       setBusyId(id);
       try {
         const { listing } = await listingAction(id, action);
-        toast.success(t(`toasts.${TOAST_KEY[action]}`));
+        // A renewal the pre-moderation holds is not renewed yet: it waits for a moderator.
+        toast.success(t(`toasts.${action === "renew" && listing.status === "pending_review" ? "renewHeld" : TOAST_KEY[action]}`));
         // The row changes now; a listing that left the tab (sold) leaves the list.
         refresh(tab, (listings) =>
           listings.flatMap((item) => {
@@ -120,12 +128,20 @@ export function MyListingsView() {
           }),
         );
       } catch (error) {
-        toast.error(apiMessage(error));
+        if (action === "renew" && isApiError(error, "invalid_listing")) {
+          // Blockers (readiness or pre-moderation): fixed in the wizard, whose review step lists them.
+          stashBlockers(id, blockersOf(error));
+          toast.error(t("errors.renewBlocked"));
+          router.push(wizardPath(id, "apercu"));
+          return;
+        }
+        // Resuming or renewing takes an active slot back: the quota sentence names this listing.
+        toast.error(isApiError(error, "listing_limit") && (action === "renew" || action === "resume") ? t("errors.listingLimit") : apiMessage(error));
       } finally {
         setBusyId(null);
       }
     },
-    [apiMessage, refresh, t, tab],
+    [apiMessage, refresh, router, t, tab],
   );
 
   const onDelete = useCallback(

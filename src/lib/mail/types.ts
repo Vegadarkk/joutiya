@@ -13,11 +13,13 @@ export type TemplateId =
   | "phoneVerified"
   | "phoneRemoved"
   // Listings (phase 3): publication, hold and rejection with an art. 17-style statement, the
-  // moderator's approval, the expiry reminder and the expiry notice.
+  // moderator's approval (online now, or changes approved on a paused or expired listing), the
+  // expiry reminder and the expiry notice.
   | "listingPublished"
   | "listingPendingReview"
   | "listingRejected"
   | "listingApproved"
+  | "listingChangesApproved"
   | "listingExpiringSoon"
   | "listingExpired";
 
@@ -57,6 +59,11 @@ export interface TemplateData {
   listingRejected: { displayName: string; title: string; listingId: string; statement: ModerationStatement };
   /** Approved by a moderator after a hold: online now, public URL and expiry date (ISO). */
   listingApproved: { displayName: string; title: string; url: string; expiresAt: string };
+  /**
+   * A held edit approved on a listing that stays off line: paused by its owner (resumable until
+   * `until` = its expiry) or expired (renewable until `until` = its purge date). `url`: "Mes annonces".
+   */
+  listingChangesApproved: { displayName: string; title: string; status: "paused" | "expired"; url: string; until: string };
   /** Reminder a few days before expiry (bulk): public URL and expiry date (ISO). */
   listingExpiringSoon: { displayName: string; title: string; url: string; expiresAt: string };
   /** Expired: renewable from "Mes annonces" until `purgeAt` (ISO), then deleted. */

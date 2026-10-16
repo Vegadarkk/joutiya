@@ -14,9 +14,11 @@ import { GET as getQueue } from "@/app/api/admin/moderation/route";
 import { GET as getReview, POST as postDecision } from "@/app/api/admin/moderation/[id]/route";
 import { POST as create } from "@/app/api/listings/route";
 import { PATCH as patch } from "@/app/api/listings/[id]/route";
+import { POST as pause } from "@/app/api/listings/[id]/pause/route";
 import { POST as publish } from "@/app/api/listings/[id]/publish/route";
+import { POST as renew } from "@/app/api/listings/[id]/renew/route";
 import type { CreateListingResponse } from "@/lib/contracts/listings";
-import { getListing } from "@/lib/db/repositories/listings";
+import { getListing, updateListing } from "@/lib/db/repositories/listings";
 import { getModerationDecision } from "@/lib/db/repositories/moderation-decisions";
 import { getSearchOutbox } from "@/lib/db/repositories/search-outbox";
 import { COLLECTIONS } from "@/lib/db/schemas";
@@ -195,7 +197,7 @@ describe("queue and review", () => {
     const item = result.body.items.find((entry) => entry.id === older)!;
     // The same seller posts many listings here: volume and duplicate-text flags join in.
     expect(item.flags).toContain("prohibited_soft");
-    expect(item).toMatchObject({ photoCount: 2, seller: { displayName: "Nadia Vendeuse", type: "individual" } });
+    expect(item).toMatchObject({ photoCount: 2, hold: "publication", seller: { displayName: "Nadia Vendeuse", type: "individual" } });
     expect(item.photo?.id).toBeTruthy();
   });
 
@@ -205,6 +207,7 @@ describe("queue and review", () => {
     expect(result.status).toBe(200);
     const { review } = result.body;
     expect(review.listing).toMatchObject({ id, status: "pending_review", title: "Réplique de vélo de course vintage" });
+    expect(review.approval).toEqual({ status: "published", kind: "publication" });
     expect(review.listing.photos).toHaveLength(2);
     expect(review.listing.photos[0]).toMatchObject({ uploadStatus: "ready", checks: { nsfw: 0.01, faces: 0 } });
     expect(review.moderation.flags).toContain("prohibited_soft");
@@ -384,18 +387,97 @@ describe("after a decision", () => {
     expect(lastMail(sendMail, "listingApproved", seller.email)?.data.expiresAt).toBe(live.expiresAt!.toISOString());
   });
 
-  it("gives a fresh lifetime when the expiry passed while the edit waited", async () => {
+  it("expires a held edit whose expiry passed while it waited: dates kept, no fresh lifetime, changes-approved mail", async () => {
     const seller = await member();
     const id = await publishedListing(seller);
     const live = (await getListing(id))!;
     expect((await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: seller, body: { title: "Réplique de vélo de course vintage" } })).body.listing.status).toBe("pending_review");
-    await db().collection(COLLECTIONS.listings).doc(id).update({ expiresAt: new Date(Date.now() - DAY_MS) });
+    const expiresAt = new Date(Date.now() - DAY_MS);
+    await db().collection(COLLECTIONS.listings).doc(id).update({ expiresAt });
     const pending = (await getListing(id))!;
-    const started = Date.now();
-    expect((await decision(moderator, id, { action: "approve", version: pending.version })).status).toBe(200);
+    const result = await decision(moderator, id, { action: "approve", version: pending.version });
+    expect(result.status).toBe(200);
+    expect(result.body.status).toBe("expired");
     const stored = (await getListing(id))!;
+    expect(stored).toMatchObject({ status: "expired", version: pending.version + 1, moderation: expect.objectContaining({ state: "human_ok" }) });
     expect(stored.publishedAt).toEqual(live.publishedAt);
     expect(stored.sortAt).toEqual(live.sortAt);
-    expect(stored.expiresAt!.getTime() - started).toBeGreaterThan(59 * DAY_MS);
+    expect(stored.expiresAt).toEqual(expiresAt);
+    // Expiry + purge months, as set at publication (§5).
+    expect(stored.purgeAt).toEqual(live.purgeAt);
+    expect(await getSearchOutbox(id)).toMatchObject({ op: "delete", version: stored.version });
+    expect(await getModerationDecision(result.body.decisionId)).toMatchObject({ action: "restore", templateId: "listingChangesApproved" });
+    expect(capturedMails(sendMail).some((sent) => sent.template === "listingApproved")).toBe(false);
+    const mail = lastMail(sendMail, "listingChangesApproved", seller.email);
+    expect(mail?.data).toEqual({ displayName: "Salma Testeuse", title: "Réplique de vélo de course vintage", status: "expired", url: "http://localhost:3000/fr/mes-annonces?onglet=ended", until: live.purgeAt!.toISOString() });
+    expect(mail?.idempotencyKey).toBe(`listingChangesApproved-${id}-${stored.version}`);
+  });
+
+  it("approves a held edit of a paused listing back to paused: the owner's pause and dates kept, not indexed", async () => {
+    const seller = await member();
+    const id = await publishedListing(seller);
+    expect((await api<ListingBody>(pause, "POST", `/api/listings/${id}/pause`, { member: seller })).body.listing.status).toBe("paused");
+    const paused = (await getListing(id))!;
+    expect((await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: seller, body: { title: "Réplique de vélo de course vintage" } })).body.listing.status).toBe("pending_review");
+    const pending = (await getListing(id))!;
+    expect(pending.pausedReason).toBe("owner");
+    const review = await admin<{ review: ModerationReview }>(getReview, "GET", `/api/admin/moderation/${id}`, { staff: moderator });
+    expect(review.body.review.approval).toEqual({ status: "paused", kind: "edit" });
+    // The owner cannot take it out of review by pausing it (then resume it unreviewed).
+    const ownerPause = await api<ErrorBody>(pause, "POST", `/api/listings/${id}/pause`, { member: seller });
+    expect(ownerPause.status).toBe(409);
+    expect((await getListing(id))?.status).toBe("pending_review");
+
+    const result = await decision(moderator, id, { action: "approve", version: pending.version });
+    expect(result.status).toBe(200);
+    expect(result.body.status).toBe("paused");
+    const stored = (await getListing(id))!;
+    expect(stored).toMatchObject({ status: "paused", pausedReason: "owner", moderation: expect.objectContaining({ state: "human_ok", reviewedBy: moderator.uid }) });
+    expect(stored.publishedAt).toEqual(paused.publishedAt);
+    expect(stored.expiresAt).toEqual(paused.expiresAt);
+    expect(stored.purgeAt).toEqual(paused.purgeAt);
+    expect(await getSearchOutbox(id)).toMatchObject({ op: "delete", version: stored.version });
+    expect((await auditOf(id)).some((log) => log["action"] === "listing.approve")).toBe(true);
+    expect(lastMail(sendMail, "listingChangesApproved", seller.email)?.data).toMatchObject({ status: "paused", url: "http://localhost:3000/fr/mes-annonces?onglet=active", until: paused.expiresAt!.toISOString() });
+    expect(capturedMails(sendMail).some((sent) => sent.template === "listingApproved")).toBe(false);
+  });
+
+  it("approves a held plain edit of an expired listing back to expired (no free renewal)", async () => {
+    const seller = await member();
+    const id = await publishedListing(seller);
+    const expiresAt = new Date(Date.now() - DAY_MS);
+    const purgeAt = new Date(Date.now() + 365 * DAY_MS);
+    await updateListing(id, { status: "expired", expiresAt, purgeAt });
+    expect((await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: seller, body: { title: "Réplique de vélo de course vintage" } })).body.listing.status).toBe("pending_review");
+    const pending = (await getListing(id))!;
+    const result = await decision(moderator, id, { action: "approve", version: pending.version });
+    expect(result.body.status).toBe("expired");
+    const stored = (await getListing(id))!;
+    expect(stored).toMatchObject({ status: "expired", expiresAt, purgeAt });
+    expect(lastMail(sendMail, "listingChangesApproved", seller.email)?.data).toMatchObject({ status: "expired", until: purgeAt.toISOString() });
+  });
+
+  it("approves a held renewal of an expired listing: published with a new lifetime, back on top, listingApproved", async () => {
+    const seller = await member();
+    const id = await publishedListing(seller);
+    const live = (await getListing(id))!;
+    await updateListing(id, { status: "expired", expiresAt: new Date(Date.now() - DAY_MS), purgeAt: new Date(Date.now() + 365 * DAY_MS), title: "Réplique de vélo de course vintage" });
+    const held = await api<ListingBody>(renew, "POST", `/api/listings/${id}/renew`, { member: seller });
+    expect(held.body.listing.status).toBe("pending_review");
+    const pending = (await getListing(id))!;
+    expect(pending.expiresAt).toBeUndefined();
+    const queue = await admin<ModerationQueueResponse>(getQueue, "GET", "/api/admin/moderation", { staff: moderator });
+    expect(queue.body.items.find((item) => item.id === id)?.hold).toBe("renewal");
+
+    const started = Date.now();
+    const result = await decision(moderator, id, { action: "approve", version: pending.version });
+    expect(result.body.status).toBe("published");
+    const stored = (await getListing(id))!;
+    expect(stored).toMatchObject({ status: "published", sortSource: "renew", adsEligible: true });
+    expect(stored.publishedAt).toEqual(live.publishedAt);
+    expect(stored.sortAt!.getTime()).toBeGreaterThanOrEqual(started - 1000);
+    expect(stored.expiresAt!.getTime() - stored.sortAt.getTime()).toBe((await getLegalConfig()).listingTtlDays * DAY_MS);
+    expect(await getSearchOutbox(id)).toMatchObject({ op: "upsert", version: stored.version });
+    expect(lastMail(sendMail, "listingApproved", seller.email)?.data).toMatchObject({ url: `http://localhost:3000/fr/annonce/${stored.slugId}`, expiresAt: stored.expiresAt!.toISOString() });
   });
 });

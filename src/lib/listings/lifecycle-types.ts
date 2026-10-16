@@ -12,7 +12,7 @@ export type ContentOp = ContentOpDoc["op"];
 export type ListingFieldPatch = { [K in keyof ListingDoc]?: ListingDoc[K] | null };
 
 /** Seller mails about a listing; approval, reminder and expiry are sent by the moderation queue and the jobs. */
-export type MailTemplateForListing = "listingPublished" | "listingPendingReview" | "listingRejected" | "listingApproved" | "listingExpiringSoon" | "listingExpired";
+export type MailTemplateForListing = "listingPublished" | "listingPendingReview" | "listingRejected" | "listingApproved" | "listingChangesApproved" | "listingExpiringSoon" | "listingExpired";
 
 export interface TransitionEffects {
   /** searchOutbox entry to write with the listing (null: the index is not concerned). */

@@ -20,7 +20,7 @@ import { listingRecipient, siteUrl } from "@/lib/mail/recipients";
 import { APPROVAL_GROUND, REJECT_REASONS, rejectStatementFacts, type ModerationDecisionRequest, type ModerationDecisionResponse } from "@/lib/moderation/decisions";
 import type { RequestIdentity } from "@/lib/rate-limit/keys";
 import { buildSlugId } from "./ids";
-import { IllegalTransitionError, transition } from "./lifecycle";
+import { IllegalTransitionError, approvalOutcome, approveHold, holdKind, transition, type ApprovalOutcome, type HoldKind, type TransitionResult } from "./lifecycle";
 import { revalidateListingPaths } from "./revalidate";
 import { screen, sellerFacts } from "./screening";
 
@@ -53,6 +53,8 @@ export interface ModerationQueueItem {
   flags: ModerationFlag[];
   score: number;
   seller: { displayName: string; publicId: string; type: "individual" | "pro" };
+  /** What is held: a first publication, an expired listing's renewal, or an edit after publication. */
+  hold: HoldKind;
   /** ISO: the hold, or the seller's last edit while held. */
   waitingSince: string;
   createdAt: string;
@@ -100,6 +102,8 @@ export interface ModerationReview {
     lastDecision: { action: ModerationDecisionDoc["action"]; facts: string; ground: string; automated: boolean; createdAt: string } | null;
     reviewedAt: string | null;
   };
+  /** What an approval would give (published, or back to paused / expired); null when not pending. */
+  approval: ApprovalOutcome | null;
   /** The pre-moderation re-run on the current content (evidence never quotes the matched text); null if it failed. */
   screening: { state: "auto_ok" | "needs_review"; score: number; flags: ModerationFlag[]; evidence: string[] } | null;
   seller: {
@@ -134,6 +138,7 @@ function queueItem(listing: ListingRecord): ModerationQueueItem {
     flags: listing.moderation.flags,
     score: listing.moderation.score,
     seller: { displayName: listing.sellerName, publicId: listing.sellerPublicId, type: listing.sellerType },
+    hold: holdKind(listing),
     waitingSince: listing.updatedAt.toISOString(),
     createdAt: listing.createdAt.toISOString(),
   };
@@ -204,6 +209,7 @@ export async function moderationReview(id: string, now = new Date()): Promise<Mo
         : null,
       reviewedAt: iso(listing.moderation.reviewedAt),
     },
+    approval: listing.status === "pending_review" ? approvalOutcome(listing, now) : null,
     screening,
     seller: {
       displayName: listing.sellerName,
@@ -222,7 +228,7 @@ export async function moderationReview(id: string, now = new Date()): Promise<Mo
 
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
-function decisionRecord(staff: StaffContext, listing: ListingRecord, input: ModerationDecisionRequest, now: Date): ModerationDecisionInput {
+function decisionRecord(staff: StaffContext, listing: ListingRecord, input: ModerationDecisionRequest, approvedAs: ListingStatus, now: Date): ModerationDecisionInput {
   const common = {
     target: { type: "listing", id: listing.id },
     affectedUid: listing.ownerUid,
@@ -239,8 +245,8 @@ function decisionRecord(staff: StaffContext, listing: ListingRecord, input: Mode
       ...common,
       action: "restore",
       facts: clip(`Human review: listing compliant${input.note ? `. Note: ${input.note}` : ""}`, 2000),
-      ground: { ...APPROVAL_GROUND, explanation: "The moderator lifted the automated hold after reviewing the listing." },
-      templateId: "listingApproved",
+      ground: { ...APPROVAL_GROUND, explanation: approvedAs === "published" ? "The moderator lifted the automated hold after reviewing the listing." : `The moderator approved the held edit; the listing is ${approvedAs} again, as before the hold.` },
+      templateId: approvedAs === "published" ? "listingApproved" : "listingChangesApproved",
     };
   }
   const reason = REJECT_REASONS[input.reason];
@@ -254,9 +260,11 @@ function decisionRecord(staff: StaffContext, listing: ListingRecord, input: Mode
 }
 
 /**
- * POST /api/admin/moderation/{id}: approval (pending_review -> published, dated like a publish)
- * or rejection (pending_review -> rejected, statement of reasons mailed). 404 for an unknown
- * listing, 409 when it is not pending any more or its version moved since the review.
+ * POST /api/admin/moderation/{id}: approval (lifecycle `approveHold`: a publication or a renewal is
+ * published, an edit gets back the status the owner had: published with its dates, paused, or
+ * expired when its expiry passed) or rejection (pending_review -> rejected, statement of reasons
+ * mailed). 404 for an unknown listing, 409 when it is not pending any more or its version moved
+ * since the review.
  */
 export async function decide(staff: StaffContext, id: string, input: ModerationDecisionRequest, identity: RequestIdentity, now = new Date()): Promise<ModerationDecisionResponse> {
   const listing = await getListing(id);
@@ -266,9 +274,10 @@ export async function decide(staff: StaffContext, id: string, input: ModerationD
   const legal = await getLegalConfig();
   const approve = input.action === "approve";
 
-  let result;
+  const ctx = { now, lifetime: listingLifetime(legal) };
+  let result: TransitionResult;
   try {
-    result = transition(listing, approve ? "published" : "rejected", { now, lifetime: listingLifetime(legal) });
+    result = approve ? approveHold(listing, ctx) : transition(listing, "rejected", ctx);
   } catch (error) {
     if (error instanceof IllegalTransitionError) throw new HttpError(409, "conflict", error.message);
     throw error;
@@ -278,7 +287,7 @@ export async function decide(staff: StaffContext, id: string, input: ModerationD
     const city = listing.location ? cityBySlug(listing.location.citySlug) : undefined;
     patch.slugId = buildSlugId({ id, title: listing.title, city: city ? cityName(city, "fr") : undefined, categoryId: listing.categoryId });
   }
-  const record = decisionRecord(staff, listing, input, now);
+  const record = decisionRecord(staff, listing, input, patch.status, now);
 
   let decisionId = "";
   try {
@@ -309,17 +318,27 @@ export async function decide(staff: StaffContext, id: string, input: ModerationD
   });
   if (effects.revalidate) revalidateListingPaths({ slugId: updated.slugId, publicId: listing.sellerPublicId });
   await notifySeller(updated, input, legal.dsaContactEmail);
-  return { status: approve ? "published" : "rejected", decisionId };
+  return { status: approve ? (updated.status as ModerationDecisionResponse["status"]) : "rejected", decisionId };
 }
 
-/** listingApproved or listingRejected (statement of reasons, human decision); a failure is logged, never thrown. */
+/**
+ * listingApproved (online now), listingChangesApproved (back to paused or expired: the changes are
+ * approved, nothing is online) or listingRejected (statement of reasons, human decision); a
+ * failure is logged, never thrown.
+ */
 async function notifySeller(listing: ListingRecord, input: ModerationDecisionRequest, redress: string): Promise<void> {
-  const template = input.action === "approve" ? "listingApproved" : "listingRejected";
+  const restored = listing.status === "paused" || listing.status === "expired" ? listing.status : null;
+  const template = input.action === "reject" ? "listingRejected" : restored ? "listingChangesApproved" : "listingApproved";
   try {
     const to = await listingRecipient(listing.ownerUid);
     if (!to) return;
     const base = { locale: to.locale, to: to.email, priority: "transactional" as const, idempotencyKey: `${template}-${listing.id}-${listing.version}` };
-    if (input.action === "approve") {
+    if (input.action === "approve" && restored) {
+      // Paused: resumable until its expiry; expired: renewable until its purge date.
+      const until = (restored === "paused" ? listing.expiresAt : listing.purgeAt) ?? listing.updatedAt;
+      const url = siteUrl(to.locale, `mes-annonces?onglet=${restored === "paused" ? "active" : "ended"}`);
+      await sendMail({ ...base, template: "listingChangesApproved", data: { displayName: to.displayName, title: listing.title, status: restored, url, until: until.toISOString() } });
+    } else if (input.action === "approve") {
       const url = siteUrl(to.locale, listing.slugId ? `annonce/${listing.slugId}` : "mes-annonces");
       await sendMail({ ...base, template: "listingApproved", data: { displayName: to.displayName, title: listing.title, url, expiresAt: (listing.expiresAt ?? listing.updatedAt).toISOString() } });
     } else {

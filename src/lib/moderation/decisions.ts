@@ -163,6 +163,7 @@ export const moderationDecisionRequestSchema = z
 export type ModerationDecisionRequest = z.infer<typeof moderationDecisionRequestSchema>;
 
 export interface ModerationDecisionResponse {
-  status: "published" | "rejected";
+  /** After an approval: published, or paused / expired when the held edit's listing was (lifecycle `approvalOutcome`). */
+  status: "published" | "paused" | "expired" | "rejected";
   decisionId: string;
 }

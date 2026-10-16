@@ -10,11 +10,13 @@ import type { ContentOp, MailTemplateForListing, TransitionEffects, TransitionRe
 export type { ListingFieldPatch, TransitionEffects, TransitionResult } from "./lifecycle-types";
 
 // `-> pending_review` from published, paused or expired: an edit (or an expired listing's renewal)
-// held by the pre-moderation. `-> purged`: the retention purge at purgeAt (§5: expiry, sale or
-// removal + 12 months; a moderator's rejection is a removal, its purgeAt is set the same way).
+// held by the pre-moderation. `pending_review ->` published, paused or expired: a moderator's
+// approval gives back what the owner had (`approveHold` only, see `approvalOutcome`). `-> purged`:
+// the retention purge at purgeAt (§5: expiry, sale or removal + 12 months; a moderator's rejection
+// is a removal, its purgeAt is set the same way).
 export const TRANSITIONS: Record<ListingStatus, readonly ListingStatus[]> = {
   draft: ["pending_review", "published", "removed"],
-  pending_review: ["published", "rejected", "removed"],
+  pending_review: ["published", "paused", "expired", "rejected", "removed"],
   published: ["paused", "sold", "expired", "removed", "pending_review"],
   paused: ["published", "sold", "expired", "removed", "pending_review"],
   sold: ["removed", "expired", "purged"],
@@ -91,12 +93,68 @@ function effects(partial: Partial<TransitionEffects>): TransitionEffects {
 
 type Listing = Pick<ListingDoc, "status" | "version" | "publishedAt" | "expiresAt" | "purgeAt" | "pausedReason" | "sortAt" | "sortSource">;
 
+const lapsed = (listing: Pick<ListingDoc, "expiresAt">, now: Date) => !listing.expiresAt || listing.expiresAt.getTime() <= now.getTime();
+
+/**
+ * Why a listing waits in pending_review, read from the held listing itself:
+ * - `publication`: never published (`draft -> pending_review` drops publishedAt);
+ * - `renewal`: an expired listing's renewal (`renewForReview` drops its lapsed expiresAt);
+ * - `edit`: an edit of a published, paused or expired listing (dates and pausedReason untouched).
+ */
+export type HoldKind = "publication" | "renewal" | "edit";
+
+export function holdKind(listing: Pick<ListingDoc, "publishedAt" | "expiresAt">): HoldKind {
+  if (!listing.publishedAt) return "publication";
+  return listing.expiresAt ? "edit" : "renewal";
+}
+
+/** Statuses an approval may give: the owner's choice before the hold. */
+export type ApprovedStatus = Extract<ListingStatus, "published" | "paused" | "expired">;
+const APPROVED_STATUSES: readonly ListingStatus[] = ["published", "paused", "expired"] satisfies readonly ApprovedStatus[];
+
+export interface ApprovalOutcome {
+  status: ApprovedStatus;
+  kind: HoldKind;
+}
+
+/**
+ * What a moderator's approval gives a held listing (D9, D16): what the owner had chosen comes back.
+ * A publication is published and dated now; a renewal is published with a new lifetime; an edit
+ * gets its status back with its dates: expired when its expiry passed (before the hold, or while it
+ * waited: the nightly expire job would have done the same, and renewing stays the owner's own
+ * step, screened again), else paused when the owner had paused it (pausedReason survives the
+ * hold), else published.
+ */
+export function approvalOutcome(listing: Pick<ListingDoc, "publishedAt" | "expiresAt" | "pausedReason">, now: Date): ApprovalOutcome {
+  const kind = holdKind(listing);
+  if (kind !== "edit") return { status: "published", kind };
+  if (lapsed(listing, now)) return { status: "expired", kind };
+  return { status: listing.pausedReason ? "paused" : "published", kind };
+}
+
+/**
+ * A moderator approves a held listing: `pending_review -> approvalOutcome(...).status`. The only way
+ * out of review to a visible or owner-chosen status (`transition` refuses those targets, so the
+ * owner cannot pause a held listing and resume it unreviewed). The admin lot sends the mail.
+ */
+export function approveHold(listing: Listing, ctx: TransitionContext): TransitionResult & { outcome: ApprovalOutcome } {
+  if (listing.status !== "pending_review") throw new IllegalTransitionError(listing.status, "published", "only a listing held for review is approved");
+  const outcome = approvalOutcome(listing, ctx.now);
+  return { ...apply(listing, outcome.status, ctx), outcome };
+}
+
 /**
  * Field patch and side effects of `listing` going to `to`. Throws IllegalTransitionError when the
- * table forbids it (or when a resume comes after expiry). `version` and `updatedAt` are always
- * part of the patch; `null` deletes an optional field.
+ * table forbids it (or when a resume comes after expiry); a held listing is approved through
+ * `approveHold`. `version` and `updatedAt` are always part of the patch; `null` deletes an
+ * optional field.
  */
 export function transition(listing: Listing, to: ListingStatus, ctx: TransitionContext): TransitionResult {
+  if (listing.status === "pending_review" && APPROVED_STATUSES.includes(to)) throw new IllegalTransitionError(listing.status, to, "a held listing leaves review through a moderator's approval");
+  return apply(listing, to, ctx);
+}
+
+function apply(listing: Listing, to: ListingStatus, ctx: TransitionContext): TransitionResult {
   const from = listing.status;
   if (!canTransition(from, to)) throw new IllegalTransitionError(from, to);
   const { now, lifetime } = ctx;
@@ -118,15 +176,22 @@ export function transition(listing: Listing, to: ListingStatus, ctx: TransitionC
         if (listing.purgeAt && now.getTime() >= listing.purgeAt.getTime()) throw new IllegalTransitionError(from, to, "listing already purgeable");
         return renewPatch(listing, now, lifetime, ctx.ip);
       }
-      if (from === "pending_review" && listing.publishedAt) {
-        // Approval of a held edit (or held renewal) of a listing published before: its dates stay;
-        // only an expiry that passed meanwhile gets a fresh lifetime.
-        const lapsed = !listing.expiresAt || listing.expiresAt.getTime() <= now.getTime();
-        const expiresAt = expiresAtFor(now, lifetime);
-        return {
-          patch: { ...base, status: "published", pausedReason: null, ...(lapsed ? { expiresAt, purgeAt: purgeAtFor(expiresAt, lifetime) } : {}) },
-          effects: effects({ search: "upsert", contentOp: contentOp("listing.update"), audit: "listing.approve", revalidate: true }),
-        };
+      if (from === "pending_review") {
+        const kind = holdKind(listing);
+        if (kind === "renewal") {
+          // Approved renewal of an expired listing: back on top with a new lifetime, as renewed now.
+          const renewed = renewPatch(listing, now, lifetime, ctx.ip);
+          return { patch: renewed.patch, effects: { ...renewed.effects, audit: "listing.approve" } };
+        }
+        if (kind === "edit") {
+          // Approved edit of a published listing: its dates and rank stay (approveHold sends a
+          // lapsed one to expired, a paused one back to paused).
+          if (lapsed(listing, now)) throw new IllegalTransitionError(from, to, "expiry passed during the review");
+          return {
+            patch: { ...base, status: "published", pausedReason: null },
+            effects: effects({ search: "upsert", contentOp: contentOp("listing.update"), audit: "listing.approve", revalidate: true }),
+          };
+        }
       }
       // Publish (from draft) or approve a held publication (from pending_review).
       const expiresAt = expiresAtFor(now, lifetime);
@@ -158,6 +223,14 @@ export function transition(listing: Listing, to: ListingStatus, ctx: TransitionC
       };
     }
     case "paused":
+      if (from === "pending_review") {
+        // Approved edit of a listing the owner had paused: paused again, same reason and dates.
+        if (!listing.pausedReason || lapsed(listing, now)) throw new IllegalTransitionError(from, to, "the held listing was not paused, or its expiry passed");
+        return {
+          patch: { ...base, status: "paused" },
+          effects: effects({ search: "delete", contentOp: contentOp("listing.update"), audit: "listing.approve", revalidate: true }),
+        };
+      }
       return {
         patch: { ...base, status: "paused", pausedReason: ctx.pausedReason ?? "owner" },
         effects: effects({ search: "delete", contentOp: contentOp("listing.update"), audit: "listing.pause", revalidate: true }),
@@ -169,6 +242,17 @@ export function transition(listing: Listing, to: ListingStatus, ctx: TransitionC
         effects: effects({ search: "delete", contentOp: contentOp("listing.update"), audit: "listing.sold", revalidate: true }),
       };
     case "expired":
+      if (from === "pending_review") {
+        // Approved edit of a listing past its expiry: expired, renewable by the owner until its
+        // purge date (kept; a fresh one only if it passed while the edit waited, so the owner has
+        // time to renew it).
+        if (!lapsed(listing, now)) throw new IllegalTransitionError(from, to, "expiry not passed");
+        const purgeAt = listing.purgeAt && listing.purgeAt.getTime() > now.getTime() ? listing.purgeAt : purgeAtFor(now, lifetime);
+        return {
+          patch: { ...base, status: "expired", purgeAt },
+          effects: effects({ search: "delete", contentOp: contentOp("listing.update"), audit: "listing.approve", revalidate: true }),
+        };
+      }
       return {
         patch: { ...base, status: "expired", purgeAt: purgeAtFor(now, lifetime) },
         effects: effects({ search: "delete", audit: "listing.expire", revalidate: true }),
@@ -211,12 +295,13 @@ export function renew(listing: Listing, ctx: TransitionContext): TransitionResul
 
 /**
  * Renewal of an expired listing that the pre-moderation holds: pending_review, back on top
- * (`sortAt`, `sortSource = "renew"`); the approval gives the new `expiresAt` (its expiry passed).
+ * (`sortAt`, `sortSource = "renew"`). Its lapsed `expiresAt` goes: the approval dates the new
+ * lifetime, and that absence is what tells a held renewal from a held edit (`holdKind`).
  */
 export function renewForReview(listing: Listing, ctx: TransitionContext): TransitionResult {
   if (listing.status !== "expired" || !canRenew(listing, ctx.now)) throw new IllegalTransitionError(listing.status, "pending_review", "listing cannot be renewed");
   const held = transition(listing, "pending_review", ctx);
-  return { patch: { ...held.patch, sortAt: ctx.now, sortSource: "renew" }, effects: { ...held.effects, audit: "listing.renew" } };
+  return { patch: { ...held.patch, sortAt: ctx.now, sortSource: "renew", expiresAt: null }, effects: { ...held.effects, audit: "listing.renew" } };
 }
 
 export type { MailTemplateForListing };

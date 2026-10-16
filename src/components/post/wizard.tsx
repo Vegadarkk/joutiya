@@ -18,7 +18,7 @@ import { parseWizardPath, wizardPath, type WizardScreen } from "@/lib/listings/c
 import { WizardProvider, useWizard } from "@/lib/listings/client/store";
 import { firstIncompleteStep, nextStep, previousStep, stepState, type StepState } from "@/lib/listings/client/validation";
 import { DoneScreen } from "./done-screen";
-import { useStepLabel } from "./field-messages";
+import { useSaveErrorMessage, useStepLabel } from "./field-messages";
 import { CategoryStep } from "./steps/category-step";
 import { ContactStep } from "./steps/contact-step";
 import { CriteriaStep } from "./steps/criteria-step";
@@ -44,6 +44,7 @@ export function PostWizard({ listingId, nonce }: { listingId: string; nonce?: st
   const t = useTranslations("Listing.wizard");
   const config = usePublicConfig();
   const apiMessage = useApiErrorMessage();
+  const saveMessage = useSaveErrorMessage();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const started = useRef(false);
 
@@ -58,13 +59,13 @@ export function PostWizard({ listingId, nonce }: { listingId: string; nonce?: st
           onClick: () => {
             patchListing(listingId, patch).then(
               () => toast.success(t("savedLive")),
-              (error: unknown) => toast.error(apiMessage(error)),
+              (error: unknown) => toast.error(saveMessage(error)),
             );
           },
         },
       });
     },
-    [apiMessage, listingId, t],
+    [saveMessage, listingId, t],
   );
 
   const load = useCallback(async () => {

@@ -21,7 +21,8 @@ import { allIssues, stepOfPath } from "@/lib/listings/client/validation";
 import { cn } from "@/lib/utils";
 import { ChipRadioGroup } from "../controls/chips";
 import { SwitchField } from "../controls/switch";
-import { groupIssuesByStep, useStepLabel, useValidationMessage } from "../field-messages";
+import { takeBlockers } from "../blockers-handoff";
+import { groupIssuesByStep, useSaveErrorMessage, useStepLabel, useValidationMessage } from "../field-messages";
 import { useCategoryLabels, useCriteriaLabels } from "../labels";
 import { useIssueOptions } from "../use-issue-options";
 import { STEP_FORM_ID } from "../wizard-shell";
@@ -48,6 +49,7 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
   const locale = useLocale() as Locale;
   const stepLabel = useStepLabel();
   const message = useValidationMessage();
+  const saveMessage = useSaveErrorMessage();
   const acceptId = useId();
   const sensitiveId = useId();
   const issueOptions = useIssueOptions();
@@ -74,6 +76,12 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
   const readyCount = photos.filter((item) => item.status === "ready").length;
 
   useEffect(() => onBusy(publishing), [publishing, onBusy]);
+
+  // Blockers of a renewal refused from "Mes annonces" (422): listed like those of a refused save.
+  useEffect(() => {
+    const handed = takeBlockers(listingId);
+    if (handed.length > 0) setBlockers(handed);
+  }, [listingId, setBlockers]);
 
   async function publish() {
     if (running.current) return;
@@ -338,7 +346,7 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
         </section>
       ) : null}
       {/* The last save failed: its reason (refused fields come back as blockers above). */}
-      {saveState === "error" && !isApiError(saveError, "invalid_listing") ? <FormMessage error={saveError} tone="warning" /> : null}
+      {saveState === "error" && !isApiError(saveError, "invalid_listing") ? <FormMessage error={saveError} tone="warning" title={saveMessage(saveError)} /> : null}
     </form>
   );
 }

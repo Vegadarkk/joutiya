@@ -16,6 +16,7 @@ import {
   type ModerationDecisionResponse,
   type RejectReasonCode,
 } from "@/lib/moderation/decisions";
+import type { ApprovalOutcome } from "@/lib/listings/lifecycle";
 import { cn } from "@/lib/utils";
 import { adminFetch, errorMessage } from "./api-client";
 
@@ -31,19 +32,53 @@ const MESSAGES: Record<string, string> = {
 
 type Choice = "approve" | "reject";
 
-const CHOICES: { value: Choice; label: string; description: string }[] = [
-  { value: "approve", label: "Publier", description: "L'annonce est mise en ligne pour la durée normale ; le vendeur est prévenu." },
-  { value: "reject", label: "Refuser", description: "Le vendeur reçoit le motif et peut corriger puis soumettre à nouveau son annonce." },
-];
+const day = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeZone: "Africa/Casablanca" });
+
+/**
+ * What approving does, in the moderator's words (lifecycle `approvalOutcome`): a publication or a
+ * renewal goes online for the normal lifetime; an edit gives back the status the seller had.
+ */
+function approveCopy(approval: ApprovalOutcome, expiresAt: string | null): { label: string; description: string; submit: string } {
+  if (approval.kind === "publication") return { label: "Publier", description: "L'annonce est mise en ligne pour la durée normale ; le vendeur est prévenu.", submit: "Publier l'annonce" };
+  if (approval.kind === "renewal") {
+    return { label: "Publier", description: "Renouvellement d'une annonce expirée : elle est remise en ligne pour la durée normale ; le vendeur est prévenu.", submit: "Publier l'annonce" };
+  }
+  switch (approval.status) {
+    case "published":
+      return {
+        label: "Valider la modification",
+        description: `Modification d'une annonce en ligne : elle y revient avec ses dates${expiresAt ? ` (fin le ${day.format(new Date(expiresAt))})` : ""} ; le vendeur est prévenu.`,
+        submit: "Valider et remettre en ligne",
+      };
+    case "paused":
+      return { label: "Valider la modification", description: "Le vendeur avait mis l'annonce en pause : elle reste en pause, il pourra la remettre en ligne. Il est prévenu par e-mail.", submit: "Valider la modification" };
+    case "expired":
+      return { label: "Valider la modification", description: "L'annonce a expiré : elle reste expirée, le vendeur pourra la renouveler. Il est prévenu par e-mail.", submit: "Valider la modification" };
+  }
+}
+
+const REJECT = { label: "Refuser", description: "Le vendeur reçoit le motif et peut corriger puis soumettre à nouveau son annonce.", submit: "Refuser l'annonce" };
+
+/** Toast after the decision, from the status the API answered with. */
+const DONE: Record<ModerationDecisionResponse["status"], string> = {
+  published: "Annonce publiée",
+  paused: "Modification validée : l'annonce reste en pause",
+  expired: "Modification validée : l'annonce reste expirée",
+  rejected: "Annonce refusée",
+};
 
 interface ModerationDecisionFormProps {
   listingId: string;
   /** Version the page was rendered with: a change since answers 409. */
   version: number;
+  /** What an approval gives (moderationReview `approval`). */
+  approval: ApprovalOutcome;
+  /** Current expiry (ISO), quoted when an approved edit keeps it. */
+  expiresAt: string | null;
 }
 
 /** Approve or reject a held listing; one explicit submit whose label names the outcome. */
-export function ModerationDecisionForm({ listingId, version }: ModerationDecisionFormProps) {
+export function ModerationDecisionForm({ listingId, version, approval, expiresAt }: ModerationDecisionFormProps) {
   const router = useRouter();
   const groupId = useId();
   const [choice, setChoice] = useState<Choice>("approve");
@@ -53,6 +88,11 @@ export function ModerationDecisionForm({ listingId, version }: ModerationDecisio
   const [fieldError, setFieldError] = useState<{ reason?: string; details?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const approveText = approveCopy(approval, expiresAt);
+  const choices: { value: Choice; label: string; description: string }[] = [
+    { value: "approve", label: approveText.label, description: approveText.description },
+    { value: "reject", label: REJECT.label, description: REJECT.description },
+  ];
 
   function validate(): ModerationDecisionRequest | null {
     if (choice === "approve") return { action: "approve", version, ...(note.trim() ? { note: note.trim() } : {}) };
@@ -76,8 +116,8 @@ export function ModerationDecisionForm({ listingId, version }: ModerationDecisio
     if (!body) return;
     setLoading(true);
     try {
-      await adminFetch<ModerationDecisionResponse>(`${MODERATION_API}/${encodeURIComponent(listingId)}`, { method: "POST", csrf: true, body });
-      toast.success(body.action === "approve" ? "Annonce publiée" : "Annonce refusée", { description: "Le vendeur est prévenu par e-mail." });
+      const result = await adminFetch<ModerationDecisionResponse>(`${MODERATION_API}/${encodeURIComponent(listingId)}`, { method: "POST", csrf: true, body });
+      toast.success(DONE[result?.status ?? (body.action === "approve" ? approval.status : "rejected")], { description: "Le vendeur est prévenu par e-mail." });
       router.push("/moderation");
       router.refresh();
     } catch (cause) {
@@ -92,7 +132,7 @@ export function ModerationDecisionForm({ listingId, version }: ModerationDecisio
         Décision
       </h2>
       <div role="radiogroup" aria-labelledby={groupId} className="grid gap-2">
-        {CHOICES.map((option) => (
+        {choices.map((option) => (
           <label
             key={option.value}
             className={cn(
@@ -138,7 +178,7 @@ export function ModerationDecisionForm({ listingId, version }: ModerationDecisio
 
       {error ? <ErrorBanner title={error} /> : null}
       <Button type="submit" variant={choice === "approve" ? "structure" : "danger"} loading={loading}>
-        {choice === "approve" ? "Publier l'annonce" : "Refuser l'annonce"}
+        {choice === "approve" ? approveText.submit : REJECT.submit}
       </Button>
     </form>
   );

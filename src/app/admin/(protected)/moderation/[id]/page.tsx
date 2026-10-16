@@ -13,7 +13,7 @@ import { moderationReview, type ModerationReview, type ModerationReviewPhoto } f
 import { mediaBaseUrl } from "@/lib/storage/keys";
 import { ModerationDecisionForm } from "../../../_components/moderation-decision-form";
 import { catalogLabels, formatPrice, waitingFor } from "../../../_components/moderation-labels";
-import { FlagBadges } from "../../../_components/moderation-queue";
+import { FlagBadges, HOLD_LABEL } from "../../../_components/moderation-queue";
 import { RiskMeter } from "../../../_components/moderation-risk";
 
 // Review of one listing of the moderation queue (design D9): the listing as the seller wrote it,
@@ -31,7 +31,7 @@ const ACTION_LABEL: Record<ModerationDecisionDoc["action"], string> = {
   suspend_account: "Suspension du compte",
   ban: "Bannissement",
   warn: "Avertissement",
-  restore: "Publication après vérification",
+  restore: "Validation après vérification",
   no_action: "Sans suite",
 };
 
@@ -137,7 +137,7 @@ export default async function ModerationReviewPage({ params }: { params: Promise
           <Badge variant={pending ? "warning" : listing.status === "published" ? "success" : "neutral"}>{labels.status(listing.status)}</Badge>
         </div>
         <p className="text-sm text-foreground-muted">
-          Référence {listing.id}. Créée le {date.format(new Date(listing.createdAt))}, dernière modification{" "}
+          {review.approval ? `${HOLD_LABEL[review.approval.kind]}. ` : null}Référence {listing.id}. Créée le {date.format(new Date(listing.createdAt))}, dernière modification{" "}
           <time dateTime={listing.updatedAt}>{waitingFor(listing.updatedAt)}</time>.
         </p>
       </div>
@@ -208,8 +208,8 @@ export default async function ModerationReviewPage({ params }: { params: Promise
             ) : null}
           </Panel>
 
-          {pending ? (
-            <ModerationDecisionForm listingId={listing.id} version={listing.version} />
+          {pending && review.approval ? (
+            <ModerationDecisionForm listingId={listing.id} version={listing.version} approval={review.approval} expiresAt={listing.expiresAt} />
           ) : (
             <Panel title="Décision">
               <p className="text-sm text-foreground-muted">

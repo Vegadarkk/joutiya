@@ -305,7 +305,10 @@ describe("renewal of an expired listing (screened like a publication)", () => {
     expect(held.body.listing.status).toBe("pending_review");
     const stored = (await getListing(id))!;
     expect(stored).toMatchObject({ status: "pending_review", sortSource: "renew", adsEligible: false, moderation: expect.objectContaining({ state: "needs_review", flags: ["prohibited_soft"] }) });
-    expect(stored.expiresAt).toEqual(before.expiresAt);
+    // The lapsed expiry goes: the approval dates the new lifetime (and reads the hold as a renewal).
+    expect(before.expiresAt).toBeDefined();
+    expect(stored.expiresAt).toBeUndefined();
+    expect(stored.purgeAt).toEqual(before.purgeAt);
     expect(await decisionsFor(id)).toEqual([stored.moderation.lastDecisionId]);
     expect(lastMail(sendMail, "listingPendingReview", owner.email)?.data).toMatchObject({ listingId: id, statement: { measure: "hold", facts: ["prohibited_soft"] } });
   });

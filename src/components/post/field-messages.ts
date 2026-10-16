@@ -3,6 +3,8 @@
 import { useCallback } from "react";
 import { useTranslations } from "next-intl";
 import type { FieldError } from "react-hook-form";
+import { useApiErrorMessage } from "@/components/auth/form-message";
+import { isApiError } from "@/lib/auth/client";
 import { WIZARD_STEPS, type FieldIssue, type WizardStep } from "@/lib/contracts/listings";
 import { DESCRIPTION_MAX, DESCRIPTION_MIN, DISTRICT_MAX, PRICE_MAX, TITLE_MAX, TITLE_MIN } from "@/lib/listings/client/validation";
 import { groupDigits } from "@/lib/listings/client/format";
@@ -11,6 +13,17 @@ import { groupDigits } from "@/lib/listings/client/format";
 // 422 blockers; the messages live in Listing.validation.
 
 type Params = Record<string, string | number>;
+
+/**
+ * Why a save of the listing failed. A 409 `listing_limit` on a save only comes from an edit of a
+ * paused or expired listing that the pre-moderation holds: in review it takes an active slot, so
+ * the generic "to publish a new one" sentence would not fit; this one says why and what to do.
+ */
+export function useSaveErrorMessage(): (error: unknown) => string {
+  const t = useTranslations("Listing.wizard");
+  const apiMessage = useApiErrorMessage();
+  return useCallback((error) => (isApiError(error, "listing_limit") ? t("saveLimit") : apiMessage(error)), [t, apiMessage]);
+}
 
 /** Message of a stable validation code; unknown server codes fall back to a generic sentence. */
 export function useValidationMessage(): (code: string, params?: Params) => string {

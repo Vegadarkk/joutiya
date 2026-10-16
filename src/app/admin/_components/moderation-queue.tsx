@@ -8,6 +8,13 @@ import { ALWAYS_REVIEW_FLAGS } from "@/lib/moderation/risk";
 import { formatPrice, waitingFor, type CatalogLabels } from "./moderation-labels";
 import { RiskMeter } from "./moderation-risk";
 
+/** What waits for review (lifecycle `holdKind`). */
+export const HOLD_LABEL: Record<ModerationQueueItem["hold"], string> = {
+  publication: "Nouvelle annonce",
+  renewal: "Renouvellement d'une annonce expirée",
+  edit: "Modification d'une annonce déjà publiée",
+};
+
 interface ModerationQueueProps {
   items: ModerationQueueItem[];
   labels: CatalogLabels;
@@ -51,6 +58,7 @@ export function ModerationQueue({ items, labels, mediaBaseUrl }: ModerationQueue
               <p className="text-sm text-foreground-muted">
                 {labels.category(item.categoryId, item.subcategoryId)}, {labels.place(item.citySlug)}, {formatPrice(item.price, item.isDonation)}
               </p>
+              <p className="text-sm text-foreground">{HOLD_LABEL[item.hold]}</p>
               <FlagBadges flags={item.flags} />
             </div>
             <div className="col-span-2 flex flex-wrap items-center justify-between gap-3 sm:col-span-1 sm:flex-col sm:items-end">

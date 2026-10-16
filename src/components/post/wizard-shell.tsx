@@ -3,7 +3,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Check, CircleDot, CloudOff, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useApiErrorMessage } from "@/components/auth/form-message";
 import { Button } from "@/components/ui/button";
 import { isApiError } from "@/lib/auth/client";
 import type { WizardStep } from "@/lib/contracts/listings";
@@ -11,6 +10,7 @@ import type { AutosaveState } from "@/lib/listings/client/autosave";
 import type { SaveMode } from "@/lib/listings/client/store";
 import type { StepState } from "@/lib/listings/client/validation";
 import { cn } from "@/lib/utils";
+import { useSaveErrorMessage } from "./field-messages";
 import { StepProgress } from "./progress";
 
 export const STEP_FORM_ID = "wizard-step-form";
@@ -125,7 +125,7 @@ interface SaveIndicatorProps {
  */
 export function SaveIndicator({ state, error, mode = "auto", onRetry, onSave, held = false }: SaveIndicatorProps) {
   const t = useTranslations("Listing.wizard");
-  const apiMessage = useApiErrorMessage();
+  const apiMessage = useSaveErrorMessage();
   const live = mode === "manual";
   // A field under its minimum length is not sent: say so rather than "saved".
   if (held && (state === "idle" || state === "saved")) {

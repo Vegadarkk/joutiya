@@ -398,7 +398,8 @@
       "saveNow": "Enregistrer",
       "unsavedLeftTitle": "Modifications non enregistrées",
       "unsavedLeftBody": "Vous avez quitté l'annonce sans enregistrer vos dernières modifications.",
-      "held": "Ce champ sera enregistré dès qu'il sera complet."
+      "held": "Ce champ sera enregistré dès qu'il sera complet.",
+      "saveLimit": "Cette modification doit être vérifiée par notre équipe, et une annonce en cours de vérification compte parmi vos annonces actives : vous avez atteint le maximum. Mettez en pause ou supprimez une autre annonce, puis enregistrez à nouveau."
     },
     "start": {
       "title": "Déposer une annonce",
@@ -1974,7 +1975,8 @@
       "resumed": "Annonce remise en ligne",
       "sold": "Annonce marquée comme vendue",
       "renewed": "Annonce renouvelée pour 60 jours",
-      "deleted": "Annonce supprimée"
+      "deleted": "Annonce supprimée",
+      "renewHeld": "Renouvellement envoyé en vérification : votre annonce sera remise en ligne après validation"
     },
     "pending": {
       "title": "En cours de vérification",
@@ -1986,7 +1988,11 @@
     },
     "pausedQuota": "En pause : le nombre d'annonces actives de votre compte est atteint.",
     "loading": "Chargement de vos annonces…",
-    "draftsLimit": "{count, plural, one {# brouillon} other {# brouillons}} sur {max} possibles"
+    "draftsLimit": "{count, plural, one {# brouillon} other {# brouillons}} sur {max} possibles",
+    "errors": {
+      "renewBlocked": "Votre annonce doit être corrigée avant d'être renouvelée : corrigez les points signalés et enregistrez, puis renouvelez-la depuis « Mes annonces ».",
+      "listingLimit": "Vous avez atteint le nombre maximal d'annonces actives. Mettez en pause ou supprimez une autre annonce pour remettre celle-ci en ligne."
+    }
   },
   "Map": {
     "mapLabel": "Carte des régions du Maroc",

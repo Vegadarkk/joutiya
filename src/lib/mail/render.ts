@@ -3,6 +3,7 @@ import { LOCALES } from "@/config/site";
 import { serverEnv } from "@/lib/env";
 import { mailLocale, type BuiltMail, type TemplateContext } from "./templates/layout";
 import { listingApproved } from "./templates/listingApproved";
+import { listingChangesApproved } from "./templates/listingChangesApproved";
 import { listingExpired } from "./templates/listingExpired";
 import { listingExpiringSoon } from "./templates/listingExpiringSoon";
 import { listingPendingReview } from "./templates/listingPendingReview";
@@ -31,6 +32,7 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   listingPendingReview,
   listingRejected,
   listingApproved,
+  listingChangesApproved,
   listingExpiringSoon,
   listingExpired,
 };

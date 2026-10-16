@@ -6,7 +6,8 @@ import type { ModerationStatement } from "@/lib/mail/types";
 import { REJECT_REASON_CODES, REJECT_REASONS, reasonFactText, rejectStatementFacts } from "@/lib/moderation/decisions";
 
 // Listing mails (design D8, D9, D16): publication, hold and rejection with the art. 17 statement,
-// the moderator's approval and rejection, the expiry reminder and the expiry notice.
+// the moderator's approval (online, or changes approved on a paused or expired listing) and
+// rejection, the expiry reminder and the expiry notice.
 
 const SITE = "https://staging.joutiya.ma";
 const statement: ModerationStatement = { measure: "hold", facts: ["new_account", "dup_text"], ground: "CGU §7 (contrôle avant publication)", automated: true, redress: "dsa@joutiya.ma" };
@@ -126,6 +127,30 @@ describe("human decisions (moderation queue)", () => {
     const ar = renderMail({ template: "listingApproved", locale: "ar", to: "salma@example.com", data: { displayName: "سلمى", title: "دراجة", url: `${SITE}/ar/annonce/draja-abcd2345`, expiresAt: "2026-12-15T10:00:00.000Z" } });
     expect(ar.html).toContain('dir="rtl"');
     expect(ar.subject).toContain("دراجة");
+  });
+
+  it("listingChangesApproved: changes approved, never claims the listing is online (paused: resume until expiry; expired: renew until purge)", () => {
+    const base = { displayName: "Salma", title: "Vélo de ville" };
+    const paused = renderMail({ template: "listingChangesApproved", locale: "fr", to: "salma@example.com", data: { ...base, status: "paused", url: `${SITE}/fr/mes-annonces?onglet=active`, until: "2026-12-15T10:00:00.000Z" } });
+    expect(paused.subject).toBe("Les modifications de votre annonce « Vélo de ville » sont validées");
+    expect(paused.text).toContain("Un modérateur a vérifié les modifications");
+    expect(paused.text).toContain("reste en pause");
+    expect(paused.text).toContain("15 décembre 2026");
+    expect(paused.text).toContain(`${SITE}/fr/mes-annonces?onglet=active`);
+    expect(paused.html).toContain("Remettre mon annonce en ligne");
+    const expired = renderMail({ template: "listingChangesApproved", locale: "fr", to: "salma@example.com", data: { ...base, status: "expired", url: `${SITE}/fr/mes-annonces?onglet=ended`, until: "2027-12-15T10:00:00.000Z" } });
+    expect(expired.text).toContain("a expiré");
+    expect(expired.text).toContain("renouveler gratuitement");
+    expect(expired.text).toMatch(/15 décembre 2027(?! à)/);
+    expect(expired.html).toContain("Renouveler mon annonce");
+    for (const mail of [paused, expired]) {
+      expect(mail.text).not.toMatch(/maintenant visible|est en ligne|publiée/);
+      expect(mail.text).toContain("n'est pas visible sur Joutiya");
+    }
+    const ar = renderMail({ template: "listingChangesApproved", locale: "ar", to: "salma@example.com", data: { displayName: "سلمى", title: "دراجة", status: "expired", url: `${SITE}/ar/mes-annonces?onglet=ended`, until: "2027-12-15T10:00:00.000Z" } });
+    expect(ar.html).toContain('dir="rtl"');
+    expect(ar.text).toContain("تجديده مجانًا");
+    expect(ar.text).toContain(`${SITE}/ar/mes-annonces?onglet=ended`);
   });
 });
 
