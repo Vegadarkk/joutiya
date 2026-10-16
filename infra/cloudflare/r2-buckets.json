@@ -1,0 +1,33 @@
+{
+  "description": "R2 bucket settings (EU jurisdiction). Nav applies them in the dashboard (docs/phase-1.md, step 14): editing bucket settings by API needs Workers R2 Storage Write on the whole account, which would reach the owner's other buckets. CORS is written as pasted in the dashboard's JSON tab; `node scripts/cloudflare.ts r2` checks it with unauthenticated preflight requests. Nav reads the lifecycle rules back; Cloudflare's default multipart-abort rule stays on every bucket (defaultMultipartAbort). Applied by Nav and checked on 2026-10-16: every preflight passes (R2 answers 204), foreign origins are refused, the read-back matches this file. Quarantine: direct browser uploads (presigned PUT, Content-Type is the only header the page sets). Media: PMTiles range reads. Dev has no CORS: local development uses the file store.",
+  "jurisdiction": "eu",
+  "defaultMultipartAbort": { "name": "Default Multipart Abort Rule", "abortAfterDays": 7 },
+  "buckets": {
+    "joutiya-prod-quarantine": {
+      "cors": [{ "AllowedOrigins": ["https://joutiya.ma", "https://www.joutiya.ma"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }],
+      "lifecycle": [{ "name": "delete-after-1-day", "prefix": "", "deleteAfterDays": 1 }]
+    },
+    "joutiya-staging-quarantine": {
+      "cors": [{ "AllowedOrigins": ["https://staging.joutiya.ma"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }],
+      "lifecycle": [{ "name": "delete-after-1-day", "prefix": "", "deleteAfterDays": 1 }]
+    },
+    "joutiya-dev-quarantine": {
+      "lifecycle": [{ "name": "delete-after-1-day", "prefix": "", "deleteAfterDays": 1 }]
+    },
+    "joutiya-prod-media": {
+      "cors": [{ "AllowedOrigins": ["https://joutiya.ma", "https://www.joutiya.ma"], "AllowedMethods": ["GET", "HEAD"], "AllowedHeaders": ["Range"], "ExposeHeaders": ["ETag", "Content-Range", "Content-Length"], "MaxAgeSeconds": 3600 }]
+    },
+    "joutiya-staging-media": {
+      "cors": [{ "AllowedOrigins": ["https://staging.joutiya.ma"], "AllowedMethods": ["GET", "HEAD"], "AllowedHeaders": ["Range"], "ExposeHeaders": ["ETag", "Content-Range", "Content-Length"], "MaxAgeSeconds": 3600 }]
+    },
+    "joutiya-prod-private": {
+      "lifecycle": [{ "name": "delete-backups-after-98-days", "prefix": "backups/", "deleteAfterDays": 98 }]
+    },
+    "joutiya-staging-private": {
+      "lifecycle": [{ "name": "delete-backups-after-98-days", "prefix": "backups/", "deleteAfterDays": 98 }]
+    },
+    "joutiya-dev-private": {
+      "lifecycle": [{ "name": "delete-backups-after-98-days", "prefix": "backups/", "deleteAfterDays": 98 }]
+    }
+  }
+}

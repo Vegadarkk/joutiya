@@ -3,8 +3,10 @@
 import { useId, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { LogIn, MessageCircle, MessageSquare, Phone, Settings2 } from "lucide-react";
+import { LogIn, MessageCircle, MessageSquare, Phone, RotateCw, Settings2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { InlineError } from "@/components/feedback/inline-error";
+import { loadWithRetry } from "@/components/layout/chunk-retry";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { ApiError, apiPost, loadSession, useSession } from "@/lib/auth/client";
@@ -12,6 +14,7 @@ import { LISTING_API } from "@/lib/contracts/endpoints";
 import type { PhoneRevealResponse } from "@/lib/contracts/listings";
 import { isolateLtr } from "@/lib/i18n/bidi";
 import { cn } from "@/lib/utils";
+import type { RevealChallengeProps, RevealErrorProps } from "./contact-feedback";
 import { isWhatsappUrl, revealFailure } from "./reveal";
 
 export { isWhatsappUrl, REVEAL_ERROR_KEYS, revealFailure, type RevealErrorKey } from "./reveal";
@@ -22,9 +25,28 @@ export { isWhatsappUrl, REVEAL_ERROR_KEYS, revealFailure, type RevealErrorKey } 
 // phase 6. Anonymous visitors get a sign-in link that brings them back here. On phones the actions
 // sit in a bar fixed to the bottom of the screen; from lg they sit in the seller card. The challenge
 // and the refusal messages load on demand (contact-feedback.tsx): most visitors never need them.
+// When their chunk cannot be downloaded (dropped connection, tab opened before a redeploy) the
+// download is tried again, then the visitor is asked to reload (chunk-retry.tsx).
 
-const RevealChallenge = dynamic(() => import("./contact-feedback").then((module) => module.RevealChallenge), { ssr: false });
-const RevealError = dynamic(() => import("./contact-feedback").then((module) => module.RevealError), { ssr: false });
+/** Stands in for the challenge or a refusal message while their chunk cannot be downloaded. */
+export function RevealFeedbackFallback() {
+  const t = useTranslations("ListingPage.contact");
+  return (
+    <div className="flex flex-col items-start gap-2">
+      <InlineError>{t("errors.outdated")}</InlineError>
+      <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+        <RotateCw aria-hidden="true" />
+        {t("reload")}
+      </Button>
+    </div>
+  );
+}
+
+export const loadRevealChallenge = loadWithRetry<RevealChallengeProps>(() => import("./contact-feedback").then((module) => module.RevealChallenge), RevealFeedbackFallback);
+export const loadRevealError = loadWithRetry<RevealErrorProps>(() => import("./contact-feedback").then((module) => module.RevealError), RevealFeedbackFallback);
+
+const RevealChallenge = dynamic(() => loadRevealChallenge(), { ssr: false });
+const RevealError = dynamic(() => loadRevealError(), { ssr: false });
 
 export interface ContactBarProps {
   listingId: string;

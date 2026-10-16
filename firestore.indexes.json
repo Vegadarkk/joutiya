@@ -139,6 +139,20 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "heldObjects",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "size",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "uploads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
           "fieldPath": "targetId",
           "order": "ASCENDING"
         },

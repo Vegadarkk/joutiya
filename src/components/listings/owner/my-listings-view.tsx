@@ -120,11 +120,13 @@ export function MyListingsView() {
   }, [tab, buckets, load]);
 
   // On a phone the four tabs overflow: the selected one is scrolled into view (a link to
-  // ?onglet=ended opens on the last tab), again once its count widens it, and the sides with more
-  // tabs fade out.
+  // ?onglet=ended opens on the last tab), again once its count widens it or anything else resizes
+  // the strip (the web font swapping in, another tab's count), and the sides with more tabs fade out.
   const shownBucket = buckets[tab];
   const selectedCount = shownBucket?.kind === "ready" ? shownBucket.listings.length : null;
+  const selectedTab = useRef(tab);
   useEffect(() => {
+    selectedTab.current = tab;
     const list = tablist.current;
     const selected = tabRefs.current[tab];
     if (list && selected) revealTab(list, selected, revealed.current);
@@ -140,8 +142,12 @@ export function MyListingsView() {
     });
     update();
     list.addEventListener("scroll", update, { passive: true });
-    // The strip and its tabs change size (window, counts arriving after each load).
-    const observer = new ResizeObserver(update);
+    // The strip and its tabs change size (window, counts arriving after each load, font swap).
+    const observer = new ResizeObserver(() => {
+      const selected = tabRefs.current[selectedTab.current];
+      if (selected) revealTab(list, selected, false);
+      update();
+    });
     observer.observe(list);
     for (const element of Array.from(list.children)) observer.observe(element);
     return () => {

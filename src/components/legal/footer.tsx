@@ -10,12 +10,13 @@ export function Footer({ publisher }: { publisher: string }) {
   const t = useTranslations("Footer");
   const year = new Date().getFullYear();
   const column = (name: "legal" | "trust") => LEGAL_PAGES.filter((page) => page.column === name);
+  // Thin green line on top: the logo's door outline (bab-700); bab-600 in dark, where structure equals this background.
   return (
-    <footer className="mt-auto bg-surface-brand text-foreground">
+    <footer className="mt-auto border-t-2 border-structure bg-surface-brand text-foreground dark:border-bab-600">
       <Container className="grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr]">
         <div className="flex flex-col gap-4">
           <Logo label="Joutiya" className="h-12 w-fit" />
-          <p className="max-w-xs text-sm text-foreground-muted">{t("about")}</p>
+          <p className="max-w-xs text-sm text-pretty text-foreground-muted">{t("about")}</p>
           <ThemeToggle className="w-fit bg-background/40" />
         </div>
         <nav aria-labelledby="footer-legal">

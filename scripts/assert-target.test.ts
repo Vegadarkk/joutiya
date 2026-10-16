@@ -19,7 +19,10 @@ const TUNNELS = {
 function envTargets(name: keyof typeof TUNNELS, phoneNumberId: string): EnvTargets {
   const index = Object.keys(TUNNELS).indexOf(name);
   return {
-    firebase: { projectId: `joutiya-${name}-4821`, projectNumber: `10000000000${index}`, firestoreLocation: "europe-west9" },
+    firebase: { projectId: `joutiya-${name}-4821`, projectNumber: `10000000000${index}`, firestoreLocation: "europe-west9", appId: `1:10000000000${index}:web:0a1b2c3d4e5f6a7b8c9d0${index}` },
+    google: { oauthClientId: `10000000000${index}-${"a".repeat(31)}${index}.apps.googleusercontent.com` },
+    turnstile: { siteKey: `0x4AAAAAAAAAAAAAAAAAAAA${index}` },
+    sentry: { dsn: `https://${"0".repeat(31)}${index}@o1.ingest.de.sentry.io/${index + 1}` },
     r2: { quarantine: `joutiya-${name}-quarantine`, media: `joutiya-${name}-media`, private: `joutiya-${name}-private` },
     whatsapp: { wabaId: "102030405060708", phoneNumberId },
     cloudflare: { tunnelId: TUNNELS[name], accessAud: "a".repeat(63) + String(index) },
@@ -29,9 +32,10 @@ function envTargets(name: keyof typeof TUNNELS, phoneNumberId: string): EnvTarge
 function recorded(): Targets {
   return {
     shared: {
-      cloudflare: { accountId: ACCOUNT, zoneId: "fedcba9876543210fedcba9876543210", accessTeamDomain: "joutiya.cloudflareaccess.com", sshTunnelId: null },
+      cloudflare: { accountId: ACCOUNT, zoneId: "fedcba9876543210fedcba9876543210", accessTeamDomain: "joutiya.cloudflareaccess.com", sshTunnelId: null, accessOauthClientId: `100000000001-${"b".repeat(32)}.apps.googleusercontent.com` },
       oracle: { homeRegion: "eu-paris-1", tenancyId: `ocid1.tenancy.oc1..${"a".repeat(60)}`, compartmentId: `ocid1.compartment.oc1..${"b".repeat(60)}`, userId: `ocid1.user.oc1..${"d".repeat(60)}`, vmDynamicGroupId: null, runCommandPolicyId: null },
       anthropic: { organizationId: "123e4567-e89b-12d3-a456-426614174000" },
+      github: { repository: "octo-org/joutiya", repositoryId: "123456789" },
       stripe: { accountId: "acct_1Q2w3E4r5T6y7U8i" },
       revenuecat: { projectId: "proj5a6b7c8d" },
       meta: { businessId: "1234567890123", appId: "9876543210987" },
@@ -58,11 +62,15 @@ describe("validateTargets", () => {
     const raw = JSON.parse(JSON.stringify(recorded()));
     delete raw.environments.dev.firebase.projectId;
     raw.environments.dev.firebase.projectID = "joutiya-dev";
-    raw.shared.github = { repo: "Vegadarkk/joutiya" };
+    raw.shared.gitlab = { project: "joutiya" };
+    raw.shared.github.repo = raw.shared.github.repository;
+    delete raw.shared.github.repository;
     assert.deepEqual(validateTargets(raw).sort(), [
       "environments.dev.firebase.projectID: unknown key",
       "environments.dev.firebase.projectId: missing key",
-      "shared.github: unknown key",
+      "shared.github.repo: unknown key",
+      "shared.github.repository: missing key",
+      "shared.gitlab: unknown key",
     ]);
   });
 
@@ -104,6 +112,20 @@ describe("validateTargets", () => {
     assert.deepEqual(validateTargets(targets), [
       "environments.dev.r2.media: joutiya-dev-quarantine is already recorded at environments.dev.r2.quarantine",
       `environments.staging.cloudflare.accessAud: ${"a".repeat(63)}0 is already recorded at environments.dev.cloudflare.accessAud`,
+    ]);
+  });
+
+  it("rejects public identifiers of another project or environment", () => {
+    const targets = recorded();
+    targets.environments.staging.firebase.appId = "1:100000000002:web:0a1b2c3d4e5f6a7b8c9d01";
+    targets.environments.prod.google.oauthClientId = `100000000001-${"c".repeat(32)}.apps.googleusercontent.com`;
+    targets.environments.prod.turnstile.siteKey = targets.environments.staging.turnstile.siteKey;
+    targets.shared.cloudflare.accessOauthClientId = `100000000002-${"b".repeat(32)}.apps.googleusercontent.com`;
+    assert.deepEqual(validateTargets(targets), [
+      "environments.staging.firebase.appId: project number 100000000002 is not environments.staging.firebase.projectNumber",
+      "environments.prod.turnstile.siteKey: 0x4AAAAAAAAAAAAAAAAAAAA1 is already recorded at environments.staging.turnstile.siteKey",
+      "environments.prod.google.oauthClientId: project number 100000000001 is not environments.prod.firebase.projectNumber",
+      "shared.cloudflare.accessOauthClientId: a production client (Access's login lives in joutiya-staging, §6)",
     ]);
   });
 

@@ -16,6 +16,8 @@ process.env.FIRESTORE_EMULATOR_HOST ??= "127.0.0.1:8080";
 
 const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 const randomId = (length: number) => Array.from({ length }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join("");
+/** Title of the segment error view (messages/fr.json Error.title). */
+const ERROR_TITLE = "La page n'a pas pu s'afficher";
 /** Valid blurhash (the one from the blurhash README). */
 const BLURHASH = "LEHV6nWB2yk8pyo0adR*.7kCMdnj";
 /** FsObjectStore layout of the dev media bucket (src/lib/storage/fs.ts, keys.ts). */
@@ -216,6 +218,29 @@ test.describe("listing page", () => {
     await expect(dialog).toBeHidden();
     // The page gallery resumes on the photo the lightbox was closed on.
     await expect(page.getByTestId("gallery-counter")).toHaveText("2 / 2");
+  });
+
+  test("keeps the listing on screen when the full-screen view cannot be downloaded (tab older than a redeploy, dropped connection)", async ({ page }) => {
+    await page.goto(`/fr/annonce/${fixture.published.slugId}`);
+    // Hydrated: the client-only spacer of the phone contact bar is in the page.
+    await expect(page.getByTestId("contact-bar-spacer")).toBeAttached();
+    const chunks: string[] = [];
+    await page.route("**/_next/static/chunks/**", (route) => {
+      chunks.push(route.request().url());
+      return route.abort("internetdisconnected");
+    });
+    await page.getByRole("button", { name: "Agrandir la photo" }).first().click();
+    // The lightbox chunk was asked for (warm-up on hover, loader, the stand-in's retry) and failed:
+    // a reload prompt under the gallery instead of the error view.
+    await expect(page.getByTestId("lightbox-unavailable")).toContainText("Le plein écran n'a pas pu se charger.", { timeout: 15_000 });
+    expect(chunks.length).toBeGreaterThan(0);
+    await expect(page.getByTestId("lightbox-unavailable").getByRole("button", { name: "Recharger la page" })).toBeVisible();
+    // Still the listing, still interactive: the gallery moves on.
+    await page.getByRole("button", { name: "Photo suivante" }).click();
+    await expect(page.getByTestId("gallery-counter")).toHaveText("2 / 2");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 1, name: fixture.published.title })).toBeVisible();
+    await expect(page.getByRole("heading", { name: ERROR_TITLE })).toHaveCount(0);
   });
 
   test("mirrors the arrow keys in Arabic", async ({ page }) => {

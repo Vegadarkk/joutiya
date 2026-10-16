@@ -196,7 +196,7 @@ describe("purge-quarantine: documents past purgeAt", () => {
     vi.mocked(repo.listPastPurge).mockResolvedValue([ready, rejected]);
     vi.mocked(getListings).mockResolvedValue([listing({ photos: [] })]);
 
-    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: 2, extended: 0, failed: 0 });
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: 2, extended: 0, freedBytes: 50_000, failed: 0 });
     expect(store.keys("media")).toEqual([]);
     expect(store.keys("quarantine")).toEqual([]);
     expect(vi.mocked(repo.deleteUploadDocument).mock.calls.map(([id]) => id)).toEqual(["readyunused1", "rejectedold1"]);
@@ -294,7 +294,7 @@ describe("purge-quarantine: documents past purgeAt", () => {
 describe("purge-quarantine: environment", () => {
   it("does nothing without Firebase", async () => {
     configured.value = false;
-    expect(await purgeQuarantine(NOW, { store })).toEqual({ expired: 0, swept: 0, purged: 0, extended: 0, skipped: 0, retained: 0, failed: 0 });
+    expect(await purgeQuarantine(NOW, { store })).toEqual({ expired: 0, swept: 0, purged: 0, extended: 0, skipped: 0, retained: 0, freedBytes: 0, failed: 0 });
     expect(repo.listExpiredQuarantine).not.toHaveBeenCalled();
   });
 });
@@ -569,6 +569,17 @@ describe("purge-quarantine: document purge and removed listings' photos", () => 
     expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: 2 });
     expect(store.keys("private")).toEqual([]);
     expect(recordMediaBytes).toHaveBeenCalledWith(-20, NOW);
+  });
+
+  it("frees the bytes of a photo deleted under a legal hold (variants kept until now), not those of a plain refusal", async () => {
+    const kept = upload("heldphoto001", { ...past, status: "rejected", rejectReason: "expired", heldObjects: true, size: 30 });
+    const refused = upload("refused00001", { ...past, status: "rejected", rejectReason: "expired", size: 70 });
+    seedVariants(LISTING, kept.id, "media");
+    vi.mocked(repo.listPastPurge).mockResolvedValue([kept, refused]);
+
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: 2, freedBytes: 30, failed: 0 });
+    expect(store.keys("media")).toEqual([]);
+    expect(recordMediaBytes).toHaveBeenCalledWith(-30, NOW);
   });
 
   it("an unattached upload of a live listing only has variants in the media bucket", async () => {

@@ -90,7 +90,7 @@ async function deleteUpload(store: ObjectStore, listing: ListingRecord, upload: 
   await deleteUploadDocument(upload.id);
   state.result.uploads += 1;
   state.budget -= 1;
-  if (upload.status === "ready" && upload.size) state.freedBytes += upload.size;
+  if ((upload.status === "ready" || upload.heldObjects) && upload.size) state.freedBytes += upload.size;
 }
 
 /**

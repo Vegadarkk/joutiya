@@ -23,13 +23,22 @@ function useRevealMessage(): (error: unknown) => string {
   };
 }
 
-export function RevealError({ error }: { error: unknown }) {
+export interface RevealErrorProps {
+  error: unknown;
+}
+
+export interface RevealChallengeProps {
+  failed: boolean;
+  onToken: (token: string) => void;
+}
+
+export function RevealError({ error }: RevealErrorProps) {
   const message = useRevealMessage();
   return <InlineError>{message(error)}</InlineError>;
 }
 
 /** The IP allowance is spent (escalation.ts): a challenge, whose token goes with the same request. */
-export function RevealChallenge({ failed, onToken }: { failed: boolean; onToken: (token: string) => void }) {
+export function RevealChallenge({ failed, onToken }: RevealChallengeProps) {
   const t = useTranslations("ListingPage.contact");
   return (
     <div data-testid="reveal-challenge" className="flex flex-col gap-2 rounded-md bg-surface-muted p-3 text-sm">

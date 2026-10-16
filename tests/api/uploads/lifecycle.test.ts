@@ -15,6 +15,10 @@ vi.mock("@/lib/listings/revalidate", async (importOriginal) => {
   const actual = await importOriginal<typeof Revalidate>();
   return { ...actual, revalidateListingPaths: vi.fn(actual.revalidateListingPaths) };
 });
+vi.mock("@/lib/uploads/storage-gauge", async (importOriginal) => {
+  const actual = await importOriginal<typeof StorageGauge>();
+  return { ...actual, recordMediaBytes: vi.fn(actual.recordMediaBytes) };
+});
 const classifier = vi.hoisted(() => ({ nsfw: 0.02, faces: 0, calls: 0, during: null as null | (() => Promise<void>) }));
 vi.mock("@/lib/media/classify", async (importOriginal) => ({
   ...(await importOriginal<typeof Classify>()),
@@ -40,12 +44,14 @@ import type { ListingResponse } from "@/lib/contracts/listings";
 import { listContentOps } from "@/lib/db/repositories/content-ops";
 import { getListing } from "@/lib/db/repositories/listings";
 import { getSearchOutbox, searchOutboxRef } from "@/lib/db/repositories/search-outbox";
-import { getUpload } from "@/lib/db/repositories/uploads";
+import { getUpload, sumStoredBytes } from "@/lib/db/repositories/uploads";
+import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { resetServerEnv } from "@/lib/env";
 import { db } from "@/lib/firebase/admin";
 import type * as Classify from "@/lib/media/classify";
 import type * as Revalidate from "@/lib/listings/revalidate";
+import type * as StorageGauge from "@/lib/uploads/storage-gauge";
 import { revalidateListingPaths } from "@/lib/listings/revalidate";
 import { sharp } from "@/lib/media/sharp-setup";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
@@ -399,9 +405,16 @@ describe("DELETE /api/uploads/{id} under a legal hold", () => {
     await db().collection(COLLECTIONS.listings).doc(live.id).update({ legalHold: ["requisition-1"] });
     store.calls.length = 0;
 
+    const bytesBefore = await sumStoredBytes();
+    const heldSize = (await getUpload(held))!.size!;
+    expect(heldSize).toBeGreaterThan(0);
+    vi.mocked(recordMediaBytes).mockClear();
     expect((await call(remove, "DELETE", `/api/uploads/${held}`, { member: owner })).status).toBe(204);
+    expect(recordMediaBytes).not.toHaveBeenCalled();
     expect((await getListing(live.id))!.photos.map((photo) => photo.id)).toEqual([kept]);
-    expect(await getUpload(held)).toMatchObject({ status: "rejected", rejectReason: "expired", variants: ["l", "s"] });
+    expect(await getUpload(held)).toMatchObject({ status: "rejected", rejectReason: "expired", variants: ["l", "s"], heldObjects: true });
+    // Its variants are still stored: the gauge's nightly recount keeps counting them.
+    expect(await sumStoredBytes()).toBe(bytesBefore);
     // Evidence: nothing deleted in either bucket.
     expect(store.calls.filter((entry) => entry.op === "delete")).toEqual([]);
     expect(store.keys("media").filter((key) => key.includes(held))).toHaveLength(2);
@@ -411,6 +424,8 @@ describe("DELETE /api/uploads/{id} under a legal hold", () => {
     expect((await call(remove, "DELETE", `/api/uploads/${pending}`, { member: owner })).status).toBe(204);
     expect((await completeAs(owner, pending)).body).toEqual({ status: "rejected", rejectReason: "expired" });
     expect(await getUpload(pending)).not.toBeNull();
+    // Nothing was stored for it: not counted.
+    expect((await getUpload(pending))!.heldObjects).toBeUndefined();
 
     const photosOf = async () => (await listingApi<ListingResponse>(getListingRoute, "GET", `/api/listings/${live.id}`, { member: owner })).body.listing.photos.map((photo) => [photo.id, photo.status]);
     const expected = [
@@ -426,9 +441,11 @@ describe("DELETE /api/uploads/{id} under a legal hold", () => {
     expect((await listingApi(patchListing, "PATCH", `/api/listings/${live.id}`, { member: owner, body: { photos: [kept, held] } })).status).toBe(200);
     expect((await getListing(live.id))!.photos.map((photo) => photo.id)).toEqual([kept]);
 
-    // After the hold, deleting it again removes the objects and the document.
+    // After the hold, deleting it again removes the objects and the document, and its bytes.
     expect((await call(remove, "DELETE", `/api/uploads/${held}`, { member: owner })).status).toBe(204);
     expect(await getUpload(held)).toBeNull();
+    expect(await sumStoredBytes()).toBe(bytesBefore - heldSize);
+    expect(recordMediaBytes).toHaveBeenCalledExactlyOnceWith(-heldSize, expect.any(Date));
     expect(store.keys("media").filter((key) => key.includes(held))).toEqual([]);
   });
 });

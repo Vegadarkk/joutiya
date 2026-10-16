@@ -51,7 +51,8 @@ import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 //    Every skipped upload gets a later purgeAt, so no run reads it again before then.
 // Steps 2 to 4 never mark anything before its objects are handled: a storage failure leaves the
 // upload for the next run. Moving photos changes no byte count: the R2 storage gauge sums the
-// `ready` uploads, whichever bucket holds them (account total).
+// uploads whose variants are stored (`ready`, and `heldObjects`), whichever bucket holds them
+// (account total).
 //
 // Edge cache: the public URL of a moved variant answers 404 at R2, but Cloudflare and browsers may
 // still serve a copy cached before the move, up to the object's max-age (MEDIA_CACHE_CONTROL: one
@@ -89,6 +90,8 @@ export interface PurgeQuarantineResult {
   skipped: number;
   /** Uploads of removed listings whose variants moved to the private bucket (steps 3 and 4). */
   retained: number;
+  /** Bytes of stored variants deleted with their documents (step 4), taken off the R2 storage gauge. */
+  freedBytes: number;
   failed: number;
 }
 
@@ -250,7 +253,6 @@ export function retainedUntil(listing: Pick<ListingRecord, "purgeAt">, now: Date
 
 async function purgeExpiredDocuments(store: ObjectStore, now: Date, result: PurgeQuarantineResult): Promise<void> {
   let page: PurgeCursor | undefined;
-  let freedBytes = 0;
   for (let pages = 0; pages < PURGE_PAGES; pages += 1) {
     const uploads = await listPastPurge(now, PURGE_QUARANTINE_BATCH, page);
     if (uploads.length === 0) break;
@@ -274,7 +276,7 @@ async function purgeExpiredDocuments(store: ObjectStore, now: Date, result: Purg
           // An orphan may have been a removed listing's: its variants can be in either bucket.
           await deleteObjects(store, upload, upload.bucket === "private" || !listing ? ["media", "private"] : ["media"]);
           await deleteUploadDocument(upload.id);
-          if (upload.status === "ready" && upload.size) freedBytes += upload.size;
+          if ((upload.status === "ready" || upload.heldObjects) && upload.size) result.freedBytes += upload.size;
           result.purged += 1;
         }
       } catch (error) {
@@ -286,11 +288,11 @@ async function purgeExpiredDocuments(store: ObjectStore, now: Date, result: Purg
     page = { purgeAt: last.purgeAt, id: last.id };
     if (uploads.length < PURGE_QUARANTINE_BATCH) break;
   }
-  if (freedBytes > 0) await recordMediaBytes(-freedBytes, now);
+  if (result.freedBytes > 0) await recordMediaBytes(-result.freedBytes, now);
 }
 
 export async function purgeQuarantine(now = new Date(), deps: { store?: ObjectStore } = {}): Promise<PurgeQuarantineResult> {
-  const result: PurgeQuarantineResult = { expired: 0, swept: 0, purged: 0, extended: 0, skipped: 0, retained: 0, failed: 0 };
+  const result: PurgeQuarantineResult = { expired: 0, swept: 0, purged: 0, extended: 0, skipped: 0, retained: 0, freedBytes: 0, failed: 0 };
   if (!isFirestoreConfigured()) {
     logger.warn("purge-quarantine skipped: Firebase not configured");
     return result;
