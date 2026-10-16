@@ -69,6 +69,7 @@ const TABLE: Record<BackedUpId, Omit<BackupCollection, "id">> = {
   moderationDecisions: { scope: "root", timeField: "createdAt" },
   favorites: { scope: "group", timeField: "createdAt" },
   savedSearches: { scope: "group", timeField: "updatedAt" },
+  proProfiles: { scope: "root", timeField: "updatedAt" },
 };
 
 export const BACKUP_COLLECTIONS: readonly BackupCollection[] = (Object.keys(TABLE) as BackedUpId[]).map((id) => ({ id, ...TABLE[id] }));

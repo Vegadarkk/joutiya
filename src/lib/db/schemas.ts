@@ -428,4 +428,6 @@ export const COLLECTIONS = {
   // Phase 4 (subcollections of users/{uid})
   favorites: "favorites",
   savedSearches: "savedSearches",
+  // Phase 7
+  proProfiles: "proProfiles",
 } as const;
