@@ -23,10 +23,12 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | 13 | Test de reconstruction de la VM | Claude | Avant le lancement |
 | 14 | Réglages des buckets R2 | Nav, sur votre « J'accepte » ; Claude vérifie | Fait le 16 octobre, vérifié |
 | 15 | Domaines des médias | Nav | À l'activation de la zone (étape 7) |
+| 16 | Variables de la VM | Claude (Run Command), Cody pour vos clés | Outil prêt ; dès que la VM existe |
 
 ## Ce qui reste à vous
 
 - **Étape 8** : sur la page de jeton GitHub préparée par Nav, cliquer sur **Generate token**, puis l'enregistrer dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
+- **Étape 16**, quand la VM existera : lancer le prompt O dans Cody, qui envoie les clés de votre `.env.local` sur la VM.
 
 Rien d'autre : ni clé SSH, ni commande, ni console.
 
@@ -183,6 +185,24 @@ Fait le 16 octobre : Nav a appliqué la fiche à 11:35 UTC, sur votre « J'accep
 - `joutiya-staging-media` : `media-staging.joutiya.ma`.
 
 Puis, pour chacun, version TLS minimale **1.2**, comme le reste de la zone. Cloudflare crée lui-même l'enregistrement DNS. Hors champ : `r2.dev`, tout autre bucket. Les deux noms restent au premier niveau (`media-staging`, pas `media.staging`) : le certificat universel ne couvre que ce niveau. Claude vérifie ensuite chaque domaine (TLS et CORS).
+
+## 16. Variables de la VM
+
+Chaque environnement lit `/etc/joutiya/<env>/app.env` (root, 0600) et deux mots de passe Valkey. Claude les écrit par Run Command avec `node scripts/oracle-vm.ts env <staging|prod>`, qui fusionne les noms envoyés avec ceux déjà présents et ne montre jamais une valeur : seulement les noms, leur provenance et ce qui manque encore.
+- **Registre** `infra/targets.json` : adresses du site et du back-office, projet et application web Firebase, compte de service `joutiya-web`, client Google de connexion, clé de site Turnstile, DSN Sentry, compte et buckets R2, Access.
+- **VM** : `CSRF_SECRET` et les mots de passe Valkey, générés une fois sur place ; ils n'en sortent jamais et une VM reconstruite en reçoit de nouveaux.
+- **Votre `.env.local`**, lu sur votre PC par Cody (prompt O) : les clés secrètes. Le fichier sert aussi à un autre produit : l'outil ne fait que le lire, ne prend que des noms de `.env.example` et seulement sous deux formes : `NOM_STAGING=…` ou `NOM_PROD=…`, ou la paire rangée par Nav le 16 octobre (ligne de production active, ligne du staging en commentaire juste dessous) pour `FIREBASE_SERVER_API_KEY`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` et `MAIL_FALLBACK_API_KEY`. Toute autre ligne est ignorée : valeur de développement ou de l'autre produit. Une clé de site Turnstile différente du registre arrête tout : la paire aurait été mal lue.
+- **Claude, au fil des étapes** : `CF_ACCESS_AUD` (étape 6), `ALERT_RELAY_URL` et `ALERT_RELAY_SECRET` (Worker, étape 11), `MAIL_API_KEY` et `MAIL_WEBHOOK_SECRET` (Resend, après la bascule DNS), `MAP_PMTILES_URL` (phase 3). Puis il relance web et worker.
+
+`HASH_PEPPER` sert aux empreintes des e-mails, des téléphones et des désabonnements dans Firestore : il ne doit jamais changer. Cody le génère dans votre `.env.local` (`HASH_PEPPER_STAGING`, `HASH_PEPPER_PROD`), qui en garde la copie ; **Vous :** rangez-la aussi dans votre gestionnaire de mots de passe. Les réglages R2 ne s'écrivent qu'avec les deux clés `R2_ACCESS_KEY_ID` et `R2_SECRET_ACCESS_KEY` de l'environnement : un jeu partiel empêche l'application de démarrer.
+
+Pour l'envoi, Cody a besoin dans votre `.env.local` des six lignes `JOUTIYA_OCI_*` de votre environnement cloud (mêmes noms, mêmes valeurs : la clé de `joutiya-claude`). Oracle garde le texte des commandes 7 jours, lisible seulement par les administrateurs du compte et `joutiya-claude`, qui lisent déjà ces fichiers en root.
+
+**O. Variables de la VM** (prompt Cody)
+
+```text
+Envoie les clés de mon .env.local sur la VM de Joutiya (docs/phase-1.md, étape 16). Ce fichier sert aussi à un autre produit : ne le lis pas toi-même (ni cat, head, tail, sed, ni grep sans -q), ne l'affiche pas, ne le réécris pas et ne change ni l'ordre ni le texte de ses lignes ; seuls les deux scripts ci-dessous le lisent. 1) `node scripts/vm-env.ts pepper .env.local` : ajoute HASH_PEPPER_STAGING et HASH_PEPPER_PROD à la fin du fichier s'ils manquent, sans montrer de valeur ; dis-moi alors de les copier dans mon gestionnaire de mots de passe. 2) Pour staging puis prod : `node --env-file=.env.local scripts/oracle-vm.ts env <env> --from=.env.local`, simulation qui liste les noms, leurs lignes et ce qui manque. Sans erreur, relance la même commande avec --apply ; sinon montre-moi les erreurs et arrête. S'il manque des variables JOUTIYA_OCI_*, dis-moi lesquelles ajouter, sans valeur. Ne me donne aucune valeur, seulement des noms.
+```
 
 ## Fin de la phase 1
 
