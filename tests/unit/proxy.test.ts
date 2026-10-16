@@ -164,7 +164,7 @@ describe("proxy", () => {
     expect(await checkPageLimits.mock.results.at(-1)?.value).toEqual({ kind: "allow" });
   });
 
-  it("gives the search page a device cookie (dynamic page), keeping a valid one", async () => {
+  it("gives the search page a nonce CSP and a device cookie (dynamic page), keeping a valid one", async () => {
     const fresh = await proxy(request("/fr/recherche?q=velo"));
     // Only the device cookie: the locale cookie stays off shared pages.
     const cookies = fresh.headers.getSetCookie();
@@ -172,7 +172,9 @@ describe("proxy", () => {
     expect(cookies[0]).toMatch(/^__Host-did=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{22}; Path=\/; .*HttpOnly/);
     expect(cookies[0]).toContain("Secure");
     const value = /^__Host-did=([^;]+)/.exec(cookies[0] ?? "")?.[1];
-    expect(fresh.headers.get(INLINE_HASH_MARKER)).toBe("1");
+    // Streamed per request: React's inline scripts need the nonce, not the hash of shared pages.
+    expect(fresh.headers.get(INLINE_HASH_MARKER)).toBeNull();
+    expect(fresh.headers.get("content-security-policy")).toMatch(/script-src[^;]*'nonce-/);
     const kept = await proxy(new NextRequest("https://joutiya.ma/fr/recherche", { headers: { host: "joutiya.ma", cookie: `__Host-did=${value}` } }));
     expect(kept.headers.get("set-cookie")).toBeNull();
     expect((await proxy(request("/fr/c/vehicules"))).headers.get("set-cookie")).toBeNull();

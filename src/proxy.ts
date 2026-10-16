@@ -126,6 +126,20 @@ function isPrivatePath(pathname: string): boolean {
 }
 
 /**
+ * Public pages rendered per request and streamed (Suspense): React's inline streaming scripts
+ * ($RC...) change with every response and match no framework shape of the hash CSP, so these
+ * pages take the nonce CSP of private pages. They are never cached anyway.
+ */
+const DYNAMIC_PUBLIC_SEGMENTS: readonly string[] = ["recherche"];
+
+/** Device cookie as a raw header: the cookies API would also write back a removed locale cookie. */
+function appendDeviceCookie(response: NextResponse): void {
+  const device = new NextResponse(null);
+  setDeviceCookie(device, newDeviceCookie().value);
+  for (const cookie of device.headers.getSetCookie()) response.headers.append("set-cookie", cookie);
+}
+
+/**
  * Over the page-view limits (D14): without a pass, GET and HEAD go to the Turnstile page (302);
  * otherwise a small 429 page. Never cached (Cloudflare would cache a bare 302 for 20 minutes).
  */
@@ -178,10 +192,18 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     if (limited) return limited;
   }
 
-  if (isPrivatePath(pathname)) {
+  const dynamicPublic = DYNAMIC_PUBLIC_SEGMENTS.includes(pageSegment(pathname));
+  if (isPrivatePath(pathname) || dynamicPublic) {
     const nonce = createNonce();
     const policy = csp("private", nonce);
     const response = decorate(forwardWithNonce(routed, request, policy, nonce), "public", policy);
+    if (dynamicPublic) {
+      // Like shared pages, no locale cookie. The device cookie makes the per-device search limits
+      // apply (D13) instead of the anonymous bucket of the IP.
+      response.headers.delete("set-cookie");
+      if (!readDeviceId(request.cookies.get(DEVICE_COOKIE)?.value)) appendDeviceCookie(response);
+      return response;
+    }
     // The device cookie exists before the first API call: sign-up and sign-in limits are counted
     // per device, and a browser without the cookie would share the anonymous bucket of its IP
     // (src/lib/rate-limit/keys.ts). Private pages are dynamic, so the cookie costs no cache.
@@ -194,14 +216,6 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // Shared pages carry no cookie, so Cloudflare can cache them. The locale cookie is written by
   // the locale switcher (next-intl Link) and still read here for the "/" redirect.
   response.headers.delete("set-cookie");
-  // The search page is dynamic (never cached): its device cookie makes the per-device search limits
-  // apply (D13) instead of the anonymous bucket of the IP.
-  // Appended as a header: the cookies API would also write back the locale cookie removed above.
-  if (pageSegment(pathname) === "recherche" && !readDeviceId(request.cookies.get(DEVICE_COOKIE)?.value)) {
-    const device = new NextResponse(null);
-    setDeviceCookie(device, newDeviceCookie().value);
-    for (const cookie of device.headers.getSetCookie()) response.headers.append("set-cookie", cookie);
-  }
   return response;
 }
 
