@@ -19,27 +19,36 @@ interface ListingActionsProps {
   busy?: boolean;
   /** Localized path of the public page (published listings). */
   publicHref?: string | null;
+  now?: Date;
+}
+
+/**
+ * A paused listing resumes only before its expiry (lifecycle: the server answers 409 after it, even
+ * while the nightly expire job has not turned it `expired` yet; renewal then takes over).
+ */
+export function canResume(listing: Pick<OwnerListingSummary, "status" | "expiresAt">, now = new Date()): boolean {
+  return listing.status === "paused" && listing.expiresAt !== null && Date.parse(listing.expiresAt) > now.getTime();
 }
 
 /** Which actions a status allows (design D16 and the lifecycle table). */
-export function allowedActions(listing: OwnerListingSummary): { edit: boolean; view: boolean; pause: boolean; resume: boolean; sold: boolean; renew: boolean; remove: boolean } {
+export function allowedActions(listing: OwnerListingSummary, now = new Date()): { edit: boolean; view: boolean; pause: boolean; resume: boolean; sold: boolean; renew: boolean; remove: boolean } {
   const { status } = listing;
   return {
     edit: status === "draft" || status === "published" || status === "paused" || status === "pending_review" || status === "rejected" || status === "expired",
     view: status === "published" && Boolean(listing.slugId),
     pause: status === "published",
-    resume: status === "paused",
+    resume: canResume(listing, now),
     sold: status === "published" || status === "paused",
     renew: listing.canRenew && (status === "published" || status === "expired"),
     remove: status !== "removed" && status !== "purged",
   };
 }
 
-export function ListingActions({ listing, onAction, onDelete, busy, publicHref }: ListingActionsProps) {
+export function ListingActions({ listing, onAction, onDelete, busy, publicHref, now }: ListingActionsProps) {
   const t = useTranslations("MyListings");
   const [confirm, setConfirm] = useState<"delete" | "sold" | null>(null);
   const [working, setWorking] = useState(false);
-  const allowed = allowedActions(listing);
+  const allowed = allowedActions(listing, now);
   const title = listing.title || t("untitled");
   const item = cn("flex min-h-11 cursor-pointer items-center gap-2.5 rounded-sm px-3 py-2 text-sm outline-none data-[highlighted]:bg-surface-muted [&_svg]:size-4 [&_svg]:text-foreground-muted");
 

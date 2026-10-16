@@ -1,8 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Phone reveal (architecture §6 "/api/listings/[id]/phone"): who may ask (signed in, verified
-// e-mail, account older than 24 hours), on which listings (published, phone shown), what is written
-// (revealLogs with hashed prefixes, listingStats.phoneReveals, once per viewer) and the IP escalation.
+// e-mail, account older than 24 hours), on which listings (published, phone shown; a listing that
+// was never public answers like a missing one), what is written (revealLogs with hashed prefixes,
+// listingStats.phoneReveals, once per viewer), the per-call limit and the IP escalation.
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/rate-limit/limiter", { spy: true });
@@ -11,17 +12,19 @@ vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
   verifyTurnstile: vi.fn(async () => ({ ok: true, codes: [] })),
 }));
 
+import { RATE_LIMITS } from "@/config/rate-limits";
 import { POST as create } from "@/app/api/listings/route";
-import { PATCH as patch } from "@/app/api/listings/[id]/route";
+import { DELETE as remove, PATCH as patch } from "@/app/api/listings/[id]/route";
 import { POST as pause } from "@/app/api/listings/[id]/pause/route";
 import { POST as reveal } from "@/app/api/listings/[id]/phone/route";
 import { POST as publish } from "@/app/api/listings/[id]/publish/route";
 import type { CreateListingResponse, ListingPatch, PhoneRevealResponse } from "@/lib/contracts/listings";
 import { getListingStats } from "@/lib/db/repositories/listing-stats";
+import { updateListing } from "@/lib/db/repositories/listings";
 import { listRevealLogs } from "@/lib/db/repositories/reveal-logs";
 import { resetServerEnv } from "@/lib/env";
 import { displayPhone } from "@/lib/phone/normalize";
-import { consumeLimit, resetRateLimiters } from "@/lib/rate-limit/limiter";
+import { consumeLimit, limitState, resetRateLimiters } from "@/lib/rate-limit/limiter";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { DAY_MS, api, freshPhone, member, readyPatch, seedReadyUpload, type ErrorBody, type ListingBody, type Member } from "./helpers";
 
@@ -97,22 +100,58 @@ describe("POST /api/listings/{id}/phone", () => {
     expect((await ask(owner, id)).status).toBe(200);
   });
 
-  it("answers 404 when no number is shown or the listing is a draft, 409 when it is not live", async () => {
+  it("answers 404 when no number is shown or the listing is missing or never public, 409 when public but not live", async () => {
     const owner = await member({ phone: freshPhone() });
     const viewer = await member();
-    const hidden = await listingOf(owner, { showPhone: false, whatsapp: false });
-    expect((await ask(viewer, hidden)).status).toBe(404);
-    const draft = await listingOf(owner, { showPhone: true, whatsapp: true }, false);
-    expect((await ask(viewer, draft)).status).toBe(404);
-    expect((await ask(viewer, "abcd2345")).status).toBe(404);
-    expect((await ask(viewer, "not-an-id")).status).toBe(404);
+    const missing = await ask(viewer, "abcd2345");
+    expect([missing.status, missing.body.error.code]).toEqual([404, "not_found"]);
+    const notFound = (id: string) => ask(viewer, id).then((result) => expect([result.status, result.body.error.code], id).toEqual([404, "not_found"]));
+    await notFound("not-an-id");
+    await notFound(await listingOf(owner, { showPhone: false, whatsapp: false }));
+    await notFound(await listingOf(owner, { showPhone: true, whatsapp: true }, false));
+    // Held for review, rejected or deleted: the same answer as a missing id (no existence leak).
+    for (const status of ["pending_review", "rejected"] as const) {
+      const id = await listingOf(owner);
+      await updateListing(id, { status });
+      await notFound(id);
+    }
+    const deleted = await listingOf(owner);
+    expect((await api(remove, "DELETE", `/api/listings/${deleted}`, { member: owner })).status).toBe(204);
+    await notFound(deleted);
 
+    // Public but not live (the page shows a banner): paused, sold, expired.
     const live = await listingOf(owner);
     expect((await api(pause, "POST", `/api/listings/${live}/pause`, { member: owner })).status).toBe(200);
     const paused = await ask(viewer, live);
-    expect(paused.status).toBe(409);
-    expect(paused.body.error.code).toBe("listing_unavailable");
+    expect([paused.status, paused.body.error.code]).toEqual([409, "listing_unavailable"]);
+    for (const status of ["sold", "expired"] as const) {
+      await updateListing(live, { status });
+      const ended = await ask(viewer, live);
+      expect([ended.status, ended.body.error.code], status).toEqual([409, "listing_unavailable"]);
+    }
     expect(await listRevealLogs(live)).toEqual([]);
+  });
+
+  it("counts every call per account, repeats included (reveal.call.uid), before any read", async () => {
+    expect(RATE_LIMITS["reveal.call.uid"]).toMatchObject({ points: 200, policy: "open" });
+    const owner = await member({ phone: freshPhone() });
+    const viewer = await member();
+    const id = await listingOf(owner);
+    expect((await ask(viewer, id)).status).toBe(200);
+    // A repeat skips the reveal limiters but not this one.
+    expect((await ask(viewer, id)).status).toBe(200);
+    expect((await limitState("reveal.call.uid", viewer.uid))?.consumedPoints).toBe(2);
+    expect((await limitState("reveal.uid.day", viewer.uid))?.consumedPoints).toBe(1);
+    expect((await consumeLimit("reveal.call.uid", viewer.uid, RATE_LIMITS["reveal.call.uid"].points - 3)).ok).toBe(true);
+    expect((await ask(viewer, id)).status).toBe(200);
+
+    const limited = await ask(viewer, id);
+    expect([limited.status, limited.body.error.code]).toEqual([429, "rate_limited"]);
+    expect(Number(limited.header("retry-after"))).toBeGreaterThan(0);
+    // Unknown ids are refused the same way once the budget is spent (no probing past it).
+    expect((await ask(viewer, "abcd2345")).status).toBe(429);
+    expect(await listRevealLogs(id)).toHaveLength(1);
+    expect((await ask(await member(), id)).status).toBe(200);
   });
 
   it("escalates to Turnstile past the IP allowance and rejects a malformed body", async () => {

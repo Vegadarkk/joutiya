@@ -13,11 +13,13 @@ import { logger } from "@/lib/logging/logger";
 import { displayPhone } from "@/lib/phone/normalize";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { escalateOnIp } from "./escalation";
+import { PUBLIC_STATES } from "./public";
 
 // Phone reveal (§6 "/api/listings/[id]/phone"): a signed-in account older than 24 hours with a
 // verified e-mail; 10/h and 30/day per uid, 20/day per device, 60/day per IP then Turnstile; every
-// limiter closed (Valkey down = refused). The number never sits in the HTML: this is the only path
-// to it, logged in revealLogs (90 days) and counted in listingStats.
+// limiter closed (Valkey down = refused); the handler counts every call first (`reveal.call.uid`).
+// The number never sits in the HTML: this is the only path to it, logged in revealLogs (90 days)
+// and counted in listingStats.
 
 export const MIN_ACCOUNT_AGE_MS = 24 * 60 * 60 * 1000;
 /** Reveals of one listing in a day past which the owner is told (§6 "aspiration des numéros"). */
@@ -47,7 +49,10 @@ export async function revealPhone(auth: AuthContext, request: Request, listingId
   if (!emailVerified || now.getTime() - viewer.createdAt.getTime() < MIN_ACCOUNT_AGE_MS) throw new HttpError(403, "reveal_not_allowed");
 
   const listing = await getListing(listingId);
-  if (!listing || listing.status === "removed" || listing.status === "purged" || listing.status === "draft") throw notFound();
+  // Missing or never public (draft, pending_review, rejected, removed, purged): the same 404, so
+  // the route does not tell which ids exist. Public but not live (paused, sold, expired: the page
+  // shows a banner instead of the contact actions): 409.
+  if (!listing || !(PUBLIC_STATES as readonly string[]).includes(listing.status)) throw notFound();
   if (listing.status !== "published") throw new HttpError(409, "listing_unavailable");
   if (!listing.contact.showPhone && !listing.contact.whatsapp) throw notFound();
 

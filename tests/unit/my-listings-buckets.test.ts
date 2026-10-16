@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BUCKET_STATUSES, primaryAction, tabKeyTarget, visibleListings } from "@/components/listings/owner/buckets";
-import { allowedActions } from "@/components/listings/owner/listing-actions";
+import { allowedActions, canResume } from "@/components/listings/owner/listing-actions";
 import { OWNER_LIST_BUCKETS, type ListingStatus, type OwnerListingSummary } from "@/lib/contracts/listings";
 
 // "Mes annonces": what each tab shows, the action each row puts forward, the actions its menu
@@ -65,8 +65,19 @@ describe("allowedActions", () => {
   });
 
   it("resumes a paused listing and keeps a sold one read-only", () => {
-    expect(allowedActions(summary("paused"))).toMatchObject({ pause: false, resume: true, sold: true, view: false });
+    const now = new Date("2026-10-16T12:00:00.000Z");
+    expect(allowedActions(summary("paused", { expiresAt: "2026-11-01T00:00:00.000Z" }), now)).toMatchObject({ pause: false, resume: true, sold: true, view: false });
     expect(allowedActions(summary("sold"))).toMatchObject({ edit: false, pause: false, resume: false, sold: false, renew: false, remove: true });
+  });
+
+  it("never offers resume once the expiry has passed (the nightly job has not run yet)", () => {
+    const now = new Date("2026-10-16T12:00:00.000Z");
+    const lapsed = summary("paused", { expiresAt: "2026-10-16T02:00:00.000Z" });
+    expect(allowedActions(lapsed, now)).toMatchObject({ resume: false, sold: true, remove: true, renew: false });
+    expect(canResume(summary("paused", { expiresAt: now.toISOString() }), now)).toBe(false);
+    expect(canResume(summary("paused", { expiresAt: "2026-10-16T12:00:01.000Z" }), now)).toBe(true);
+    expect(canResume(summary("paused"), now)).toBe(false);
+    expect(canResume(summary("published", { expiresAt: "2026-11-01T00:00:00.000Z" }), now)).toBe(false);
   });
 
   it("offers only edit and delete on drafts and listings under review", () => {

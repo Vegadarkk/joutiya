@@ -63,6 +63,16 @@ export const RATE_LIMITS = {
   // POST /api/listings: 5 per day per account (individuals, D5), 30 per hour per IP then Turnstile.
   "listing.create.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },
   "listing.create.ip": { points: 30, duration: HOUR, policy: "open", key: "ip" },
+  // The owner's routes cost Firestore quota shared by the whole site (Spark: 20 000 writes and
+  // 50 000 reads a day). POST /api/listings (a new draft; the 5 above count publications, at
+  // publish): 20 per day per account. MAX_DRAFTS caps live drafts, this caps create-delete loops.
+  "listing.new.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
+  // DELETE /api/listings/{id} and pause / resume / sold / renew (~4 writes and an ISR
+  // revalidation each): 120 per day per account (an individual has at most 20 active listings).
+  "listing.status.uid": { points: 120, duration: DAY, policy: "open", key: "uid" },
+  // GET /api/listings/{id} and /mine, points = documents read (a /mine tab reads up to 100, the
+  // owner view the listing and its uploads): 5 000 per day per account, a tenth of the Spark day.
+  "listing.owner.read.uid": { points: 5000, duration: DAY, policy: "open", key: "uid" },
   // POST /api/uploads/sign: 30 per hour; bytes declared per day (points = bytes, 200 MiB).
   // Closed: every signed upload costs R2 operations and storage.
   "upload.sign.uid": { points: 30, duration: HOUR, policy: "closed", key: "uid" },
@@ -75,6 +85,10 @@ export const RATE_LIMITS = {
   "reveal.uid.day": { points: 30, duration: DAY, policy: "closed", key: "uid" },
   "reveal.device": { points: 20, duration: DAY, policy: "closed", key: "device" },
   "reveal.ip": { points: 60, duration: DAY, policy: "closed", key: "ip" },
+  // Every reveal call, repeats included: a listing this account already revealed skips the four
+  // limiters above yet still reads ~5 documents. 200 per day per account; open, a repeat discloses
+  // nothing new and first reveals stay behind the closed limiters.
+  "reveal.call.uid": { points: 200, duration: DAY, policy: "open", key: "uid" },
   // Public listing and profile reads (API; the SSR page limit lives in the proxy, phase 4).
   "listing.read.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
   "profile.read.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
