@@ -4,8 +4,10 @@
 //
 // Where each value comes from:
 // - infra/targets.json and the hosts of §1 (derivedValues), never a file;
-// - the VM itself for CSRF_SECRET and the Valkey passwords (with the two Redis URLs): generated
-//   there once, they never leave it, and a rebuilt VM simply gets new ones;
+// - the VM itself for CSRF_SECRET, the Valkey passwords (with the two Redis URLs) and Meilisearch's
+//   master key (meilisearch.env, phase 4): generated there once, they never leave it, and a rebuilt
+//   VM simply gets new ones. The app's two Meilisearch keys come from that master key
+//   (infra/vm/search-setup.sh);
 // - the dotenv files given with --from for everything else. On the owner's PC that is his
 //   .env.local, which he shares with another product: it is only read, and only names of
 //   .env.example count. For <env> (staging or prod):
@@ -47,10 +49,12 @@ const NOT_IN_APP_ENV = new Set([
   "ACCESS_OWNER_EMAIL",
   "ACCESS_CI_TOKEN_ID",
   "ACCESS_PROBE_TOKEN_ID",
+  // Meilisearch's own key, in meilisearch.env only: the app holds two scoped keys made from it.
+  "MEILI_MASTER_KEY",
 ]);
 
-/** Generated on the VM by the merge script, never taken from a file. */
-export const VM_GENERATED = ["CSRF_SECRET", "QUEUE_REDIS_URL", "RATE_LIMIT_REDIS_URL"] as const;
+/** Generated on the VM (by the merge script, the Meilisearch keys by search-setup.sh), never taken from a file. */
+export const VM_GENERATED = ["CSRF_SECRET", "QUEUE_REDIS_URL", "RATE_LIMIT_REDIS_URL", "MEILI_SEARCH_KEY", "MEILI_INDEX_KEY"] as const;
 
 /** A partial R2 set stops the app: the derived R2 settings are written only with both keys. */
 export const R2_KEYS = ["R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"] as const;
@@ -119,6 +123,8 @@ export function derivedValues(env: DeployedEnv, targets: Targets): Record<string
     R2_BUCKET_MEDIA: recorded.r2.media,
     R2_BUCKET_PRIVATE: recorded.r2.private,
     MEDIA_BASE_URL: `https://${HOSTS[env].media}`,
+    // Phase 4: Meilisearch on the environment's internal data network.
+    MEILI_URL: "http://meilisearch:7700",
   };
   return Object.fromEntries(Object.entries(values).filter((entry): entry is [string, string] => entry[1] !== null));
 }
@@ -316,6 +322,8 @@ export function envScripts(env: DeployedEnv, payload: string, dirs: EnvDirs = VM
     "done",
     `queue="$(sed -n 's/^VALKEY_PASSWORD=//p' ${dir}/valkey-queue.env)"`,
     `ratelimit="$(sed -n 's/^VALKEY_PASSWORD=//p' ${dir}/valkey-ratelimit.env)"`,
+    `[[ -s ${dir}/meilisearch.env ]] || printf 'MEILI_MASTER_KEY=%s\\n' "$(openssl rand -hex 32)" > ${dir}/meilisearch.env`,
+    `chmod 0600 ${dir}/meilisearch.env`,
     `printf "QUEUE_REDIS_URL='redis://:%s@valkey-queue:6379'\\nRATE_LIMIT_REDIS_URL='redis://:%s@valkey-ratelimit:6379'\\n" "$queue" "$ratelimit" >> "$new"`,
     'chmod 0600 "$new"',
     `mv -f "$new" ${dir}/app.env`,

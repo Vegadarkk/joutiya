@@ -142,7 +142,7 @@ Garde-fous : au plus 20 e-mails relayés par jour UTC (au-delà, l'application r
 ## 12. Mise en production et contrôles
 
 1. Claude vérifie que le dernier *Deploy staging* est vert, et que `https://staging.joutiya.ma` affiche l'accueil et les pages légales.
-2. Claude promeut la version du staging par Run Command (`node scripts/oracle-vm.ts promote --apply`, qui vide ensuite le cache Cloudflare) : seules les images déjà en service en staging peuvent passer, désignées par leur identifiant exact, et seulement un commit de `main`. Retour arrière : `rollback --apply`. La production n'a aucun accès SSH : seul le staging en garde un, pour la CI.
+2. Claude promeut la version du staging par Run Command (`node scripts/oracle-vm.ts promote --apply`, qui vide ensuite le cache Cloudflare) : seules les images déjà en service en staging peuvent passer, désignées par leur identifiant exact, et seulement un commit de `main`. Retour arrière : `rollback --apply`. La production n'a aucun accès SSH : seul le staging en garde un, pour la CI. Un déploiement, en staging comme en production, n'attend que web et worker : une recherche en panne répond 503 sans faire revenir la version précédente.
 3. Contrôles de fin de phase :
    - `https://joutiya.ma/api/health` répond `ok` ;
    - un balayage de tous les ports de l'IP publique de la VM n'en trouve aucun ouvert ;
@@ -190,7 +190,7 @@ Puis, pour chacun, version TLS minimale **1.2**, comme le reste de la zone. Clou
 
 Chaque environnement lit `/etc/joutiya/<env>/app.env` (root, 0600) et deux mots de passe Valkey. Claude les écrit par Run Command avec `node scripts/oracle-vm.ts env <staging|prod>`, qui fusionne les noms envoyés avec ceux déjà présents et ne montre jamais une valeur : seulement les noms, leur provenance et ce qui manque encore.
 - **Registre** `infra/targets.json` : adresses du site et du back-office, projet et application web Firebase, compte de service `joutiya-web`, client Google de connexion, clé de site Turnstile, DSN Sentry, compte et buckets R2, Access.
-- **VM** : `CSRF_SECRET` et les mots de passe Valkey, générés une fois sur place ; ils n'en sortent jamais et une VM reconstruite en reçoit de nouveaux.
+- **VM** : `CSRF_SECRET`, les mots de passe Valkey et la clé maîtresse de Meilisearch (`meilisearch.env`, phase 4), générés une fois sur place ; ils n'en sortent jamais et une VM reconstruite en reçoit de nouveaux. Les deux clés de recherche de l'application en dérivent : `node scripts/oracle-vm.ts search-setup <env> --apply` crée l'index et les écrit dans `app.env`, puis recrée web et worker, une fois qu'une version avec Meilisearch tourne.
 - **Votre `.env.local`**, lu sur votre PC par Cody (prompt O) : les clés secrètes. Le fichier sert aussi à un autre produit : l'outil ne fait que le lire, ne prend que des noms de `.env.example` et seulement sous deux formes : `NOM_STAGING=…` ou `NOM_PROD=…`, ou la paire rangée par Nav le 16 octobre (ligne de production active, ligne du staging en commentaire juste dessous) pour `FIREBASE_SERVER_API_KEY`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` et `MAIL_FALLBACK_API_KEY`. Toute autre ligne est ignorée : valeur de développement ou de l'autre produit. Une clé de site Turnstile différente du registre arrête tout : la paire aurait été mal lue.
 - **Claude, au fil des étapes** : `CF_ACCESS_AUD` (étape 6), `ALERT_RELAY_URL` et `ALERT_RELAY_SECRET` (Worker, étape 11), `MAIL_API_KEY` et `MAIL_WEBHOOK_SECRET` (Resend, après la bascule DNS), `MAP_PMTILES_URL` (phase 3). Puis il relance web et worker.
 

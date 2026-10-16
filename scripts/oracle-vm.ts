@@ -28,10 +28,13 @@
 //       the CI's public key for deploy-staging when given.
 //   node scripts/oracle-vm.ts env <staging|prod> --from=<file> [--from=<file>…] [--apply]
 //       merges /etc/joutiya/<env>/app.env through Run Command (scripts/vm-env.ts): values from
-//       infra/targets.json and the --from files (- reads stdin), CSRF_SECRET and the Valkey
-//       passwords generated once on the VM. Prints names and sources, never a value. Oracle keeps
-//       the text 7 days, readable only by the tenancy's administrators and joutiya-claude, who can
-//       read these files as root anyway.
+//       infra/targets.json and the --from files (- reads stdin), CSRF_SECRET, the Valkey passwords
+//       and Meilisearch's master key generated once on the VM. Prints names and sources, never a
+//       value. Oracle keeps the text 7 days, readable only by the tenancy's administrators and
+//       joutiya-claude, who can read these files as root anyway.
+//   node scripts/oracle-vm.ts search-setup <staging|prod> [--reindex=<max reads>] [--apply]
+//       Meilisearch's index and the app's two keys in app.env, then web and worker recreated
+//       (infra/vm/search-setup.sh); --reindex also rebuilds the index from Firestore (new VM).
 //   node scripts/oracle-vm.ts deploy-status
 //       releases and image IDs running in staging and production (read only).
 //   node scripts/oracle-vm.ts promote [--apply]
@@ -780,6 +783,18 @@ async function release(oci: Oci, targets: Targets, compartmentId: string, action
   printStatus(await deployStatus(oci, compartmentId, instance.id));
 }
 
+/** Root script of `search-setup`: infra/vm/search-setup.sh, installed by install.sh. */
+export function searchSetupScript(env: DeployedEnv, reindex?: string): string {
+  if (reindex !== undefined && !/^[1-9][0-9]{0,8}$/.test(reindex)) throw new Error("--reindex takes a number of Firestore reads");
+  return `/usr/local/sbin/joutiya-search-setup ${env}${reindex === undefined ? "" : ` --reindex=${reindex}`}`;
+}
+
+async function searchSetup(oci: Oci, compartmentId: string, env: DeployedEnv, reindex: string | undefined): Promise<void> {
+  const instance = await runningInstance(oci, compartmentId);
+  const output = await runCommand(oci, compartmentId, instance.id, `joutiya-search-setup ${env}`, rootCommand(searchSetupScript(env, reindex)), 3_600);
+  if (oci.apply) console.log(output.trimEnd());
+}
+
 async function reboot(oci: Oci, compartmentId: string): Promise<void> {
   const instance = await runningInstance(oci, compartmentId);
   await oci.write("POST", `/20160918/instances/${instance.id}${query({ action: "SOFTRESET" })}`, undefined, { action: "SOFTRESET" });
@@ -806,11 +821,12 @@ async function main(): Promise<void> {
   const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);
   const smallFallback = args.includes("--small-fallback");
-  const actions = ["create", "status", "reboot", "agent", "run", "sync", "env", "deploy-status", "promote", "rollback"];
-  const argument = action === "run" || action === "env";
-  if (!action || !actions.includes(action) || argument !== (file !== undefined) || (action === "env" && !(DEPLOYED_ENVS as readonly string[]).includes(file ?? ""))) {
+  const actions = ["create", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "deploy-status", "promote", "rollback"];
+  const argument = action === "run" || action === "env" || action === "search-setup";
+  const perEnv = action === "env" || action === "search-setup";
+  if (!action || !actions.includes(action) || argument !== (file !== undefined) || (perEnv && !(DEPLOYED_ENVS as readonly string[]).includes(file ?? ""))) {
     throw new Error(
-      "usage: scripts/oracle-vm.ts <create|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
+      "usage: scripts/oracle-vm.ts <create|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|search-setup <staging|prod> [--reindex=<n>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
     );
   }
 
@@ -831,6 +847,7 @@ async function main(): Promise<void> {
   else if (action === "agent") await agent(oci, compartment);
   else if (action === "run") await run(oci, compartment, file as string);
   else if (action === "sync") await sync(oci, compartment, args.find((arg) => arg.startsWith("--deploy-staging-key="))?.split("=").slice(1).join("="));
+  else if (action === "search-setup") await searchSetup(oci, compartment, file as DeployedEnv, args.find((arg) => arg.startsWith("--reindex="))?.slice("--reindex=".length));
   else if (action === "env") await envFiles(oci, targets, compartment, file as DeployedEnv, args.filter((arg) => arg.startsWith("--from=")).map((arg) => arg.slice("--from=".length)));
   else if (action === "deploy-status") await release(oci, targets, compartment, "status");
   else if (action === "promote" || action === "rollback") await release(oci, targets, compartment, action);

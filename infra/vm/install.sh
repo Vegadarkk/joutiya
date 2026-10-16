@@ -58,6 +58,7 @@ install -d -m 0755 -o root -g root /opt/joutiya/docker /opt/joutiya/docker/valke
 install -m 0644 -o root -g root "$SRC"/docker/compose.yml "$SRC"/docker/compose.prod.yml "$SRC"/docker/compose.staging.yml /opt/joutiya/docker/
 install -m 0644 -o root -g root "$SRC"/docker/valkey/*.conf /opt/joutiya/docker/valkey/
 install -m 0755 -o root -g root "$SRC/infra/vm/deploy-forced-command.sh" /usr/local/sbin/joutiya-deploy
+install -m 0755 -o root -g root "$SRC/infra/vm/search-setup.sh" /usr/local/sbin/joutiya-search-setup
 
 # sudoers: each file validated before it is moved into place (sudo skips names with a dot).
 install_sudoers() {

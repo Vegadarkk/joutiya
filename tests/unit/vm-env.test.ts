@@ -58,7 +58,7 @@ describe("app.env names", () => {
   const names = appEnvNames(example);
 
   it("keeps .env.example's names, less Compose's, development's and the owner's tooling", () => {
-    for (const name of ["APP_ENV", "NODE_ENV", "RELEASE", "GOOGLE_APPLICATION_CREDENTIALS", "DEV_MAILBOX", "FIRESTORE_EMULATOR_HOST", "ACCESS_CI_TOKEN_ID", "JOUTIYA_CLOUDFLARE_API_TOKEN"]) {
+    for (const name of ["APP_ENV", "NODE_ENV", "RELEASE", "GOOGLE_APPLICATION_CREDENTIALS", "DEV_MAILBOX", "FIRESTORE_EMULATOR_HOST", "ACCESS_CI_TOKEN_ID", "JOUTIYA_CLOUDFLARE_API_TOKEN", "MEILI_MASTER_KEY"]) {
       expect(names).not.toContain(name);
     }
     for (const name of [...REQUIRED, ...VM_GENERATED, ...PAIRED, ...Object.keys(derivedValues("staging", targets))]) expect(names).toContain(name);
@@ -78,6 +78,7 @@ describe("app.env names", () => {
       FIREBASE_SERVICE_ACCOUNT: "joutiya-web@joutiya-staging.iam.gserviceaccount.com",
       TURNSTILE_SITE_KEY: "0x4AAAAAAFYY7P8KeaWCGihV",
       MEDIA_BASE_URL: "https://media-staging.joutiya.ma",
+      MEILI_URL: "http://meilisearch:7700",
     });
     const prod = derivedValues("prod", targets);
     expect(prod).toMatchObject({ SITE_URL: "https://joutiya.ma", ADMIN_HOST: "admin.joutiya.ma", MEDIA_BASE_URL: "https://media.joutiya.ma" });
@@ -169,6 +170,11 @@ describe("app.env on the VM", () => {
     expect(merged).toMatch(/^CSRF_SECRET='[0-9a-f]{64}'$/m);
     expect(statSync(appEnv).mode & 0o777).toBe(0o600);
     expect(statSync(join(dirs.etc, "staging", "valkey-ratelimit.env")).mode & 0o777).toBe(0o600);
+    const meili = join(dirs.etc, "staging", "meilisearch.env");
+    const master = readFileSync(meili, "utf8");
+    expect(master).toMatch(/^MEILI_MASTER_KEY=[0-9a-f]{64}\n$/);
+    expect(statSync(meili).mode & 0o777).toBe(0o600);
+    expect(merged).not.toContain("MEILI_MASTER_KEY");
     expect(existsSync(join(dirs.stage, "staging.b64"))).toBe(false);
     expect(parseNames(results.at(-1)?.stdout ?? "")).toEqual(new Set(["CSRF_SECRET", "KEEP_ME", "LONG_VALUE", "MAIL_FROM", "QUEUE_REDIS_URL", "RATE_LIMIT_REDIS_URL", "TURNSTILE_SECRET_KEY"]));
     expect(results.map((result) => result.stdout).join("")).not.toContain("new $secret");
@@ -184,6 +190,7 @@ describe("app.env on the VM", () => {
     expect(/^CSRF_SECRET=.*$/m.exec(again)?.[0]).toBe(csrf);
     expect(again).toContain(`QUEUE_REDIS_URL='redis://:${queue}@valkey-queue:6379'\n`);
     expect(again).toContain("TURNSTILE_SECRET_KEY='new $secret #1'\n");
+    expect(readFileSync(meili, "utf8")).toBe(master);
   });
 
   it("changes nothing when a chunk is missing", () => {
