@@ -50,3 +50,22 @@ export async function assertQuotas(ids: readonly QuotaId[]): Promise<void> {
   const degraded = await firstDegraded(ids);
   if (degraded) throw quotaUnavailable(degraded);
 }
+
+/** gRPC status of a Spark refusal (google.rpc.Code RESOURCE_EXHAUSTED), as the Admin SDK reports it. */
+const RESOURCE_EXHAUSTED = 8;
+
+/**
+ * True when Firestore refused the call because a daily quota is spent: the counters missed some
+ * usage (client-side reads, retried transactions). Batch jobs stop on it like on a degraded quota.
+ */
+export function isResourceExhausted(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === RESOURCE_EXHAUSTED;
+}
+
+/**
+ * The same 503 as a degraded quota for a Firestore refusal (reads, writes and deletes all reset at
+ * the Pacific midnight), or null for any other error: for the API route wrapper.
+ */
+export function fromResourceExhausted(error: unknown, at = new Date()): HttpError | null {
+  return isResourceExhausted(error) ? quotaUnavailable("firestore.writes", at) : null;
+}

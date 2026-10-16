@@ -5,7 +5,7 @@ vi.mock("@/lib/quota", async (importOriginal) => ({ ...(await importOriginal<typ
 
 const { firstDegraded } = await import("@/lib/quota");
 const { HttpError } = await import("@/lib/http/errors");
-const { assertQuotas, quotaUnavailable, retryAfterSeconds, DEPOSIT_QUOTAS, PUBLIC_READ_QUOTAS, QUOTA_ERROR_CODE, SIGNUP_QUOTAS } = await import("@/lib/quota/gate");
+const { assertQuotas, fromResourceExhausted, isResourceExhausted, quotaUnavailable, retryAfterSeconds, DEPOSIT_QUOTAS, PUBLIC_READ_QUOTAS, QUOTA_ERROR_CODE, SIGNUP_QUOTAS } = await import("@/lib/quota/gate");
 
 beforeEach(() => {
   vi.mocked(firstDegraded).mockReset();
@@ -45,5 +45,17 @@ describe("quota gate", () => {
     const nextDay = Number(quotaUnavailable("firestore.reads", new Date("2026-10-16T08:00:00Z")).headers?.["Retry-After"]);
     expect(nextDay).toBeGreaterThanOrEqual(23 * 3600);
     expect(nextDay).toBeLessThanOrEqual(23 * 3600 + 1);
+  });
+
+  it("turns a Firestore RESOURCE_EXHAUSTED into the same 503, and nothing else", () => {
+    const exhausted = Object.assign(new Error("8 RESOURCE_EXHAUSTED: Quota exceeded."), { code: 8 });
+    expect(isResourceExhausted(exhausted)).toBe(true);
+    for (const other of [new Error("boom"), Object.assign(new Error("14 UNAVAILABLE"), { code: 14 }), { code: "auth/user-not-found" }, null, "8"]) {
+      expect(isResourceExhausted(other)).toBe(false);
+      expect(fromResourceExhausted(other)).toBeNull();
+    }
+    const refusal = fromResourceExhausted(exhausted, new Date("2026-10-16T05:00:00Z"));
+    expect(refusal).toMatchObject({ status: 503, code: QUOTA_ERROR_CODE });
+    expect(Number(refusal?.headers?.["Retry-After"])).toBeGreaterThanOrEqual(2 * 3600);
   });
 });

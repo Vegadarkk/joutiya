@@ -94,6 +94,17 @@ describe("purge-connection-logs", () => {
     expect(deleteConnectionLogsPastPurge).toHaveBeenCalledTimes(1);
   });
 
+  it("stops on RESOURCE_EXHAUSTED (the counters missed some usage) and fails on any other error", async () => {
+    vi.mocked(deleteConnectionLogsPastPurge)
+      .mockResolvedValueOnce(CONNECTION_LOG_BATCH)
+      .mockRejectedValueOnce(Object.assign(new Error("8 RESOURCE_EXHAUSTED: Quota exceeded."), { code: 8 }));
+    expect(await purgeConnectionLogs(NOW)).toEqual({ deleted: CONNECTION_LOG_BATCH, deferred: true });
+    expect(oldestConnectionLogPastPurge).toHaveBeenCalledWith(NOW);
+
+    vi.mocked(deleteConnectionLogsPastPurge).mockRejectedValueOnce(Object.assign(new Error("14 UNAVAILABLE"), { code: 14 }));
+    await expect(purgeConnectionLogs(NOW)).rejects.toThrow("UNAVAILABLE");
+  });
+
   it("keeps its result when the backlog check fails", async () => {
     endless();
     vi.mocked(oldestConnectionLogPastPurge).mockRejectedValue(new Error("RESOURCE_EXHAUSTED"));

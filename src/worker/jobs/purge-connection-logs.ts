@@ -3,13 +3,14 @@ import { isFirebaseConfigured } from "@/lib/firebase/admin";
 import { deleteConnectionLogsPastPurge, oldestConnectionLogPastPurge } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
 import { firstDegraded, headroom } from "@/lib/quota";
+import { isResourceExhausted } from "@/lib/quota/gate";
 
 // Nightly at 03:15 UTC (§7 retention table: connection data kept 1 year, décret 2021-1362; §5
 // "Purges sans TTL"): connectionLogs past purgeAt are deleted in batches. The system queue runs one
-// job at a time, so this runs after retention-purge (03:00) and the R2 gauge (03:10), whose
-// deletions are already in the counter, and before the backup (03:30), which then no longer
-// exports them. At most CONNECTION_LOG_PURGE_BUDGET deletions a night, never past
-// DELETE_QUOTA_SHARE of the Spark delete quota, and none once deletes or reads are degraded: the
+// job at a time, so this runs after retention-purge (03:00), whose deletions are then in the
+// counter, and before the backup (03:30), which then no longer exports them. At most
+// CONNECTION_LOG_PURGE_BUDGET deletions a night, never past DELETE_QUOTA_SHARE of the Spark delete
+// quota, and none once deletes or reads are degraded or Firestore answers RESOURCE_EXHAUSTED: the
 // rest waits a night, and a backlog older than 3 days raises an alert. Idempotent.
 
 export const CONNECTION_LOG_PURGE_BUDGET = 5_000;
@@ -44,7 +45,15 @@ export async function purgeConnectionLogs(now = new Date()): Promise<ConnectionL
       break;
     }
     const wanted = Math.min(CONNECTION_LOG_BATCH, budget);
-    const deleted = await deleteConnectionLogsPastPurge(now, wanted);
+    let deleted: number;
+    try {
+      deleted = await deleteConnectionLogsPastPurge(now, wanted);
+    } catch (error) {
+      if (!isResourceExhausted(error)) throw error;
+      result.deferred = true;
+      logger.warn("purge-connection-logs deferred: Firestore answered RESOURCE_EXHAUSTED");
+      break;
+    }
     result.deleted += deleted;
     budget -= deleted;
     if (deleted < wanted) break;
