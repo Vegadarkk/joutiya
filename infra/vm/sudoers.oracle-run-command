@@ -1,0 +1,4 @@
+# /etc/sudoers.d/101-oracle-cloud-agent-run-command (0440). OCI Run Command, Claude's admin channel to
+# the VM (docs/phase-1.md), runs scripts as ocarun; this makes them root, as Oracle documents. Who
+# may send commands is decided by OCI IAM: the joutiya-automation group, in compartment joutiya only.
+ocarun ALL=(ALL) NOPASSWD:ALL

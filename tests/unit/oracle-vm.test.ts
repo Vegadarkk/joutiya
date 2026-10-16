@@ -1,5 +1,6 @@
-import { generateKeyPairSync, createVerify } from "node:crypto";
+import { generateKeyPairSync, createVerify, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import {
   MAX_METADATA_BYTES,
@@ -50,8 +51,9 @@ describe("OCI request signing", () => {
 });
 
 describe("cloud-init user data", () => {
-  it("fills every placeholder of bootstrap.sh between single quotes", () => {
-    const script = Buffer.from(buildUserData(input), "base64").toString("utf8");
+  it("fills every placeholder of bootstrap.sh between single quotes, gzipped for cloud-init", () => {
+    const script = gunzipSync(Buffer.from(buildUserData(input), "base64")).toString("utf8");
+    expect(script.startsWith("#!/bin/bash\n")).toBe(true);
     expect(script).not.toMatch(/__JOUTIYA_[A-Z_]+__/);
     expect(script).toContain(`SSH_TUNNEL_TOKEN='${input.sshTunnelToken}'`);
     expect(script).toContain(`PROD_TUNNEL_TOKEN='${input.prodTunnelToken}'`);
@@ -61,7 +63,7 @@ describe("cloud-init user data", () => {
   it("refuses a value that could leave its quotes, a missing placeholder and oversized data", () => {
     expect(() => buildUserData({ ...input, prodTunnelToken: "x'; reboot; '" })).toThrow("prodTunnelToken is not a base64 value");
     expect(() => buildUserData({ ...input, template: template.replace("'__JOUTIYA_PROD_TUNNEL_TOKEN__'", "''") })).toThrow("found 0");
-    expect(() => buildUserData({ ...input, vmFiles: "A".repeat(MAX_METADATA_BYTES) })).toThrow("OCI allows");
+    expect(() => buildUserData({ ...input, vmFiles: randomBytes(MAX_METADATA_BYTES).toString("base64") })).toThrow("OCI allows");
   });
 });
 

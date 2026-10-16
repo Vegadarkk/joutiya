@@ -4,7 +4,8 @@
 # which send infra/vm, docker/ and the deploy users' public keys and call
 #   install.sh <extracted directory>
 # Idempotent. sshd and sudoers changes are validated before they replace the running ones.
-# Secrets are never handled here: /etc/joutiya/<env>/*.env are written by the owner (redeploy.md).
+# Secrets are never handled here: bootstrap.sh writes the tunnel tokens, the other
+# /etc/joutiya/<env>/*.env files come later (docs/phase-1.md).
 set -euo pipefail
 umask 022
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -58,10 +59,18 @@ install -m 0644 -o root -g root "$SRC"/docker/compose.yml "$SRC"/docker/compose.
 install -m 0644 -o root -g root "$SRC"/docker/valkey/*.conf /opt/joutiya/docker/valkey/
 install -m 0755 -o root -g root "$SRC/infra/vm/deploy-forced-command.sh" /usr/local/sbin/joutiya-deploy
 
-# sudoers: validated before it is moved into place.
-install -m 0440 -o root -g root "$SRC/infra/vm/sudoers.joutiya-deploy" /etc/sudoers.d/.joutiya-deploy.new
-visudo -cqf /etc/sudoers.d/.joutiya-deploy.new
-mv /etc/sudoers.d/.joutiya-deploy.new /etc/sudoers.d/joutiya-deploy
+# sudoers: each file validated before it is moved into place (sudo skips names with a dot).
+install_sudoers() {
+  install -m 0440 -o root -g root "$SRC/infra/vm/$1" "/etc/sudoers.d/.$2.new"
+  visudo -cqf "/etc/sudoers.d/.$2.new"
+  mv "/etc/sudoers.d/.$2.new" "/etc/sudoers.d/$2"
+}
+install_sudoers sudoers.joutiya-deploy joutiya-deploy
+install_sudoers sudoers.oracle-run-command 101-oracle-cloud-agent-run-command
+
+# Host cloudflared of joutiya-ssh-tunnel: a new unit applies at its next restart, never now (this
+# script may itself run over that tunnel).
+install -m 0644 -o root -g root "$SRC/infra/vm/cloudflared-ssh.service" /etc/systemd/system/cloudflared.service
 
 # sshd: the new drop-in is tested with the full configuration; the previous one comes back on error.
 readonly SSHD_DROPIN=/etc/ssh/sshd_config.d/10-joutiya.conf
@@ -83,6 +92,7 @@ systemctl try-reload-or-restart ssh
 # user data, which holds the SSH tunnel token.
 install -m 0644 -o root -g root "$SRC/infra/vm/joutiya-docker-firewall.service" /etc/systemd/system/
 systemctl daemon-reload
+if [[ -f /etc/joutiya/ssh-tunnel.env ]]; then systemctl enable cloudflared.service; fi
 systemctl enable --now joutiya-docker-firewall.service
 systemctl restart joutiya-docker-firewall.service
 

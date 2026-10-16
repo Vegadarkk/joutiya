@@ -10,6 +10,9 @@
 //       every minute for <n> minutes (default 0). Never a paid shape.
 //   node scripts/oracle-vm.ts status
 //       instance state, SSH tunnel connections, bootstrap progress from the serial console.
+//   node scripts/oracle-vm.ts reboot [--apply]
+//       soft reboot (ACPI) of joutiya-vm: a bootstrap that failed runs again (it stays as a per-boot
+//       script until it succeeds).
 //
 // Environment (never printed): JOUTIYA_OCI_TENANCY, _USER, _FINGERPRINT, _REGION, _COMPARTMENT,
 // _KEY_B64 (base64 of the PEM key of joutiya-claude), JOUTIYA_CLOUDFLARE_API_TOKEN.
@@ -18,6 +21,7 @@ import { createHash, createSign } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
 import { tunnelTokenErrors, validateTargets, type Targets } from "./assert-target.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -149,7 +153,7 @@ const PLACEHOLDERS: Record<keyof Omit<UserDataInput, "template">, string> = {
   vmFiles: "__JOUTIYA_VM_FILES__",
 };
 
-/** bootstrap.sh with its placeholders filled, base64-encoded for the instance metadata. */
+/** bootstrap.sh with its placeholders filled, gzipped (cloud-init decompresses it) and base64-encoded for the instance metadata. */
 export function buildUserData(input: UserDataInput): string {
   let script = input.template;
   for (const [key, placeholder] of Object.entries(PLACEHOLDERS) as [keyof typeof PLACEHOLDERS, string][]) {
@@ -161,7 +165,7 @@ export function buildUserData(input: UserDataInput): string {
     script = script.replace(`'${placeholder}'`, `'${value}'`);
   }
   if (/__JOUTIYA_[A-Z_]+__/.test(script)) throw new Error("bootstrap.sh has a placeholder this script does not fill");
-  const userData = Buffer.from(script, "utf8").toString("base64");
+  const userData = gzipSync(Buffer.from(script, "utf8"), { level: 9 }).toString("base64");
   if (userData.length > MAX_METADATA_BYTES) throw new Error(`user data is ${userData.length} bytes, OCI allows ${MAX_METADATA_BYTES}`);
   return userData;
 }
@@ -413,6 +417,14 @@ async function status(oci: Oci, targets: Targets, compartmentId: string): Promis
   }
 }
 
+async function reboot(oci: Oci, compartmentId: string): Promise<void> {
+  const instance = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance);
+  if (!instance) throw new Error(`instance ${NAMES.instance}: none`);
+  if (instance.lifecycleState !== "RUNNING") throw new Error(`instance ${NAMES.instance} is ${instance.lifecycleState}, not RUNNING`);
+  await oci.write("POST", `/20160918/instances/${instance.id}${query({ action: "SOFTRESET" })}`, undefined, { action: "SOFTRESET" });
+  if (oci.apply) console.log("reboot requested: follow it with `node scripts/oracle-vm.ts status`");
+}
+
 function credentialsFromEnv(): OciCredentials {
   const read = (name: string): string => {
     const value = process.env[name]?.trim();
@@ -432,7 +444,7 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const action = args.find((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);
-  if (action !== "create" && action !== "status") throw new Error("usage: scripts/oracle-vm.ts <create|status> [--apply] [--retry-minutes=<n>]");
+  if (action !== "create" && action !== "status" && action !== "reboot") throw new Error("usage: scripts/oracle-vm.ts <create|status|reboot> [--apply] [--retry-minutes=<n>]");
 
   const raw: unknown = JSON.parse(readFileSync(new URL("../infra/targets.json", import.meta.url), "utf8"));
   const errors = validateTargets(raw);
@@ -446,8 +458,9 @@ async function main(): Promise<void> {
   }
   const oci = new Oci(credentials, args.includes("--apply"));
   if (action === "create") await create(oci, targets, compartmentId as string, retry);
+  else if (action === "reboot") await reboot(oci, compartmentId as string);
   else await status(oci, targets, compartmentId as string);
-  if (action === "create") console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
+  if (action !== "status") console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
 }
 
 const self = fileURLToPath(import.meta.url);
