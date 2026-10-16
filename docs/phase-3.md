@@ -12,7 +12,7 @@ Le code de la phase 3 est sur la branche `claude/mvp-phase-3-fable-8j3rv0` (PR #
 ## Qui fait quoi (règle n°1)
 
 - **Claude** agit par API avec `JOUTIYA_CLOUDFLARE_API_TOKEN` : CORS et règles de cycle de vie des buckets, domaine `media.joutiya.ma`, envoi de la carte PMTiles, variables de la VM par OCI Run Command (fil « Mise en ligne phase 1 »).
-- **Nav** (Claude dans votre navigateur) prépare les jetons qui ne se créent qu'en console : jeton S3 R2 par environnement, jeton Sentry des versions.
+- **Nav** (Claude dans votre navigateur) prépare le seul jeton qui ne se crée qu'en console : le jeton S3 R2 de chaque environnement.
 - **Vous :** le clic qui révèle chaque secret et son rangement, la paire de clés des sauvegardes (la clé privée ne quitte jamais votre PC). Ces moments sont signalés par **Vous :**.
 - **Cody** : le prompt N en fin de page (paire de clés des sauvegardes).
 
@@ -23,11 +23,11 @@ Le code de la phase 3 est sur la branche `claude/mvp-phase-3-fable-8j3rv0` (PR #
 | Cloudflare R2 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (jeton `joutiya-r2-<env>`) | *Object Read & Write*, limité aux 3 buckets de l'environnement | `app.env` de l'environnement | Nav prépare, **Vous :** révélez et rangez |
 | Cloudflare R2 | `R2_S3_ENDPOINT` | `https://<account id>.eu.r2.cloudflarestorage.com` (juridiction UE) | `app.env` | Claude |
 | Cloudflare R2 | `R2_BUCKET_QUARANTINE`, `R2_BUCKET_MEDIA`, `R2_BUCKET_PRIVATE` | Noms exacts de `infra/targets.json`, vérifiés par `scripts/assert-target.ts` | `app.env` | Claude |
-| Cloudflare R2 | CORS du bucket quarantaine | `PUT` avec `Content-Type` depuis les origines du site de l'environnement | Bucket | Claude par API |
+| Cloudflare R2 | CORS du bucket quarantaine | `PUT` avec l'en-tête `Content-Type`, origines `https://joutiya.ma` et `https://www.joutiya.ma` (staging : `https://staging.joutiya.ma`) | Bucket | Claude par API |
+| Cloudflare R2 | CORS du bucket médias | `GET` et `HEAD` avec l'en-tête `Range`, en-têtes exposés `ETag`, `Content-Range`, `Content-Length`, mêmes origines (lecture de la carte PMTiles par plages) | Bucket | Claude par API |
 | Cloudflare R2 | Cycle de vie | Quarantaine : suppression après 1 jour ; privé `backups/` : 98 jours | Buckets | Claude par API |
 | Cloudflare R2 | Domaine `media.joutiya.ma` (prod), `media-staging.joutiya.ma` (staging) | Domaine personnalisé du bucket médias, après activation de la zone | `MEDIA_BASE_URL` | Claude par API |
 | Protomaps | Carte `maps/morocco.pmtiles` (~63 Mo, extrait Maroc z0-12) | Bucket médias, `Cache-Control: public, max-age=31536000, immutable`, CORS `GET`/`HEAD` + `Range` | `MAP_PMTILES_URL` | Claude (`scripts/geo/pmtiles-extract.sh` puis envoi S3) |
-| Sentry | `SENTRY_AUTH_TOKEN` | Jeton d'organisation `joutiya`, droits *project:releases* et *org:read* | Secret GitHub du dépôt | Nav prépare, **Vous :** révélez et rangez dans GitHub |
 | age | `BACKUP_AGE_RECIPIENT` (clé publique `age1…`) | Clé publique seulement ; la clé privée reste hors ligne chez vous | `app.env` | **Vous :** prompt N, puis Claude |
 
 ## 1. Stockage des photos (R2)
@@ -49,6 +49,8 @@ Chaque nuit à 03:30 UTC, le worker exporte Firestore (incrémental + rotation c
 3. Restauration (en cas de besoin) : `node scripts/restore-firestore.ts --identity <fichier de clé privée> --from <dossier> --project <projet>` (simulation par défaut, `--apply` pour écrire ; voir `docs/backups.md`).
 
 Sans `BACKUP_AGE_RECIPIENT`, le travail de nuit ne sauvegarde rien et envoie une alerte : rien n'est jamais écrit en clair.
+
+Aucun jeton Sentry n'est nécessaire en phase 3 : l'envoi des « source maps » n'est pas encore branché. Il sera demandé quand une étape de CI l'utilisera.
 
 ## 4. Variables de la VM (Claude, Run Command)
 
