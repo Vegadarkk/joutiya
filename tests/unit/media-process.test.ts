@@ -13,7 +13,10 @@ import { MAX_INPUT_PIXELS, sharp } from "@/lib/media/sharp-setup";
 const create = (width: number, height: number, background = { r: 200, g: 40, b: 40 }) => sharp({ create: { width, height, channels: 3, background } });
 
 /** A photo-like JPEG (gaussian noise) so that compression artefacts and truncation are realistic. */
-const noisy = (width: number, height: number) => sharp({ create: { width, height, channels: 3, noise: { type: "gaussian", mean: 128, sigma: 40 } } }).jpeg({ quality: 90 }).toBuffer();
+const noisy = (width: number, height: number) =>
+  sharp({ create: { width, height, channels: 3, background: { r: 128, g: 128, b: 128 }, noise: { type: "gaussian", mean: 128, sigma: 40 } } })
+    .jpeg({ quality: 90 })
+    .toBuffer();
 
 /** Marker ids of a JPEG's segments before the scan start (e1 = APP1 Exif/XMP, e2 = APP2 ICC, ed = APP13 IPTC). */
 function jpegSegments(buffer: Buffer): string[] {

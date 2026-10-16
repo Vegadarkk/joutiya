@@ -75,18 +75,18 @@ export async function screen(facts: ScreeningInput, selfId?: string): Promise<Sc
   const checks = new Map(facts.uploads.map((upload) => [upload.id, upload.checks]));
   const duplicates = detectDuplicates(listing, facts.others, selfId);
   const input: ScreenInput = {
-      title: listing.title,
-      description: listing.description,
-      attributes: listing.attributes,
-      categoryId: listing.categoryId ?? "",
-      subcategoryId: listing.subcategoryId ?? "",
-      price: listing.price,
-      isDonation: listing.isDonation,
-      contact: { showPhone: listing.contact.showPhone, whatsapp: listing.contact.whatsapp },
-      sensitiveDeclaration: listing.moderation.sensitiveDeclaration ? { kind: listing.moderation.sensitiveDeclaration.kind } : null,
-      photos: listing.photos.map((photo) => ({ checks: checks.get(photo.id) })),
-      seller: facts.seller,
-      duplicates,
+    title: listing.title,
+    description: listing.description,
+    attributes: listing.attributes,
+    categoryId: listing.categoryId ?? "",
+    subcategoryId: listing.subcategoryId ?? "",
+    price: listing.price,
+    isDonation: listing.isDonation,
+    contact: { showPhone: listing.contact.showPhone, whatsapp: listing.contact.whatsapp },
+    sensitiveDeclaration: listing.moderation.sensitiveDeclaration ? { kind: listing.moderation.sensitiveDeclaration.kind } : null,
+    photos: listing.photos.map((photo) => ({ checks: checks.get(photo.id) })),
+    seller: facts.seller,
+    duplicates,
   };
   const result = await screenListing(input, { ai: facts.ai ?? DEFAULT_AI });
   return {

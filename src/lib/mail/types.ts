@@ -4,7 +4,36 @@ import type { Locale } from "@/config/site";
 // fallback, an in-memory mailbox in development (DEV_MAILBOX). The web app only enqueues; the
 // worker sends (BullMQ queue "mail", priorities), or the web sends inline when no queue is set.
 
-export type TemplateId = "verifyEmail" | "resetPassword" | "signupExisting" | "passwordChanged" | "staffInvite" | "phoneVerified" | "phoneRemoved";
+export type TemplateId =
+  | "verifyEmail"
+  | "resetPassword"
+  | "signupExisting"
+  | "passwordChanged"
+  | "staffInvite"
+  | "phoneVerified"
+  | "phoneRemoved"
+  // Listings (phase 3): publication, hold and rejection with an art. 17-style statement.
+  | "listingPublished"
+  | "listingPendingReview"
+  | "listingRejected";
+
+/**
+ * Statement of reasons (art. 17 DSA, design D8) carried by the hold and rejection mails. The
+ * sentences are rendered by the template in the recipient's language; `facts` are flag codes
+ * (MODERATION_FLAGS) or free text already in the recipient's language, `ground` a CGU reference.
+ */
+export interface ModerationStatement {
+  /** What was done: held for review, or rejected. */
+  measure: "hold" | "reject";
+  /** Signals that led to the measure: moderation flag codes, or a moderator's sentence. */
+  facts: string[];
+  /** Legal or contractual ground, e.g. "CGU §7.2". */
+  ground: string;
+  /** Automated detection and decision (no human in the loop at this stage). */
+  automated: true;
+  /** Where to object: the DSA contact address of the legal configuration. */
+  redress: string;
+}
 
 export interface TemplateData {
   verifyEmail: { displayName: string; actionUrl: string };
@@ -15,6 +44,12 @@ export interface TemplateData {
   phoneVerified: { displayName: string; phone: string };
   /** The number was verified on another account and left this one. */
   phoneRemoved: { displayName: string; phone: string };
+  /** The listing is online: its public URL (localized) and the expiry date (ISO). */
+  listingPublished: { displayName: string; title: string; url: string; expiresAt: string };
+  /** Held by the pre-moderation: a moderator will decide; statement of the automated measure. */
+  listingPendingReview: { displayName: string; title: string; listingId: string; statement: ModerationStatement };
+  /** Rejected (automated or by a moderator): statement of reasons and how to object. */
+  listingRejected: { displayName: string; title: string; listingId: string; statement: ModerationStatement };
 }
 
 /** Security mails bypass the suppression list and fall back to Brevo when Resend is exhausted. */

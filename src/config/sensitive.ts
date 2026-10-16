@@ -37,7 +37,7 @@ export const SENSITIVE_VOCABULARY: readonly SensitiveVocabulary[] = [
       "aveugle", "muet", "muette",
       "سرطان", "سيدا", "ايدز", "سكري", "صرع", "اعاقة", "معاق", "معاقة", "مريض", "مريضة", "مرض", "شلل", "مشلول", "توحد", "اكتئاب", "فصام",
       "غسيل الكلى", "علاج كيميائي", "ضرير", "اعمى", "اصم",
-      "mrid", "mrida", "mrad", "mo3a9", "mou3aq", "m3a9", "saratan",
+      "mrid", "mrida", "mrad", "mo3a9", "mo3a9a", "mou3aq", "mou3aqa", "m3a9", "m3a9a", "saratan",
     ],
   },
   {
@@ -96,7 +96,7 @@ export const PERSON_MARKERS: readonly string[] = [
   "mon oncle", "ma tante", "mon enfant", "mes enfants", "mon bebe", "mon epoux", "mon epouse", "feu mon", "feue ma", "defunt", "defunte",
   "decede", "decedee", "mon proche", "mon voisin", "ma voisine", "mon ami", "mon amie", "je suis", "moi meme",
   "والدي", "والدتي", "امي", "ابي", "ابني", "بنتي", "ابنتي", "زوجتي", "زوجي", "اخي", "اختي", "جدي", "جدتي", "عمي", "خالي", "خالتي", "عمتي",
-  "رحمه الله", "رحمها الله", "الله يرحمه", "الله يرحمها", "المرحوم", "المرحومة", "متوفى", "متوفي", "انا",
+  "رحمه الله", "رحمها الله", "الله يرحمه", "الله يرحمها", "المرحوم", "المرحومة", "متوفى", "انا",
   "mama", "baba", "khti", "khouya", "khoya", "weldi", "wldi", "benti", "bnti", "mrati", "rajli", "jdi", "jdati", "3ammi", "khali", "khalti",
   "lmarhoum", "lmarhouma", "allah yrahmo", "allah yrhmo", "lah yrhmo", "lah yrahmo", "allah yrahmha", "lah yrhmha", "ana",
 ];
@@ -113,6 +113,12 @@ export const RESTRICTION_MARKERS: readonly string[] = [
  * never an identity number. Lower case, compared after normalisation.
  */
 export const ID_NUMBER_STOPLIST: ReadonlySet<string> = new Set([
-  "dh", "dhs", "mad", "km", "kg", "g", "go", "gb", "mo", "to", "tb", "cv", "ch", "w", "kw", "v", "l", "ml", "m", "cm", "mm", "n", "no", "ref",
-  "lot", "bp", "cp", "tel", "fix", "gsm", "imei", "sn", "ps", "rs", "eur", "usd", "ht", "ttc", "an", "ans", "h", "hz", "ghz", "mhz", "px", "mp",
+  // currency, units
+  "dh", "dhs", "da", "mad", "eur", "usd", "ht", "km", "kg", "g", "mg", "go", "gb", "mo", "mb", "to", "tb", "cv", "ch", "hp", "w", "kw", "v", "kv", "va",
+  "a", "ah", "l", "ml", "m", "cm", "mm", "m2", "h", "hz", "px", "mp", "an", "lb", "oz", "ft", "in", "x",
+  // references, counts
+  "n", "no", "nr", "nb", "qt", "ref", "lot", "bp", "cp", "tel", "fix", "gsm", "sn", "ps", "rs", "ex",
+  // 1-2 letter words (FR, EN, darija) that precede an amount
+  "de", "du", "au", "le", "la", "et", "ou", "en", "un", "ce", "sa", "on", "il", "je", "tu", "me", "te", "se", "ne", "ni", "si", "y", "d", "s",
+  "c", "j", "t", "qu", "of", "at", "to", "is", "f", "b", "w", "l", "o", "u",
 ]);

@@ -2,6 +2,9 @@ import "server-only";
 import { LOCALES } from "@/config/site";
 import { serverEnv } from "@/lib/env";
 import { mailLocale, type BuiltMail, type TemplateContext } from "./templates/layout";
+import { listingPendingReview } from "./templates/listingPendingReview";
+import { listingPublished } from "./templates/listingPublished";
+import { listingRejected } from "./templates/listingRejected";
 import { passwordChanged } from "./templates/passwordChanged";
 import { phoneRemoved } from "./templates/phoneRemoved";
 import { phoneVerified } from "./templates/phoneVerified";
@@ -21,6 +24,9 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   staffInvite,
   phoneVerified,
   phoneRemoved,
+  listingPublished,
+  listingPendingReview,
+  listingRejected,
 };
 
 export const TEMPLATE_IDS = Object.keys(TEMPLATES) as TemplateId[];

@@ -23,11 +23,24 @@ export interface KeywordHit {
 const ARABIC_LETTER = /^[؀-ۿ]/;
 const ARABIC_CONJUNCTIONS = ["و", "ف", "ب", "ل", "ك"];
 
+/** French elision glues the article to the word once apostrophes are dropped ("l'arme" -> "larme"). */
+const ELIDABLE = /^[aeiouyh][a-z]/;
+const ELIDED_ARTICLES = ["l", "d"];
+
+/**
+ * Compiles config terms. A Latin term starting with a vowel or h gets extra variants with an elided
+ * article ("heroine" also matches "lheroine", "dheroine"); every variant reports the config term.
+ */
 export function compileKeywords(terms: readonly string[]): CompiledKeyword[] {
   const out: CompiledKeyword[] = [];
   for (const term of terms) {
     const tokens = tokenize(term);
-    if (tokens.length > 0) out.push({ term, tokens });
+    const first = tokens[0];
+    if (first === undefined) continue;
+    out.push({ term, tokens });
+    if (ELIDABLE.test(first)) {
+      for (const article of ELIDED_ARTICLES) out.push({ term, tokens: [article + first, ...tokens.slice(1)] });
+    }
   }
   return out;
 }

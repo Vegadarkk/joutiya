@@ -1,7 +1,7 @@
 import "server-only";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import type { InferenceSession, Tensor } from "onnxruntime-node";
+import type * as Ort from "onnxruntime-node";
 import { DEFAULT_AI, type AiConfig } from "@/config/ai";
 import type { ServerEnv } from "@/lib/env";
 import { logger } from "@/lib/logging/logger";
@@ -52,9 +52,9 @@ export function modelsPresent(dir: string): boolean {
   return existsSync(paths.nsfw) && existsSync(paths.face);
 }
 
-type Ort = typeof import("onnxruntime-node");
+type OrtModule = typeof Ort;
 
-const SESSION_OPTIONS: InferenceSession.SessionOptions = {
+const SESSION_OPTIONS: Ort.InferenceSession.SessionOptions = {
   executionProviders: ["cpu"],
   intraOpNumThreads: 1,
   interOpNumThreads: 1,
@@ -95,7 +95,7 @@ const clamp01 = (value: number) => Math.min(Math.max(value, 0), 1);
  * YuNet 2023mar outputs (cls_s, obj_s, bbox_s for strides 8/16/32, no anchors) -> faces above
  * `threshold`, as OpenCV's FaceDetectorYN decodes them. Exported for tests with synthetic tensors.
  */
-export function decodeYunet(outputs: Record<string, { data: Tensor.DataType }>, threshold: number, inputSize = FACE_INPUT_SIZE): FaceBox[] {
+export function decodeYunet(outputs: Record<string, { data: Ort.Tensor.DataType }>, threshold: number, inputSize = FACE_INPUT_SIZE): FaceBox[] {
   const candidates: FaceBox[] = [];
   for (const stride of FACE_STRIDES) {
     const cols = inputSize / stride;
@@ -130,8 +130,8 @@ export function softmax2(logits: ArrayLike<number>): number {
 
 export class OnnxImageClassifier implements ImageClassifier {
   readonly name = "onnx";
-  private runtime: Promise<Ort> | undefined;
-  private readonly sessions: Partial<Record<ModelName, Promise<InferenceSession>>> = {};
+  private runtime: Promise<OrtModule> | undefined;
+  private readonly sessions: Partial<Record<ModelName, Promise<Ort.InferenceSession>>> = {};
 
   constructor(
     readonly paths: ModelPaths,
@@ -139,12 +139,12 @@ export class OnnxImageClassifier implements ImageClassifier {
     readonly faceThreshold: number,
   ) {}
 
-  private ort(): Promise<Ort> {
+  private ort(): Promise<OrtModule> {
     this.runtime ??= import("onnxruntime-node");
     return this.runtime;
   }
 
-  private session(model: ModelName): Promise<InferenceSession> {
+  private session(model: ModelName): Promise<Ort.InferenceSession> {
     this.sessions[model] ??= this.ort().then((ort) => ort.InferenceSession.create(this.paths[model], SESSION_OPTIONS));
     return this.sessions[model];
   }

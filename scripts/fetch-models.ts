@@ -10,6 +10,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { fileURLToPath } from "node:url";
 
 interface ManifestModel {
@@ -68,7 +69,7 @@ async function download(model: ManifestModel, target: string): Promise<void> {
     throw new Error(`${model.name}: server announces ${length} bytes, manifest says ${model.bytes}`);
   }
   try {
-    await pipeline(Readable.fromWeb(response.body as import("node:stream/web").ReadableStream), createWriteStream(part, { flags: "wx" }));
+    await pipeline(Readable.fromWeb(response.body as WebReadableStream), createWriteStream(part, { flags: "wx" }));
     const digest = await sha256Of(part);
     const size = (await stat(part)).size;
     if (digest !== model.sha256 || size !== model.bytes) throw new Error(`${model.name}: checksum mismatch (got ${size} bytes, sha256 ${digest})`);
