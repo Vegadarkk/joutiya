@@ -17,13 +17,15 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | 7 | Serveurs DNS chez Cloudflare | Nav (Hostinger) | Après la validation du .MA, avant le 12 novembre |
 | 8 | Déploiement automatique du staging | Claude (API), vous pour un jeton | Après les étapes 6 et 7 |
 | 9 | Accès sans clé de la VM à Firestore | Claude (outil), Nav sur le PC2 pour la partie Google | Partie Google faite le 16 octobre (staging et production testés) ; certificats de la VM dès qu'elle existe |
-| 10 | Mentions légales de la production | Claude | Après Firebase |
+| 10 | Mentions légales de la production | Claude | Hébergeurs relevés le 16 octobre, dans le code |
 | 11 | Alertes | Claude (API), Nav pour un filtre Gmail | Code en phase 2 ; après l'étape 7 (domaine Resend) |
 | 12 | Mise en production et contrôles | Claude | Après l'étape 8 |
 | 13 | Test de reconstruction de la VM | Claude | Avant le lancement |
 | 14 | Réglages des buckets R2 | Nav, sur votre « J'accepte » ; Claude vérifie | Fait le 16 octobre, vérifié |
 | 15 | Domaines des médias | Nav | À l'activation de la zone (étape 7) |
 | 16 | Variables de la VM | Claude (Run Command), Cody pour vos clés | Outil prêt ; dès que la VM existe |
+
+Point d'arrêt du 16 octobre au soir, avant l'audit de lundi : tout le travail de la phase 1 est dans `main`. La suite attend la VM, dont la création gratuite est relancée chaque minute (étapes 3, 4, 9 pour les certificats, 16, puis 12), ou la bascule DNS après le .MA (étapes 6, 7, 8, 11 et 15). Les échéances à renouveler sont plus bas (Renouvellements).
 
 ## Ce qui reste à vous
 
@@ -139,7 +141,13 @@ Prépare l'accès sans clé de Joutiya à Google (docs/phase-1.md, étape 9), de
 
 ## 10. Mentions légales de la production
 
-La production refuse de démarrer tant qu'une mention obligatoire manque : hébergeur, adresse et téléphone des hébergeurs de données. Claude relève les entités Oracle et Google dans leurs contrats publics, puis écrit `config/legal` dans Firestore avec `scripts/legal-config.ts`, en production puis en staging.
+La production refuse de démarrer tant qu'une mention obligatoire manque : hébergeur, adresse et téléphone des hébergeurs de données. Fait le 16 octobre : les valeurs par défaut de `src/config/legal.ts` portent les hébergeurs, relevés dans les contrats publics et le registre SIRENE.
+
+- Hébergeur du site : Oracle France SAS (contrat Oracle Cloud d'un compte français), 6 avenue de Messine, 75008 Paris, +33 1 57 60 20 20.
+- Données : Google Cloud France SARL pour Firestore (Paris) et Firebase Authentication (États-Unis), entité des conditions Google Cloud pour un client français, 8 rue de Londres, 75009 Paris ; Google ne publie pas de téléphone pour elle, d'où le standard de Google Paris, +33 1 42 68 53 00. Le forfait Spark n'ayant pas d'adresse de facturation, Google LLC (États-Unis) reste possible : à revoir si Google l'indique.
+- Photos et CDN : Cloudflare, Inc., inchangé.
+
+Aucune écriture dans Firestore n'est nécessaire. `scripts/legal-config.ts` sert plus tard à modifier ces mentions sans redéployer (médiateur de la consommation, changement d'hébergeur), depuis le PC2 par Nav.
 
 ## 11. Alertes
 
