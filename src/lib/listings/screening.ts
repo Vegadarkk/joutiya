@@ -58,14 +58,17 @@ export function detectDuplicates(listing: Pick<ListingDoc, "title" | "descriptio
   return { sameText, samePhoto };
 }
 
-/** Seller facts from the account and its other listings (volume = the last 24 hours). */
-export function sellerFacts(input: { accountCreatedAt: Date; phoneVerified: boolean; others: readonly Pick<ListingRecord, "createdAt" | "status">[]; now: Date }): SellerFacts {
+/**
+ * Seller facts from the account and its other listings (volume = the last 24 hours). `selfRejected`:
+ * the screened listing itself was rejected by a moderator (reopened since), one more rejection.
+ */
+export function sellerFacts(input: { accountCreatedAt: Date; phoneVerified: boolean; others: readonly Pick<ListingRecord, "createdAt" | "status">[]; selfRejected?: boolean; now: Date }): SellerFacts {
   const dayAgo = input.now.getTime() - 24 * 60 * 60 * 1000;
   return {
     accountAgeDays: Math.max(0, Math.floor((input.now.getTime() - input.accountCreatedAt.getTime()) / (24 * 60 * 60 * 1000))),
     listingsLast24h: input.others.filter((other) => other.createdAt.getTime() >= dayAgo).length,
     phoneVerified: input.phoneVerified,
-    previousRejections: input.others.filter((other) => other.status === "rejected").length,
+    previousRejections: input.others.filter((other) => other.status === "rejected").length + (input.selfRejected ? 1 : 0),
   };
 }
 
@@ -84,6 +87,7 @@ export async function screen(facts: ScreeningInput, selfId?: string): Promise<Sc
     isDonation: listing.isDonation,
     contact: { showPhone: listing.contact.showPhone, whatsapp: listing.contact.whatsapp },
     sensitiveDeclaration: listing.moderation.sensitiveDeclaration ? { kind: listing.moderation.sensitiveDeclaration.kind } : null,
+    ...(listing.location?.district ? { district: listing.location.district } : {}),
     photos: listing.photos.map((photo) => ({ checks: checks.get(photo.id) })),
     seller: facts.seller,
     duplicates,

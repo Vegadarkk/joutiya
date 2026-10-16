@@ -11,7 +11,7 @@ import { GET as mine } from "@/app/api/listings/mine/route";
 import { DELETE as remove, GET as get, PATCH as patch } from "@/app/api/listings/[id]/route";
 import { MAX_DRAFTS, type CreateListingResponse, type OwnerListingsResponse } from "@/lib/contracts/listings";
 import { listContentOps, listingContentRef } from "@/lib/db/repositories/content-ops";
-import { getListing } from "@/lib/db/repositories/listings";
+import { getListing, updateListing } from "@/lib/db/repositories/listings";
 import { getUpload } from "@/lib/db/repositories/uploads";
 import { resetServerEnv } from "@/lib/env";
 import { LISTING_ID_PATTERN } from "@/lib/listings/ids";
@@ -178,11 +178,12 @@ describe("ownership and removal", () => {
     expect((await getListing(id))?.title).toBe("");
   });
 
-  it("DELETE removes the listing (204) and schedules its uploads for purge", async () => {
+  it("DELETE removes the listing (204); its photos stay until the listing's own purge", async () => {
     const owner = await member();
     const id = await draft(owner);
     const upload = await seedReadyUpload(owner, id);
     await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { photos: [upload] } });
+    const uploadPurge = (await getUpload(upload))!.purgeAt;
     const before = Date.now();
     const removed = await api(remove, "DELETE", `/api/listings/${id}`, { member: owner });
     expect(removed.status).toBe(204);
@@ -190,9 +191,8 @@ describe("ownership and removal", () => {
     const stored = await getListing(id);
     expect(stored).toMatchObject({ status: "removed", version: 2 });
     expect(stored?.purgeAt?.getTime()).toBeGreaterThan(before);
-    const purge = await getUpload(upload);
-    expect(purge?.purgeAt.getTime()).toBeGreaterThanOrEqual(before - 1000);
-    expect(purge?.purgeAt.getTime()).toBeLessThanOrEqual(Date.now());
+    // retention-purge deletes text and photos together at the listing's purgeAt (§5, §7).
+    expect((await getUpload(upload))?.purgeAt).toEqual(uploadPurge);
     // Gone from every tab (a deleted listing is not "ended"); no further edit.
     expect((await api<OwnerListingsResponse>(mine, "GET", "/api/listings/mine", { member: owner })).body.listings).toEqual([]);
     expect((await api<OwnerListingsResponse>(mine, "GET", "/api/listings/mine?status=ended", { member: owner })).body.listings).toEqual([]);
@@ -200,5 +200,27 @@ describe("ownership and removal", () => {
     expect(edit.status).toBe(409);
     expect(edit.body.error.code).toBe("conflict");
     expect(await listContentOps(listingContentRef(id))).toEqual(expect.arrayContaining([expect.objectContaining({ op: "listing.remove", ip: owner.jar.ip })]));
+  });
+});
+
+describe("rejected listings reopened as drafts", () => {
+  it("counts the reopened listing against the draft cap (409 draft_limit when 5 drafts exist)", async () => {
+    const owner = await member();
+    const rejected = await draft(owner);
+    await updateListing(rejected, { status: "rejected", purgeAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) });
+    for (let i = 0; i < MAX_DRAFTS; i += 1) await draft(owner);
+
+    const refused = await api<ErrorBody>(patch, "PATCH", `/api/listings/${rejected}`, { member: owner, body: { title: "Vélo de ville corrigé" } });
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.code).toBe("draft_limit");
+    expect(await getListing(rejected)).toMatchObject({ status: "rejected", title: "" });
+
+    // One draft fewer: the edit reopens it (purge clock stopped).
+    const drafts = await api<OwnerListingsResponse>(mine, "GET", "/api/listings/mine", { member: owner });
+    expect((await api(remove, "DELETE", `/api/listings/${drafts.body.listings[0]!.id}`, { member: owner })).status).toBe(204);
+    const reopened = await api<ListingBody>(patch, "PATCH", `/api/listings/${rejected}`, { member: owner, body: { title: "Vélo de ville corrigé" } });
+    expect(reopened.status).toBe(200);
+    expect(reopened.body.listing).toMatchObject({ status: "draft", title: "Vélo de ville corrigé" });
+    expect((await getListing(rejected))?.purgeAt).toBeUndefined();
   });
 });

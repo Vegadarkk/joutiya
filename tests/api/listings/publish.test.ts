@@ -129,6 +129,15 @@ describe("POST /api/listings/{id}/publish", () => {
     expect((await getListing(inText))?.status).toBe("draft");
   });
 
+  it("screens the free-text district (422 on a phone number in it)", async () => {
+    const owner = await member();
+    const id = await readyDraft(owner, { location: { regionCode: "06", citySlug: "casablanca", district: "Maarif, appelez 0612345678" } });
+    const blocked = await api<ErrorBody & { error: { details: FieldIssue[] } }>(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: ACCEPT });
+    expect(blocked.status).toBe(422);
+    expect(codesOf(blocked.body.error.details)).toEqual(["location.district:phone_in_text"]);
+    expect((await getListing(id))?.status).toBe("draft");
+  });
+
   it("holds a flagged listing in pending_review with the statement of reasons", async () => {
     const owner = await member();
     const id = await readyDraft(owner, { title: "Réplique de vélo de course vintage" });

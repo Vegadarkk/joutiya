@@ -320,3 +320,82 @@ describe("decisions", () => {
     expect(capturedMails(sendMail).filter((mail) => mail.template === "listingApproved" || mail.template === "listingRejected")).toHaveLength(1);
   });
 });
+
+describe("after a decision", () => {
+  /** A clean complete listing, published by the owner (auto_ok). */
+  async function publishedListing(seller: Member): Promise<string> {
+    const created = await api<CreateListingResponse>(create, "POST", "/api/listings", { member: seller, body: {} });
+    const id = created.body.id;
+    expect((await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: seller, body: readyPatch() })).status).toBe(200);
+    const photo = await seedReadyUpload(seller, id);
+    expect((await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: seller, body: { photos: [photo] } })).status).toBe(200);
+    const result = await api<PublishBody>(publish, "POST", `/api/listings/${id}/publish`, { member: seller, body: { acceptRules: true } });
+    expect(result.body.status).toBe("published");
+    return id;
+  }
+
+  it("holds again a listing a moderator rejected, once reopened and cleaned (rejection counted)", async () => {
+    const seller = await member();
+    const id = await heldListing(seller);
+    const rejected = await decision(moderator, id, { action: "reject", version: (await getListing(id))!.version, reason: "counterfeit" });
+    expect(rejected.status).toBe(200);
+
+    // The owner edits it (back to a draft) with a clean title the automated screen would publish.
+    const reopened = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: seller, body: { title: "Vélo de course vintage d'origine" } });
+    expect(reopened.status).toBe(200);
+    expect(reopened.body.listing.status).toBe("draft");
+    const republished = await api<PublishBody>(publish, "POST", `/api/listings/${id}/publish`, { member: seller, body: { acceptRules: true } });
+    expect(republished.status).toBe(200);
+    expect(republished.body.status).toBe("pending_review");
+
+    const stored = (await getListing(id))!;
+    expect(stored).toMatchObject({ status: "pending_review", adsEligible: false, moderation: expect.objectContaining({ state: "needs_review" }) });
+    expect(stored.moderation.score).toBeGreaterThanOrEqual(10);
+    expect(stored.publishedAt).toBeUndefined();
+    expect(await getSearchOutbox(id)).toMatchObject({ op: "delete" });
+    const hold = await getModerationDecision(stored.moderation.lastDecisionId!);
+    expect(hold).toMatchObject({ action: "restrict_visibility", decidedBy: "system", automation: { detection: true, decision: true } });
+    expect(hold?.facts).toContain("previously rejected by a moderator");
+
+    // A second approval publishes it, dated like a first publication.
+    const started = Date.now();
+    const approved = await decision(moderator, id, { action: "approve", version: stored.version });
+    expect(approved.status).toBe(200);
+    expect((await getListing(id))!.publishedAt!.getTime()).toBeGreaterThanOrEqual(started - 1000);
+  });
+
+  it("approves a held edit of a published listing without touching its dates or rank", async () => {
+    const seller = await member();
+    const id = await publishedListing(seller);
+    const live = (await getListing(id))!;
+    const held = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: seller, body: { title: "Réplique de vélo de course vintage" } });
+    expect(held.body.listing.status).toBe("pending_review");
+    const pending = (await getListing(id))!;
+
+    const result = await decision(moderator, id, { action: "approve", version: pending.version });
+    expect(result.status).toBe(200);
+    const stored = (await getListing(id))!;
+    expect(stored).toMatchObject({ status: "published", sortSource: live.sortSource, moderation: expect.objectContaining({ state: "human_ok" }) });
+    expect(stored.publishedAt).toEqual(live.publishedAt);
+    expect(stored.sortAt).toEqual(live.sortAt);
+    expect(stored.expiresAt).toEqual(live.expiresAt);
+    expect(stored.purgeAt).toEqual(live.purgeAt);
+    expect(await getSearchOutbox(id)).toMatchObject({ op: "upsert", version: stored.version });
+    expect(lastMail(sendMail, "listingApproved", seller.email)?.data.expiresAt).toBe(live.expiresAt!.toISOString());
+  });
+
+  it("gives a fresh lifetime when the expiry passed while the edit waited", async () => {
+    const seller = await member();
+    const id = await publishedListing(seller);
+    const live = (await getListing(id))!;
+    expect((await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: seller, body: { title: "Réplique de vélo de course vintage" } })).body.listing.status).toBe("pending_review");
+    await db().collection(COLLECTIONS.listings).doc(id).update({ expiresAt: new Date(Date.now() - DAY_MS) });
+    const pending = (await getListing(id))!;
+    const started = Date.now();
+    expect((await decision(moderator, id, { action: "approve", version: pending.version })).status).toBe(200);
+    const stored = (await getListing(id))!;
+    expect(stored.publishedAt).toEqual(live.publishedAt);
+    expect(stored.sortAt).toEqual(live.sortAt);
+    expect(stored.expiresAt!.getTime() - started).toBeGreaterThan(59 * DAY_MS);
+  });
+});

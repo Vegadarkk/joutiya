@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LISTING_STATUSES, type ListingStatus } from "@/lib/contracts/listings";
-import { IllegalTransitionError, RENEW_WINDOW_DAYS, TRANSITIONS, addDays, addMonths, canRenew, canTransition, expiresAtFor, purgeAtFor, renew, transition } from "@/lib/listings/lifecycle";
+import { IllegalTransitionError, RENEW_WINDOW_DAYS, TRANSITIONS, addDays, addMonths, canRenew, canTransition, expiresAtFor, purgeAtFor, renew, renewForReview, transition } from "@/lib/listings/lifecycle";
 
 // Status machine (architecture §5, design D16): the table, the field patches, the renewal window,
 // the expiry and purge dates. Pure module: no Firestore.
@@ -19,12 +19,17 @@ describe("transition table", () => {
     expect(TRANSITIONS.draft).toEqual(["pending_review", "published", "removed"]);
     expect(TRANSITIONS.pending_review).toEqual(["published", "rejected", "removed"]);
     expect(TRANSITIONS.published).toEqual(["paused", "sold", "expired", "removed", "pending_review"]);
-    expect(TRANSITIONS.paused).toEqual(["published", "sold", "expired", "removed"]);
-    expect(TRANSITIONS.sold).toEqual(["removed", "expired"]);
-    expect(TRANSITIONS.expired).toEqual(["published", "removed", "purged"]);
-    expect(TRANSITIONS.rejected).toEqual(["draft", "removed"]);
+    expect(TRANSITIONS.paused).toEqual(["published", "sold", "expired", "removed", "pending_review"]);
+    expect(TRANSITIONS.sold).toEqual(["removed", "expired", "purged"]);
+    expect(TRANSITIONS.expired).toEqual(["published", "removed", "purged", "pending_review"]);
+    expect(TRANSITIONS.rejected).toEqual(["draft", "removed", "purged"]);
     expect(TRANSITIONS.removed).toEqual(["purged"]);
     expect(TRANSITIONS.purged).toEqual([]);
+  });
+
+  it("purges every status the retention job purges (expired, sold, removed, rejected), never a live one", () => {
+    const purgeable = LISTING_STATUSES.filter((status) => TRANSITIONS[status].includes("purged"));
+    expect(purgeable.sort()).toEqual(["expired", "rejected", "removed", "sold"]);
   });
 
   it("refuses what the table does not list, with the pair in the error", () => {
@@ -63,7 +68,8 @@ describe("publish and hold", () => {
   it("holds a flagged publication: pending_review, dated, not indexed, seller told", () => {
     const { patch, effects } = transition(listing("draft"), "pending_review", ctx);
     expect(patch).toMatchObject({ status: "pending_review", sortAt: NOW, sortSource: "publish", version: 4 });
-    expect(patch.publishedAt).toBeUndefined();
+    // Not published yet: a reopened rejected listing drops the date of its earlier publication.
+    expect(patch.publishedAt).toBeNull();
     expect(effects).toEqual({ search: null, contentOp: { op: "listing.publish", ip: "41.250.1.2" }, audit: "listing.publish", revalidate: false, mail: "listingPendingReview" });
   });
 
@@ -75,11 +81,28 @@ describe("publish and hold", () => {
     expect(effects.search).toBe("upsert");
   });
 
-  it("takes an edited live listing off the index while it waits for review", () => {
-    const { patch, effects } = transition(listing("published", { publishedAt: addDays(NOW, -5), expiresAt: addDays(NOW, 55) }), "pending_review", ctx);
-    expect(patch.status).toBe("pending_review");
+  it("takes an edited live, paused or expired listing off the index and its page while it waits for review", () => {
+    for (const status of ["published", "paused", "expired"] as const) {
+      const { patch, effects } = transition(listing(status, { publishedAt: addDays(NOW, -5), expiresAt: addDays(NOW, 55) }), "pending_review", ctx);
+      expect(patch, status).toEqual({ version: 4, updatedAt: NOW, status: "pending_review" });
+      expect(effects, status).toMatchObject({ search: "delete", audit: "listing.hold", mail: "listingPendingReview", revalidate: true });
+    }
+  });
+
+  it("approves a held edit of a published listing keeping its dates and rank", () => {
+    const publishedAt = addDays(NOW, -5);
+    const held = listing("pending_review", { publishedAt, expiresAt: addDays(NOW, 55), purgeAt: addMonths(addDays(NOW, 55), 12), sortAt: addDays(NOW, -5) });
+    const { patch, effects } = transition(held, "published", ctx);
+    expect(patch).toEqual({ version: 4, updatedAt: NOW, status: "published", pausedReason: null });
+    expect(effects).toEqual({ search: "upsert", contentOp: { op: "listing.update", ip: "41.250.1.2" }, audit: "listing.approve", revalidate: true, mail: null });
+  });
+
+  it("gives a fresh lifetime on approval only when the expiry passed during the review (or a held renewal)", () => {
+    const held = listing("pending_review", { publishedAt: addDays(NOW, -70), expiresAt: addDays(NOW, -10), purgeAt: addDays(NOW, 355), sortAt: addDays(NOW, -1), sortSource: "renew" });
+    const { patch } = transition(held, "published", ctx);
+    expect(patch).toEqual({ version: 4, updatedAt: NOW, status: "published", pausedReason: null, expiresAt: addDays(NOW, 60), purgeAt: addMonths(addDays(NOW, 60), 12) });
     expect(patch.publishedAt).toBeUndefined();
-    expect(effects).toMatchObject({ search: "delete", audit: "listing.hold", mail: "listingPendingReview", revalidate: true });
+    expect(patch.sortAt).toBeUndefined();
   });
 
   it("rejects with a purge date and the rejection mail; editing again reopens a draft without purge", () => {
@@ -173,6 +196,15 @@ describe("renewal (D16)", () => {
     // A published listing in its last week renews in place.
     const soon = listing("published", { publishedAt: addDays(NOW, -55), expiresAt: addDays(NOW, 5) });
     expect(renew(soon, ctx).patch).toMatchObject({ status: "published", sortSource: "renew", expiresAt: addDays(NOW, 60) });
+  });
+
+  it("holds an expired listing's renewal for review: back on top, the approval dates the new lifetime", () => {
+    const expired = listing("expired", { publishedAt: addDays(NOW, -70), expiresAt: addDays(NOW, -10), purgeAt: addDays(NOW, 355) });
+    const { patch, effects } = renewForReview(expired, ctx);
+    expect(patch).toEqual({ version: 4, updatedAt: NOW, status: "pending_review", sortAt: NOW, sortSource: "renew" });
+    expect(effects).toMatchObject({ search: "delete", contentOp: { op: "listing.update" }, audit: "listing.renew", revalidate: true, mail: "listingPendingReview" });
+    expect(() => renewForReview(listing("expired", { purgeAt: addDays(NOW, -1) }), ctx)).toThrow(IllegalTransitionError);
+    expect(() => renewForReview(listing("published", { expiresAt: addDays(NOW, 2) }), ctx)).toThrow(IllegalTransitionError);
   });
 
   it("refuses a renewal outside the window or after purgeAt", () => {

@@ -40,6 +40,8 @@ export interface ScreenInput {
   isDonation: boolean;
   contact: { showPhone: boolean; whatsapp: boolean };
   sensitiveDeclaration?: { kind: SensitiveDeclarationKind } | null;
+  /** Free-text district of the location (rendered on the public page), screened like the texts. */
+  district?: string;
   photos: ScreenPhoto[];
   seller: ScreenSeller;
   duplicates?: ScreenDuplicates;

@@ -58,6 +58,19 @@ describe("screenListing: hard blockers", () => {
     ]);
   });
 
+  it("screens the free-text district like the other texts (it is shown on the public page)", () => {
+    expect(codes(cleanListing({ district: "Maarif, appelez 0612345678" }))).toEqual(["location.district:phone_in_text"]);
+    expect(codes(cleanListing({ district: "Maarif www.vends-ici.ma" }))).toEqual(["location.district:url_in_text"]);
+    expect(codes(cleanListing({ district: "Maarif ahmed@gmail.com" }))).toEqual(["location.district:email_in_text"]);
+    const hard = screenListing(cleanListing({ district: "Kalachnikov Maarif" }), ctx);
+    expect(hard.blockers).toEqual([{ path: "location.district", code: "prohibited" }]);
+    expect(hard.evidence).toEqual(["prohibited hard:weapons in location.district"]);
+    const sensitive = screenListing(cleanListing({ district: "Chez ma mère malade du cancer" }), ctx);
+    expect(sensitive).toMatchObject({ blockers: [], flags: ["sensitive_text"], state: "needs_review" });
+    expect(screenListing(cleanListing({ district: "Maarif" }), ctx)).toEqual({ state: "auto_ok", score: 0, flags: [], blockers: [], evidence: [] });
+    expect(screenListing(cleanListing({ district: "   " }), ctx).blockers).toEqual([]);
+  });
+
   it("blocks hard prohibited keywords and records the group", () => {
     const result = screenListing(cleanListing({ title: "Kalachnikov de collection" }), ctx);
     expect(result.blockers).toEqual([{ path: "title", code: "prohibited" }]);

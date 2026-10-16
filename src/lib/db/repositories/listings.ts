@@ -107,9 +107,7 @@ export async function getListings(ids: readonly string[]): Promise<ListingRecord
 export async function createListing(id: string, doc: ListingDoc, options: { maxDrafts: number }): Promise<ListingRecord> {
   const data = toFirestore(doc);
   await db().runTransaction(async (tx) => {
-    const drafts = await tx.get(listings().where("ownerUid", "==", doc.ownerUid).where("status", "==", "draft").count());
-    void consume("firestore.reads", 1);
-    if (drafts.data().count >= options.maxDrafts) throw new DraftLimitError();
+    if ((await countDraftsTx(tx, doc.ownerUid)) >= options.maxDrafts) throw new DraftLimitError();
     tx.create(listingRef(id), data);
   });
   void consume("firestore.writes", 1);
@@ -140,6 +138,13 @@ export async function countActive(uid: string): Promise<number> {
   const result = await listings().where("ownerUid", "==", uid).where("status", "in", [...ACTIVE_STATUSES]).count().get();
   void consume("firestore.reads", 1);
   return result.data().count;
+}
+
+/** Drafts of an owner inside a transaction (the D2 cap: creation, and a rejected listing reopened as a draft). */
+export async function countDraftsTx(tx: Transaction, uid: string): Promise<number> {
+  const drafts = await tx.get(listings().where("ownerUid", "==", uid).where("status", "==", "draft").count());
+  void consume("firestore.reads", 1);
+  return drafts.data().count;
 }
 
 export async function countDrafts(uid: string): Promise<number> {

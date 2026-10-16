@@ -9,7 +9,8 @@ import { detectSensitiveDetailed } from "@/lib/moderation/sensitive";
 import type { FieldIssue, ScreenBlockerCode, ScreenContext, ScreenInput, ScreenResult } from "@/lib/moderation/types";
 
 // Pre-publication screen (architecture §7 steps 1-5, design D8), pure and deterministic. The
-// listing service calls it at publish (and when a published listing is edited):
+// listing service calls it at publish, on an edit of a published, paused, pending or expired
+// listing, and when an expired listing is renewed:
 //   blockers.length > 0 -> 422 `invalid_listing` with `blockers` as details;
 //   otherwise `state` / `score` / `flags` go to `moderation`, `needs_review` -> `pending_review`.
 // Step 6 (AI agent) is phase 5 and absent on purpose. Evidence strings carry no personal data.
@@ -24,7 +25,7 @@ function pushIssue(blockers: FieldIssue[], next: FieldIssue): void {
   if (!blockers.some((b) => b.path === next.path && b.code === next.code)) blockers.push(next);
 }
 
-/** Title, description, then the free-text attributes in key order. */
+/** Title, description, the free-text attributes in key order, then the district. */
 function textFields(input: ScreenInput): TextField[] {
   const fields: TextField[] = [
     { path: "title", text: input.title ?? "" },
@@ -34,6 +35,7 @@ function textFields(input: ScreenInput): TextField[] {
     const value = input.attributes[key];
     if (typeof value === "string" && value.trim() !== "") fields.push({ path: `attributes.${key}`, text: value });
   }
+  if (input.district && input.district.trim() !== "") fields.push({ path: "location.district", text: input.district });
   return fields;
 }
 

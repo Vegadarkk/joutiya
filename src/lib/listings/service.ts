@@ -15,6 +15,7 @@ import {
   ListingVersionError,
   applyPatch,
   countActive,
+  countDraftsTx,
   countPublishedSince,
   createListing,
   getListing,
@@ -24,10 +25,10 @@ import {
   type ListingFieldPatch,
   type ListingRecord,
 } from "@/lib/db/repositories/listings";
-import { recordModerationDecision } from "@/lib/db/repositories/moderation-decisions";
+import { recordModerationDecisionTx, type ModerationDecisionInput } from "@/lib/db/repositories/moderation-decisions";
 import { getUserRecord, type UserRecord } from "@/lib/db/repositories/profiles";
 import { enqueueSearchOutboxTx } from "@/lib/db/repositories/search-outbox";
-import { getUploads, listUploadsByTarget, updateUpload } from "@/lib/db/repositories/uploads";
+import { getUploads } from "@/lib/db/repositories/uploads";
 import { getUserPrivate } from "@/lib/db/repositories/users";
 import { listingSchema, type ListingDoc, type ListingModeration } from "@/lib/db/schemas";
 import { serverEnv } from "@/lib/env";
@@ -40,8 +41,9 @@ import type { ModerationStatement, TemplateData } from "@/lib/mail/types";
 import { consumeLimit } from "@/lib/rate-limit/limiter";
 import { escalateOnIp } from "./escalation";
 import { buildSlugId, newListingId } from "./ids";
-import { IllegalTransitionError, canTransition, renew, transition, type Lifetime, type TransitionEffects } from "./lifecycle";
+import { IllegalTransitionError, canRenew, canTransition, renew, renewForReview, transition, type Lifetime, type TransitionContext, type TransitionEffects, type TransitionResult } from "./lifecycle";
 import { ownerListingView } from "./owner-view";
+import { PUBLIC_STATES } from "./public";
 import { assessReadiness } from "./readiness";
 import { revalidateListingPaths } from "./revalidate";
 import { screen, sellerFacts, type ScreeningResult } from "./screening";
@@ -61,10 +63,13 @@ export type OwnerAction = "pause" | "resume" | "sold" | "renew" | "remove";
 
 /** Statuses the owner may still edit (sold, removed and purged listings are read-only). */
 export const EDITABLE_STATUSES: readonly ListingStatus[] = ["draft", "pending_review", "published", "paused", "expired", "rejected"];
-/** Live listings: an edit is re-screened and may fall back to pending_review. */
-const LIVE_STATUSES: readonly ListingStatus[] = ["published", "paused", "pending_review"];
-/** Fields whose change re-runs the pre-moderation on a live listing. */
-const SCREENED_FIELDS: readonly (keyof ListingDoc)[] = ["title", "description", "attributes", "categoryId", "subcategoryId", "price", "isDonation", "photos", "contact"];
+/**
+ * Listings published before (live, paused, held or expired): an edit must stay publishable
+ * (readiness), is re-screened and may fall back to pending_review. Drafts are screened at publish.
+ */
+const SCREENED_STATUSES: readonly ListingStatus[] = ["published", "paused", "pending_review", "expired"];
+/** Fields whose change re-runs the pre-moderation (every free text, the district included). */
+const SCREENED_FIELDS: readonly (keyof ListingDoc)[] = ["title", "description", "attributes", "categoryId", "subcategoryId", "price", "isDonation", "photos", "contact", "location"];
 /** CGU reference quoted in the automated statements (design D8). */
 const AUTOMATED_GROUND = "CGU §7 (contrôle avant publication)";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -95,6 +100,24 @@ async function ownedListing(actor: Actor, id: string): Promise<ListingRecord> {
 }
 
 const invalidListing = (blockers: FieldIssue[]) => new HttpError(422, "invalid_listing", undefined, { details: blockers });
+
+/** The public page renders the listing (published, or with a banner): an edit revalidates it. */
+const hasPublicPage = (status: ListingStatus) => (PUBLIC_STATES as readonly ListingStatus[]).includes(status);
+
+/** Runs a lifecycle step; a transition the table forbids is a 409 conflict, never a 500. */
+function step(compute: () => TransitionResult): TransitionResult {
+  try {
+    return compute();
+  } catch (error) {
+    if (error instanceof IllegalTransitionError) throw new HttpError(409, "conflict", error.message);
+    throw error;
+  }
+}
+
+/** `activeListings` quota (published + pending_review): 409 `listing_limit` when another listing would exceed it. */
+async function assertWithinQuota(uid: string, quotas: ListingQuotas): Promise<void> {
+  if (!withinQuota(quotas.activeListings, await countActive(uid))) throw new HttpError(409, "listing_limit");
+}
 
 // ---- Drafts ---------------------------------------------------------------------------------
 
@@ -212,12 +235,28 @@ async function screenFor(listing: ListingDoc & { id: string }, seller: SellerCon
     listing.photos.length > 0 ? getUploads(listing.photos.map((photo) => photo.id)) : Promise.resolve([]),
     listOwnerListingsByStatus(listing.ownerUid, [...ACTIVE_STATUSES, "paused", "rejected"]),
   ]);
-  const facts = sellerFacts({ accountCreatedAt: seller.user.createdAt, phoneVerified: seller.user.badges.phoneVerified, others: others.filter((other) => other.id !== listing.id), now });
+  const facts = sellerFacts({
+    accountCreatedAt: seller.user.createdAt,
+    phoneVerified: seller.user.badges.phoneVerified,
+    others: others.filter((other) => other.id !== listing.id),
+    selfRejected: rejectedByModerator(listing),
+    now,
+  });
   return screen({ listing, uploads, seller: facts, others: others.filter((other) => other.status !== "rejected") }, listing.id);
 }
 
-function moderationPatch(current: ListingModeration, result: ScreeningResult, lastDecisionId?: string): ListingModeration {
-  return { ...current, state: result.state, score: result.score, flags: result.flags, ...(lastDecisionId ? { lastDecisionId } : {}) };
+/** Screening result on the listing; `held`: a person reviews it whatever the screen said. The hold's decision id is set by `commit`. */
+function moderationPatch(current: ListingModeration, result: ScreeningResult, held = false): ListingModeration {
+  return { ...current, state: held ? "needs_review" : result.state, score: result.score, flags: result.flags };
+}
+
+/**
+ * A moderator rejected this listing (then the owner reopened it as a draft): its next publication
+ * goes to a person again, whatever the automated screen says. Reopening and draft edits leave
+ * `moderation.state` alone, so it still reads "human_rejected" at publish.
+ */
+function rejectedByModerator(listing: Pick<ListingDoc, "moderation">): boolean {
+  return listing.moderation.state === "human_rejected";
 }
 
 export async function patchListing(actor: Actor, id: string, patch: ListingPatch, now = new Date()) {
@@ -228,38 +267,45 @@ export async function patchListing(actor: Actor, id: string, patch: ListingPatch
   const fields = await fieldsOf(listing, patch, { uid, quotas: seller.quotas, now });
   let effects: TransitionEffects = { search: null, contentOp: null, audit: null, revalidate: false, mail: null };
   let mail: MailJob | null = null;
+  let hold: ModerationDecisionInput | undefined;
+  let maxDrafts: number | undefined;
 
-  if (LIVE_STATUSES.includes(listing.status)) {
+  if (SCREENED_STATUSES.includes(listing.status)) {
     const next = applyPatch(listing, fields);
     const blockers = assessReadiness(next, { seller: seller.seller, phoneVerified: seller.user.badges.phoneVerified });
     if (blockers.length > 0) throw invalidListing(blockers);
+    // Kept as is: indexed again when published, its public page refreshed (paused and expired too).
+    effects = { search: listing.status === "published" ? "upsert" : null, contentOp: { op: "listing.update", ip: actor.ip }, audit: null, revalidate: hasPublicPage(listing.status), mail: null };
     if (SCREENED_FIELDS.some((field) => fields[field] !== undefined)) {
       const result = await screenFor(next, seller, now);
       if (result.blockers.length > 0) throw invalidListing(result.blockers);
       if (result.state === "needs_review" && listing.status !== "pending_review") {
-        const decisionId = await holdDecision(listing, result, now);
-        fields.moderation = moderationPatch(fields.moderation ?? listing.moderation, result, decisionId);
-        fields.adsEligible = false;
-        const held = transition(listing, "pending_review", { now, lifetime: await lifetime(), ip: actor.ip });
+        // Everything that can refuse comes first; the hold decision is written with the listing.
+        const ctx = { now, lifetime: await lifetime(), ip: actor.ip };
+        const held = step(() => transition(listing, "pending_review", ctx));
+        // Paused and expired listings free their slot; held for review, the listing takes one again.
+        if (!ACTIVE_STATUSES.includes(listing.status)) await assertWithinQuota(uid, seller.quotas);
         Object.assign(fields, held.patch);
+        fields.moderation = moderationPatch(fields.moderation ?? listing.moderation, result);
+        fields.adsEligible = false;
         effects = held.effects;
+        hold = holdRecord(listing, result, now);
         mail = { template: "listingPendingReview", statement: statementOf("hold", result.flags, await redressAddress()) };
       } else {
         fields.moderation = moderationPatch(fields.moderation ?? listing.moderation, result);
-        fields.adsEligible = result.state === "auto_ok" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy;
-        effects = { search: listing.status === "published" ? "upsert" : null, contentOp: { op: "listing.update", ip: actor.ip }, audit: null, revalidate: listing.status === "published", mail: null };
+        fields.adsEligible = result.state === "auto_ok" && listing.status !== "pending_review" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy;
       }
-    } else {
-      effects = { search: listing.status === "published" ? "upsert" : null, contentOp: { op: "listing.update", ip: actor.ip }, audit: null, revalidate: listing.status === "published", mail: null };
     }
   } else if (listing.status === "rejected") {
-    // Editing a rejected listing reopens it as a draft (lifecycle: rejected -> draft).
-    const reopened = transition(listing, "draft", { now, lifetime: await lifetime(), ip: actor.ip });
+    // Editing a rejected listing reopens it as a draft (lifecycle: rejected -> draft), under the draft cap (D2).
+    const ctx = { now, lifetime: await lifetime(), ip: actor.ip };
+    const reopened = step(() => transition(listing, "draft", ctx));
     Object.assign(fields, reopened.patch);
     effects = reopened.effects;
+    maxDrafts = MAX_DRAFTS;
   }
 
-  const updated = await commit(listing, fields, effects, { actor, user: seller.user, now });
+  const updated = await commit(listing, fields, effects, { actor, user: seller.user, now, hold, maxDrafts });
   if (mail) await notifySeller(updated, seller.user, mail);
   return ownerListingView(updated);
 }
@@ -281,7 +327,8 @@ export interface PublishOutcome {
 /**
  * Publish (§7 steps 1-5, design D8): readiness blockers, pre-moderation blockers (422), active
  * quota, IP escalation, 5-per-day limiter, then the transition to `published` (indexed, mailed)
- * or `pending_review` (held, statement mailed), in one transaction with searchOutbox and contentOps.
+ * or `pending_review` (held, statement mailed), in one transaction with searchOutbox, contentOps
+ * and the hold decision. A listing a moderator rejected before is always held.
  */
 export async function publish(actor: Actor, request: Request, id: string, options: PublishOptions): Promise<PublishOutcome> {
   const now = options.now ?? new Date();
@@ -295,20 +342,22 @@ export async function publish(actor: Actor, request: Request, id: string, option
   const screening = await screenFor(listing, seller, now);
   if (screening.blockers.length > 0) throw invalidListing(screening.blockers);
 
-  if (!withinQuota(seller.quotas.activeListings, await countActive(uid))) throw new HttpError(409, "listing_limit");
+  await assertWithinQuota(uid, seller.quotas);
   const turnstilePassed = await escalateOnIp(request, "listing.create.ip", options.device, options.turnstileToken, "listing");
   await enforceDailyLimit(uid, seller.quotas, now);
 
   const city = cityBySlug(listing.location!.citySlug)!;
   const slugId = buildSlugId({ id, title: listing.title, city: cityName(city, "fr"), categoryId: listing.categoryId });
-  const to: ListingStatus = screening.state === "needs_review" ? "pending_review" : "published";
-  const decisionId = to === "pending_review" ? await holdDecision(listing, screening, now) : undefined;
-  const { patch, effects } = transition(listing, to, { now, lifetime: await lifetime(), ip: actor.ip });
+  const rejectedBefore = rejectedByModerator(listing);
+  const to: ListingStatus = screening.state === "needs_review" || rejectedBefore ? "pending_review" : "published";
+  const ctx = { now, lifetime: await lifetime(), ip: actor.ip };
+  const { patch, effects } = step(() => transition(listing, to, ctx));
   patch.slugId = slugId;
-  patch.moderation = moderationPatch(listing.moderation, screening, decisionId);
+  patch.moderation = moderationPatch(listing.moderation, screening, to === "pending_review");
   patch.adsEligible = to === "published" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy;
+  const hold = to === "pending_review" ? holdRecord(listing, screening, now, rejectedBefore) : undefined;
 
-  const updated = await commit(listing, patch, effects, { actor, user: seller.user, now });
+  const updated = await commit(listing, patch, effects, { actor, user: seller.user, now, hold });
   const path = `/${seller.user.locale}/annonce/${slugId}`;
   if (to === "published") await notifySeller(updated, seller.user, { template: "listingPublished", path });
   else await notifySeller(updated, seller.user, { template: "listingPendingReview", statement: statementOf("hold", screening.flags, await redressAddress()) });
@@ -329,66 +378,89 @@ async function enforceDailyLimit(uid: string, quotas: ListingQuotas, now: Date):
   }
 }
 
-/** moderationDecisions entry of an automated hold (art. 17: the statement is mailed with it). */
-async function holdDecision(listing: ListingRecord, result: ScreeningResult, now: Date): Promise<string> {
-  return recordModerationDecision({
+/**
+ * moderationDecisions entry of an automated hold (art. 17: the statement is mailed with it),
+ * written by `commit` in the listing's transaction. `rejectedBefore`: held because a moderator
+ * rejected the listing before.
+ */
+function holdRecord(listing: ListingRecord, result: ScreeningResult, now: Date, rejectedBefore = false): ModerationDecisionInput {
+  const facts = [...(result.flags.length > 0 ? [`flags: ${result.flags.join(", ")}`] : []), `score ${result.score}`, ...(rejectedBefore ? ["previously rejected by a moderator"] : [])];
+  return {
     target: { type: "listing", id: listing.id },
     affectedUid: listing.ownerUid,
     action: "restrict_visibility",
-    facts: result.flags.length > 0 ? `flags: ${result.flags.join(", ")}; score ${result.score}` : `score ${result.score}`,
+    facts: facts.join("; "),
     origin: "own_initiative",
     automation: { detection: true, decision: true },
-    ground: { type: "terms", ref: AUTOMATED_GROUND, explanation: "Pre-publication screening held the listing for human review." },
+    ground: {
+      type: "terms",
+      ref: AUTOMATED_GROUND,
+      explanation: rejectedBefore ? "A moderator rejected this listing before: a person reviews it again before publication." : "Pre-publication screening held the listing for human review.",
+    },
     reportIds: [],
     templateId: "listingPendingReview",
     decidedBy: "system",
     notified: true,
     now,
-  });
+  };
 }
 
 // ---- Owner actions --------------------------------------------------------------------------
 
+/**
+ * Owner actions (D16). Resume takes an active slot back (quota, 409 `listing_limit`); an expired
+ * listing's renewal is screened like a publication (`renewExpired`). Removal keeps the photos:
+ * retention-purge deletes text and media together at purgeAt (§5, §7 retention table).
+ */
 export async function changeStatus(actor: Actor, id: string, action: OwnerAction, now = new Date()): Promise<ListingRecord> {
   const listing = await ownedListing(actor, id);
   const seller = await sellerOf(actor.auth);
-  const ctx = { now, lifetime: await lifetime(), ip: actor.ip };
-  let result;
-  try {
+  const ctx: TransitionContext = { now, lifetime: await lifetime(), ip: actor.ip };
+  if (action === "renew" && listing.status === "expired") return renewExpired(actor, listing, seller, ctx);
+  const result = step(() => {
     switch (action) {
       case "pause":
-        result = transition(listing, "paused", ctx);
-        break;
+        return transition(listing, "paused", ctx);
       case "resume":
         if (listing.status !== "paused") throw new IllegalTransitionError(listing.status, "published", "only a paused listing resumes");
-        result = transition(listing, "published", ctx);
-        break;
+        return transition(listing, "published", ctx);
       case "sold":
-        result = transition(listing, "sold", ctx);
-        break;
+        return transition(listing, "sold", ctx);
       case "renew":
-        result = renew(listing, ctx);
-        break;
+        // A published listing in its last week: same content, same slot, renewed in place.
+        return renew(listing, ctx);
       case "remove":
-        result = transition(listing, "removed", ctx);
-        break;
+        return transition(listing, "removed", ctx);
     }
-  } catch (error) {
-    if (error instanceof IllegalTransitionError) throw new HttpError(409, "conflict", error.message);
-    throw error;
-  }
-  const updated = await commit(listing, result.patch, result.effects, { actor, user: seller.user, now });
-  if (action === "remove") await scheduleUploadPurge(listing, now);
-  return updated;
+  });
+  if (action === "resume") await assertWithinQuota(actor.auth.user.uid, seller.quotas);
+  return commit(listing, result.patch, result.effects, { actor, user: seller.user, now });
 }
 
 /**
- * Removal: the photos' objects go with the retention purge. The upload documents get `purgeAt =
- * now`; retention-purge (media lot) deletes the objects and the documents on its next run.
+ * Renewal of an expired listing (D16): back on a public page and in search, so screened like a
+ * publication: readiness and pre-moderation blockers (422), active quota (409), then `published`
+ * with a fresh lifetime, or `pending_review` when flagged (or rejected by a moderator before);
+ * the approval then dates its new lifetime.
  */
-async function scheduleUploadPurge(listing: ListingRecord, now: Date): Promise<void> {
-  const uploads = await listUploadsByTarget(listing.id);
-  await Promise.all(uploads.map((upload) => updateUpload(upload.id, { purgeAt: now }, now)));
+async function renewExpired(actor: Actor, listing: ListingRecord, seller: SellerContext, ctx: TransitionContext): Promise<ListingRecord> {
+  const { now } = ctx;
+  if (!canRenew(listing, now)) throw new HttpError(409, "conflict", "listing cannot be renewed any more");
+  const blockers = assessReadiness(listing, { seller: seller.seller, phoneVerified: seller.user.badges.phoneVerified });
+  if (blockers.length > 0) throw invalidListing(blockers);
+  const screening = await screenFor(listing, seller, now);
+  if (screening.blockers.length > 0) throw invalidListing(screening.blockers);
+  await assertWithinQuota(actor.auth.user.uid, seller.quotas);
+
+  const rejectedBefore = rejectedByModerator(listing);
+  const held = screening.state === "needs_review" || rejectedBefore;
+  const { patch, effects } = step(() => (held ? renewForReview(listing, ctx) : renew(listing, ctx)));
+  patch.moderation = moderationPatch(listing.moderation, screening, held);
+  patch.adsEligible = !held && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy;
+  const hold = held ? holdRecord(listing, screening, now, rejectedBefore) : undefined;
+  const updated = await commit(listing, patch, effects, { actor, user: seller.user, now, hold });
+  if (held) await notifySeller(updated, seller.user, { template: "listingPendingReview", statement: statementOf("hold", screening.flags, await redressAddress()) });
+  return updated;
 }
 
 export function isAllowedTransition(from: ListingStatus, to: ListingStatus): boolean {
@@ -401,11 +473,16 @@ interface CommitContext {
   actor: Actor;
   user: UserRecord;
   now: Date;
+  /** Automated hold decision, written in the same transaction; its id becomes `moderation.lastDecisionId`. */
+  hold?: ModerationDecisionInput;
+  /** Draft cap (D2) checked in the transaction: a rejected listing reopened as a draft. */
+  maxDrafts?: number;
 }
 
 /**
- * Writes the patch (version = read version + 1) with the searchOutbox and contentOps entries in
- * one transaction; a concurrent change answers 409. Audit and ISR revalidation follow the commit.
+ * Writes the patch (version = read version + 1) with the searchOutbox and contentOps entries and
+ * the hold decision in one transaction: a concurrent change answers 409 and leaves no decision
+ * behind. Audit and ISR revalidation follow the commit.
  */
 async function commit(listing: ListingRecord, patch: ListingFieldPatch, effects: TransitionEffects, ctx: CommitContext): Promise<ListingRecord> {
   const version = listing.version + 1;
@@ -414,12 +491,16 @@ async function commit(listing: ListingRecord, patch: ListingFieldPatch, effects:
     await db().runTransaction(async (tx) => {
       const current = await getListingTx(tx, listing.id);
       if (!current || current.version !== listing.version) throw new ListingVersionError();
+      if (ctx.maxDrafts !== undefined && (await countDraftsTx(tx, listing.ownerUid)) >= ctx.maxDrafts) throw new DraftLimitError();
+      // Reads above, writes below (Firestore transactions). A retry records a fresh decision id.
+      if (ctx.hold) full.moderation = { ...(full.moderation ?? current.moderation), lastDecisionId: recordModerationDecisionTx(tx, ctx.hold) };
       updateListingTx(tx, listing.id, full);
       if (effects.search) enqueueSearchOutboxTx(tx, listing.id, effects.search, version, ctx.now);
       if (effects.contentOp && ctx.actor.ip) recordContentOpTx(tx, { uid: ctx.actor.auth.user.uid, op: effects.contentOp.op, contentRef: listingContentRef(listing.id), ip: ctx.actor.ip, now: ctx.now });
     });
   } catch (error) {
     if (error instanceof ListingVersionError) throw new HttpError(409, "conflict", "listing changed meanwhile, reload it");
+    if (error instanceof DraftLimitError) throw new HttpError(409, "draft_limit");
     throw error;
   }
   const updated = applyPatch(listing, full);
