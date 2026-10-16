@@ -168,7 +168,8 @@ describe("RefineChips", () => {
     const html = render(<RefineChips params={url("q=velo")} facets={facets} />);
     expect(html).toContain(`aria-label="${escape(fr.SearchPage.refine.categories)}"`);
     expect(html).toContain('href="/fr/recherche?q=velo&amp;categorie=vehicules"');
-    expect(text(html)).toContain(`${fr.Categories.vehicules.name} ${groupDigits("1200")}`);
+    expect(text(html)).toContain(`${fr.Categories.vehicules.name} 1 200`);
+    expect(html).toContain(groupDigits("1200"));
     expect(render(<RefineChips params={url("sous-categorie=velos")} facets={facets} />)).toBe("");
     expect(render(<RefineChips params={{}} facets={{ categories: { mode: 3 }, subcategories: {} }} />)).toBe("");
   });

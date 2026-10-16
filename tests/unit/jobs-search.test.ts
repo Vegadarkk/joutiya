@@ -63,15 +63,41 @@ describe("processSearchJob", () => {
     expect(indexListing).not.toHaveBeenCalled();
   });
 
-  it("outbox-poll hands the ids to index-listing jobs while the engine answers", async () => {
+  /** Runs one poll and returns the options it gave processOutbox. */
+  async function poll() {
+    vi.mocked(processOutbox).mockClear();
     await jobs.processSearchJob({ name: "outbox-poll", data: {} });
-    const options = vi.mocked(processOutbox).mock.calls[0]?.[0];
+    return vi.mocked(processOutbox).mock.calls[0]?.[0];
+  }
+
+  it("outbox-poll hands the ids to index-listing jobs while the engine answers", async () => {
+    const options = await poll();
+    expect(options?.limit).toBe(200);
     await options?.dispatch?.(["abcdefgh"]);
     expect(enqueueIndexJobs).toHaveBeenCalledWith(["abcdefgh"]);
+  });
+
+  it("with the engine down the poll reads only the oldest entry and dispatches nothing", async () => {
     healthy.mockResolvedValueOnce(false);
-    await options?.dispatch?.(["bcdefghj"]);
-    expect(enqueueIndexJobs).toHaveBeenCalledTimes(1);
+    const options = await poll();
+    expect(options?.limit).toBe(1);
+    await options?.dispatch?.(["abcdefgh"]);
+    expect(enqueueIndexJobs).not.toHaveBeenCalled();
     expect(logger.warn).toHaveBeenCalled();
+  });
+
+  it("the poll waits before dispatching the same entry again, longer once its job failed for good", async () => {
+    vi.useFakeTimers();
+    await (await poll())?.dispatch?.(["abcdefgh", "bcdefghj"]);
+    await (await poll())?.dispatch?.(["abcdefgh", "bcdefghj", "cdefghjk"]);
+    expect(vi.mocked(enqueueIndexJobs).mock.calls).toEqual([[["abcdefgh", "bcdefghj"]], [["cdefghjk"]]]);
+    jobs.holdFailedListing("bcdefghj");
+    vi.advanceTimersByTime(jobs.POLL_REDISPATCH_MS);
+    await (await poll())?.dispatch?.(["abcdefgh", "bcdefghj"]);
+    expect(enqueueIndexJobs).toHaveBeenLastCalledWith(["abcdefgh"]);
+    vi.advanceTimersByTime(jobs.FAILED_HOLD_MS);
+    await (await poll())?.dispatch?.(["bcdefghj"]);
+    expect(enqueueIndexJobs).toHaveBeenLastCalledWith(["bcdefghj"]);
   });
 
   it("after an unavailable engine, index jobs fail fast without reading Firestore, then probe again", async () => {
@@ -81,10 +107,8 @@ describe("processSearchJob", () => {
     await expect(jobs.processSearchJob({ name: "index-listing", data: { id: "bcdefghj" } })).rejects.toBeInstanceOf(SearchUnavailableError);
     expect(indexListing).toHaveBeenCalledTimes(1);
     // The poll does not even ask the engine during the backoff.
-    await jobs.processSearchJob({ name: "outbox-poll", data: {} });
-    await vi.mocked(processOutbox).mock.calls[0]?.[0]?.dispatch?.(["cdefghjk"]);
+    expect((await poll())?.limit).toBe(1);
     expect(healthy).not.toHaveBeenCalled();
-    expect(enqueueIndexJobs).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(jobs.ENGINE_BACKOFF_MS);
     await jobs.processSearchJob({ name: "index-listing", data: { id: "bcdefghj" } });
