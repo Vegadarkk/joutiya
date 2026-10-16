@@ -107,6 +107,9 @@ export function derivedValues(env: DeployedEnv, targets: Targets): Record<string
     // §6: staging starts with its CSP in report-only mode; production enforces it.
     CSP_REPORT_ONLY: env === "staging" ? "true" : null,
     FIREBASE_PROJECT_ID: project,
+    // Without it, google-auth-library looks the project up before its first token (gcloud, the
+    // metadata server, then Resource Manager with a permission the service accounts lack).
+    GOOGLE_CLOUD_PROJECT: project,
     FIREBASE_APP_ID: recorded.firebase.appId,
     FIREBASE_SERVICE_ACCOUNT: project === null ? null : `joutiya-web@${project}.iam.gserviceaccount.com`,
     GOOGLE_OAUTH_CLIENT_ID: recorded.google.oauthClientId,

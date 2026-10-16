@@ -76,6 +76,7 @@ describe("app.env names", () => {
       ADMIN_HOST: "admin-staging.joutiya.ma",
       CSP_REPORT_ONLY: "true",
       FIREBASE_SERVICE_ACCOUNT: "joutiya-web@joutiya-staging.iam.gserviceaccount.com",
+      GOOGLE_CLOUD_PROJECT: "joutiya-staging",
       TURNSTILE_SITE_KEY: "0x4AAAAAAFYY7P8KeaWCGihV",
       MEDIA_BASE_URL: "https://media-staging.joutiya.ma",
       MEILI_URL: "http://meilisearch:7700",

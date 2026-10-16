@@ -16,7 +16,7 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | 6 | Applications Access et jetons de service | Claude (API), Nav | Après les étapes 5 et 7 (Access exige une zone active) |
 | 7 | Serveurs DNS chez Cloudflare | Nav (Hostinger) | Après la validation du .MA, avant le 12 novembre |
 | 8 | Déploiement automatique du staging | Claude (API), vous pour un jeton | Après les étapes 6 et 7 |
-| 9 | Accès sans clé de la VM à Firestore | Claude | Avec la phase 2 |
+| 9 | Accès sans clé de la VM à Firestore | Claude (outil), Cody pour la partie Google | Outil prêt : prompt P ; certificats de la VM dès qu'elle existe |
 | 10 | Mentions légales de la production | Claude | Après Firebase |
 | 11 | Alertes | Claude (API), Nav pour un filtre Gmail | Code en phase 2 ; après l'étape 7 (domaine Resend) |
 | 12 | Mise en production et contrôles | Claude | Après l'étape 8 |
@@ -28,7 +28,8 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 ## Ce qui reste à vous
 
 - **Étape 8** : sur la page de jeton GitHub préparée par Nav, cliquer sur **Generate token**, puis l'enregistrer dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
-- **Étape 16**, quand la VM existera : lancer le prompt O dans Cody, qui envoie les clés de votre `.env.local` sur la VM.
+- **Étape 9** : lancer le prompt P dans Cody, puis choisir dans votre navigateur le compte Google de vos projets Firebase.
+- **Étape 16**, quand la VM existera : lancer le prompt O dans Cody, qui envoie les clés de votre `.env.local` sur la VM, puis ses certificats Google.
 
 Rien d'autre : ni clé SSH, ni commande, ni console.
 
@@ -117,11 +118,25 @@ Après la validation du .MA par le registre, et avant le 12 novembre (Cloudflare
    - puis met `STAGING_DEPLOY_ENABLED` à `true`.
 3. Claude lance *Deploy staging* sur `main`. Ensuite, chaque fusion sur `main` construit l'image et la déploie en staging toute seule.
 
-Le déploiement des règles Firestore du staging par la CI (`FIREBASE_STAGING_WIF_PROVIDER`, `FIREBASE_STAGING_DEPLOYER`) attend la phase 2.
+Le déploiement des règles Firestore du staging par la CI attend l'étape 9 : Claude met alors aussi les variables `FIREBASE_STAGING_WIF_PROVIDER` et `FIREBASE_STAGING_DEPLOYER`, que `setup staging` affiche (rien de secret).
 
 ## 9. Accès sans clé de la VM à Firestore
 
-Fédération d'identité X.509 (§9) : comptes de service `joutiya-web` et `joutiya-worker`, pool `joutiya-vm`, un certificat par conteneur. Claude la met en place avec la phase 2, une fois les projets Firebase créés. Si Google exige la facturation, la solution de repli (une clé par conteneur, renouvelée tous les 90 jours) demande votre accord.
+Fédération d'identité X.509 (§9) : web et worker prouvent qui ils sont par un certificat, sans clé JSON. `scripts/google-wif.ts` tourne sur votre PC, par Cody : l'autorité qui signe les certificats y reste (`~/.joutiya/wif-ca`), et gcloud s'y connecte dans une configuration à part (`~/.joutiya/gcloud`), sans toucher à celle de vos autres projets.
+
+1. `ca` crée l'autorité (EC P-256, 10 ans), une seule fois.
+2. `login` ouvre la connexion Google. **Vous :** choisir le compte de vos projets Firebase et accepter.
+3. `setup staging` puis `setup prod`, en simulation puis avec `--apply`, dans le projet Firebase consigné pour l'environnement : API IAM, IAM Credentials, STS et Resource Manager ; comptes `joutiya-web` (Cloud Datastore User, Firebase Authentication Admin, signature de ses propres custom tokens) et `joutiya-worker` (Cloud Datastore User, Firebase Authentication Admin) ; pool `joutiya-vm` et son fournisseur `x509`, qui ne croit que l'autorité et n'accepte que `joutiya-<env>-web` et `joutiya-<env>-worker`. En staging, aussi `joutiya-deployer` (Firebase Rules Admin, Cloud Datastore Index Admin, et Service Usage Consumer, qu'exige `firebase deploy`) et le pool `github`, réservé à `deploy-staging.yml` sur `main` de ce dépôt (identifiant numérique dans `infra/targets.json`). L'outil ajoute ce qui manque et ne retire jamais rien.
+4. `test staging` puis `test prod` : des certificats d'un jour signés sur votre PC prouvent toute la chaîne (lecture Firestore et custom token pour web, lecture Firestore et Firebase Auth pour worker), puis leurs clés sont effacées. IAM met quelques minutes à appliquer les droits : l'outil réessaie seul.
+5. Quand la VM existe, après ses variables et avant le premier déploiement (prompt O, étape 16) : `node --env-file=.env.local scripts/oracle-vm.ts wif <env> --apply`. Chaque conteneur reçoit une clé créée sur la VM, qui n'en sort jamais ; seule sa demande de certificat passe par votre PC pour être signée. Sans ces fichiers, web et worker refusent de démarrer.
+
+Le certificat d'un conteneur vaut un an : la même commande le renouvelle, et Claude programme un rappel. Si Google exige la facturation pour ces API, `setup` s'arrête avant toute création : la solution de repli (une clé JSON par conteneur, renouvelée tous les 90 jours) demande votre accord. Nouvelle autorité (fin de projet, fuite) : `ca --new`, puis `setup` et `wif` pour les deux environnements.
+
+**P. Accès Google sans clé** (prompt Cody)
+
+```text
+Prépare l'accès sans clé de Joutiya à Google (docs/phase-1.md, étape 9), depuis Git Bash, à la racine du dépôt à jour (git pull). Ces commandes n'ont pas besoin de .env.local : ne le lis pas. 1) Si node_modules manque : npm ci --ignore-scripts. 2) node scripts/google-wif.ts ca. 3) node scripts/google-wif.ts login ; si gcloud manque, dis-moi d'installer Google Cloud CLI et arrête-toi ; sinon je choisis dans le navigateur le compte de mes projets Firebase. 4) Pour staging puis prod : node scripts/google-wif.ts setup <env>, simulation qui liste ce qui sera créé ; sans erreur, relance-la avec --apply ; si Google demande la facturation, arrête-toi et montre-moi le message. 5) node scripts/google-wif.ts test staging, puis test prod. Résume-moi seulement ce qui a été créé et si les deux tests passent. N'affiche jamais une clé ni un jeton.
+```
 
 ## 10. Mentions légales de la production
 
@@ -192,6 +207,7 @@ Chaque environnement lit `/etc/joutiya/<env>/app.env` (root, 0600) et deux mots 
 - **Registre** `infra/targets.json` : adresses du site et du back-office, projet et application web Firebase, compte de service `joutiya-web`, client Google de connexion, clé de site Turnstile, DSN Sentry, compte et buckets R2, Access.
 - **VM** : `CSRF_SECRET`, les mots de passe Valkey et la clé maîtresse de Meilisearch (`meilisearch.env`, phase 4), générés une fois sur place ; ils n'en sortent jamais et une VM reconstruite en reçoit de nouveaux. Les deux clés de recherche de l'application en dérivent : `node scripts/oracle-vm.ts search-setup <env> --apply` crée l'index et les écrit dans `app.env`, puis recrée web et worker, une fois qu'une version avec Meilisearch tourne.
 - **Votre `.env.local`**, lu sur votre PC par Cody (prompt O) : les clés secrètes. Le fichier sert aussi à un autre produit : l'outil ne fait que le lire, ne prend que des noms de `.env.example` et seulement sous deux formes : `NOM_STAGING=…` ou `NOM_PROD=…`, ou la paire rangée par Nav le 16 octobre (ligne de production active, ligne du staging en commentaire juste dessous) pour `FIREBASE_SERVER_API_KEY`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` et `MAIL_FALLBACK_API_KEY`. Toute autre ligne est ignorée : valeur de développement ou de l'autre produit. Une clé de site Turnstile différente du registre arrête tout : la paire aurait été mal lue.
+- **Google** : `GOOGLE_CLOUD_PROJECT`, égal au projet Firebase, évite à la bibliothèque de Google de chercher le projet avant chaque premier jeton. Les certificats de web et worker ne sont pas dans `app.env` : `oracle-vm.ts wif <env> --apply` les pose ensuite dans `/etc/joutiya/<env>/gcp` (étape 9).
 - **Claude, au fil des étapes** : `CF_ACCESS_AUD` (étape 6), `ALERT_RELAY_URL` et `ALERT_RELAY_SECRET` (Worker, étape 11), `MAIL_API_KEY` et `MAIL_WEBHOOK_SECRET` (Resend, après la bascule DNS), `MAP_PMTILES_URL` (phase 3). Puis il relance web et worker.
 
 `HASH_PEPPER` sert aux empreintes des e-mails, des téléphones et des désabonnements dans Firestore : il ne doit jamais changer. Cody le génère dans votre `.env.local` (`HASH_PEPPER_STAGING`, `HASH_PEPPER_PROD`), qui en garde la copie ; **Vous :** rangez-la aussi dans votre gestionnaire de mots de passe. Les réglages R2 ne s'écrivent qu'avec les deux clés `R2_ACCESS_KEY_ID` et `R2_SECRET_ACCESS_KEY` de l'environnement : un jeu partiel empêche l'application de démarrer.
@@ -201,7 +217,7 @@ Pour l'envoi, Cody a besoin dans votre `.env.local` des six lignes `JOUTIYA_OCI_
 **O. Variables de la VM** (prompt Cody)
 
 ```text
-Envoie les clés de mon .env.local sur la VM de Joutiya (docs/phase-1.md, étape 16). Ce fichier sert aussi à un autre produit : ne le lis pas toi-même (ni cat, head, tail, sed, ni grep sans -q), ne l'affiche pas, ne le réécris pas et ne change ni l'ordre ni le texte de ses lignes ; seuls les deux scripts ci-dessous le lisent. 1) `node scripts/vm-env.ts pepper .env.local` : ajoute HASH_PEPPER_STAGING et HASH_PEPPER_PROD à la fin du fichier s'ils manquent, sans montrer de valeur ; dis-moi alors de les copier dans mon gestionnaire de mots de passe. 2) Pour staging puis prod : `node --env-file=.env.local scripts/oracle-vm.ts env <env> --from=.env.local`, simulation qui liste les noms, leurs lignes et ce qui manque. Sans erreur, relance la même commande avec --apply ; sinon montre-moi les erreurs et arrête. S'il manque des variables JOUTIYA_OCI_*, dis-moi lesquelles ajouter, sans valeur. Ne me donne aucune valeur, seulement des noms.
+Envoie les clés de mon .env.local sur la VM de Joutiya (docs/phase-1.md, étape 16). Ce fichier sert aussi à un autre produit : ne le lis pas toi-même (ni cat, head, tail, sed, ni grep sans -q), ne l'affiche pas, ne le réécris pas et ne change ni l'ordre ni le texte de ses lignes ; seuls les deux scripts ci-dessous le lisent. 1) `node scripts/vm-env.ts pepper .env.local` : ajoute HASH_PEPPER_STAGING et HASH_PEPPER_PROD à la fin du fichier s'ils manquent, sans montrer de valeur ; dis-moi alors de les copier dans mon gestionnaire de mots de passe. 2) Pour staging puis prod : `node --env-file=.env.local scripts/oracle-vm.ts env <env> --from=.env.local`, simulation qui liste les noms, leurs lignes et ce qui manque. Sans erreur, relance la même commande avec --apply ; sinon montre-moi les erreurs et arrête. 3) Pour staging puis prod : `node --env-file=.env.local scripts/oracle-vm.ts wif <env>` (simulation), puis la même avec --apply : certificats Google de la VM, signés par l'autorité de l'étape 9. S'il manque des variables JOUTIYA_OCI_*, dis-moi lesquelles ajouter, sans valeur. Ne me donne aucune valeur, seulement des noms.
 ```
 
 ## Fin de la phase 1
