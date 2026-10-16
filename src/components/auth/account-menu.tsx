@@ -42,7 +42,7 @@ export function AccountMenu() {
     const next = nextFor(locale, pathname);
     return (
       <Button asChild variant="ghost" className="px-2 md:px-3">
-        <Link href={next ? { pathname: "/connexion", query: { next } } : "/connexion"}>
+        <Link href={next ? { pathname: "/connexion", query: { next } } : "/connexion"} className="min-w-11">
           <UserRound aria-hidden="true" />
           <span className="hidden sm:inline">{nav("signIn")}</span>
           <span className="sr-only sm:hidden">{nav("signIn")}</span>
@@ -59,22 +59,26 @@ export function AccountMenu() {
     router.refresh();
   }
   const item = cn(
-    "flex cursor-pointer items-center gap-2.5 rounded-sm px-3 py-2.5 text-sm outline-none",
+    "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-sm px-3 py-2.5 text-sm outline-none",
     "data-[highlighted]:bg-surface-muted [&_svg]:size-4 [&_svg]:text-foreground-muted",
   );
   return (
     <DropdownMenu.Root modal={false}>
+      {/* Named by its text, not aria-label, so the name holds what is visible (WCAG 2.5.3): "Mon compte"
+          then the display name from sm; the initials are a decorative avatar. */}
       <DropdownMenu.Trigger
         className={cn(
-          "inline-flex h-11 items-center gap-2 rounded-md px-1.5 text-sm font-medium text-foreground hover:bg-surface-muted md:px-2",
+          "inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-md px-1.5 text-sm font-medium text-foreground hover:bg-surface-muted md:px-2",
           "data-[state=open]:bg-surface-muted",
         )}
-        aria-label={t("account")}
       >
         <span className="flex size-8 items-center justify-center rounded-full bg-structure text-xs font-semibold text-structure-foreground" aria-hidden="true">
           {initials(session)}
         </span>
-        <span className="hidden max-w-32 truncate sm:inline">{name}</span>
+        <span className="sr-only">{t("account")}</span>{" "}
+        <span dir="auto" className="hidden max-w-32 truncate sm:inline">
+          {name}
+        </span>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
@@ -86,7 +90,9 @@ export function AccountMenu() {
           )}
         >
           <div className="flex flex-col px-3 py-2">
-            <span className="truncate text-sm font-semibold">{name}</span>
+            <span dir="auto" className="truncate text-sm font-semibold">
+              {name}
+            </span>
             {session.displayName && session.email ? (
               <span className="truncate text-xs text-foreground-muted" dir="ltr">
                 {session.email}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -35,6 +35,36 @@ function isBucket(value: string | null): value is OwnerListBucket {
   return value !== null && (OWNER_LIST_BUCKETS as readonly string[]).includes(value);
 }
 
+/** Width of the fade on a side of the tab strip that has more tabs to scroll to. */
+const TAB_FADE = 40;
+
+type Edges = { start: boolean; end: boolean };
+
+/** Which sides of a horizontal scroller hide content (scrollLeft is negative in RTL). */
+function scrollEdges(list: HTMLElement): Edges {
+  const max = list.scrollWidth - list.clientWidth;
+  if (max <= 1) return { start: false, end: false };
+  const offset = Math.abs(list.scrollLeft);
+  return { start: offset > 1, end: offset < max - 1 };
+}
+
+/** Mask fading the tab strip out on the sides that scroll further (gradients only take physical sides). */
+function fadeStyle(edges: Edges, rtl: boolean): CSSProperties | undefined {
+  if (!edges.start && !edges.end) return undefined;
+  const mask = `linear-gradient(to ${rtl ? "left" : "right"}, ${edges.start ? "transparent" : "#000"}, #000 ${TAB_FADE}px, #000 calc(100% - ${TAB_FADE}px), ${edges.end ? "transparent" : "#000"})`;
+  return { maskImage: mask, WebkitMaskImage: mask };
+}
+
+/** Scrolls `list` so `tab` is in view, clear of the fades. */
+function revealTab(list: HTMLElement, tab: HTMLElement, smooth: boolean): void {
+  const box = list.getBoundingClientRect();
+  const item = tab.getBoundingClientRect();
+  const delta = item.left < box.left + TAB_FADE ? item.left - box.left - TAB_FADE : item.right > box.right - TAB_FADE ? item.right - box.right + TAB_FADE : 0;
+  if (delta === 0) return;
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  list.scrollBy({ left: delta, behavior: smooth && !reduced ? "smooth" : "auto" });
+}
+
 /** The row after an action, from the listing the API answered with (renewability comes with the reload). */
 function summaryAfter(summary: OwnerListingSummary, listing: OwnerListing): OwnerListingSummary {
   return {
@@ -63,6 +93,9 @@ export function MyListingsView() {
   // Answers that arrive out of order: only the latest request of a bucket is kept.
   const requests = useRef<Partial<Record<OwnerListBucket, number>>>({});
   const tabRefs = useRef<Partial<Record<OwnerListBucket, HTMLButtonElement | null>>>({});
+  const tablist = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState<Edges>({ start: false, end: false });
+  const revealed = useRef(false);
 
   const load = useCallback(async (bucket: OwnerListBucket) => {
     const request = (requests.current[bucket] ?? 0) + 1;
@@ -85,6 +118,37 @@ export function MyListingsView() {
   useEffect(() => {
     if (!buckets[tab]) void load(tab);
   }, [tab, buckets, load]);
+
+  // On a phone the four tabs overflow: the selected one is scrolled into view (a link to
+  // ?onglet=ended opens on the last tab), again once its count widens it, and the sides with more
+  // tabs fade out.
+  const shownBucket = buckets[tab];
+  const selectedCount = shownBucket?.kind === "ready" ? shownBucket.listings.length : null;
+  useEffect(() => {
+    const list = tablist.current;
+    const selected = tabRefs.current[tab];
+    if (list && selected) revealTab(list, selected, revealed.current);
+    revealed.current = true;
+  }, [tab, selectedCount]);
+
+  useEffect(() => {
+    const list = tablist.current;
+    if (!list) return;
+    const update = () => setEdges((current) => {
+      const next = scrollEdges(list);
+      return next.start === current.start && next.end === current.end ? current : next;
+    });
+    update();
+    list.addEventListener("scroll", update, { passive: true });
+    // The strip and its tabs change size (window, counts arriving after each load).
+    const observer = new ResizeObserver(update);
+    observer.observe(list);
+    for (const element of Array.from(list.children)) observer.observe(element);
+    return () => {
+      list.removeEventListener("scroll", update);
+      observer.disconnect();
+    };
+  }, []);
 
   function selectTab(next: OwnerListBucket, focus = false) {
     setTab(next);
@@ -177,7 +241,13 @@ export function MyListingsView() {
         </Button>
       </header>
 
-      <div role="tablist" aria-label={t("tabsLabel")} className="-mx-4 flex gap-1 overflow-x-auto border-b border-border px-4 [scrollbar-width:none] sm:mx-0 sm:px-0">
+      <div
+        ref={tablist}
+        role="tablist"
+        aria-label={t("tabsLabel")}
+        style={fadeStyle(edges, rtl)}
+        className="-mx-4 flex gap-1 overflow-x-auto overscroll-x-contain border-b border-border px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+      >
         {tabs.map(({ bucket, label }, index) => {
           const selected = bucket === tab;
           const shown = buckets[bucket];

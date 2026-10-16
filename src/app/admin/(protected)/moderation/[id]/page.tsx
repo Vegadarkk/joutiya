@@ -199,7 +199,7 @@ export default async function ModerationReviewPage({ params }: { params: Promise
                 <h3 className="mb-1 font-medium text-foreground-muted">Détail du contrôle</h3>
                 <ul className="list-disc ps-5 text-foreground-muted">
                   {screening.evidence.map((line) => (
-                    <li key={line}>{line}</li>
+                    <li key={line}>{labels.evidence(line)}</li>
                   ))}
                 </ul>
               </div>

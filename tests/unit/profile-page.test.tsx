@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import fr from "../../messages/fr.json";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UserRecord } from "@/lib/db/repositories/profiles";
+import { isolate } from "@/lib/i18n/bidi";
 import type * as Quota from "@/lib/quota";
 
 // The public profile page module (lot D2, §5 /profil/{publicId}): ISR settings, 404 for unknown or
@@ -149,7 +150,8 @@ describe("profile page", () => {
     repo.findUserByPublicId.mockResolvedValue(user());
     repo.listPublishedByOwner.mockResolvedValue([listing("abcd2345", "Vélo de ville"), listing("bcde3456", "Casque")]);
     const html = await renderPage();
-    expect(html).toMatch(/<h1[^>]*>Salma/);
+    // The name keeps its own direction (dir="auto"), apart from the Pro badge.
+    expect(html).toMatch(/<h1[^>]*><span dir="auto"[^>]*>Salma<\/span>/);
     expect(html).toContain("Membre depuis octobre 2025");
     expect(html).toContain("Téléphone vérifié");
     expect(html).toContain("2 annonces en ligne");
@@ -176,6 +178,8 @@ describe("profile page", () => {
     expect(html).toContain(fr.Profile.emptyTitle);
     expect(html).toContain('href="/fr/recherche"');
     expect(html).toContain("0 annonce en ligne");
+    // The name inside the translated sentence is bidi-isolated.
+    expect(html).toContain(fr.Profile.emptyBody.replace("{name}", isolate("Salma")));
     expect(repo.listPublishedByOwner).not.toHaveBeenCalled();
   });
 

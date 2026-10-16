@@ -8,6 +8,7 @@ import fr from "../../messages/fr.json";
 import type { ListingStatus } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UserRecord } from "@/lib/db/repositories/profiles";
+import { isolate } from "@/lib/i18n/bidi";
 import type * as Quota from "@/lib/quota";
 
 // The public listing page module (lot D2: D1 canonical redirect, D14 404, §8 ISR settings, §5
@@ -222,6 +223,18 @@ describe("page content", () => {
     expect(description?.[0]).toContain("whitespace-pre-wrap");
     expect(description?.[1]).toBe("Ligne 1\n\n  Ligne 2 &lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).not.toContain("<script>alert(1)");
+  });
+
+  it("shows the seller's texts in their own direction: title, description, district and seller name", async () => {
+    repo.getListing.mockResolvedValue(record("published", { location: { regionCode: "06", citySlug: "casablanca", district: "المعاريف", geo: { lat: 33.57, lng: -7.59 } } }));
+    const html = await renderPage();
+    expect(html).toMatch(/<h1 dir="auto"[^>]*>Vélo de ville<\/h1>/);
+    expect(html).toMatch(/<div data-testid="listing-description" dir="auto" class="[^"]*\[unicode-bidi:plaintext\]/);
+    expect(html).toContain(`Casablanca, ${isolate("المعاريف")}, Casablanca-Settat`);
+    expect(html).toMatch(/<span aria-current="page" dir="auto"[^>]*>Vélo de ville<\/span>/);
+    expect(html).toMatch(/<a dir="auto"[^>]*href="\/fr\/profil\/abcdefghjk"[^>]*>Salma<\/a>/);
+    // The gallery's alt texts isolate the title inside the translated sentence.
+    expect(html).toContain(`alt="${isolate("Vélo de ville")}, photo 1 sur 2"`);
   });
 
   it("never prints the uid, the moderation data, the geo point or a phone number", async () => {

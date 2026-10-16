@@ -13,13 +13,14 @@ export function LocaleSwitcher({ className }: { className?: string }) {
   const pathname = usePathname();
   return (
     <DropdownMenu.Root modal={false}>
+      {/* The accessible name starts with the visible code (WCAG 2.5.3): "FR, Langue". */}
       <DropdownMenu.Trigger
         className={cn(
           "inline-flex h-11 items-center gap-2 rounded-md px-3 text-sm font-medium text-foreground hover:bg-surface-muted",
           "data-[state=open]:bg-surface-muted",
           className,
         )}
-        aria-label={t("label")}
+        aria-label={t("trigger", { short: t(`short.${current}`), label: t("label") })}
       >
         <Globe className="size-4" aria-hidden="true" />
         <span>{t(`short.${current}`)}</span>
@@ -41,7 +42,7 @@ export function LocaleSwitcher({ className }: { className?: string }) {
                 lang={locale === "rif" ? "rif-Latn" : locale}
                 aria-current={locale === current ? "true" : undefined}
                 className={cn(
-                  "flex cursor-pointer items-center justify-between gap-6 rounded-sm px-3 py-2 text-sm outline-none",
+                  "flex min-h-11 cursor-pointer items-center justify-between gap-6 rounded-sm px-3 py-2 text-sm outline-none",
                   "data-[highlighted]:bg-surface-muted aria-[current=true]:font-semibold",
                 )}
               >

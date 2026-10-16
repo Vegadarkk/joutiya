@@ -14,8 +14,8 @@ export function SiteHeader({ locale }: { locale: string }) {
   return (
     <header className="threshold sticky top-0 z-40 bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/85">
       <Container className="flex h-16 items-center gap-3 md:h-20 md:gap-5">
-        <Link href="/" className="h-10 shrink-0 rounded-sm md:h-12" aria-label={t("home")}>
-          <Logo label="Joutiya" className="h-full" />
+        <Link href="/" className="flex h-11 shrink-0 items-center rounded-sm md:h-12" aria-label={t("home")}>
+          <Logo label="Joutiya" className="h-10 md:h-12" />
         </Link>
 
         <Button asChild className="hidden md:inline-flex">
@@ -25,7 +25,8 @@ export function SiteHeader({ locale }: { locale: string }) {
           </Link>
         </Button>
 
-        <form action={`/${locale}/recherche`} method="get" role="search" className="relative hidden min-w-0 flex-1 md:block">
+        {/* Named: the home page has a second search landmark (its search panel). */}
+        <form action={`/${locale}/recherche`} method="get" role="search" aria-label={t("searchLabel")} className="relative hidden min-w-0 flex-1 md:block">
           <label htmlFor="header-search" className="sr-only">
             {t("searchLabel")}
           </label>

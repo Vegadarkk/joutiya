@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { ApiError, apiPost, loadSession, useSession, type ApiErrorCode } from "@/lib/auth/client";
 import { LISTING_API, type PhoneRevealResponse } from "@/lib/contracts/listings";
+import { isolateLtr } from "@/lib/i18n/bidi";
 import { cn } from "@/lib/utils";
 
 // Contact actions of a published listing (design §5): the phone reveal island (POST
@@ -155,7 +156,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, showPhone, whats
       <>
         {showPhone ? (
           <Button asChild className={cn(wide && "min-w-0 flex-1")}>
-            <a href={`tel:${revealed.e164}`} aria-label={t("call", { number: revealed.display })}>
+            <a href={`tel:${revealed.e164}`} aria-label={t("call", { number: isolateLtr(revealed.display) })}>
               <Phone aria-hidden="true" />
               <span dir="ltr" className="tabular-nums">
                 {revealed.display}

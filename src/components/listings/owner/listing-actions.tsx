@@ -7,6 +7,7 @@ import { DropdownMenu } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import type { OwnerListingSummary } from "@/lib/contracts/listings";
+import { isolate } from "@/lib/i18n/bidi";
 import type { OwnerAction } from "@/lib/listings/client/api";
 import { wizardPath } from "@/lib/listings/client/routes";
 import { cn } from "@/lib/utils";
@@ -44,7 +45,8 @@ export function ListingActions({ listing, onAction, onDelete, busy, publicHref, 
   const [confirm, setConfirm] = useState<"delete" | "sold" | null>(null);
   const [working, setWorking] = useState(false);
   const allowed = allowedActions(listing, now);
-  const title = listing.title || t("untitled");
+  // The seller's title keeps its own direction inside the translated labels.
+  const title = isolate(listing.title || t("untitled"));
   const item = cn("flex min-h-11 cursor-pointer items-center gap-2.5 rounded-sm px-3 py-2 text-sm outline-none data-[highlighted]:bg-surface-muted [&_svg]:size-4 [&_svg]:text-foreground-muted");
 
   async function run(fn: () => Promise<void>) {

@@ -73,7 +73,7 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
         {listing.sellerType === "pro" ? <span className="absolute top-2 start-2 rounded-sm bg-structure px-2 py-0.5 text-xs font-medium text-structure-foreground">{t("pro")}</span> : null}
       </div>
       <Heading className="text-sm font-medium leading-snug">
-        <Link href={`/annonce/${listing.slugId}`} prefetch={false} className="line-clamp-2 break-words outline-none group-hover:underline group-hover:underline-offset-2 after:absolute after:inset-0 after:rounded-lg">
+        <Link href={`/annonce/${listing.slugId}`} prefetch={false} dir="auto" className="line-clamp-2 break-words outline-none group-hover:underline group-hover:underline-offset-2 after:absolute after:inset-0 after:rounded-lg">
           {listing.title}
         </Link>
       </Heading>

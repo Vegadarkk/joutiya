@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ChevronLeft, ChevronRight, Expand, ImageOff, X } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useTranslations } from "next-intl";
+import { isolate } from "@/lib/i18n/bidi";
 import { cn } from "@/lib/utils";
 import { blurhashPlaceholder, photoSources, type PhotoLike } from "./photo";
 
@@ -11,6 +12,8 @@ import { blurhashPlaceholder, photoSources, type PhotoLike } from "./photo";
 // thumbnails on larger screens), a counter, and a full-screen lightbox on the `l` variants. Plain
 // <img srcSet sizes width height> (design §8): the first photo is the LCP element (fetchpriority
 // high, eager), the others load lazily. The blurhash placeholder is in the server HTML.
+// Each track is held in state (callback ref), not in a ref: the lightbox track only exists once the
+// dialog's portal has mounted, a commit after `open` flips, and its scroll listener must follow it.
 
 /** Width of the main column: full width on phones, ~44rem beside the aside (page grid). */
 export const GALLERY_SIZES = "(min-width: 1280px) 46rem, (min-width: 1024px) 40rem, 100vw";
@@ -27,10 +30,15 @@ function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+/** `index` kept inside [0, count - 1]. */
+export function clampIndex(index: number, count: number): number {
+  return Math.min(Math.max(0, count - 1), Math.max(0, index));
+}
+
 /** Index of the slide in view; scrollLeft is negative in right-to-left scrollers. */
-function currentIndex(track: HTMLElement): number {
+function currentIndex(track: HTMLElement, count: number): number {
   const width = track.clientWidth || 1;
-  return Math.round(Math.abs(track.scrollLeft) / width);
+  return clampIndex(Math.round(Math.abs(track.scrollLeft) / width), count);
 }
 
 function scrollToIndex(track: HTMLElement | null, index: number, smooth: boolean): void {
@@ -40,44 +48,69 @@ function scrollToIndex(track: HTMLElement | null, index: number, smooth: boolean
   track.scrollTo({ left, behavior: smooth && !prefersReducedMotion() ? "smooth" : "auto" });
 }
 
-/** Keeps `index` in sync with the scroll position of `track` (one update per frame). */
-function useTrackIndex(track: RefObject<HTMLUListElement | null>, count: number, active = true): number {
+/**
+ * The slide in view of `track` (one update per frame while it scrolls). The listener follows the
+ * element: attached when it mounts, removed when it unmounts.
+ */
+function useTrackIndex(track: HTMLUListElement | null, count: number): [number, (index: number) => void] {
   const [index, setIndex] = useState(0);
   useEffect(() => {
-    const element = track.current;
-    if (!element || !active) return;
+    if (!track) return;
     let frame = 0;
     const onScroll = () => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => setIndex(Math.min(count - 1, Math.max(0, currentIndex(element)))));
+      frame = requestAnimationFrame(() => setIndex(currentIndex(track, count)));
     };
-    element.addEventListener("scroll", onScroll, { passive: true });
+    track.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       cancelAnimationFrame(frame);
-      element.removeEventListener("scroll", onScroll);
+      track.removeEventListener("scroll", onScroll);
     };
-  }, [track, count, active]);
-  return index;
+  }, [track, count]);
+  return [index, setIndex];
 }
 
-/** Arrow keys move one photo, Home/End jump; "next" follows the reading direction. */
-function stepForKey(event: KeyboardEvent<HTMLElement>): number | "first" | "last" | null {
-  const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
-  if (event.key === "ArrowRight") return rtl ? -1 : 1;
-  if (event.key === "ArrowLeft") return rtl ? 1 : -1;
-  if (event.key === "Home") return "first";
-  if (event.key === "End") return "last";
+export type GalleryStep = number | "first" | "last";
+
+/** Arrow keys move one photo, Home/End jump; "next" follows the reading direction (mirrored in RTL). */
+export function stepForKey(key: string, rtl: boolean): GalleryStep | null {
+  if (key === "ArrowRight") return rtl ? -1 : 1;
+  if (key === "ArrowLeft") return rtl ? 1 : -1;
+  if (key === "Home") return "first";
+  if (key === "End") return "last";
   return null;
+}
+
+/** The photo a step leads to from `from`, inside the track. */
+export function targetIndex(step: GalleryStep, from: number, count: number): number {
+  return clampIndex(step === "first" ? 0 : step === "last" ? count - 1 : from + step, count);
+}
+
+/**
+ * Keyboard and button navigation of one track. The photo in view is read from the scroll position
+ * at the time of the action, so it is right even before the first scroll event.
+ */
+function trackNavigation(track: HTMLUListElement | null, index: number, count: number) {
+  const at = () => (track ? currentIndex(track, count) : index);
+  const goTo = (target: number) => scrollToIndex(track, clampIndex(target, count), true);
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    const step = stepForKey(event.key, getComputedStyle(event.currentTarget).direction === "rtl");
+    if (step === null) return;
+    event.preventDefault();
+    goTo(targetIndex(step, at(), count));
+  };
+  return { at, goTo, onKeyDown };
 }
 
 export function Gallery({ listingId, title, photos, mediaBaseUrl, className }: GalleryProps) {
   const t = useTranslations("ListingPage.gallery");
-  const track = useRef<HTMLUListElement>(null);
+  const [track, setTrack] = useState<HTMLUListElement | null>(null);
   const count = photos.length;
-  const index = useTrackIndex(track, count);
+  const [index] = useTrackIndex(track, count);
+  const { at, goTo, onKeyDown } = trackNavigation(track, index, count);
   const [lightbox, setLightbox] = useState<number | null>(null);
-
-  const go = useCallback((target: number) => scrollToIndex(track.current, Math.min(count - 1, Math.max(0, target)), true), [count]);
+  // Where the lightbox was closed: the track resumes there once the dialog has given focus back.
+  const closedAt = useRef<number | null>(null);
 
   if (count === 0 || !mediaBaseUrl) {
     return (
@@ -88,18 +121,11 @@ export function Gallery({ listingId, title, photos, mediaBaseUrl, className }: G
     );
   }
 
-  function onKeyDown(event: KeyboardEvent<HTMLElement>) {
-    const step = stepForKey(event);
-    if (step === null) return;
-    event.preventDefault();
-    go(step === "first" ? 0 : step === "last" ? count - 1 : index + step);
-  }
-
   return (
     <section data-testid="gallery" aria-roledescription={t("roledescription")} aria-label={t("label", { count })} className={cn("flex flex-col gap-3", className)}>
       <div className="relative">
         <ul
-          ref={track}
+          ref={setTrack}
           tabIndex={0}
           onKeyDown={onKeyDown}
           aria-label={t("trackLabel")}
@@ -128,7 +154,7 @@ export function Gallery({ listingId, title, photos, mediaBaseUrl, className }: G
                     sizes={GALLERY_SIZES}
                     width={sources.width}
                     height={sources.height}
-                    alt={t("photoAlt", { title, index: position + 1, count })}
+                    alt={t("photoAlt", { title: isolate(title), index: position + 1, count })}
                     {...(first ? { fetchPriority: "high" as const, loading: "eager" as const } : { loading: "lazy" as const, decoding: "async" as const })}
                     className="size-full object-contain"
                   />
@@ -144,8 +170,8 @@ export function Gallery({ listingId, title, photos, mediaBaseUrl, className }: G
             <span aria-hidden="true" data-testid="gallery-counter" className="pointer-events-none absolute bottom-3 end-3 rounded-full bg-bab-950/75 px-3 py-1 text-sm font-medium text-cream-100 tabular-nums">
               {index + 1} / {count}
             </span>
-            <ArrowButton direction="previous" label={t("previous")} disabled={index === 0} onClick={() => go(index - 1)} className="start-3" />
-            <ArrowButton direction="next" label={t("next")} disabled={index === count - 1} onClick={() => go(index + 1)} className="end-3" />
+            <ArrowButton direction="previous" label={t("previous")} disabled={index === 0} onClick={() => goTo(at() - 1)} className="start-3" />
+            <ArrowButton direction="next" label={t("next")} disabled={index === count - 1} onClick={() => goTo(at() + 1)} className="end-3" />
           </>
         ) : null}
         <span aria-hidden="true" className="pointer-events-none absolute top-3 end-3 hidden size-9 items-center justify-center rounded-full bg-bab-950/60 text-cream-100 sm:flex">
@@ -163,7 +189,7 @@ export function Gallery({ listingId, title, photos, mediaBaseUrl, className }: G
               <li key={photo.id} className="shrink-0">
                 <button
                   type="button"
-                  onClick={() => go(position)}
+                  onClick={() => goTo(position)}
                   aria-current={current ? "true" : undefined}
                   aria-label={t("show", { index: position + 1, count })}
                   className={cn(
@@ -184,8 +210,18 @@ export function Gallery({ listingId, title, photos, mediaBaseUrl, className }: G
         open={lightbox !== null}
         start={lightbox ?? 0}
         onClose={(last) => {
+          closedAt.current = last;
           setLightbox(null);
-          scrollToIndex(track.current, last, false);
+        }}
+        onCloseAutoFocus={(event) => {
+          // The dialog would focus the photo that opened it, scrolling the track back to it: show the
+          // photo the visitor closed on instead, and give its button the focus without scrolling.
+          const last = closedAt.current;
+          closedAt.current = null;
+          if (last === null || !track) return;
+          event.preventDefault();
+          scrollToIndex(track, last, false);
+          track.children[last]?.querySelector("button")?.focus({ preventScroll: true });
         }}
         listingId={listingId}
         title={title}
@@ -218,47 +254,45 @@ interface LightboxProps {
   open: boolean;
   start: number;
   onClose: (lastIndex: number) => void;
+  onCloseAutoFocus: (event: Event) => void;
   listingId: string;
   title: string;
   photos: PhotoLike[];
   mediaBaseUrl: string;
 }
 
-function Lightbox({ open, start, onClose, listingId, title, photos, mediaBaseUrl }: LightboxProps) {
+function Lightbox({ open, start, onClose, onCloseAutoFocus, listingId, title, photos, mediaBaseUrl }: LightboxProps) {
   const t = useTranslations("ListingPage.gallery");
-  const track = useRef<HTMLUListElement>(null);
+  // Set by the portal once the dialog content is in the DOM, cleared when it closes.
+  const [track, setTrack] = useState<HTMLUListElement | null>(null);
   const count = photos.length;
-  const index = useTrackIndex(track, count, open);
+  const [index, setIndex] = useTrackIndex(track, count);
+  const { at, goTo, onKeyDown } = trackNavigation(track, index, count);
 
-  // The dialog content mounts in the commit that opens it: jump to the photo that was clicked.
+  // The track has just mounted: show the photo that was clicked (no scroll event when it is the first).
   useEffect(() => {
-    if (!open) return;
-    const frame = requestAnimationFrame(() => scrollToIndex(track.current, start, false));
-    return () => cancelAnimationFrame(frame);
-  }, [open, start]);
-
-  function onKeyDown(event: KeyboardEvent<HTMLElement>) {
-    const step = stepForKey(event);
-    if (step === null) return;
-    event.preventDefault();
-    const target = step === "first" ? 0 : step === "last" ? count - 1 : index + step;
-    scrollToIndex(track.current, Math.min(count - 1, Math.max(0, target)), true);
-  }
+    if (!track) return;
+    setIndex(clampIndex(start, count));
+    scrollToIndex(track, start, false);
+  }, [track, start, count, setIndex]);
 
   return (
     <Dialog.Root
       open={open}
       onOpenChange={(next) => {
-        if (!next) onClose(index);
+        if (!next) onClose(at());
       }}
     >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-bab-950/95 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
         <Dialog.Content
           onKeyDown={onKeyDown}
+          onCloseAutoFocus={onCloseAutoFocus}
           className="fixed inset-0 z-50 flex flex-col text-cream-100 outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0"
         >
-          <Dialog.Title className="sr-only">{title}</Dialog.Title>
+          <Dialog.Title className="sr-only" dir="auto">
+            {title}
+          </Dialog.Title>
           <Dialog.Description className="sr-only">{t("lightboxHint")}</Dialog.Description>
           <div className="flex h-16 shrink-0 items-center justify-between gap-4 px-4">
             <span className="text-sm font-medium tabular-nums" aria-live="polite">
@@ -271,7 +305,12 @@ function Lightbox({ open, start, onClose, listingId, title, photos, mediaBaseUrl
             </Dialog.Close>
           </div>
           <div className="relative min-h-0 flex-1">
-            <ul ref={track} className="flex h-full snap-x snap-mandatory overflow-x-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <ul
+              ref={setTrack}
+              tabIndex={0}
+              aria-label={t("trackLabel")}
+              className="flex h-full snap-x snap-mandatory overflow-x-auto overscroll-contain [scrollbar-width:none] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-gold-300 [&::-webkit-scrollbar]:hidden"
+            >
               {photos.map((photo, position) => {
                 const sources = photoSources(mediaBaseUrl, listingId, photo, "l");
                 if (!sources) return null;
@@ -282,7 +321,7 @@ function Lightbox({ open, start, onClose, listingId, title, photos, mediaBaseUrl
                       src={sources.large}
                       width={sources.width}
                       height={sources.height}
-                      alt={t("photoAlt", { title, index: position + 1, count })}
+                      alt={t("photoAlt", { title: isolate(title), index: position + 1, count })}
                       loading={position === start ? "eager" : "lazy"}
                       decoding="async"
                       className="max-h-full max-w-full object-contain"
@@ -293,8 +332,8 @@ function Lightbox({ open, start, onClose, listingId, title, photos, mediaBaseUrl
             </ul>
             {count > 1 ? (
               <>
-                <LightboxArrow direction="previous" label={t("previous")} disabled={index === 0} onClick={() => scrollToIndex(track.current, index - 1, true)} className="start-3" />
-                <LightboxArrow direction="next" label={t("next")} disabled={index === count - 1} onClick={() => scrollToIndex(track.current, index + 1, true)} className="end-3" />
+                <LightboxArrow direction="previous" label={t("previous")} disabled={index === 0} onClick={() => goTo(at() - 1)} className="start-3" />
+                <LightboxArrow direction="next" label={t("next")} disabled={index === count - 1} onClick={() => goTo(at() + 1)} className="end-3" />
               </>
             ) : null}
           </div>

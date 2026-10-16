@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { photoSources } from "@/components/listing/photo";
+import { isolate } from "@/lib/i18n/bidi";
 import type { ModerationQueueItem } from "@/lib/listings/moderation-actions";
 import { FLAG_LABELS } from "@/lib/moderation/decisions";
 import { ALWAYS_REVIEW_FLAGS } from "@/lib/moderation/risk";
@@ -52,7 +53,7 @@ export function ModerationQueue({ items, labels, mediaBaseUrl }: ModerationQueue
               ) : null}
             </div>
             <div className="flex min-w-0 flex-col gap-1.5">
-              <Link href={href} className="truncate font-medium text-foreground underline-offset-4 hover:underline focus-visible:underline">
+              <Link href={href} dir="auto" className="truncate font-medium text-foreground underline-offset-4 hover:underline focus-visible:underline">
                 {item.title || "Sans titre"}
               </Link>
               <p className="text-sm text-foreground-muted">
@@ -64,11 +65,13 @@ export function ModerationQueue({ items, labels, mediaBaseUrl }: ModerationQueue
             <div className="col-span-2 flex flex-wrap items-center justify-between gap-3 sm:col-span-1 sm:flex-col sm:items-end">
               <RiskMeter score={item.score} />
               <p className="text-sm text-foreground-muted">
-                <span className="text-foreground">{item.seller.displayName}</span>
+                <span dir="auto" className="text-foreground">
+                  {item.seller.displayName}
+                </span>
                 {item.seller.type === "pro" ? " (Pro)" : null}, <time dateTime={item.waitingSince}>{waitingFor(item.waitingSince)}</time>
               </p>
               <Button asChild variant="outline" size="sm">
-                <Link href={href} aria-label={`Examiner « ${item.title || "Sans titre"} »`}>
+                <Link href={href} aria-label={`Examiner « ${isolate(item.title || "Sans titre")} »`}>
                   Examiner
                 </Link>
               </Button>

@@ -11,10 +11,10 @@ const ITEMS = [
 ] as const;
 
 /** Section links of the back office; the current one carries the ochre underline. */
-export function AdminNav({ admin }: { admin: boolean }) {
+export function AdminNav({ admin, className }: { admin: boolean; className?: string }) {
   const pathname = usePathname();
   return (
-    <nav aria-label="Sections du back-office" className="flex h-full items-stretch gap-1">
+    <nav aria-label="Sections du back-office" className={cn("flex items-stretch gap-1 overflow-x-auto [scrollbar-width:none] md:h-14", className)}>
       {ITEMS.filter((item) => admin || !item.adminOnly).map((item) => {
         const current = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
         return (
@@ -23,7 +23,7 @@ export function AdminNav({ admin }: { admin: boolean }) {
             href={item.href}
             aria-current={current ? "page" : undefined}
             className={cn(
-              "relative flex items-center px-2 text-sm font-medium text-foreground-muted transition-colors hover:text-foreground",
+              "relative flex min-h-11 shrink-0 items-center px-2 text-sm font-medium text-foreground-muted transition-colors hover:text-foreground",
               "after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-t after:bg-primary after:opacity-0 after:transition-opacity",
               "aria-[current=page]:text-foreground aria-[current=page]:after:opacity-100",
             )}

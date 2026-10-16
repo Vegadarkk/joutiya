@@ -23,7 +23,8 @@
       "fr": "FR",
       "ar": "ع",
       "rif": "RIF"
-    }
+    },
+    "trigger": "{short}, {label}"
   },
   "Theme": {
     "label": "Apparence",
@@ -1964,7 +1965,7 @@
       "continueDraftOf": "Reprendre « {title} »",
       "editOf": "Modifier « {title} »",
       "resumeOf": "Remettre en ligne « {title} »",
-      "renewOf": "Renouveler « {title} » pour 60 jours"
+      "renewOf": "Renouveler pour 60 jours « {title} »"
     },
     "confirm": {
       "deleteTitle": "Supprimer cette annonce ?",

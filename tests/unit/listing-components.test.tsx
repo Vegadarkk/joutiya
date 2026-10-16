@@ -84,6 +84,12 @@ describe("CriteriaGrid", () => {
     expect(html).not.toContain(fr.Criteria.condition.label);
   });
 
+  it("shows free text typed by the seller in its own direction, translated values in the page's", () => {
+    const html = render(<CriteriaGrid subcategoryId="voitures" condition="very_good" attributes={{ "car-brand": "dacia", model: "لوغان" }} />, "ar");
+    expect(html).toContain('<dd dir="auto" class="font-medium break-words">لوغان</dd>');
+    expect(html.match(/<dd dir="auto"/g)).toHaveLength(1);
+  });
+
   it("escapes free text typed by the seller", () => {
     const html = render(<CriteriaGrid subcategoryId="voitures" condition={null} attributes={{ model: '<img src=x onerror="alert(1)">' }} />);
     expect(html).not.toContain("<img");
@@ -117,6 +123,9 @@ describe("ListingCard", () => {
     const html = render(<ListingCard listing={card} mediaBaseUrl={MEDIA} locale="fr" />);
     expect(html).toContain('href="/fr/annonce/velo-de-ville-casablanca-abcd2345"');
     expect(html).toMatch(/<h3[^>]*><a /);
+    // The title keeps its own direction (an Arabic title on a French page, and the reverse); its
+    // two-line clamp ends with the ellipsis on the title's own side.
+    expect(html).toMatch(/<a [^>]*dir="auto"[^>]*class="line-clamp-2/);
     expect(text(html)).toContain("Vélo de ville");
     expect(html).toContain(`1${NNBSP}500${NBSP}DH`);
     expect(text(html)).toContain("Casablanca");
@@ -176,12 +185,15 @@ describe("SellerCard", () => {
     expect(content).not.toContain("Pro certifié");
     expect(content).toContain("2 annonces en ligne");
     expect(html).not.toContain("ignored");
+    // The name keeps its own direction inside the heading, apart from the Pro badge.
+    expect(html).toMatch(/<a [^>]*dir="auto"[^>]*>Salma<\/a>/);
   });
 
   it("falls back to the denormalized name, without profile link, when the account has no public face", () => {
     const html = render(<SellerCard seller={null} fallbackName="Garage Atlas" fallbackType="pro" locale="fr" />);
     expect(html).not.toContain("/profil/");
     expect(text(html)).toContain("Garage Atlas");
+    expect(html).toContain('<span dir="auto" class="break-words">Garage Atlas</span>');
     expect(text(html)).toContain("Professionnel");
     expect(text(html)).not.toContain("Membre depuis");
   });
@@ -259,7 +271,8 @@ describe("Breadcrumb", () => {
     expect(html).toContain(`aria-label="${escape(fr.ListingPage.breadcrumb)}"`);
     expect(html).toContain('href="/fr"');
     expect(html).toContain('href="/fr/recherche?categorie=vehicules"');
-    expect(html).toContain('<span aria-current="page"');
+    // The truncated title takes its own direction, so the ellipsis falls at its logical end.
+    expect(html).toContain('<span aria-current="page" dir="auto" class="block truncate');
     expect(html).toContain("rtl:-scale-x-100");
   });
 });

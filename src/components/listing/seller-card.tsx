@@ -86,11 +86,13 @@ export function SellerCard({ seller, fallbackName, fallbackType, locale, childre
           <p className="text-xs text-foreground-muted">{type === "pro" ? t("roleBusiness") : t("roleIndividual")}</p>
           <h2 id="seller-name" className="flex flex-wrap items-center gap-2 text-lg font-semibold leading-tight">
             {seller ? (
-              <Link href={`/profil/${seller.publicId}`} className="break-words rounded-sm hover:underline hover:underline-offset-2">
+              <Link href={`/profil/${seller.publicId}`} dir="auto" className="break-words rounded-sm hover:underline hover:underline-offset-2">
                 {name}
               </Link>
             ) : (
-              <span className="break-words">{name}</span>
+              <span dir="auto" className="break-words">
+                {name}
+              </span>
             )}
             {type === "pro" ? <span className="rounded-sm bg-structure px-2 py-0.5 text-xs font-medium text-structure-foreground">{t("pro")}</span> : null}
           </h2>

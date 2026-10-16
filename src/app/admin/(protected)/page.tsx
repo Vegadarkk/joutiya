@@ -32,12 +32,15 @@ export default async function AdminHome() {
     <>
       <section className="flex flex-col gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Quotas gratuits</h1>
+          <h1 id="quotas-title" className="text-2xl font-semibold">
+            Quotas gratuits
+          </h1>
           <p className="mt-1 text-sm text-foreground-muted">
             Alerte à 70 %, mode dégradé au seuil indiqué. Les compteurs sont tenus par l&apos;application.
           </p>
         </div>
-        <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+        {/* Scrolls on its own on a phone (the page keeps its width): focusable and named for the keyboard. */}
+        <div role="region" aria-labelledby="quotas-title" tabIndex={0} className="overflow-x-auto rounded-lg border border-border bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
           <table className="w-full min-w-[40rem] text-sm">
             <thead className="bg-surface-muted text-start text-foreground-muted">
               <tr>

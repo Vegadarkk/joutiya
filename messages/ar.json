@@ -13,7 +13,8 @@
     "signIn": "تسجيل الدخول"
   },
   "Locale": {
-    "label": "اللغة"
+    "label": "اللغة",
+    "trigger": "{short}، {label}"
   },
   "Theme": {
     "label": "المظهر",
@@ -1953,8 +1954,8 @@
       "delete": "حذف",
       "continueDraftOf": "استئناف « {title} »",
       "editOf": "تعديل « {title} »",
-      "resumeOf": "إعادة نشر « {title} »",
-      "renewOf": "تجديد « {title} » لمدة 60 يومًا"
+      "resumeOf": "إعادة النشر « {title} »",
+      "renewOf": "تجديد لمدة 60 يومًا « {title} »"
     },
     "confirm": {
       "deleteTitle": "حذف هذا الإعلان؟",
