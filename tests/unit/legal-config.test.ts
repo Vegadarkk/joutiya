@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planLegal } from "../../scripts/legal-config";
+import { firestoreFields, planLegal } from "../../scripts/legal-config";
 
 describe("legal-config", () => {
   it("lists the mentions production still needs", () => {
@@ -13,6 +13,20 @@ describe("legal-config", () => {
     const plan = planLegal({ host: entity, dataHosts: [{ ...entity, region: "europe-west9, Paris" }] });
     expect(plan.errors).toEqual([]);
     expect(plan.missing).toEqual([]);
+  });
+
+  it("sends the document as Firestore REST values", () => {
+    expect(
+      firestoreFields({ host: { name: "H", phone: "+33 1" }, dataHosts: [{ name: "D" }], dsaContactLanguages: [], listingTtlDays: 60, ratio: 0.5, open: true, rcsCity: null }),
+    ).toEqual({
+      host: { mapValue: { fields: { name: { stringValue: "H" }, phone: { stringValue: "+33 1" } } } },
+      dataHosts: { arrayValue: { values: [{ mapValue: { fields: { name: { stringValue: "D" } } } }] } },
+      dsaContactLanguages: { arrayValue: {} },
+      listingTtlDays: { integerValue: "60" },
+      ratio: { doubleValue: 0.5 },
+      open: { booleanValue: true },
+      rcsCity: { nullValue: null },
+    });
   });
 
   it("rejects unknown fields and non-objects", () => {
