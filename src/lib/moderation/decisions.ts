@@ -148,7 +148,7 @@ const textSchema = z.string().trim().max(DECISION_TEXT_MAX);
 /**
  * POST /api/admin/moderation/{id}. `version` is the listing version the moderator reviewed: a
  * concurrent edit or decision makes the request fail (409) instead of deciding on stale content.
- * `details` of a rejection is quoted to the seller; `note` of an approval stays internal.
+ * `details` of a rejection is quoted to the seller; `note` of an approval is kept in the decision record, never mailed.
  */
 export const moderationDecisionRequestSchema = z
   .discriminatedUnion("action", [

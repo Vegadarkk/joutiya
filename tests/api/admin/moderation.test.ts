@@ -237,7 +237,7 @@ describe("decisions", () => {
     expect(result.body).toEqual({ status: "published", decisionId: expect.any(String) });
 
     const stored = (await getListing(id))!;
-    expect(stored).toMatchObject({ status: "published", version: before.version + 1, slugId: before.slugId, moderation: expect.objectContaining({ state: "human_ok", reviewedBy: moderator.uid, lastDecisionId: result.body.decisionId }) });
+    expect(stored).toMatchObject({ status: "published", version: before.version + 1, slugId: before.slugId, adsEligible: true, moderation: expect.objectContaining({ state: "human_ok", reviewedBy: moderator.uid, lastDecisionId: result.body.decisionId }) });
     expect(stored.publishedAt!.getTime()).toBeGreaterThanOrEqual(started - 1000);
     expect(stored.expiresAt!.getTime() - stored.publishedAt!.getTime()).toBe((await getLegalConfig()).listingTtlDays * DAY_MS);
     expect(await getSearchOutbox(id)).toMatchObject({ op: "upsert", version: before.version + 1 });

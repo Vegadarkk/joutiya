@@ -146,8 +146,9 @@ async function purgeRemovedUploads(store: ObjectStore, state: RunState): Promise
   for (let pages = 0; pages < UPLOAD_PURGE_PAGES; pages += 1) {
     const uploads = await listPastPurge(now, UPLOAD_PURGE_BATCH, cursor);
     if (uploads.length === 0) return;
-    const listings = new Map((await getListings([...new Set(uploads.map((upload) => upload.targetId))])).map((listing) => [listing.id, listing]));
-    for (const upload of uploads) {
+    const ofListings = uploads.filter((upload) => upload.purpose === "listing");
+    const listings = new Map((await getListings([...new Set(ofListings.map((upload) => upload.targetId))])).map((listing) => [listing.id, listing]));
+    for (const upload of ofListings) {
       const listing = listings.get(upload.targetId);
       if (!listing || listing.status !== "removed" || listing.legalHold.length > 0) continue;
       if (state.budget <= 0) {

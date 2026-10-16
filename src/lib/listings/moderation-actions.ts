@@ -278,7 +278,6 @@ export async function decide(staff: StaffContext, id: string, input: ModerationD
     const city = listing.location ? cityBySlug(listing.location.citySlug) : undefined;
     patch.slugId = buildSlugId({ id, title: listing.title, city: city ? cityName(city, "fr") : undefined, categoryId: listing.categoryId });
   }
-  patch.adsEligible = approve && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy;
   const record = decisionRecord(staff, listing, input, now);
 
   let decisionId = "";
@@ -288,6 +287,7 @@ export async function decide(staff: StaffContext, id: string, input: ModerationD
       if (!current || current.status !== "pending_review" || current.version !== input.version) throw new ListingVersionError();
       decisionId = recordModerationDecisionTx(tx, record);
       patch.moderation = { ...current.moderation, state: approve ? "human_ok" : "human_rejected", reviewedBy: staff.user.uid, reviewedAt: now, lastDecisionId: decisionId };
+      patch.adsEligible = approve && current.moderation.openReports === 0 && !current.moderation.hiddenBy;
       updateListingTx(tx, id, patch);
       if (effects.search) enqueueSearchOutboxTx(tx, id, effects.search, patch.version, now);
     });

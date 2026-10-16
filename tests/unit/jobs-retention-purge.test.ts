@@ -201,13 +201,16 @@ describe("retention-purge: uploads of removed listings", () => {
     const published = listing("publish2", { status: "published" });
     const items = [upload("upl0000000000001", removed.id), upload("upl0000000000002", heldRemoved.id), upload("upl0000000000003", published.id), upload("upl0000000000004", "missing2")];
     for (const item of items) seed(item.targetId, item.id);
-    vi.mocked(uploadsRepo.listPastPurge).mockResolvedValueOnce(items);
+    // Another purpose whose target id happens to be a removed listing's: never this job's.
+    const avatar = upload("avatar0000000005", removed.id, { purpose: "avatar" });
+    vi.mocked(uploadsRepo.listPastPurge).mockResolvedValueOnce([...items, avatar]);
     vi.mocked(getListings).mockResolvedValue([removed, heldRemoved, published]);
 
     const result = await retentionPurge(NOW, { store });
     expect(result).toMatchObject({ uploads: 1, listings: 0 });
     expect(uploadsRepo.deleteUploadDocument).toHaveBeenCalledTimes(1);
     expect(uploadsRepo.deleteUploadDocument).toHaveBeenCalledWith("upl0000000000001");
+    expect(getListings).toHaveBeenCalledWith(["removed2", "heldrem2", "publish2", "missing2"]);
     expect(store.keys("media").some((key) => key.startsWith("listings/removed2/"))).toBe(false);
     expect(store.keys("media").filter((key) => !key.startsWith("listings/removed2/"))).toHaveLength(6);
     expect(store.keys("quarantine")).not.toContain("uploads/upl0000000000001");

@@ -110,7 +110,7 @@ export function ModerationDecisionForm({ listingId, version }: ModerationDecisio
       </div>
 
       {choice === "approve" ? (
-        <Field label="Note interne" hint="Visible du personnel seulement, jamais du vendeur.">
+        <Field label="Note interne" hint="Gardée dans le dossier de la décision, jamais envoyée au vendeur.">
           <textarea name="note" rows={2} maxLength={DECISION_TEXT_MAX} value={note} onChange={(event) => setNote(event.target.value)} className={cn(inputClassName, "h-auto min-h-16 py-2")} />
         </Field>
       ) : (
