@@ -104,7 +104,8 @@ describe("processInbound", () => {
     await pending("bob", "444444");
     mocks.claim.mockImplementationOnce(async () => ({ previousUid: "alice" }));
     await run([message("444444")]);
-    const keys = mocks.sendMail.mock.calls.map(([mail]) => mail).filter((mail) => mail.template === "phoneRemoved").map((mail) => mail.idempotencyKey);
+    const sent = (mocks.sendMail.mock.calls as unknown as [{ template: string; idempotencyKey?: string }][]).map(([mail]) => mail);
+    const keys = sent.filter((mail) => mail.template === "phoneRemoved").map((mail) => mail.idempotencyKey);
     expect(keys).toHaveLength(2);
     expect(new Set(keys).size).toBe(2);
     expect(keys.every((key) => /^phoneRemoved:alice:wamid\.\d+$/.test(key ?? ""))).toBe(true);
