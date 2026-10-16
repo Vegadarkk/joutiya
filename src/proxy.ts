@@ -6,7 +6,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import createMiddleware from "next-intl/middleware";
 import { routing } from "@/i18n/routing";
 import { PRIVATE_SEGMENTS } from "@/config/site";
+import { DEVICE_COOKIE, setDeviceCookie } from "@/lib/security/cookies";
 import { buildCsp, createNonce, INLINE_HASH_MARKER, type CspVariant } from "@/lib/security/csp";
+import { newDeviceCookie, readDeviceId } from "@/lib/security/device";
 import { coopFor } from "@/lib/security/headers";
 
 const handleI18nRouting = createMiddleware(routing);
@@ -132,7 +134,12 @@ export function proxy(request: NextRequest): NextResponse {
   if (isPrivatePath(pathname)) {
     const nonce = createNonce();
     const policy = csp("private", nonce);
-    return decorate(forwardWithNonce(routed, request, policy, nonce), "public", policy);
+    const response = decorate(forwardWithNonce(routed, request, policy, nonce), "public", policy);
+    // The device cookie exists before the first API call: sign-up and sign-in limits are counted
+    // per device, and a browser without the cookie would share the anonymous bucket of its IP
+    // (src/lib/rate-limit/keys.ts). Private pages are dynamic, so the cookie costs no cache.
+    if (!readDeviceId(request.cookies.get(DEVICE_COOKIE)?.value)) setDeviceCookie(response, newDeviceCookie().value);
+    return response;
   }
   // Fallback policy; the server hook swaps 'unsafe-inline' for the hashes of this HTML.
   const response = decorate(routed, "public", csp("public"));

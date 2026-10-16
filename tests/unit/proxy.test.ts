@@ -57,6 +57,20 @@ describe("proxy", () => {
     expect(first.headers.get("x-middleware-request-x-nonce")).not.toBe(second.headers.get("x-middleware-request-x-nonce"));
   });
 
+  it("gives private pages a device cookie when the request has none, and public pages never", () => {
+    const fresh = proxy(request("/fr/connexion"));
+    const cookie = fresh.cookies.get("__Host-did");
+    expect(cookie?.value).toMatch(/^[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{22}$/);
+    expect(cookie?.httpOnly).toBe(true);
+    expect(cookie?.secure).toBe(true);
+    // A valid cookie is kept; a forged one is replaced.
+    const kept = proxy(new NextRequest("https://joutiya.ma/fr/connexion", { headers: { host: "joutiya.ma", cookie: `__Host-did=${cookie!.value}` } }));
+    expect(kept.cookies.get("__Host-did")).toBeUndefined();
+    const forged = proxy(new NextRequest("https://joutiya.ma/fr/connexion", { headers: { host: "joutiya.ma", cookie: "__Host-did=aaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbb" } }));
+    expect(forged.cookies.get("__Host-did")?.value).not.toBe("aaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbb");
+    expect(proxy(request("/fr")).headers.get("set-cookie")).toBeNull();
+  });
+
   it("keeps staging out of search engines", () => {
     vi.stubEnv("APP_ENV", "staging");
     expect(proxy(request("/fr")).headers.get("x-robots-tag")).toBe("noindex, nofollow");

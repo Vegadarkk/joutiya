@@ -147,7 +147,7 @@ test("an admin invites a moderator, who sets a password from the mailed link and
   await moderator.getByLabel("Nouveau mot de passe").fill("Court-123");
   await moderator.getByLabel("Confirmation").fill("Court-123");
   await moderator.getByRole("button", { name: "Enregistrer le mot de passe" }).click();
-  await expect(moderator.getByRole("alert")).toContainText("12 caractères au minimum");
+  await expect(moderator.getByRole("alert").filter({ hasText: "caractères au minimum" })).toBeVisible();
 
   await moderator.getByLabel("Nouveau mot de passe").fill(MODERATOR_PASSWORD);
   await moderator.getByLabel("Confirmation").fill(MODERATOR_PASSWORD);

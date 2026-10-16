@@ -202,7 +202,8 @@ test.describe("account", () => {
 
     await page.getByLabel("Nouveau mot de passe").fill(NEW_PASSWORD);
     await page.getByRole("button", { name: "Enregistrer le mot de passe" }).click();
-    const done = page.locator("section").filter({ has: page.getByRole("heading", { name: "Mot de passe modifié" }) });
+    // The status panel is the innermost section carrying the heading (the page wraps it in another).
+    const done = page.locator("section").filter({ has: page.getByRole("heading", { name: "Mot de passe modifié" }) }).last();
     await expect(done).toBeVisible({ timeout: 15_000 });
     await done.getByRole("link", { name: "Se connecter" }).click();
     await expect(page).toHaveURL(/\/fr\/connexion/);
@@ -237,7 +238,7 @@ test.describe("account", () => {
     expect(challenge.status()).toBe(200);
     expect(((await challenge.json()) as { status: string }).status).toBe("turnstile_required");
     await expect(page.getByText("Encore une vérification")).toBeVisible();
-    await waitForTurnstile(page);
+    // The form resubmits by itself once the widget hands it a token; the widget is gone with the page.
     await expect(page).toHaveURL(/\/fr\/parametres$/, { timeout: 20_000 });
   });
 
@@ -277,7 +278,8 @@ test.describe("account", () => {
     await page.goto("/fr/connexion");
     await page.getByRole("button", { name: "Continuer avec Google (stub)" }).click();
     // The fake token is refused server side: the form says so, and the page stays.
-    await expect(page.getByRole("alert")).toBeVisible({ timeout: 15_000 });
+    // Next's empty route announcer is an alert too: the message is the alert with text.
+    await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toBeVisible({ timeout: 15_000 });
     await expect(page).toHaveURL(/\/fr\/connexion/);
     // GIS was initialised with a per-page nonce (replay protection).
     const nonce = await page.evaluate(() => (window as unknown as { __gsi?: { nonce?: string } }).__gsi?.nonce ?? "");
