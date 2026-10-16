@@ -38,8 +38,11 @@ async function seedStaff(email: string, role: "admin" | "moderator", displayName
     .then((record) => record.uid)
     .catch(async (error: { code?: string }) => {
       if (error.code !== "auth/email-already-exists") throw error;
+      // beforeAll runs once per Playwright worker: another worker created this account with the same
+      // password. Setting the password again would revoke the sessions of tests already signed in.
       const existing = await auth.getUserByEmail(email);
-      return (await auth.updateUser(existing.uid, { password: PASSWORD, disabled: false })).uid;
+      if (existing.disabled) await auth.updateUser(existing.uid, { disabled: false });
+      return existing.uid;
     });
   await auth.setCustomUserClaims(uid, { role, v: 2 });
   await getFirestore(app).collection("staff").doc(uid).set({ email, displayName, role, invitedBy: "script", createdAt: new Date() });
@@ -177,21 +180,28 @@ test("anonymous visitors of the admin host land on the sign-in page, under a non
   await expect(page).toHaveURL(`${admin}/connexion`);
 });
 
-test("staff sign in with their password, see the quota board and the roster, then sign out", async ({ page }) => {
-  await signIn(page, EMAIL, PASSWORD);
+test("staff sign in with their password, see the quota board and the roster, then sign out", async ({ browser }) => {
+  // A dedicated admin: signing out revokes every session of the account, which would sign the
+  // shared admin out of the tests running in parallel.
+  const email = uniqueEmail("admin-signout-e2e");
+  await seedStaff(email, "admin", "Admin déconnexion e2e");
+  const context = await browser.newContext({ extraHTTPHeaders: { "x-dev-access-email": email } });
+  const page = await context.newPage();
+  await signIn(page, email, PASSWORD);
   await expect(page.getByRole("heading", { name: /quotas gratuits/i })).toBeVisible();
   await expect(page.getByText("Admin", { exact: true })).toBeVisible();
 
   await page.getByRole("link", { name: "Personnel" }).click();
   await expect(page).toHaveURL(`${admin}/personnel`);
   await expect(page.getByRole("heading", { name: "Personnel", level: 1 })).toBeVisible();
-  await expect(page.getByRole("table").getByText(EMAIL)).toBeVisible();
+  await expect(page.getByRole("table").getByText(email)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Inviter un membre" })).toBeVisible();
 
   await page.getByRole("button", { name: "Se déconnecter" }).click();
   await expect(page).toHaveURL(`${admin}/connexion`);
   await page.goto(`${admin}/`);
   await expect(page).toHaveURL(`${admin}/connexion`);
+  await context.close();
 });
 
 test("the moderation review shows the listing's photos, served by the public host's media route", async ({ page }) => {
