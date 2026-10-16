@@ -2,6 +2,12 @@ import "server-only";
 import { LOCALES } from "@/config/site";
 import { serverEnv } from "@/lib/env";
 import { mailLocale, type BuiltMail, type TemplateContext } from "./templates/layout";
+import { appealOutcome } from "./templates/appealOutcome";
+import { appealReceived } from "./templates/appealReceived";
+import { contentRestored } from "./templates/contentRestored";
+import { decisionNotice } from "./templates/decisionNotice";
+import { reportOutcome } from "./templates/reportOutcome";
+import { reporterWarning } from "./templates/reporterWarning";
 import { listingApproved } from "./templates/listingApproved";
 import { listingChangesApproved } from "./templates/listingChangesApproved";
 import { listingExpired } from "./templates/listingExpired";
@@ -38,6 +44,12 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   listingExpiringSoon,
   listingExpired,
   reportReceived,
+  decisionNotice,
+  reportOutcome,
+  contentRestored,
+  appealReceived,
+  appealOutcome,
+  reporterWarning,
   savedSearchAlert,
 };
 

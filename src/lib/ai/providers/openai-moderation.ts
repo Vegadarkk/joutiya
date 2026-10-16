@@ -4,7 +4,7 @@ import { serverEnv } from "@/lib/env";
 import { z } from "@/lib/zod";
 import { aiConfig } from "../config";
 import { escalation, type Policy } from "../output";
-import { ProviderError, type AiOutput, type AiProvider, type AiSeverity, type AiTaskInput, type ProviderResult } from "../types";
+import { ProviderError, type AiOutput, type AiSeverity, type AiTaskInput, type ModerationClassifier, type ProviderResult } from "../types";
 
 // Free fallback 1 (design D19): OpenAI's moderation endpoint (omni-moderation-latest, text and
 // images, no prepaid credit). A generic harm classifier, not a marketplace-policy judge: it can
@@ -65,7 +65,7 @@ export interface OpenAiModerationOptions {
   config?: () => Promise<AiConfig>;
 }
 
-export function createOpenAiModerationProvider(options: OpenAiModerationOptions = {}): AiProvider {
+export function createOpenAiModerationProvider(options: OpenAiModerationOptions = {}): ModerationClassifier {
   const apiKey = () => options.apiKey ?? serverEnv().OPENAI_API_KEY;
   const doFetch = options.fetch ?? fetch;
   const loadConfig = options.config ?? aiConfig;

@@ -5,7 +5,7 @@ import { consume, isDegraded } from "@/lib/quota";
 import { z } from "@/lib/zod";
 import { aiConfig } from "../config";
 import { escalation, type Policy } from "../output";
-import { ProviderError, type AiOutput, type AiProvider, type AiSeverity, type AiTaskInput, type ProviderResult } from "../types";
+import { ProviderError, type AiOutput, type AiSeverity, type AiTaskInput, type ModerationClassifier, type ProviderResult } from "../types";
 
 // Free fallback 2 (design D19): Cloudflare Workers AI, Llama Guard 3 8B, through the REST API
 // (text only). Generic safety categories S1-S14: "unsafe" proposes a hold for a human, "safe" is no
@@ -91,7 +91,7 @@ export interface WorkersAiOptions {
   config?: () => Promise<AiConfig>;
 }
 
-export function createWorkersAiProvider(options: WorkersAiOptions = {}): AiProvider {
+export function createWorkersAiProvider(options: WorkersAiOptions = {}): ModerationClassifier {
   const token = () => options.token ?? serverEnv().CF_WORKERS_AI_TOKEN;
   const accountId = () => options.accountId ?? serverEnv().CF_ACCOUNT_ID;
   const doFetch = options.fetch ?? fetch;

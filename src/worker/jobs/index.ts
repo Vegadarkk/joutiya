@@ -12,6 +12,9 @@ import { reconcileSearch } from "./reconcile-search";
 import { sweepExpiredBoosts } from "./expire-boosts";
 import { sendSavedSearchAlerts } from "./saved-search-alerts";
 
+// Phase 5 (design D19): queue "agent", its own consumer at concurrency 1 (createAgentWorker).
+export { AGENT_CONCURRENCY, AGENT_QUEUE, createAgentWorker, processAgentJob } from "./agent";
+
 export const SYSTEM_QUEUE = "system";
 
 export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {

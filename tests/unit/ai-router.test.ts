@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_AI } from "@/config/ai";
+import type { ClaudeClient } from "@/lib/ai/providers/anthropic";
+import type { AiTaskInput } from "@/lib/ai/types";
 
 // Exit criterion of phase 5 (DESIGN §5): when the Claude budget is exhausted (`claude.budget`
 // degraded at 4 USD) or the API answers a spend-limit error, the agent switches to the free
@@ -33,8 +35,6 @@ const { createWorkersAiProvider } = await import("@/lib/ai/providers/workers-ai"
 const { createRulesProvider } = await import("@/lib/ai/providers/rules");
 const { SPEND_LIMIT_KEY, resetSpendLimitLatch } = await import("@/lib/ai/budget");
 const { RetryableAiError } = await import("@/lib/ai/types");
-type AiTaskInput = import("@/lib/ai/types").AiTaskInput;
-type ClaudeClient = import("@/lib/ai/providers/anthropic").ClaudeClient;
 
 const config = async () => DEFAULT_AI;
 
@@ -67,7 +67,7 @@ function claudeMessage(parsed: unknown, stop: string = "end_turn") {
 const approve = { action: "approve", policy: "none", severity: "none", confidence: 0.97, rationale: "Annonce conforme.", userMessage: "", templateId: "" };
 
 function claudeClient(impl: () => Promise<unknown>) {
-  const parse = vi.fn(impl);
+  const parse = vi.fn<(params: unknown) => Promise<unknown>>(impl);
   return { client: { messages: { parse } } as unknown as ClaudeClient, parse };
 }
 

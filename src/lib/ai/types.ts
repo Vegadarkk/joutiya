@@ -94,6 +94,12 @@ export interface AiProvider {
 
 export type ProviderErrorCode = "spend_limit" | "refusal" | "invalid_output" | "max_tokens" | "auth" | "bad_request" | "quota" | "unavailable";
 
+/**
+ * The free harm classifiers (OpenAI moderation, Workers AI Llama Guard): providers whose answers
+ * the router bounds to "hold" or "escalate" (CLAUDE.md adapters: ModerationClassifier).
+ */
+export type ModerationClassifier = AiProvider & { readonly id: "openai" | "workers-ai" };
+
 /** The provider failed in a way the router skips to the next one (and the job does not retry). */
 export class ProviderError extends Error {
   constructor(
