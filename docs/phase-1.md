@@ -21,10 +21,13 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | 11 | Alertes | Claude (API), Nav pour un filtre Gmail | Code en phase 2 ; après l'étape 7 (domaine Resend) |
 | 12 | Mise en production et contrôles | Claude | Après l'étape 8 |
 | 13 | Test de reconstruction de la VM | Claude | Avant le lancement |
+| 14 | Réglages des buckets R2 | Nav, sur votre « J'accepte » ; Claude vérifie | Prête : n'attend ni la VM ni la zone |
+| 15 | Domaines des médias | Nav | À l'activation de la zone (étape 7) |
 
 ## Ce qui reste à vous
 
 - **Étape 5** : cliquer sur **Create** du client Google préparé par Nav (Google n'affiche le secret qu'à ce moment), puis coller l'ID et le secret dans le formulaire Zero Trust que Nav a ouvert. Vérifier que la validation en deux étapes de votre compte Google est active.
+- **Étape 14** : répondre « J'accepte » sous le message qui la nomme.
 - **Étape 8** : sur la page de jeton GitHub préparée par Nav, cliquer sur **Generate token**, puis l'enregistrer dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
 
 Rien d'autre : ni clé SSH, ni commande, ni console.
@@ -74,7 +77,7 @@ Commandes de Claude (`scripts/oracle-vm.ts`) :
 - `run <script> --apply` : un script en root, sa sortie revient ;
 - `sync --apply` : installe `infra/vm` et `docker/` sur la VM (`infra/vm/install.sh`), en plusieurs commandes vérifiées par empreinte SHA-256.
 
-## 5. Connexion Google d'Access
+## 5. Connexion Google d'Access (fiche Nav N15)
 
 Vous, et plus tard le personnel, entrez sur les pages protégées avec un compte Google (§6). Les projets Firebase existent depuis le 16 octobre ; cette étape n'attend ni la VM ni la zone.
 
@@ -148,7 +151,39 @@ Garde-fous : au plus 20 e-mails relayés par jour UTC (au-delà, l'application r
 
 La VM ne doit garder aucune donnée unique. On le vérifie une fois, avant le lancement, tant que personne n'utilise le site : Claude supprime `joutiya-vm` (disque compris) et la reconstruit selon `infra/redeploy.md`, refait les contrôles de l'étape 12 et note la durée totale.
 
-**Fin de la phase 1 :**
+## 14. Réglages des buckets R2 (fiche Nav N16)
+
+La quarantaine reçoit les photos envoyées directement par le navigateur ; les médias servent la carte (PMTiles) par plages d'octets. Régler les buckets par API exigerait la permission **Workers R2 Storage : Edit** sur tout le compte, donc sur vos autres buckets ([doc](https://developers.cloudflare.com/r2/platform/troubleshooting/)) : Nav le fait dans le tableau de bord. L'état voulu est dans `infra/cloudflare/r2-buckets.json`.
+
+Phrase de votre « J'accepte » : « Nav règle le CORS et les règles de cycle de vie des buckets R2 joutiya (dev, staging, prod) dans le tableau de bord Cloudflare. »
+
+Cloudflare → **R2** (buckets EU) → bucket → **Settings**. Seulement ces buckets `joutiya-*` ; la règle par défaut d'abandon des envois multipart reste.
+1. **CORS Policy** → **Add CORS policy** → onglet **JSON**, coller exactement, puis **Save** :
+   - `joutiya-prod-quarantine` : `[{"AllowedOrigins":["https://joutiya.ma","https://www.joutiya.ma"],"AllowedMethods":["PUT"],"AllowedHeaders":["Content-Type"],"MaxAgeSeconds":3600}]`
+   - `joutiya-staging-quarantine` : le même avec `"AllowedOrigins":["https://staging.joutiya.ma"]`
+   - `joutiya-prod-media` : `[{"AllowedOrigins":["https://joutiya.ma","https://www.joutiya.ma"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["Range"],"ExposeHeaders":["ETag","Content-Range","Content-Length"],"MaxAgeSeconds":3600}]`
+   - `joutiya-staging-media` : le même avec `"AllowedOrigins":["https://staging.joutiya.ma"]`
+2. **Object lifecycle rules** → **Add rule** :
+   - `joutiya-dev-quarantine`, `joutiya-staging-quarantine`, `joutiya-prod-quarantine` : nom `delete-after-1-day`, tous les objets, suppression des objets envoyés après 1 jour ;
+   - `joutiya-dev-private`, `joutiya-staging-private`, `joutiya-prod-private` : nom `delete-backups-after-98-days`, préfixe `backups/`, suppression après 98 jours.
+
+   Le dev reçoit les règles de cycle de vie, comme les autres, mais pas de CORS : en local, l'application garde ses fichiers sur le disque.
+3. Nav rapporte, pour chaque bucket, le JSON du CORS et la liste des règles de cycle de vie, tels que le tableau de bord les affiche.
+
+Hors champ : aucun changement de jeton, ni accès public, ni `r2.dev`, ni domaine personnalisé (étape 15), ni autre bucket.
+
+Ensuite, Claude vérifie le CORS par des requêtes préliminaires, sans jeton (`node scripts/cloudflare.ts r2`) : chaque origine du site doit passer, une origine étrangère doit être refusée. Il compare les règles de cycle de vie rapportées par Nav à `r2-buckets.json`.
+
+## 15. Domaines des médias
+
+À l'activation de la zone (étape 7), Nav relie chaque bucket de médias à son domaine, pour la même raison qu'à l'étape 14 : Cloudflare → **R2** → bucket → **Settings** → **Custom Domains** → **Add**.
+- `joutiya-prod-media` : `media.joutiya.ma` ;
+- `joutiya-staging-media` : `media-staging.joutiya.ma`.
+
+Puis, pour chacun, version TLS minimale **1.2**, comme le reste de la zone. Cloudflare crée lui-même l'enregistrement DNS. Hors champ : `r2.dev`, tout autre bucket. Les deux noms restent au premier niveau (`media-staging`, pas `media.staging`) : le certificat universel ne couvre que ce niveau. Claude vérifie ensuite chaque domaine (TLS et CORS).
+
+## Fin de la phase 1
+
 - `main` se déploie seul en staging ;
 - la production tourne ;
 - aucun port n'est ouvert ;
