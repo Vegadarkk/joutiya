@@ -47,7 +47,7 @@ function requestWith(jar: Jar): Request {
 beforeEach(() => resetRateLimiters());
 
 describe("suspended account", () => {
-  it("answers 403 account_suspended unless the route allows suspended members", async () => {
+  it("answers 403 account_suspended unless the route allows suspended members (client token does, D9)", async () => {
     const { uid } = await verifiedAccount();
     await setClaims(uid, { role: "individual", st: "suspended" });
     const jar = await jarFor(uid);
@@ -57,9 +57,9 @@ describe("suspended account", () => {
     const refused = await call<ErrorBody>(profile, "/api/auth/profile", { jar, body: { displayName: "Still Me" } });
     expect(refused.status).toBe(403);
     expect(refused.body.error.code).toBe("account_suspended");
-    const token = await call<ErrorBody>(clientToken, "/api/auth/client-token", { jar, body: {} });
-    expect(token.status).toBe(403);
-    expect(token.body.error.code).toBe("account_suspended");
+    // Phase 5 (D9): a suspended member still reads their conversations and decisions in real time.
+    const token = await call<{ token: string }>(clientToken, "/api/auth/client-token", { jar, body: {} });
+    expect(token.status).toBe(200);
 
     await expect(requireUser(requestWith(jar), { mutation: true })).rejects.toMatchObject({ status: 403, code: "account_suspended" });
     const allowed = await requireUser(requestWith(jar), { mutation: true, allowSuspended: true });
