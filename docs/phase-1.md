@@ -27,6 +27,8 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 
 Point d'arrêt du 16 octobre au soir, avant l'audit de lundi : tout le travail de la phase 1 est dans `main`. La suite attend la VM, dont la création gratuite est relancée chaque minute (étapes 3, 4, 9 pour les certificats, 16, puis 12), ou la bascule DNS après le .MA (étapes 6, 7, 8, 11 et 15). Les échéances à renouveler sont plus bas (Renouvellements).
 
+Relance de la VM : 856 essais du 16 octobre, de 01:44 à 17:00 UTC, un par minute hors trois pauses du matin, tous refusés par Oracle faute de place (« Out of host capacity ») : aucune machine A1 gratuite libre à Paris, région à un seul domaine de disponibilité, domaine de pannes laissé au choix d'Oracle. La relance tourne dans le conteneur de Claude, qui s'arrête avec le quota de la semaine : pause du 16 octobre vers 19 h UTC au lundi 19 octobre 10:05 UTC, où la routine du coordinateur la relance. Pas de relance depuis la CI ni depuis un autre serveur : les clés `JOUTIYA_OCI_*` ne quittent pas l'environnement cloud de Claude.
+
 ## Ce qui reste à vous
 
 - **Étape 8** : sur la page de jeton GitHub préparée par Nav, cliquer sur **Generate token**, puis l'enregistrer dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
