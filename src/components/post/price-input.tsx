@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type InputHTMLAttributes, type ReactNode, type Ref } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -46,27 +46,27 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
   return (
     <div className="flex flex-col gap-5" onBlur={onBlur}>
       <Field label={t("price")} hint={disabled ? undefined : t("priceHint")} error={error} required={!priceOptional && !isDonation}>
-        <div className="relative">
-          <Input
-            ref={input}
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder={disabled ? "" : t("pricePlaceholder")}
-            value={isDonation ? "0" : toDiscuss ? "" : text}
-            disabled={disabled}
-            dir="ltr"
-            className={cn("h-14 pe-20 text-start text-2xl font-semibold tabular-nums", disabled && "text-foreground-muted")}
-            onChange={(event) => {
-              const parsed = parsePriceInput(event.target.value);
-              onChange(parsed === null ? null : Math.min(parsed, PRICE_MAX * 10));
-            }}
-          />
-          <span className="pointer-events-none absolute end-4 top-1/2 flex -translate-y-1/2 flex-col items-end leading-tight" aria-hidden="true">
-            <span className="text-lg font-medium text-foreground-muted">{currencyLabel(locale)}</span>
-            {priceUnit ? <span className="text-xs text-foreground-muted">{t(`per.${priceUnit}`)}</span> : null}
-          </span>
-        </div>
+        <AmountBox
+          inputRef={input}
+          suffix={
+            <span className="pointer-events-none absolute end-4 top-1/2 flex -translate-y-1/2 flex-col items-end leading-tight" aria-hidden="true">
+              <span className="text-lg font-medium text-foreground-muted">{currencyLabel(locale)}</span>
+              {priceUnit ? <span className="text-xs text-foreground-muted">{t(`per.${priceUnit}`)}</span> : null}
+            </span>
+          }
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder={disabled ? "" : t("pricePlaceholder")}
+          value={isDonation ? "0" : toDiscuss ? "" : text}
+          disabled={disabled}
+          dir="ltr"
+          className={cn("h-14 pe-20 text-start text-2xl font-semibold tabular-nums", disabled && "text-foreground-muted")}
+          onChange={(event) => {
+            const parsed = parsePriceInput(event.target.value);
+            onChange(parsed === null ? null : Math.min(parsed, PRICE_MAX * 10));
+          }}
+        />
       </Field>
 
       <div className="flex flex-col divide-y divide-border rounded-lg border border-border px-4">
@@ -103,6 +103,21 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
           />
         ) : null}
       </div>
+    </div>
+  );
+}
+
+interface AmountBoxProps extends InputHTMLAttributes<HTMLInputElement> {
+  inputRef: Ref<HTMLInputElement>;
+  suffix: ReactNode;
+}
+
+/** Field clones its child with id and aria-*: the box hands them to the input, not to the wrapper. */
+function AmountBox({ inputRef, suffix, ...props }: AmountBoxProps) {
+  return (
+    <div className="relative">
+      <Input ref={inputRef} {...props} />
+      {suffix}
     </div>
   );
 }

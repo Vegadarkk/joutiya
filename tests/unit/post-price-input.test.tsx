@@ -28,6 +28,7 @@ function render(props: Partial<PriceInputProps>, locale: Locale = "fr") {
 
 // React 19 writes `inputMode` in camelCase (HTML attribute names are case-insensitive).
 const inputValue = (html: string) => /<input[^>]*inputmode="numeric"[^>]*>/i.exec(html)?.[0].match(/ value="([^"]*)"/)?.[1];
+const inputTag = (html: string) => /<input[^>]*inputmode="numeric"[^>]*>/i.exec(html)?.[0] ?? "";
 
 describe("PriceInput", () => {
   it("groups the digits of the amount and shows the currency", () => {
@@ -82,6 +83,15 @@ describe("PriceInput", () => {
   it("shows the validation message", () => {
     const html = render({ error: "Indiquez un prix" });
     expect(html).toContain("Indiquez un prix");
-    expect(html).toContain('aria-invalid="true"');
+    expect(inputTag(html)).toContain('aria-invalid="true"');
+  });
+
+  it("names the input with its label (id, aria-required and the hint land on the input, not the wrapper)", () => {
+    const html = render({});
+    const id = /<label for="([^"]+)"/.exec(html)?.[1];
+    expect(id).toBeTruthy();
+    expect(inputTag(html)).toContain(`id="${id}"`);
+    expect(inputTag(html)).toContain('aria-required="true"');
+    expect(inputTag(html)).toContain(`aria-describedby="${id}-hint"`);
   });
 });
