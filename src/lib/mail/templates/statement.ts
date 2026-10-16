@@ -1,9 +1,11 @@
+import { reasonFactText } from "@/lib/moderation/decisions";
 import type { ModerationStatement } from "../types";
 import type { MailLocale } from "./layout";
 
 // Art. 17 DSA statement of reasons (design D8), shared by the hold and rejection mails: the
-// measure, the facts (moderation flags translated, or a moderator's own words), the ground, the
-// automated nature of the decision and the redress channel (reply to the DSA contact address).
+// measure, the facts (moderation flags or reject reasons translated, or a moderator's own words),
+// the ground, whether the decision was automated, and the redress channel (the DSA contact
+// address, until the appeal form of phase 5).
 
 const FLAGS: Record<MailLocale, Record<string, string>> = {
   fr: {
@@ -34,14 +36,26 @@ const FLAGS: Record<MailLocale, Record<string, string>> = {
   },
 };
 
-const COPY: Record<MailLocale, { measure: Record<ModerationStatement["measure"], string>; facts: string; noFacts: string; ground: string; automated: string; redress: (email: string) => string }> = {
+interface StatementCopy {
+  measure: Record<ModerationStatement["measure"], string>;
+  facts: string;
+  noFacts: string;
+  ground: string;
+  automated: string;
+  human: string;
+  redress: (email: string, ref: string | undefined, human: boolean) => string;
+}
+
+const COPY: Record<MailLocale, StatementCopy> = {
   fr: {
     measure: { hold: "Mesure : publication suspendue dans l'attente d'une vérification humaine.", reject: "Mesure : annonce refusée, elle n'est pas publiée." },
     facts: "Faits constatés : ",
     noFacts: "Faits constatés : signaux de risque relevés par le contrôle automatique.",
     ground: "Fondement : ",
     automated: "Cette mesure a été prise par un traitement automatisé, sans intervention humaine à ce stade.",
-    redress: (email) => `Pour la contester, répondez à cet e-mail ou écrivez à ${email} : un modérateur réexaminera votre annonce.`,
+    human: "Cette décision a été prise par un modérateur de Joutiya, après examen de l'annonce.",
+    redress: (email, ref, human) =>
+      `Pour la contester, écrivez à ${email}${ref ? ` en indiquant la référence ${ref}` : ""} : ${human ? "une autre personne" : "un modérateur"} réexaminera votre annonce.`,
   },
   ar: {
     measure: { hold: "الإجراء: تعليق النشر في انتظار مراجعة بشرية.", reject: "الإجراء: رُفض الإعلان ولم يُنشر." },
@@ -49,19 +63,21 @@ const COPY: Record<MailLocale, { measure: Record<ModerationStatement["measure"],
     noFacts: "الوقائع المسجّلة: مؤشرات خطر رصدها الفحص الآلي.",
     ground: "الأساس: ",
     automated: "اتُّخذ هذا الإجراء بمعالجة آلية دون تدخل بشري في هذه المرحلة.",
-    redress: (email) => `للاعتراض عليه، أجب على هذا البريد أو اكتب إلى ${email}: سيعيد مشرف فحص إعلانك.`,
+    human: "اتخذ هذا القرار مشرف لدى Joutiya بعد فحص الإعلان.",
+    redress: (email, ref, human) => `للاعتراض عليه، اكتب إلى ${email}${ref ? ` مع ذكر المرجع ${ref}` : ""}: ${human ? "سيعيد شخص آخر" : "سيعيد مشرف"} فحص إعلانك.`,
   },
 };
 
-/** The statement as mail paragraphs, in the recipient's language. */
-export function statementParagraphs(statement: ModerationStatement, lang: MailLocale): string[] {
+/** The statement as mail paragraphs, in the recipient's language; `ref` (listing id) is quoted in the redress line. */
+export function statementParagraphs(statement: ModerationStatement, lang: MailLocale, ref?: string): string[] {
   const copy = COPY[lang];
-  const facts = statement.facts.map((fact) => FLAGS[lang][fact] ?? fact);
+  // A moderator's sentence may end with its own full stop: the list adds one.
+  const facts = statement.facts.map((fact) => FLAGS[lang][fact] ?? reasonFactText(fact, lang) ?? fact.replace(/[.\s]+$/, ""));
   return [
     copy.measure[statement.measure],
     facts.length > 0 ? `${copy.facts}${facts.join(" ; ")}.` : copy.noFacts,
     `${copy.ground}${statement.ground}.`,
-    copy.automated,
-    copy.redress(statement.redress),
+    statement.automated ? copy.automated : copy.human,
+    copy.redress(statement.redress, ref, !statement.automated),
   ];
 }

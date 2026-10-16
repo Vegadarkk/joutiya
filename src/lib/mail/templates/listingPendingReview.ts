@@ -29,7 +29,8 @@ export function listingPendingReview(data: TemplateData["listingPendingReview"],
     subject: copy.subject(data.title),
     title: copy.title,
     greeting: GREETING[ctx.lang](data.displayName),
-    paragraphs: [...copy.body(data.title), ...statementParagraphs(data.statement, ctx.lang)],
+    paragraphs: [...copy.body(data.title), ...statementParagraphs(data.statement, ctx.lang, data.listingId)],
     action: { label: copy.button, url: pageUrl(ctx, "mes-annonces") },
+    replyTo: data.statement.redress,
   });
 }

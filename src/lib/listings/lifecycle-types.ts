@@ -11,7 +11,8 @@ export type ContentOp = ContentOpDoc["op"];
 /** A partial update of the listing: `null` deletes an optional field (repository convention). */
 export type ListingFieldPatch = { [K in keyof ListingDoc]?: ListingDoc[K] | null };
 
-export type MailTemplateForListing = "listingPublished" | "listingPendingReview" | "listingRejected";
+/** Seller mails about a listing; approval, reminder and expiry are sent by the moderation queue and the jobs. */
+export type MailTemplateForListing = "listingPublished" | "listingPendingReview" | "listingRejected" | "listingApproved" | "listingExpiringSoon" | "listingExpired";
 
 export interface TransitionEffects {
   /** searchOutbox entry to write with the listing (null: the index is not concerned). */

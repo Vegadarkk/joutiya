@@ -12,15 +12,20 @@ export type TemplateId =
   | "staffInvite"
   | "phoneVerified"
   | "phoneRemoved"
-  // Listings (phase 3): publication, hold and rejection with an art. 17-style statement.
+  // Listings (phase 3): publication, hold and rejection with an art. 17-style statement, the
+  // moderator's approval, the expiry reminder and the expiry notice.
   | "listingPublished"
   | "listingPendingReview"
-  | "listingRejected";
+  | "listingRejected"
+  | "listingApproved"
+  | "listingExpiringSoon"
+  | "listingExpired";
 
 /**
  * Statement of reasons (art. 17 DSA, design D8) carried by the hold and rejection mails. The
  * sentences are rendered by the template in the recipient's language; `facts` are flag codes
- * (MODERATION_FLAGS) or free text already in the recipient's language, `ground` a CGU reference.
+ * (MODERATION_FLAGS), reject reason codes (`reason:<code>`, src/lib/moderation/decisions.ts) or a
+ * moderator's free text, `ground` a CGU reference.
  */
 export interface ModerationStatement {
   /** What was done: held for review, or rejected. */
@@ -29,8 +34,8 @@ export interface ModerationStatement {
   facts: string[];
   /** Legal or contractual ground, e.g. "CGU §7.2". */
   ground: string;
-  /** Automated detection and decision (no human in the loop at this stage). */
-  automated: true;
+  /** true: automated detection and decision (pre-moderation); false: decided by a moderator. */
+  automated: boolean;
   /** Where to object: the DSA contact address of the legal configuration. */
   redress: string;
 }
@@ -50,6 +55,12 @@ export interface TemplateData {
   listingPendingReview: { displayName: string; title: string; listingId: string; statement: ModerationStatement };
   /** Rejected (automated or by a moderator): statement of reasons and how to object. */
   listingRejected: { displayName: string; title: string; listingId: string; statement: ModerationStatement };
+  /** Approved by a moderator after a hold: online now, public URL and expiry date (ISO). */
+  listingApproved: { displayName: string; title: string; url: string; expiresAt: string };
+  /** Reminder a few days before expiry (bulk): public URL and expiry date (ISO). */
+  listingExpiringSoon: { displayName: string; title: string; url: string; expiresAt: string };
+  /** Expired: renewable from "Mes annonces" until `purgeAt` (ISO), then deleted. */
+  listingExpired: { displayName: string; title: string; purgeAt: string };
 }
 
 /** Security mails bypass the suppression list and fall back to Brevo when Resend is exhausted. */

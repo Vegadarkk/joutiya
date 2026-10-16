@@ -2,6 +2,9 @@ import "server-only";
 import { LOCALES } from "@/config/site";
 import { serverEnv } from "@/lib/env";
 import { mailLocale, type BuiltMail, type TemplateContext } from "./templates/layout";
+import { listingApproved } from "./templates/listingApproved";
+import { listingExpired } from "./templates/listingExpired";
+import { listingExpiringSoon } from "./templates/listingExpiringSoon";
 import { listingPendingReview } from "./templates/listingPendingReview";
 import { listingPublished } from "./templates/listingPublished";
 import { listingRejected } from "./templates/listingRejected";
@@ -27,6 +30,9 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   listingPublished,
   listingPendingReview,
   listingRejected,
+  listingApproved,
+  listingExpiringSoon,
+  listingExpired,
 };
 
 export const TEMPLATE_IDS = Object.keys(TEMPLATES) as TemplateId[];
@@ -61,6 +67,7 @@ export function renderMail(mail: TemplateMail): RenderedMail {
     subject: built.subject,
     text: built.text,
     html: built.html,
+    ...(built.replyTo ? { replyTo: built.replyTo } : {}),
     tags: { template: mail.template, env: env.APP_ENV },
     meta: { template: mail.template, locale: mail.locale, data: mail.data },
   };
