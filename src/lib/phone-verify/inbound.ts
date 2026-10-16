@@ -8,7 +8,7 @@ import { captureServerException } from "@/lib/observability/capture";
 import { displayPhone, MOROCCAN_MOBILE_E164 } from "@/lib/phone/normalize";
 import { safeEqual } from "@/lib/security/hash";
 import { claimVerifiedPhone } from "./accounts";
-import { codeHash, phoneCodeKey, phoneKey } from "./codes";
+import { codeHash, phoneCodeKey } from "./codes";
 import { challengeStore, type ChallengeStore } from "./store";
 import type { InboundMessage } from "./webhook";
 
@@ -65,9 +65,9 @@ export async function processInbound(items: readonly InboundMessage[], options: 
       if (previousUid) {
         summary.transferred += 1;
         await audit({ actorUid: challenge.uid, actorRole: "system", action: "phone.transferred", target: { type: "user", id: previousUid }, automated: true, reason: `number verified by ${challenge.uid}` });
-        await notify("phoneRemoved", previousUid, e164);
+        await notify("phoneRemoved", previousUid, e164, item.wamid);
       }
-      await notify("phoneVerified", challenge.uid, e164);
+      await notify("phoneVerified", challenge.uid, e164, item.wamid);
     } catch (error) {
       summary.failed += 1;
       captureServerException(error, { route: "/api/webhooks/whatsapp", step: "processInbound" });
@@ -78,8 +78,13 @@ export async function processInbound(items: readonly InboundMessage[], options: 
   return summary;
 }
 
-/** Confirmation (or removal) e-mail, best effort: the verification itself is already recorded. */
-async function notify(template: Extract<TemplateId, "phoneVerified" | "phoneRemoved">, uid: string, e164: string): Promise<void> {
+/**
+ * Confirmation (or removal) e-mail, best effort: the verification itself is already recorded. One
+ * mail per WhatsApp message (wamid): a number that leaves the same account twice in a day, as when
+ * a phished transfer is undone and repeated, warns the holder each time; Meta's retries of one
+ * message are already deduped upstream.
+ */
+async function notify(template: Extract<TemplateId, "phoneVerified" | "phoneRemoved">, uid: string, e164: string, wamid: string): Promise<void> {
   try {
     const [user, account] = await Promise.all([getUser(uid), getUserPrivate(uid)]);
     if (!user || !account?.email) return;
@@ -89,7 +94,7 @@ async function notify(template: Extract<TemplateId, "phoneVerified" | "phoneRemo
       to: account.email,
       data: { displayName: user.displayName, phone: displayPhone(e164) },
       priority: "security",
-      idempotencyKey: `${template}:${uid}:${phoneKey(e164).slice(0, 16)}`,
+      idempotencyKey: `${template}:${uid}:${wamid}`,
     });
   } catch (error) {
     logger.warn({ err: (error as Error).message, template }, "phone verification mail not sent");

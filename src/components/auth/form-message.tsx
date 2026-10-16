@@ -26,6 +26,11 @@ const WITH_WAIT: readonly ApiErrorCode[] = ["rate_limited", "account_locked"];
 const WEAK_PASSWORD_REASONS = ["common", "personal", "repeated", "sequence"] as const;
 type WeakPasswordReason = (typeof WEAK_PASSWORD_REASONS)[number];
 
+function lengthReason(error: ApiError): "too_short" | "too_long" | null {
+  const reason = typeof error.details === "object" && error.details !== null ? (error.details as { reason?: unknown }).reason : undefined;
+  return reason === "too_short" || reason === "too_long" ? reason : null;
+}
+
 function weakPasswordReason(error: ApiError): WeakPasswordReason | null {
   const reason = typeof error.details === "object" && error.details !== null ? (error.details as { reason?: unknown }).reason : undefined;
   return typeof reason === "string" && (WEAK_PASSWORD_REASONS as readonly string[]).includes(reason) ? (reason as WeakPasswordReason) : null;
@@ -44,6 +49,10 @@ export function useApiErrorMessage(): (error: unknown) => string {
       if (code === "weak_password" && error instanceof ApiError) {
         const reason = weakPasswordReason(error);
         if (reason) return t(`weak_password_${reason}`);
+        // The policy counts code points, the schema UTF-16 units: a length refusal can reach the server.
+        const length = lengthReason(error);
+        if (length === "too_short") return common("validation.passwordMin", { min: PASSWORD_MIN });
+        if (length === "too_long") return common("validation.passwordMax", { max: PASSWORD_MAX });
       }
       return t.has(code) && !WITH_WAIT.includes(code) ? t(code) : t("internal");
     },

@@ -109,7 +109,7 @@ async function check(env: Env, target: Target, now: number): Promise<void> {
   const previous = stored ? (JSON.parse(stored) as ProbeState) : null;
   const { state, alert } = transition(previous, status, now, target.name, detail);
   // KV writes only when something changed (free tier: 1,000 writes a day).
-  if (!previous || state.status !== previous.status || state.pending !== previous.pending) {
+  if (!previous || state.status !== previous.status || state.pending !== previous.pending || state.pendingStatus !== previous.pendingStatus) {
     await env.STATE.put(key, JSON.stringify(state));
   }
   if (!alert) return;

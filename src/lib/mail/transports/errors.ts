@@ -53,9 +53,13 @@ export async function readErrorBody(response: Response): Promise<{ name?: string
   }
 }
 
+/** Anything that looks like an e-mail address, replaced before a provider message is logged. */
+const ADDRESS = /[^\s<>"'`]+@[^\s<>"'`]+/g;
+
 /**
- * Error for a non-2xx answer. The provider's own message may quote the recipient address: it
- * stays in the (redacted) log and never enters the error, which reaches Sentry on the final attempt.
+ * Error for a non-2xx answer. The provider's own message may quote the recipient address: it is
+ * scrubbed before the log line (pino redacts by key, not by value) and never enters the error,
+ * which reaches Sentry on the final attempt.
  */
 export function providerFailure(
   provider: string,
@@ -64,7 +68,7 @@ export function providerFailure(
   detail: { name?: string; message?: string },
   retryAfterSeconds?: number,
 ): ProviderError {
-  logger.warn({ provider, status, kind, error: detail.name, detail: detail.message }, "mail provider error");
+  logger.warn({ provider, status, kind, error: detail.name, detail: detail.message?.replace(ADDRESS, "[redacted]") }, "mail provider error");
   return new ProviderError(provider, status, kind, `${provider}: HTTP ${status}${detail.name ? ` ${detail.name}` : ""}`, retryAfterSeconds);
 }
 

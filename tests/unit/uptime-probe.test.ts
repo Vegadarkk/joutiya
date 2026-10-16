@@ -97,7 +97,7 @@ describe("transition", () => {
     for (let probe = 1; probe < RECOVERY_CONFIRMATIONS; probe += 1) {
       const step = transition(state, "up", probe * 300_000, "production", "HTTP 200");
       expect(step.alert).toBeNull();
-      expect(step.state).toEqual({ status: "down", pending: probe, since: 0 });
+      expect(step.state).toEqual({ status: "down", pending: probe, pendingStatus: "up", since: 0 });
       state = step.state;
     }
     const { state: recovered, alert } = transition(state, "up", 20 * 60_000, "production", "HTTP 200");
@@ -110,14 +110,14 @@ describe("transition", () => {
     const down: ProbeState = { status: "down", pending: 0, since: 0 };
     const once = transition(down, "up", 1, "production", "HTTP 200").state;
     const twice = transition(once, "up", 2, "production", "HTTP 200").state;
-    expect(twice).toEqual({ status: "down", pending: RECOVERY_CONFIRMATIONS - 1, since: 0 });
+    expect(twice).toEqual({ status: "down", pending: RECOVERY_CONFIRMATIONS - 1, pendingStatus: "up", since: 0 });
     // One failed probe resets the recovery count: no "rétabli" e-mail for a blip.
     expect(transition(twice, "down", 3, "production", "HTTP 502")).toEqual({ state: down, alert: null });
   });
 
   it("alerts P1 for a degraded site and starts unknown sites as up", () => {
-    expect(transition({ status: "up", pending: CONFIRMATIONS - 1, since: 0 }, "degraded", 1, "staging", "HTTP 503").alert?.severity).toBe("P1");
-    expect(transition(null, "down", 1, "staging", "x")).toEqual({ state: { status: "up", pending: 1, since: 1 }, alert: null });
+    expect(transition({ status: "up", pending: CONFIRMATIONS - 1, pendingStatus: "degraded", since: 0 }, "degraded", 1, "staging", "HTTP 503").alert?.severity).toBe("P1");
+    expect(transition(null, "down", 1, "staging", "x")).toEqual({ state: { status: "up", pending: 1, pendingStatus: "down", since: 1 }, alert: null });
   });
 });
 
@@ -365,5 +365,16 @@ describe("readCapped", () => {
     const big = new Response("x".repeat(100)).body;
     expect(await readCapped(big, 64)).toBeNull();
     expect(await readCapped(null, 64)).toBe("");
+  });
+  it("counts only probes that agree: a lone degraded probe inside a recovery window confirms nothing", () => {
+    let state: ProbeState = { status: "down", pending: 0, since: 0 };
+    for (const observed of ["up", "up"] as const) state = transition(state, observed, 1, "prod", "ok").state;
+    const stray = transition(state, "degraded", 2, "prod", "HTTP 503");
+    expect(stray.alert).toBeNull();
+    expect(stray.state).toEqual({ status: "down", pending: 1, pendingStatus: "degraded", since: 0 });
+    // And one down probe after two up probes on a degraded site is not an outage yet.
+    let degraded: ProbeState = { status: "degraded", pending: 0, since: 0 };
+    for (const observed of ["up", "up"] as const) degraded = transition(degraded, observed, 1, "prod", "ok").state;
+    expect(transition(degraded, "down", 2, "prod", "timeout").alert).toBeNull();
   });
 });

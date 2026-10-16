@@ -13,9 +13,9 @@ describe("mailPublisher", () => {
   it("falls back to the defaults and the Paris address", () => {
     expect(PUBLISHER_ADDRESS).toBe("6 rue d'Armaillé, 75017 Paris");
     expect(DEFAULT_LEGAL.hqAddress).toBe(PUBLISHER_ADDRESS);
-    expect(mailPublisher()).toEqual({ name: DEFAULT_LEGAL.companyName, address: PUBLISHER_ADDRESS });
-    expect(mailPublisher({ companyName: "  ", hqAddress: "" })).toEqual({ name: DEFAULT_LEGAL.companyName, address: PUBLISHER_ADDRESS });
-    expect(mailPublisher({ companyName: " Joutiya SAS ", hqAddress: PUBLISHER_ADDRESS })).toEqual({ name: "Joutiya SAS", address: PUBLISHER_ADDRESS });
+    expect(mailPublisher()).toEqual({ name: DEFAULT_LEGAL.companyName, address: PUBLISHER_ADDRESS, email: DEFAULT_LEGAL.email });
+    expect(mailPublisher({ companyName: "  ", hqAddress: "", email: " " })).toEqual({ name: DEFAULT_LEGAL.companyName, address: PUBLISHER_ADDRESS, email: DEFAULT_LEGAL.email });
+    expect(mailPublisher({ companyName: " Joutiya SAS ", hqAddress: PUBLISHER_ADDRESS, email: "aide@joutiya.ma" })).toEqual({ name: "Joutiya SAS", address: PUBLISHER_ADDRESS, email: "aide@joutiya.ma" });
   });
 });
 

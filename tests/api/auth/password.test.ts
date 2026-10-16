@@ -109,6 +109,15 @@ describe("password reset", () => {
     expect(bad.body.error.code).toBe("invalid_code");
   });
 
+  it("mails a reset link to a Google-only account, which has no password yet", async () => {
+    const email = uniqueEmail("gonly");
+    const record = await auth().createUser({ email, emailVerified: true, displayName: "Nadia" });
+    expect(record.providerData.some((provider) => provider.providerId === "password")).toBe(false);
+    const result = await call<{ status: string }>(resetRequest, "/api/auth/password/reset", { jar: new Jar(), body: { email, locale: "fr", turnstileToken: "t" } });
+    expect(result.status).toBe(202);
+    expect(lastMail(sendMail, "resetPassword", email)).toBeDefined();
+  });
+
   it("never mails nor resets a staff account from the public host", async () => {
     const email = uniqueEmail("staff");
     const record = await auth().createUser({ email, password: PASSWORD, emailVerified: true, displayName: "Admin Person" });

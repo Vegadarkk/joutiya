@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_LEGAL } from "@/config/legal";
 import { resetServerEnv } from "@/lib/env";
 import { isTemplateMail, renderMail, TEMPLATE_IDS } from "@/lib/mail/render";
+import { setMailPublisher } from "@/lib/mail/templates/layout";
 
 // The phoneRemoved security mail (number moved to another account): copy per locale, contact
 // address from the legal config, button to the verifications page, escaping.
@@ -57,5 +58,15 @@ describe("phoneRemoved", () => {
     expect(rendered.html).not.toContain("<img");
     expect(rendered.html).not.toContain("<b>");
     expect(rendered.html).toContain("&lt;b&gt;0600&lt;/b&gt;");
+  });
+  it("offers the contact address of the legal config, not a constant", () => {
+    setMailPublisher({ companyName: "Adark Prime", hqAddress: "6 rue d'Armaillé, 75017 Paris", email: "aide@joutiya.ma" });
+    try {
+      const rendered = renderMail({ template: "phoneRemoved", locale: "fr", to: "nadia@example.com", data });
+      expect(rendered.text).toContain("aide@joutiya.ma");
+      expect(rendered.text).not.toContain(DEFAULT_LEGAL.email);
+    } finally {
+      setMailPublisher();
+    }
   });
 });

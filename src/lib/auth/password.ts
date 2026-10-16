@@ -32,9 +32,11 @@ async function resetRequest(request: Request): Promise<Response> {
   await checkTurnstile(flow, input.turnstileToken, "reset");
   const record = await accountByEmail(input.email);
   // Staff accounts reset their password on the back office only, behind Cloudflare Access (§6
-  // "Personnel"): the public flow never mails them, and answers the same 202.
+  // "Personnel"): the public flow never mails them, and answers the same 202. Any other account
+  // with an e-mail is mailed, a Google-only one included: the link sets its first password (the
+  // settings page sends password-less accounts here).
   const staff = record ? isStaff(readClaims(record.customClaims ?? {})) : false;
-  if (record?.email && !record.disabled && !staff && record.providerData.some((provider) => provider.providerId === "password")) {
+  if (record?.email && !record.disabled && !staff) {
     const profile = await getUser(record.uid);
     await sendResetMail({ email: record.email, displayName: displayNameFor(profile, record, record.email), locale: input.locale });
   }

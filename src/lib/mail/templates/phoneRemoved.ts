@@ -1,10 +1,9 @@
-import { DEFAULT_LEGAL } from "@/config/legal";
 import type { TemplateData } from "../types";
-import { GREETING, pageUrl, renderLayout, type BuiltMail, type MailLocale, type TemplateContext } from "./layout";
+import { GREETING, mailContact, pageUrl, renderLayout, type BuiltMail, type MailLocale, type TemplateContext } from "./layout";
 
 // Security mail of the phone transfer (src/lib/phone-verify/inbound.ts): the number was just
 // verified from the phone itself on another account, so it left this one. The contact address is
-// the one of the legal notice, never hardcoded.
+// the one of the legal config (setMailPublisher), never hardcoded.
 
 const COPY: Record<MailLocale, { subject: string; title: string; body: (phone: string) => string[]; button: string; notYou: (contact: string) => string }> = {
   fr: {
@@ -41,6 +40,6 @@ export function phoneRemoved(data: TemplateData["phoneRemoved"], ctx: TemplateCo
     greeting: GREETING[ctx.lang](data.displayName),
     paragraphs: copy.body(isolate(data.phone)),
     action: { label: copy.button, url: pageUrl(ctx, "verifications") },
-    closing: [copy.notYou(isolate(DEFAULT_LEGAL.email))],
+    closing: [copy.notYou(isolate(mailContact()))],
   });
 }

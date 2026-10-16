@@ -21,8 +21,10 @@ export interface Alert {
 
 export interface ProbeState {
   status: Status;
-  /** Consecutive probes that disagree with `status`. */
+  /** Consecutive probes that reported `pendingStatus` (a candidate for the next status). */
   pending: number;
+  /** The status the pending probes agree on; absent while nothing is pending. */
+  pendingStatus?: Status;
   since: number;
 }
 
@@ -86,13 +88,15 @@ export function transition(
   if (!previous) {
     const state: ProbeState = { status: observed, pending: 0, since: now };
     if (observed === "up") return { state, alert: null };
-    return { state: { ...state, status: "up", pending: 1 }, alert: null };
+    return { state: { ...state, status: "up", pending: 1, pendingStatus: observed }, alert: null };
   }
-  if (observed === previous.status) return { state: { ...previous, pending: 0 }, alert: null };
-  const pending = previous.pending + 1;
+  if (observed === previous.status) return { state: { status: previous.status, pending: 0, since: previous.since }, alert: null };
+  // Only probes that agree with each other count: a lone "degraded" inside a recovery window is
+  // one pending probe, not a confirmed incident.
+  const pending = previous.pendingStatus === observed ? previous.pending + 1 : 1;
   // Hysteresis: a recovery needs more agreeing probes than an incident.
   const needed = observed === "up" ? RECOVERY_CONFIRMATIONS : CONFIRMATIONS;
-  if (pending < needed) return { state: { ...previous, pending }, alert: null };
+  if (pending < needed) return { state: { status: previous.status, pending, pendingStatus: observed, since: previous.since }, alert: null };
 
   const state: ProbeState = { status: observed, pending: 0, since: now };
   const minutes = Math.max(1, Math.round((now - previous.since) / 60_000));

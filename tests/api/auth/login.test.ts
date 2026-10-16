@@ -3,7 +3,7 @@ import { RATE_LIMITS } from "@/config/rate-limits";
 import { auth } from "@/lib/firebase/admin";
 import { setClaims } from "@/lib/firebase/claims";
 import { sendMail } from "@/lib/mail";
-import { consumeLimit, resetRateLimiters } from "@/lib/rate-limit/limiter";
+import { consumeLimit, limitState, resetRateLimiters } from "@/lib/rate-limit/limiter";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 import { POST as action } from "@/app/api/auth/action/route";
@@ -13,6 +13,7 @@ import { POST as signup } from "@/app/api/auth/signup/route";
 import { CONSENTS, Jar, PASSWORD, call, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
+vi.mock("@/lib/rate-limit/limiter", { spy: true });
 vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
   ...(await importOriginal<typeof Turnstile>()),
   verifyTurnstile: vi.fn(async () => ({ ok: true, codes: [] })),
@@ -140,6 +141,13 @@ describe("POST /api/auth/login", () => {
     // The pass then lifts the IP escalation for this device.
     const again = await call<SignedInBody>(login, LOGIN, { jar, body: { email, password: PASSWORD } });
     expect(again.status).toBe(200);
+  });
+
+  it("fails closed when the lock counters cannot be read (policy closed, like the staff login)", async () => {
+    vi.mocked(limitState).mockResolvedValueOnce(null);
+    const result = await call<ErrorBody>(login, LOGIN, { jar: new Jar(), body: { email: uniqueEmail("store"), password: PASSWORD } });
+    expect(result.status).toBe(503);
+    expect(result.body.error.code).toBe("unavailable");
   });
 
   it("answers invalid_credentials for an unknown e-mail, like a wrong password", async () => {

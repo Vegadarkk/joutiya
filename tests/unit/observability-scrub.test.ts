@@ -103,6 +103,12 @@ describe("scrubBreadcrumb", () => {
       data: { from: "/fr/connexion", to: "/fr/compte" },
     });
     expect(scrubBreadcrumb({ category: "console", message: "sent to a@b.ma" })).toEqual({ category: "console", message: "sent to [email]" });
+    // The console integrations keep the raw arguments next to the joined message.
+    expect(scrubBreadcrumb({ category: "console", message: "sent to a@b.ma", data: { arguments: ["sent to a@b.ma", 3], logger: "console" } })).toEqual({
+      category: "console",
+      message: "sent to [email]",
+      data: { arguments: ["sent to [email]", 3], logger: "console" },
+    });
     const plain = { category: "ui.click", message: "button" };
     expect(scrubBreadcrumb(plain)).toEqual(plain);
   });

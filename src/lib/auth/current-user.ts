@@ -13,9 +13,10 @@ import { hostKind } from "@/lib/security/origin";
 // and where to redirect. Back-office pages still guard themselves (requirePageStaff): a layout
 // guard alone is skipped by client-side navigations, which render the page on its own.
 
+/** Revocation is checked like /api/auth/me does: a signed-out or reset account never renders as signed in. */
 export async function currentUser(): Promise<SessionUser | null> {
   const store = await cookies();
-  return verifySession(store.get(SESSION_COOKIE)?.value);
+  return verifySession(store.get(SESSION_COOKIE)?.value, { checkRevoked: true });
 }
 
 /** A member (individual or pro) with an activated account, on the public host; null otherwise. */

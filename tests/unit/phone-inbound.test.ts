@@ -96,6 +96,20 @@ describe("processInbound", () => {
     expect(mocks.sendMail).toHaveBeenCalledWith(expect.objectContaining({ template: "phoneVerified", to: "bob@example.com", locale: "ar" }));
   });
 
+  it("warns the previous holder at every transfer: the removal mail is keyed per inbound message, not per number", async () => {
+    // Alice is phished twice within a day (she takes the number back in between): two distinct warnings.
+    await pending("bob", "222222");
+    mocks.claim.mockImplementationOnce(async () => ({ previousUid: "alice" }));
+    await run([message("222222")]);
+    await pending("bob", "444444");
+    mocks.claim.mockImplementationOnce(async () => ({ previousUid: "alice" }));
+    await run([message("444444")]);
+    const keys = mocks.sendMail.mock.calls.map(([mail]) => mail).filter((mail) => mail.template === "phoneRemoved").map((mail) => mail.idempotencyKey);
+    expect(keys).toHaveLength(2);
+    expect(new Set(keys).size).toBe(2);
+    expect(keys.every((key) => /^phoneRemoved:alice:wamid\.\d+$/.test(key ?? ""))).toBe(true);
+  });
+
   it("processes a wamid once, but lets the retry through after a failure", async () => {
     await pending("alice", "111111");
     mocks.claim.mockRejectedValueOnce(new Error("firestore unavailable"));

@@ -37,9 +37,12 @@ export function loginKeys(email: string, ipBucket: string): LoginKeys {
 /** 429 `account_locked` once this account + IP exhausted its failures; Retry-After is the real time left on the lock. */
 export async function assertNotLocked(keys: LoginKeys): Promise<{ failures: number; accountFailures: number }> {
   const [state, accountFailures] = await Promise.all([limitState("login.fail.accountIp", keys.accountIp), consumedPoints("login.fail.account", keys.account)]);
-  const result = { failures: state?.consumedPoints ?? 0, accountFailures: accountFailures ?? 0 };
+  // Both limits are policy "closed": an unreadable counter never reads as "no failures" (a lock or
+  // a mandatory Turnstile would silently lift), the same answer as the staff login.
+  if (!state || accountFailures === null) throw unavailable("rate limiter unavailable");
+  const result = { failures: state.consumedPoints, accountFailures };
   if (result.failures >= RATE_LIMITS["login.fail.accountIp"].points) {
-    const retryAfter = state && state.msBeforeNext > 0 ? Math.ceil(state.msBeforeNext / 1000) : LOCK_SECONDS;
+    const retryAfter = state.msBeforeNext > 0 ? Math.ceil(state.msBeforeNext / 1000) : LOCK_SECONDS;
     throw new HttpError(429, "account_locked", undefined, { headers: { "Retry-After": String(retryAfter) } });
   }
   return result;

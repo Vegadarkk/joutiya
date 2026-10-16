@@ -26,15 +26,18 @@ export interface TemplateContext {
 export interface MailPublisher {
   name: string;
   address: string;
+  /** Contact address offered by the security mails ("if this was not you"); the legal default when absent. */
+  email?: string;
 }
 
 /** The only postal address ever displayed (domiciliation): the fallback when the config has none. */
 export const PUBLISHER_ADDRESS = "6 rue d'Armaillé, 75017 Paris";
 
-export function mailPublisher(legal?: Pick<LegalConfig, "companyName" | "hqAddress">): MailPublisher {
+export function mailPublisher(legal?: Partial<Pick<LegalConfig, "companyName" | "hqAddress" | "email">>): MailPublisher {
   return {
     name: legal?.companyName?.trim() || DEFAULT_LEGAL.companyName,
     address: legal?.hqAddress?.trim() || PUBLISHER_ADDRESS,
+    email: legal?.email?.trim() || DEFAULT_LEGAL.email,
   };
 }
 
@@ -44,8 +47,13 @@ let currentPublisher: MailPublisher = mailPublisher();
  * Refreshes the publisher shown in every footer. renderMail() is synchronous, so deliverMail()
  * calls this with the cached legal config right before rendering; without a call, the defaults.
  */
-export function setMailPublisher(legal?: Pick<LegalConfig, "companyName" | "hqAddress">): void {
+export function setMailPublisher(legal?: Partial<Pick<LegalConfig, "companyName" | "hqAddress" | "email">>): void {
   currentPublisher = mailPublisher(legal);
+}
+
+/** Contact address of the current publisher (config/legal `email`, else the default). */
+export function mailContact(): string {
+  return currentPublisher.email ?? DEFAULT_LEGAL.email;
 }
 
 export interface BuiltMail {

@@ -115,6 +115,8 @@ export function scrubBreadcrumb<T extends ScrubbableBreadcrumb>(crumb: T): T {
     }
     delete data["http.query"];
     delete data["http.fragment"];
+    // Console breadcrumbs carry the raw arguments next to the joined message.
+    if (Array.isArray(data.arguments)) data.arguments = data.arguments.map((item: unknown) => (typeof item === "string" ? redactText(item) : item));
     result.data = truncateData(data);
   }
   return result as T;

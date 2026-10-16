@@ -1,8 +1,12 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 
 // Account flows against the production build and the Firebase emulators (npm run test:e2e).
 // Mails stay in memory (DEV_MAILBOX=true) and are read back from /api/dev/mailbox; Turnstile runs
-// with Cloudflare's always-pass test keys (playwright.config.ts).
+// with Cloudflare's always-pass test keys (playwright.config.ts). The revocation test talks to the
+// Auth emulator directly (`npm run test:e2e` runs inside `firebase emulators:exec`).
+process.env.FIREBASE_AUTH_EMULATOR_HOST ??= "127.0.0.1:9099";
 
 // Assembled at runtime: a literal would look like a credential to the secret scan.
 const PASSWORD = ["Souk", "Tanger", "2026!"].join("-");
@@ -170,6 +174,28 @@ test.describe("account", () => {
     await page.getByRole("button", { name: "Se connecter" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "Adresse e-mail ou mot de passe incorrect." })).toBeVisible({ timeout: 15_000 });
     await expect(page).toHaveURL(/\/fr\/connexion/);
+  });
+
+  test("a revoked member session is signed out on the next page load", async ({ page, request }) => {
+    const { email } = await createVerifiedAccount(page, request, "revoked");
+    await page.goto("/fr/connexion");
+    await signIn(page, email, PASSWORD);
+    await expect(page).toHaveURL(/\/fr\/parametres$/, { timeout: 15_000 });
+    const me = (await (await page.request.get("/api/auth/me")).json()) as { session: { uid: string } | null };
+    expect(me.session).not.toBeNull();
+
+    // Firebase compares revocation to the second: the cookie must be older than the revocation.
+    const second = Math.floor(Date.now() / 1000);
+    while (Math.floor(Date.now() / 1000) === second) await new Promise((resolve) => setTimeout(resolve, 50));
+    const app = getApps()[0] ?? initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID ?? "demo-joutiya" });
+    await getAuth(app).revokeRefreshTokens(me.session!.uid);
+
+    // The cookie is still there and unexpired: only the revocation check can send the person away.
+    await page.goto("/fr/parametres");
+    await expect(page).toHaveURL(/\/fr\/connexion/);
+    await expect(page.getByRole("heading", { level: 1, name: "Se connecter" })).toBeVisible();
+    const after = (await (await page.request.get("/api/auth/me")).json()) as { session: unknown };
+    expect(after.session).toBeNull();
   });
 
   test("the account area sends visitors to the sign-in page", async ({ page }) => {
