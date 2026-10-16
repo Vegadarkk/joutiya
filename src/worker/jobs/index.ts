@@ -1,4 +1,5 @@
 import type { Job } from "bullmq";
+import { backupFirestore } from "./backup-firestore";
 import { purgeQuarantine } from "./purge-quarantine";
 import { purgeUnactivated } from "./purge-unactivated";
 import { quotaReport } from "./quota-report";
@@ -11,6 +12,7 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "purge-unactivated": () => purgeUnactivated(),
   "purge-quarantine": () => purgeQuarantine(),
   "r2-storage-gauge": () => r2StorageGauge(),
+  "backup-firestore": () => backupFirestore(),
 };
 
 /** Repeatable jobs (UTC cron patterns), upserted at every start. */
@@ -23,4 +25,6 @@ export const SCHEDULES = {
   "purge-quarantine-hourly": { pattern: "20 * * * *", job: "purge-quarantine" },
   // 03:10 UTC: media bucket recount for the R2 storage gauge (D15).
   "r2-storage-gauge-nightly": { pattern: "10 3 * * *", job: "r2-storage-gauge" },
+  // 03:30 UTC (D17): encrypted Firestore backup, after retention-purge (03:00) and the R2 gauge (03:10).
+  "backup-firestore-nightly": { pattern: "30 3 * * *", job: "backup-firestore" },
 } as const;
