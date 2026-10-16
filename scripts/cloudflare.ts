@@ -62,13 +62,19 @@ export interface AccessApp {
   domain: string;
   type: string;
   session_duration: string;
-  allowed_idps: string[];
-  auto_redirect_to_identity: boolean;
+  allowed_idps?: string[];
+  auto_redirect_to_identity?: boolean;
   policies: { name: string; decision: string; include: unknown[] }[];
 }
 
 /** Staff sign in with Google only (§6); the identity provider is looked up in the account. */
 export const GOOGLE_IDP = "${ACCESS_GOOGLE_IDP_ID}";
+/**
+ * Resend and Meta cannot sign in, so their webhooks reach the staging site through this path
+ * without Access; the routes check each sender's signature and the WAF skips the path. The
+ * production site is public: it needs no such path.
+ */
+export const WEBHOOK_BYPASS = "staging.joutiya.ma/api/webhooks/*";
 export interface DnsRecord {
   id: string;
   type: string;
@@ -106,7 +112,12 @@ export function validateEdge(read: <T>(name: string) => T = readEdgeFile): strin
   const access = read<{ apps: AccessApp[] }>("access-apps.json").apps;
   const guarded = new Set(access.map((app) => app.domain));
   for (const app of access) {
-    if (app.allowed_idps?.length !== 1 || app.allowed_idps[0] !== GOOGLE_IDP || app.auto_redirect_to_identity !== true) {
+    const bypass = app.policies.some((policy) => policy.decision === "bypass");
+    if (app.domain === WEBHOOK_BYPASS) {
+      if (app.policies.length !== 1 || !bypass) errors.push(`access-apps.json: ${app.domain} must have a single bypass policy`);
+    } else if (bypass || app.domain.includes("/")) {
+      errors.push(`access-apps.json: ${app.domain}: only ${WEBHOOK_BYPASS} may bypass Access`);
+    } else if (app.allowed_idps?.length !== 1 || app.allowed_idps[0] !== GOOGLE_IDP || app.auto_redirect_to_identity !== true) {
       errors.push(`access-apps.json: ${app.domain} must allow the Google login method only (§6)`);
     }
   }
@@ -272,9 +283,12 @@ export function googleIdp(providers: { id: string; type: string }[]): string {
 }
 
 async function accessApp(api: CloudflareApi, accountId: string, domain: string): Promise<{ id: string; domain: string; aud: string } | undefined> {
+  // The API documents exact matching of the domain filter, not whether a path takes part in it:
+  // the partial filter on the hostname also returns its path applications, compared exactly here.
+  const hostname = domain.split("/")[0] ?? domain;
   const found = await api.call<{ id: string; domain: string; aud: string }[]>({
     method: "GET",
-    path: `/accounts/${accountId}/access/apps?domain=${encodeURIComponent(domain)}&exact=true`,
+    path: `/accounts/${accountId}/access/apps?domain=${encodeURIComponent(hostname)}`,
   });
   return found.find((item) => item.domain === domain);
 }

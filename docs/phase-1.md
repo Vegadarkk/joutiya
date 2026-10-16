@@ -97,7 +97,7 @@ Cloudflare n'accepte une application Access que sur une zone active ([doc](https
 
 1. Nav ajoute au jeton `joutiya-edge`, sans changer sa valeur, deux permissions : **Access: Service Tokens : Edit** (compte) et **Cache Purge : Purge** (zone `joutiya.ma`).
 2. Claude crée par API les jetons de service `joutiya-ci` (déploiement du staging, étape 8) et `joutiya-probe` (la sonde ; son secret sera renouvelé par API quand la sonde sera déployée). Un secret va directement de l'API à sa destination, jamais dans un fichier ni dans le chat.
-3. Claude lance `node scripts/cloudflare.ts access --apply`, avec `ACCESS_OWNER_EMAIL` (votre Gmail), `ACCESS_CI_TOKEN_ID` et `ACCESS_PROBE_TOKEN_ID` : `admin`, `staging` et `admin-staging` n'acceptent que votre compte Google (plus le jeton de la sonde pour `staging`), et `ssh` seulement le jeton de la CI.
+3. Claude lance `node scripts/cloudflare.ts access --apply`, avec `ACCESS_OWNER_EMAIL` (votre Gmail), `ACCESS_CI_TOKEN_ID` et `ACCESS_PROBE_TOKEN_ID` : `admin`, `staging` et `admin-staging` n'acceptent que votre compte Google (plus le jeton de la sonde pour `staging`), et `ssh` seulement le jeton de la CI. Seul `staging.joutiya.ma/api/webhooks/*` laisse passer sans Access les webhooks de Resend et de Meta, qui ne peuvent pas se connecter : le site vérifie la signature de chaque envoi.
 4. Claude relance les parties `tunnel:*` : les noms protégés reçoivent leur enregistrement DNS.
 5. Claude inscrit par PR les tags AUD de `admin.joutiya.ma` et `admin-staging.joutiya.ma` dans `infra/targets.json`. L'image de l'application embarque ce fichier.
 

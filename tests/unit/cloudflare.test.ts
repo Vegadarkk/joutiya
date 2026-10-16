@@ -11,6 +11,7 @@ import {
   tunnelHostnames,
   validateEdge,
   validateR2,
+  WEBHOOK_BYPASS,
   type AccessApp,
   type DnsRecord,
   type R2CorsRule,
@@ -49,6 +50,23 @@ describe("infra/cloudflare", () => {
     const withOtp = { apps: apps.map((app, index) => (index === 0 ? { ...app, allowed_idps: [] } : app)) };
     const read = <T,>(name: string): T => (name === "access-apps.json" ? withOtp : readEdgeFile(name)) as T;
     expect(validateEdge(read)).toEqual(["access-apps.json: admin.joutiya.ma must allow the Google login method only (§6)"]);
+  });
+
+  it("lets only the staging webhook path bypass Access", () => {
+    const { apps } = readEdgeFile<{ apps: AccessApp[] }>("access-apps.json");
+    const bypass = { name: "Open", decision: "bypass", include: [{ everyone: {} }] };
+    const changed = {
+      apps: [
+        ...apps.map((app) => (app.domain === WEBHOOK_BYPASS || app.domain === "admin-staging.joutiya.ma" ? { ...app, policies: [...app.policies, bypass] } : app)),
+        { name: "Open API", domain: "staging.joutiya.ma/api", type: "self_hosted", session_duration: "24h", policies: [bypass] },
+      ],
+    };
+    const read = <T,>(name: string): T => (name === "access-apps.json" ? changed : readEdgeFile(name)) as T;
+    expect(validateEdge(read)).toEqual([
+      `access-apps.json: ${WEBHOOK_BYPASS} must have a single bypass policy`,
+      `access-apps.json: admin-staging.joutiya.ma: only ${WEBHOOK_BYPASS} may bypass Access`,
+      `access-apps.json: staging.joutiya.ma/api: only ${WEBHOOK_BYPASS} may bypass Access`,
+    ]);
   });
 
   it("picks the account's only Google login method", () => {
