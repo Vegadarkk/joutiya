@@ -20,6 +20,8 @@ const repo = vi.hoisted(() => ({
 vi.mock("@/lib/db/repositories/listings", () => ({ getListing: repo.getListing, listPublishedByOwner: vi.fn() }));
 vi.mock("@/lib/db/repositories/profiles", () => ({ findUserByPublicId: vi.fn(), getUserRecord: repo.getUserRecord }));
 vi.mock("@/lib/quota", () => ({ consume: vi.fn() }));
+// The heart is a client island (app router hooks): its own tests cover it (phase 4).
+vi.mock("@/components/favorites/favorite-button", () => ({ FavoriteButton: ({ listingId }: { listingId: string }) => <span data-favorite={listingId} /> }));
 vi.mock("@/lib/firebase/admin", () => {
   const query = { where: () => query, count: () => ({ get: async () => ({ data: () => ({ count: 4 }) }) }) };
   return { db: () => ({ collection: () => query }) };
@@ -214,13 +216,16 @@ describe("page content", () => {
     for (const secret of ["uid-secret-1", "new_account", "auto_ok", "33.57", "-7.59", "0123456789abcdef", "tel:", "+212"]) expect(html, secret).not.toContain(secret);
   });
 
-  it("links the breadcrumb to the filtered search", async () => {
+  it("links the breadcrumb to the category landing pages, with a BreadcrumbList and the heart", async () => {
     repo.getListing.mockResolvedValue(record());
     const html = await renderPage();
-    expect(html).toContain('href="/fr/recherche?categorie=vehicules"');
-    expect(html).toContain('href="/fr/recherche?categorie=vehicules&amp;sous-categorie=velos"');
-    expect(html).toContain('href="/fr/recherche?sous-categorie=velos&amp;ville=casablanca"');
+    expect(html).toContain('href="/fr/c/vehicules"');
+    expect(html).toContain('href="/fr/c/vehicules/velos"');
+    expect(html).toContain('href="/fr/c/vehicules/velos/casablanca"');
+    expect(html).not.toContain("/recherche?");
     expect(html).toContain('aria-current="page"');
+    expect(html).toContain('"@type":"BreadcrumbList"');
+    expect(html).toMatch(/data-favorite="[^"]+"/);
   });
 
   it("shows a banner and no contact action for a sold, paused or expired listing", async () => {
@@ -258,8 +263,8 @@ describe("JSON-LD", () => {
     });
     const block = JSON.stringify(data);
     for (const secret of ["Salma", "abcdefghjk", "uid-secret-1", "33.57", "telephone", "+212"]) expect(block, secret).not.toContain(secret);
-    // The seller's text cannot close the data block.
-    expect(html.match(/<\/script>/g)).toHaveLength(1);
+    // The seller's text cannot close the data blocks (Product + BreadcrumbList).
+    expect(html.match(/<\/script>/g)).toHaveLength(2);
     expect(html).toContain("\\u003cscript\\u003ealert(1)\\u003c/script\\u003e");
   });
 
