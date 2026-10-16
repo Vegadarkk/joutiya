@@ -22,7 +22,7 @@ function render(props: Partial<ContactBarProps> = {}, session?: SessionSummary |
 }
 
 const escape = (value: string) => value.replace(/'/g, "&#x27;");
-const error = (code: ApiErrorCode, status = 403) => new ApiError(status, code, code);
+const error = (code: ApiErrorCode, status = 403) => new ApiError(status, code);
 
 describe("revealFailure", () => {
   it("sends an expired session to sign-in", () => {

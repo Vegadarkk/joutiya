@@ -83,7 +83,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const city = cityBySlug(listing.location.citySlug);
   const title = city ? t("title", { title: listing.title, city: cityName(city, locale) }) : listing.title;
   const price = listing.isDonation ? card("donation") : listing.price === null ? card("toDiscuss") : formatPrice(listing.price, locale);
-  const description = flatten(`${price}. ${listing.description}`, 160);
+  // The price keeps its no-break spaces; only the seller's text is flattened.
+  const description = `${price}. ${flatten(listing.description, 160 - price.length - 2)}`;
   const path = `/annonce/${listing.slugId}`;
   const cover = listing.photos[0];
   const coverUrl = cover ? photoUrl(mediaBaseUrl(), listing.id, cover.id, "l") : null;
