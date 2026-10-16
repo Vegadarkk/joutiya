@@ -17,13 +17,17 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | 7 | Serveurs DNS chez Cloudflare | Nav (Hostinger) | Après la validation du .MA, avant le 12 novembre |
 | 8 | Déploiement automatique du staging | Claude (API), vous pour un jeton | Après les étapes 6 et 7 |
 | 9 | Accès sans clé de la VM à Firestore | Claude (outil), Nav sur le PC2 pour la partie Google | Partie Google faite le 16 octobre (staging et production testés) ; certificats de la VM dès qu'elle existe |
-| 10 | Mentions légales de la production | Claude | Après Firebase |
+| 10 | Mentions légales de la production | Claude | Hébergeurs relevés le 16 octobre, dans le code |
 | 11 | Alertes | Claude (API), Nav pour un filtre Gmail | Code en phase 2 ; après l'étape 7 (domaine Resend) |
 | 12 | Mise en production et contrôles | Claude | Après l'étape 8 |
 | 13 | Test de reconstruction de la VM | Claude | Avant le lancement |
 | 14 | Réglages des buckets R2 | Nav, sur votre « J'accepte » ; Claude vérifie | Fait le 16 octobre, vérifié |
 | 15 | Domaines des médias | Nav | À l'activation de la zone (étape 7) |
 | 16 | Variables de la VM | Claude (Run Command), Cody pour vos clés | Outil prêt ; dès que la VM existe |
+
+Point d'arrêt du 16 octobre au soir, avant l'audit de lundi : tout le travail de la phase 1 est dans `main`. La suite attend la VM, dont la création gratuite est relancée chaque minute (étapes 3, 4, 9 pour les certificats, 16, puis 12), ou la bascule DNS après le .MA (étapes 6, 7, 8, 11 et 15). Les échéances à renouveler sont plus bas (Renouvellements).
+
+Relance de la VM : 856 essais du 16 octobre, de 01:44 à 17:00 UTC, un par minute hors trois pauses du matin, tous refusés par Oracle faute de place (« Out of host capacity ») : aucune machine A1 gratuite libre à Paris, région à un seul domaine de disponibilité, domaine de pannes laissé au choix d'Oracle. La relance tourne dans le conteneur de Claude, qui s'arrête avec le quota de la semaine : pause du 16 octobre vers 19 h UTC au lundi 19 octobre 10:05 UTC, où la routine du coordinateur la relance. Pas de relance depuis la CI ni depuis un autre serveur : les clés `JOUTIYA_OCI_*` ne quittent pas l'environnement cloud de Claude.
 
 ## Ce qui reste à vous
 
@@ -139,7 +143,13 @@ Prépare l'accès sans clé de Joutiya à Google (docs/phase-1.md, étape 9), de
 
 ## 10. Mentions légales de la production
 
-La production refuse de démarrer tant qu'une mention obligatoire manque : hébergeur, adresse et téléphone des hébergeurs de données. Claude relève les entités Oracle et Google dans leurs contrats publics, puis écrit `config/legal` dans Firestore avec `scripts/legal-config.ts`, en production puis en staging.
+La production refuse de démarrer tant qu'une mention obligatoire manque : hébergeur, adresse et téléphone des hébergeurs de données. Fait le 16 octobre : les valeurs par défaut de `src/config/legal.ts` portent les hébergeurs, relevés dans les contrats publics et le registre SIRENE.
+
+- Hébergeur du site : Oracle France SAS (contrat Oracle Cloud d'un compte français), 6 avenue de Messine, 75008 Paris, +33 1 57 60 20 20.
+- Données : Google Cloud France SARL pour Firestore (Paris) et Firebase Authentication (États-Unis), entité des conditions Google Cloud pour un client français, 8 rue de Londres, 75009 Paris ; Google ne publie pas de téléphone pour elle, d'où le standard de Google Paris, +33 1 42 68 53 00. Le forfait Spark n'ayant pas d'adresse de facturation, Google LLC (États-Unis) reste possible : à revoir si Google l'indique.
+- Photos et CDN : Cloudflare, Inc., inchangé.
+
+Aucune écriture dans Firestore n'est nécessaire. `scripts/legal-config.ts` sert plus tard à modifier ces mentions sans redéployer (médiateur de la consommation, changement d'hébergeur), depuis le PC2 par Nav.
 
 ## 11. Alertes
 
@@ -151,7 +161,7 @@ Prérequis : le domaine `notif.joutiya.ma` vérifié chez Resend, après la basc
 2. Claude déploie le Worker et pose ses secrets par l'API Cloudflare : `RESEND_API_KEY`, `ALERT_EMAIL_TO` (votre Gmail), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ALERT_RELAY_SECRET`, `ACCESS_CLIENT_ID` et `ACCESS_CLIENT_SECRET` (jeton `joutiya-probe`). L'expéditeur, `Joutiya alertes <alertes@notif.joutiya.ma>`, est dans `workers/uptime-probe/wrangler.jsonc`.
 3. Test : une alerte signée arrive dans votre Gmail depuis `alertes@notif.joutiya.ma`, avec SPF, DKIM et DMARC à PASS (« Afficher l'original ») ; Nav ajoute un filtre Gmail « Ne jamais envoyer dans le spam » pour cet expéditeur.
 
-Garde-fous : au plus 20 e-mails relayés par jour UTC (au-delà, l'application reçoit une erreur 429 et la note dans ses journaux), et un seul avis Telegram par jour quand le quota Resend du jour est épuisé. Sans `ALERT_EMAIL_TO` ni `RESEND_API_KEY`, le Worker n'envoie aucun e-mail et l'écrit dans ses journaux ; avec un seul des deux, il signale une erreur.
+Garde-fous : au plus 20 e-mails relayés par jour UTC, dont les 5 derniers gardés pour les alertes P0 (au-delà, l'application reçoit une erreur 429 et la note dans ses journaux), et un seul avis Telegram par jour quand le quota Resend du jour est épuisé. Sans `ALERT_EMAIL_TO` ni `RESEND_API_KEY`, le Worker n'envoie aucun e-mail et l'écrit dans ses journaux ; avec un seul des deux, il signale une erreur.
 
 ## 12. Mise en production et contrôles
 

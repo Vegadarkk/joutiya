@@ -7,6 +7,7 @@ import {
   parseTargets,
   PROBE_DAILY_CAP,
   relay,
+  relayCap,
   sendViaResend,
   takeDailySlot,
   transition,
@@ -161,7 +162,7 @@ const worker = {
           // E-mail off: no slot is taken and the app learns it (503) instead of a silent 204.
           const settings = emailSettings(env.ALERT_EMAIL_TO, env.RESEND_API_KEY);
           if (!settings) return "off";
-          if (!(await takeDailySlot(env.STATE, "relay", Date.now()))) {
+          if (!(await takeDailySlot(env.STATE, "relay", Date.now(), relayCap(alert.severity)))) {
             console.warn("relay cap reached: alert e-mail skipped for today");
             return "capped";
           }

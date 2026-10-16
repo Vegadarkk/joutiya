@@ -3,9 +3,10 @@ import { firestoreFields, planLegal } from "../../scripts/legal-config";
 
 describe("legal-config", () => {
   it("lists the mentions production still needs", () => {
-    const plan = planLegal({});
+    expect(planLegal({})).toMatchObject({ errors: [], missing: [] });
+    const plan = planLegal({ host: { name: "", address: "", phone: "" } });
     expect(plan.errors).toEqual([]);
-    expect(plan.missing).toContain("host.name");
+    expect(plan.missing).toEqual(["host.name", "host.address", "host.phone"]);
   });
 
   it("accepts the host entity and reports nothing missing once complete", () => {

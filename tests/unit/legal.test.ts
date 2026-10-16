@@ -16,9 +16,11 @@ describe("config/legal", () => {
     expect(DEFAULT_LEGAL.hqAddress).toBe("6 rue d'Armaillé, 75017 Paris");
   });
 
-  it("reports the host fields still missing in the defaults", () => {
-    expect(missingLegalMentions(DEFAULT_LEGAL)).toEqual(["host.name", "host.address", "host.phone", "dataHosts[0].address", "dataHosts[0].phone"]);
+  it("holds every host mention in the defaults and reports the missing ones", () => {
+    expect(missingLegalMentions(DEFAULT_LEGAL)).toEqual([]);
     expect(missingLegalMentions(complete)).toEqual([]);
+    const blank: LegalConfig = { ...DEFAULT_LEGAL, host: { name: "", address: "", phone: "" }, dataHosts: [{ ...DEFAULT_LEGAL.dataHosts[0]!, address: "", phone: "" }] };
+    expect(missingLegalMentions(blank)).toEqual(["host.name", "host.address", "host.phone", "dataHosts[0].address", "dataHosts[0].phone"]);
   });
 
   it("requires capital and RCS city for a company", () => {
