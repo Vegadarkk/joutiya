@@ -11,7 +11,7 @@ import { STAFF_MESSAGES_MAX, hideMessageDoc, readTranscript, setConversationHold
 export { scheduleDigest, MESSAGING_KEYS, DIGEST_DELAY_MS, SEEN_TTL_SECONDS, UnreadUnavailableError } from "./unread";
 export { readUnreadTotal, MESSAGING_QUOTAS } from "./service";
 export { conversationId } from "./ids";
-export { FREEZE_HOLD_PREFIXES, isFreezeHold, type ConversationRecord, type ConversationTranscript, type MessageRecord } from "./repository";
+export { FREEZE_HOLD_PREFIXES, isFreezeHold, unreadSummary, type ConversationRecord, type ConversationTranscript, type MessageRecord, type UnreadSummaryItem } from "./repository";
 export { setRepeatRiskReporter, type RepeatRiskReport } from "./system-report";
 
 const HOLD_ID = /^[^/\s]{1,64}$/;

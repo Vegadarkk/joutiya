@@ -342,6 +342,39 @@ export async function unreadCounts(uid: string, limit = UNREAD_REBUILD_LIMIT): P
   return out;
 }
 
+export interface UnreadSummaryItem {
+  cid: string;
+  listingTitle: string;
+  /** Display name of the other participant. */
+  counterpartName: string;
+  unread: number;
+}
+
+/**
+ * What the grouped new-messages mail shows (D21, job message-digest): the unread total over the
+ * newest conversations and the `items` most recent ones with unread messages. No message text.
+ */
+export async function unreadSummary(uid: string, options: { limit?: number; items?: number } = {}): Promise<{ total: number; items: UnreadSummaryItem[] }> {
+  const snapshot = await conversations()
+    .where("participants", "array-contains", uid)
+    .orderBy("updatedAt", "desc")
+    .limit(options.limit ?? UNREAD_REBUILD_LIMIT)
+    .get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  let total = 0;
+  const items: UnreadSummaryItem[] = [];
+  for (const doc of snapshot.docs) {
+    const conversation = conversationFromSnapshot(doc);
+    const count = conversation?.unread[uid] ?? 0;
+    if (!conversation || count <= 0) continue;
+    total += count;
+    if (items.length < (options.items ?? 3)) {
+      items.push({ cid: conversation.cid, listingTitle: conversation.listingSnapshot.title, counterpartName: conversation.buyerUid === uid ? conversation.sellerName : conversation.buyerName, unread: count });
+    }
+  }
+  return { total, items };
+}
+
 // ---- Staff and moderation (D11, D17, D18) ---------------------------------------------------
 
 export interface ConversationTranscript {

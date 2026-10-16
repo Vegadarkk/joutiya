@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
-import { collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, setDoc, updateDoc, where, type Firestore } from "firebase/firestore";
+import { collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Firestore rules (§6, phase 5 design D2): a member reads his own conversations and their messages
@@ -50,6 +50,9 @@ afterAll(async () => {
   await env.clearFirestore();
   await env.cleanup();
 });
+
+/** The emulator context's client. */
+type Firestore = ReturnType<ReturnType<RulesTestEnvironment["unauthenticatedContext"]>["firestore"]>;
 
 const member = (uid: string, claims: Record<string, unknown> = {}) => env.authenticatedContext(uid, { role: "individual", email_verified: true, ...claims }).firestore();
 
