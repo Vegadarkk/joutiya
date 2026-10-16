@@ -39,17 +39,18 @@ const FACE_STRIDES = [8, 16, 32] as const;
 const FACE_NMS_IOU = 0.3;
 
 export function modelsDir(env: Pick<ServerEnv, "MEDIA_MODELS_DIR">): string {
-  return path.resolve(env.MEDIA_MODELS_DIR ?? DEFAULT_MODELS_DIR);
+  // turbopackIgnore: runtime paths; without it the web trace copies the whole project (models are worker-only).
+  return path.resolve(/*turbopackIgnore: true*/ env.MEDIA_MODELS_DIR ?? DEFAULT_MODELS_DIR);
 }
 
 export function modelPaths(dir: string): ModelPaths {
-  return { nsfw: path.join(dir, MODEL_FILES.nsfw), face: path.join(dir, MODEL_FILES.face) };
+  return { nsfw: path.join(/*turbopackIgnore: true*/ dir, MODEL_FILES.nsfw), face: path.join(/*turbopackIgnore: true*/ dir, MODEL_FILES.face) };
 }
 
 /** Both model files exist (content is checked by scripts/fetch-models.ts --check, not here). */
 export function modelsPresent(dir: string): boolean {
   const paths = modelPaths(dir);
-  return existsSync(paths.nsfw) && existsSync(paths.face);
+  return existsSync(/*turbopackIgnore: true*/ paths.nsfw) && existsSync(/*turbopackIgnore: true*/ paths.face);
 }
 
 type OrtModule = typeof Ort;
