@@ -190,7 +190,7 @@ test.describe("posting wizard", () => {
 
     // Result screen, then the public page with its photo served as a WebP variant.
     await expect(page).toHaveURL(new RegExp(`/fr/deposer/${listingId}/termine$`));
-    await expect(page.getByRole("heading", { name: "Votre annonce est en ligne" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Votre annonce est en ligne" })).toBeVisible();
     const view = page.getByRole("link", { name: "Voir l'annonce" });
     await expect(view).toHaveAttribute("href", `/fr/annonce/${answer.slugId}`);
     await view.click();

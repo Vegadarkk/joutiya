@@ -80,35 +80,36 @@ export function CategoryPicker({ categoryId, subcategoryId, onCategory, onSubcat
           {t("change")}
         </Button>
       </div>
-      <ul role="radiogroup" aria-label={t("subcategories", { category: names.category(category.id) })} className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface">
+      {/* The radios are the group's direct children: a list in between would put list items under a
+          radiogroup, which has no list semantics. */}
+      <div role="radiogroup" aria-label={t("subcategories", { category: names.category(category.id) })} className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface">
         {category.subcategories.map((subcategory) => {
           const checked = subcategory.id === subcategoryId;
           const locked = Boolean(subcategory.proOnly) && !isPro;
           return (
-            <li key={subcategory.id}>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={checked}
-                aria-disabled={locked || undefined}
-                onClick={() => (locked ? undefined : onSubcategory(subcategory))}
-                className={cn(
-                  "flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-start transition-colors duration-150 ease-door",
-                  "first:rounded-t-lg last:rounded-b-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25 focus-visible:ring-inset",
-                  locked ? "cursor-not-allowed text-foreground-muted" : "hover:bg-surface-muted",
-                  checked && "bg-structure text-structure-foreground hover:bg-bab-600",
-                )}
-              >
-                <span className="flex min-w-0 flex-col">
-                  <span className="truncate font-medium">{names.subcategory(category.id, subcategory.id)}</span>
-                  {locked ? <span className="text-xs">{t("proOnly")}</span> : null}
-                </span>
-                {checked ? <Check className="size-5 shrink-0" aria-hidden="true" /> : <ChevronRight className="size-5 shrink-0 text-foreground-muted rtl:-scale-x-100" aria-hidden="true" />}
-              </button>
-            </li>
+            <button
+              key={subcategory.id}
+              type="button"
+              role="radio"
+              aria-checked={checked}
+              aria-disabled={locked || undefined}
+              onClick={() => (locked ? undefined : onSubcategory(subcategory))}
+              className={cn(
+                "flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-start transition-colors duration-150 ease-door",
+                "first:rounded-t-lg last:rounded-b-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25 focus-visible:ring-inset",
+                locked ? "cursor-not-allowed text-foreground-muted" : "hover:bg-surface-muted",
+                checked && "bg-structure text-structure-foreground hover:bg-bab-600",
+              )}
+            >
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate font-medium">{names.subcategory(category.id, subcategory.id)}</span>
+                {locked ? <span className="text-xs">{t("proOnly")}</span> : null}
+              </span>
+              {checked ? <Check className="size-5 shrink-0" aria-hidden="true" /> : <ChevronRight className="size-5 shrink-0 text-foreground-muted rtl:-scale-x-100" aria-hidden="true" />}
+            </button>
           );
         })}
-      </ul>
+      </div>
       {category.subcategories.some((s) => s.proOnly) && !isPro ? <ErrorBanner tone="info" title={t("proOnly")}>{t("proOnlyBody")}</ErrorBanner> : null}
     </div>
   );

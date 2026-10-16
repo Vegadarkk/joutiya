@@ -1,6 +1,7 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { useId, useState } from "react";
+import { Check, ChevronDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { WIZARD_STEPS, type WizardStep } from "@/lib/contracts/listings";
 import type { StepState } from "@/lib/listings/client/validation";
@@ -18,47 +19,52 @@ interface StepProgressProps {
 
 /**
  * The threshold: nine segments, the ones behind you in structure green, the one you stand on in
- * gold, the rest to come. Compact strip on a phone; the full list of names on wide screens.
+ * gold, the rest to come. On a phone the strip and "Step 6 of 9" form one 44 px button that unfolds
+ * the named list (nine 44 px targets do not fit side by side at 360 px); wide screens always show
+ * the list.
  */
 export function StepProgress({ current, states, onSelect, reachable }: StepProgressProps) {
   const t = useTranslations("Listing.wizard");
   const label = useStepLabel();
+  const listId = useId();
   const currentIndex = WIZARD_STEPS.indexOf(current);
+  // Open for the step it was unfolded on: reaching another step folds it again.
+  const [openOn, setOpenOn] = useState<WizardStep | null>(null);
+  const open = openOn === current;
+  const status = (step: WizardStep) => (step === current ? t("stepCurrent") : states[step] === "complete" ? t("stepDone") : states[step] === "incomplete" ? t("stepIncomplete") : t("stepTodo"));
 
   return (
     <nav aria-label={t("stepsNav")} className="flex flex-col gap-3">
-      <p className="text-sm font-medium text-foreground-muted lg:hidden">{t("stepOf", { current: currentIndex + 1, total: WIZARD_STEPS.length })}</p>
-      <ol className="-my-3 flex gap-1 lg:hidden" aria-label={t("progress")}>
-        {WIZARD_STEPS.map((step, index) => {
-          const isCurrent = step === current;
-          const state = states[step];
-          const can = reachable(step) && !isCurrent;
-          return (
-            <li key={step} className="min-w-0 flex-1">
-              <button
-                type="button"
-                disabled={!can}
-                onClick={() => onSelect(step)}
-                aria-current={isCurrent ? "step" : undefined}
-                aria-label={`${index + 1}. ${label(step)}, ${isCurrent ? t("stepCurrent") : state === "complete" ? t("stepDone") : state === "incomplete" ? t("stepIncomplete") : t("stepTodo")}`}
-                // 44 px touch target around a 6 px segment.
-                className="group flex h-11 w-full items-center rounded-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25 disabled:cursor-default"
-              >
-                <span
-                  className={cn(
-                    "block h-1.5 w-full rounded-full transition-[background-color,transform] duration-150 ease-door",
-                    isCurrent && "scale-y-[1.35]",
-                    isCurrent ? "bg-featured" : state === "complete" ? "bg-structure" : state === "incomplete" && index < currentIndex ? "bg-danger/70" : "bg-border",
-                    can && "group-hover:bg-bab-500",
-                  )}
-                />
-              </button>
-            </li>
-          );
-        })}
-      </ol>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => setOpenOn(open ? null : current)}
+        className="group -mx-2 flex min-h-11 flex-col justify-center gap-3 rounded-md px-2 py-1.5 text-start focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25 lg:hidden"
+      >
+        <span className="flex w-full items-center justify-between gap-3 text-sm font-medium text-foreground-muted">
+          {t("stepOf", { current: currentIndex + 1, total: WIZARD_STEPS.length })}
+          <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-150 ease-door group-hover:text-foreground", open && "rotate-180")} aria-hidden="true" />
+        </span>
+        <span className="flex w-full gap-1" aria-hidden="true">
+          {WIZARD_STEPS.map((step, index) => {
+            const isCurrent = step === current;
+            const state = states[step];
+            return (
+              <span
+                key={step}
+                className={cn(
+                  "block h-1.5 min-w-0 flex-1 rounded-full transition-[background-color,transform] duration-150 ease-door",
+                  isCurrent && "scale-y-[1.35]",
+                  isCurrent ? "bg-featured" : state === "complete" ? "bg-structure" : state === "incomplete" && index < currentIndex ? "bg-danger/70" : "bg-border",
+                )}
+              />
+            );
+          })}
+        </span>
+      </button>
 
-      <ol className="hidden lg:flex lg:flex-col lg:gap-1">
+      <ol id={listId} className={cn("flex-col gap-1 lg:flex", open ? "flex" : "hidden")}>
         {WIZARD_STEPS.map((step, index) => {
           const isCurrent = step === current;
           const state = states[step];
@@ -68,10 +74,13 @@ export function StepProgress({ current, states, onSelect, reachable }: StepProgr
               <button
                 type="button"
                 disabled={!can}
-                onClick={() => onSelect(step)}
+                onClick={() => {
+                  setOpenOn(null);
+                  onSelect(step);
+                }}
                 aria-current={isCurrent ? "step" : undefined}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-start text-sm transition-colors duration-150 ease-door",
+                  "flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-start text-sm transition-colors duration-150 ease-door",
                   "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25",
                   isCurrent ? "bg-surface-brand font-semibold text-foreground" : can ? "text-foreground hover:bg-surface-muted" : "text-foreground-muted",
                   !can && !isCurrent && "cursor-default",
@@ -88,7 +97,7 @@ export function StepProgress({ current, states, onSelect, reachable }: StepProgr
                 </span>
                 <span className="truncate">{label(step)}</span>
                 {state === "incomplete" && !isCurrent && index < currentIndex ? <span className="ms-auto size-2 shrink-0 rounded-full bg-danger" aria-hidden="true" /> : null}
-                <span className="sr-only">{isCurrent ? t("stepCurrent") : state === "complete" ? t("stepDone") : state === "incomplete" ? t("stepIncomplete") : t("stepTodo")}</span>
+                <span className="sr-only">{status(step)}</span>
               </button>
             </li>
           );
