@@ -54,6 +54,17 @@ export type ErrorCode =
   | "listing_unavailable"
   /** Phone reveal refused: account too young, e-mail unverified or quota reached. */
   | "reveal_not_allowed"
+  // Search and discovery (phase 4). Messages: Listing.errors.<code>.
+  /** Search engine missing or unreachable (503). */
+  | "search_unavailable"
+  /** Favorites per account (FAVORITES_MAX). */
+  | "favorite_limit"
+  /** Saved searches per account (10, §5). */
+  | "saved_search_limit"
+  /** The same search is already saved (409; details: { id }). */
+  | "saved_search_exists"
+  /** Unsubscribe link token invalid or for another account. */
+  | "invalid_token"
   | "unavailable"
   | "internal";
 

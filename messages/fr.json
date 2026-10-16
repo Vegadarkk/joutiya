@@ -360,7 +360,12 @@
       "upload_not_ready": "Une photo est encore en cours de traitement. Patientez quelques secondes, puis réessayez.",
       "phone_required": "Vérifiez votre numéro de téléphone pour afficher ce moyen de contact.",
       "listing_unavailable": "Cette annonce n'est plus disponible.",
-      "reveal_not_allowed": "Le numéro ne peut pas être affiché pour le moment. Vérifiez votre adresse e-mail ou réessayez plus tard."
+      "reveal_not_allowed": "Le numéro ne peut pas être affiché pour le moment. Vérifiez votre adresse e-mail ou réessayez plus tard.",
+      "search_unavailable": "La recherche est momentanément indisponible. Réessayez dans quelques instants.",
+      "favorite_limit": "Vous avez atteint le nombre maximal de favoris (300). Retirez-en quelques-uns pour en ajouter d'autres.",
+      "saved_search_limit": "Vous avez déjà 10 recherches sauvegardées. Supprimez-en une pour en ajouter une autre.",
+      "saved_search_exists": "Cette recherche est déjà sauvegardée.",
+      "invalid_token": "Ce lien n'est plus valide."
     },
     "wizard": {
       "title": "Déposer une annonce",

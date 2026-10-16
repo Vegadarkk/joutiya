@@ -94,6 +94,30 @@ export const RATE_LIMITS = {
   "profile.read.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
   // Staff moderation decisions (admin host, behind Access): a moderator working the queue.
   "moderation.decision.uid": { points: 300, duration: HOUR, policy: "closed", key: "uid" },
+  // --- Search and discovery (phase 4, design §6) ---------------------------------------------
+  // /api/search and /recherche pages: 30 per minute and 600 per hour per device (or uid), 120 per
+  // minute per IP; over: Turnstile, then 429. Open: reading and searching stay up without Valkey.
+  "search.device.minute": { points: 30, duration: MINUTE, policy: "open", key: "device" },
+  "search.device.hour": { points: 600, duration: HOUR, policy: "open", key: "device" },
+  "search.ip": { points: 120, duration: MINUTE, policy: "open", key: "ip" },
+  // After a solved challenge (30 min pass): a bounded allowance, then 429.
+  "search.passed.device": { points: 300, duration: 30 * MINUTE, policy: "open", key: "device" },
+  // Server-rendered pages /annonce, /c, /profil, /boutique (proxy.ts): visitor 120 per hour per
+  // device, signed in 600 per hour, 1 200 per hour per IP /64; verified bots exempt.
+  "pages.device": { points: 120, duration: HOUR, policy: "open", key: "device" },
+  "pages.session": { points: 600, duration: HOUR, policy: "open", key: "account" },
+  "pages.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
+  "pages.passed.device": { points: 600, duration: HOUR, policy: "open", key: "device" },
+  // Solving the page challenge (/anti-robot): Turnstile verifications per IP.
+  "challenge.ip": { points: 30, duration: HOUR, policy: "closed", key: "ip" },
+  // Favorites: adding and removing hearts, reading the list.
+  "favorites.write.uid": { points: 300, duration: HOUR, policy: "open", key: "uid" },
+  "favorites.read.uid": { points: 1200, duration: HOUR, policy: "open", key: "uid" },
+  // Saved searches (10 per account): create, rename, alert toggle, delete; list.
+  "savedSearch.write.uid": { points: 60, duration: HOUR, policy: "open", key: "uid" },
+  "savedSearch.read.uid": { points: 600, duration: HOUR, policy: "open", key: "uid" },
+  // One-click unsubscribe links of the alert e-mails (signed token, no session).
+  "alerts.unsubscribe.ip": { points: 60, duration: HOUR, policy: "open", key: "ip" },
 } as const satisfies Record<string, RateLimitDefinition>;
 
 export type RateLimitId = keyof typeof RATE_LIMITS;

@@ -17,6 +17,8 @@ import {
 } from "@/lib/contracts/listings";
 import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, UPLOAD_DECLARED_TYPES, UPLOAD_REJECT_REASONS, UPLOAD_STATUSES, listingPhotoSchema, uploadIdSchema } from "@/lib/contracts/media";
 import { ROLES } from "@/lib/firebase/claims";
+import { SAVED_SEARCH_ALERTS, SAVED_SEARCH_NAME_MAX } from "@/lib/contracts/search";
+import { storedSearchParamsSchema } from "@/lib/search/params";
 
 // The enums shared with the browser are defined in the client-safe contracts (this module is
 // server-only through claims.ts) and re-exported here so the repositories have one import.
@@ -354,6 +356,46 @@ export type ModerationDecisionDoc = z.infer<typeof moderationDecisionSchema>;
 /** Upload id as stored on `photos[].id` (re-exported for the repositories). */
 export { uploadIdSchema, listingIdSchema };
 
+// ---- Phase 4: favorites and saved searches (architecture §5 "Autres collections").
+
+const searchPhotoSchema = z.object({ id: z.string().min(1).max(64), w: z.number().int().min(1), h: z.number().int().min(1), blurhash: z.string().max(100) }).strict();
+
+/** What a favorite shows once its listing is gone (sold, expired, removed): the card at the time it was saved. */
+export const favoriteSnapshotSchema = z
+  .object({
+    slugId: slugIdSchema,
+    title: z.string().max(TITLE_MAX),
+    subcategoryId: z.string().max(40).nullable(),
+    price: z.number().int().min(0).max(PRICE_MAX).nullable(),
+    priceNegotiable: z.boolean(),
+    isDonation: z.boolean(),
+    citySlug: z.string().max(64).nullable(),
+    photo: searchPhotoSchema.nullable(),
+    photoCount: z.number().int().min(0),
+    sellerType: z.enum(["individual", "pro"]),
+  })
+  .strict();
+export type FavoriteSnapshot = z.infer<typeof favoriteSnapshotSchema>;
+
+/** users/{uid}/favorites/{listingId}. */
+export const favoriteSchema = z.object({ createdAt: ts, listingSnapshot: favoriteSnapshotSchema }).strict();
+export type FavoriteDoc = z.infer<typeof favoriteSchema>;
+
+/** users/{uid}/savedSearches/{id}: 10 at most; alerts are daily e-mails, never instant (no reverse search). */
+export const savedSearchSchema = z
+  .object({
+    name: z.string().trim().min(1).max(SAVED_SEARCH_NAME_MAX),
+    params: storedSearchParamsSchema,
+    alert: z.enum(SAVED_SEARCH_ALERTS),
+    /** sortAt (epoch ms) of the newest listing already sent by the alert; listings after it are new. */
+    lastNotifiedSortAt: z.number().int().min(0),
+    lastAlertAt: ts.optional(),
+    createdAt: ts,
+    updatedAt: ts,
+  })
+  .strict();
+export type SavedSearchDoc = z.infer<typeof savedSearchSchema>;
+
 export const COLLECTIONS = {
   users: "users",
   userPrivate: "private",
@@ -374,4 +416,7 @@ export const COLLECTIONS = {
   moderationDecisions: "moderationDecisions",
   /** system/backup (cursor state of backup-firestore), free-form documents. */
   system: "system",
+  // Phase 4 (subcollections of users/{uid})
+  favorites: "favorites",
+  savedSearches: "savedSearches",
 } as const;
