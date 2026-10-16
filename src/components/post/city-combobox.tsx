@@ -61,7 +61,8 @@ export function CityCombobox({ value, onSelect, error, required, locale: localeP
 
   const results = useMemo(() => searchCities(query, locale, 12), [query, locale]);
   const groups = useMemo(() => groupByRegion(results, locale), [results, locale]);
-  const flat = results;
+  // Keyboard order follows the rendered (grouped) order, not the raw ranking.
+  const flat = useMemo(() => groups.flatMap((group) => group.cities), [groups]);
 
   useEffect(() => {
     if (editing && autoFocus) input.current?.focus();

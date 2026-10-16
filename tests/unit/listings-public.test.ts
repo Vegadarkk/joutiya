@@ -19,7 +19,8 @@ const { getPublishedBySlugId, getProfile, memberSince, PUBLIC_STATES } = await i
 const NOW = new Date("2026-10-16T10:00:00.000Z");
 const ID = "abcd2345";
 
-function record(status: ListingStatus, slugId: string | undefined = `velo-de-ville-casablanca-${ID}`): ListingRecord {
+/** `slugId: null` builds a record without a stored slug (a passed `undefined` would take the default). */
+function record(status: ListingStatus, slugId: string | null = `velo-de-ville-casablanca-${ID}`): ListingRecord {
   return {
     id: ID,
     ownerUid: "uid-1",
@@ -27,7 +28,7 @@ function record(status: ListingStatus, slugId: string | undefined = `velo-de-vil
     sellerName: "Salma",
     sellerPublicId: "abcdefghjk",
     status,
-    slugId,
+    ...(slugId === null ? {} : { slugId }),
     title: "Vélo de ville",
     description: "Un vélo de ville en bon état, révisé.",
     categoryId: "vehicules",
@@ -113,7 +114,7 @@ describe("getPublishedBySlugId", () => {
   });
 
   it("rebuilds a canonical slug when the document has none", async () => {
-    repo.getListing.mockResolvedValue(record("published", undefined));
+    repo.getListing.mockResolvedValue(record("published", null));
     const result = await getPublishedBySlugId(ID);
     expect(result?.canonicalSlugId).toBe(`velo-de-ville-${ID}`);
     expect(result?.redirect).toBe(true);

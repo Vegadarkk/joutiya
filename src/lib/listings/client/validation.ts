@@ -237,12 +237,28 @@ export function stepIssues(step: WizardStep, draft: DraftLike, options: { maxPho
     case "prix":
       return toIssues(priceStepSchema(draft.subcategoryId).safeParse(values), values);
     case "lieu":
-      return toIssues(locationStepSchema.safeParse(values), values);
+      return dedupeLocationIssues(toIssues(locationStepSchema.safeParse(values), values));
     case "contact":
       return toIssues(contactStepSchema.safeParse(values), values);
     case "apercu":
       return [];
   }
+}
+
+/** The city field carries region and slug together: one blocker for both, under the slug path. */
+function dedupeLocationIssues(issues: FieldIssue[]): FieldIssue[] {
+  const out: FieldIssue[] = [];
+  let cityIssue = false;
+  for (const issue of issues) {
+    if (issue.code === "city_required") {
+      if (cityIssue) continue;
+      cityIssue = true;
+      out.push({ ...issue, path: "location.citySlug" });
+    } else {
+      out.push(issue);
+    }
+  }
+  return out;
 }
 
 export type StepState = "complete" | "incomplete" | "empty";

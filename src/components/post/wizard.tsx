@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { FormMessage, useApiErrorMessage } from "@/components/auth/form-message";
@@ -41,6 +41,7 @@ export function PostWizard({ listingId, nonce }: { listingId: string; nonce?: st
   const config = usePublicConfig();
   const apiMessage = useApiErrorMessage();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const started = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -52,6 +53,8 @@ export function PostWizard({ listingId, nonce }: { listingId: string; nonce?: st
   }, [listingId]);
 
   useEffect(() => {
+    if (started.current) return;
+    started.current = true;
     void load();
   }, [load]);
 

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import type { z } from "@/lib/zod";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -23,11 +23,11 @@ export function TitleStep({ onNext }: { onNext: () => void }) {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setError,
     formState: { errors },
   } = useForm<Form>({ resolver: zodResolver(titleStepSchema), defaultValues: { title: listing.title }, mode: "onBlur" });
-  const title = watch("title");
+  const title = useWatch({ control, name: "title" });
 
   useEffect(() => {
     if (title !== listing.title) update({ title });

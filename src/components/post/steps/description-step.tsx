@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Lightbulb } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import type { z } from "@/lib/zod";
 import { Field } from "@/components/ui/field";
 import { useWizard } from "@/lib/listings/client/store";
@@ -24,11 +24,11 @@ export function DescriptionStep({ onNext }: { onNext: () => void }) {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setError,
     formState: { errors },
   } = useForm<Form>({ resolver: zodResolver(descriptionStepSchema), defaultValues: { description: listing.description }, mode: "onBlur" });
-  const description = watch("description");
+  const description = useWatch({ control, name: "description" });
 
   useEffect(() => {
     if (description !== listing.description) update({ description });

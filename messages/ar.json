@@ -1940,5 +1940,19 @@
       "body": "أُرسل السبب إليك بالبريد الإلكتروني. عدّل الإعلان ثم انشره مجددًا."
     },
     "pausedQuota": "متوقف مؤقتًا: تم بلوغ عدد الإعلانات النشطة لحسابك."
+  },
+  "Map": {
+    "mapLabel": "خريطة جهات المغرب",
+    "approximate": "موقع تقريبي: {city}، {region}",
+    "showInteractive": "عرض الخريطة التفاعلية",
+    "loading": "جارٍ تحميل الخريطة…",
+    "unavailable": "الخريطة التفاعلية غير متاحة على هذا الجهاز. تبقى خريطة الجهات معروضة.",
+    "attribution": "© <osm>OpenStreetMap contributors</osm> · Protomaps",
+    "regionsSource": "حدود الجهات: geoBoundaries (ODbL)",
+    "zoomIn": "تكبير",
+    "zoomOut": "تصغير",
+    "scrollHint": "استخدم Ctrl + عجلة الفأرة لتكبير الخريطة",
+    "scrollHintMac": "استخدم ⌘ + عجلة الفأرة لتكبير الخريطة",
+    "touchHint": "استخدم إصبعين لتحريك الخريطة"
   }
 }

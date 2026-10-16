@@ -1950,5 +1950,19 @@
       "body": "Le motif vous a été envoyé par e-mail. Modifiez l'annonce puis publiez-la à nouveau."
     },
     "pausedQuota": "En pause : le nombre d'annonces actives de votre compte est atteint."
+  },
+  "Map": {
+    "mapLabel": "Carte des régions du Maroc",
+    "approximate": "Position approximative : {city}, {region}",
+    "showInteractive": "Afficher la carte interactive",
+    "loading": "Chargement de la carte…",
+    "unavailable": "La carte interactive n'est pas disponible sur cet appareil. La carte des régions reste affichée.",
+    "attribution": "© <osm>OpenStreetMap contributors</osm> · Protomaps",
+    "regionsSource": "Limites des régions : geoBoundaries (ODbL)",
+    "zoomIn": "Zoom avant",
+    "zoomOut": "Zoom arrière",
+    "scrollHint": "Utilisez Ctrl + molette pour zoomer sur la carte",
+    "scrollHintMac": "Utilisez ⌘ + molette pour zoomer sur la carte",
+    "touchHint": "Utilisez deux doigts pour déplacer la carte"
   }
 }
