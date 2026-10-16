@@ -11,6 +11,7 @@ import {
   OciError,
   RUN_COMMAND_MAX_BYTES,
   SHAPE,
+  SMALL_SHAPE_CONFIG,
   bootstrapLines,
   buildUserData,
   deployScript,
@@ -23,6 +24,7 @@ import {
   promoteCommand,
   rootCommand,
   securityList,
+  shapeForAttempt,
   signedHeaders,
   signingString,
   syncCommands,
@@ -86,6 +88,14 @@ describe("instance", () => {
     expect(details.instanceOptions).toEqual({ areLegacyImdsEndpointsDisabled: true });
     expect(JSON.stringify(details.agentConfig)).toContain("Compute Instance Run Command");
     expect(SHAPE.ocpus * 6).toBe(SHAPE.memoryInGBs);
+  });
+
+  it("alternates with the half-size free shape only when asked to", () => {
+    expect([1, 2, 3, 4].map((attempt) => shapeForAttempt(attempt, false))).toEqual(Array(4).fill({ ocpus: 2, memoryInGBs: 12 }));
+    expect([1, 2, 3, 4].map((attempt) => shapeForAttempt(attempt, true).ocpus)).toEqual([2, 1, 2, 1]);
+    expect(SMALL_SHAPE_CONFIG.ocpus * 6).toBe(SMALL_SHAPE_CONFIG.memoryInGBs);
+    const details = launchDetails({ availabilityDomain: "AD-1", compartmentId: "c", subnetId: "s", imageId: "i", userData: "u", shapeConfig: SMALL_SHAPE_CONFIG });
+    expect(details).toMatchObject({ shape: "VM.Standard.A1.Flex", shapeConfig: { ocpus: 1, memoryInGBs: 6 } });
   });
 
   it("keeps the committed security list closed", () => {

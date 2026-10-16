@@ -4,7 +4,8 @@
       "accountId": "795e3aeafd644dbdf1810fc0e29a5e97",
       "zoneId": "f09bd1e8b2f7ae0d61472b0eb617b0b0",
       "accessTeamDomain": "joutiya.cloudflareaccess.com",
-      "sshTunnelId": "fddd6cc1-24d3-4fad-83b1-09e2ac432fe9"
+      "sshTunnelId": "fddd6cc1-24d3-4fad-83b1-09e2ac432fe9",
+      "accessOauthClientId": "365736224142-b7gv3fng8tv3uj2g6c9pffqcqu5sn1cp.apps.googleusercontent.com"
     },
     "oracle": {
       "homeRegion": "eu-paris-1",
@@ -16,6 +17,10 @@
     },
     "anthropic": {
       "organizationId": "de60375e-fd8c-47a8-bbbc-c40672c4eee5"
+    },
+    "github": {
+      "repository": "Vegadarkk/joutiya",
+      "repositoryId": "1406007525"
     },
     "stripe": {
       "accountId": "acct_1UQxR07tCjk226ma"
@@ -31,9 +36,19 @@
   "environments": {
     "dev": {
       "firebase": {
-        "projectId": null,
-        "projectNumber": null,
-        "firestoreLocation": null
+        "projectId": "joutiya-dev",
+        "projectNumber": "89741285084",
+        "firestoreLocation": "europe-west9",
+        "appId": "1:89741285084:web:4178e0fff46cf770cb0619"
+      },
+      "google": {
+        "oauthClientId": null
+      },
+      "turnstile": {
+        "siteKey": null
+      },
+      "sentry": {
+        "dsn": null
       },
       "r2": {
         "quarantine": "joutiya-dev-quarantine",
@@ -51,9 +66,19 @@
     },
     "staging": {
       "firebase": {
-        "projectId": null,
-        "projectNumber": null,
-        "firestoreLocation": null
+        "projectId": "joutiya-staging",
+        "projectNumber": "365736224142",
+        "firestoreLocation": "europe-west9",
+        "appId": "1:365736224142:web:c8243457d7f0423f8430df"
+      },
+      "google": {
+        "oauthClientId": "365736224142-cs8si5388vk1g12uneaack086jhr6m5s.apps.googleusercontent.com"
+      },
+      "turnstile": {
+        "siteKey": "0x4AAAAAAFYY7P8KeaWCGihV"
+      },
+      "sentry": {
+        "dsn": "https://d6aa7e09b2945a669af0b118e1203e27@o4512265655746560.ingest.de.sentry.io/4512265664725072"
       },
       "r2": {
         "quarantine": "joutiya-staging-quarantine",
@@ -71,9 +96,19 @@
     },
     "prod": {
       "firebase": {
-        "projectId": null,
-        "projectNumber": null,
-        "firestoreLocation": null
+        "projectId": "joutiya-prod",
+        "projectNumber": "652258095167",
+        "firestoreLocation": "europe-west9",
+        "appId": "1:652258095167:web:df6b5fe75a7358a647088a"
+      },
+      "google": {
+        "oauthClientId": "652258095167-rvncaj13bcrnqrtjfha587jihll5us4f.apps.googleusercontent.com"
+      },
+      "turnstile": {
+        "siteKey": "0x4AAAAAAFYY2RkrwQRAswcZ"
+      },
+      "sentry": {
+        "dsn": "https://93599af390a36c21f05e1894ad9c754b@o4512265655746560.ingest.de.sentry.io/4512265661972560"
       },
       "r2": {
         "quarantine": "joutiya-prod-quarantine",
