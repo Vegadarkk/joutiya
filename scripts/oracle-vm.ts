@@ -13,6 +13,15 @@
 //   node scripts/oracle-vm.ts reboot [--apply]
 //       soft reboot (ACPI) of joutiya-vm: a bootstrap that failed runs again (it stays as a per-boot
 //       script until it succeeds).
+//   node scripts/oracle-vm.ts agent
+//       recent Run Command commands of the compartment, and the state of the Oracle Cloud Agent
+//       plugins on joutiya-vm (Run Command among them).
+//   node scripts/oracle-vm.ts run <script> [--apply]
+//       runs a local bash script as root on joutiya-vm through OCI Run Command (at most ~3.7 KB;
+//       the last 1 KB of output comes back). Oracle keeps the text 7 days: no secret that must not
+//       outlive the command.
+//   node scripts/oracle-vm.ts sync [--apply]
+//       installs infra/vm and docker/ on joutiya-vm (infra/vm/install.sh) through Run Command.
 //
 // Environment (never printed): JOUTIYA_OCI_TENANCY, _USER, _FINGERPRINT, _REGION, _COMPARTMENT,
 // _KEY_B64 (base64 of the PEM key of joutiya-claude), JOUTIYA_CLOUDFLARE_API_TOKEN.
@@ -20,6 +29,7 @@
 import { createHash, createSign } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
+import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { tunnelTokenErrors, validateTargets, type Targets } from "./assert-target.ts";
@@ -417,10 +427,156 @@ async function status(oci: Oci, targets: Targets, compartmentId: string): Promis
   }
 }
 
-async function reboot(oci: Oci, compartmentId: string): Promise<void> {
+// ---------------------------------------------------------------------------------------------
+// OCI Run Command (Compute Instance Agent API): Claude's admin channel to the VM (docs/phase-1.md,
+// step 4). The agent runs each command as ocarun, which infra/vm/sudoers.oracle-run-command makes
+// root. Who may send commands is decided by OCI IAM (policy joutiya-run-command-policy).
+
+/** Inline script limit of Run Command (text source); the output that comes back is its last 1 KB. */
+export const RUN_COMMAND_MAX_BYTES = 4_000;
+const ROOT_SCRIPT_END = "JOUTIYA_ROOT_SCRIPT";
+/** Root-only directory where `sync` assembles the bundle on the VM. */
+export const SYNC_DIR = "/var/lib/joutiya/sync";
+
+/**
+ * A root script as Run Command text: ocarun writes it to a temporary file, root runs it through
+ * sudo in strict mode, stdin closed (a command reading stdin cannot eat the rest of the script).
+ */
+export function rootCommand(script: string): string {
+  if (script.split("\n").includes(ROOT_SCRIPT_END)) throw new Error(`a line of the script is ${ROOT_SCRIPT_END}`);
+  const text = [
+    "#!/bin/bash",
+    "set -euo pipefail",
+    'script="$(mktemp)"',
+    `trap 'rm -f "$script"' EXIT`,
+    `cat > "$script" << '${ROOT_SCRIPT_END}'`,
+    script.replace(/\n+$/, ""),
+    ROOT_SCRIPT_END,
+    'sudo -n /bin/bash -euo pipefail "$script" < /dev/null 2>&1',
+    "",
+  ].join("\n");
+  const bytes = Buffer.byteLength(text);
+  if (bytes > RUN_COMMAND_MAX_BYTES) throw new Error(`command is ${bytes} bytes, Run Command allows ${RUN_COMMAND_MAX_BYTES}`);
+  return text;
+}
+
+/**
+ * `sync` as Run Command texts: the bundle (base64 of the VM files tarball) appended in chunks to a
+ * root-only file, then checked against its SHA-256 and installed by infra/vm/install.sh.
+ */
+export function syncCommands(bundle: string, dir = SYNC_DIR, chunkSize = 3_500): string[] {
+  if (!/^[A-Za-z0-9+/=]+$/.test(bundle)) throw new Error("the bundle is not base64");
+  const file = `${dir}/bundle.b64`;
+  const chunks = bundle.match(new RegExp(`.{1,${chunkSize}}`, "g")) ?? [];
+  const append = chunks.map((chunk, index) =>
+    rootCommand(
+      [
+        ...(index === 0 ? [`install -d -m 0700 ${dir}`, `: > ${file}`] : []),
+        `printf '%s' '${chunk}' >> ${file}`,
+        `echo "chunk ${index + 1}/${chunks.length}: $(wc -c < ${file}) bytes"`,
+      ].join("\n"),
+    ),
+  );
+  const sha256 = createHash("sha256").update(bundle).digest("hex");
+  const install = rootCommand(
+    [
+      `trap 'rm -rf "\${files:-}" ${dir}' EXIT`,
+      `echo "${sha256}  ${file}" | sha256sum -c --quiet`,
+      'files="$(mktemp -d)"',
+      `base64 -d ${file} | tar -xzf - -C "$files"`,
+      'bash "$files/infra/vm/install.sh" "$files"',
+    ].join("\n"),
+  );
+  return [...append, install];
+}
+
+interface CommandExecution {
+  lifecycleState: string;
+  deliveryState?: string;
+  content?: { exitCode?: number; message?: string; text?: string };
+}
+const COMMAND_DONE = ["SUCCEEDED", "FAILED", "TIMED_OUT", "CANCELED"];
+
+/** Sends one command and waits for it; throws unless it exits 0. Returns its last 1 KB of output. */
+async function runCommand(oci: Oci, compartmentId: string, instanceId: string, displayName: string, text: string, timeoutSeconds = 900): Promise<string> {
+  const shown = { displayName, bytes: Buffer.byteLength(text), sha256: createHash("sha256").update(text).digest("hex") };
+  const body = {
+    compartmentId,
+    displayName,
+    executionTimeOutInSeconds: timeoutSeconds,
+    target: { instanceId },
+    content: { source: { sourceType: "TEXT", text }, output: { outputType: "TEXT" } },
+  };
+  const command = await oci.write<{ id: string }>("POST", "/20180530/instanceAgentCommands", body, shown);
+  if (!command) return "";
+  // Delivery waits for the agent's next poll; past the timeout plus a delivery margin, it is cancelled.
+  const deadline = Date.now() + (timeoutSeconds + 300) * 1000;
+  for (;;) {
+    const execution = await oci
+      .call<CommandExecution>("GET", "iaas", `/20180530/instanceAgentCommands/${command.id}/status${query({ instanceId })}`)
+      .catch((error: unknown) => {
+        if (error instanceof OciError && error.status === 404) return undefined; // not delivered yet
+        throw error;
+      });
+    if (execution && COMMAND_DONE.includes(execution.lifecycleState)) {
+      const output = execution.content?.text ?? "";
+      const exitCode = execution.content?.exitCode;
+      if (execution.lifecycleState !== "SUCCEEDED" || exitCode !== 0) {
+        const message = execution.content?.message ? ` (${execution.content.message})` : "";
+        throw new Error(`${displayName}: ${execution.lifecycleState}, exit ${exitCode ?? "?"}${message}\n${output}`);
+      }
+      return output;
+    }
+    if (Date.now() > deadline) {
+      await oci.call("DELETE", "iaas", `/20180530/instanceAgentCommands/${command.id}`).catch(() => undefined);
+      throw new Error(`${displayName}: not run in time (delivery ${execution?.deliveryState ?? "unknown"}), cancelled`);
+    }
+    await sleep(5_000);
+  }
+}
+
+async function runningInstance(oci: Oci, compartmentId: string): Promise<Instance> {
   const instance = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance);
   if (!instance) throw new Error(`instance ${NAMES.instance}: none`);
   if (instance.lifecycleState !== "RUNNING") throw new Error(`instance ${NAMES.instance} is ${instance.lifecycleState}, not RUNNING`);
+  return instance;
+}
+
+async function agent(oci: Oci, compartmentId: string): Promise<void> {
+  // The compartment's recent commands: reading them also proves the Run Command policy.
+  const commands = await oci.call<{ displayName?: string; timeCreated: string; isCanceled?: boolean }[]>(
+    "GET",
+    "iaas",
+    `/20180530/instanceAgentCommands${query({ compartmentId, sortBy: "TIMECREATED", sortOrder: "DESC", limit: "5" })}`,
+  );
+  console.log(`commands ${commands.length} recent`);
+  for (const command of commands) console.log(`command  ${command.timeCreated} ${command.displayName ?? ""}${command.isCanceled ? " (cancelled)" : ""}`);
+  const instance = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance);
+  if (instance?.lifecycleState !== "RUNNING") {
+    console.log(`instance ${NAMES.instance}: ${instance?.lifecycleState ?? "none"}`);
+    return;
+  }
+  const plugins = await oci.call<{ name: string; status: string; message?: string }[]>("GET", "iaas", `/20180530/instanceagents/${instance.id}/plugins${query({ compartmentId })}`);
+  for (const plugin of plugins) console.log(`plugin   ${plugin.name}: ${plugin.status}${plugin.message ? ` (${plugin.message})` : ""}`);
+}
+
+async function run(oci: Oci, compartmentId: string, file: string): Promise<void> {
+  const instance = await runningInstance(oci, compartmentId);
+  const output = await runCommand(oci, compartmentId, instance.id, `joutiya-run ${basename(file)}`, rootCommand(readFileSync(file, "utf8")));
+  if (output) console.log(output.trimEnd());
+}
+
+async function sync(oci: Oci, compartmentId: string): Promise<void> {
+  const instance = await runningInstance(oci, compartmentId);
+  const commands = syncCommands(vmFilesTarball());
+  for (const [index, text] of commands.entries()) {
+    const output = await runCommand(oci, compartmentId, instance.id, `joutiya-sync ${index + 1}/${commands.length}`, text);
+    if (output) console.log(output.trimEnd());
+  }
+}
+
+async function reboot(oci: Oci, compartmentId: string): Promise<void> {
+  const instance = await runningInstance(oci, compartmentId);
   await oci.write("POST", `/20160918/instances/${instance.id}${query({ action: "SOFTRESET" })}`, undefined, { action: "SOFTRESET" });
   if (oci.apply) console.log("reboot requested: follow it with `node scripts/oracle-vm.ts status`");
 }
@@ -442,9 +598,12 @@ function credentialsFromEnv(): OciCredentials {
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const action = args.find((arg) => !arg.startsWith("--"));
+  const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);
-  if (action !== "create" && action !== "status" && action !== "reboot") throw new Error("usage: scripts/oracle-vm.ts <create|status|reboot> [--apply] [--retry-minutes=<n>]");
+  const actions = ["create", "status", "reboot", "agent", "run", "sync"];
+  if (!action || !actions.includes(action) || (action === "run") !== (file !== undefined)) {
+    throw new Error("usage: scripts/oracle-vm.ts <create|status|reboot|agent|sync|run <script>> [--apply] [--retry-minutes=<n>]");
+  }
 
   const raw: unknown = JSON.parse(readFileSync(new URL("../infra/targets.json", import.meta.url), "utf8"));
   const errors = validateTargets(raw);
@@ -457,10 +616,14 @@ async function main(): Promise<void> {
     throw new Error("JOUTIYA_OCI_* do not match shared.oracle in infra/targets.json: nothing done");
   }
   const oci = new Oci(credentials, args.includes("--apply"));
-  if (action === "create") await create(oci, targets, compartmentId as string, retry);
-  else if (action === "reboot") await reboot(oci, compartmentId as string);
-  else await status(oci, targets, compartmentId as string);
-  if (action !== "status") console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
+  const compartment = compartmentId as string;
+  if (action === "create") await create(oci, targets, compartment, retry);
+  else if (action === "reboot") await reboot(oci, compartment);
+  else if (action === "agent") await agent(oci, compartment);
+  else if (action === "run") await run(oci, compartment, file as string);
+  else if (action === "sync") await sync(oci, compartment);
+  else await status(oci, targets, compartment);
+  if (action !== "status" && action !== "agent") console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
 }
 
 const self = fileURLToPath(import.meta.url);

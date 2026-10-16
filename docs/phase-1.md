@@ -11,7 +11,7 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | 1 | Tunnels Cloudflare | Claude (API) | Fait |
 | 2 | DNS de `joutiya.ma` | Claude (API) | `joutiya.ma` et `www` faits ; les noms protégés attendent l'étape 6 |
 | 3 | Réseau et VM Oracle | Claude (API), Nav pour le quota | Réseau fait, quota corrigé par Nav ; VM en création |
-| 4 | Accès de Claude à la VM | Nav, sur votre phrase | Attend votre phrase dans le fil de Nav |
+| 4 | Accès de Claude à la VM | Nav, sur votre phrase | Fait ; vérifié sur la VM dès sa création |
 | 5 | Connexion Google d'Access | Nav, puis vous | Attend le projet Firebase de production |
 | 6 | Applications Access et jetons de service | Claude (API), Nav | Après l'étape 5 |
 | 7 | Serveurs DNS chez Cloudflare | Nav (Hostinger) | Après la validation du .MA, avant le 12 novembre |
@@ -24,7 +24,6 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 
 ## Ce qui reste à vous
 
-- **Étape 4** : écrire dans le fil de Nav la phrase qu'il vous a proposée (accès Run Command ; le quota est déjà corrigé).
 - **Étape 5** : afficher le secret du client Google créé par Nav et le coller dans le formulaire Zero Trust que Nav a ouvert. Vérifier que la validation en deux étapes de votre compte Google est active.
 - **Étape 8** : sur la page de jeton GitHub préparée par Nav, cliquer sur **Generate token**, puis l'enregistrer dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
 
@@ -64,13 +63,16 @@ Oracle peut reprendre une VM gratuite inactive 7 jours de suite (processeur, ré
 
 Claude administre la VM par OCI Run Command : il envoie un script par l'API Oracle avec sa clé `joutiya-claude`, et l'agent Oracle l'exécute en root. Aucun port ouvert, aucune clé SSH à garder, et cela marche avant la bascule DNS. Il s'en sert pour mettre à jour les fichiers de la VM, y déposer les secrets et faire les mises en production.
 
-Nav crée, sur votre phrase écrite dans son fil :
+Fait le 16 octobre par Nav, sur votre phrase écrite dans son fil (01:44 UTC) ; leurs ID sont dans `infra/targets.json` :
 - le groupe dynamique `joutiya-vm`, qui regroupe les instances du compartiment `joutiya` ;
 - la politique `joutiya-run-command-policy`, en 3 lignes : le groupe `joutiya-automation` gère les commandes et lit l'état de l'agent dans `joutiya`, et la VM exécute ses propres commandes.
 
 Limites : script de 4 Ko et sortie de 1 Ko par commande. Oracle garde le contenu 7 jours, lisible seulement par les administrateurs du compte et `joutiya-claude`. Sur la VM, `infra/vm/sudoers.oracle-run-command` rend root l'utilisateur `ocarun` de l'agent.
 
-Une fois l'accès créé, Claude ajoute à `scripts/oracle-vm.ts` la synchronisation des fichiers et la mise en production, puis vérifie l'agent.
+Commandes de Claude (`scripts/oracle-vm.ts`) :
+- `agent` : les dernières commandes et l'état des modules de l'agent sur la VM ;
+- `run <script> --apply` : un script en root, sa sortie revient ;
+- `sync --apply` : installe `infra/vm` et `docker/` sur la VM (`infra/vm/install.sh`), en plusieurs commandes vérifiées par empreinte SHA-256.
 
 ## 5. Connexion Google d'Access
 

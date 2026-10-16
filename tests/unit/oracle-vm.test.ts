@@ -1,20 +1,26 @@
+import { spawnSync } from "node:child_process";
 import { generateKeyPairSync, createVerify, randomBytes } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import {
   MAX_METADATA_BYTES,
   NAMES,
   OciError,
+  RUN_COMMAND_MAX_BYTES,
   SHAPE,
   bootstrapLines,
   buildUserData,
   isCapacityError,
   launchDetails,
   pickImage,
+  rootCommand,
   securityList,
   signedHeaders,
   signingString,
+  syncCommands,
 } from "../../scripts/oracle-vm";
 
 const template = readFileSync(new URL("../../infra/vm/bootstrap.sh", import.meta.url), "utf8");
@@ -102,5 +108,59 @@ describe("instance", () => {
   it("reads the bootstrap progress from the serial console", () => {
     const console = "[  12.1] cloud-init[812]: noise\r\n[  30.2] joutiya-bootstrap: ssh tunnel installed\r\nCloud-init v. 25.1 finished at Fri, 16 Oct 2026. Up 300 seconds\r\n";
     expect(bootstrapLines(console)).toEqual(["joutiya-bootstrap: ssh tunnel installed", "Cloud-init v. 25.1 finished at Fri, 16 Oct 2026. Up 300 seconds"]);
+  });
+});
+
+describe("OCI Run Command", () => {
+  // The commands run here as the test user: a sudo stub drops -n and runs the rest.
+  const work = mkdtempSync(join(tmpdir(), "joutiya-run-command-"));
+  writeFileSync(join(work, "sudo"), '#!/bin/sh\n[ "$1" = "-n" ] && shift\nexec "$@"\n');
+  chmodSync(join(work, "sudo"), 0o755);
+  afterAll(() => rmSync(work, { recursive: true, force: true }));
+  const runText = (text: string) => {
+    writeFileSync(join(work, "command.sh"), text);
+    return spawnSync("bash", [join(work, "command.sh")], { encoding: "utf8", env: { ...process.env, PATH: `${work}:${process.env.PATH ?? ""}` }, input: "never read\n" });
+  };
+  const bundleOf = (files: Record<string, string>): string => {
+    const source = mkdtempSync(join(work, "source-"));
+    for (const [name, content] of Object.entries(files)) {
+      mkdirSync(join(source, name, ".."), { recursive: true });
+      writeFileSync(join(source, name), content);
+    }
+    return spawnSync("tar", ["-czf", "-", "-C", source, "infra"]).stdout.toString("base64");
+  };
+
+  it("runs a root script in strict mode with stdin closed and keeps its exit code", () => {
+    const ok = runText(rootCommand('echo "$(cat)" done\nfalse || echo recovered'));
+    expect([ok.status, ok.stdout]).toEqual([0, " done\nrecovered\n"]);
+    const failed = runText(rootCommand("echo before\nfalse\necho after"));
+    expect([failed.status, failed.stdout]).toEqual([1, "before\n"]);
+  });
+
+  it("refuses its end marker and a script over the Run Command limit", () => {
+    expect(() => rootCommand("echo a\nJOUTIYA_ROOT_SCRIPT\necho b")).toThrow("a line of the script");
+    expect(() => rootCommand("#".repeat(RUN_COMMAND_MAX_BYTES))).toThrow("Run Command allows");
+  });
+
+  it("syncs a bundle in chunks, checks it, runs its install.sh and cleans up", () => {
+    const bundle = bundleOf({ "infra/vm/install.sh": 'echo "install: $(ls "$1")"\n', "infra/vm/noise": randomBytes(6_000).toString("hex") });
+    const dir = join(work, "sync");
+    const commands = syncCommands(bundle, dir, 3_000);
+    expect(commands.length).toBeGreaterThan(3);
+    for (const text of commands.slice(0, -1)) expect(runText(text).status).toBe(0);
+    expect(readFileSync(join(dir, "bundle.b64"), "utf8")).toBe(bundle);
+    const install = runText(commands.at(-1) ?? "");
+    expect([install.status, install.stdout]).toEqual([0, "install: infra\n"]);
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it("installs nothing when a chunk is missing", () => {
+    const bundle = bundleOf({ "infra/vm/install.sh": "echo installed\n", "infra/vm/noise": randomBytes(6_000).toString("hex") });
+    const commands = syncCommands(bundle, join(work, "partial"), 3_000);
+    expect(runText(commands[0] ?? "").status).toBe(0);
+    const install = runText(commands.at(-1) ?? "");
+    expect(install.status).not.toBe(0);
+    expect(install.stdout).not.toContain("installed");
+    expect(() => syncCommands("not base64!")).toThrow("not base64");
   });
 });
