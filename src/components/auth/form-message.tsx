@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import type { FieldError } from "react-hook-form";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { ApiError, type ApiErrorCode } from "@/lib/auth/client";
-import { PASSWORD_MAX, PASSWORD_MIN } from "@/lib/contracts/auth";
+import { PASSWORD_MAX, PASSWORD_MIN } from "@/lib/contracts/endpoints";
 
 // Translates API errors (`{ error: { code } }`) and zod field errors (issue codes) into the
 // messages of Auth.errors and Auth.common.validation. Codes stay the contract; words live here.
