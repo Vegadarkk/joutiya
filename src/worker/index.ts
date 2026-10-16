@@ -1,12 +1,17 @@
-// BullMQ worker (§4) on valkey-queue. Receives no connection. Phase 1 jobs: heartbeat and the
-// nightly quota report; later phases register their jobs in ./jobs.
+// BullMQ worker (§4) on valkey-queue. Receives no connection. Queues: "system" (heartbeat, nightly
+// quota report, hourly purge of unactivated accounts) and "mail" (deliveries with retries).
 
 import { writeFile } from "node:fs/promises";
-import { Queue, Worker } from "bullmq";
+import { DelayedError, Queue, UnrecoverableError, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import { serverEnv } from "@/lib/env";
 import { WORKER_HEARTBEAT_KEY, WORKER_HEARTBEAT_TTL } from "@/lib/health";
 import { logger } from "@/lib/logging/logger";
+import { captureServerException } from "@/lib/observability/capture";
+import { flushObservability, initServerObservability } from "@/lib/observability/sentry-server";
+import { deliverMail, MailDeferredError } from "@/lib/mail/deliver";
+import { isTemplateMail } from "@/lib/mail/render";
+import { closeMailQueue, MAIL_QUEUE } from "@/lib/mail/send";
 import { runStartupChecks } from "@/lib/startup/checks";
 import { clientOptions } from "@/lib/valkey/clients";
 import { JOBS, SYSTEM_QUEUE, SCHEDULES } from "./jobs";
@@ -16,6 +21,7 @@ const HEARTBEAT_FILE = "/tmp/joutiya-worker-heartbeat";
 
 async function main(): Promise<void> {
   await runStartupChecks("worker");
+  initServerObservability("worker");
   const env = serverEnv();
   if (!env.QUEUE_REDIS_URL) {
     logger.fatal("QUEUE_REDIS_URL is not set: the worker has nothing to process");
@@ -29,7 +35,7 @@ async function main(): Promise<void> {
     await queue.upsertJobScheduler(id, { pattern: schedule.pattern, tz: "UTC" }, { name: schedule.job, opts: { removeOnComplete: 100, removeOnFail: 500 } });
   }
 
-  const worker = new Worker(
+  const systemWorker = new Worker(
     SYSTEM_QUEUE,
     async (job) => {
       const handler = JOBS[job.name as keyof typeof JOBS];
@@ -38,7 +44,35 @@ async function main(): Promise<void> {
     },
     { connection, concurrency: 1 },
   );
-  worker.on("failed", (job, error) => logger.error({ job: job?.name, err: error.message }, "job failed"));
+  systemWorker.on("failed", (job, error) => {
+    logger.error({ queue: SYSTEM_QUEUE, job: job?.name, err: error.message }, "job failed");
+    captureServerException(error, { queue: SYSTEM_QUEUE, job: job?.name });
+  });
+
+  const mailWorker = new Worker(
+    MAIL_QUEUE,
+    async (job, token) => {
+      // Job payloads are ours, but a malformed one must not burn five retries.
+      if (!isTemplateMail(job.data)) throw new UnrecoverableError(`invalid mail job ${job.id ?? ""}`);
+      try {
+        await deliverMail(job.data);
+      } catch (error) {
+        if (!(error instanceof MailDeferredError)) throw error;
+        // Quotas exhausted or provider unavailable: the job waits for the reset instead of burning
+        // its quick retries (BullMQ: moveToDelayed with the lock token, then DelayedError, which
+        // the worker swallows without a "failed" event).
+        logger.warn({ queue: MAIL_QUEUE, job: job.name, retryAt: error.retryAt.toISOString(), reason: error.message }, "mail job deferred");
+        await job.moveToDelayed(error.retryAt.getTime(), token);
+        throw new DelayedError();
+      }
+    },
+    { connection, concurrency: 2 },
+  );
+  mailWorker.on("failed", (job, error) => {
+    logger.error({ queue: MAIL_QUEUE, job: job?.name, attempt: job?.attemptsMade, err: error.message }, "mail job failed");
+    // Only the final attempt reaches Sentry: BullMQ retries the earlier ones.
+    if (job && job.attemptsMade >= (job.opts.attempts ?? 1)) captureServerException(error, { queue: MAIL_QUEUE, job: job.name });
+  });
 
   const beat = async () => {
     try {
@@ -54,17 +88,20 @@ async function main(): Promise<void> {
   const stop = async (signal: string) => {
     logger.info({ signal }, "worker stopping");
     clearInterval(heartbeat);
-    await worker.close();
-    await queue.close();
-    await connection.quit();
+    await Promise.allSettled([systemWorker.close(), mailWorker.close()]);
+    await Promise.allSettled([queue.close(), closeMailQueue()]);
+    await connection.quit().catch(() => undefined);
+    await flushObservability(2_000);
     process.exit(0);
   };
   process.on("SIGTERM", () => void stop("SIGTERM"));
   process.on("SIGINT", () => void stop("SIGINT"));
-  logger.info({ queue: SYSTEM_QUEUE }, "worker started");
+  logger.info({ queues: [SYSTEM_QUEUE, MAIL_QUEUE] }, "worker started");
 }
 
-main().catch((error: unknown) => {
+main().catch(async (error: unknown) => {
   logger.fatal({ err: (error as Error).message }, "worker crashed");
+  captureServerException(error, { phase: "startup" });
+  await flushObservability(2_000);
   process.exit(1);
 });

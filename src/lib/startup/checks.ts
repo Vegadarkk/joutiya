@@ -8,13 +8,36 @@ import { logger } from "@/lib/logging/logger";
 
 // Startup gate of `web` and `worker`. Staging and production refuse to start on a wrong
 // third-party target (§9), an incomplete environment, a missing CSP hook, or (production web)
-// incomplete legal mentions (§7, art. 1-1 LCEN).
+// incomplete legal mentions (§7, art. 1-1 LCEN). A development server refuses to serve anything
+// but a local host: APP_ENV=dev enables the x-dev-access-email bypass and skips every deployed check.
 
 export type Service = "web" | "worker";
 
 export interface StartupReport {
   fatal: string[];
   warnings: string[];
+}
+
+/** localhost, *.localhost, loopback or a private RFC 1918 address: the only hosts APP_ENV=dev may serve. */
+export function isLocalHost(hostname: string): boolean {
+  const host = hostname.trim().toLowerCase().replace(/\.$/, "");
+  if (host === "localhost" || host.endsWith(".localhost") || host === "[::1]" || host === "::1") return true;
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!v4) return false;
+  const a = Number(v4[1]);
+  const b = Number(v4[2]);
+  return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+}
+
+function siteHost(siteUrl: string | undefined): string | undefined {
+  const value = (siteUrl ?? "").trim();
+  if (!value) return undefined;
+  try {
+    return new URL(value).hostname;
+  } catch {
+    // Already reported by parseEnv.
+    return undefined;
+  }
 }
 
 export async function startupReport(service: Service, env: Record<string, string | undefined> = process.env): Promise<StartupReport> {
@@ -28,6 +51,14 @@ export async function startupReport(service: Service, env: Record<string, string
   const deployed = rawAppEnv !== "" && rawAppEnv !== "dev";
 
   (deployed ? fatal : warnings).push(...parsed.errors);
+  warnings.push(...parsed.warnings);
+
+  const host = siteHost(env.SITE_URL);
+  if (!deployed && host !== undefined && !isLocalHost(host)) {
+    fatal.push(
+      `APP_ENV=dev serves local hosts only, not SITE_URL host ${host}: set APP_ENV=staging or APP_ENV=prod (dev enables the x-dev-access-email bypass and skips the deployed checks)`,
+    );
+  }
 
   const fileErrors = validateTargets(targets);
   if (fileErrors.length > 0) fatal.push(...fileErrors.map((error) => `infra/targets.json: ${error}`));

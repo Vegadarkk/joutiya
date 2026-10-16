@@ -73,6 +73,12 @@ interface Binding {
   normalize?: (value: string) => string;
   /** Values of another shape are rejected before the comparison: "<variable> must be <description>". */
   shape?: { pattern: RegExp; description: string };
+  /**
+   * Local development runs with a dummy value (docs/phase-2.md §5, playwright.config.ts): while no
+   * identifier is recorded for dev, "set but not recorded" is tolerated there outside strict mode.
+   * A recorded identifier is still compared.
+   */
+  devPlaceholder?: boolean;
 }
 
 const firebaseProject = (variable: string): Binding => ({
@@ -99,6 +105,15 @@ const serviceAccount = (variable: string): Binding => ({
   shape: { pattern: SERVICE_ACCOUNT, description: "<name>@<project id>.iam.gserviceaccount.com, a service account of the environment's Firebase project" },
   normalize: (value) => SERVICE_ACCOUNT.exec(value)?.[1] ?? "",
 });
+
+/**
+ * Firebase's emulator convention: a project id starting with "demo-" is never a real project, so
+ * the emulators refuse to reach Google for it. Accepted in dev only (local runs, tests, CI).
+ */
+const DEMO_PROJECT = /^demo-[a-z0-9-]+$/;
+function isDemoProject(appEnv: AppEnv, projectId: unknown): boolean {
+  return appEnv === "dev" && typeof projectId === "string" && DEMO_PROJECT.test(projectId);
+}
 
 // Configured identifiers checked against the targets of APP_ENV.
 // GOOGLE_CLOUD_PROJECT, GCLOUD_PROJECT and CLOUDSDK_CORE_PROJECT are read implicitly by Google
@@ -169,6 +184,7 @@ const BINDINGS: Binding[] = [
     variable: "WHATSAPP_PHONE_NUMBER_ID",
     target: "environments.<env>.whatsapp.phoneNumberId",
     expected: (t, env) => t.environments[env].whatsapp.phoneNumberId,
+    devPlaceholder: true,
   },
   {
     variable: "REVENUECAT_PROJECT_ID",
@@ -397,6 +413,7 @@ export function assertTargets(targets: Targets, env: Env, options: AssertOptions
   }
   for (const binding of configured) {
     const target = binding.target.replace("<env>", appEnv);
+    if (binding.target === "environments.<env>.firebase.projectId" && !binding.shape && isDemoProject(appEnv, value(binding.variable))) continue;
     if (binding.shape && !binding.shape.pattern.test(value(binding.variable))) {
       errors.push(`${binding.variable} must be ${binding.shape.description}`);
       continue;
@@ -404,6 +421,7 @@ export function assertTargets(targets: Targets, env: Env, options: AssertOptions
     const expected = binding.expected(targets, appEnv);
     const actual = binding.normalize ? binding.normalize(value(binding.variable)) : value(binding.variable);
     if (expected === null) {
+      if (binding.devPlaceholder && appEnv === "dev" && !options.strict) continue;
       errors.push(`${binding.variable} is set but ${target} is not recorded in infra/targets.json`);
     } else if (actual !== expected) {
       errors.push(`${binding.variable} does not match ${target} (${expected})`);
@@ -421,7 +439,7 @@ export function assertTargets(targets: Targets, env: Env, options: AssertOptions
   const credentials = value("GOOGLE_APPLICATION_CREDENTIALS");
   if (credentials !== "") errors.push(...projectFileErrors("GOOGLE_APPLICATION_CREDENTIALS", credentials, expectedProject, appEnv, options));
   const firebaseConfig = value("FIREBASE_CONFIG");
-  if (firebaseConfig !== "") {
+  if (firebaseConfig !== "" && !(firebaseConfig.startsWith("{") && isDemoProject(appEnv, parseJson(firebaseConfig)?.projectId))) {
     if (expectedProject === null) {
       errors.push(`FIREBASE_CONFIG is set but environments.${appEnv}.firebase.projectId is not recorded in infra/targets.json`);
     } else if (firebaseConfig.startsWith("{")) {

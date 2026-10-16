@@ -14,8 +14,16 @@
   },
   "Locale": {
     "label": "Langue",
-    "names": { "fr": "Français", "ar": "العربية", "rif": "Tarifit" },
-    "short": { "fr": "FR", "ar": "ع", "rif": "RIF" }
+    "names": {
+      "fr": "Français",
+      "ar": "العربية",
+      "rif": "Tarifit"
+    },
+    "short": {
+      "fr": "FR",
+      "ar": "ع",
+      "rif": "RIF"
+    }
   },
   "Theme": {
     "label": "Apparence",
@@ -34,9 +42,18 @@
     "openingTitle": "Joutiya ouvre bientôt",
     "openingBody": "Le dépôt d'annonces et la recherche arrivent dans les prochaines semaines. Le site que vous voyez est en préparation.",
     "pillars": {
-      "free": { "title": "Déposer est gratuit", "body": "Publiez vos annonces sans frais, avec vos photos." },
-      "near": { "title": "Près de chez vous", "body": "12 régions et leurs villes, pour trouver à deux pas." },
-      "safe": { "title": "Des échanges sûrs", "body": "Messagerie interne, signalement en un clic, numéro jamais affiché en clair." }
+      "free": {
+        "title": "Déposer est gratuit",
+        "body": "Publiez vos annonces sans frais, avec vos photos."
+      },
+      "near": {
+        "title": "Près de chez vous",
+        "body": "12 régions et leurs villes, pour trouver à deux pas."
+      },
+      "safe": {
+        "title": "Des échanges sûrs",
+        "body": "Messagerie interne, signalement en un clic, numéro jamais affiché en clair."
+      }
     }
   },
   "Search": {
@@ -46,8 +63,6 @@
     "backHome": "Revenir à l'accueil"
   },
   "Private": {
-    "signInTitle": "La connexion ouvre bientôt",
-    "signInBody": "Vous pourrez bientôt créer votre compte et retrouver vos annonces, vos messages et vos favoris.",
     "postTitle": "Le dépôt d'annonces ouvre bientôt",
     "postBody": "Vous pourrez publier une annonce avec ses photos en quelques minutes."
   },
@@ -89,5 +104,247 @@
     "body": "Un incident technique a interrompu le chargement. Réessayez ; si le problème continue, revenez dans quelques minutes.",
     "retry": "Réessayer",
     "back": "Revenir à l'accueil"
+  },
+  "Auth": {
+    "common": {
+      "email": "Adresse e-mail",
+      "password": "Mot de passe",
+      "showPassword": "Afficher le mot de passe",
+      "hidePassword": "Masquer le mot de passe",
+      "or": "ou",
+      "googleLoading": "Chargement du bouton Google…",
+      "backHome": "Revenir à l'accueil",
+      "waitLater": "dans quelques minutes",
+      "brandPromise": "Une porte ouverte sur le souk de votre quartier.",
+      "trust": {
+        "messages": "Vos échanges restent dans la messagerie Joutiya.",
+        "phone": "Votre numéro n'est jamais affiché en clair.",
+        "report": "Un signalement se fait en un clic, et il est lu."
+      },
+      "turnstileLabel": "Vérification anti-robots",
+      "turnstileError": "La vérification anti-robots n'a pas pu se charger. Rechargez la page et réessayez.",
+      "turnstilePending": "La vérification anti-robots n'est pas terminée. Patientez une seconde, puis réessayez.",
+      "validation": {
+        "email": "Entrez une adresse e-mail valide.",
+        "passwordRequired": "Entrez votre mot de passe.",
+        "passwordMin": "Le mot de passe doit faire au moins {min} caractères.",
+        "passwordMax": "Le mot de passe ne peut pas dépasser {max} caractères.",
+        "displayNameMin": "Le nom doit faire au moins 2 caractères.",
+        "displayNameMax": "Le nom ne peut pas dépasser 40 caractères.",
+        "displayNameFormat": "Utilisez des lettres, des chiffres, des espaces, des points, des apostrophes ou des tirets.",
+        "consentRequired": "Cette case est obligatoire pour continuer.",
+        "currentPassword": "Entrez votre mot de passe actuel.",
+        "phone": "Entrez un numéro de mobile marocain (06 ou 07).",
+        "locale": "Choisissez une langue."
+      },
+      "hints": {
+        "title": "Votre mot de passe doit :",
+        "length": "faire au moins {min} caractères",
+        "common": "ne pas être un mot de passe courant ni une simple suite de caractères",
+        "personal": "ne pas contenir votre nom ni votre adresse e-mail"
+      },
+      "inApp": {
+        "title": "Ouvrez cette page dans votre navigateur",
+        "body": "Google refuse la connexion depuis le navigateur intégré de {app}. Ouvrez le lien dans Chrome ou Safari, ou connectez-vous avec votre e-mail ci-dessous.",
+        "bodyGeneric": "Google refuse la connexion depuis le navigateur intégré d'une application. Ouvrez le lien dans Chrome ou Safari, ou connectez-vous avec votre e-mail ci-dessous.",
+        "copy": "Copier le lien",
+        "copied": "Lien copié"
+      },
+      "googleError": "Le bouton Google n'a pas pu se charger. Connectez-vous avec votre adresse e-mail.",
+      "frenchOnly": "Cette partie du site est en français pour le moment."
+    },
+    "signIn": {
+      "title": "Se connecter",
+      "lead": "Retrouvez vos annonces, vos messages et vos favoris.",
+      "submit": "Se connecter",
+      "forgot": "Mot de passe oublié ?",
+      "noAccount": "Pas encore de compte ?",
+      "create": "Créer un compte",
+      "turnstileTitle": "Encore une vérification",
+      "turnstileBody": "Plusieurs tentatives ont échoué. Confirmez que vous n'êtes pas un robot, puis reconnectez-vous.",
+      "verifyTitle": "Confirmez votre adresse e-mail",
+      "verifyBody": "Votre compte existe, mais l'adresse {email} n'a pas encore été confirmée. Ouvrez le lien reçu par e-mail, ou demandez un nouvel envoi."
+    },
+    "signUp": {
+      "title": "Créer un compte",
+      "lead": "Gratuit, en deux minutes. Vous pourrez déposer des annonces et écrire aux vendeurs.",
+      "displayName": "Nom affiché",
+      "displayNameHint": "Visible sur vos annonces et dans la messagerie. Un prénom suffit.",
+      "submit": "Créer mon compte",
+      "hasAccount": "Déjà un compte ?",
+      "signIn": "Se connecter",
+      "sentTitle": "Vérifiez votre boîte mail",
+      "sentBody": "Si l'adresse {email} peut être utilisée, un e-mail vient de vous être envoyé. Ouvrez le lien qu'il contient pour activer votre compte. Pensez à regarder dans les indésirables.",
+      "sentHelp": "Rien reçu après quelques minutes ?",
+      "consentTitle": "Encore une étape",
+      "consentBody": "Pour créer votre compte Joutiya avec cette adresse, acceptez les conditions ci-dessous.",
+      "consentEmail": "Compte Google",
+      "consentSubmit": "Créer mon compte",
+      "consentCancel": "Annuler"
+    },
+    "consents": {
+      "cgu": "J'ai lu et j'accepte les <link>conditions générales d'utilisation</link> de Joutiya.",
+      "transfers": "J'autorise expressément Joutiya à transférer mes données personnelles hors du Maroc, vers ses prestataires d'hébergement et d'envoi d'e-mails situés dans l'Union européenne et aux États-Unis (article 44 de la loi 09-08). Sans cet accord, le compte ne peut pas être créé.",
+      "marketing": "Je souhaite recevoir par e-mail les nouveautés et les offres de Joutiya. Facultatif, et révocable à tout moment.",
+      "privacy": "Le traitement de vos données est décrit dans la <link>politique de confidentialité</link>.",
+      "legend": "Consentements"
+    },
+    "forgot": {
+      "title": "Mot de passe oublié",
+      "lead": "Indiquez l'adresse de votre compte : vous recevrez un lien pour choisir un nouveau mot de passe.",
+      "submit": "Envoyer le lien",
+      "sentTitle": "Consultez votre boîte mail",
+      "sentBody": "Si un compte existe pour {email}, un e-mail avec un lien de réinitialisation vient de partir. Le lien reste valable une heure.",
+      "back": "Retour à la connexion"
+    },
+    "resend": {
+      "title": "Recevoir un nouveau lien",
+      "submit": "Renvoyer l'e-mail",
+      "sentTitle": "E-mail renvoyé",
+      "sentBody": "Si l'adresse {email} correspond à un compte en attente, un nouveau lien vient de partir."
+    },
+    "action": {
+      "title": "Confirmation",
+      "verifying": "Confirmation de votre adresse en cours…",
+      "checking": "Vérification du lien…",
+      "verifiedTitle": "Adresse confirmée",
+      "verifiedBody": "Votre compte est activé et vous êtes connecté. Bienvenue sur Joutiya.",
+      "verifiedBodyAnonymous": "Votre compte est activé. Connectez-vous pour commencer.",
+      "goSettings": "Mes paramètres",
+      "goHome": "Découvrir les annonces",
+      "goSignIn": "Se connecter",
+      "missingTitle": "Lien incomplet",
+      "missingBody": "Ouvrez le lien complet depuis l'e-mail que vous avez reçu.",
+      "invalidTitle": "Ce lien n'est plus valable",
+      "invalidBody": "Il a peut-être déjà été utilisé, ou il est incomplet. Demandez-en un nouveau.",
+      "expiredTitle": "Ce lien a expiré",
+      "expiredBody": "Les liens de confirmation sont valables un temps limité. Demandez-en un nouveau.",
+      "failedTitle": "La confirmation n'a pas abouti",
+      "retry": "Réessayer",
+      "resetTitle": "Choisir un nouveau mot de passe",
+      "resetLead": "Pour le compte {email}.",
+      "newPassword": "Nouveau mot de passe",
+      "resetSubmit": "Enregistrer le mot de passe",
+      "resetDoneTitle": "Mot de passe modifié",
+      "resetDoneBody": "Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.",
+      "resetExpiredBody": "Les liens de réinitialisation sont valables une heure. Demandez-en un nouveau.",
+      "requestNew": "Demander un nouveau lien"
+    },
+    "settings": {
+      "title": "Mes paramètres",
+      "lead": "Votre profil, votre mot de passe et vos méthodes de connexion.",
+      "loading": "Chargement de votre compte…",
+      "profile": {
+        "title": "Profil",
+        "body": "Le nom affiché apparaît sur vos annonces et dans la messagerie.",
+        "displayName": "Nom affiché",
+        "locale": "Langue de l'interface",
+        "save": "Enregistrer",
+        "saved": "Profil enregistré"
+      },
+      "password": {
+        "title": "Mot de passe",
+        "body": "Choisissez un mot de passe que vous n'utilisez nulle part ailleurs.",
+        "current": "Mot de passe actuel",
+        "new": "Nouveau mot de passe",
+        "save": "Changer le mot de passe",
+        "changed": "Mot de passe changé",
+        "noneBody": "Ce compte se connecte avec Google et n'a pas de mot de passe. Pour en ajouter un, demandez un lien de réinitialisation à votre adresse e-mail.",
+        "noneAction": "Choisir un mot de passe"
+      },
+      "verification": {
+        "title": "Vérifications",
+        "body": "Un numéro vérifié rassure les acheteurs et vous permet d'être contacté sur WhatsApp.",
+        "email": "Adresse e-mail",
+        "emailVerified": "Confirmée",
+        "emailPending": "À confirmer",
+        "phone": "Numéro de téléphone",
+        "phoneVerified": "Vérifié",
+        "phoneMissing": "Non vérifié",
+        "verifyPhone": "Vérifier mon numéro",
+        "managePhone": "Voir la vérification"
+      },
+      "methods": {
+        "title": "Méthodes de connexion",
+        "body": "Les façons dont vous pouvez vous connecter à ce compte.",
+        "password": "E-mail et mot de passe",
+        "google": "Compte Google",
+        "none": "Aucune méthode de connexion n'est enregistrée."
+      },
+      "signOut": "Se déconnecter",
+      "signedOut": "Vous êtes déconnecté"
+    },
+    "verifications": {
+      "title": "Vérifier mon numéro",
+      "lead": "Un numéro vérifié apparaît avec un badge sur vos annonces et permet le contact WhatsApp.",
+      "how": "Vous envoyez un code depuis votre propre WhatsApp au numéro de Joutiya, et c'est tout. Joutiya ne vous envoie jamais de message : ni SMS, ni appel, ni message WhatsApp.",
+      "phone": "Numéro de mobile",
+      "phoneHint": "Mobile marocain, par exemple 06 12 34 56 78 ou +212 6 12 34 56 78.",
+      "start": "Obtenir mon code",
+      "codeTitle": "Envoyez ce code sur WhatsApp",
+      "codeBody": "Depuis le WhatsApp du {phone}, envoyez le message ci-dessous au numéro de Joutiya.",
+      "codeLabel": "Votre code",
+      "copyCode": "Copier le code",
+      "copied": "Code copié",
+      "joutiyaNumber": "Numéro de Joutiya",
+      "openWhatsApp": "Ouvrir WhatsApp",
+      "expiresIn": "Code valable encore {time}",
+      "waiting": "En attente de votre message…",
+      "pollStopped": "Suivi automatique en pause : après avoir envoyé votre message, rechargez la page.",
+      "pendingTitle": "Un code est déjà en attente",
+      "pendingBody": "Un code a été demandé pour le {phone}. Si vous ne l'avez plus, demandez-en un nouveau.",
+      "verifiedTitle": "Numéro vérifié",
+      "verifiedBody": "Le {phone} est maintenant associé à votre compte.",
+      "expiredTitle": "Le code a expiré",
+      "expiredBody": "Vous avez dix minutes pour envoyer le code. Demandez-en un nouveau.",
+      "changeNumber": "Changer de numéro",
+      "badge": "Téléphone vérifié",
+      "backSettings": "Retour aux paramètres",
+      "unavailable": "La vérification WhatsApp n'est pas encore ouverte. Revenez dans quelques jours.",
+      "loadFailedTitle": "L'état de la vérification n'a pas pu être chargé",
+      "retry": "Réessayer",
+      "alreadyVerified": "Votre compte a déjà un numéro vérifié."
+    },
+    "menu": {
+      "account": "Mon compte",
+      "settings": "Mes paramètres",
+      "verifications": "Vérifications",
+      "signOut": "Déconnexion"
+    },
+    "errors": {
+      "invalid_body": "Certaines informations sont incorrectes. Vérifiez le formulaire, puis réessayez.",
+      "invalid_json": "La demande est mal formée. Rechargez la page, puis réessayez.",
+      "payload_too_large": "Les informations envoyées sont trop volumineuses.",
+      "unauthenticated": "Votre session a expiré. Reconnectez-vous.",
+      "forbidden": "Vous n'avez pas accès à cette action.",
+      "csrf": "Votre session a changé. Rechargez la page, puis réessayez.",
+      "origin": "La demande n'a pas pu être vérifiée. Rechargez la page, puis réessayez.",
+      "not_found": "Ce service n'est pas disponible pour le moment. Réessayez plus tard.",
+      "method_not_allowed": "Cette action n'est pas disponible.",
+      "conflict": "Cette information est déjà utilisée par un autre compte.",
+      "rate_limited": "Trop de tentatives. Réessayez {wait}.",
+      "turnstile_required": "Une vérification anti-robots est nécessaire. Cochez la case, puis réessayez.",
+      "turnstile_failed": "La vérification anti-robots a échoué. Réessayez.",
+      "invalid_credentials": "Adresse e-mail ou mot de passe incorrect.",
+      "account_locked": "Trop de tentatives : la connexion à ce compte est bloquée quelques minutes. Réessayez {wait}.",
+      "account_disabled": "Ce compte a été désactivé. Si vous pensez qu'il s'agit d'une erreur, écrivez-nous.",
+      "account_suspended": "Ce compte est suspendu. Vous pouvez lire vos conversations et faire un recours.",
+      "email_not_verified": "Confirmez d'abord votre adresse e-mail avec le lien reçu.",
+      "role_missing": "Votre compte n'est pas encore activé. Ouvrez le lien reçu par e-mail.",
+      "invalid_code": "Ce lien n'est plus valable.",
+      "expired_code": "Ce lien a expiré.",
+      "weak_password": "Ce mot de passe est trop courant ou trop simple. Choisissez-en un autre.",
+      "weak_password_common": "Ce mot de passe est trop courant. Choisissez-en un plus personnel, que vous n'utilisez nulle part ailleurs.",
+      "weak_password_personal": "Ce mot de passe contient votre nom ou votre adresse e-mail. Choisissez-en un autre.",
+      "weak_password_repeated": "Ce mot de passe répète un seul caractère. Choisissez-en un autre.",
+      "weak_password_sequence": "Ce mot de passe est une simple suite de caractères. Choisissez-en un autre.",
+      "disposable_email": "Les adresses e-mail jetables ne sont pas acceptées.",
+      "consent_required": "Acceptez les conditions pour continuer.",
+      "phone_invalid": "Ce numéro n'est pas valide.",
+      "phone_not_mobile": "Seul un numéro de mobile marocain (06 ou 07) peut être vérifié.",
+      "unavailable": "Le service est momentanément indisponible. Réessayez dans quelques minutes.",
+      "internal": "Une erreur technique est survenue. Réessayez.",
+      "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez."
+    }
   }
 }

@@ -136,6 +136,17 @@ describe("assertTargets", () => {
     STRIPE_SECRET_KEY: "rk_test_x",
   };
 
+  it("accepts the emulators' demo project in dev only", () => {
+    const emulator = { APP_ENV: "dev", FIREBASE_PROJECT_ID: "demo-joutiya", GCLOUD_PROJECT: "demo-joutiya", FIREBASE_CONFIG: '{"projectId":"demo-joutiya"}' };
+    const targets = recorded();
+    targets.environments.dev.firebase.projectId = null;
+    assert.deepEqual(assertTargets(targets, emulator), []);
+    assert.ok(assertTargets(targets, { ...emulator, FIREBASE_PROJECT_ID: "joutiya-dev" }).some((e) => e.includes("FIREBASE_PROJECT_ID is set but")));
+    const outsideDev = assertTargets(recorded(), { ...emulator, APP_ENV: "staging" });
+    assert.ok(outsideDev.some((e) => e.includes("FIREBASE_PROJECT_ID does not match")));
+    assert.ok(outsideDev.some((e) => e.includes("FIREBASE_CONFIG does not match")));
+  });
+
   it("passes when nothing is configured", () => {
     assert.deepEqual(assertTargets(recorded(), {}), []);
   });
@@ -216,6 +227,24 @@ describe("assertTargets", () => {
     targets.environments.dev.firebase.projectId = null;
     assert.deepEqual(assertTargets(targets, { APP_ENV: "dev", FIREBASE_PROJECT_ID: "punk-records-1234" }), [
       "FIREBASE_PROJECT_ID is set but environments.dev.firebase.projectId is not recorded in infra/targets.json",
+    ]);
+  });
+
+  it("lets dev run with a dummy WhatsApp number id while none is recorded, and nowhere else", () => {
+    const targets = recorded();
+    targets.environments.dev.whatsapp.phoneNumberId = null;
+    targets.environments.staging.whatsapp.phoneNumberId = null;
+    assert.deepEqual(assertTargets(targets, { APP_ENV: "dev", WHATSAPP_PHONE_NUMBER_ID: "100000000000001" }), []);
+    assert.deepEqual(assertTargets(targets, { APP_ENV: "dev", WHATSAPP_PHONE_NUMBER_ID: "100000000000001" }, { strict: true }).filter((e) => e.includes("WHATSAPP")), [
+      "WHATSAPP_PHONE_NUMBER_ID is set but environments.dev.whatsapp.phoneNumberId is not recorded in infra/targets.json",
+    ]);
+    assert.deepEqual(assertTargets(targets, { ...staging, WHATSAPP_PHONE_NUMBER_ID: "100000000000001" }), [
+      "WHATSAPP_PHONE_NUMBER_ID is set but environments.staging.whatsapp.phoneNumberId is not recorded in infra/targets.json",
+    ]);
+    // A recorded dev identifier is still compared.
+    targets.environments.dev.whatsapp.phoneNumberId = "100000000000002";
+    assert.deepEqual(assertTargets(targets, { APP_ENV: "dev", WHATSAPP_PHONE_NUMBER_ID: "100000000000001" }), [
+      "WHATSAPP_PHONE_NUMBER_ID does not match environments.dev.whatsapp.phoneNumberId (100000000000002)",
     ]);
   });
 

@@ -4,6 +4,13 @@ import { staticSecurityHeaders, apiContentSecurityPolicy } from "./src/lib/secur
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
+// One image serves staging and production (§2): no NEXT_PUBLIC_* may be frozen at build time.
+// Next inlines them into server bundles as well, so the build refuses any such variable.
+const frozen = Object.keys(process.env).filter((name) => name.startsWith("NEXT_PUBLIC_") && process.env[name]);
+if (frozen.length > 0) {
+  throw new Error(`NEXT_PUBLIC_* variables are not allowed (runtime configuration, src/lib/config): ${frozen.join(", ")}`);
+}
+
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
@@ -26,6 +33,8 @@ const nextConfig: NextConfig = {
     // Photos are served by R2 (media host), never optimized on the VM (§2).
     unoptimized: true,
   },
+  // Native and runtime-resolved packages stay outside the server bundle (Sentry hooks Node modules).
+  serverExternalPackages: ["@sentry/node", "pino", "firebase-admin"],
   async headers() {
     return [
       { source: "/:path*", headers: staticSecurityHeaders() },

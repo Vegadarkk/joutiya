@@ -32,3 +32,18 @@ describe("quota periods", () => {
     }
   });
 });
+
+describe("nextPeriodStart", () => {
+  it("finds the provider's reset instant within a second, DST included", async () => {
+    const { nextPeriodStart } = await import("@/lib/quota/period");
+    const near = (date: Date, iso: string) => {
+      expect(date.getTime()).toBeGreaterThanOrEqual(Date.parse(iso));
+      expect(date.getTime()).toBeLessThanOrEqual(Date.parse(iso) + 1_000);
+    };
+    near(nextPeriodStart({ period: "day", resetTimeZone: "UTC" }, new Date("2026-10-16T23:59:59.500Z")), "2026-10-17T00:00:00Z");
+    near(nextPeriodStart({ period: "day", resetTimeZone: "UTC" }, new Date("2026-10-17T00:00:00Z")), "2026-10-18T00:00:00Z");
+    // Pacific day on the DST switch (2026-11-01, 02:00 PDT → 01:00 PST): next midnight is 08:00 UTC.
+    near(nextPeriodStart({ period: "day", resetTimeZone: "America/Los_Angeles" }, new Date("2026-11-01T12:00:00Z")), "2026-11-02T08:00:00Z");
+    near(nextPeriodStart({ period: "month", resetTimeZone: "UTC" }, new Date("2026-02-10T00:00:00Z")), "2026-03-01T00:00:00Z");
+  });
+});

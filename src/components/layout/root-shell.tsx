@@ -4,17 +4,30 @@ import { getTranslations } from "next-intl/server";
 import { isRtl, LOCALE_TAGS, type Locale } from "@/config/site";
 import { DEFAULT_LEGAL } from "@/config/legal";
 import { Footer } from "@/components/legal/footer";
+import type { PublicConfig } from "@/lib/config/public-types";
+import type { SessionSummary } from "@/lib/contracts/auth";
 import { readex, tarifitFallback } from "@/lib/fonts";
 import { Providers } from "./providers";
 import { SiteHeader } from "./site-header";
 import { ThemeScript } from "./theme-script";
 import "@/styles/globals.css";
 
+interface RootShellProps {
+  locale: Locale;
+  /** Private layout only: the request nonce for inline and third-party scripts. */
+  nonce?: string;
+  /** Private layout only: runtime browser configuration (public pages fetch /api/config instead). */
+  config?: PublicConfig;
+  /** Private layout only: the session of this request (null = anonymous), so the header renders it on first paint. */
+  initialSession?: SessionSummary | null;
+  children: ReactNode;
+}
+
 /**
  * <html> of the localized root layouts. Two root layouts share it: (public), static with a
- * hash-based CSP, and (private), dynamic with the request nonce.
+ * hash-based CSP, and (private), dynamic with the request nonce and the runtime configuration.
  */
-export async function RootShell({ locale, nonce, children }: { locale: Locale; nonce?: string; children: ReactNode }) {
+export async function RootShell({ locale, nonce, config, initialSession, children }: RootShellProps) {
   const t = await getTranslations({ locale, namespace: "Nav" });
   const dir = isRtl(locale) ? "rtl" : "ltr";
   return (
@@ -28,7 +41,7 @@ export async function RootShell({ locale, nonce, children }: { locale: Locale; n
           {t("skip")}
         </a>
         <NextIntlClientProvider>
-          <Providers dir={dir}>
+          <Providers dir={dir} config={config} initialSession={initialSession}>
             <SiteHeader locale={locale} />
             <main id="main" className="flex flex-1 flex-col">
               {children}

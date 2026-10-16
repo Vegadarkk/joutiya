@@ -23,7 +23,7 @@ describe("buildCsp", () => {
 
   it("uses the 'self' fallback on public pages, without nonce", () => {
     const text = buildCsp({ variant: "public" });
-    expect(directives(text).get("script-src")).toEqual(["'self'", "'unsafe-inline'"]);
+    expect(directives(text).get("script-src")).toEqual(["'self'", "'unsafe-inline'", "https://challenges.cloudflare.com", "https://accounts.google.com/gsi/client"]);
     expect(text).not.toContain("nonce");
   });
 

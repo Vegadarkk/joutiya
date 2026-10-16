@@ -1,0 +1,116 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { publicConfig } from "@/lib/config/public";
+import { parseEnv, resetServerEnv } from "@/lib/env";
+
+// The /api/config payload (§2: runtime configuration, no NEXT_PUBLIC_*): public values only.
+
+const DSN = "https://examplePublicKey@o0.ingest.de.sentry.io/0";
+
+const configured: Record<string, string> = {
+  APP_ENV: "staging",
+  SITE_URL: "https://staging.joutiya.ma/",
+  RELEASE: "0123456789ab",
+  FIREBASE_PROJECT_ID: "joutiya-staging",
+  FIREBASE_API_KEY: "AIza-browser",
+  FIREBASE_APP_ID: "1:123456789:web:abc",
+  TURNSTILE_SITE_KEY: "0x4AAAAAAA-site",
+  GOOGLE_OAUTH_CLIENT_ID: "123456789-abc.apps.googleusercontent.com",
+  SENTRY_DSN: DSN,
+};
+
+// Not real secrets (Gitleaks runs on this repository): values that must never reach the browser.
+const secrets: Record<string, string> = {
+  FIREBASE_SERVER_API_KEY: "AIza-server-only",
+  FIREBASE_SERVICE_ACCOUNT: "joutiya-web@joutiya-staging.iam.gserviceaccount.com",
+  GOOGLE_APPLICATION_CREDENTIALS: "/run/secrets/gcp.json",
+  TURNSTILE_SECRET_KEY: "0x4AAAAAAA-secret",
+  HASH_PEPPER: "pepper-".repeat(5),
+  CSRF_SECRET: "csrf-".repeat(7),
+  TELEGRAM_BOT_TOKEN: "123:bot-token",
+  ALERT_RELAY_SECRET: "relay-secret",
+  ALERT_RELAY_URL: "https://probe.example/alert",
+  QUEUE_REDIS_URL: "redis://:queue-pw@valkey-queue:6379",
+  RATE_LIMIT_REDIS_URL: "redis://:rl-pw@valkey-ratelimit:6379",
+  MAIL_API_KEY: "mail-key",
+  MAIL_WEBHOOK_SECRET: "whsec-x",
+  MAIL_FALLBACK_API_KEY: "fallback-key",
+  WHATSAPP_APP_SECRET: "wa-secret",
+  WHATSAPP_VERIFY_TOKEN: "wa-verify",
+  CF_ACCESS_AUD: "a".repeat(64),
+};
+
+describe("publicConfig", () => {
+  it("carries the public values and nothing else", () => {
+    const config = publicConfig(parseEnv({ ...configured, ...secrets }).env);
+    expect(config).toEqual({
+      env: "staging",
+      siteUrl: "https://staging.joutiya.ma",
+      firebase: { apiKey: "AIza-browser", projectId: "joutiya-staging", appId: "1:123456789:web:abc", authDomain: "joutiya-staging.firebaseapp.com" },
+      turnstileSiteKey: "0x4AAAAAAA-site",
+      googleClientId: "123456789-abc.apps.googleusercontent.com",
+      sentry: { dsn: DSN, environment: "staging", release: "0123456789ab" },
+    });
+    const json = JSON.stringify(config);
+    for (const [name, value] of Object.entries(secrets)) {
+      expect(json, name).not.toContain(value);
+      expect(json).not.toContain(name);
+    }
+    expect(json).not.toMatch(/NEXT_PUBLIC_/);
+  });
+
+  it("nulls what is not configured and names the Sentry DSN only when set", () => {
+    expect(publicConfig(parseEnv({}).env)).toEqual({
+      env: "dev",
+      siteUrl: "http://localhost:3000",
+      firebase: null,
+      turnstileSiteKey: null,
+      googleClientId: null,
+      sentry: null,
+    });
+    expect(publicConfig(parseEnv({ SENTRY_DSN: DSN }).env).sentry).toEqual({ dsn: DSN, environment: "dev", release: "dev" });
+    // Firebase needs both the browser key and the project; the app id and auth domain have defaults.
+    expect(publicConfig(parseEnv({ FIREBASE_API_KEY: "AIza-browser" }).env).firebase).toBeNull();
+    expect(publicConfig(parseEnv({ FIREBASE_PROJECT_ID: "joutiya-dev", FIREBASE_API_KEY: "AIza-browser", FIREBASE_AUTH_DOMAIN: "auth.joutiya.ma" }).env).firebase).toEqual({
+      apiKey: "AIza-browser",
+      projectId: "joutiya-dev",
+      appId: "",
+      authDomain: "auth.joutiya.ma",
+    });
+  });
+
+  it("names the Auth emulator in dev only", () => {
+    const emulated = { FIREBASE_PROJECT_ID: "demo-joutiya", FIREBASE_API_KEY: "fake", FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099" };
+    expect(publicConfig(parseEnv(emulated).env).firebase?.authEmulatorUrl).toBe("http://127.0.0.1:9099");
+    // Refused at startup outside dev (env.ts); never advertised to the browser either.
+    expect(publicConfig(parseEnv({ ...configured, ...emulated }).env).firebase).not.toHaveProperty("authEmulatorUrl");
+  });
+});
+
+describe("GET /api/config", () => {
+  const names = ["SENTRY_DSN", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET_KEY"] as const;
+  const saved = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+
+  afterEach(() => {
+    for (const name of names) {
+      if (saved[name] === undefined) delete process.env[name];
+      else process.env[name] = saved[name];
+    }
+    resetServerEnv();
+  });
+
+  it("answers the public configuration as JSON with a short shared cache", async () => {
+    process.env.SENTRY_DSN = DSN;
+    process.env.TURNSTILE_SITE_KEY = "0x4AAAAAAA-site";
+    process.env.TURNSTILE_SECRET_KEY = "0x4AAAAAAA-secret";
+    resetServerEnv();
+    const { GET, dynamic } = await import("@/app/api/config/route");
+    expect(dynamic).toBe("force-dynamic");
+    const response = GET();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toMatch(/^application\/json/);
+    expect(response.headers.get("cache-control")).toBe("public, max-age=300");
+    const body = (await response.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({ turnstileSiteKey: "0x4AAAAAAA-site", sentry: { dsn: DSN } });
+    expect(JSON.stringify(body)).not.toContain("0x4AAAAAAA-secret");
+  });
+});

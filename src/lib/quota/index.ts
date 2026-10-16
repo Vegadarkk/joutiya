@@ -3,7 +3,7 @@ import { QUOTA_IDS, QUOTAS, type QuotaId } from "@/config/quotas";
 import { alert } from "@/lib/alert";
 import { logger } from "@/lib/logging/logger";
 import { isValkeyConfigured, valkey } from "@/lib/valkey/clients";
-import { classify, periodKey, retentionSeconds, type QuotaLevel } from "./period";
+import { classify, nextPeriodStart, periodKey, retentionSeconds, type QuotaLevel } from "./period";
 
 // Counters live in valkey-queue (noeviction, AOF): they must survive a restart and never be
 // evicted by rate-limit pressure (§2).
@@ -99,15 +99,34 @@ export async function readQuotas(at = new Date()): Promise<QuotaStatus[]> {
   }
 }
 
+/** Raw counter of the current period: null when unset or unreadable (unknown counts as available). */
+async function readCounter(id: QuotaId): Promise<number | null> {
+  const definition = QUOTAS[id];
+  if (!isValkeyConfigured("queue")) return null;
+  try {
+    const value = await valkey("queue").get(counterKey(id, periodKey(definition, new Date())));
+    return value === null ? null : Number(value);
+  } catch {
+    return null;
+  }
+}
+
 /** True once the degraded mode of this quota applies. Unknown counts as available. */
 export async function isDegraded(id: QuotaId): Promise<boolean> {
-  const definition = QUOTAS[id];
-  const period = periodKey(definition, new Date());
-  if (!isValkeyConfigured("queue")) return false;
-  try {
-    const value = await valkey("queue").get(counterKey(id, period));
-    return value !== null && classify(definition, Number(value)) === "degraded";
-  } catch {
-    return false;
-  }
+  const used = await readCounter(id);
+  return used !== null && classify(QUOTAS[id], used) === "degraded";
+}
+
+/**
+ * True once the counter reached its limit, whatever `degradeAt` says: the share between the two
+ * is a reserve (Resend keeps its last 10 % for security mails). Unknown counts as available.
+ */
+export async function isExhausted(id: QuotaId): Promise<boolean> {
+  const used = await readCounter(id);
+  return used !== null && used >= QUOTAS[id].limit;
+}
+
+/** When the provider resets this quota (start of the next period): deferred jobs wait for it. */
+export function nextReset(id: QuotaId, at = new Date()): Date {
+  return nextPeriodStart(QUOTAS[id], at);
 }

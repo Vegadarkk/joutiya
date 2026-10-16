@@ -52,7 +52,7 @@ jobs:
     outputs:
       release: ${{ steps.release.outputs.id }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Release
@@ -106,16 +106,16 @@ jobs:
       # Workload Identity Federation for the staging Firestore rules (no JSON key).
       id-token: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
       # firebase-tools from the lockfile (devDependency kept current by Dependabot), not a fresh npx download.
       - run: npm ci --ignore-scripts
-      - uses: google-github-actions/auth@v3
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: ${{ vars.FIREBASE_STAGING_WIF_PROVIDER }}
           service_account: ${{ vars.FIREBASE_STAGING_DEPLOYER }}

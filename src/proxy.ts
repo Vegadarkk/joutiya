@@ -6,7 +6,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import createMiddleware from "next-intl/middleware";
 import { routing } from "@/i18n/routing";
 import { PRIVATE_SEGMENTS } from "@/config/site";
+import { DEVICE_COOKIE, setDeviceCookie } from "@/lib/security/cookies";
 import { buildCsp, createNonce, INLINE_HASH_MARKER, type CspVariant } from "@/lib/security/csp";
+import { newDeviceCookie, readDeviceId } from "@/lib/security/device";
 import { coopFor } from "@/lib/security/headers";
 
 const handleI18nRouting = createMiddleware(routing);
@@ -26,6 +28,16 @@ function notFound(): NextResponse {
   });
 }
 
+/** Origin of the Sentry ingest host named by the DSN (connect-src), or undefined. */
+function sentryOrigin(dsn: string | undefined): string | undefined {
+  if (!dsn) return undefined;
+  try {
+    return new URL(dsn).origin;
+  } catch {
+    return undefined;
+  }
+}
+
 function cspHeaderName(): string {
   return process.env.CSP_REPORT_ONLY === "true" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy";
 }
@@ -35,12 +47,13 @@ function csp(variant: CspVariant, nonce?: string): string {
     variant,
     nonce,
     dev: process.env.NODE_ENV === "development",
-    mediaOrigin: process.env.NEXT_PUBLIC_MEDIA_BASE_URL,
+    mediaOrigin: process.env.MEDIA_BASE_URL,
     r2Origin: process.env.R2_S3_ENDPOINT,
-    errorIngestOrigin: process.env.ERROR_INGEST_ORIGIN,
+    errorIngestOrigin: sentryOrigin(process.env.SENTRY_DSN),
+    authEmulatorOrigin: process.env.FIREBASE_AUTH_EMULATOR_HOST ? `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}` : undefined,
     reportPath: "/api/csp-report",
     // Deployed sites are https only; a production build served on http://127.0.0.1 (e2e) is not.
-    upgradeInsecure: (process.env.NEXT_PUBLIC_SITE_URL ?? "").startsWith("https://"),
+    upgradeInsecure: (process.env.SITE_URL ?? "").startsWith("https://"),
   });
 }
 
@@ -71,6 +84,8 @@ function forwardWithNonce(routed: NextResponse, request: NextRequest, policy: st
   }
   headers.set("x-nonce", nonce);
   headers.set("Content-Security-Policy", policy);
+  // Read by the (account) layout to send an anonymous visitor back here after sign-in.
+  headers.set("x-pathname", `${request.nextUrl.pathname}${request.nextUrl.search}`);
 
   const rewrite = routed.headers.get("x-middleware-rewrite");
   const response = rewrite
@@ -119,7 +134,12 @@ export function proxy(request: NextRequest): NextResponse {
   if (isPrivatePath(pathname)) {
     const nonce = createNonce();
     const policy = csp("private", nonce);
-    return decorate(forwardWithNonce(routed, request, policy, nonce), "public", policy);
+    const response = decorate(forwardWithNonce(routed, request, policy, nonce), "public", policy);
+    // The device cookie exists before the first API call: sign-up and sign-in limits are counted
+    // per device, and a browser without the cookie would share the anonymous bucket of its IP
+    // (src/lib/rate-limit/keys.ts). Private pages are dynamic, so the cookie costs no cache.
+    if (!readDeviceId(request.cookies.get(DEVICE_COOKIE)?.value)) setDeviceCookie(response, newDeviceCookie().value);
+    return response;
   }
   // Fallback policy; the server hook swaps 'unsafe-inline' for the hashes of this HTML.
   const response = decorate(routed, "public", csp("public"));

@@ -1,36 +1,48 @@
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
-import { Link } from "@/i18n/navigation";
-import { Container } from "@/components/layout/container";
-import { EmptyState } from "@/components/feedback/empty-state";
-import { Button } from "@/components/ui/button";
+import { headers } from "next/headers";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { AuthShell } from "@/components/auth/auth-shell";
+import { LoginForm } from "@/components/auth/login-form";
+import { Link, redirect } from "@/i18n/navigation";
 import { pageLocale } from "@/i18n/params";
+import { currentMember } from "@/lib/auth/current-user";
+import { afterSignInTarget, safeNextPath } from "@/lib/auth/next-path";
 
-// Placeholder until phase 2 (Firebase Auth, sessions).
+type Props = { params: Promise<{ locale: string }>; searchParams: Promise<{ next?: string | string[] }> };
 
-export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const locale = pageLocale((await params).locale);
-  const t = await getTranslations({ locale, namespace: "Nav" });
-  return { title: t("signIn") };
+  const t = await getTranslations({ locale, namespace: "Auth.signIn" });
+  return { title: t("title") };
 }
 
-export default async function SignInPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function SignInPage({ params, searchParams }: Props) {
   const locale = pageLocale((await params).locale);
-  const t = await getTranslations({ locale, namespace: "Private" });
-  const nav = await getTranslations({ locale, namespace: "Search" });
+  setRequestLocale(locale);
+  // Already signed in: straight to the page the person wanted (same `next` check as the form).
+  if (await currentMember()) {
+    const target = afterSignInTarget((await searchParams).next);
+    redirect({ href: target.pathname, locale: target.locale ?? locale });
+  }
+  const t = await getTranslations({ locale, namespace: "Auth.signIn" });
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  // The link to the other flow keeps a valid `next`.
+  const raw = (await searchParams).next;
+  const next = safeNextPath(Array.isArray(raw) ? raw[0] : raw);
   return (
-    <Container>
-      <EmptyState
-        headingLevel="h1"
-        title={t("signInTitle")}
-        action={
-          <Button asChild variant="outline">
-            <Link href="/">{nav("backHome")}</Link>
-          </Button>
-        }
-      >
-        {t("signInBody")}
-      </EmptyState>
-    </Container>
+    <AuthShell
+      title={t("title")}
+      lead={t("lead")}
+      footer={
+        <p>
+          {t("noAccount")}{" "}
+          <Link href={next ? { pathname: "/inscription", query: { next } } : "/inscription"} className="font-medium text-link underline-offset-2 hover:underline">
+            {t("create")}
+          </Link>
+        </p>
+      }
+    >
+      <LoginForm nonce={nonce} />
+    </AuthShell>
   );
 }
