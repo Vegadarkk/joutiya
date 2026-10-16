@@ -36,6 +36,7 @@ function hasFiles(event: DragEvent): boolean {
 
 export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onRefresh, onMove, keepOne = false }: PhotoUploaderProps) {
   const t = useTranslations("Listing.photos");
+  const errors = useTranslations("Listing.errors");
   const picker = useRef<HTMLInputElement>(null);
   const camera = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLUListElement>(null);
@@ -46,6 +47,8 @@ export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onR
   const focusAfterMove = useRef<FocusTarget | null>(null);
   const room = Math.max(0, maxPhotos - photos.length);
   const readyCount = photos.filter((item) => item.status === "ready").length;
+  // The upload cap counts refused photos too: the tile says it briefly, the banner what to do.
+  const uploadLimited = photos.some((item) => item.status === "failed" && item.errorCode === "upload_limit");
 
   // The moved tile changed place in the DOM: give the focus back to the control that moved it.
   useEffect(() => {
@@ -94,6 +97,7 @@ export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onR
         <span className="font-medium tabular-nums text-foreground">{t("count", { count: photos.length, max: maxPhotos })}</span>
         <span>{room > 0 ? t("tooMany", { count: room }) : t("full")}</span>
       </div>
+      {uploadLimited ? <ErrorBanner tone="warning" title={errors("upload_limit")} /> : null}
 
       <ul ref={list} aria-label={t("list")} className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {photos.map((item, index) => (
@@ -210,7 +214,9 @@ function PhotoTile({ item, index, total, canRemove, onRemove, onRetry, onRefresh
           : item.status === "failed"
             ? item.errorCode === "decode_failed"
               ? t("decodeFailed")
-              : item.errorCode && errors.has(item.errorCode as Parameters<typeof errors.has>[0])
+              : item.errorCode === "upload_limit"
+                ? t("uploadLimit")
+                : item.errorCode && errors.has(item.errorCode as Parameters<typeof errors.has>[0])
                 ? errors(item.errorCode as Parameters<typeof errors.has>[0])
                 : t("failed")
             : item.status === "timeout"

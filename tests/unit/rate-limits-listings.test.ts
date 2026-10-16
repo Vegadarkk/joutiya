@@ -12,13 +12,17 @@ const MIB = 1024 * 1024;
 
 const expected: Record<string, RateLimitDefinition> = {
   "listing.draft.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
+  "listing.edit.uid": { points: 30, duration: DAY, policy: "open", key: "uid" },
   "listing.create.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },
   "listing.create.ip": { points: 30, duration: HOUR, policy: "open", key: "ip" },
   "listing.new.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
   "listing.status.uid": { points: 120, duration: DAY, policy: "open", key: "uid" },
+  "listing.publish.uid": { points: 60, duration: DAY, policy: "open", key: "uid" },
   "listing.owner.read.uid": { points: 5000, duration: DAY, policy: "open", key: "uid" },
   "upload.sign.uid": { points: 30, duration: HOUR, policy: "closed", key: "uid" },
   "upload.bytes.uid": { points: 200 * MIB, duration: DAY, policy: "closed", key: "uid" },
+  "upload.status.uid": { points: 900, duration: HOUR, policy: "open", key: "uid" },
+  "upload.delete.uid": { points: 300, duration: DAY, policy: "open", key: "uid" },
   "reveal.uid.hour": { points: 10, duration: HOUR, policy: "closed", key: "uid" },
   "reveal.uid.day": { points: 30, duration: DAY, policy: "closed", key: "uid" },
   "reveal.device": { points: 20, duration: DAY, policy: "closed", key: "device" },
@@ -54,6 +58,7 @@ describe("phase 3 rate-limit table", () => {
     expect(RATE_LIMITS["upload.bytes.uid"].policy).toBe("closed");
     expect(RATE_LIMITS["reveal.ip"].policy).toBe("closed");
     expect(RATE_LIMITS["listing.draft.uid"].policy).toBe("open");
+    expect(RATE_LIMITS["listing.edit.uid"].policy).toBe("open");
   });
 });
 

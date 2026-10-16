@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import fr from "../../messages/fr.json";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UserRecord } from "@/lib/db/repositories/profiles";
+import { isolate } from "@/lib/i18n/bidi";
+import type * as Quota from "@/lib/quota";
 
 // The public profile page module (lot D2, §5 /profil/{publicId}): ISR settings, 404 for unknown or
 // hidden accounts, header, listing grid, empty state, metadata. Firestore and the request-scoped
@@ -19,7 +21,7 @@ const repo = vi.hoisted(() => ({
 vi.mock("@/components/favorites/favorite-button", () => ({ FavoriteButton: ({ listingId }: { listingId: string }) => <span data-favorite={listingId} /> }));
 vi.mock("@/lib/db/repositories/listings", () => ({ getListing: vi.fn(), listPublishedByOwner: repo.listPublishedByOwner }));
 vi.mock("@/lib/db/repositories/profiles", () => ({ findUserByPublicId: repo.findUserByPublicId, getUserRecord: vi.fn() }));
-vi.mock("@/lib/quota", () => ({ consume: vi.fn() }));
+vi.mock("@/lib/quota", async (importOriginal) => ({ ...(await importOriginal<typeof Quota>()), consume: vi.fn(), firstDegraded: vi.fn(async () => null) }));
 vi.mock("@/lib/firebase/admin", () => {
   const query = { where: () => query, count: () => ({ get: async () => ({ data: () => ({ count: repo.count() }) }) }) };
   return { db: () => ({ collection: () => query }) };
@@ -42,6 +44,7 @@ vi.mock("next-intl/server", async () => {
   };
 });
 
+const { firstDegraded } = await import("@/lib/quota");
 const page = await import("@/app/[locale]/(public)/profil/[publicId]/page");
 const { default: ProfilePage, generateMetadata, generateStaticParams } = page;
 
@@ -115,6 +118,8 @@ beforeEach(() => {
   repo.findUserByPublicId.mockReset();
   repo.listPublishedByOwner.mockReset();
   repo.count.mockReset();
+  vi.mocked(firstDegraded).mockReset();
+  vi.mocked(firstDegraded).mockResolvedValue(null);
 });
 
 describe("profile page", () => {
@@ -134,11 +139,21 @@ describe("profile page", () => {
     }
   });
 
+  it("fails the render before any read on a degraded-reads day, so Next keeps serving the last generated page", async () => {
+    repo.findUserByPublicId.mockResolvedValue(user());
+    vi.mocked(firstDegraded).mockResolvedValue("firestore.reads");
+    await expect(ProfilePage(params(PUBLIC_ID))).rejects.toMatchObject({ status: 503, code: "quota_exhausted" });
+    await expect(generateMetadata(params(PUBLIC_ID))).rejects.toMatchObject({ status: 503, code: "quota_exhausted" });
+    expect(firstDegraded).toHaveBeenCalledWith(["firestore.reads"]);
+    expect(repo.findUserByPublicId).not.toHaveBeenCalled();
+  });
+
   it("shows the header and the grid of published listings, linked to their pages", async () => {
     repo.findUserByPublicId.mockResolvedValue(user());
     repo.listPublishedByOwner.mockResolvedValue([listing("abcd2345", "Vélo de ville"), listing("bcde3456", "Casque")]);
     const html = await renderPage();
-    expect(html).toMatch(/<h1[^>]*>Salma/);
+    // The name keeps its own direction (dir="auto"), apart from the Pro badge.
+    expect(html).toMatch(/<h1[^>]*><span dir="auto"[^>]*>Salma<\/span>/);
     expect(html).toContain("Membre depuis octobre 2025");
     expect(html).toContain("Téléphone vérifié");
     expect(html).toContain("2 annonces en ligne");
@@ -165,6 +180,8 @@ describe("profile page", () => {
     expect(html).toContain(fr.Profile.emptyTitle);
     expect(html).toContain('href="/fr/recherche"');
     expect(html).toContain("0 annonce en ligne");
+    // The name inside the translated sentence is bidi-isolated.
+    expect(html).toContain(fr.Profile.emptyBody.replace("{name}", isolate("Salma")));
     expect(repo.listPublishedByOwner).not.toHaveBeenCalled();
   });
 

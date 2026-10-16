@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { Direction } from "radix-ui";
 import { ThemeSync } from "./theme";
-import { Toaster } from "@/components/ui/toaster";
+import { DeferredToaster } from "@/components/ui/deferred-toaster";
 import { SentryClient } from "@/components/observability/sentry-client";
 import { InitialSessionContext } from "@/lib/auth/client";
 import { PublicConfigProvider } from "@/lib/config/client";
@@ -34,7 +34,7 @@ export function Providers({
           <ThemeSync />
           <SentryClient />
           {children}
-          <Toaster dir={dir} />
+          <DeferredToaster dir={dir} />
         </InitialSessionContext.Provider>
       </PublicConfigProvider>
     </Direction.Provider>

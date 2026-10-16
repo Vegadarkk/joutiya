@@ -34,6 +34,7 @@ vi.mock("next-intl/server", async () => {
     setRequestLocale: () => undefined,
     getTranslations: async ({ locale, namespace }: { locale: "fr" | "ar"; namespace?: string }) =>
       createTranslator({ locale, messages: messages[locale] ?? messages.fr, namespace: namespace as never }),
+    getMessages: async ({ locale }: { locale: "fr" | "ar" }) => messages[locale] ?? messages.fr,
   };
 });
 

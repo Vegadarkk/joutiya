@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
-import { useTranslations } from "next-intl";
-import { getTranslations, setRequestLocale } from "next-intl/server";
+import { NextIntlClientProvider, useTranslations } from "next-intl";
+import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Container } from "@/components/layout/container";
@@ -19,6 +19,7 @@ import { SearchError } from "@/components/search/search-error";
 import { PendingBar, PendingRegion, SearchNavigationProvider } from "@/components/search/search-navigation";
 import { SortSelect } from "@/components/search/sort-select";
 import type { Locale } from "@/config/site";
+import { PUBLIC_CLIENT_NAMESPACES, SEARCH_PAGE_CLIENT_NAMESPACES, pickMessages } from "@/i18n/client-messages";
 import { numbersLocale, pageLocale } from "@/i18n/params";
 import { parseSearchParams, SEARCH_MAX_TOTAL_HITS, SEARCH_PATH, searchPath } from "@/lib/search/params";
 import type { SearchCard, SearchResponse } from "@/lib/search/types";
@@ -110,36 +111,42 @@ export default async function SearchPage({ params, searchParams }: Props) {
   const [t, title] = await Promise.all([getTranslations({ locale: numbersLocale(locale), namespace: "SearchPage" }), searchPageTitle(locale, applied)]);
   const total = outcome.kind === "results" ? outcome.response.total : 0;
 
+  // The public layout ships only the public client namespaces; the filters sheet and the save
+  // dialog read more (src/i18n/client-messages.ts). A nested provider replaces, never merges.
+  const messages = pickMessages(await getMessages({ locale }), [...PUBLIC_CLIENT_NAMESPACES, ...SEARCH_PAGE_CLIENT_NAMESPACES]);
+
   return (
-    <SearchNavigationProvider>
-      <div className="border-b border-border bg-surface-brand/60">
-        <Container className="py-4 sm:py-6">
-          {/* Remounted per search: its fields start from the URL after every navigation. */}
-          <SearchBar key={searchPath(applied)} params={applied} />
-        </Container>
-      </div>
-      <Container className="flex flex-col gap-4 pt-6 pb-12 sm:gap-5 sm:pt-8 sm:pb-16">
-        <header className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold text-balance break-words sm:text-3xl">{title}</h1>
+    <NextIntlClientProvider locale={locale} messages={messages}>
+      <SearchNavigationProvider>
+        <div className="border-b border-border bg-surface-brand/60">
+          <Container className="py-4 sm:py-6">
+            {/* Remounted per search: its fields start from the URL after every navigation. */}
+            <SearchBar key={searchPath(applied)} params={applied} />
+          </Container>
+        </div>
+        <Container className="flex flex-col gap-4 pt-6 pb-12 sm:gap-5 sm:pt-8 sm:pb-16">
+          <header className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold text-balance break-words sm:text-3xl">{title}</h1>
+            {outcome.kind === "results" ? (
+              <p data-testid="search-count" aria-live="polite" className="text-foreground-muted">
+                {total >= SEARCH_MAX_TOTAL_HITS ? t("countAtLeast", { count: SEARCH_MAX_TOTAL_HITS }) : t("count", { count: total })}
+              </p>
+            ) : null}
+          </header>
           {outcome.kind === "results" ? (
-            <p data-testid="search-count" aria-live="polite" className="text-foreground-muted">
-              {total >= SEARCH_MAX_TOTAL_HITS ? t("countAtLeast", { count: SEARCH_MAX_TOTAL_HITS }) : t("count", { count: total })}
-            </p>
-          ) : null}
-        </header>
-        {outcome.kind === "results" ? (
-          <Results
-            response={outcome.response}
-            locale={locale}
-            toolbarAction={<SaveSearchButton params={outcome.response.params} />}
-            renderAction={favoriteAction}
-          />
-        ) : outcome.kind === "challenge" ? (
-          <SearchChallenge params={applied} />
-        ) : (
-          <SearchError kind={outcome.kind} retryAfter={outcome.kind === "rate_limited" ? outcome.retryAfter : undefined} />
-        )}
-      </Container>
-    </SearchNavigationProvider>
+            <Results
+              response={outcome.response}
+              locale={locale}
+              toolbarAction={<SaveSearchButton params={outcome.response.params} />}
+              renderAction={favoriteAction}
+            />
+          ) : outcome.kind === "challenge" ? (
+            <SearchChallenge params={applied} />
+          ) : (
+            <SearchError kind={outcome.kind} retryAfter={outcome.kind === "rate_limited" ? outcome.retryAfter : undefined} />
+          )}
+        </Container>
+      </SearchNavigationProvider>
+    </NextIntlClientProvider>
   );
 }

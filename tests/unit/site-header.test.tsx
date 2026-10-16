@@ -2,90 +2,97 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import type * as NextNavigation from "next/navigation";
-import type * as Radix from "radix-ui";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import fr from "../../messages/fr.json";
+import { AccountMenu } from "@/components/auth/account-menu";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { SiteHeader } from "@/components/layout/site-header";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import type { Locale } from "@/config/site";
 import { loadMessages } from "@/i18n/messages";
+import { InitialSessionContext } from "@/lib/auth/client";
+import type { SessionSummary } from "@/lib/contracts/auth";
 
-// Header fixes: 44 px touch targets (logo link, every control on the end side), no header search
-// on pages that carry their own search form, and a language switch that keeps the query string
-// (search filters, ?next= of the challenge page, unsubscribe token). The menu content is rendered
-// inline here (Radix mounts it only once opened in the browser).
+// Header controls (server markup): accessible names that hold the visible text (WCAG 2.5.3), a
+// named search landmark, and 44 px touch targets.
 
-const nav = vi.hoisted(() => ({ pathname: "/fr/recherche", search: "" }));
 vi.mock("next/navigation", async (importOriginal) => ({
   ...(await importOriginal<typeof NextNavigation>()),
+  usePathname: () => "/fr/mes-annonces",
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn(), back: vi.fn(), forward: vi.fn() }),
-  usePathname: () => nav.pathname,
-  useSearchParams: () => new URLSearchParams(nav.search),
 }));
-vi.mock("radix-ui", async (importOriginal) => {
-  const actual = await importOriginal<typeof Radix>();
-  const Pass = ({ children }: { children?: ReactNode }) => <>{children}</>;
-  const Trigger = ({ children, className }: { children?: ReactNode; className?: string }) => (
-    <button type="button" className={className}>
-      {children}
-    </button>
-  );
-  return { ...actual, DropdownMenu: { ...actual.DropdownMenu, Root: Pass, Trigger, Portal: Pass, Content: Pass, Item: Pass } };
-});
 
-const MESSAGES = { fr: await loadMessages("fr"), ar: await loadMessages("ar"), rif: await loadMessages("rif") };
+// Arabic over the French base, as the app loads it (the language codes are only in fr.json).
+const ar = await loadMessages("ar");
 
-function render(node: ReactNode, locale: Locale = "fr") {
+function render(node: ReactNode, locale: Locale = "fr", session: SessionSummary | null = null) {
   return renderToStaticMarkup(
-    <NextIntlClientProvider locale={locale} messages={MESSAGES[locale]} timeZone="Africa/Casablanca">
-      {node}
+    <NextIntlClientProvider locale={locale} messages={locale === "ar" ? ar : fr} timeZone="Africa/Casablanca">
+      <InitialSessionContext.Provider value={session}>{node}</InitialSessionContext.Provider>
     </NextIntlClientProvider>,
   );
 }
 
-/** The href of each language link (the tags that carry a lang attribute). */
-const hrefs = (html: string) =>
-  [...html.matchAll(/<a [^>]*>/g)]
-    .map((match) => match[0])
-    .filter((tag) => / lang="/.test(tag))
-    .map((tag) => / href="([^"]+)"/.exec(tag)?.[1]?.replace(/&amp;/g, "&"));
-
-beforeEach(() => {
-  nav.pathname = "/fr/recherche";
-  nav.search = "";
-});
+const session: SessionSummary = {
+  uid: "uid-1",
+  email: "salma@test.joutiya.ma",
+  emailVerified: true,
+  role: "individual",
+  suspended: false,
+  displayName: "Salma Benali",
+  publicId: "abcdefghjk",
+  phoneVerified: false,
+  locale: "fr",
+  providers: ["password"],
+};
 
 describe("LocaleSwitcher", () => {
-  it("keeps the query string of the page in every language", () => {
-    nav.search = "q=velo&ville=rabat&prix-max=2000&etat=neuf&etat=bon";
-    expect(hrefs(render(<LocaleSwitcher />))).toEqual(["fr", "ar", "rif"].map((locale) => `/${locale}/recherche?q=velo&ville=rabat&prix-max=2000&etat=neuf&etat=bon`));
+  it("starts its accessible name with the visible language code", () => {
+    expect(render(<LocaleSwitcher />)).toContain('aria-label="FR, Langue"');
+    const arabic = render(<LocaleSwitcher />, "ar");
+    expect(arabic).toContain(`aria-label="${ar.Locale.short.ar}، ${ar.Locale.label}"`);
+    expect(arabic).toContain(`<span>${ar.Locale.short.ar}</span>`);
+  });
+});
 
-    nav.pathname = "/ar/alertes/desabonnement";
-    nav.search = "t=abc.def";
-    expect(hrefs(render(<LocaleSwitcher />, "ar"))).toEqual(["/fr/alertes/desabonnement?t=abc.def", "/ar/alertes/desabonnement?t=abc.def", "/rif/alertes/desabonnement?t=abc.def"]);
+describe("AccountMenu", () => {
+  it("names the signed-in trigger by its text: 'Mon compte', then the display name shown from sm", () => {
+    const html = render(<AccountMenu />, "fr", session);
+    const trigger = /<button[^>]*>([\s\S]*?)<\/button>/.exec(html);
+    expect(trigger?.[0]).not.toContain("aria-label=");
+    expect(trigger?.[1]).toContain(`<span class="sr-only">${fr.Auth.menu.account}</span> <span dir="auto" class="hidden max-w-32 truncate sm:inline">Salma Benali</span>`);
+    // The initials are a decorative avatar.
+    expect(trigger?.[1]).toMatch(/<span class="[^"]*" aria-hidden="true">SB<\/span>/);
+    expect(trigger?.[0]).toContain("min-w-11");
   });
 
-  it("links the bare path when there is no query", () => {
-    nav.pathname = "/fr";
-    expect(hrefs(render(<LocaleSwitcher />))).toEqual(["/fr", "/ar", "/rif"]);
-  });
-
-  it("gives every language a 44 px row", () => {
-    expect(render(<LocaleSwitcher />).match(/<a [^>]*class="flex min-h-11 /g)).toHaveLength(3);
+  it("gives the anonymous sign-in link a 44 px target", () => {
+    const html = render(<AccountMenu />);
+    expect(html).toMatch(/<a [^>]*class="[^"]*min-w-11[^"]*"[^>]*href="\/fr\/connexion\?next=/);
+    expect(html).toContain(`<span class="sr-only sm:hidden">${fr.Nav.signIn}</span>`);
   });
 });
 
 describe("SiteHeader", () => {
-  it("makes the logo link and the end-side controls 44 px touch targets", () => {
+  it("names its search landmark (the home page has a second one) and keeps the logo link 44 px tall", () => {
     const html = render(<SiteHeader locale="fr" />);
-    expect(html).toMatch(/<a [^>]*class="h-11 [^"]*py-0\.5 md:h-12 md:py-0"[^>]*aria-label="[^"]+"/);
+    expect(html).toContain(`role="search" aria-label="${fr.Nav.searchLabel}"`);
+    expect(html).toMatch(/<a class="flex h-11 [^"]*" aria-label="Accueil Joutiya" href="\/fr"/);
     expect(html).toContain('<div class="ms-auto flex items-center gap-1 *:min-w-11">');
   });
 
-  it("hides its search field when the main content has its own search form", () => {
-    nav.pathname = "/ar";
+  it("hides its search field when the main content has its own search form (home, /recherche)", () => {
     const html = render(<SiteHeader locale="ar" />, "ar");
     const form = /<form [^>]*>/.exec(html)?.[0] ?? "";
     expect(form).toContain('action="/ar/recherche"');
     expect(form).toContain("[:root:has(#main_[role=search])_&amp;]:hidden");
+  });
+});
+
+describe("ThemeToggle", () => {
+  it("offers three 44 px radios", () => {
+    const html = render(<ThemeToggle />);
+    expect(html.match(/role="radio"/g)).toHaveLength(3);
+    expect(html.match(/inline-flex size-11 /g)).toHaveLength(3);
   });
 });

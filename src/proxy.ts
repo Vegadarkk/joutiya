@@ -14,6 +14,7 @@ import { newDeviceCookie, readDeviceId } from "@/lib/security/device";
 import { coopFor } from "@/lib/security/headers";
 import { checkPageLimits, isMeteredPath, pathLocale, tooManyPagesHtml, TOO_MANY_CSP } from "@/lib/rate-limit/proxy-limits";
 import { challengeUrlPath } from "@/lib/security/challenge-path";
+import { mediaBaseUrl } from "@/lib/storage/keys";
 
 const handleI18nRouting = createMiddleware(routing);
 
@@ -42,6 +43,18 @@ function sentryOrigin(dsn: string | undefined): string | undefined {
   }
 }
 
+/**
+ * Where photos come from (img-src): MEDIA_BASE_URL when set, else the dev storage route on the
+ * public origin, which the admin host (another origin) must allow too. Null outside dev without it.
+ */
+function mediaOrigin(): string | undefined {
+  try {
+    return mediaBaseUrl() ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function cspHeaderName(): string {
   return process.env.CSP_REPORT_ONLY === "true" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy";
 }
@@ -52,7 +65,7 @@ function csp(variant: CspVariant, nonce?: string, scriptHashes?: readonly string
     nonce,
     scriptHashes,
     dev: process.env.NODE_ENV === "development",
-    mediaOrigin: process.env.MEDIA_BASE_URL,
+    mediaOrigin: mediaOrigin(),
     r2Origin: process.env.R2_S3_ENDPOINT,
     tilesOrigin: process.env.MAP_PMTILES_URL,
     errorIngestOrigin: sentryOrigin(process.env.SENTRY_DSN),

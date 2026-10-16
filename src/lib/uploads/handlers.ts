@@ -5,6 +5,7 @@ import { notFound } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { json, noContent } from "@/lib/http/route";
+import { assertQuotas, DEPOSIT_QUOTAS } from "@/lib/quota/gate";
 import { requestIdentity } from "@/lib/rate-limit/keys";
 import { z } from "@/lib/zod";
 import { completeUpload, deleteUpload, signUpload, uploadStatus, type Uploader } from "./service";
@@ -38,6 +39,9 @@ export async function handleSign(request: Request): Promise<Response> {
 export async function handleComplete(request: Request, params: Params): Promise<Response> {
   const auth = await requireUser(request, { mutation: true });
   await enforceLimit("upload.status.uid", auth.user.uid);
+  // Processing writes the upload and attaches the photo: suspended with the deposit. Status and
+  // deletion stay open (a degraded day must not trap a photo the owner wants removed).
+  await assertQuotas(DEPOSIT_QUOTAS);
   const id = await uploadIdOf(params);
   if (request.headers.get("content-type")) await readJson(request, completeSchema);
   const body: UploadStatusResponse = await completeUpload(uploaderOf(request, auth), id);
@@ -55,6 +59,8 @@ export async function handleStatus(request: Request, params: Params): Promise<Re
 export async function handleDelete(request: Request, params: Params): Promise<Response> {
   const auth = await requireUser(request, { mutation: true });
   const id = await uploadIdOf(params);
+  // Before the first Firestore read: the Spark daily quotas are shared by the whole site.
+  await enforceLimit("upload.delete.uid", auth.user.uid);
   await deleteUpload(uploaderOf(request, auth), id);
   return noContent();
 }

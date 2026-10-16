@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { blurhashPlaceholder, photoSources, smallWidth } from "@/components/listing/photo";
+import { blurhashPlaceholder, photoSources, smallWidth, srcSetOf, variantWidth } from "@/components/listing/photo";
 
-// Image attributes of listing photos (design §8): srcset over the s/l variants with their real
-// widths, and the blurhash placeholder as a tiny BMP data URL that the server can render.
+// Image attributes of listing photos (design §8): srcset over the s/m/l variants (s/l before m)
+// with their real widths, and the blurhash placeholder as a tiny BMP data URL that the server can render.
 
 const BASE = "https://media.joutiya.ma";
 const HASH = "LEHV6nWB2yk8pyo0adR*.7kCMdnj";
@@ -30,6 +30,23 @@ describe("photoSources", () => {
 
   it("keeps one candidate for photos smaller than the s variant", () => {
     expect(photoSources(BASE, "abcd2345", { id: "photo0003", w: 400, h: 300, blurhash: HASH })?.srcSet).toBe(`${BASE}/listings/abcd2345/photo0003-l.webp 400w`);
+  });
+
+  it("adds the m variant between s and l when the photo has it", () => {
+    const sources = photoSources(BASE, "abcd2345", { id: "photo0004", w: 1600, h: 1200, blurhash: HASH, variants: ["l", "m", "s"] });
+    expect(sources?.srcSet).toBe(
+      `${BASE}/listings/abcd2345/photo0004-s.webp 480w, ${BASE}/listings/abcd2345/photo0004-m.webp 960w, ${BASE}/listings/abcd2345/photo0004-l.webp 1600w`,
+    );
+    expect(sources?.src).toBe(`${BASE}/listings/abcd2345/photo0004-s.webp`);
+    expect(variantWidth({ w: 1200, h: 1600 }, "m")).toBe(720);
+  });
+
+  it("leaves out a variant as wide as the next one (photo smaller than its edge)", () => {
+    const url = (variant: string) => variant;
+    expect(srcSetOf({ w: 900, h: 600, variants: ["l", "m", "s"] }, url)).toBe("s 480w, l 900w");
+    expect(srcSetOf({ w: 400, h: 300, variants: ["l", "m", "s"] }, url)).toBe("l 400w");
+    expect(srcSetOf({ w: 1600, h: 1200, variants: ["l", "s"] }, url)).toBe("s 480w, l 1600w");
+    expect(srcSetOf({ w: 1600, h: 1200 }, url)).toBe("s 480w, l 1600w");
   });
 
   it("returns null without a media host", () => {

@@ -267,10 +267,14 @@ export const uploadSchema = z
     declaredType: z.enum(UPLOAD_DECLARED_TYPES),
     status: z.enum(UPLOAD_STATUSES),
     quarantineKey: z.string().min(1).max(200),
-    /** `listings/{listingId}/{photoId}` once ready (variants add `-l.webp` / `-s.webp`). */
+    /**
+     * `listings/{listingId}/{photoId}` once ready (variants add `-l.webp` / `-s.webp`);
+     * `removed/listings/{listingId}/{photoId}` once purge-quarantine moved a removed listing's photos.
+     */
     finalKey: z.string().min(1).max(200).optional(),
+    /** Where the variants are: `media` (public), or `private` for a removed listing's photos (moved there, kept until its purge). */
     bucket: z.enum(UPLOAD_BUCKETS),
-    /** Real size from the HEAD on the quarantine object. */
+    /** Real size from the HEAD on the quarantine object; once ready, the bytes of the variants (R2 storage gauge). */
     size: z.number().int().min(0).optional(),
     width: z.number().int().min(1).optional(),
     height: z.number().int().min(1).optional(),

@@ -18,7 +18,7 @@ import {
   titleSchema,
   type ListingPatch,
 } from "@/lib/contracts/listings";
-import { MAX_PHOTOS_INDIVIDUAL, MAX_PHOTOS_PRO, MAX_UPLOAD_BYTES, MEDIA_API, PHOTO_VARIANT_SPECS, listingPhotoSchema, signUploadSchema, uploadIdSchema } from "@/lib/contracts/media";
+import { LEGACY_PHOTO_VARIANTS, MAX_PHOTOS_INDIVIDUAL, MAX_PHOTOS_PRO, MAX_UPLOAD_BYTES, MEDIA_API, PHOTO_VARIANT_SPECS, listingPhotoSchema, signUploadSchema, uploadIdSchema } from "@/lib/contracts/media";
 
 const fullPatch: ListingPatch = {
   categoryId: "vehicules",
@@ -134,7 +134,7 @@ describe("media contracts", () => {
     expect(signUploadSchema.safeParse({ ...sign, targetId: "ABCDEFGH" }).success).toBe(false);
     expect(signUploadSchema.safeParse({ ...sign, fileName: "x.jpg" }).success).toBe(false);
     expect([MAX_UPLOAD_BYTES, MAX_PHOTOS_INDIVIDUAL, MAX_PHOTOS_PRO]).toEqual([10 * 1024 * 1024, 10, 20]);
-    expect(PHOTO_VARIANT_SPECS).toEqual({ l: { maxEdge: 1600, quality: 80 }, s: { maxEdge: 480, quality: 75 } });
+    expect(PHOTO_VARIANT_SPECS).toEqual({ l: { maxEdge: 1600, quality: 80 }, m: { maxEdge: 960, quality: 78 }, s: { maxEdge: 480, quality: 75 } });
   });
 
   it("validates photo ids and the stored photo shape", () => {
@@ -149,5 +149,9 @@ describe("media contracts", () => {
     expect(listingPhotoSchema.safeParse({ ...photo, hash: "0123456789ABCDEF" }).success).toBe(false);
     expect(listingPhotoSchema.safeParse({ ...photo, w: 0 }).success).toBe(false);
     expect(listingPhotoSchema.safeParse({ ...photo, url: "https://x" }).success).toBe(false);
+    expect(listingPhotoSchema.safeParse({ ...photo, variants: ["l", "m", "s"] }).success).toBe(true);
+    expect(listingPhotoSchema.safeParse({ ...photo, variants: [...LEGACY_PHOTO_VARIANTS] }).success).toBe(true);
+    expect(listingPhotoSchema.safeParse({ ...photo, variants: [] }).success).toBe(false);
+    expect(listingPhotoSchema.safeParse({ ...photo, variants: ["xl"] }).success).toBe(false);
   });
 });

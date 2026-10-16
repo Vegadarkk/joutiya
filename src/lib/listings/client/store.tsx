@@ -260,6 +260,8 @@ const backoff = (attempt: number) => Math.min(120_000, 15_000 * 2 ** Math.max(0,
 /** Automatic retry after a failed save (Autosave `retryAfter`); null waits for "Réessayer". */
 export function saveRetryDelay(error: unknown, attempt: number): number | null {
   if (!(error instanceof ApiError)) return backoff(attempt);
+  // Firestore quota spent for the day (503 until the reset, hours away): retrying only spends reads.
+  if (error.code === "quota_exhausted") return null;
   if (error.code === "network" || error.code === "unavailable" || error.code === "internal" || error.status >= 500) return backoff(attempt);
   if (error.code === "rate_limited") return Math.min(10 * 60_000, Math.max(1, error.retryAfter ?? 60) * 1000);
   // Version race with the photo pipeline (it bumps `version` when it attaches a photo): once, quickly.
@@ -274,6 +276,16 @@ export function recoverPatch(patch: ListingPatch, error: unknown): ListingPatch 
   if (isApiError(error, "invalid_body")) return withoutRejectedFields(patch, error.details);
   if (isApiError(error, "not_found")) return null;
   return patch;
+}
+
+/**
+ * Leaving the page asks first (beforeunload): a live listing's unsaved changes, a field too short
+ * to be sent, or a draft's changes whose last save failed. Those would be lost: the keepalive
+ * request sent on page hide is refused the same way (a spent daily quota halts the autosave).
+ */
+export function confirmsLeave(autosave: Pick<Autosave<object>, "isManual" | "currentState" | "hasPending">, heldFields: number): boolean {
+  if (heldFields > 0) return true;
+  return autosave.hasPending() && (autosave.isManual || autosave.currentState === "error");
 }
 
 export interface WizardContextValue extends WizardState {
@@ -417,9 +429,10 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
       const pending = instance.takePending();
       if (pending) patchListingOnUnload(listingId, pending);
     };
-    // Unsaved changes (a live listing's, or a field too short to be saved): the browser asks first.
+    // Unsaved changes (a live listing's, a draft's after a failed save, a field too short to be
+    // saved): the browser asks first.
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if ((instance.isManual && instance.hasPending()) || heldRef.current.length > 0) event.preventDefault();
+      if (confirmsLeave(instance, heldRef.current.length)) event.preventDefault();
     };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", onHide);

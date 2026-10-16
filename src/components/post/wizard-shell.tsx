@@ -103,9 +103,13 @@ export function WizardShell({ step, title, lead, states, reachable, onSelect, on
   );
 }
 
-/** Failures the autosave retries by itself (Autosave `retryAfter`): the message says so. */
+/**
+ * Failures the autosave retries by itself (saveRetryDelay in store.tsx): the message says so. A
+ * spent daily quota (503 quota_exhausted) is not retried: its message says when to come back.
+ */
 function isTransient(error: unknown): boolean {
   if (!isApiError(error)) return true;
+  if (error.code === "quota_exhausted") return false;
   return error.status >= 500 || ["network", "unavailable", "internal", "rate_limited"].includes(error.code);
 }
 

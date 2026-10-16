@@ -52,7 +52,7 @@ export function Breadcrumb({ items, current, className }: { items: BreadcrumbIte
           </li>
         ))}
         <li className="min-w-0 max-w-full">
-          <span aria-current="page" className="block truncate text-foreground sm:max-w-[22rem]">
+          <span aria-current="page" dir="auto" className="block truncate text-foreground sm:max-w-[22rem]">
             {current}
           </span>
         </li>

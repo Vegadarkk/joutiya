@@ -2,6 +2,7 @@ import type { Job } from "bullmq";
 import { backupFirestore } from "./backup-firestore";
 import { expireListings } from "./expire-listings";
 import { sendExpiryReminders } from "./listing-expiry-reminders";
+import { purgeConnectionLogs } from "./purge-connection-logs";
 import { purgeQuarantine } from "./purge-quarantine";
 import { purgeUnactivated } from "./purge-unactivated";
 import { quotaReport } from "./quota-report";
@@ -25,6 +26,7 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "reconcile-search": () => reconcileSearch(),
   "expire-boosts": () => sweepExpiredBoosts(),
   "saved-search-alerts": () => sendSavedSearchAlerts(),
+  "purge-connection-logs": () => purgeConnectionLogs(),
 };
 
 /** Repeatable jobs (UTC cron patterns), upserted at every start. */
@@ -42,6 +44,9 @@ export const SCHEDULES = {
   "purge-quarantine-hourly": { pattern: "20 * * * *", job: "purge-quarantine" },
   // 03:10 UTC: media bucket recount for the R2 storage gauge (D15).
   "r2-storage-gauge-nightly": { pattern: "10 3 * * *", job: "r2-storage-gauge" },
+  // 03:15 UTC: connectionLogs past purgeAt (1 year). The system queue runs one job at a time: after
+  // retention-purge (its deletions are then in the counter), before the backup (03:30).
+  "purge-connection-logs-nightly": { pattern: "15 3 * * *", job: "purge-connection-logs" },
   // 03:30 UTC (D17): encrypted Firestore backup, after retention-purge (03:00) and the R2 gauge (03:10).
   "backup-firestore-nightly": { pattern: "30 3 * * *", job: "backup-firestore" },
   // Phase 4. 04:05 UTC: À la Une ended since the last sweep -> searchOutbox (safety net of the

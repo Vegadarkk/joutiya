@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import type { PriceUnit } from "@/config/categories";
-import type { Locale } from "@/config/site";
+import { isRtl, type Locale } from "@/config/site";
 import { currencyLabel, groupDigits, parsePriceInput } from "@/lib/listings/client/format";
 import { PRICE_MAX } from "@/lib/listings/client/validation";
 import { cn } from "@/lib/utils";
@@ -42,6 +42,10 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
   const text = value === null ? "" : groupDigits(String(value));
 
   const disabled = isDonation || toDiscuss;
+  // The digits stay left to right (dir="ltr" on the input), so the box uses physical sides: the
+  // currency sits at the reading end (right in French, left in Arabic) and the reserved padding is
+  // on that same side, the amount aligned at the other end.
+  const rtl = isRtl(locale);
 
   return (
     <div className="flex flex-col gap-5" onBlur={onBlur}>
@@ -49,7 +53,7 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
         <AmountBox
           inputRef={input}
           suffix={
-            <span className="pointer-events-none absolute end-4 top-1/2 flex -translate-y-1/2 flex-col items-end leading-tight" aria-hidden="true">
+            <span className={cn("pointer-events-none absolute top-1/2 flex -translate-y-1/2 flex-col leading-tight", rtl ? "left-4 items-start" : "right-4 items-end")} aria-hidden="true">
               <span className="text-lg font-medium text-foreground-muted">{currencyLabel(locale)}</span>
               {priceUnit ? <span className="text-xs text-foreground-muted">{t(`per.${priceUnit}`)}</span> : null}
             </span>
@@ -61,7 +65,7 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
           value={isDonation ? "0" : toDiscuss ? "" : text}
           disabled={disabled}
           dir="ltr"
-          className={cn("h-14 pe-20 text-start text-2xl font-semibold tabular-nums", disabled && "text-foreground-muted")}
+          className={cn("h-14 text-2xl font-semibold tabular-nums", rtl ? "pl-20 text-right" : "pr-20 text-left", disabled && "text-foreground-muted")}
           onChange={(event) => {
             const parsed = parsePriceInput(event.target.value);
             onChange(parsed === null ? null : Math.min(parsed, PRICE_MAX * 10));

@@ -182,7 +182,7 @@ async function publish(upload: UploadRecord, listing: ListingRecord, processed: 
   for (const variant of PHOTO_VARIANTS) {
     await ctx.store.put("media", mediaObjectKey(listing.id, upload.id, variant), processed.variants[variant], { contentType: MEDIA_CONTENT_TYPE, cacheControl: MEDIA_CACHE_CONTROL });
   }
-  const photo: ListingPhoto = { id: upload.id, w: processed.width, h: processed.height, blurhash: processed.blurhash, hash: processed.hash };
+  const photo: ListingPhoto = { id: upload.id, w: processed.width, h: processed.height, blurhash: processed.blurhash, hash: processed.hash, variants: [...PHOTO_VARIANTS] };
   const storedBytes = PHOTO_VARIANTS.reduce((sum, variant) => sum + processed.variants[variant].byteLength, 0);
   const outcome = await markUploadReady(
     upload.id,

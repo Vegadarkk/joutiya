@@ -10,7 +10,7 @@ import type { ListingStatus } from "@/lib/contracts/listings";
 import { usePublicConfig } from "@/lib/config/client";
 
 // `/deposer/{id}/termine`: published (link + share), pending review (explanation, mail sent) or
-// rejected, and the way to the next listing.
+// rejected, and the way to the next listing. The panel is the whole page: its title is the h1.
 
 interface DoneScreenProps {
   status: ListingStatus;
@@ -60,7 +60,7 @@ export function DoneScreen({ status, slugId, url, listingId }: DoneScreenProps) 
       <StatusPanel
         icon={CircleCheck}
         title={t("publishedTitle")}
-        headingLevel="h2"
+        headingLevel="h1"
         actions={
           <>
             {path ? (
@@ -97,7 +97,7 @@ export function DoneScreen({ status, slugId, url, listingId }: DoneScreenProps) 
       <StatusPanel
         icon={CircleX}
         title={t("rejectedTitle")}
-        headingLevel="h2"
+        headingLevel="h1"
         actions={
           <>
             <Button asChild>
@@ -117,7 +117,7 @@ export function DoneScreen({ status, slugId, url, listingId }: DoneScreenProps) 
       <StatusPanel
         icon={Clock}
         title={t("pendingTitle")}
-        headingLevel="h2"
+        headingLevel="h1"
         actions={
           <>
             {another}
@@ -134,7 +134,7 @@ export function DoneScreen({ status, slugId, url, listingId }: DoneScreenProps) 
     <StatusPanel
       icon={CircleCheck}
       title={t("savedTitle")}
-      headingLevel="h2"
+      headingLevel="h1"
       actions={
         <>
           {mine}

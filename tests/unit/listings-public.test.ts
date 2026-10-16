@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ListingStatus } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UserRecord } from "@/lib/db/repositories/profiles";
+import type * as Quota from "@/lib/quota";
 
 // Public reads (design §4 public.ts): slug parsing -> redirect decision, which statuses render,
 // profile by publicId. Repositories mocked: no Firestore here.
@@ -10,9 +11,11 @@ const repo = vi.hoisted(() => ({
   getListing: vi.fn<(id: string) => Promise<ListingRecord | null>>(),
   listPublishedByOwner: vi.fn<(uid: string, limit?: number) => Promise<ListingRecord[]>>(),
   findUserByPublicId: vi.fn<(publicId: string) => Promise<UserRecord | null>>(),
+  firstDegraded: vi.fn(async (): Promise<string | null> => null),
 }));
 vi.mock("@/lib/db/repositories/listings", () => ({ getListing: repo.getListing, listPublishedByOwner: repo.listPublishedByOwner }));
 vi.mock("@/lib/db/repositories/profiles", () => ({ findUserByPublicId: repo.findUserByPublicId }));
+vi.mock("@/lib/quota", async (importOriginal) => ({ ...(await importOriginal<typeof Quota>()), firstDegraded: repo.firstDegraded }));
 
 const { getPublishedBySlugId, getProfile, memberSince, PUBLIC_STATES } = await import("@/lib/listings/public");
 
@@ -72,6 +75,8 @@ beforeEach(() => {
   repo.getListing.mockReset();
   repo.listPublishedByOwner.mockReset();
   repo.findUserByPublicId.mockReset();
+  repo.firstDegraded.mockReset();
+  repo.firstDegraded.mockResolvedValue(null);
 });
 
 describe("getPublishedBySlugId", () => {
@@ -118,6 +123,17 @@ describe("getPublishedBySlugId", () => {
     const result = await getPublishedBySlugId(ID);
     expect(result?.canonicalSlugId).toBe(`velo-de-ville-${ID}`);
     expect(result?.redirect).toBe(true);
+  });
+
+  it("throws before the read once Firestore reads are degraded (ISR keeps the last page); a malformed id stays a 404", async () => {
+    repo.getListing.mockResolvedValue(record("published"));
+    repo.firstDegraded.mockResolvedValue("firestore.reads");
+    await expect(getPublishedBySlugId(`velo-de-ville-casablanca-${ID}`)).rejects.toMatchObject({ status: 503, code: "quota_exhausted" });
+    expect(repo.firstDegraded).toHaveBeenCalledWith(["firestore.reads"]);
+    expect(repo.getListing).not.toHaveBeenCalled();
+    repo.firstDegraded.mockClear();
+    expect(await getPublishedBySlugId("velo-de-ville")).toBeNull();
+    expect(repo.firstDegraded).not.toHaveBeenCalled();
   });
 });
 

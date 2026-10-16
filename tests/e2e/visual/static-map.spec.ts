@@ -16,6 +16,8 @@ process.env.FIRESTORE_EMULATOR_HOST ??= "127.0.0.1:8080";
 const LISTING_ID = "vsmap234";
 const SLUG_ID = `appartement-casablanca-${LISTING_ID}`;
 const SCREENSHOT = "static-map.png";
+// Public ids use the publicId alphabet (no i, l, o, 0, 1): the strict schemas refuse anything else.
+const SELLER_PUBLIC_ID = "vsmapsef23";
 
 async function seedFixture(): Promise<void> {
   const app = getApps()[0] ?? initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID ?? "demo-joutiya" });
@@ -23,7 +25,7 @@ async function seedFixture(): Promise<void> {
   const uid = "e2e-visual-seller";
   const at = new Date("2026-10-01T09:00:00.000Z");
   await firestore.collection("users").doc(uid).set({
-    publicId: "vsmapsel23",
+    publicId: SELLER_PUBLIC_ID,
     displayName: "Vendeur Visuel",
     type: "individual",
     badges: { emailVerified: true, phoneVerified: false, proCertified: false },
@@ -38,7 +40,7 @@ async function seedFixture(): Promise<void> {
     ownerUid: uid,
     sellerType: "individual",
     sellerName: "Vendeur Visuel",
-    sellerPublicId: "vsmapsel23",
+    sellerPublicId: SELLER_PUBLIC_ID,
     status: "published",
     slugId: SLUG_ID,
     title: "Appartement lumineux",

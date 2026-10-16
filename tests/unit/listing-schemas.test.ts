@@ -261,4 +261,13 @@ describe("firestore.indexes.json", () => {
     expect(exempt).toEqual(["attributes", "description", "photos"]);
     expect(file.fieldOverrides.some((o) => o.collectionGroup === "private" && o.fieldPath === "phoneE164")).toBe(true);
   });
+
+  it("keeps the automatic purgeAt index the journal purges query (no composite index needed)", () => {
+    // purge-connection-logs and retention-purge ask `purgeAt <= now` (ordered by purgeAt) and nothing
+    // else: the automatic single-field index serves it, and the CLI refuses a one-field composite.
+    // An exemption of purgeAt would break those nightly purges in production only.
+    for (const group of ["connectionLogs", "contentOps", "revealLogs"]) {
+      expect(file.fieldOverrides.some((o) => o.collectionGroup === group && o.fieldPath === "purgeAt"), group).toBe(false);
+    }
+  });
 });

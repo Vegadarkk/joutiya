@@ -4,10 +4,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import type * as NextNavigation from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import ar from "../../messages/ar.json";
 import fr from "../../messages/fr.json";
 import type { ListingStatus } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UserRecord } from "@/lib/db/repositories/profiles";
+import { isolate } from "@/lib/i18n/bidi";
+import type * as Quota from "@/lib/quota";
 
 // The public listing page module (lot D2: D1 canonical redirect, D14 404, §8 ISR settings, §5
 // content, metadata and JSON-LD). Firestore, next/navigation and the request-scoped next-intl API
@@ -19,7 +22,7 @@ const repo = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db/repositories/listings", () => ({ getListing: repo.getListing, listPublishedByOwner: vi.fn() }));
 vi.mock("@/lib/db/repositories/profiles", () => ({ findUserByPublicId: vi.fn(), getUserRecord: repo.getUserRecord }));
-vi.mock("@/lib/quota", () => ({ consume: vi.fn() }));
+vi.mock("@/lib/quota", async (importOriginal) => ({ ...(await importOriginal<typeof Quota>()), consume: vi.fn(), firstDegraded: vi.fn(async () => null) }));
 // The heart is a client island (app router hooks): its own tests cover it (phase 4).
 vi.mock("@/components/favorites/favorite-button", () => ({ FavoriteButton: ({ listingId }: { listingId: string }) => <span data-favorite={listingId} /> }));
 vi.mock("@/lib/firebase/admin", () => {
@@ -50,6 +53,7 @@ vi.mock("next-intl/server", async () => {
   };
 });
 
+const { firstDegraded } = await import("@/lib/quota");
 const page = await import("@/app/[locale]/(public)/annonce/[slugId]/page");
 const { default: ListingPage, generateMetadata, generateStaticParams } = page;
 
@@ -116,10 +120,10 @@ function user(overrides: Partial<UserRecord> = {}): UserRecord {
 
 const params = (slugId: string, locale = "fr") => ({ params: Promise.resolve({ locale, slugId }) });
 
-async function renderPage(slugId = SLUG_ID): Promise<string> {
-  const tree = await ListingPage(params(slugId));
+async function renderPage(slugId = SLUG_ID, locale: "fr" | "ar" = "fr"): Promise<string> {
+  const tree = await ListingPage(params(slugId, locale));
   return renderToStaticMarkup(
-    <NextIntlClientProvider locale="fr" messages={fr} timeZone="Africa/Casablanca">
+    <NextIntlClientProvider locale={locale} messages={locale === "ar" ? ar : fr} timeZone="Africa/Casablanca">
       {tree}
     </NextIntlClientProvider>,
   );
@@ -146,6 +150,8 @@ beforeEach(() => {
   repo.getListing.mockReset();
   repo.getUserRecord.mockReset();
   repo.getUserRecord.mockResolvedValue(user());
+  vi.mocked(firstDegraded).mockReset();
+  vi.mocked(firstDegraded).mockResolvedValue(null);
 });
 
 describe("route settings (design §8)", () => {
@@ -191,6 +197,18 @@ describe("D1 canonical URL and D14 404", () => {
   });
 });
 
+describe("degraded Firestore reads (ISR cache)", () => {
+  it("fails the render before any read, so Next keeps serving the last generated page", async () => {
+    repo.getListing.mockResolvedValue(record());
+    vi.mocked(firstDegraded).mockResolvedValue("firestore.reads");
+    await expect(ListingPage(params(SLUG_ID))).rejects.toMatchObject({ status: 503, code: "quota_exhausted" });
+    await expect(generateMetadata(params(SLUG_ID))).rejects.toMatchObject({ status: 503, code: "quota_exhausted" });
+    expect(firstDegraded).toHaveBeenCalledWith(["firestore.reads"]);
+    expect(repo.getListing).not.toHaveBeenCalled();
+    expect(repo.getUserRecord).not.toHaveBeenCalled();
+  });
+});
+
 describe("page content", () => {
   it("renders the title, price, place, criteria, description, seller, contact island, safety tips and map", async () => {
     repo.getListing.mockResolvedValue(record());
@@ -219,6 +237,35 @@ describe("page content", () => {
     expect(description?.[0]).toContain("whitespace-pre-wrap");
     expect(description?.[1]).toBe("Ligne 1\n\n  Ligne 2 &lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).not.toContain("<script>alert(1)");
+  });
+
+  it("shows the seller's texts in their own direction: title, description, district and seller name", async () => {
+    repo.getListing.mockResolvedValue(record("published", { location: { regionCode: "06", citySlug: "casablanca", district: "المعاريف", geo: { lat: 33.57, lng: -7.59 } } }));
+    const html = await renderPage();
+    expect(html).toMatch(/<h1 dir="auto"[^>]*>Vélo de ville<\/h1>/);
+    expect(html).toMatch(/<div data-testid="listing-description" dir="auto" class="[^"]*\[unicode-bidi:plaintext\]/);
+    expect(html).toContain(`Casablanca, ${isolate("المعاريف")}, Casablanca-Settat`);
+    expect(html).toMatch(/<span aria-current="page" dir="auto"[^>]*>Vélo de ville<\/span>/);
+    expect(html).toMatch(/<a dir="auto"[^>]*href="\/fr\/profil\/abcdefghjk"[^>]*>Salma<\/a>/);
+    // The gallery's alt texts isolate the title inside the translated sentence.
+    expect(html).toContain(`alt="${isolate("Vélo de ville")}, photo 1 sur 2"`);
+  });
+
+  it("joins the city and the district with the locale's separator (an Arabic comma in Arabic)", async () => {
+    repo.getListing.mockResolvedValue(record("published", { location: { regionCode: "06", citySlug: "casablanca", district: "Maârif (près du parc)", geo: { lat: 33.57, lng: -7.59 } } }));
+    const district = isolate("Maârif (près du parc)");
+    expect(await renderPage()).toContain(`Casablanca, ${district}, Casablanca-Settat`);
+    const html = await renderPage(SLUG_ID, "ar");
+    expect(html).toContain(`الدار البيضاء، ${district}، الدار البيضاء-سطات`);
+    expect(html).not.toContain("الدار البيضاء,");
+  });
+
+  it("offers the m variant in the gallery's srcset for photos that have it (D6), not for legacy ones", async () => {
+    const [first, second] = record().photos;
+    repo.getListing.mockResolvedValue(record("published", { photos: [{ ...first!, variants: ["l", "m", "s"] }, second!] }));
+    const html = await renderPage();
+    expect(html).toContain("/listings/abcd2345/photo0001-m.webp 960w");
+    expect(html).not.toContain("photo0002-m.webp");
   });
 
   it("never prints the uid, the moderation data, the geo point or a phone number", async () => {

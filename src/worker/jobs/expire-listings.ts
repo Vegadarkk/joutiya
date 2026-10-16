@@ -16,9 +16,15 @@ import { notifySearchIndex } from "@/lib/search/queue";
 // searchOutbox delete, audit), one transaction each that re-checks the listing, then the seller
 // gets the listingExpired mail. The public page follows within its ISR window (300 s):
 // revalidatePath does not work outside a Next request. Bounded per night; the rest waits a day.
+// The write quota is re-checked before each listing (a Valkey read), and the first RESOURCE_EXHAUSTED
+// ends the run: the SDK would otherwise back off for minutes on every remaining listing while the
+// system queue (reminders, purges, backup) waits behind this job.
 
 export const EXPIRE_BATCH = 200;
 export const EXPIRE_PAGES = 10;
+
+/** gRPC RESOURCE_EXHAUSTED: Spark refuses writes until its daily reset. */
+const RESOURCE_EXHAUSTED = 8;
 
 export interface ExpireResult {
   expired: number;
@@ -82,9 +88,13 @@ export async function expireListings(now = new Date()): Promise<ExpireResult> {
   const lifetime = listingLifetime(await getLegalConfig());
   const recipients = recipientCache();
   let cursor: ListingCursor | undefined;
-  for (let pages = 0; pages < EXPIRE_PAGES; pages += 1) {
+  pages: for (let pages = 0; pages < EXPIRE_PAGES; pages += 1) {
     const page = await listListingsToExpire(now, EXPIRE_BATCH, cursor);
     for (const candidate of page.listings) {
+      if (await isDegraded("firestore.writes")) {
+        logger.warn({ ...result }, "expire-listings stopped: Firestore write quota degraded");
+        break pages;
+      }
       try {
         const done = await expireOne(candidate.id, now, lifetime);
         if (!done) {
@@ -98,6 +108,7 @@ export async function expireListings(now = new Date()): Promise<ExpireResult> {
       } catch (error) {
         result.failed += 1;
         logger.warn({ listingId: candidate.id, err: (error as Error).message }, "listing not expired");
+        if ((error as { code?: unknown }).code === RESOURCE_EXHAUSTED) break pages;
       }
     }
     if (!page.next || page.read < EXPIRE_BATCH) break;

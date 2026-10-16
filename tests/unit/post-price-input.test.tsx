@@ -44,6 +44,27 @@ describe("PriceInput", () => {
     expect(render({ value: 1500 }, "ar")).toContain(">درهم<");
   });
 
+  it("keeps the currency and the space reserved for it on the same side in both directions", () => {
+    const suffixClass = (html: string) => /<span class="([^"]*)" aria-hidden="true"><span[^>]*>(?:DH|درهم)</.exec(html)?.[1] ?? "";
+    const classes = (value: string) => value.split(/\s+/);
+
+    // French: currency on the right, amount from the left.
+    const fr = render({ value: 1500 });
+    expect(classes(suffixClass(fr))).toEqual(expect.arrayContaining(["right-4", "items-end"]));
+    expect(classes(/class="([^"]*)"/.exec(inputTag(fr))?.[1] ?? "")).toEqual(expect.arrayContaining(["pr-20", "text-left"]));
+
+    // Arabic: the digits stay left to right, the currency moves to the left and the amount is set
+    // against the right edge, so the two never overlap.
+    const ar = render({ value: 1500 }, "ar");
+    expect(inputTag(ar)).toContain('dir="ltr"');
+    expect(classes(suffixClass(ar))).toEqual(expect.arrayContaining(["left-4", "items-start"]));
+    const arInput = classes(/class="([^"]*)"/.exec(inputTag(ar))?.[1] ?? "");
+    expect(arInput).toEqual(expect.arrayContaining(["pl-20", "text-right"]));
+    expect(arInput).not.toContain("pr-20");
+    // Logical sides would resolve against the input's own dir="ltr", not the page direction.
+    for (const html of [fr, ar]) expect(`${suffixClass(html)} ${inputTag(html)}`).not.toMatch(/\b(?:end-4|pe-20|text-start)\b/);
+  });
+
   it("shows the unit under the currency for rentals", () => {
     const html = render({ value: 4000, priceUnit: "month" });
     expect(html).toContain(fr.Listing.fields.per.month);

@@ -14,7 +14,9 @@ import { datesToTimestamps, timestampsToDates } from "./timestamps";
 // uploads/{id} (§5): one document per signed upload, id = photo id. Written by the sign route
 // (`signed`), the complete route (`processing`), the pipeline (`ready` | `rejected`) and the
 // purge jobs. `size` is the quarantine object's real size (HEAD) until the upload is ready, then
-// the bytes the variants occupy in the media bucket: the R2 storage gauge sums it (D15).
+// the bytes the variants occupy: the R2 storage gauge sums it (D15). `bucket` and `finalKey` say
+// where the variants are: the media bucket, or the private bucket once purge-quarantine moved the
+// photos of a removed listing there (`removed/listings/...`).
 
 export interface UploadRecord extends UploadDoc {
   id: string;
@@ -296,10 +298,41 @@ export async function writeRejectedSweepCursor(createdAt: Date, now = new Date()
   void consume("firestore.writes", 1);
 }
 
-/** Bytes of every `ready` upload (nightly recount of the R2 storage gauge, D15). */
-export async function sumReadyBytes(): Promise<number> {
-  const result = await uploads().where("status", "==", "ready").aggregate({ bytes: AggregateField.sum("size") }).get();
+/**
+ * Progress of purge-quarantine's scan of removed listings (system/purgeQuarantine): every one
+ * with (updatedAt, id) <= (at, id) had its photos moved to the private bucket, or handed to the
+ * hourly document purge.
+ */
+export interface RetainedScanCursor {
+  at: Date;
+  id: string;
+}
+
+export async function readRetainedScanCursor(): Promise<RetainedScanCursor | null> {
+  const snapshot = await db().collection(COLLECTIONS.system).doc(SWEEP_CURSOR_DOC).get();
   void consume("firestore.reads", 1);
+  const at: unknown = snapshot.get("retainedUpdatedAt");
+  const id: unknown = snapshot.get("retainedId");
+  return at instanceof Timestamp && typeof id === "string" && id.length > 0 ? { at: at.toDate(), id } : null;
+}
+
+export async function writeRetainedScanCursor(cursor: RetainedScanCursor, now = new Date()): Promise<void> {
+  await db()
+    .collection(COLLECTIONS.system)
+    .doc(SWEEP_CURSOR_DOC)
+    .set({ retainedUpdatedAt: Timestamp.fromDate(cursor.at), retainedId: cursor.id, updatedAt: Timestamp.fromDate(now) }, { merge: true });
+  void consume("firestore.writes", 1);
+}
+
+/**
+ * Bytes of every `ready` upload (nightly recount of the R2 storage gauge, D15), wherever its
+ * variants are: the media bucket, or the private bucket for a removed listing's (same account
+ * total, so a move between buckets changes nothing).
+ */
+export async function sumReadyBytes(): Promise<number> {
+  const result = await uploads().where("status", "==", "ready").aggregate({ bytes: AggregateField.sum("size"), entries: AggregateField.count() }).get();
+  // Aggregations bill one read per batch of up to 1 000 index entries (at least one).
+  void consume("firestore.reads", 1 + Math.floor(Number(result.data().entries ?? 0) / 1000));
   return Number(result.data().bytes ?? 0);
 }
 

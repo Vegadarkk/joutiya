@@ -8,8 +8,8 @@ import { INPUT_OPTIONS, MAX_INPUT_PIXELS, openImage, sharp } from "./sharp-setup
 // The sharp pipeline of a listing photo (architecture §3 step 5, design D6): header check first
 // (format, dimensions, pixel cap), then one decode with EXIF orientation applied, every metadata
 // block dropped (EXIF, GPS, XMP, IPTC, ICC: sharp writes none unless asked), re-encoded as WebP
-// `l` (1600 px) and `s` (480 px, from `l`), plus the blurhash placeholder and the dHash. The
-// output container is always ours, so trailing data of a polyglot file never survives.
+// `l` (1600 px), `m` (960 px) and `s` (480 px), both from `l`, plus the blurhash placeholder and
+// the dHash. The output container is always ours, so trailing data of a polyglot file never survives.
 
 export interface ProcessedImage {
   /** Dimensions of the `l` variant (what pages render). */
@@ -66,10 +66,13 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
       .resize({ width: PHOTO_VARIANT_SPECS.l.maxEdge, height: PHOTO_VARIANT_SPECS.l.maxEdge, fit: "inside", withoutEnlargement: true })
       .webp({ quality: PHOTO_VARIANT_SPECS.l.quality, effort: WEBP_EFFORT })
       .toBuffer({ resolveWithObject: true });
-    const small = await openImage(large.data)
-      .resize({ width: PHOTO_VARIANT_SPECS.s.maxEdge, height: PHOTO_VARIANT_SPECS.s.maxEdge, fit: "inside", withoutEnlargement: true })
-      .webp({ quality: PHOTO_VARIANT_SPECS.s.quality, effort: WEBP_EFFORT })
-      .toBuffer();
+    const fromLarge = (variant: "m" | "s") =>
+      openImage(large.data)
+        .resize({ width: PHOTO_VARIANT_SPECS[variant].maxEdge, height: PHOTO_VARIANT_SPECS[variant].maxEdge, fit: "inside", withoutEnlargement: true })
+        .webp({ quality: PHOTO_VARIANT_SPECS[variant].quality, effort: WEBP_EFFORT })
+        .toBuffer();
+    const medium = await fromLarge("m");
+    const small = await fromLarge("s");
     const blurhash = await blurhashOf(large.data);
     const hash = await dhash(large.data);
     return {
@@ -79,7 +82,7 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
       sourceHeight,
       blurhash,
       hash,
-      variants: { l: large.data, s: small },
+      variants: { l: large.data, m: medium, s: small },
     };
   } catch (error) {
     throw toMediaError(error);

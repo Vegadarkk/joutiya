@@ -4,11 +4,13 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import type { Locale } from "@/config/site";
 import { db } from "@/lib/firebase/admin";
 import { HttpError } from "@/lib/http/errors";
+import { consume } from "@/lib/quota";
 import { pepperedHash } from "@/lib/security/hash";
 import { normalizeEmail } from "@/lib/security/email-normalize";
 import { COLLECTIONS, emailIndexSchema, userPrivateSchema, userSchema, type UserDoc, type UserPrivateDoc } from "../schemas";
 
-// users, users/{uid}/private/account and emailIndex (§5). The server is the only writer.
+// users, users/{uid}/private/account and emailIndex (§5). The server is the only writer. Every
+// operation is counted against the Firestore Spark quotas (`consume`).
 
 const PUBLIC_ID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
@@ -80,10 +82,12 @@ export async function createAccountDocuments(input: CreateAccountInput): Promise
   });
   await db().runTransaction(async (tx) => {
     const existing = await tx.get(emailRef(hash));
+    void consume("firestore.reads", 1);
     if (existing.exists) throw new EmailTakenError(String(existing.get("uid")));
     tx.create(emailRef(hash), emailIndexSchema.parse({ uid: input.uid, createdAt: now }));
     tx.create(userRef(input.uid), user);
     tx.create(privateRef(input.uid), account);
+    void consume("firestore.writes", 3);
   });
   return { publicId };
 }
@@ -91,16 +95,19 @@ export async function createAccountDocuments(input: CreateAccountInput): Promise
 /** uid registered under this e-mail (normalized), or null. */
 export async function findUidByEmail(email: string): Promise<string | null> {
   const snapshot = await emailRef(emailNormHash(email)).get();
+  void consume("firestore.reads", 1);
   return snapshot.exists ? String(snapshot.get("uid")) : null;
 }
 
 export async function getUser(uid: string): Promise<UserDoc | null> {
   const snapshot = await userRef(uid).get();
+  void consume("firestore.reads", 1);
   return snapshot.exists ? (snapshot.data() as UserDoc) : null;
 }
 
 export async function getUserPrivate(uid: string): Promise<UserPrivateDoc | null> {
   const snapshot = await privateRef(uid).get();
+  void consume("firestore.reads", 1);
   return snapshot.exists ? (snapshot.data() as UserPrivateDoc) : null;
 }
 
@@ -109,23 +116,28 @@ export async function activateAccount(uid: string, now = new Date()): Promise<vo
   // A nested map, not a dotted key: set() with merge stores "badges.emailVerified" as a literal field
   // name, which leaves the badge false and makes the strict user schema refuse the document.
   await userRef(uid).set({ activation: "done", badges: { emailVerified: true }, updatedAt: now }, { merge: true });
+  void consume("firestore.writes", 1);
 }
 
 export async function linkProvider(uid: string, provider: "password" | "google.com"): Promise<void> {
   await privateRef(uid).update({ providers: FieldValue.arrayUnion(provider) });
+  void consume("firestore.writes", 1);
 }
 
 /** The account can no longer sign in with this provider (a never-verified password replaced on a Google sign-in). */
 export async function unlinkProvider(uid: string, provider: "password" | "google.com"): Promise<void> {
   await privateRef(uid).update({ providers: FieldValue.arrayRemove(provider) });
+  void consume("firestore.writes", 1);
 }
 
 export async function updateDisplayName(uid: string, displayName: string, now = new Date()): Promise<void> {
   await userRef(uid).update({ displayName, updatedAt: now });
+  void consume("firestore.writes", 1);
 }
 
 export async function updateLocale(uid: string, locale: Locale, now = new Date()): Promise<void> {
   await userRef(uid).update({ locale, updatedAt: now });
+  void consume("firestore.writes", 1);
 }
 
 /** Accounts still pending after `before` (purge-unactivated): uids, oldest first. */
@@ -137,6 +149,7 @@ export async function listPendingAccounts(before: Date, limit = 200): Promise<st
     .orderBy("createdAt", "asc")
     .limit(limit)
     .get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
   return snapshot.docs.map((doc) => doc.id);
 }
 
@@ -144,15 +157,18 @@ export async function listPendingAccounts(before: Date, limit = 200): Promise<st
  * Deletes the documents of an account that is still pending (purge-unactivated), in one
  * transaction: an activation that lands between the listing and the purge keeps the account.
  * False, and nothing written, when the user document is gone or no longer pending. The Auth
- * record is deleted by the caller.
+ * record is deleted by the caller. The deletions are counted by that caller (purge-unactivated,
+ * three per purged account), the reads here.
  */
 export async function deleteAccountDocumentsIfPending(uid: string): Promise<boolean> {
   return db().runTransaction(async (tx) => {
     const [user, account] = await Promise.all([tx.get(userRef(uid)), tx.get(privateRef(uid))]);
+    void consume("firestore.reads", 2);
     if (!user.exists || user.get("activation") !== "pending") return false;
     const hash: unknown = account.exists ? account.get("emailNormHash") : undefined;
     // The index entry goes only when it is this account's (reads before writes in a transaction).
     const index = typeof hash === "string" && hash ? await tx.get(emailRef(hash)) : null;
+    if (index) void consume("firestore.reads", 1);
     if (index?.exists && String(index.get("uid")) === uid) tx.delete(index.ref);
     if (account.exists) tx.delete(privateRef(uid));
     tx.delete(userRef(uid));
@@ -168,6 +184,7 @@ export async function deleteAccountDocuments(uid: string): Promise<void> {
   batch.delete(privateRef(uid));
   batch.delete(userRef(uid));
   await batch.commit();
+  void consume("firestore.deletes", account ? 3 : 2);
 }
 
 /** Translates a repository failure into the API answer (never reveals the other account). */

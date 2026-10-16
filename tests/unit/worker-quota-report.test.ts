@@ -3,7 +3,7 @@ import type { QuotaStatus } from "@/lib/quota";
 
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => true) }));
-vi.mock("@/lib/quota", () => ({ readQuotas: vi.fn(async () => []) }));
+vi.mock("@/lib/quota", () => ({ readQuotas: vi.fn(async () => []), consume: vi.fn(async () => ({ level: "ok" })) }));
 
 const set = vi.fn(async () => undefined);
 const doc = vi.fn(() => ({ set }));
@@ -12,7 +12,7 @@ const configured = { value: true };
 vi.mock("@/lib/firebase/admin", () => ({ db: () => ({ collection }), isFirestoreConfigured: () => configured.value }));
 
 const { alert } = await import("@/lib/alert");
-const { readQuotas } = await import("@/lib/quota");
+const { consume, readQuotas } = await import("@/lib/quota");
 const { quotaReport } = await import("@/worker/jobs/quota-report");
 const { JOBS } = await import("@/worker/jobs");
 
@@ -28,6 +28,7 @@ beforeEach(() => {
   doc.mockClear();
   collection.mockClear();
   vi.mocked(alert).mockClear();
+  vi.mocked(consume).mockClear();
   vi.mocked(readQuotas).mockReset();
   vi.mocked(readQuotas).mockResolvedValue(STATUS);
 });
@@ -49,6 +50,8 @@ describe("quota-report", () => {
       },
       { merge: true },
     );
+    // The snapshot is a Firestore write like any other (Spark quota).
+    expect(consume).toHaveBeenCalledExactlyOnceWith("firestore.writes", 1);
     expect(alert).not.toHaveBeenCalled();
   });
 
@@ -57,6 +60,7 @@ describe("quota-report", () => {
     vi.mocked(readQuotas).mockResolvedValue([...STATUS, { id: "brevo.daily", period: "2026-10-15", used: 0, limit: 300, ratio: 0, level: "unknown" }]);
     await quotaReport();
     expect(set).not.toHaveBeenCalled();
+    expect(consume).not.toHaveBeenCalled();
     expect(alert).toHaveBeenCalledTimes(1);
     expect(alert).toHaveBeenCalledWith({ severity: "P1", title: "Compteurs de quotas illisibles", body: expect.stringContaining("1 compteurs inconnus pour le 2026-10-15") });
   });

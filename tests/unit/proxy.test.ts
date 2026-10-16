@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { proxy } from "@/proxy";
+import { resetServerEnv } from "@/lib/env";
 import { INLINE_HASH_MARKER } from "@/lib/security/csp";
 import { PINNED_SCRIPT_HASHES } from "@/lib/security/inline-hashes";
 import * as proxyLimits from "@/lib/rate-limit/proxy-limits";
@@ -19,8 +20,16 @@ beforeEach(() => {
   vi.stubEnv("ADMIN_HOST", "admin.joutiya.ma");
   vi.stubEnv("APP_ENV", "prod");
   vi.stubEnv("SITE_URL", "https://joutiya.ma");
+  // The media origin comes from the parsed (cached) environment.
+  resetServerEnv();
 });
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  resetServerEnv();
+});
+
+/** One directive of a policy, e.g. "img-src 'self' data: ...". */
+const directive = (policy: string, name: string) => policy.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name} `)) ?? "";
 
 describe("proxy", () => {
   it("hides the back office on the public host", async () => {
@@ -96,6 +105,32 @@ describe("proxy", () => {
     const forged = await proxy(new NextRequest("https://joutiya.ma/fr/connexion", { headers: { host: "joutiya.ma", cookie: "__Host-did=aaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbb" } }));
     expect(forged.cookies.get("__Host-did")?.value).not.toBe("aaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbb");
     expect((await proxy(request("/fr"))).headers.get("set-cookie")).toBeNull();
+  });
+
+  it("lets the admin host show photos from the media host, and from the public origin's dev route in development", async () => {
+    vi.stubEnv("MEDIA_BASE_URL", "https://media.joutiya.ma/");
+    resetServerEnv();
+    const deployed = (await proxy(request("/moderation/abcd2345", "admin.joutiya.ma"))).headers.get("content-security-policy") ?? "";
+    expect(directive(deployed, "img-src")).toBe("img-src 'self' data: blob: https://media.joutiya.ma");
+
+    // Development without MEDIA_BASE_URL: photos come from /api/dev/storage on SITE_URL, another
+    // origin than admin.localhost. The staff route /photos/... is same-origin ('self').
+    vi.stubEnv("MEDIA_BASE_URL", "");
+    vi.stubEnv("APP_ENV", "dev");
+    vi.stubEnv("SITE_URL", "http://localhost:3100");
+    vi.stubEnv("ADMIN_HOST", "admin.localhost");
+    resetServerEnv();
+    const dev = (await proxy(request("/moderation/abcd2345", "admin.localhost:3100"))).headers.get("content-security-policy") ?? "";
+    expect(directive(dev, "img-src")).toContain("http://localhost:3100");
+    expect(directive(dev, "img-src")).toContain("'self'");
+
+    // Deployed without a media host: no extra origin.
+    vi.stubEnv("APP_ENV", "staging");
+    vi.stubEnv("SITE_URL", "https://staging.joutiya.ma");
+    vi.stubEnv("ADMIN_HOST", "admin.staging.joutiya.ma");
+    resetServerEnv();
+    const bare = (await proxy(request("/moderation", "admin.staging.joutiya.ma"))).headers.get("content-security-policy") ?? "";
+    expect(directive(bare, "img-src")).toBe("img-src 'self' data: blob:");
   });
 
   it("keeps staging out of search engines", async () => {

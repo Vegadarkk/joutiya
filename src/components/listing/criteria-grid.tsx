@@ -19,6 +19,8 @@ export interface CriterionRow {
   id: string;
   label: string;
   value: string;
+  /** Free text typed by the seller (not a translated option): shown in its own direction. */
+  userText?: boolean;
 }
 
 /** "120000" km -> "120 000 km"; years and small counts are not grouped. */
@@ -43,11 +45,16 @@ export function useCriteriaRows({ subcategoryId, attributes, condition }: Omit<C
     if (value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) continue;
     const def = criterionById(field.id) ?? field;
     let text: string;
+    let userText = false;
     if (Array.isArray(value)) text = value.map((item) => option(field.id, item)).join(", ");
     else if (typeof value === "boolean") text = value ? page("yes") : page("no");
     else if (typeof value === "number") text = def.unit && def.unit !== "an" ? `${formatNumber(value, def)} ${page(`units.${def.unit}`)}` : formatNumber(value, def);
-    else text = def.type === "select" ? option(field.id, value) : value;
-    rows.push({ id: field.id, label: label(field.id), value: text });
+    else if (def.type === "select") text = option(field.id, value);
+    else {
+      text = value;
+      userText = true;
+    }
+    rows.push({ id: field.id, label: label(field.id), value: text, ...(userText ? { userText } : {}) });
   }
   return rows;
 }
@@ -58,7 +65,9 @@ function Rows({ rows, className }: { rows: CriterionRow[]; className?: string })
       {rows.map((row) => (
         <div key={row.id} className="flex min-w-0 flex-col gap-0.5 border-s-2 border-border ps-3">
           <dt className="text-sm text-foreground-muted">{row.label}</dt>
-          <dd className="font-medium break-words">{row.value}</dd>
+          <dd dir={row.userText ? "auto" : undefined} className="font-medium break-words">
+            {row.value}
+          </dd>
         </div>
       ))}
     </dl>
