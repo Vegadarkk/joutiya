@@ -10,6 +10,22 @@ export interface PublicFirebaseConfig {
   authEmulatorUrl?: string;
 }
 
+/** Browser-side upload limits (phase 3); the API enforces the same numbers. */
+export interface PublicUploadLimits {
+  /** Largest accepted file, bytes (after the browser-side resize). */
+  maxBytes: number;
+  /** Photos per listing for an individual account. */
+  maxPhotos: number;
+}
+
+/** Interactive map of the listing page (D10): unset when no PMTiles archive is configured. */
+export interface PublicMapConfig {
+  /** Absolute URL of the Morocco PMTiles archive, fetched with Range requests. */
+  pmtilesUrl: string;
+  /** Always displayed on the map (OSM data under ODbL). */
+  attribution: string;
+}
+
 export interface PublicConfig {
   env: "dev" | "staging" | "prod";
   siteUrl: string;
@@ -18,4 +34,8 @@ export interface PublicConfig {
   /** OAuth web client id of Google Identity Services (Google sign-in); null disables the button. */
   googleClientId: string | null;
   sentry: { dsn: string; environment: string; release: string } | null;
+  /** Origin (plus path) photos are served from, without a trailing slash; null until storage exists. */
+  mediaBaseUrl: string | null;
+  upload: PublicUploadLimits;
+  map: PublicMapConfig | null;
 }

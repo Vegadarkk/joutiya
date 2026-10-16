@@ -20,6 +20,7 @@ export interface RateLimitDefinition {
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
+const MIB = 1024 * 1024;
 
 export const RATE_LIMITS = {
   // /api/auth/signup: 3 per day per device; one account per normalized e-mail (users repository);
@@ -56,6 +57,25 @@ export const RATE_LIMITS = {
   "staff.login.accountIp": { points: 5, duration: 15 * MINUTE, blockDuration: 15 * MINUTE, policy: "closed", key: "account+ip" },
   // Account settings mutations (display name, password change, account closure).
   "account.mutation.uid": { points: 60, duration: HOUR, policy: "closed", key: "uid" },
+  // --- Listings and media (phase 3, design §4) ---------------------------------------------
+  // Draft autosave (PATCH /api/listings/{id}): coalesced client-side, never per keystroke.
+  "listing.draft.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
+  // POST /api/listings: 5 per day per account (individuals, D5), 30 per hour per IP then Turnstile.
+  "listing.create.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },
+  "listing.create.ip": { points: 30, duration: HOUR, policy: "open", key: "ip" },
+  // POST /api/uploads/sign: 30 per hour; bytes declared per day (points = bytes, 200 MiB).
+  // Closed: every signed upload costs R2 operations and storage.
+  "upload.sign.uid": { points: 30, duration: HOUR, policy: "closed", key: "uid" },
+  "upload.bytes.uid": { points: 200 * MIB, duration: DAY, policy: "closed", key: "uid" },
+  // POST /api/listings/{id}/phone (§6): 10 per hour and 30 per day per account, 20 per day per
+  // device, 60 per day per IP then Turnstile. Closed: the number is personal data.
+  "reveal.uid.hour": { points: 10, duration: HOUR, policy: "closed", key: "uid" },
+  "reveal.uid.day": { points: 30, duration: DAY, policy: "closed", key: "uid" },
+  "reveal.device": { points: 20, duration: DAY, policy: "closed", key: "device" },
+  "reveal.ip": { points: 60, duration: DAY, policy: "closed", key: "ip" },
+  // Public listing and profile reads (API; the SSR page limit lives in the proxy, phase 4).
+  "listing.read.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
+  "profile.read.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
 } as const satisfies Record<string, RateLimitDefinition>;
 
 export type RateLimitId = keyof typeof RATE_LIMITS;

@@ -1,8 +1,16 @@
 import "server-only";
+import { MAX_PHOTOS_INDIVIDUAL, MAX_UPLOAD_BYTES } from "@/lib/contracts/media";
 import { serverEnv, type ServerEnv } from "@/lib/env";
+import { mediaBaseUrl } from "@/lib/storage/keys";
 import type { PublicConfig } from "./public-types";
 
-export type { PublicConfig, PublicFirebaseConfig } from "./public-types";
+export type { PublicConfig, PublicFirebaseConfig, PublicMapConfig, PublicUploadLimits } from "./public-types";
+
+/** Upload limits shown to the browser; the API enforces the same constants (design §3). */
+const UPLOAD_LIMITS = { maxBytes: MAX_UPLOAD_BYTES, maxPhotos: MAX_PHOTOS_INDIVIDUAL } as const;
+
+/** OSM data (ODbL) through Protomaps: shown on every map (D10). */
+export const MAP_ATTRIBUTION = "© OpenStreetMap contributors · Protomaps";
 
 /** The browser's configuration, built from the server environment at request time. */
 export function publicConfig(env: ServerEnv = serverEnv()): PublicConfig {
@@ -25,5 +33,9 @@ export function publicConfig(env: ServerEnv = serverEnv()): PublicConfig {
     turnstileSiteKey: env.TURNSTILE_SITE_KEY ?? null,
     googleClientId: env.GOOGLE_OAUTH_CLIENT_ID ?? null,
     sentry: env.SENTRY_DSN ? { dsn: env.SENTRY_DSN, environment: env.APP_ENV, release: env.RELEASE ?? "dev" } : null,
+    // R2 keys and bucket names never leave the server: only the public media host is shared.
+    mediaBaseUrl: mediaBaseUrl(env),
+    upload: { ...UPLOAD_LIMITS },
+    map: env.MAP_PMTILES_URL ? { pmtilesUrl: env.MAP_PMTILES_URL, attribution: MAP_ATTRIBUTION } : null,
   };
 }

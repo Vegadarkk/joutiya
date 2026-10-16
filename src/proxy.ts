@@ -49,6 +49,7 @@ function csp(variant: CspVariant, nonce?: string): string {
     dev: process.env.NODE_ENV === "development",
     mediaOrigin: process.env.MEDIA_BASE_URL,
     r2Origin: process.env.R2_S3_ENDPOINT,
+    tilesOrigin: process.env.MAP_PMTILES_URL,
     errorIngestOrigin: sentryOrigin(process.env.SENTRY_DSN),
     authEmulatorOrigin: process.env.FIREBASE_AUTH_EMULATOR_HOST ? `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}` : undefined,
     reportPath: "/api/csp-report",

@@ -346,5 +346,1266 @@
       "internal": "Une erreur technique est survenue. Réessayez.",
       "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez."
     }
+  },
+  "Listing": {
+    "errors": {
+      "invalid_listing": "L'annonce ne peut pas être publiée en l'état. Corrigez les points signalés, puis réessayez.",
+      "draft_limit": "Vous avez déjà 5 brouillons. Publiez ou supprimez un brouillon avant d'en créer un autre.",
+      "listing_limit": "Vous avez atteint le nombre maximal d'annonces actives. Mettez une annonce en pause ou supprimez-en une pour en publier une nouvelle.",
+      "listing_daily_limit": "Vous avez atteint le nombre d'annonces que vous pouvez déposer aujourd'hui. Réessayez demain.",
+      "photo_limit": "Le nombre maximal de photos pour cette annonce est atteint.",
+      "file_too_large": "Cette photo dépasse la taille maximale autorisée (10 Mo).",
+      "unsupported_media": "Ce format d'image n'est pas pris en charge. Utilisez une photo JPEG, WebP ou PNG.",
+      "storage_full": "L'envoi de photos est momentanément suspendu. Vous pouvez publier l'annonce et ajouter des photos plus tard.",
+      "upload_not_ready": "Une photo est encore en cours de traitement. Patientez quelques secondes, puis réessayez.",
+      "phone_required": "Vérifiez votre numéro de téléphone pour afficher ce moyen de contact.",
+      "listing_unavailable": "Cette annonce n'est plus disponible.",
+      "reveal_not_allowed": "Le numéro ne peut pas être affiché pour le moment. Vérifiez votre adresse e-mail ou réessayez plus tard."
+    }
+  },
+  "Categories": {
+    "vehicules": {
+      "name": "Véhicules",
+      "sub": {
+        "voitures": "Voitures",
+        "location-voitures": "Location de voitures",
+        "motos-scooters": "Motos & scooters",
+        "velos": "Vélos",
+        "utilitaires-camions": "Utilitaires & camions",
+        "bateaux": "Bateaux",
+        "pieces-accessoires": "Pièces & accessoires"
+      }
+    },
+    "immobilier": {
+      "name": "Immobilier",
+      "sub": {
+        "vente": "Vente",
+        "location": "Location",
+        "colocation": "Colocation",
+        "location-vacances": "Location de vacances"
+      }
+    },
+    "electronique": {
+      "name": "Électronique",
+      "sub": {
+        "telephones-objets-connectes": "Téléphones & objets connectés",
+        "ordinateurs": "Ordinateurs",
+        "tablettes": "Tablettes",
+        "accessoires-electronique": "Accessoires",
+        "tv-photo-audio": "TV, photo & audio",
+        "consoles-jeux-video": "Consoles & jeux vidéo"
+      }
+    },
+    "maison-jardin": {
+      "name": "Maison & Jardin",
+      "sub": {
+        "ameublement": "Ameublement",
+        "electromenager": "Électroménager",
+        "decoration-artisanat": "Décoration & artisanat",
+        "linge": "Linge de maison",
+        "arts-de-la-table": "Arts de la table",
+        "bricolage": "Bricolage",
+        "jardin": "Jardin"
+      }
+    },
+    "mode": {
+      "name": "Mode",
+      "sub": {
+        "vetements": "Vêtements",
+        "tenues-traditionnelles": "Tenues traditionnelles",
+        "chaussures": "Chaussures",
+        "sacs-accessoires": "Sacs & accessoires",
+        "montres-bijoux": "Montres & bijoux"
+      }
+    },
+    "famille": {
+      "name": "Famille",
+      "sub": {
+        "equipement-bebe": "Équipement bébé",
+        "vetements-enfant": "Vêtements enfant",
+        "mobilier-enfant": "Mobilier enfant"
+      }
+    },
+    "loisirs": {
+      "name": "Loisirs",
+      "sub": {
+        "sport-plein-air": "Sport & plein air",
+        "instruments": "Instruments de musique",
+        "livres": "Livres",
+        "jeux-jouets": "Jeux & jouets",
+        "collection-antiquites": "Collection & antiquités"
+      }
+    },
+    "animaux": {
+      "name": "Animaux",
+      "sub": {
+        "accessoires-animaux": "Accessoires",
+        "animaux-compagnie": "Animaux de compagnie",
+        "betail-moutons": "Bétail & moutons"
+      }
+    },
+    "materiel-pro": {
+      "name": "Matériel professionnel",
+      "sub": {
+        "agricole-tracteurs": "Agricole & tracteurs",
+        "btp": "BTP",
+        "chr": "Cafés, hôtels & restaurants",
+        "commerce-bureau": "Commerce & bureau",
+        "medical": "Médical",
+        "stocks-gros": "Stocks & vente en gros"
+      }
+    },
+    "services": {
+      "name": "Services",
+      "sub": {
+        "cours": "Cours",
+        "demenagement-transport": "Déménagement & transport",
+        "travaux-reparations": "Travaux & réparations",
+        "menage": "Ménage",
+        "evenements": "Événements",
+        "beaute": "Beauté"
+      }
+    },
+    "divers": {
+      "name": "Divers",
+      "sub": {
+        "autres": "Autres"
+      }
+    }
+  },
+  "Criteria": {
+    "car-brand": {
+      "label": "Marque",
+      "options": {
+        "dacia": "Dacia",
+        "renault": "Renault",
+        "peugeot": "Peugeot",
+        "citroen": "Citroën",
+        "ds": "DS",
+        "volkswagen": "Volkswagen",
+        "audi": "Audi",
+        "bmw": "BMW",
+        "mercedes-benz": "Mercedes-Benz",
+        "opel": "Opel",
+        "fiat": "Fiat",
+        "alfa-romeo": "Alfa Romeo",
+        "lancia": "Lancia",
+        "ford": "Ford",
+        "toyota": "Toyota",
+        "hyundai": "Hyundai",
+        "kia": "Kia",
+        "nissan": "Nissan",
+        "honda": "Honda",
+        "mazda": "Mazda",
+        "mitsubishi": "Mitsubishi",
+        "suzuki": "Suzuki",
+        "subaru": "Subaru",
+        "daihatsu": "Daihatsu",
+        "isuzu": "Isuzu",
+        "lexus": "Lexus",
+        "infiniti": "Infiniti",
+        "skoda": "Škoda",
+        "seat": "Seat",
+        "cupra": "Cupra",
+        "porsche": "Porsche",
+        "mini": "Mini",
+        "smart": "Smart",
+        "land-rover": "Land Rover",
+        "jaguar": "Jaguar",
+        "volvo": "Volvo",
+        "jeep": "Jeep",
+        "chevrolet": "Chevrolet",
+        "dodge": "Dodge",
+        "chrysler": "Chrysler",
+        "cadillac": "Cadillac",
+        "tesla": "Tesla",
+        "byd": "BYD",
+        "chery": "Chery",
+        "geely": "Geely",
+        "mg": "MG",
+        "jac": "JAC",
+        "dfsk": "DFSK",
+        "haval": "Haval",
+        "great-wall": "Great Wall",
+        "changan": "Changan",
+        "baic": "BAIC",
+        "ssangyong": "SsangYong",
+        "maserati": "Maserati",
+        "ferrari": "Ferrari",
+        "lamborghini": "Lamborghini",
+        "bentley": "Bentley",
+        "rolls-royce": "Rolls-Royce",
+        "aston-martin": "Aston Martin",
+        "lada": "Lada",
+        "tata": "Tata",
+        "mahindra": "Mahindra",
+        "autre": "Autre marque"
+      }
+    },
+    "model": {
+      "label": "Modèle"
+    },
+    "year": {
+      "label": "Année-modèle"
+    },
+    "mileage": {
+      "label": "Kilométrage"
+    },
+    "fuel": {
+      "label": "Carburant",
+      "options": {
+        "diesel": "Diesel",
+        "essence": "Essence",
+        "hybride": "Hybride",
+        "electrique": "Électrique",
+        "gpl": "GPL"
+      }
+    },
+    "gearbox": {
+      "label": "Boîte de vitesses",
+      "options": {
+        "manuelle": "Manuelle",
+        "automatique": "Automatique"
+      }
+    },
+    "fiscal-power": {
+      "label": "Puissance fiscale"
+    },
+    "origin": {
+      "label": "Origine",
+      "options": {
+        "ww-maroc": "WW au Maroc",
+        "dedouanee": "Dédouanée",
+        "importee-neuve": "Importée neuve",
+        "pas-dedouanee": "Pas encore dédouanée"
+      }
+    },
+    "first-hand": {
+      "label": "Première main"
+    },
+    "doors": {
+      "label": "Nombre de portes",
+      "options": {
+        "2": "2 portes",
+        "3": "3 portes",
+        "4": "4 portes",
+        "5": "5 portes"
+      }
+    },
+    "moto-brand": {
+      "label": "Marque",
+      "options": {
+        "yamaha": "Yamaha",
+        "honda": "Honda",
+        "suzuki": "Suzuki",
+        "kawasaki": "Kawasaki",
+        "bmw": "BMW",
+        "ktm": "KTM",
+        "ducati": "Ducati",
+        "piaggio": "Piaggio",
+        "vespa": "Vespa",
+        "sym": "SYM",
+        "kymco": "Kymco",
+        "peugeot": "Peugeot",
+        "aprilia": "Aprilia",
+        "triumph": "Triumph",
+        "harley-davidson": "Harley-Davidson",
+        "docker": "Docker",
+        "becane": "Bécane",
+        "haojue": "Haojue",
+        "lifan": "Lifan",
+        "autre": "Autre marque"
+      }
+    },
+    "engine-size": {
+      "label": "Cylindrée",
+      "options": {
+        "moins-50": "Moins de 50 cm³",
+        "50-125": "50 à 125 cm³",
+        "126-250": "126 à 250 cm³",
+        "251-500": "251 à 500 cm³",
+        "501-750": "501 à 750 cm³",
+        "plus-750": "Plus de 750 cm³"
+      }
+    },
+    "bike-type": {
+      "label": "Type de vélo",
+      "options": {
+        "vtt": "VTT",
+        "route": "Route",
+        "ville": "Ville",
+        "electrique": "Électrique",
+        "enfant": "Enfant",
+        "bmx": "BMX",
+        "pliant": "Pliant",
+        "autre": "Autre"
+      }
+    },
+    "bike-size": {
+      "label": "Taille du cadre",
+      "options": {
+        "enfant": "Enfant",
+        "xs": "XS",
+        "s": "S",
+        "m": "M",
+        "l": "L",
+        "xl": "XL"
+      }
+    },
+    "brand": {
+      "label": "Marque"
+    },
+    "utility-type": {
+      "label": "Type de véhicule",
+      "options": {
+        "fourgon": "Fourgon",
+        "camionnette": "Camionnette",
+        "camion": "Camion",
+        "pickup": "Pick-up",
+        "bus-minibus": "Bus & minibus",
+        "remorque": "Remorque",
+        "autre": "Autre"
+      }
+    },
+    "boat-type": {
+      "label": "Type de bateau",
+      "options": {
+        "bateau-moteur": "Bateau à moteur",
+        "voilier": "Voilier",
+        "pneumatique": "Pneumatique",
+        "jet-ski": "Jet-ski",
+        "barque": "Barque de pêche",
+        "autre": "Autre"
+      }
+    },
+    "engine-power": {
+      "label": "Puissance moteur"
+    },
+    "part-type": {
+      "label": "Type de pièce",
+      "options": {
+        "pneus-jantes": "Pneus & jantes",
+        "moteur-mecanique": "Moteur & mécanique",
+        "carrosserie": "Carrosserie",
+        "electronique-auto": "Électronique & électricité",
+        "interieur": "Intérieur",
+        "audio-gps": "Audio & GPS",
+        "accessoires-moto": "Accessoires moto",
+        "outillage": "Outillage",
+        "autre": "Autre"
+      }
+    },
+    "vehicle-kind": {
+      "label": "Véhicule concerné",
+      "options": {
+        "voiture": "Voiture",
+        "moto": "Moto",
+        "velo": "Vélo",
+        "utilitaire": "Utilitaire & camion",
+        "autre": "Autre"
+      }
+    },
+    "property-type": {
+      "label": "Type de bien",
+      "options": {
+        "appartement": "Appartement",
+        "maison": "Maison",
+        "villa-riad": "Villa & riad",
+        "terrain-ferme": "Terrain & ferme",
+        "bureau": "Bureau",
+        "local-commercial": "Local commercial",
+        "studio": "Studio",
+        "autre": "Autre"
+      }
+    },
+    "surface": {
+      "label": "Surface"
+    },
+    "bedrooms": {
+      "label": "Chambres"
+    },
+    "living-rooms": {
+      "label": "Salons"
+    },
+    "bathrooms": {
+      "label": "Salles de bain"
+    },
+    "floor": {
+      "label": "Étage"
+    },
+    "standing": {
+      "label": "Standing",
+      "options": {
+        "economique": "Économique",
+        "moyen": "Moyen standing",
+        "haut": "Haut standing"
+      }
+    },
+    "property-age": {
+      "label": "Âge du bien",
+      "options": {
+        "neuf": "Neuf",
+        "1-5-ans": "1 à 5 ans",
+        "6-10-ans": "6 à 10 ans",
+        "11-20-ans": "11 à 20 ans",
+        "plus-20-ans": "Plus de 20 ans"
+      }
+    },
+    "furnished": {
+      "label": "Meublé"
+    },
+    "amenities": {
+      "label": "Équipements",
+      "options": {
+        "parking": "Parking",
+        "ascenseur": "Ascenseur",
+        "climatisation": "Climatisation",
+        "securite": "Sécurité & gardiennage",
+        "cuisine-equipee": "Cuisine équipée",
+        "terrasse": "Terrasse",
+        "jardin": "Jardin",
+        "piscine": "Piscine",
+        "chauffage": "Chauffage"
+      }
+    },
+    "deposit": {
+      "label": "Caution (DH)"
+    },
+    "availability": {
+      "label": "Disponibilité",
+      "options": {
+        "immediate": "Immédiate",
+        "a-convenir": "À convenir"
+      }
+    },
+    "room-type": {
+      "label": "Type de chambre",
+      "options": {
+        "chambre-privee": "Chambre privée",
+        "chambre-partagee": "Chambre partagée"
+      }
+    },
+    "flatmates": {
+      "label": "Nombre de colocataires"
+    },
+    "guests": {
+      "label": "Capacité (personnes)"
+    },
+    "min-nights": {
+      "label": "Séjour minimum"
+    },
+    "phone-device-type": {
+      "label": "Type d'appareil",
+      "options": {
+        "smartphone": "Smartphone",
+        "telephone-basique": "Téléphone basique",
+        "montre-connectee": "Montre connectée",
+        "ecouteurs": "Écouteurs sans fil",
+        "bracelet": "Bracelet connecté",
+        "autre": "Autre"
+      }
+    },
+    "phone-brand": {
+      "label": "Marque",
+      "options": {
+        "apple": "Apple",
+        "samsung": "Samsung",
+        "xiaomi": "Xiaomi",
+        "huawei": "Huawei",
+        "oppo": "Oppo",
+        "realme": "Realme",
+        "infinix": "Infinix",
+        "tecno": "Tecno",
+        "honor": "Honor",
+        "nokia": "Nokia",
+        "google": "Google",
+        "oneplus": "OnePlus",
+        "vivo": "Vivo",
+        "motorola": "Motorola",
+        "autre": "Autre marque"
+      }
+    },
+    "storage": {
+      "label": "Stockage",
+      "options": {
+        "16-go": "16 Go",
+        "32-go": "32 Go",
+        "64-go": "64 Go",
+        "128-go": "128 Go",
+        "256-go": "256 Go",
+        "512-go": "512 Go",
+        "1-to": "1 To",
+        "plus-1-to": "Plus de 1 To"
+      }
+    },
+    "warranty": {
+      "label": "Sous garantie"
+    },
+    "computer-type": {
+      "label": "Type d'ordinateur",
+      "options": {
+        "portable": "Portable",
+        "bureau": "Fixe",
+        "tout-en-un": "Tout-en-un",
+        "mini-pc": "Mini PC",
+        "autre": "Autre"
+      }
+    },
+    "computer-brand": {
+      "label": "Marque",
+      "options": {
+        "apple": "Apple",
+        "hp": "HP",
+        "dell": "Dell",
+        "lenovo": "Lenovo",
+        "asus": "Asus",
+        "acer": "Acer",
+        "msi": "MSI",
+        "microsoft": "Microsoft",
+        "samsung": "Samsung",
+        "toshiba": "Toshiba",
+        "huawei": "Huawei",
+        "autre": "Autre marque"
+      }
+    },
+    "ram": {
+      "label": "Mémoire vive",
+      "options": {
+        "4-go": "4 Go",
+        "8-go": "8 Go",
+        "16-go": "16 Go",
+        "32-go": "32 Go",
+        "plus-32-go": "Plus de 32 Go"
+      }
+    },
+    "tablet-brand": {
+      "label": "Marque",
+      "options": {
+        "apple": "Apple",
+        "samsung": "Samsung",
+        "huawei": "Huawei",
+        "xiaomi": "Xiaomi",
+        "lenovo": "Lenovo",
+        "microsoft": "Microsoft",
+        "amazon": "Amazon",
+        "alcatel": "Alcatel",
+        "autre": "Autre marque"
+      }
+    },
+    "accessory-type": {
+      "label": "Type d'accessoire",
+      "options": {
+        "chargeurs-cables": "Chargeurs & câbles",
+        "coques-protections": "Coques & protections",
+        "batteries-externes": "Batteries externes",
+        "cartes-memoire": "Cartes mémoire & clés USB",
+        "claviers-souris": "Claviers & souris",
+        "supports": "Supports & trépieds",
+        "autre": "Autre"
+      }
+    },
+    "av-type": {
+      "label": "Type d'appareil",
+      "options": {
+        "televiseur": "Téléviseur",
+        "projecteur": "Projecteur",
+        "appareil-photo": "Appareil photo",
+        "objectif": "Objectif",
+        "camera": "Caméra",
+        "enceinte": "Enceinte",
+        "casque": "Casque audio",
+        "home-cinema": "Home cinéma & ampli",
+        "autre": "Autre"
+      }
+    },
+    "gaming-type": {
+      "label": "Type d'article",
+      "options": {
+        "console": "Console",
+        "jeu": "Jeu",
+        "accessoire-gaming": "Accessoire",
+        "autre": "Autre"
+      }
+    },
+    "platform": {
+      "label": "Plateforme",
+      "options": {
+        "playstation-5": "PlayStation 5",
+        "playstation-4": "PlayStation 4",
+        "xbox-series": "Xbox Series",
+        "xbox-one": "Xbox One",
+        "nintendo-switch": "Nintendo Switch",
+        "pc": "PC",
+        "retro": "Rétro",
+        "autre": "Autre"
+      }
+    },
+    "furniture-type": {
+      "label": "Type de meuble",
+      "options": {
+        "salon-marocain": "Salon marocain",
+        "salon": "Salon & canapés",
+        "table-chaises": "Table & chaises",
+        "lit-matelas": "Lit & matelas",
+        "armoire-rangement": "Armoire & rangement",
+        "bureau": "Bureau",
+        "meuble-tv": "Meuble TV",
+        "autre": "Autre"
+      }
+    },
+    "material": {
+      "label": "Matière",
+      "options": {
+        "bois": "Bois",
+        "metal": "Métal",
+        "verre": "Verre",
+        "tissu": "Tissu",
+        "cuir": "Cuir",
+        "rotin": "Rotin & osier",
+        "plastique": "Plastique",
+        "ceramique": "Céramique",
+        "cuivre": "Cuivre & laiton",
+        "autre": "Autre"
+      }
+    },
+    "color": {
+      "label": "Couleur",
+      "options": {
+        "noir": "Noir",
+        "blanc": "Blanc",
+        "gris": "Gris",
+        "beige": "Beige",
+        "marron": "Marron",
+        "bleu": "Bleu",
+        "vert": "Vert",
+        "rouge": "Rouge",
+        "jaune": "Jaune",
+        "orange": "Orange",
+        "rose": "Rose",
+        "violet": "Violet",
+        "dore": "Doré",
+        "argente": "Argenté",
+        "multicolore": "Multicolore",
+        "autre": "Autre"
+      }
+    },
+    "appliance-type": {
+      "label": "Type d'appareil",
+      "options": {
+        "refrigerateur": "Réfrigérateur",
+        "congelateur": "Congélateur",
+        "lave-linge": "Lave-linge",
+        "lave-vaisselle": "Lave-vaisselle",
+        "four": "Four",
+        "cuisiniere": "Cuisinière",
+        "micro-ondes": "Micro-ondes",
+        "hotte": "Hotte",
+        "climatiseur": "Climatiseur",
+        "chauffe-eau": "Chauffe-eau",
+        "aspirateur": "Aspirateur",
+        "petit-electromenager": "Petit électroménager",
+        "autre": "Autre"
+      }
+    },
+    "decor-type": {
+      "label": "Type d'article",
+      "options": {
+        "tapis": "Tapis",
+        "dinanderie": "Dinanderie",
+        "poterie-ceramique": "Poterie & céramique",
+        "luminaire": "Luminaire",
+        "miroir": "Miroir",
+        "tableau": "Tableau & cadre",
+        "zellige": "Zellige",
+        "bois-sculpte": "Bois sculpté",
+        "autre": "Autre"
+      }
+    },
+    "handmade": {
+      "label": "Fait main"
+    },
+    "linen-type": {
+      "label": "Type de linge",
+      "options": {
+        "literie": "Literie",
+        "serviettes": "Serviettes",
+        "rideaux": "Rideaux",
+        "nappes": "Nappes",
+        "couvertures": "Couvertures & plaids",
+        "autre": "Autre"
+      }
+    },
+    "tableware-type": {
+      "label": "Type d'article",
+      "options": {
+        "vaisselle": "Vaisselle",
+        "verres": "Verres",
+        "couverts": "Couverts",
+        "service-the": "Service à thé",
+        "cocotte-ustensiles": "Cocottes & ustensiles",
+        "plateaux": "Plateaux",
+        "autre": "Autre"
+      }
+    },
+    "diy-type": {
+      "label": "Type d'article",
+      "options": {
+        "outillage-electrique": "Outillage électrique",
+        "outillage-main": "Outillage à main",
+        "plomberie": "Plomberie",
+        "electricite": "Électricité",
+        "peinture": "Peinture",
+        "materiaux": "Matériaux",
+        "quincaillerie": "Quincaillerie",
+        "autre": "Autre"
+      }
+    },
+    "garden-type": {
+      "label": "Type d'article",
+      "options": {
+        "mobilier-jardin": "Mobilier de jardin",
+        "plantes": "Plantes",
+        "outillage-jardin": "Outillage de jardin",
+        "arrosage": "Arrosage",
+        "barbecue": "Barbecue",
+        "piscine-spa": "Piscine & spa",
+        "abri": "Abri & pergola",
+        "autre": "Autre"
+      }
+    },
+    "audience": {
+      "label": "Pour qui",
+      "options": {
+        "femme": "Femme",
+        "homme": "Homme",
+        "enfant": "Enfant",
+        "mixte": "Mixte"
+      }
+    },
+    "clothing-type": {
+      "label": "Type de vêtement",
+      "options": {
+        "haut": "Haut & t-shirt",
+        "pantalon": "Pantalon & jean",
+        "robe": "Robe",
+        "jupe": "Jupe",
+        "veste-manteau": "Veste & manteau",
+        "costume": "Costume & tailleur",
+        "sport": "Sportswear",
+        "lingerie-nuit": "Lingerie & nuit",
+        "maillot": "Maillot de bain",
+        "autre": "Autre"
+      }
+    },
+    "clothing-size": {
+      "label": "Taille",
+      "options": {
+        "xs": "XS",
+        "s": "S",
+        "m": "M",
+        "l": "L",
+        "xl": "XL",
+        "xxl": "XXL",
+        "xxxl": "XXXL",
+        "34": "34",
+        "36": "36",
+        "38": "38",
+        "40": "40",
+        "42": "42",
+        "44": "44",
+        "46": "46",
+        "48": "48",
+        "unique": "Taille unique"
+      }
+    },
+    "traditional-type": {
+      "label": "Type de tenue",
+      "options": {
+        "caftan": "Caftan",
+        "takchita": "Takchita",
+        "djellaba": "Djellaba",
+        "gandoura": "Gandoura",
+        "jabador": "Jabador",
+        "abaya": "Abaya",
+        "babouches-accessoires": "Babouches & accessoires",
+        "autre": "Autre"
+      }
+    },
+    "shoe-type": {
+      "label": "Type de chaussures",
+      "options": {
+        "baskets": "Baskets",
+        "ville": "Chaussures de ville",
+        "bottes": "Bottes",
+        "sandales": "Sandales",
+        "babouches": "Babouches",
+        "sport": "Sport spécialisé",
+        "autre": "Autre"
+      }
+    },
+    "shoe-size": {
+      "label": "Pointure",
+      "options": {
+        "35": "35",
+        "36": "36",
+        "37": "37",
+        "38": "38",
+        "39": "39",
+        "40": "40",
+        "41": "41",
+        "42": "42",
+        "43": "43",
+        "44": "44",
+        "45": "45",
+        "46": "46",
+        "47": "47",
+        "autre": "Autre"
+      }
+    },
+    "fashion-accessory-type": {
+      "label": "Type d'accessoire",
+      "options": {
+        "sac-a-main": "Sac à main",
+        "sac-a-dos": "Sac à dos",
+        "portefeuille": "Portefeuille",
+        "ceinture": "Ceinture",
+        "foulard": "Foulard & écharpe",
+        "lunettes": "Lunettes",
+        "chapeau": "Chapeau & casquette",
+        "autre": "Autre"
+      }
+    },
+    "jewelry-type": {
+      "label": "Type d'article",
+      "options": {
+        "montre": "Montre",
+        "bague": "Bague",
+        "collier": "Collier",
+        "bracelet": "Bracelet",
+        "boucles-oreilles": "Boucles d'oreilles",
+        "parure": "Parure",
+        "autre": "Autre"
+      }
+    },
+    "jewelry-material": {
+      "label": "Matière",
+      "options": {
+        "or": "Or",
+        "argent": "Argent",
+        "acier": "Acier",
+        "plaque": "Plaqué or",
+        "fantaisie": "Fantaisie",
+        "autre": "Autre"
+      }
+    },
+    "baby-type": {
+      "label": "Type d'article",
+      "options": {
+        "poussette": "Poussette",
+        "siege-auto": "Siège auto",
+        "lit-bebe": "Lit & berceau",
+        "chaise-haute": "Chaise haute",
+        "porte-bebe": "Porte-bébé",
+        "jouets-eveil": "Jouets d'éveil",
+        "soins-bain": "Soins & bain",
+        "autre": "Autre"
+      }
+    },
+    "child-age": {
+      "label": "Âge",
+      "options": {
+        "0-6-mois": "0 à 6 mois",
+        "6-12-mois": "6 à 12 mois",
+        "1-2-ans": "1 à 2 ans",
+        "2-4-ans": "2 à 4 ans",
+        "4-8-ans": "4 à 8 ans",
+        "8-ans-plus": "8 ans et plus"
+      }
+    },
+    "child-clothing-type": {
+      "label": "Type de vêtement",
+      "options": {
+        "haut": "Haut",
+        "pantalon": "Pantalon",
+        "robe": "Robe",
+        "ensemble": "Ensemble",
+        "manteau": "Manteau & veste",
+        "pyjama": "Pyjama & body",
+        "chaussures-enfant": "Chaussures",
+        "autre": "Autre"
+      }
+    },
+    "child-audience": {
+      "label": "Fille ou garçon",
+      "options": {
+        "fille": "Fille",
+        "garcon": "Garçon",
+        "mixte": "Mixte"
+      }
+    },
+    "child-furniture-type": {
+      "label": "Type de meuble",
+      "options": {
+        "lit": "Lit enfant",
+        "bureau": "Bureau",
+        "rangement": "Rangement",
+        "chaise": "Chaise & table",
+        "parc": "Parc & barrière",
+        "autre": "Autre"
+      }
+    },
+    "sport-type": {
+      "label": "Discipline",
+      "options": {
+        "fitness-musculation": "Fitness & musculation",
+        "football": "Football",
+        "randonnee-camping": "Randonnée & camping",
+        "natation-plage": "Natation & plage",
+        "sports-raquettes": "Sports de raquette",
+        "sports-combat": "Sports de combat",
+        "surf-glisse": "Surf & glisse",
+        "peche-chasse": "Pêche & chasse",
+        "autre": "Autre"
+      }
+    },
+    "instrument-type": {
+      "label": "Type d'instrument",
+      "options": {
+        "guitare": "Guitare & basse",
+        "piano-clavier": "Piano & clavier",
+        "percussions": "Percussions",
+        "traditionnels": "Instruments traditionnels (oud, bendir)",
+        "vent": "Instruments à vent",
+        "cordes": "Violon & cordes",
+        "dj-sono": "DJ & sono",
+        "accessoires-musique": "Accessoires",
+        "autre": "Autre"
+      }
+    },
+    "book-type": {
+      "label": "Type de livre",
+      "options": {
+        "roman": "Roman & littérature",
+        "scolaire-universitaire": "Scolaire & universitaire",
+        "religion": "Religion",
+        "jeunesse": "Jeunesse",
+        "bd-manga": "BD & manga",
+        "pratique": "Pratique & cuisine",
+        "langues": "Langues",
+        "autre": "Autre"
+      }
+    },
+    "book-language": {
+      "label": "Langue",
+      "options": {
+        "francais": "Français",
+        "arabe": "Arabe",
+        "anglais": "Anglais",
+        "amazigh": "Amazigh",
+        "espagnol": "Espagnol",
+        "autre": "Autre"
+      }
+    },
+    "toy-type": {
+      "label": "Type de jouet",
+      "options": {
+        "jeux-societe": "Jeux de société",
+        "puzzles": "Puzzles",
+        "figurines": "Figurines",
+        "poupees": "Poupées",
+        "voitures-miniatures": "Voitures & circuits",
+        "jeux-construction": "Jeux de construction",
+        "peluches": "Peluches",
+        "exterieur": "Jeux d'extérieur",
+        "autre": "Autre"
+      }
+    },
+    "collectible-type": {
+      "label": "Type d'objet",
+      "options": {
+        "monnaies-billets": "Monnaies & billets",
+        "timbres": "Timbres",
+        "objets-anciens": "Objets anciens",
+        "art": "Art & peinture",
+        "montres-anciennes": "Montres anciennes",
+        "livres-anciens": "Livres anciens",
+        "autre": "Autre"
+      }
+    },
+    "pet-accessory-type": {
+      "label": "Type d'article",
+      "options": {
+        "alimentation": "Alimentation",
+        "cage-aquarium": "Cage & aquarium",
+        "laisse-collier": "Laisse & collier",
+        "couchage": "Couchage & niche",
+        "jouets": "Jouets",
+        "toilettage": "Toilettage & soins",
+        "autre": "Autre"
+      }
+    },
+    "animal-type": {
+      "label": "Animal",
+      "options": {
+        "chien": "Chien",
+        "chat": "Chat",
+        "oiseau": "Oiseau",
+        "poisson": "Poisson",
+        "rongeur": "Rongeur & lapin",
+        "reptile": "Reptile",
+        "autre": "Autre"
+      }
+    },
+    "breed": {
+      "label": "Race"
+    },
+    "animal-age": {
+      "label": "Âge",
+      "options": {
+        "moins-3-mois": "Moins de 3 mois",
+        "3-12-mois": "3 à 12 mois",
+        "1-5-ans": "1 à 5 ans",
+        "plus-5-ans": "Plus de 5 ans"
+      }
+    },
+    "animal-sex": {
+      "label": "Sexe",
+      "options": {
+        "male": "Mâle",
+        "femelle": "Femelle"
+      }
+    },
+    "vaccinated": {
+      "label": "Vacciné"
+    },
+    "livestock-type": {
+      "label": "Type d'animal",
+      "options": {
+        "mouton": "Mouton",
+        "chevre": "Chèvre",
+        "vache": "Vache",
+        "veau": "Veau",
+        "chameau": "Chameau",
+        "cheval": "Cheval & âne",
+        "volaille": "Volaille",
+        "autre": "Autre"
+      }
+    },
+    "head-count": {
+      "label": "Nombre de têtes"
+    },
+    "livestock-age": {
+      "label": "Âge",
+      "options": {
+        "moins-1-an": "Moins d'un an",
+        "1-2-ans": "1 à 2 ans",
+        "plus-2-ans": "Plus de 2 ans"
+      }
+    },
+    "agri-type": {
+      "label": "Type de matériel",
+      "options": {
+        "tracteur": "Tracteur",
+        "motoculteur": "Motoculteur",
+        "remorque-agricole": "Remorque",
+        "irrigation": "Irrigation & pompes",
+        "semoir-charrue": "Semoir & charrue",
+        "moissonneuse": "Moissonneuse",
+        "pulverisateur": "Pulvérisateur",
+        "autre": "Autre"
+      }
+    },
+    "construction-type": {
+      "label": "Type de matériel",
+      "options": {
+        "engin-chantier": "Engin de chantier",
+        "betonniere": "Bétonnière",
+        "echafaudage": "Échafaudage",
+        "compresseur": "Compresseur",
+        "groupe-electrogene": "Groupe électrogène",
+        "coffrage": "Coffrage & étais",
+        "outillage-btp": "Outillage",
+        "autre": "Autre"
+      }
+    },
+    "horeca-type": {
+      "label": "Type de matériel",
+      "options": {
+        "cuisine-pro": "Cuisine professionnelle",
+        "refrigeration": "Réfrigération & vitrines",
+        "machine-cafe": "Machine à café",
+        "four-pro": "Four & grill",
+        "mobilier-restaurant": "Mobilier",
+        "bar": "Bar",
+        "vaisselle-pro": "Vaisselle",
+        "autre": "Autre"
+      }
+    },
+    "office-type": {
+      "label": "Type de matériel",
+      "options": {
+        "caisse-tpe": "Caisse & TPE",
+        "presentoirs-rayonnages": "Présentoirs & rayonnages",
+        "mobilier-bureau": "Mobilier de bureau",
+        "informatique-pro": "Informatique",
+        "imprimante-copieur": "Imprimante & copieur",
+        "securite-video": "Sécurité & vidéosurveillance",
+        "autre": "Autre"
+      }
+    },
+    "medical-type": {
+      "label": "Type de matériel",
+      "options": {
+        "dentaire": "Dentaire",
+        "mobilier-medical": "Mobilier médical",
+        "imagerie": "Imagerie",
+        "laboratoire": "Laboratoire",
+        "paramedical": "Paramédical",
+        "esthetique": "Esthétique",
+        "autre": "Autre"
+      }
+    },
+    "stock-type": {
+      "label": "Type de marchandise",
+      "options": {
+        "textile": "Textile",
+        "alimentaire": "Alimentaire",
+        "cosmetique": "Cosmétique",
+        "electronique": "Électronique",
+        "menage": "Ménage & entretien",
+        "jouets": "Jouets",
+        "autre": "Autre"
+      }
+    },
+    "quantity": {
+      "label": "Quantité"
+    },
+    "course-subject": {
+      "label": "Matière",
+      "options": {
+        "soutien-scolaire": "Soutien scolaire",
+        "langues": "Langues",
+        "informatique": "Informatique",
+        "musique": "Musique",
+        "sport-coaching": "Sport & coaching",
+        "cuisine": "Cuisine",
+        "conduite": "Conduite",
+        "autre": "Autre"
+      }
+    },
+    "course-level": {
+      "label": "Niveau",
+      "options": {
+        "primaire": "Primaire",
+        "college": "Collège",
+        "lycee": "Lycée",
+        "superieur": "Supérieur",
+        "adultes": "Adultes"
+      }
+    },
+    "course-mode": {
+      "label": "Format",
+      "options": {
+        "domicile": "À domicile",
+        "en-ligne": "En ligne",
+        "chez-le-prof": "Chez le professeur"
+      }
+    },
+    "transport-type": {
+      "label": "Type de service",
+      "options": {
+        "demenagement": "Déménagement",
+        "livraison": "Livraison",
+        "transport-marchandises": "Transport de marchandises",
+        "transport-personnes": "Transport de personnes",
+        "camion-chauffeur": "Camion avec chauffeur",
+        "autre": "Autre"
+      }
+    },
+    "transport-vehicle": {
+      "label": "Véhicule",
+      "options": {
+        "camion": "Camion",
+        "camionnette": "Camionnette",
+        "voiture": "Voiture",
+        "autre": "Autre"
+      }
+    },
+    "trade": {
+      "label": "Corps de métier",
+      "options": {
+        "plomberie": "Plomberie",
+        "electricite": "Électricité",
+        "peinture": "Peinture",
+        "maconnerie": "Maçonnerie",
+        "menuiserie": "Menuiserie",
+        "climatisation": "Climatisation",
+        "carrelage": "Carrelage",
+        "serrurerie": "Serrurerie",
+        "reparation-electromenager": "Réparation électroménager",
+        "autre": "Autre"
+      }
+    },
+    "service-mode": {
+      "label": "Lieu d'intervention",
+      "options": {
+        "domicile": "À domicile",
+        "atelier": "En atelier ou en salon",
+        "les-deux": "Les deux"
+      }
+    },
+    "cleaning-type": {
+      "label": "Type de prestation",
+      "options": {
+        "menage-regulier": "Ménage régulier",
+        "grand-nettoyage": "Grand nettoyage",
+        "repassage": "Repassage",
+        "nettoyage-bureaux": "Nettoyage de bureaux",
+        "fin-chantier": "Nettoyage fin de chantier",
+        "autre": "Autre"
+      }
+    },
+    "frequency": {
+      "label": "Fréquence",
+      "options": {
+        "ponctuel": "Ponctuel",
+        "hebdomadaire": "Hebdomadaire",
+        "quotidien": "Quotidien"
+      }
+    },
+    "event-service": {
+      "label": "Prestation",
+      "options": {
+        "traiteur": "Traiteur",
+        "neggafa": "Neggafa",
+        "photographe-video": "Photographe & vidéo",
+        "dj-animation": "DJ & animation",
+        "location-salle": "Location de salle",
+        "decoration": "Décoration",
+        "location-materiel": "Location de matériel",
+        "autre": "Autre"
+      }
+    },
+    "beauty-service": {
+      "label": "Prestation",
+      "options": {
+        "coiffure": "Coiffure",
+        "maquillage": "Maquillage",
+        "esthetique": "Soins esthétiques",
+        "henne": "Henné",
+        "onglerie": "Onglerie",
+        "autre": "Autre"
+      }
+    },
+    "condition": {
+      "label": "État",
+      "options": {
+        "new_tagged": "Neuf avec étiquette",
+        "like_new": "Comme neuf",
+        "very_good": "Très bon état",
+        "good": "Bon état",
+        "for_parts": "Pour pièces"
+      }
+    }
   }
 }

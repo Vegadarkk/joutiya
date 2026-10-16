@@ -55,7 +55,7 @@ export const turnstileTokenSchema = z.string().min(1).max(2048);
  * Turnstile `action` names: the widget declares one, siteverify echoes it and the server refuses a
  * token solved for another action. One list for both sides (a mismatch is a hard 403 in prod).
  */
-export const TURNSTILE_ACTIONS = ["signup", "login", "reset", "google", "verify-resend", "staff-login", "phone"] as const;
+export const TURNSTILE_ACTIONS = ["signup", "login", "reset", "google", "verify-resend", "staff-login", "phone", "listing"] as const;
 export type TurnstileAction = (typeof TURNSTILE_ACTIONS)[number];
 
 export const consentsSchema = z

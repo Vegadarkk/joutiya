@@ -29,6 +29,31 @@ export type ErrorCode =
   | "consent_required"
   | "phone_invalid"
   | "phone_not_mobile"
+  // Listings and media (phase 3, design §3). Messages: Listing.errors.<code> in messages/*.json.
+  /** 422 at publish: hard blockers (details: FieldIssue[]). */
+  | "invalid_listing"
+  /** 5 drafts per user. */
+  | "draft_limit"
+  /** Active listings quota of the account (individual 20, Pro by plan). */
+  | "listing_limit"
+  /** 5 listings created per day (individuals). */
+  | "listing_daily_limit"
+  /** Photos per listing (10, Pro 20). */
+  | "photo_limit"
+  /** Declared or real size above MAX_UPLOAD_BYTES. */
+  | "file_too_large"
+  /** Declared type or sniffed bytes outside JPEG/WebP/PNG. */
+  | "unsupported_media"
+  /** r2.storage quota degraded: uploads suspended (D15). */
+  | "storage_full"
+  /** Upload referenced before its processing finished. */
+  | "upload_not_ready"
+  /** A verified phone is needed (showPhone, WhatsApp). */
+  | "phone_required"
+  /** Listing not published any more (paused, sold, expired, removed). */
+  | "listing_unavailable"
+  /** Phone reveal refused: account too young, e-mail unverified or quota reached. */
+  | "reveal_not_allowed"
   | "unavailable"
   | "internal";
 

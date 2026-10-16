@@ -38,11 +38,16 @@ function weakPasswordReason(error: ApiError): WeakPasswordReason | null {
 
 export function useApiErrorMessage(): (error: unknown) => string {
   const t = useTranslations("Auth.errors");
+  const listing = useTranslations("Listing.errors");
   const common = useTranslations("Auth.common");
   const locale = useLocale();
   return useCallback(
     (error: unknown) => {
       const code: ApiErrorCode = error instanceof ApiError ? error.code : "internal";
+      // Listing and media codes (phase 3) live in their own namespace; the keys are typed from
+      // messages/fr.json, so an API code that is in neither namespace falls back to "internal".
+      const listingKey = code as Parameters<typeof listing.has>[0];
+      if (listing.has(listingKey)) return listing(listingKey);
       if (code === "rate_limited" || code === "account_locked") {
         return t(code, { wait: formatWait(locale, error instanceof ApiError ? error.retryAfter : undefined, common("waitLater")) });
       }
@@ -54,9 +59,10 @@ export function useApiErrorMessage(): (error: unknown) => string {
         if (length === "too_short") return common("validation.passwordMin", { min: PASSWORD_MIN });
         if (length === "too_long") return common("validation.passwordMax", { max: PASSWORD_MAX });
       }
-      return t.has(code) && !WITH_WAIT.includes(code) ? t(code) : t("internal");
+      const authKey = code as Parameters<typeof t.has>[0];
+      return t.has(authKey) && !WITH_WAIT.includes(code) ? t(authKey) : t("internal");
     },
-    [t, common, locale],
+    [t, listing, common, locale],
   );
 }
 

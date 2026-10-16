@@ -57,6 +57,23 @@ describe("proxy", () => {
     expect(first.headers.get("x-middleware-request-x-nonce")).not.toBe(second.headers.get("x-middleware-request-x-nonce"));
   });
 
+  it("allows WebAssembly in the wizard (private) only", () => {
+    expect(proxy(request("/fr/deposer")).headers.get("content-security-policy")).toContain("'wasm-unsafe-eval'");
+    expect(proxy(request("/fr/annonce/velo-casablanca-abcd2345")).headers.get("content-security-policy")).not.toContain("'wasm-unsafe-eval'");
+  });
+
+  it("adds the PMTiles origin to connect-src and img-src when a map is configured", () => {
+    const before = proxy(request("/fr/annonce/velo-casablanca-abcd2345")).headers.get("content-security-policy") ?? "";
+    expect(before).not.toContain("tiles.joutiya.ma");
+    vi.stubEnv("MAP_PMTILES_URL", "https://tiles.joutiya.ma/maps/morocco.pmtiles");
+    for (const path of ["/fr/annonce/velo-casablanca-abcd2345", "/fr/deposer"]) {
+      const policy = proxy(request(path)).headers.get("content-security-policy") ?? "";
+      const directive = (name: string) => policy.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name} `)) ?? "";
+      expect(directive("connect-src")).toContain("https://tiles.joutiya.ma");
+      expect(directive("img-src")).toContain("https://tiles.joutiya.ma");
+    }
+  });
+
   it("gives private pages a device cookie when the request has none, and public pages never", () => {
     const fresh = proxy(request("/fr/connexion"));
     const cookie = fresh.cookies.get("__Host-did");

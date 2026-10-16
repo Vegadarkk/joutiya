@@ -336,5 +336,1266 @@
       "internal": "حدث خطأ تقني. حاول مجددًا.",
       "network": "تعذّر الاتصال. تحقق من شبكتك ثم حاول مجددًا."
     }
+  },
+  "Listing": {
+    "errors": {
+      "invalid_listing": "لا يمكن نشر الإعلان بوضعه الحالي. صحّح النقاط المشار إليها ثم حاول مجددًا.",
+      "draft_limit": "لديك بالفعل 5 مسودات. انشر مسودة أو احذفها قبل إنشاء أخرى.",
+      "listing_limit": "بلغت الحد الأقصى للإعلانات النشطة. أوقف إعلانًا مؤقتًا أو احذفه لنشر إعلان جديد.",
+      "listing_daily_limit": "بلغت عدد الإعلانات التي يمكنك نشرها اليوم. حاول مجددًا غدًا.",
+      "photo_limit": "بلغت الحد الأقصى لعدد الصور في هذا الإعلان.",
+      "file_too_large": "هذه الصورة تتجاوز الحجم الأقصى المسموح به (10 ميغابايت).",
+      "unsupported_media": "صيغة هذه الصورة غير مدعومة. استخدم صورة JPEG أو WebP أو PNG.",
+      "storage_full": "إرسال الصور متوقف مؤقتًا. يمكنك نشر الإعلان وإضافة الصور لاحقًا.",
+      "upload_not_ready": "ما تزال إحدى الصور قيد المعالجة. انتظر بضع ثوانٍ ثم حاول مجددًا.",
+      "phone_required": "تحقّق من رقم هاتفك لعرض وسيلة الاتصال هذه.",
+      "listing_unavailable": "هذا الإعلان لم يعد متاحًا.",
+      "reveal_not_allowed": "لا يمكن عرض الرقم حاليًا. تحقّق من بريدك الإلكتروني أو حاول لاحقًا."
+    }
+  },
+  "Categories": {
+    "vehicules": {
+      "name": "مركبات",
+      "sub": {
+        "voitures": "سيارات",
+        "location-voitures": "كراء السيارات",
+        "motos-scooters": "دراجات نارية وسكوتر",
+        "velos": "دراجات هوائية",
+        "utilitaires-camions": "شاحنات ومركبات نفعية",
+        "bateaux": "قوارب",
+        "pieces-accessoires": "قطع غيار وإكسسوارات"
+      }
+    },
+    "immobilier": {
+      "name": "عقارات",
+      "sub": {
+        "vente": "بيع",
+        "location": "كراء",
+        "colocation": "سكن مشترك",
+        "location-vacances": "كراء للعطل"
+      }
+    },
+    "electronique": {
+      "name": "إلكترونيات",
+      "sub": {
+        "telephones-objets-connectes": "هواتف وأجهزة ذكية",
+        "ordinateurs": "حواسيب",
+        "tablettes": "أجهزة لوحية",
+        "accessoires-electronique": "إكسسوارات",
+        "tv-photo-audio": "تلفاز وتصوير وصوتيات",
+        "consoles-jeux-video": "أجهزة وألعاب فيديو"
+      }
+    },
+    "maison-jardin": {
+      "name": "المنزل والحديقة",
+      "sub": {
+        "ameublement": "أثاث",
+        "electromenager": "أجهزة منزلية",
+        "decoration-artisanat": "ديكور وصناعة تقليدية",
+        "linge": "مفروشات وأغطية",
+        "arts-de-la-table": "أدوات المائدة",
+        "bricolage": "أدوات وعدد",
+        "jardin": "حديقة"
+      }
+    },
+    "mode": {
+      "name": "أزياء",
+      "sub": {
+        "vetements": "ملابس",
+        "tenues-traditionnelles": "ملابس تقليدية",
+        "chaussures": "أحذية",
+        "sacs-accessoires": "حقائب وإكسسوارات",
+        "montres-bijoux": "ساعات ومجوهرات"
+      }
+    },
+    "famille": {
+      "name": "الأسرة والطفل",
+      "sub": {
+        "equipement-bebe": "مستلزمات الرضّع",
+        "vetements-enfant": "ملابس الأطفال",
+        "mobilier-enfant": "أثاث الأطفال"
+      }
+    },
+    "loisirs": {
+      "name": "ترفيه وهوايات",
+      "sub": {
+        "sport-plein-air": "رياضة وهواء طلق",
+        "instruments": "آلات موسيقية",
+        "livres": "كتب",
+        "jeux-jouets": "ألعاب",
+        "collection-antiquites": "مقتنيات وتحف"
+      }
+    },
+    "animaux": {
+      "name": "حيوانات",
+      "sub": {
+        "accessoires-animaux": "مستلزمات الحيوانات",
+        "animaux-compagnie": "حيوانات أليفة",
+        "betail-moutons": "مواشي وأغنام"
+      }
+    },
+    "materiel-pro": {
+      "name": "معدات مهنية",
+      "sub": {
+        "agricole-tracteurs": "معدات فلاحية وجرارات",
+        "btp": "معدات البناء والأشغال",
+        "chr": "مقاهي وفنادق ومطاعم",
+        "commerce-bureau": "تجارة ومكاتب",
+        "medical": "معدات طبية",
+        "stocks-gros": "مخزون وبيع بالجملة"
+      }
+    },
+    "services": {
+      "name": "خدمات",
+      "sub": {
+        "cours": "دروس",
+        "demenagement-transport": "نقل وترحيل",
+        "travaux-reparations": "أشغال وإصلاحات",
+        "menage": "تنظيف",
+        "evenements": "حفلات ومناسبات",
+        "beaute": "تجميل"
+      }
+    },
+    "divers": {
+      "name": "متنوعات",
+      "sub": {
+        "autres": "أخرى"
+      }
+    }
+  },
+  "Criteria": {
+    "car-brand": {
+      "label": "العلامة التجارية",
+      "options": {
+        "dacia": "داسيا",
+        "renault": "رونو",
+        "peugeot": "بيجو",
+        "citroen": "سيتروين",
+        "ds": "دي إس",
+        "volkswagen": "فولكس فاغن",
+        "audi": "أودي",
+        "bmw": "بي إم دبليو",
+        "mercedes-benz": "مرسيدس بنز",
+        "opel": "أوبل",
+        "fiat": "فيات",
+        "alfa-romeo": "ألفا روميو",
+        "lancia": "لانسيا",
+        "ford": "فورد",
+        "toyota": "تويوتا",
+        "hyundai": "هيونداي",
+        "kia": "كيا",
+        "nissan": "نيسان",
+        "honda": "هوندا",
+        "mazda": "مازدا",
+        "mitsubishi": "ميتسوبيشي",
+        "suzuki": "سوزوكي",
+        "subaru": "سوبارو",
+        "daihatsu": "دايهاتسو",
+        "isuzu": "إيسوزو",
+        "lexus": "لكزس",
+        "infiniti": "إنفينيتي",
+        "skoda": "سكودا",
+        "seat": "سيات",
+        "cupra": "كوبرا",
+        "porsche": "بورشه",
+        "mini": "ميني",
+        "smart": "سمارت",
+        "land-rover": "لاند روفر",
+        "jaguar": "جاكوار",
+        "volvo": "فولفو",
+        "jeep": "جيب",
+        "chevrolet": "شيفروليه",
+        "dodge": "دودج",
+        "chrysler": "كرايسلر",
+        "cadillac": "كاديلاك",
+        "tesla": "تيسلا",
+        "byd": "بي واي دي",
+        "chery": "شيري",
+        "geely": "جيلي",
+        "mg": "إم جي",
+        "jac": "جاك",
+        "dfsk": "دي إف إس كيه",
+        "haval": "هافال",
+        "great-wall": "غريت وول",
+        "changan": "شانجان",
+        "baic": "بايك",
+        "ssangyong": "سانغ يونغ",
+        "maserati": "مازيراتي",
+        "ferrari": "فيراري",
+        "lamborghini": "لامبورغيني",
+        "bentley": "بنتلي",
+        "rolls-royce": "رولز رويس",
+        "aston-martin": "أستون مارتن",
+        "lada": "لادا",
+        "tata": "تاتا",
+        "mahindra": "ماهيندرا",
+        "autre": "علامة أخرى"
+      }
+    },
+    "model": {
+      "label": "الطراز"
+    },
+    "year": {
+      "label": "سنة الصنع"
+    },
+    "mileage": {
+      "label": "عدد الكيلومترات"
+    },
+    "fuel": {
+      "label": "نوع الوقود",
+      "options": {
+        "diesel": "ديزل",
+        "essence": "بنزين",
+        "hybride": "هجين",
+        "electrique": "كهربائي",
+        "gpl": "غاز"
+      }
+    },
+    "gearbox": {
+      "label": "علبة السرعة",
+      "options": {
+        "manuelle": "يدوية",
+        "automatique": "أوتوماتيكية"
+      }
+    },
+    "fiscal-power": {
+      "label": "القوة الجبائية"
+    },
+    "origin": {
+      "label": "المصدر",
+      "options": {
+        "ww-maroc": "WW بالمغرب",
+        "dedouanee": "مجمركة",
+        "importee-neuve": "مستوردة جديدة",
+        "pas-dedouanee": "غير مجمركة بعد"
+      }
+    },
+    "first-hand": {
+      "label": "اليد الأولى"
+    },
+    "doors": {
+      "label": "عدد الأبواب",
+      "options": {
+        "2": "بابان",
+        "3": "3 أبواب",
+        "4": "4 أبواب",
+        "5": "5 أبواب"
+      }
+    },
+    "moto-brand": {
+      "label": "العلامة التجارية",
+      "options": {
+        "yamaha": "ياماها",
+        "honda": "هوندا",
+        "suzuki": "سوزوكي",
+        "kawasaki": "كاواساكي",
+        "bmw": "بي إم دبليو",
+        "ktm": "كيه تي إم",
+        "ducati": "دوكاتي",
+        "piaggio": "بياجيو",
+        "vespa": "فيسبا",
+        "sym": "إس واي إم",
+        "kymco": "كيمكو",
+        "peugeot": "بيجو",
+        "aprilia": "أبريليا",
+        "triumph": "ترايمف",
+        "harley-davidson": "هارلي ديفيدسون",
+        "docker": "دوكر",
+        "becane": "بيكان",
+        "haojue": "هاوجو",
+        "lifan": "ليفان",
+        "autre": "علامة أخرى"
+      }
+    },
+    "engine-size": {
+      "label": "سعة المحرك",
+      "options": {
+        "moins-50": "أقل من 50 سم³",
+        "50-125": "من 50 إلى 125 سم³",
+        "126-250": "من 126 إلى 250 سم³",
+        "251-500": "من 251 إلى 500 سم³",
+        "501-750": "من 501 إلى 750 سم³",
+        "plus-750": "أكثر من 750 سم³"
+      }
+    },
+    "bike-type": {
+      "label": "نوع الدراجة",
+      "options": {
+        "vtt": "دراجة جبلية",
+        "route": "دراجة طريق",
+        "ville": "دراجة مدينية",
+        "electrique": "دراجة كهربائية",
+        "enfant": "دراجة أطفال",
+        "bmx": "بي إم إكس",
+        "pliant": "دراجة قابلة للطي",
+        "autre": "أخرى"
+      }
+    },
+    "bike-size": {
+      "label": "مقاس الإطار",
+      "options": {
+        "enfant": "أطفال",
+        "xs": "XS",
+        "s": "S",
+        "m": "M",
+        "l": "L",
+        "xl": "XL"
+      }
+    },
+    "brand": {
+      "label": "العلامة التجارية"
+    },
+    "utility-type": {
+      "label": "نوع المركبة",
+      "options": {
+        "fourgon": "فان",
+        "camionnette": "شاحنة صغيرة",
+        "camion": "شاحنة",
+        "pickup": "بيك أب",
+        "bus-minibus": "حافلة وميني باص",
+        "remorque": "مقطورة",
+        "autre": "أخرى"
+      }
+    },
+    "boat-type": {
+      "label": "نوع القارب",
+      "options": {
+        "bateau-moteur": "قارب بمحرك",
+        "voilier": "قارب شراعي",
+        "pneumatique": "قارب مطاطي",
+        "jet-ski": "جيت سكي",
+        "barque": "قارب صيد",
+        "autre": "أخرى"
+      }
+    },
+    "engine-power": {
+      "label": "قوة المحرك"
+    },
+    "part-type": {
+      "label": "نوع القطعة",
+      "options": {
+        "pneus-jantes": "إطارات وجنوط",
+        "moteur-mecanique": "محرك وميكانيك",
+        "carrosserie": "هيكل السيارة",
+        "electronique-auto": "إلكترونيات وكهرباء",
+        "interieur": "تجهيزات داخلية",
+        "audio-gps": "صوتيات وجي بي إس",
+        "accessoires-moto": "إكسسوارات الدراجات النارية",
+        "outillage": "عدد وأدوات",
+        "autre": "أخرى"
+      }
+    },
+    "vehicle-kind": {
+      "label": "المركبة المعنية",
+      "options": {
+        "voiture": "سيارة",
+        "moto": "دراجة نارية",
+        "velo": "دراجة هوائية",
+        "utilitaire": "مركبة نفعية وشاحنة",
+        "autre": "أخرى"
+      }
+    },
+    "property-type": {
+      "label": "نوع العقار",
+      "options": {
+        "appartement": "شقة",
+        "maison": "منزل",
+        "villa-riad": "فيلا ورياض",
+        "terrain-ferme": "أرض وضيعة",
+        "bureau": "مكتب",
+        "local-commercial": "محل تجاري",
+        "studio": "ستوديو",
+        "autre": "أخرى"
+      }
+    },
+    "surface": {
+      "label": "المساحة"
+    },
+    "bedrooms": {
+      "label": "غرف النوم"
+    },
+    "living-rooms": {
+      "label": "الصالونات"
+    },
+    "bathrooms": {
+      "label": "الحمّامات"
+    },
+    "floor": {
+      "label": "الطابق"
+    },
+    "standing": {
+      "label": "الفئة",
+      "options": {
+        "economique": "اقتصادي",
+        "moyen": "متوسط",
+        "haut": "رفيع"
+      }
+    },
+    "property-age": {
+      "label": "عمر العقار",
+      "options": {
+        "neuf": "جديد",
+        "1-5-ans": "من سنة إلى 5 سنوات",
+        "6-10-ans": "من 6 إلى 10 سنوات",
+        "11-20-ans": "من 11 إلى 20 سنة",
+        "plus-20-ans": "أكثر من 20 سنة"
+      }
+    },
+    "furnished": {
+      "label": "مفروش"
+    },
+    "amenities": {
+      "label": "التجهيزات",
+      "options": {
+        "parking": "موقف سيارات",
+        "ascenseur": "مصعد",
+        "climatisation": "تكييف",
+        "securite": "حراسة وأمن",
+        "cuisine-equipee": "مطبخ مجهز",
+        "terrasse": "شرفة",
+        "jardin": "حديقة",
+        "piscine": "مسبح",
+        "chauffage": "تدفئة"
+      }
+    },
+    "deposit": {
+      "label": "الضمان (درهم)"
+    },
+    "availability": {
+      "label": "التوفر",
+      "options": {
+        "immediate": "فوري",
+        "a-convenir": "حسب الاتفاق"
+      }
+    },
+    "room-type": {
+      "label": "نوع الغرفة",
+      "options": {
+        "chambre-privee": "غرفة خاصة",
+        "chambre-partagee": "غرفة مشتركة"
+      }
+    },
+    "flatmates": {
+      "label": "عدد المشاركين في السكن"
+    },
+    "guests": {
+      "label": "السعة (أشخاص)"
+    },
+    "min-nights": {
+      "label": "الحد الأدنى للإقامة"
+    },
+    "phone-device-type": {
+      "label": "نوع الجهاز",
+      "options": {
+        "smartphone": "هاتف ذكي",
+        "telephone-basique": "هاتف عادي",
+        "montre-connectee": "ساعة ذكية",
+        "ecouteurs": "سماعات لاسلكية",
+        "bracelet": "سوار ذكي",
+        "autre": "أخرى"
+      }
+    },
+    "phone-brand": {
+      "label": "العلامة التجارية",
+      "options": {
+        "apple": "آبل",
+        "samsung": "سامسونغ",
+        "xiaomi": "شاومي",
+        "huawei": "هواوي",
+        "oppo": "أوبو",
+        "realme": "ريلمي",
+        "infinix": "إنفينيكس",
+        "tecno": "تكنو",
+        "honor": "هونر",
+        "nokia": "نوكيا",
+        "google": "غوغل",
+        "oneplus": "ون بلس",
+        "vivo": "فيفو",
+        "motorola": "موتورولا",
+        "autre": "علامة أخرى"
+      }
+    },
+    "storage": {
+      "label": "سعة التخزين",
+      "options": {
+        "16-go": "16 جيغابايت",
+        "32-go": "32 جيغابايت",
+        "64-go": "64 جيغابايت",
+        "128-go": "128 جيغابايت",
+        "256-go": "256 جيغابايت",
+        "512-go": "512 جيغابايت",
+        "1-to": "1 تيرابايت",
+        "plus-1-to": "أكثر من 1 تيرابايت"
+      }
+    },
+    "warranty": {
+      "label": "تحت الضمان"
+    },
+    "computer-type": {
+      "label": "نوع الحاسوب",
+      "options": {
+        "portable": "محمول",
+        "bureau": "مكتبي",
+        "tout-en-un": "كل في واحد",
+        "mini-pc": "حاسوب صغير",
+        "autre": "أخرى"
+      }
+    },
+    "computer-brand": {
+      "label": "العلامة التجارية",
+      "options": {
+        "apple": "آبل",
+        "hp": "إتش بي",
+        "dell": "ديل",
+        "lenovo": "لينوفو",
+        "asus": "أسوس",
+        "acer": "أيسر",
+        "msi": "إم إس آي",
+        "microsoft": "مايكروسوفت",
+        "samsung": "سامسونغ",
+        "toshiba": "توشيبا",
+        "huawei": "هواوي",
+        "autre": "علامة أخرى"
+      }
+    },
+    "ram": {
+      "label": "الذاكرة العشوائية",
+      "options": {
+        "4-go": "4 جيغابايت",
+        "8-go": "8 جيغابايت",
+        "16-go": "16 جيغابايت",
+        "32-go": "32 جيغابايت",
+        "plus-32-go": "أكثر من 32 جيغابايت"
+      }
+    },
+    "tablet-brand": {
+      "label": "العلامة التجارية",
+      "options": {
+        "apple": "آبل",
+        "samsung": "سامسونغ",
+        "huawei": "هواوي",
+        "xiaomi": "شاومي",
+        "lenovo": "لينوفو",
+        "microsoft": "مايكروسوفت",
+        "amazon": "أمازون",
+        "alcatel": "ألكاتيل",
+        "autre": "علامة أخرى"
+      }
+    },
+    "accessory-type": {
+      "label": "نوع الإكسسوار",
+      "options": {
+        "chargeurs-cables": "شواحن وكابلات",
+        "coques-protections": "أغطية وواقيات",
+        "batteries-externes": "بطاريات خارجية",
+        "cartes-memoire": "بطاقات ذاكرة وذواكر USB",
+        "claviers-souris": "لوحات مفاتيح وفئران",
+        "supports": "حوامل وركائز",
+        "autre": "أخرى"
+      }
+    },
+    "av-type": {
+      "label": "نوع الجهاز",
+      "options": {
+        "televiseur": "تلفاز",
+        "projecteur": "جهاز عرض",
+        "appareil-photo": "كاميرا تصوير",
+        "objectif": "عدسة",
+        "camera": "كاميرا فيديو",
+        "enceinte": "مكبر صوت",
+        "casque": "سماعة رأس",
+        "home-cinema": "مسرح منزلي ومضخم صوت",
+        "autre": "أخرى"
+      }
+    },
+    "gaming-type": {
+      "label": "نوع المنتج",
+      "options": {
+        "console": "جهاز ألعاب",
+        "jeu": "لعبة",
+        "accessoire-gaming": "إكسسوار",
+        "autre": "أخرى"
+      }
+    },
+    "platform": {
+      "label": "المنصة",
+      "options": {
+        "playstation-5": "بلايستيشن 5",
+        "playstation-4": "بلايستيشن 4",
+        "xbox-series": "إكس بوكس سيريز",
+        "xbox-one": "إكس بوكس ون",
+        "nintendo-switch": "نينتندو سويتش",
+        "pc": "حاسوب",
+        "retro": "كلاسيكي",
+        "autre": "أخرى"
+      }
+    },
+    "furniture-type": {
+      "label": "نوع الأثاث",
+      "options": {
+        "salon-marocain": "صالون مغربي",
+        "salon": "صالون وأرائك",
+        "table-chaises": "طاولة وكراسي",
+        "lit-matelas": "سرير وفراش",
+        "armoire-rangement": "خزانة وتخزين",
+        "bureau": "مكتب",
+        "meuble-tv": "طاولة تلفاز",
+        "autre": "أخرى"
+      }
+    },
+    "material": {
+      "label": "المادة",
+      "options": {
+        "bois": "خشب",
+        "metal": "معدن",
+        "verre": "زجاج",
+        "tissu": "قماش",
+        "cuir": "جلد",
+        "rotin": "خيزران",
+        "plastique": "بلاستيك",
+        "ceramique": "خزف",
+        "cuivre": "نحاس",
+        "autre": "أخرى"
+      }
+    },
+    "color": {
+      "label": "اللون",
+      "options": {
+        "noir": "أسود",
+        "blanc": "أبيض",
+        "gris": "رمادي",
+        "beige": "بيج",
+        "marron": "بني",
+        "bleu": "أزرق",
+        "vert": "أخضر",
+        "rouge": "أحمر",
+        "jaune": "أصفر",
+        "orange": "برتقالي",
+        "rose": "وردي",
+        "violet": "بنفسجي",
+        "dore": "ذهبي",
+        "argente": "فضي",
+        "multicolore": "متعدد الألوان",
+        "autre": "أخرى"
+      }
+    },
+    "appliance-type": {
+      "label": "نوع الجهاز",
+      "options": {
+        "refrigerateur": "ثلاجة",
+        "congelateur": "مجمّد",
+        "lave-linge": "غسالة ملابس",
+        "lave-vaisselle": "غسالة أطباق",
+        "four": "فرن",
+        "cuisiniere": "طباخة",
+        "micro-ondes": "ميكروويف",
+        "hotte": "شفاط",
+        "climatiseur": "مكيف",
+        "chauffe-eau": "سخان ماء",
+        "aspirateur": "مكنسة كهربائية",
+        "petit-electromenager": "أجهزة منزلية صغيرة",
+        "autre": "أخرى"
+      }
+    },
+    "decor-type": {
+      "label": "نوع المنتج",
+      "options": {
+        "tapis": "زرابي وسجاد",
+        "dinanderie": "نحاسيات",
+        "poterie-ceramique": "خزف وفخار",
+        "luminaire": "إنارة",
+        "miroir": "مرآة",
+        "tableau": "لوحة وإطار",
+        "zellige": "زليج",
+        "bois-sculpte": "خشب منقوش",
+        "autre": "أخرى"
+      }
+    },
+    "handmade": {
+      "label": "صناعة يدوية"
+    },
+    "linen-type": {
+      "label": "نوع المفروشات",
+      "options": {
+        "literie": "أغطية الأسرّة",
+        "serviettes": "مناشف",
+        "rideaux": "ستائر",
+        "nappes": "مفارش طاولة",
+        "couvertures": "بطانيات",
+        "autre": "أخرى"
+      }
+    },
+    "tableware-type": {
+      "label": "نوع المنتج",
+      "options": {
+        "vaisselle": "أطباق",
+        "verres": "كؤوس",
+        "couverts": "أدوات مائدة",
+        "service-the": "طقم شاي",
+        "cocotte-ustensiles": "قدور وأواني",
+        "plateaux": "صواني",
+        "autre": "أخرى"
+      }
+    },
+    "diy-type": {
+      "label": "نوع المنتج",
+      "options": {
+        "outillage-electrique": "عدد كهربائية",
+        "outillage-main": "عدد يدوية",
+        "plomberie": "سباكة",
+        "electricite": "كهرباء",
+        "peinture": "صباغة",
+        "materiaux": "مواد بناء",
+        "quincaillerie": "مواد حديدية",
+        "autre": "أخرى"
+      }
+    },
+    "garden-type": {
+      "label": "نوع المنتج",
+      "options": {
+        "mobilier-jardin": "أثاث حديقة",
+        "plantes": "نباتات",
+        "outillage-jardin": "أدوات الحديقة",
+        "arrosage": "سقي",
+        "barbecue": "شواية",
+        "piscine-spa": "مسبح وسبا",
+        "abri": "مظلة وبرغولا",
+        "autre": "أخرى"
+      }
+    },
+    "audience": {
+      "label": "لمن",
+      "options": {
+        "femme": "نساء",
+        "homme": "رجال",
+        "enfant": "أطفال",
+        "mixte": "مشترك"
+      }
+    },
+    "clothing-type": {
+      "label": "نوع الملابس",
+      "options": {
+        "haut": "قمصان وتيشيرتات",
+        "pantalon": "سراويل وجينز",
+        "robe": "فستان",
+        "jupe": "تنورة",
+        "veste-manteau": "سترة ومعطف",
+        "costume": "بدلة",
+        "sport": "ملابس رياضية",
+        "lingerie-nuit": "ملابس داخلية ونوم",
+        "maillot": "لباس البحر",
+        "autre": "أخرى"
+      }
+    },
+    "clothing-size": {
+      "label": "المقاس",
+      "options": {
+        "xs": "XS",
+        "s": "S",
+        "m": "M",
+        "l": "L",
+        "xl": "XL",
+        "xxl": "XXL",
+        "xxxl": "XXXL",
+        "34": "34",
+        "36": "36",
+        "38": "38",
+        "40": "40",
+        "42": "42",
+        "44": "44",
+        "46": "46",
+        "48": "48",
+        "unique": "مقاس واحد"
+      }
+    },
+    "traditional-type": {
+      "label": "نوع اللباس",
+      "options": {
+        "caftan": "قفطان",
+        "takchita": "تكشيطة",
+        "djellaba": "جلابة",
+        "gandoura": "قندورة",
+        "jabador": "جابادور",
+        "abaya": "عباية",
+        "babouches-accessoires": "بلغة وإكسسوارات",
+        "autre": "أخرى"
+      }
+    },
+    "shoe-type": {
+      "label": "نوع الأحذية",
+      "options": {
+        "baskets": "أحذية رياضية",
+        "ville": "أحذية كلاسيكية",
+        "bottes": "أحذية طويلة",
+        "sandales": "صنادل",
+        "babouches": "بلغة",
+        "sport": "أحذية رياضة متخصصة",
+        "autre": "أخرى"
+      }
+    },
+    "shoe-size": {
+      "label": "مقاس الحذاء",
+      "options": {
+        "35": "35",
+        "36": "36",
+        "37": "37",
+        "38": "38",
+        "39": "39",
+        "40": "40",
+        "41": "41",
+        "42": "42",
+        "43": "43",
+        "44": "44",
+        "45": "45",
+        "46": "46",
+        "47": "47",
+        "autre": "أخرى"
+      }
+    },
+    "fashion-accessory-type": {
+      "label": "نوع الإكسسوار",
+      "options": {
+        "sac-a-main": "حقيبة يد",
+        "sac-a-dos": "حقيبة ظهر",
+        "portefeuille": "محفظة",
+        "ceinture": "حزام",
+        "foulard": "وشاح",
+        "lunettes": "نظارات",
+        "chapeau": "قبعة",
+        "autre": "أخرى"
+      }
+    },
+    "jewelry-type": {
+      "label": "نوع المنتج",
+      "options": {
+        "montre": "ساعة",
+        "bague": "خاتم",
+        "collier": "قلادة",
+        "bracelet": "سوار",
+        "boucles-oreilles": "أقراط",
+        "parure": "طقم مجوهرات",
+        "autre": "أخرى"
+      }
+    },
+    "jewelry-material": {
+      "label": "المادة",
+      "options": {
+        "or": "ذهب",
+        "argent": "فضة",
+        "acier": "فولاذ",
+        "plaque": "مطلي بالذهب",
+        "fantaisie": "إكسسوارات تقليد",
+        "autre": "أخرى"
+      }
+    },
+    "baby-type": {
+      "label": "نوع المنتج",
+      "options": {
+        "poussette": "عربة أطفال",
+        "siege-auto": "مقعد سيارة للأطفال",
+        "lit-bebe": "سرير ومهد",
+        "chaise-haute": "كرسي طعام مرتفع",
+        "porte-bebe": "حمالة أطفال",
+        "jouets-eveil": "ألعاب تعليمية للرضّع",
+        "soins-bain": "عناية واستحمام",
+        "autre": "أخرى"
+      }
+    },
+    "child-age": {
+      "label": "العمر",
+      "options": {
+        "0-6-mois": "من 0 إلى 6 أشهر",
+        "6-12-mois": "من 6 إلى 12 شهرًا",
+        "1-2-ans": "من سنة إلى سنتين",
+        "2-4-ans": "من 2 إلى 4 سنوات",
+        "4-8-ans": "من 4 إلى 8 سنوات",
+        "8-ans-plus": "8 سنوات وأكثر"
+      }
+    },
+    "child-clothing-type": {
+      "label": "نوع الملابس",
+      "options": {
+        "haut": "قمصان",
+        "pantalon": "سراويل",
+        "robe": "فستان",
+        "ensemble": "طقم",
+        "manteau": "معطف وسترة",
+        "pyjama": "بيجامة",
+        "chaussures-enfant": "أحذية",
+        "autre": "أخرى"
+      }
+    },
+    "child-audience": {
+      "label": "بنت أو ولد",
+      "options": {
+        "fille": "بنت",
+        "garcon": "ولد",
+        "mixte": "مشترك"
+      }
+    },
+    "child-furniture-type": {
+      "label": "نوع الأثاث",
+      "options": {
+        "lit": "سرير أطفال",
+        "bureau": "مكتب",
+        "rangement": "تخزين",
+        "chaise": "كرسي وطاولة",
+        "parc": "سور ألعاب وحاجز",
+        "autre": "أخرى"
+      }
+    },
+    "sport-type": {
+      "label": "النوع الرياضي",
+      "options": {
+        "fitness-musculation": "لياقة وكمال أجسام",
+        "football": "كرة القدم",
+        "randonnee-camping": "مشي وتخييم",
+        "natation-plage": "سباحة وشاطئ",
+        "sports-raquettes": "رياضات المضرب",
+        "sports-combat": "رياضات قتالية",
+        "surf-glisse": "ركوب الأمواج",
+        "peche-chasse": "صيد",
+        "autre": "أخرى"
+      }
+    },
+    "instrument-type": {
+      "label": "نوع الآلة",
+      "options": {
+        "guitare": "غيتار",
+        "piano-clavier": "بيانو وأورغ",
+        "percussions": "آلات إيقاع",
+        "traditionnels": "آلات تقليدية (عود، بندير)",
+        "vent": "آلات نفخ",
+        "cordes": "كمان وآلات وترية",
+        "dj-sono": "دي جي وصوتيات",
+        "accessoires-musique": "إكسسوارات",
+        "autre": "أخرى"
+      }
+    },
+    "book-type": {
+      "label": "نوع الكتاب",
+      "options": {
+        "roman": "روايات وأدب",
+        "scolaire-universitaire": "مدرسي وجامعي",
+        "religion": "كتب دينية",
+        "jeunesse": "كتب الأطفال",
+        "bd-manga": "قصص مصورة ومانغا",
+        "pratique": "كتب عملية وطبخ",
+        "langues": "لغات",
+        "autre": "أخرى"
+      }
+    },
+    "book-language": {
+      "label": "اللغة",
+      "options": {
+        "francais": "الفرنسية",
+        "arabe": "العربية",
+        "anglais": "الإنجليزية",
+        "amazigh": "الأمازيغية",
+        "espagnol": "الإسبانية",
+        "autre": "أخرى"
+      }
+    },
+    "toy-type": {
+      "label": "نوع اللعبة",
+      "options": {
+        "jeux-societe": "ألعاب جماعية",
+        "puzzles": "ألعاب تركيب",
+        "figurines": "مجسمات",
+        "poupees": "دمى",
+        "voitures-miniatures": "سيارات مصغرة",
+        "jeux-construction": "ألعاب بناء",
+        "peluches": "دمى محشوة",
+        "exterieur": "ألعاب خارجية",
+        "autre": "أخرى"
+      }
+    },
+    "collectible-type": {
+      "label": "نوع المقتنى",
+      "options": {
+        "monnaies-billets": "عملات وأوراق نقدية",
+        "timbres": "طوابع",
+        "objets-anciens": "تحف قديمة",
+        "art": "فن ولوحات",
+        "montres-anciennes": "ساعات قديمة",
+        "livres-anciens": "كتب قديمة",
+        "autre": "أخرى"
+      }
+    },
+    "pet-accessory-type": {
+      "label": "نوع المنتج",
+      "options": {
+        "alimentation": "أغذية",
+        "cage-aquarium": "قفص وحوض",
+        "laisse-collier": "مقود وطوق",
+        "couchage": "فراش وبيت",
+        "jouets": "ألعاب",
+        "toilettage": "تنظيف وعناية",
+        "autre": "أخرى"
+      }
+    },
+    "animal-type": {
+      "label": "نوع الحيوان",
+      "options": {
+        "chien": "كلب",
+        "chat": "قط",
+        "oiseau": "طائر",
+        "poisson": "سمك",
+        "rongeur": "قوارض وأرانب",
+        "reptile": "زواحف",
+        "autre": "أخرى"
+      }
+    },
+    "breed": {
+      "label": "السلالة"
+    },
+    "animal-age": {
+      "label": "العمر",
+      "options": {
+        "moins-3-mois": "أقل من 3 أشهر",
+        "3-12-mois": "من 3 إلى 12 شهرًا",
+        "1-5-ans": "من سنة إلى 5 سنوات",
+        "plus-5-ans": "أكثر من 5 سنوات"
+      }
+    },
+    "animal-sex": {
+      "label": "الجنس",
+      "options": {
+        "male": "ذكر",
+        "femelle": "أنثى"
+      }
+    },
+    "vaccinated": {
+      "label": "ملقّح"
+    },
+    "livestock-type": {
+      "label": "نوع الماشية",
+      "options": {
+        "mouton": "خروف",
+        "chevre": "معزة",
+        "vache": "بقرة",
+        "veau": "عجل",
+        "chameau": "جمل",
+        "cheval": "حصان وحمار",
+        "volaille": "دواجن",
+        "autre": "أخرى"
+      }
+    },
+    "head-count": {
+      "label": "عدد الرؤوس"
+    },
+    "livestock-age": {
+      "label": "العمر",
+      "options": {
+        "moins-1-an": "أقل من سنة",
+        "1-2-ans": "من سنة إلى سنتين",
+        "plus-2-ans": "أكثر من سنتين"
+      }
+    },
+    "agri-type": {
+      "label": "نوع المعدات",
+      "options": {
+        "tracteur": "جرار",
+        "motoculteur": "محراث آلي",
+        "remorque-agricole": "مقطورة",
+        "irrigation": "ري ومضخات",
+        "semoir-charrue": "بذّارة ومحراث",
+        "moissonneuse": "حصّادة",
+        "pulverisateur": "مرشة",
+        "autre": "أخرى"
+      }
+    },
+    "construction-type": {
+      "label": "نوع المعدات",
+      "options": {
+        "engin-chantier": "آلية بناء",
+        "betonniere": "خلاطة خرسانة",
+        "echafaudage": "سقالات",
+        "compresseur": "ضاغط هواء",
+        "groupe-electrogene": "مولد كهربائي",
+        "coffrage": "قوالب ودعامات",
+        "outillage-btp": "عدد وأدوات",
+        "autre": "أخرى"
+      }
+    },
+    "horeca-type": {
+      "label": "نوع المعدات",
+      "options": {
+        "cuisine-pro": "مطبخ مهني",
+        "refrigeration": "تبريد وواجهات عرض",
+        "machine-cafe": "ماكينة قهوة",
+        "four-pro": "فرن وشواية",
+        "mobilier-restaurant": "أثاث مطعم",
+        "bar": "بار",
+        "vaisselle-pro": "أواني",
+        "autre": "أخرى"
+      }
+    },
+    "office-type": {
+      "label": "نوع المعدات",
+      "options": {
+        "caisse-tpe": "صندوق ونقطة بيع",
+        "presentoirs-rayonnages": "رفوف وواجهات عرض",
+        "mobilier-bureau": "أثاث مكتبي",
+        "informatique-pro": "إعلاميات",
+        "imprimante-copieur": "طابعة وناسخة",
+        "securite-video": "أمن وكاميرات مراقبة",
+        "autre": "أخرى"
+      }
+    },
+    "medical-type": {
+      "label": "نوع المعدات",
+      "options": {
+        "dentaire": "أسنان",
+        "mobilier-medical": "أثاث طبي",
+        "imagerie": "تصوير طبي",
+        "laboratoire": "مختبر",
+        "paramedical": "شبه طبي",
+        "esthetique": "تجميل",
+        "autre": "أخرى"
+      }
+    },
+    "stock-type": {
+      "label": "نوع البضاعة",
+      "options": {
+        "textile": "نسيج وملابس",
+        "alimentaire": "مواد غذائية",
+        "cosmetique": "مستحضرات تجميل",
+        "electronique": "إلكترونيات",
+        "menage": "منظفات ومنتجات منزلية",
+        "jouets": "ألعاب",
+        "autre": "أخرى"
+      }
+    },
+    "quantity": {
+      "label": "الكمية"
+    },
+    "course-subject": {
+      "label": "المادة",
+      "options": {
+        "soutien-scolaire": "دعم مدرسي",
+        "langues": "لغات",
+        "informatique": "إعلاميات",
+        "musique": "موسيقى",
+        "sport-coaching": "رياضة وتدريب",
+        "cuisine": "طبخ",
+        "conduite": "تعليم السياقة",
+        "autre": "أخرى"
+      }
+    },
+    "course-level": {
+      "label": "المستوى",
+      "options": {
+        "primaire": "ابتدائي",
+        "college": "إعدادي",
+        "lycee": "ثانوي",
+        "superieur": "جامعي",
+        "adultes": "كبار"
+      }
+    },
+    "course-mode": {
+      "label": "الصيغة",
+      "options": {
+        "domicile": "في المنزل",
+        "en-ligne": "عن بعد",
+        "chez-le-prof": "عند الأستاذ"
+      }
+    },
+    "transport-type": {
+      "label": "نوع الخدمة",
+      "options": {
+        "demenagement": "ترحيل الأثاث",
+        "livraison": "توصيل",
+        "transport-marchandises": "نقل البضائع",
+        "transport-personnes": "نقل الأشخاص",
+        "camion-chauffeur": "شاحنة مع سائق",
+        "autre": "أخرى"
+      }
+    },
+    "transport-vehicle": {
+      "label": "المركبة",
+      "options": {
+        "camion": "شاحنة",
+        "camionnette": "شاحنة صغيرة",
+        "voiture": "سيارة",
+        "autre": "أخرى"
+      }
+    },
+    "trade": {
+      "label": "المهنة",
+      "options": {
+        "plomberie": "سباكة",
+        "electricite": "كهرباء",
+        "peinture": "صباغة",
+        "maconnerie": "بناء",
+        "menuiserie": "نجارة",
+        "climatisation": "تكييف",
+        "carrelage": "تبليط",
+        "serrurerie": "أقفال",
+        "reparation-electromenager": "إصلاح الأجهزة المنزلية",
+        "autre": "أخرى"
+      }
+    },
+    "service-mode": {
+      "label": "مكان الخدمة",
+      "options": {
+        "domicile": "في المنزل",
+        "atelier": "في المحل",
+        "les-deux": "كلاهما"
+      }
+    },
+    "cleaning-type": {
+      "label": "نوع الخدمة",
+      "options": {
+        "menage-regulier": "تنظيف دوري",
+        "grand-nettoyage": "تنظيف شامل",
+        "repassage": "كي الملابس",
+        "nettoyage-bureaux": "تنظيف المكاتب",
+        "fin-chantier": "تنظيف بعد الأشغال",
+        "autre": "أخرى"
+      }
+    },
+    "frequency": {
+      "label": "التكرار",
+      "options": {
+        "ponctuel": "مرة واحدة",
+        "hebdomadaire": "أسبوعي",
+        "quotidien": "يومي"
+      }
+    },
+    "event-service": {
+      "label": "الخدمة",
+      "options": {
+        "traiteur": "ممون حفلات",
+        "neggafa": "نكافة",
+        "photographe-video": "تصوير فوتوغرافي وفيديو",
+        "dj-animation": "دي جي وتنشيط",
+        "location-salle": "كراء قاعة",
+        "decoration": "ديكور",
+        "location-materiel": "كراء معدات",
+        "autre": "أخرى"
+      }
+    },
+    "beauty-service": {
+      "label": "الخدمة",
+      "options": {
+        "coiffure": "حلاقة وتصفيف",
+        "maquillage": "مكياج",
+        "esthetique": "عناية بالبشرة",
+        "henne": "حناء",
+        "onglerie": "عناية بالأظافر",
+        "autre": "أخرى"
+      }
+    },
+    "condition": {
+      "label": "الحالة",
+      "options": {
+        "new_tagged": "جديد بالملصق",
+        "like_new": "كالجديد",
+        "very_good": "حالة جيدة جدًا",
+        "good": "حالة جيدة",
+        "for_parts": "للقطع"
+      }
+    }
   }
 }

@@ -21,6 +21,8 @@ export interface CspOptions {
   mediaOrigin?: string;
   /** R2 S3 host for presigned uploads, e.g. https://<account>.eu.r2.cloudflarestorage.com. */
   r2Origin?: string;
+  /** Host of the PMTiles archive the interactive map fetches with Range requests (D10), if configured. */
+  tilesOrigin?: string;
   /** Error-reporting ingest origin (Sentry EU), if configured. */
   errorIngestOrigin?: string;
   /** Development only: Firebase Auth emulator origin the browser SDK talks to. */
@@ -77,25 +79,30 @@ export function buildCsp(options: CspOptions): string {
   // render, so they cannot be pinned at build time; chunks are pinned by SRI instead.
   // Turnstile and GIS are loaded by <script nonce> tags on private pages ('strict-dynamic' then
   // ignores host sources); the hosts stay listed for CSP2 browsers and the public variant.
+  // 'wasm-unsafe-eval' (private only, D13): the HEIC converter of the listing wizard runs in
+  // WebAssembly; it never ships on public pages, whose script-src the hash hook rebuilds anyway.
   const scriptSrc =
     variant === "private"
-      ? [`'nonce-${options.nonce}'`, "'strict-dynamic'", "https:", "'unsafe-inline'"]
+      ? [`'nonce-${options.nonce}'`, "'strict-dynamic'", "'wasm-unsafe-eval'", "https:", "'unsafe-inline'"]
       : ["'self'", "'unsafe-inline'", TURNSTILE_ORIGIN, GIS_SCRIPT];
   if (dev) scriptSrc.push("'unsafe-eval'");
 
   const media = origin(options.mediaOrigin);
+  // MapLibre fetches PMTiles with fetch + Range (connect-src) and draws raster sprites as images.
+  const tiles = origin(options.tilesOrigin);
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
     "script-src": scriptSrc,
     // Radix and Sonner set inline style attributes; a nonce cannot cover attributes.
     "style-src": ["'self'", "'unsafe-inline'", GIS_STYLE],
-    "img-src": compact(["'self'", "data:", "blob:", media]),
+    "img-src": compact(["'self'", "data:", "blob:", media, tiles]),
     "font-src": ["'self'"],
     "connect-src": compact([
       "'self'",
       ...FIREBASE_ORIGINS,
       GIS_FRAME,
       origin(options.r2Origin),
+      tiles,
       origin(options.errorIngestOrigin),
       origin(options.authEmulatorOrigin),
       dev ? "ws:" : undefined,
