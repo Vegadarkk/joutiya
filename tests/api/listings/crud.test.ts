@@ -114,7 +114,8 @@ describe("PATCH /api/listings/{id}", () => {
     const owner = await member();
     const id = await draft(owner);
     const codes: [number, string][] = [];
-    for (const body of [{ ownerUid: "x" }, { title: "Vélo" }, { price: -1 }, { location: { regionCode: "06", citySlug: "atlantis" } }, { location: { regionCode: "04", citySlug: "casablanca" } }]) {
+    // A short title is a valid draft (D2 autosave keeps half-typed text); an overlong one is refused.
+    for (const body of [{ ownerUid: "x" }, { title: "V".repeat(71) }, { price: -1 }, { location: { regionCode: "06", citySlug: "atlantis" } }, { location: { regionCode: "04", citySlug: "casablanca" } }]) {
       const result = await api<ErrorBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body });
       codes.push([result.status, result.body.error.code]);
     }
@@ -122,6 +123,8 @@ describe("PATCH /api/listings/{id}", () => {
     const city = await api<ErrorBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { location: { regionCode: "06", citySlug: "atlantis" } } });
     expect(city.body.error.details).toEqual([{ path: "location.citySlug", code: "unknown" }]);
     expect((await getListing(id))?.version).toBe(0);
+    const short = await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { title: "Vélo" } });
+    expect(short.status).toBe(200);
   });
 
   it("keeps only the owner's ready uploads of this listing as photos, in the order sent", async () => {
@@ -190,9 +193,9 @@ describe("ownership and removal", () => {
     const purge = await getUpload(upload);
     expect(purge?.purgeAt.getTime()).toBeGreaterThanOrEqual(before - 1000);
     expect(purge?.purgeAt.getTime()).toBeLessThanOrEqual(Date.now());
-    // Gone from the drafts tab, listed under "ended"; no further edit.
+    // Gone from every tab (a deleted listing is not "ended"); no further edit.
     expect((await api<OwnerListingsResponse>(mine, "GET", "/api/listings/mine", { member: owner })).body.listings).toEqual([]);
-    expect((await api<OwnerListingsResponse>(mine, "GET", "/api/listings/mine?status=ended", { member: owner })).body.listings.map((listing) => listing.status)).toEqual(["removed"]);
+    expect((await api<OwnerListingsResponse>(mine, "GET", "/api/listings/mine?status=ended", { member: owner })).body.listings).toEqual([]);
     const edit = await api<ErrorBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { title: "Encore là ?" } });
     expect(edit.status).toBe(409);
     expect(edit.body.error.code).toBe("conflict");

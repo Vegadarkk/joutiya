@@ -21,7 +21,7 @@ export const OWNER_BUCKET_STATUSES: Record<OwnerListBucket, readonly ListingStat
   drafts: ["draft"],
   active: ["published", "paused"],
   pending: ["pending_review"],
-  ended: ["sold", "expired", "rejected", "removed"],
+  ended: ["sold", "expired", "rejected"],
 };
 
 /** Statuses that occupy an `activeListings` slot (a paused listing frees its slot: Listing.errors.listing_limit). */

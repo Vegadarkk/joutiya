@@ -5,7 +5,7 @@ import nextTs from "eslint-config-next/typescript";
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
-  globalIgnores([".next/**", "dist/**", "coverage/**", "playwright-report/**", "test-results/**", "next-env.d.ts", "workers/*/.wrangler/**"]),
+  globalIgnores([".next/**", "dist/**", "public/vendor/**", "coverage/**", "playwright-report/**", "test-results/**", "next-env.d.ts", "workers/*/.wrangler/**"]),
   {
     rules: {
       // XSS (§6): raw HTML injection is never needed; the CSP hook and React escaping do the rest.

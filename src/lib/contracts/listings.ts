@@ -133,8 +133,10 @@ export const listingPatchSchema = z
   .object({
     categoryId: treeIdSchema.optional(),
     subcategoryId: treeIdSchema.optional(),
-    title: titleSchema.optional(),
-    description: descriptionSchema.optional(),
+    // Drafts keep half-typed text (D2 autosave); the minimums are checked at publish and on live
+    // listings by assessReadiness.
+    title: z.string().trim().max(TITLE_MAX).optional(),
+    description: z.string().trim().max(DESCRIPTION_MAX).optional(),
     attributes: listingAttributesSchema.optional(),
     condition: conditionSchema.nullable().optional(),
     /** null = "à discuter" (allowed only with `isDonation` or a `priceOptional` subcategory). */

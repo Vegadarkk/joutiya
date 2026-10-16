@@ -11,9 +11,11 @@ import {
   WIZARD_DONE,
   WIZARD_STEPS,
   createListingSchema,
+  descriptionSchema,
   listingPatchSchema,
   publishListingSchema,
   slugIdSchema,
+  titleSchema,
   type ListingPatch,
 } from "@/lib/contracts/listings";
 import { MAX_PHOTOS_INDIVIDUAL, MAX_PHOTOS_PRO, MAX_UPLOAD_BYTES, MEDIA_API, PHOTO_VARIANT_SPECS, listingPhotoSchema, signUploadSchema, uploadIdSchema } from "@/lib/contracts/media";
@@ -41,16 +43,17 @@ describe("listingPatchSchema", () => {
     expect(listingPatchSchema.safeParse({ price: null, condition: null }).success).toBe(true);
   });
 
-  it("enforces the title and description bounds", () => {
-    expect(listingPatchSchema.safeParse({ title: "x".repeat(TITLE_MIN) }).success).toBe(true);
-    expect(listingPatchSchema.safeParse({ title: "x".repeat(TITLE_MIN - 1) }).success).toBe(false);
+  it("lets drafts keep short text and caps its length; the minimums belong to publication", () => {
+    // D2: autosave stores half-typed text; assessReadiness (titleSchema / descriptionSchema) checks the minimums.
+    expect(listingPatchSchema.safeParse({ title: "x".repeat(TITLE_MIN - 1) }).success).toBe(true);
     expect(listingPatchSchema.safeParse({ title: "x".repeat(TITLE_MAX) }).success).toBe(true);
     expect(listingPatchSchema.safeParse({ title: "x".repeat(TITLE_MAX + 1) }).success).toBe(false);
-    expect(listingPatchSchema.safeParse({ title: `  ${"x".repeat(TITLE_MIN - 1)}  ` }).success).toBe(false);
-    expect(listingPatchSchema.safeParse({ description: "x".repeat(DESCRIPTION_MIN) }).success).toBe(true);
-    expect(listingPatchSchema.safeParse({ description: "x".repeat(DESCRIPTION_MIN - 1) }).success).toBe(false);
+    expect(listingPatchSchema.safeParse({ description: "x".repeat(DESCRIPTION_MIN - 1) }).success).toBe(true);
     expect(listingPatchSchema.safeParse({ description: "x".repeat(DESCRIPTION_MAX) }).success).toBe(true);
     expect(listingPatchSchema.safeParse({ description: "x".repeat(DESCRIPTION_MAX + 1) }).success).toBe(false);
+    expect(titleSchema.safeParse("x".repeat(TITLE_MIN)).success).toBe(true);
+    expect(titleSchema.safeParse(`  ${"x".repeat(TITLE_MIN - 1)}  `).success).toBe(false);
+    expect(descriptionSchema.safeParse("x".repeat(DESCRIPTION_MIN - 1)).success).toBe(false);
     expect([TITLE_MIN, TITLE_MAX, DESCRIPTION_MIN, DESCRIPTION_MAX, PRICE_MAX, MAX_DRAFTS]).toEqual([5, 70, 20, 4000, 100_000_000, 5]);
   });
 

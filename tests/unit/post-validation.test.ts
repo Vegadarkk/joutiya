@@ -168,7 +168,9 @@ describe("step navigation helpers", () => {
 
 describe("autosave payload", () => {
   it("keeps only the fields the API accepts as they stand", () => {
-    expect(sanitizePatch({ title: "Vélo", description: "Trop court", price: 1500 })).toEqual({ price: 1500 });
+    // Short text is a valid draft (minimums are checked at publication).
+    expect(sanitizePatch({ title: "Vélo", description: "Trop court", price: 1500 })).toEqual({ title: "Vélo", description: "Trop court", price: 1500 });
+    expect(sanitizePatch({ title: "x".repeat(71), price: 1500 })).toEqual({ price: 1500 });
     expect(sanitizePatch({ title: "Vélo de ville", price: -3, priceNegotiable: true })).toEqual({ title: "Vélo de ville", priceNegotiable: true });
     expect(sanitizePatch({ price: null, isDonation: true })).toEqual({ price: null, isDonation: true });
     expect(sanitizePatch({ location: { regionCode: "06", citySlug: "casablanca", district: "x".repeat(65) } })).toEqual({});
