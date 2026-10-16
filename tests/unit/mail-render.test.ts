@@ -18,11 +18,18 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
   staffInvite: { displayName: "Nadia", actionUrl: ACTION, role: "moderator" },
   phoneVerified: { displayName: "Nadia", phone: "+212 6 00 00 00 00" },
   phoneRemoved: { displayName: "Nadia", phone: "+212 6 00 00 00 00" },
+  listingPublished: { displayName: "Nadia", title: "Vélo de ville", url: `${SITE}/fr/annonce/velo-de-ville-casablanca-abcd2345`, expiresAt: "2026-12-15T09:30:00.000Z" },
+  listingPendingReview: { displayName: "Nadia", title: "Vélo de ville", listingId: "abcd2345", statement: { measure: "hold", facts: ["new_account", "dup_text"], ground: "CGU §7", automated: true, redress: "dsa@joutiya.ma" } },
+  listingRejected: { displayName: "Nadia", title: "Vélo de ville", listingId: "abcd2345", statement: { measure: "reject", facts: ["prohibited_kw"], ground: "CGU §7.2", automated: true, redress: "dsa@joutiya.ma" } },
+  listingApproved: { displayName: "Nadia", title: "Vélo de ville", url: `${SITE}/fr/annonce/velo-de-ville-casablanca-abcd2345`, expiresAt: "2026-12-15T09:30:00.000Z" },
+  listingChangesApproved: { displayName: "Nadia", title: "Vélo de ville", status: "paused", url: `${SITE}/fr/mes-annonces?onglet=active`, until: "2026-12-15T09:30:00.000Z" },
+  listingExpiringSoon: { displayName: "Nadia", title: "Vélo de ville", url: `${SITE}/fr/annonce/velo-de-ville-casablanca-abcd2345`, expiresAt: "2026-12-15T09:30:00.000Z" },
+  listingExpired: { displayName: "Nadia", title: "Vélo de ville", purgeAt: "2027-12-15T09:30:00.000Z" },
 };
 
 /** Every URL a template receives must appear in both bodies. */
-function urlsOf(data: Record<string, string>): string[] {
-  return Object.values(data).filter((value) => value.startsWith("https://"));
+function urlsOf(data: Record<string, unknown>): string[] {
+  return Object.values(data).filter((value): value is string => typeof value === "string" && value.startsWith("https://"));
 }
 
 function mail<T extends TemplateId>(template: T, locale: Locale, data: TemplateData[T] = DATA[template]): TemplateMail<T> {
@@ -54,7 +61,7 @@ describe("renderMail", () => {
           expect(body).not.toMatch(/undefined|\[object Object\]|NaN/);
         }
         // Raw URL in the text version, attribute-escaped ("&amp;") in the HTML.
-        for (const url of urlsOf(DATA[template] as Record<string, string>)) {
+        for (const url of urlsOf(DATA[template] as Record<string, unknown>)) {
           expect(rendered.text).toContain(url);
           expect(rendered.html).toContain(`href="${escapeHtml(url)}"`);
           expect(rendered.html).toContain(`>${escapeHtml(url)}</a>`);
@@ -70,7 +77,8 @@ describe("renderMail", () => {
           expect(rendered.text).toMatch(/[؀-ۿ]/);
         } else {
           expect(rendered.html).toContain('<html lang="fr" dir="ltr">');
-          expect(rendered.text).toContain("E-mail automatique, merci de ne pas répondre.");
+          // Statement mails carry a Reply-To (dsa@): their footer invites the reply instead.
+          expect(rendered.text).toContain(rendered.replyTo ? "Votre réponse à cet e-mail parvient à notre équipe." : "E-mail automatique, merci de ne pas répondre.");
         }
       });
     }

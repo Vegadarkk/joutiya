@@ -96,6 +96,26 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      # Static map baseline (design D10): it must come from this Linux image (fonts), so while none is
+      # committed this job renders it and publishes it as the "visual-baseline" artifact (and in the log,
+      # base64 between markers). Commit it under tests/e2e/visual/static-map.spec.ts-snapshots/ to arm the test.
+      - name: Render the static map baseline when none is committed
+        id: baseline
+        if: hashFiles('tests/e2e/visual/static-map.spec.ts-snapshots/*.png') == ''
+        run: |
+          npx firebase emulators:exec --only auth,firestore --project demo-joutiya "npx playwright test tests/e2e/visual --update-snapshots"
+          for file in tests/e2e/visual/static-map.spec.ts-snapshots/*.png; do
+            echo "BASELINE-BEGIN $(basename "$file")"
+            base64 -w0 "$file"
+            echo
+            echo "BASELINE-END"
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.baseline.outcome == 'success'
+        with:
+          name: visual-baseline
+          path: tests/e2e/visual/static-map.spec.ts-snapshots/
+          retention-days: 7
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
@@ -132,7 +152,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         # grep reads the whole list: with pipefail, `grep -q` closing early would fail git diff and skip the build.
         run: |
-          if git diff --name-only "origin/$BASE_REF...HEAD" | grep -E '^(docker/|\.dockerignore|package(-lock)?\.json|next\.config\.ts|scripts/build-node\.ts|src/worker/|src/server/)' >/dev/null; then
+          if git diff --name-only "origin/$BASE_REF...HEAD" | grep -E '^(docker/|\.dockerignore|package(-lock)?\.json|next\.config\.ts|scripts/build-node\.ts|scripts/fetch-models\.ts|models/|src/worker/|src/server/|src/lib/media/|src/lib/storage/)' >/dev/null; then
             echo "build=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Build web and worker
@@ -146,7 +166,12 @@ jobs:
       - name: Boot check of the worker image
         if: steps.changes.outputs.build == 'true'
         # The worker bundle keeps its npm packages external (scripts/build-node.ts): the traced
-        # node_modules copied into the image must resolve them, @sentry/node included.
+        # node_modules copied into the image must resolve them, @sentry/node included. sharp and
+        # onnxruntime-node load native arm64 binaries, and the models of docs/models.md must be in
+        # the image (phase 3): one session on the face model proves both.
         run: |
           docker run --rm joutiya-worker:ci node --check dist/worker/index.mjs
           docker run --rm joutiya-worker:ci node -e "import('@sentry/node').then(() => console.log('ok'))"
+          docker run --rm joutiya-worker:ci node -e "import('sharp').then((m) => console.log('sharp: libvips', m.default.versions.vips))"
+          docker run --rm joutiya-worker:ci sh -c 'test -s models/nsfw-marqo-384.onnx && test -s models/yunet-2023mar.onnx && ls -l models'
+          docker run --rm joutiya-worker:ci node -e "import('onnxruntime-node').then(async (ort) => { const s = await ort.InferenceSession.create('models/yunet-2023mar.onnx', { logSeverityLevel: 3 }); console.log('onnx: inputs', s.inputNames.join()); await s.release(); })"

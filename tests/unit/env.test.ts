@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseEnv, RECOMMENDED_DEPLOYED, REQUIRED_DEPLOYED } from "@/lib/env";
+import { isR2Configured, parseEnv, R2_STORAGE_VARS, RECOMMENDED_DEPLOYED, REQUIRED_DEPLOYED } from "@/lib/env";
 
 const deployed: Record<string, string> = {
   APP_ENV: "staging",
@@ -31,6 +31,15 @@ const deployed: Record<string, string> = {
   WHATSAPP_VERIFY_TOKEN: "v",
   WHATSAPP_DISPLAY_NUMBER: "212600000000",
   SENTRY_DSN: "https://key@o1.ingest.de.sentry.io/1",
+  // Not real credentials (Gitleaks runs on this repository).
+  R2_S3_ENDPOINT: "https://0123456789abcdef.eu.r2.cloudflarestorage.com",
+  R2_ACCESS_KEY_ID: "r2-key-id",
+  R2_SECRET_ACCESS_KEY: "r2-key-secret",
+  R2_BUCKET_QUARANTINE: "joutiya-staging-quarantine",
+  R2_BUCKET_MEDIA: "joutiya-staging-media",
+  R2_BUCKET_PRIVATE: "joutiya-staging-private",
+  MEDIA_BASE_URL: "https://media-staging.joutiya.ma",
+  BACKUP_AGE_RECIPIENT: "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",
 };
 
 describe("parseEnv", () => {
@@ -91,5 +100,48 @@ describe("parseEnv", () => {
 
   it("rejects an unknown APP_ENV", () => {
     expect(parseEnv({ APP_ENV: "production" }).errors[0]).toMatch(/^APP_ENV/);
+  });
+
+  describe("object storage (phase 3)", () => {
+    it("accepts a complete or absent R2 configuration and refuses a partial one outside dev", () => {
+      expect(isR2Configured(parseEnv(deployed).env)).toBe(true);
+      const none = { ...deployed };
+      for (const name of R2_STORAGE_VARS) delete none[name];
+      const without = parseEnv(none);
+      expect(without.errors).toEqual([]);
+      expect(isR2Configured(without.env)).toBe(false);
+      const partial = { ...deployed };
+      delete partial["R2_SECRET_ACCESS_KEY"];
+      delete partial["MEDIA_BASE_URL"];
+      expect(parseEnv(partial).errors).toEqual([expect.stringMatching(/^R2 storage needs all of .* or none \(missing: R2_SECRET_ACCESS_KEY, MEDIA_BASE_URL\)$/)]);
+      // Dev may run half-configured (the file store takes over).
+      expect(parseEnv({ R2_BUCKET_MEDIA: "joutiya-dev-media" }).errors).toEqual([]);
+    });
+
+    it("lists the storage and backup variables as recommended, never required", () => {
+      for (const name of [...R2_STORAGE_VARS, "BACKUP_AGE_RECIPIENT"] as const) {
+        expect(RECOMMENDED_DEPLOYED).toContain(name);
+        expect(REQUIRED_DEPLOYED as readonly string[]).not.toContain(name);
+      }
+    });
+
+    it("requires https media and tile URLs outside dev and a valid URL everywhere", () => {
+      expect(parseEnv({ ...deployed, MEDIA_BASE_URL: "http://media-staging.joutiya.ma" }).errors).toEqual(["MEDIA_BASE_URL must be https outside dev"]);
+      expect(parseEnv({ ...deployed, MAP_PMTILES_URL: "http://tiles.example/morocco.pmtiles" }).errors).toEqual(["MAP_PMTILES_URL must be https outside dev"]);
+      expect(parseEnv({ ...deployed, MAP_PMTILES_URL: "https://media-staging.joutiya.ma/maps/morocco.pmtiles" }).errors).toEqual([]);
+      expect(parseEnv({ MAP_PMTILES_URL: "http://localhost:3000/api/dev/storage/joutiya-dev-media/maps/morocco.pmtiles" }).errors).toEqual([]);
+      const invalid = parseEnv({ MAP_PMTILES_URL: "maps/morocco.pmtiles", MEDIA_BASE_URL: "media.joutiya.ma" });
+      expect(invalid.errors).toEqual(["MEDIA_BASE_URL: must be an absolute http(s) URL", "MAP_PMTILES_URL: must be an absolute http(s) URL"]);
+      expect(invalid.env.MAP_PMTILES_URL).toBeUndefined();
+    });
+
+    it("parses the R2 storage baseline as an integer with the account's default", () => {
+      expect(parseEnv({}).env.R2_STORAGE_BASELINE_BYTES).toBe(4_140_000_000);
+      expect(parseEnv({ R2_STORAGE_BASELINE_BYTES: "" }).env.R2_STORAGE_BASELINE_BYTES).toBe(4_140_000_000);
+      expect(parseEnv({ R2_STORAGE_BASELINE_BYTES: "123" }).env.R2_STORAGE_BASELINE_BYTES).toBe(123);
+      const invalid = parseEnv({ R2_STORAGE_BASELINE_BYTES: "4.1e9" });
+      expect(invalid.errors).toEqual(["R2_STORAGE_BASELINE_BYTES: must be a non-negative integer"]);
+      expect(invalid.env.R2_STORAGE_BASELINE_BYTES).toBe(4_140_000_000);
+    });
   });
 });

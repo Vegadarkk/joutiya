@@ -1,7 +1,11 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import sharp from "sharp";
 
 // ADMIN_HOST=admin.localhost (playwright.config.ts). The server runs with APP_ENV=dev and no
 // CF_ACCESS_AUD: the Access identity is the x-dev-access-email header, sent by the browser context
@@ -34,8 +38,11 @@ async function seedStaff(email: string, role: "admin" | "moderator", displayName
     .then((record) => record.uid)
     .catch(async (error: { code?: string }) => {
       if (error.code !== "auth/email-already-exists") throw error;
+      // beforeAll runs once per Playwright worker: another worker created this account with the same
+      // password. Setting the password again would revoke the sessions of tests already signed in.
       const existing = await auth.getUserByEmail(email);
-      return (await auth.updateUser(existing.uid, { password: PASSWORD, disabled: false })).uid;
+      if (existing.disabled) await auth.updateUser(existing.uid, { disabled: false });
+      return existing.uid;
     });
   await auth.setCustomUserClaims(uid, { role, v: 2 });
   await getFirestore(app).collection("staff").doc(uid).set({ email, displayName, role, invitedBy: "script", createdAt: new Date() });
@@ -45,6 +52,74 @@ async function seedStaff(email: string, role: "admin" | "moderator", displayName
 test.beforeAll(async () => {
   await seedStaff(EMAIL, "admin", "Admin e2e");
 });
+
+const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+const randomId = (length: number) => Array.from({ length }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join("");
+/** FsObjectStore layout of the dev media bucket (src/lib/storage/fs.ts, keys.ts), served by /api/dev/storage on the public host. */
+const MEDIA_ROOT = path.join(os.tmpdir(), "joutiya-dev-storage", "joutiya-dev-media");
+
+/** A listing held for review, with one photo (both WebP variants) in the dev media bucket. */
+async function seedHeldListing(): Promise<{ id: string; title: string }> {
+  const firestore = getFirestore(firebase());
+  const uid = `e2e-held-${randomId(12)}`;
+  const publicId = randomId(10);
+  const id = randomId(8);
+  const photoId = `e2eheld${randomId(8)}`;
+  for (const [variant, size] of Object.entries({ l: { width: 1600, height: 1200 }, s: { width: 480, height: 360 } })) {
+    const key = ["listings", id, `${photoId}-${variant}.webp`];
+    const body = await sharp({ create: { ...size, channels: 3, background: { r: 196, g: 120, b: 52 } } }).webp({ quality: 75 }).toBuffer();
+    const objectPath = path.join(MEDIA_ROOT, "objects", ...key);
+    const metaPath = `${path.join(MEDIA_ROOT, "meta", ...key)}.json`;
+    await Promise.all([mkdir(path.dirname(objectPath), { recursive: true }), mkdir(path.dirname(metaPath), { recursive: true })]);
+    await writeFile(objectPath, body);
+    await writeFile(metaPath, JSON.stringify({ contentType: "image/webp", size: body.byteLength, cacheControl: "public, max-age=31536000, immutable", storedAt: new Date().toISOString() }));
+  }
+  const now = new Date();
+  await firestore.collection("users").doc(uid).set({
+    publicId,
+    displayName: "Vendeur e2e",
+    type: "individual",
+    citySlug: "casablanca",
+    badges: { emailVerified: true, phoneVerified: false, proCertified: false },
+    stats: { activeListings: 0, responseRate: 0, medianReplyMin: 0, ratingCount: 0 },
+    status: "active",
+    activation: "done",
+    locale: "fr",
+    createdAt: now,
+    updatedAt: now,
+  });
+  const title = `Vélo à vérifier ${id}`;
+  await firestore.collection("listings").doc(id).set({
+    ownerUid: uid,
+    sellerType: "individual",
+    sellerName: "Vendeur e2e",
+    sellerPublicId: publicId,
+    status: "pending_review",
+    slugId: `velo-a-verifier-casablanca-${id}`,
+    title,
+    description: "Vélo de ville, à vérifier avant publication.",
+    categoryId: "vehicules",
+    subcategoryId: "velos",
+    attributes: { "bike-type": "ville" },
+    condition: "good",
+    price: 1500,
+    priceNegotiable: false,
+    isDonation: false,
+    location: { regionCode: "06", citySlug: "casablanca", geo: { lat: 33.57, lng: -7.59 } },
+    photos: [{ id: photoId, w: 1600, h: 1200, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj" }],
+    contact: { messaging: true, showPhone: false, whatsapp: false },
+    boosts: {},
+    sortAt: now,
+    sortSource: "publish",
+    moderation: { state: "needs_review", score: 55, flags: ["new_account"], openReports: 0 },
+    adsEligible: false,
+    legalHold: [],
+    createdAt: now,
+    updatedAt: now,
+    version: 1,
+  });
+  return { id, title };
+}
 
 /** The widget must hold a token before the form is sent (the form itself waits too; this keeps the click deterministic). */
 async function waitForTurnstile(page: Page): Promise<void> {
@@ -105,21 +180,40 @@ test("anonymous visitors of the admin host land on the sign-in page, under a non
   await expect(page).toHaveURL(`${admin}/connexion`);
 });
 
-test("staff sign in with their password, see the quota board and the roster, then sign out", async ({ page }) => {
-  await signIn(page, EMAIL, PASSWORD);
+test("staff sign in with their password, see the quota board and the roster, then sign out", async ({ browser }) => {
+  // A dedicated admin: signing out revokes every session of the account, which would sign the
+  // shared admin out of the tests running in parallel.
+  const email = uniqueEmail("admin-signout-e2e");
+  await seedStaff(email, "admin", "Admin déconnexion e2e");
+  const context = await browser.newContext({ extraHTTPHeaders: { "x-dev-access-email": email } });
+  const page = await context.newPage();
+  await signIn(page, email, PASSWORD);
   await expect(page.getByRole("heading", { name: /quotas gratuits/i })).toBeVisible();
   await expect(page.getByText("Admin", { exact: true })).toBeVisible();
 
   await page.getByRole("link", { name: "Personnel" }).click();
   await expect(page).toHaveURL(`${admin}/personnel`);
   await expect(page.getByRole("heading", { name: "Personnel", level: 1 })).toBeVisible();
-  await expect(page.getByRole("table").getByText(EMAIL)).toBeVisible();
+  await expect(page.getByRole("table").getByText(email)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Inviter un membre" })).toBeVisible();
 
   await page.getByRole("button", { name: "Se déconnecter" }).click();
   await expect(page).toHaveURL(`${admin}/connexion`);
   await page.goto(`${admin}/`);
   await expect(page).toHaveURL(`${admin}/connexion`);
+  await context.close();
+});
+
+test("the moderation review shows the listing's photos, served by the public host's media route", async ({ page }) => {
+  const held = await seedHeldListing();
+  await signIn(page, EMAIL, PASSWORD);
+  await page.goto(`${admin}/moderation/${held.id}`);
+  await expect(page.getByRole("heading", { level: 1, name: held.title })).toBeVisible();
+  // Another origin than the admin host: the admin CSP (img-src) and the media route's CORP must both let it load.
+  const photo = page.getByRole("img", { name: "Photo 1 sur 1" });
+  await expect(photo).toHaveAttribute("src", new RegExp(`^http://localhost:3100/api/dev/storage/joutiya-dev-media/listings/${held.id}/[^/]+-s\\.webp$`));
+  await photo.scrollIntoViewIfNeeded();
+  await expect.poll(() => photo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
 });
 
 test("an admin invites a moderator, who sets a password from the mailed link and signs in; the admin then revokes the access", async ({ page, browser, request }) => {

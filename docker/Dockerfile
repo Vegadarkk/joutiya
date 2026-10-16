@@ -15,6 +15,22 @@ FROM deps AS build
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY . .
 RUN npm run build
+# onnxruntime-node ships the binaries of five platforms (about 300 MB) and the worker trace copies
+# them all: keep the one this image runs on (linux/arm64 on the VM) before the worker stage copies.
+RUN set -eu; keep="dist/worker-standalone/node_modules/onnxruntime-node/bin/napi-v6/linux/$(node -p process.arch)"; \
+    for dir in dist/worker-standalone/node_modules/onnxruntime-node/bin/napi-v6/*/*; do \
+      if [ -d "$dir" ] && [ "$dir" != "$keep" ]; then rm -rf "$dir"; fi; \
+    done
+
+FROM ${NODE_IMAGE} AS models
+# Local ONNX models of the worker (docs/models.md, models/MANIFEST.json): downloaded from their
+# pinned URLs and verified by sha256 at build time, the only step that needs the network. The web
+# target never sees them.
+WORKDIR /src
+COPY package.json ./
+COPY scripts/fetch-models.ts scripts/
+COPY models/MANIFEST.json models/
+RUN MEDIA_MODELS_DIR=/app/models node scripts/fetch-models.ts
 
 FROM ${NODE_IMAGE} AS runtime
 ENV NODE_ENV=production \
@@ -45,5 +61,9 @@ FROM runtime AS worker
 # Bundle plus its traced npm packages (scripts/build-node.ts), owned by root, read-only at runtime.
 COPY --from=build /src/dist/worker-standalone ./
 COPY --from=build /src/infra/targets.json ./infra/targets.json
+COPY --from=models /app/models ./models
+# MALLOC_ARENA_MAX: glibc fragmentation with sharp/libvips (research/libs-media.md §1.1).
+ENV MEDIA_MODELS_DIR=/app/models \
+    MALLOC_ARENA_MAX=2
 USER node
 CMD ["node", "--enable-source-maps", "dist/worker/index.mjs"]

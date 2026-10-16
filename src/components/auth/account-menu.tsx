@@ -1,18 +1,33 @@
 "use client";
 
-import { BadgeCheck, LogOut, Settings, UserRound } from "lucide-react";
+import { Suspense } from "react";
+import { UserRound } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { DropdownMenu } from "radix-ui";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Link, usePathname, useRouter } from "@/i18n/navigation";
-import { signOut, useSession } from "@/lib/auth/client";
+import { Link, usePathname } from "@/i18n/navigation";
+import { useSession } from "@/lib/auth/client";
+import { lazyIsland } from "@/components/layout/lazy-island";
 import type { SessionSummary } from "@/lib/contracts/auth";
 import { cn } from "@/lib/utils";
+import type { AccountDropdownProps } from "./account-dropdown";
 
 // Header account state. Private pages render with the session the layout already knows. Public
 // pages are static and carry no session: the anonymous button renders first (server and client
 // alike) and swaps once GET /api/auth/me has answered. Both states are 44 px tall, so nothing shifts.
+// The menu itself (account-dropdown.tsx) is a separate chunk, loaded once a session is known:
+// anonymous visitors never download it, and the same trigger shows as a plain button meanwhile.
+// If that chunk cannot be loaded, the trigger links to the account settings (sign-out included).
+
+const AccountDropdown = lazyIsland(() => import("./account-dropdown"), AccountSettingsLink);
+
+/** The account menu without its chunk (download failed): the trigger leads to the settings page. */
+export function AccountSettingsLink({ triggerClassName, children }: AccountDropdownProps) {
+  return (
+    <Link href="/parametres" className={triggerClassName}>
+      {children}
+    </Link>
+  );
+}
 
 /** Pages of the sign-in flow itself: coming back to them after signing in makes no sense. */
 const AUTH_PATHS = ["/connexion", "/inscription", "/mot-de-passe-oublie", "/action"];
@@ -32,8 +47,6 @@ export function initials(session: SessionSummary): string {
 export function AccountMenu() {
   const nav = useTranslations("Nav");
   const t = useTranslations("Auth.menu");
-  const s = useTranslations("Auth.settings");
-  const router = useRouter();
   const locale = useLocale();
   const pathname = usePathname();
   const { status, session } = useSession();
@@ -42,7 +55,7 @@ export function AccountMenu() {
     const next = nextFor(locale, pathname);
     return (
       <Button asChild variant="ghost" className="px-2 md:px-3">
-        <Link href={next ? { pathname: "/connexion", query: { next } } : "/connexion"}>
+        <Link href={next ? { pathname: "/connexion", query: { next } } : "/connexion"} className="min-w-11">
           <UserRound aria-hidden="true" />
           <span className="hidden sm:inline">{nav("signIn")}</span>
           <span className="sr-only sm:hidden">{nav("signIn")}</span>
@@ -52,67 +65,34 @@ export function AccountMenu() {
   }
 
   const name = session.displayName ?? session.email ?? "";
-  async function onSignOut() {
-    await signOut();
-    toast.success(s("signedOut"));
-    // Private layouts re-run their guard; public pages only swap the menu.
-    router.refresh();
-  }
-  const item = cn(
-    "flex cursor-pointer items-center gap-2.5 rounded-sm px-3 py-2.5 text-sm outline-none",
-    "data-[highlighted]:bg-surface-muted [&_svg]:size-4 [&_svg]:text-foreground-muted",
+  const triggerClassName = cn(
+    "inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-md px-1.5 text-sm font-medium text-foreground hover:bg-surface-muted md:px-2",
+    "data-[state=open]:bg-surface-muted",
+  );
+  // Named by its text, not aria-label, so the name holds what is visible (WCAG 2.5.3): "Mon compte"
+  // then the display name from sm; the initials are a decorative avatar.
+  const triggerContent = (
+    <>
+      <span className="flex size-8 items-center justify-center rounded-full bg-structure text-xs font-semibold text-structure-foreground dark:bg-bab-700" aria-hidden="true">
+        {initials(session)}
+      </span>
+      <span className="sr-only">{t("account")}</span>{" "}
+      <span dir="auto" className="hidden max-w-32 truncate sm:inline">
+        {name}
+      </span>
+    </>
   );
   return (
-    <DropdownMenu.Root modal={false}>
-      <DropdownMenu.Trigger
-        className={cn(
-          "inline-flex h-11 items-center gap-2 rounded-md px-1.5 text-sm font-medium text-foreground hover:bg-surface-muted md:px-2",
-          "data-[state=open]:bg-surface-muted",
-        )}
-        aria-label={t("account")}
-      >
-        <span className="flex size-8 items-center justify-center rounded-full bg-structure text-xs font-semibold text-structure-foreground" aria-hidden="true">
-          {initials(session)}
-        </span>
-        <span className="hidden max-w-32 truncate sm:inline">{name}</span>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          align="end"
-          sideOffset={6}
-          className={cn(
-            "z-50 min-w-56 rounded-md border border-border bg-surface p-1 shadow-lg shadow-bab-950/10",
-            "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
-          )}
-        >
-          <div className="flex flex-col px-3 py-2">
-            <span className="truncate text-sm font-semibold">{name}</span>
-            {session.displayName && session.email ? (
-              <span className="truncate text-xs text-foreground-muted" dir="ltr">
-                {session.email}
-              </span>
-            ) : null}
-          </div>
-          <DropdownMenu.Separator className="my-1 h-px bg-border" />
-          <DropdownMenu.Item asChild>
-            <Link href="/parametres" className={item}>
-              <Settings aria-hidden="true" />
-              {t("settings")}
-            </Link>
-          </DropdownMenu.Item>
-          <DropdownMenu.Item asChild>
-            <Link href="/verifications" className={item}>
-              <BadgeCheck aria-hidden="true" />
-              {t("verifications")}
-            </Link>
-          </DropdownMenu.Item>
-          <DropdownMenu.Separator className="my-1 h-px bg-border" />
-          <DropdownMenu.Item className={item} onSelect={() => void onSignOut()}>
-            <LogOut aria-hidden="true" />
-            {t("signOut")}
-          </DropdownMenu.Item>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+    <Suspense
+      fallback={
+        <button type="button" aria-haspopup="menu" aria-expanded={false} className={triggerClassName}>
+          {triggerContent}
+        </button>
+      }
+    >
+      <AccountDropdown session={session} name={name} triggerClassName={triggerClassName}>
+        {triggerContent}
+      </AccountDropdown>
+    </Suspense>
   );
 }

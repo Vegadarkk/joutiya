@@ -16,7 +16,9 @@ import { Spinner } from "@/components/ui/spinner";
 import { Link } from "@/i18n/navigation";
 import { apiGet, apiPost, isApiError, refreshSession } from "@/lib/auth/client";
 import { AUTH_API, phoneStartSchema, type PhoneStartResponse, type PhoneStatusResponse } from "@/lib/contracts/auth";
+import { isolateLtr } from "@/lib/i18n/bidi";
 import { FormMessage, useApiErrorMessage, useFieldMessage } from "./form-message";
+import { displayMoroccanPhone, phoneArgument } from "./phone-display";
 import { StatusPanel } from "./status-panel";
 
 // /verifications: WhatsApp phone verification (§6). The person sends the code from their own
@@ -95,7 +97,7 @@ export function VerificationsView() {
         <ErrorBanner tone="info" title={t("unavailable")} action={<BackToSettings />} />
       ) : state.kind === "verified" ? (
         <StatusPanel icon={BadgeCheck} title={t("verifiedTitle")} extra={<VerifiedBadge />} actions={<BackToSettings />}>
-          {t("verifiedBody", { phone: state.phone ?? "" })}
+          {t("verifiedBody", { phone: phoneArgument(state.phone) })}
         </StatusPanel>
       ) : state.kind === "pending" ? (
         <PendingCode
@@ -112,7 +114,7 @@ export function VerificationsView() {
             </ErrorBanner>
           ) : state.kind === "pendingUnknown" ? (
             <ErrorBanner tone="info" title={t("pendingTitle")}>
-              {t("pendingBody", { phone: state.phone ?? "" })}
+              {t("pendingBody", { phone: phoneArgument(state.phone) })}
             </ErrorBanner>
           ) : null}
           <PhoneForm defaultPhone={state.kind === "idle" ? "" : (state.phone ?? "")} onStarted={(pending) => setState(pending)} onUnavailable={() => setState({ kind: "unavailable" })} />
@@ -206,7 +208,7 @@ function formatRemaining(ms: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-function PendingCode({
+export function PendingCode({
   state,
   onExpired,
   onVerified,
@@ -286,14 +288,14 @@ function PendingCode({
         <h2 id="phone-code-title" ref={heading} tabIndex={-1} className="rounded-sm text-lg font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
           {t("codeTitle")}
         </h2>
-        <p className="text-foreground-muted text-pretty">{t("codeBody", { phone: state.phone })}</p>
+        <p className="text-foreground-muted text-pretty">{t("codeBody", { phone: phoneArgument(state.phone) })}</p>
       </div>
       <div className="arch flex flex-col items-center gap-3 rounded-b-lg bg-surface-brand px-6 pb-6 pt-10 text-center">
         <span className="text-sm text-foreground-muted">{t("codeLabel")}</span>
         <p dir="ltr" className="text-4xl font-semibold tracking-[0.35em] tabular-nums text-foreground ps-[0.35em]">
           {state.code}
         </p>
-        <Button type="button" variant="ghost" size="sm" onClick={copyCode}>
+        <Button type="button" variant="ghost" size="sm" onClick={copyCode} className="h-11">
           {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
           {copied ? t("copied") : t("copyCode")}
         </Button>
@@ -308,8 +310,8 @@ function PendingCode({
         </Button>
         <p className="text-center text-sm text-foreground-muted">
           {t("joutiyaNumber")}{" "}
-          <span dir="ltr" className="font-medium text-foreground">
-            {state.number}
+          <span dir="ltr" className="whitespace-nowrap font-medium text-foreground">
+            {displayMoroccanPhone(`+${state.number.replace(/^\+/, "")}`)}
           </span>
         </p>
       </div>
@@ -322,7 +324,7 @@ function PendingCode({
         {/* Ticks every second: kept out of the accessibility tree (the expiry itself is announced when it happens). */}
         <span aria-hidden="true" className="flex shrink-0 items-center gap-2 tabular-nums">
           <Timer className="size-4" />
-          {t("expiresIn", { time: formatRemaining(remaining) })}
+          {t("expiresIn", { time: isolateLtr(formatRemaining(remaining)) })}
         </span>
       </div>
       <Button type="button" variant="link" onClick={onReset} className="w-fit text-sm">

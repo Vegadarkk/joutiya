@@ -76,9 +76,19 @@ function stageHeaders(res: Res, buffered: Buffering): void {
   res.removeHeader(INLINE_HASH_MARKER);
 }
 
+/**
+ * Next 16 sends the Location of an ISR page's permanentRedirect twice (seen on /annonce/{old-slug});
+ * identical copies are harmless to browsers but break strict clients and caches: keep one.
+ */
+function collapseLocation(res: Res): void {
+  const location = res.getHeader("location");
+  if (Array.isArray(location) && location.length > 1) res.setHeader("location", location[0] as string);
+}
+
 /** Sends the deferred head (status line and the staged headers) and stops buffering. */
 function applyHead(res: Res, buffered: Buffering): void {
   stageHeaders(res, buffered);
+  collapseLocation(res);
   const head = buffered.head ?? [res.statusCode];
   const status = typeof head[0] === "number" ? head[0] : res.statusCode;
   const reason = typeof head[1] === "string" ? head[1] : undefined;

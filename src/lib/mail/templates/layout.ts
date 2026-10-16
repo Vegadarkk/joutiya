@@ -60,6 +60,8 @@ export interface BuiltMail {
   subject: string;
   html: string;
   text: string;
+  /** Where a reply goes (statement mails: the DSA contact address). */
+  replyTo?: string;
 }
 
 export interface LayoutInput {
@@ -78,6 +80,8 @@ export interface LayoutInput {
   closing?: string[];
   /** Footer identity; the current publisher (setMailPublisher) when omitted. */
   publisher?: MailPublisher;
+  /** Reply-To of the mail (a reply then reaches a person instead of the no-reply sender). */
+  replyTo?: string;
 }
 
 const COLORS = {
@@ -96,14 +100,16 @@ const COLORS = {
 
 const FONT = "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, Tahoma, sans-serif";
 
-const FOOTER: Record<MailLocale, { auto: string; publisher: (who: MailPublisher) => string; site: string }> = {
+const FOOTER: Record<MailLocale, { auto: string; reply: string; publisher: (who: MailPublisher) => string; site: string }> = {
   fr: {
     auto: "E-mail automatique, merci de ne pas répondre.",
+    reply: "Votre réponse à cet e-mail parvient à notre équipe.",
     publisher: (who) => `Édité par ${who.name} · ${who.address}`,
     site: "Aller sur Joutiya",
   },
   ar: {
     auto: "بريد إلكتروني آلي، يرجى عدم الرد عليه.",
+    reply: "يصل ردّك على هذا البريد إلى فريقنا.",
     publisher: (who) => `الناشر: ${who.name} · ${who.address}`,
     site: "الذهاب إلى Joutiya",
   },
@@ -132,6 +138,14 @@ export function formatDate(value: string, locale: Locale): string {
   // Tarifit has no Intl data: the copy is French, so is the date.
   const tag = LOCALE_TAGS[locale === "rif" ? "fr" : locale];
   return new Intl.DateTimeFormat(tag, { dateStyle: "long", timeStyle: "short", timeZone: "Africa/Casablanca" }).format(date);
+}
+
+/** Formats an ISO date as a day (no time) for the recipient (Morocco time). */
+export function formatDay(value: string, locale: Locale): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const tag = LOCALE_TAGS[locale === "rif" ? "fr" : locale];
+  return new Intl.DateTimeFormat(tag, { dateStyle: "long", timeZone: "Africa/Casablanca" }).format(date);
 }
 
 export function pageUrl(ctx: TemplateContext, segment: string): string {
@@ -201,7 +215,7 @@ export function renderLayout(input: LayoutInput): BuiltMail {
     `<tr><td style="padding:24px 8px 0;text-align:${align};">` +
     `<p style="margin:0 0 6px;font-size:12px;line-height:1.5;color:${COLORS.muted};">${escapeHtml(publisher)}</p>` +
     `<p style="margin:0 0 6px;font-size:12px;line-height:1.5;color:${COLORS.muted};"><a href="${escapeHtml(input.siteUrl)}" style="color:${COLORS.link};text-decoration:underline;">${escapeHtml(footer.site)}</a> · ${escapeHtml(siteHost)}</p>` +
-    `<p style="margin:0;font-size:12px;line-height:1.5;color:${COLORS.muted};">${escapeHtml(footer.auto)}</p>` +
+    `<p style="margin:0;font-size:12px;line-height:1.5;color:${COLORS.muted};">${escapeHtml(input.replyTo ? footer.reply : footer.auto)}</p>` +
     `</td></tr>` +
     `</table></td></tr></table></body></html>`;
 
@@ -209,8 +223,8 @@ export function renderLayout(input: LayoutInput): BuiltMail {
   if (input.action) lines.push(`${input.action.label} : ${input.action.url}`, "");
   for (const link of input.links ?? []) lines.push(`${link.label} ${link.url}`, "");
   for (const text of input.closing ?? []) lines.push(text, "");
-  lines.push("—", publisher, `${footer.site} : ${input.siteUrl}`, footer.auto);
+  lines.push("—", publisher, `${footer.site} : ${input.siteUrl}`, input.replyTo ? footer.reply : footer.auto);
   const text = lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 
-  return { subject: input.subject, html, text };
+  return { subject: input.subject, html, text, ...(input.replyTo ? { replyTo: input.replyTo } : {}) };
 }

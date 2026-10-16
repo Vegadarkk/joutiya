@@ -17,6 +17,14 @@ beforeAll(async () => {
     await setDoc(doc(db, "config/legal"), { companyName: "Adark Prime" });
     await setDoc(doc(db, "users/alice"), { displayName: "Alice", role: "individual" });
     await setDoc(doc(db, "listings/l1"), { ownerUid: "alice", title: "Vélo", status: "published" });
+    // Phase 3 collections (design §1): nothing opens to the client.
+    await setDoc(doc(db, "listingStats/l1"), { views: 0, favorites: 0, contacts: 0, phoneReveals: 0 });
+    await setDoc(doc(db, "uploads/u1"), { ownerUid: "alice", targetId: "l1", status: "ready" });
+    await setDoc(doc(db, "searchOutbox/l1"), { op: "upsert", version: 1 });
+    await setDoc(doc(db, "contentOps/op1"), { uid: "alice", op: "listing.publish", contentRef: "listings/l1", ip: "41.250.1.2" });
+    await setDoc(doc(db, "revealLogs/r1"), { viewerUid: "bob", listingId: "l1", ipPrefixHash: "h", deviceHash: "d" });
+    await setDoc(doc(db, "moderationDecisions/d1"), { target: { type: "listing", id: "l1" }, affectedUid: "alice", action: "restrict_visibility" });
+    await setDoc(doc(db, "system/backup"), { cursor: "2026-10-16" });
     await setDoc(doc(db, "conversations/c1"), { participants: ["alice", "bob"] });
     await setDoc(doc(db, "conversations/c1/messages/m1"), { from: "alice", text: "Salam" });
   });
@@ -27,7 +35,20 @@ afterAll(async () => {
   await env.cleanup();
 });
 
-const PATHS = ["config/legal", "users/alice", "listings/l1", "conversations/c1", "conversations/c1/messages/m1"];
+const PATHS = [
+  "config/legal",
+  "users/alice",
+  "listings/l1",
+  "listingStats/l1",
+  "uploads/u1",
+  "searchOutbox/l1",
+  "contentOps/op1",
+  "revealLogs/r1",
+  "moderationDecisions/d1",
+  "system/backup",
+  "conversations/c1",
+  "conversations/c1/messages/m1",
+];
 
 const contexts = () => ({
   visitor: env.unauthenticatedContext().firestore(),
@@ -46,6 +67,7 @@ describe("firestore.rules", () => {
       it("cannot list or query collections", async () => {
         const db = contexts()[name];
         await assertFails(getDocs(collection(db, "listings")));
+        for (const name of ["uploads", "searchOutbox", "contentOps", "revealLogs", "moderationDecisions", "listingStats", "system"]) await assertFails(getDocs(collection(db, name)));
         await assertFails(getDocs(collectionGroup(db, "messages")));
       });
 

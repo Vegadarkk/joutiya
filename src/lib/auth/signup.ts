@@ -7,6 +7,7 @@ import { auth } from "@/lib/firebase/admin";
 import { readJson } from "@/lib/http/json";
 import { logConnection } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
+import { assertQuotas, SIGNUP_QUOTAS } from "@/lib/quota/gate";
 import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
 import { HttpError } from "@/lib/http/errors";
 import { displayNameFor, errorCode, userByEmail } from "./accounts";
@@ -55,6 +56,9 @@ async function signup(request: Request): Promise<Response> {
   const flow = beginAnonymous(request);
   const input = await readJson(request, signupSchema);
   await enforceLimit("signup.ip", flow.identity.ipBucket);
+  // Firestore writes degraded (§2): the documents would fail after the Auth record; refused first.
+  // Before the device limit (3 a day): a refusal must not use up the retry its Retry-After invites.
+  await assertQuotas(SIGNUP_QUOTAS);
   await enforceLimit("signup.device", flow.identity.deviceKey);
   await checkTurnstile(flow, input.turnstileToken, "signup");
   if (!mailchecker.isValid(input.email)) throw new HttpError(400, "disposable_email");

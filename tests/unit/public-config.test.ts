@@ -16,6 +16,8 @@ const configured: Record<string, string> = {
   TURNSTILE_SITE_KEY: "0x4AAAAAAA-site",
   GOOGLE_OAUTH_CLIENT_ID: "123456789-abc.apps.googleusercontent.com",
   SENTRY_DSN: DSN,
+  MEDIA_BASE_URL: "https://media-staging.joutiya.ma/",
+  MAP_PMTILES_URL: "https://media-staging.joutiya.ma/maps/morocco.pmtiles",
 };
 
 // Not real secrets (Gitleaks runs on this repository): values that must never reach the browser.
@@ -37,6 +39,13 @@ const secrets: Record<string, string> = {
   WHATSAPP_APP_SECRET: "wa-secret",
   WHATSAPP_VERIFY_TOKEN: "wa-verify",
   CF_ACCESS_AUD: "a".repeat(64),
+  R2_S3_ENDPOINT: "https://0123456789abcdef.eu.r2.cloudflarestorage.com",
+  R2_ACCESS_KEY_ID: "r2-key-id",
+  R2_SECRET_ACCESS_KEY: "r2-key-secret",
+  R2_BUCKET_QUARANTINE: "joutiya-staging-quarantine",
+  R2_BUCKET_MEDIA: "joutiya-staging-media",
+  R2_BUCKET_PRIVATE: "joutiya-staging-private",
+  BACKUP_AGE_RECIPIENT: "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",
 };
 
 describe("publicConfig", () => {
@@ -49,6 +58,9 @@ describe("publicConfig", () => {
       turnstileSiteKey: "0x4AAAAAAA-site",
       googleClientId: "123456789-abc.apps.googleusercontent.com",
       sentry: { dsn: DSN, environment: "staging", release: "0123456789ab" },
+      mediaBaseUrl: "https://media-staging.joutiya.ma",
+      upload: { maxBytes: 10 * 1024 * 1024, maxPhotos: 10 },
+      map: { pmtilesUrl: "https://media-staging.joutiya.ma/maps/morocco.pmtiles", attribution: "© OpenStreetMap contributors · Protomaps" },
     });
     const json = JSON.stringify(config);
     for (const [name, value] of Object.entries(secrets)) {
@@ -66,7 +78,16 @@ describe("publicConfig", () => {
       turnstileSiteKey: null,
       googleClientId: null,
       sentry: null,
+      // Development without MEDIA_BASE_URL: photos come from the signed dev storage route (D11).
+      mediaBaseUrl: "http://localhost:3000/api/dev/storage/joutiya-dev-media",
+      upload: { maxBytes: 10 * 1024 * 1024, maxPhotos: 10 },
+      map: null,
     });
+    // Outside dev the media host is null until MEDIA_BASE_URL exists: no bucket name leaks.
+    const staging = publicConfig(parseEnv({ APP_ENV: "staging", SITE_URL: "https://staging.joutiya.ma", R2_BUCKET_MEDIA: "joutiya-staging-media" }).env);
+    expect(staging.mediaBaseUrl).toBeNull();
+    expect(JSON.stringify(staging)).not.toContain("joutiya-staging-media");
+    expect(publicConfig(parseEnv({ MEDIA_BASE_URL: "http://localhost:3000/media/" }).env).mediaBaseUrl).toBe("http://localhost:3000/media");
     expect(publicConfig(parseEnv({ SENTRY_DSN: DSN }).env).sentry).toEqual({ dsn: DSN, environment: "dev", release: "dev" });
     // Firebase needs both the browser key and the project; the app id and auth domain have defaults.
     expect(publicConfig(parseEnv({ FIREBASE_API_KEY: "AIza-browser" }).env).firebase).toBeNull();

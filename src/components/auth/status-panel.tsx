@@ -10,7 +10,8 @@ interface StatusPanelProps {
   actions?: ReactNode;
   /** Extra content under the text (a form, a badge). */
   extra?: ReactNode;
-  headingLevel?: "h2" | "h3";
+  /** "h1" when the panel is the whole page (the wizard's result screen). */
+  headingLevel?: "h1" | "h2" | "h3";
   /** Move focus to the title when the panel appears (default): the screen just changed. */
   autoFocus?: boolean;
   className?: string;

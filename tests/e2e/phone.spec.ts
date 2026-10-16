@@ -16,10 +16,17 @@ const uniqueEmail = () => `e2e-phone-${Date.now()}-${Math.floor(Math.random() * 
 
 /** A fresh Moroccan mobile per run: verified numbers persist in the emulator for the session. */
 function freshNumber(): { typed: string; from: string; national: string } {
-  const digits = `6${String(Date.now() % 100_000_000).padStart(8, "0")}`;
+  // 061xxxxxxx is always a valid Moroccan mobile range (06 8[356] is not).
+  const digits = `61${String(Date.now() % 10_000_000).padStart(7, "0")}`;
   const national = `0${digits}`.replace(/^(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/, "$1 $2 $3 $4 $5");
   return { typed: `0${digits}`, from: `212${digits}`, national };
 }
+
+/**
+ * A number inside a sentence: national form between bidi isolates (LRI..PDI, src/lib/i18n/bidi.ts).
+ * The page joins its digit pairs with no-break spaces, which getByText matches as spaces.
+ */
+const inSentence = (phone: string) => `\u2066${phone}\u2069`;
 
 interface DevMail {
   template: string;
@@ -114,8 +121,11 @@ test.describe("phone verification", () => {
     expect(answer.code).toMatch(/^\d{6}$/);
     expect(answer.number).toBe(WHATSAPP.displayNumber);
 
-    // The page shows the code, the wa.me link and Joutiya's number, and waits.
+    // The page shows the code, the wa.me link and Joutiya's number, and waits. Both numbers are in
+    // the national form, as after a reload.
     await expect(page.getByRole("heading", { name: "Envoyez ce code sur WhatsApp" })).toBeVisible();
+    await expect(page.getByText(`Depuis le WhatsApp du ${inSentence(number.national)}, envoyez le message ci-dessous au numéro de Joutiya.`)).toBeVisible();
+    await expect(page.getByText("06 00 00 00 00", { exact: true })).toBeVisible();
     await expect(page.getByText(answer.code, { exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Ouvrir WhatsApp" })).toHaveAttribute("href", answer.waLink);
     await expect(page.getByText("En attente de votre message…")).toBeVisible();
@@ -135,11 +145,12 @@ test.describe("phone verification", () => {
     // The page polls the status every 5 s and switches to the verified state.
     await expect(page.getByRole("heading", { name: "Numéro vérifié" })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Téléphone vérifié")).toBeVisible();
+    await expect(page.getByText(`Le ${inSentence(number.national)} est maintenant associé à votre compte.`)).toBeVisible();
 
     // The state survives a reload (the number in its national form), and the confirmation mail went out.
     await page.reload();
     await expect(page.getByRole("heading", { name: "Numéro vérifié" })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(`Le ${number.national} est maintenant associé à votre compte.`)).toBeVisible();
+    await expect(page.getByText(`Le ${inSentence(number.national)} est maintenant associé à votre compte.`)).toBeVisible();
     const mail = await waitForMail(request, email, "phoneVerified");
     expect(mail.data["phone"]).toBe(number.national);
   });

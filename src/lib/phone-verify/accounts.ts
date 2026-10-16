@@ -2,6 +2,7 @@ import "server-only";
 import { FieldValue } from "firebase-admin/firestore";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { db } from "@/lib/firebase/admin";
+import { consume } from "@/lib/quota";
 
 // One verified number per account (§5 users/{uid}/private.phoneE164), and one account per number:
 // proof of possession wins. Whoever sends the code from the phone gets the number, and the account
@@ -17,14 +18,19 @@ export interface ClaimResult {
 
 /**
  * Marks `e164` verified on `uid` and removes it from any other account that held it (number,
- * verification date and badge), in one transaction.
+ * verification date and badge), in one transaction. Counted against the Spark quotas: the holder
+ * query on every attempt (a contended transaction runs again), the writes once committed.
  */
 export async function claimVerifiedPhone(uid: string, e164: string, now = new Date()): Promise<ClaimResult> {
   const firestore = db();
   const userRef = (id: string) => firestore.collection(COLLECTIONS.users).doc(id);
   const privateRef = (id: string) => userRef(id).collection(COLLECTIONS.userPrivate).doc(COLLECTIONS.userPrivateDoc);
-  return firestore.runTransaction(async (tx) => {
+  let moved = 0;
+  const result = await firestore.runTransaction(async (tx) => {
     const holders = await tx.get(firestore.collectionGroup(COLLECTIONS.userPrivate).where("phoneE164", "==", e164));
+    // A query is billed one read per document returned, at least one.
+    void consume("firestore.reads", Math.max(1, holders.size));
+    moved = 0;
     let previousUid: string | null = null;
     for (const holder of holders.docs) {
       // users/{uid}/private/account: the uid is the grandparent document.
@@ -33,9 +39,13 @@ export async function claimVerifiedPhone(uid: string, e164: string, now = new Da
       previousUid ??= holderUid;
       tx.update(holder.ref, { phoneE164: FieldValue.delete(), phoneVerifiedAt: FieldValue.delete() });
       tx.update(userRef(holderUid), { "badges.phoneVerified": false, updatedAt: now });
+      moved += 1;
     }
     tx.update(privateRef(uid), { phoneE164: e164, phoneVerifiedAt: now });
     tx.update(userRef(uid), { "badges.phoneVerified": true, updatedAt: now });
     return { previousUid };
   });
+  // The caller's two documents, and two per account that lost the number.
+  void consume("firestore.writes", 2 + 2 * moved);
+  return result;
 }

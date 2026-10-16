@@ -1,6 +1,29 @@
 import { z } from "@/lib/zod";
+import { CONDITIONS } from "@/config/categories";
 import { LOCALES } from "@/config/site";
+import {
+  DESCRIPTION_MAX,
+  LISTING_STATUSES,
+  MODERATION_FLAGS,
+  MODERATION_STATES,
+  PRICE_MAX,
+  SENSITIVE_DECLARATION_KINDS,
+  TITLE_MAX,
+  citySlugSchema,
+  listingAttributesSchema,
+  listingIdSchema,
+  regionCodeSchema,
+  slugIdSchema,
+} from "@/lib/contracts/listings";
+import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, UPLOAD_DECLARED_TYPES, UPLOAD_REJECT_REASONS, UPLOAD_STATUSES, listingPhotoSchema, uploadIdSchema } from "@/lib/contracts/media";
 import { ROLES } from "@/lib/firebase/claims";
+
+// The enums shared with the browser are defined in the client-safe contracts (this module is
+// server-only through claims.ts) and re-exported here so the repositories have one import.
+export { CONDITIONS, LISTING_STATUSES, MODERATION_FLAGS, MODERATION_STATES, UPLOAD_REJECT_REASONS, UPLOAD_STATUSES };
+export type { Condition } from "@/config/categories";
+export type { ListingStatus, ModerationFlag, ModerationState } from "@/lib/contracts/listings";
+export type { UploadRejectReason, UploadStatus } from "@/lib/contracts/media";
 
 // Firestore documents (architecture §5), one Zod schema per collection written in phase 2.
 // `.strict()` everywhere: no unknown field reaches Firestore. Timestamps are stored as Firestore
@@ -116,6 +139,230 @@ export const mailSuppressionSchema = z
   .strict();
 export type MailSuppressionDoc = z.infer<typeof mailSuppressionSchema>;
 
+// ---- Phase 3: listings and media (architecture §5, design §1).
+
+export const SELLER_TYPES = ["individual", "pro"] as const;
+export const SORT_SOURCES = ["publish", "renew", "bump"] as const;
+export const PAUSED_REASONS = ["owner", "quota"] as const;
+
+/** City (later district) centroid, rounded (~1 km): never the seller's address. */
+export const geoPointSchema = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).strict();
+
+export const listingLocationSchema = z
+  .object({ regionCode: regionCodeSchema, citySlug: citySlugSchema, district: z.string().min(1).max(64).optional(), geo: geoPointSchema })
+  .strict();
+export type ListingLocation = z.infer<typeof listingLocationSchema>;
+
+export const moderationSchema = z
+  .object({
+    state: z.enum(MODERATION_STATES),
+    /** Risk score 0-100 (§7 step 4). */
+    score: z.number().min(0).max(100),
+    flags: z.array(z.enum(MODERATION_FLAGS)).max(MODERATION_FLAGS.length),
+    /** Russmedia: the advertiser declares being the person concerned, or holding explicit consent. */
+    sensitiveDeclaration: z.object({ kind: z.enum(SENSITIVE_DECLARATION_KINDS), at: ts }).strict().optional(),
+    openReports: z.number().int().min(0),
+    hiddenBy: z.object({ reportId: z.string().min(1).max(128), signal: z.enum(["trusted", "multi", "auto", "authority"]), at: ts }).strict().optional(),
+    lastDecisionId: z.string().max(128).optional(),
+    reviewedBy: z.string().max(128).optional(),
+    reviewedAt: ts.optional(),
+    ai: z
+      .object({ decisionId: z.string().min(1).max(128), action: z.enum(["approve", "hold", "reject", "escalate"]), confidence: z.number().min(0).max(1), applied: z.boolean() })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export type ListingModeration = z.infer<typeof moderationSchema>;
+
+/**
+ * listings/{listingId}: §5 `Listing` plus `slugId`; the id is the document id. A draft (D2) is the
+ * same document with `status: "draft"`: the fields the wizard fills step by step (category, texts,
+ * location, slug) are optional or empty until publish, which `publishedListingSchema` requires.
+ * `attributes` is validated by `criteriaSchema(subcategoryId)` at publish, stored as a map.
+ */
+export const listingSchema = z
+  .object({
+    ownerUid: uid,
+    proId: z.string().max(64).optional(),
+    sellerType: z.enum(SELLER_TYPES),
+    /** Denormalized: the seller is always displayed (art. 6(3) DSA). */
+    sellerName: displayNameSchema,
+    sellerPublicId: publicIdSchema,
+    status: z.enum(LISTING_STATUSES),
+    pausedReason: z.enum(PAUSED_REASONS).optional(),
+    /** `{slug}-{id}` of the canonical URL, set at publish (D1). */
+    slugId: slugIdSchema.optional(),
+    title: z.string().max(TITLE_MAX),
+    description: z.string().max(DESCRIPTION_MAX),
+    categoryId: z.string().min(1).max(40).optional(),
+    subcategoryId: z.string().min(1).max(40).optional(),
+    attributes: listingAttributesSchema,
+    condition: z.enum(CONDITIONS).optional(),
+    /** Integer MAD; null = "à discuter" (D4). */
+    price: z.number().int().min(0).max(PRICE_MAX).nullable(),
+    priceNegotiable: z.boolean(),
+    isDonation: z.boolean(),
+    location: listingLocationSchema.optional(),
+    /** Order = display order; <= quotas.photosPerListing. */
+    photos: z.array(listingPhotoSchema).max(50),
+    /** The number is never here; `showPhone` requires `badges.phoneVerified` at publish. */
+    contact: z.object({ messaging: z.literal(true), showPhone: z.boolean(), whatsapp: z.boolean() }).strict(),
+    boosts: z.object({ bumpedAt: ts.optional(), featuredUntil: ts.optional(), dailyBumpUntil: ts.optional(), highlightUntil: ts.optional() }).strict(),
+    sortAt: ts,
+    sortSource: z.enum(SORT_SOURCES),
+    moderation: moderationSchema,
+    /** Moderated, no open report, not hidden. */
+    adsEligible: z.boolean(),
+    publishedAt: ts.optional(),
+    /** publishedAt + listingTtlDays. */
+    expiresAt: ts.optional(),
+    /** Expiry or removal + listingPurgeMonths; blocked while `legalHold` is not empty. */
+    purgeAt: ts.optional(),
+    legalHold: z.array(z.string().min(1).max(64)).max(50),
+    createdAt: ts,
+    updatedAt: ts,
+    /** Optimistic lock and indexing order. */
+    version: z.number().int().min(0),
+  })
+  .strict();
+export type ListingDoc = z.infer<typeof listingSchema>;
+
+/** A listing once published: what a draft may leave empty becomes required. */
+export const publishedListingSchema = listingSchema.extend({
+  slugId: slugIdSchema,
+  categoryId: z.string().min(1).max(40),
+  subcategoryId: z.string().min(1).max(40),
+  location: listingLocationSchema,
+  publishedAt: ts,
+  expiresAt: ts,
+});
+export type PublishedListingDoc = z.infer<typeof publishedListingSchema>;
+
+/** listingStats/{listingId}: nightly flush of the Valkey counters; never touches the listing. */
+export const listingStatsSchema = z
+  .object({
+    views: z.number().int().min(0),
+    favorites: z.number().int().min(0),
+    contacts: z.number().int().min(0),
+    phoneReveals: z.number().int().min(0),
+    flushedAt: ts,
+  })
+  .strict();
+export type ListingStatsDoc = z.infer<typeof listingStatsSchema>;
+
+/** Every purpose of §5; phase 3 signs `listing` only (contracts/media.ts). */
+export const UPLOAD_DOC_PURPOSES = ["listing", "kyb", "avatar", "pro_logo"] as const;
+export const UPLOAD_BUCKETS = ["media", "private"] as const;
+
+/** uploads/{id}: id = photo id; written by the API (sign) and the pipeline (worker or inline). */
+export const uploadSchema = z
+  .object({
+    ownerUid: uid,
+    purpose: z.enum(UPLOAD_DOC_PURPOSES),
+    /** Listing id for photos. */
+    targetId: z.string().min(1).max(128),
+    declaredSize: z.number().int().min(1).max(MAX_UPLOAD_BYTES),
+    declaredType: z.enum(UPLOAD_DECLARED_TYPES),
+    status: z.enum(UPLOAD_STATUSES),
+    quarantineKey: z.string().min(1).max(200),
+    /**
+     * `listings/{listingId}/{photoId}` once ready (variants add `-l.webp` / `-s.webp`);
+     * `removed/listings/{listingId}/{photoId}` once purge-quarantine moved a removed listing's photos.
+     */
+    finalKey: z.string().min(1).max(200).optional(),
+    /** Where the variants are: `media` (public), or `private` for a removed listing's photos (moved there, kept until its purge). */
+    bucket: z.enum(UPLOAD_BUCKETS),
+    /** Real size from the HEAD on the quarantine object; once ready, the bytes of the variants (R2 storage gauge). */
+    size: z.number().int().min(0).optional(),
+    width: z.number().int().min(1).optional(),
+    height: z.number().int().min(1).optional(),
+    blurhash: z.string().min(6).max(120).optional(),
+    /** dHash, 16 hex characters (near-duplicate photos). */
+    hash: z.string().regex(/^[0-9a-f]{16}$/).optional(),
+    /** Local models: nsfw score in [0, 1], number of faces found. */
+    checks: z.object({ nsfw: z.number().min(0).max(1).optional(), faces: z.number().int().min(0).optional() }).strict(),
+    variants: z.array(z.enum(PHOTO_VARIANTS)).max(PHOTO_VARIANTS.length).optional(),
+    rejectReason: z.enum(UPLOAD_REJECT_REASONS).optional(),
+    /**
+     * Deleted by its owner under a legal hold once ready: `rejected`, but its variants stay as
+     * evidence until the document purge, so the R2 storage gauge still counts its `size`.
+     */
+    heldObjects: z.literal(true).optional(),
+    /** 7 days (retention-purge). */
+    purgeAt: ts,
+    createdAt: ts,
+    updatedAt: ts,
+  })
+  .strict();
+export type UploadDoc = z.infer<typeof uploadSchema>;
+
+/** searchOutbox/{listingId}: written in the listing's transaction; consumed in phase 4. */
+export const searchOutboxSchema = z.object({ op: z.enum(["upsert", "delete"]), version: z.number().int().min(0), enqueuedAt: ts }).strict();
+export type SearchOutboxDoc = z.infer<typeof searchOutboxSchema>;
+
+export const CONTENT_OPS = ["listing.create", "listing.update", "listing.publish", "listing.remove", "upload.create"] as const;
+
+/** contentOps/{id}: who published what from which IP (LCEN, IP in clear), purged after 1 year. */
+export const contentOpSchema = z
+  .object({
+    uid,
+    op: z.enum(CONTENT_OPS),
+    /** "listings/{id}" or "uploads/{id}". */
+    contentRef: z.string().min(1).max(200),
+    ip: z.string().max(45),
+    at: ts,
+    purgeAt: ts,
+  })
+  .strict();
+export type ContentOpDoc = z.infer<typeof contentOpSchema>;
+
+/** revealLogs/{id}: phone reveals (number scraping detection), purged after 90 days. */
+export const revealLogSchema = z
+  .object({
+    viewerUid: uid,
+    listingId: listingIdSchema,
+    ipPrefixHash: z.string().min(1).max(64),
+    deviceHash: z.string().min(1).max(64),
+    at: ts,
+    purgeAt: ts,
+  })
+  .strict();
+export type RevealLogDoc = z.infer<typeof revealLogSchema>;
+
+export const MODERATION_ACTIONS = ["remove", "restrict_visibility", "demote", "suspend_account", "ban", "warn", "restore", "no_action"] as const;
+
+/** moderationDecisions/{id}: statement of reasons (art. 17 DSA), kept 5 years. */
+export const moderationDecisionSchema = z
+  .object({
+    target: z.object({ type: z.string().min(1).max(32), id: z.string().min(1).max(128) }).strict(),
+    affectedUid: uid,
+    action: z.enum(MODERATION_ACTIONS),
+    durationDays: z.number().int().min(1).max(3650).optional(),
+    facts: z.string().max(2000),
+    origin: z.enum(["notice", "own_initiative", "authority_order"]),
+    automation: z.object({ detection: z.boolean(), decision: z.boolean() }).strict(),
+    /** e.g. { type: "terms", ref: "CGU §7.2" }. */
+    ground: z.object({ type: z.enum(["illegal", "terms"]), ref: z.string().max(64), explanation: z.string().max(2000) }).strict(),
+    reportIds: z.array(z.string().min(1).max(128)).max(100),
+    templateId: z.string().min(1).max(64),
+    /** Staff uid, or "system" for automated decisions. */
+    decidedBy: z.string().min(1).max(128),
+    notifiedAt: ts.optional(),
+    appeal: z
+      .object({ status: z.enum(["open", "upheld", "reversed"]), openedAt: ts, closedAt: ts.optional(), reviewer: z.string().max(128).optional(), note: z.string().max(2000).optional() })
+      .strict()
+      .optional(),
+    /** Notification + 6 months. */
+    appealDeadline: ts,
+    createdAt: ts,
+    purgeAt: ts,
+  })
+  .strict();
+export type ModerationDecisionDoc = z.infer<typeof moderationDecisionSchema>;
+
+/** Upload id as stored on `photos[].id` (re-exported for the repositories). */
+export { uploadIdSchema, listingIdSchema };
+
 export const COLLECTIONS = {
   users: "users",
   userPrivate: "private",
@@ -126,4 +373,14 @@ export const COLLECTIONS = {
   mailSuppressions: "mailSuppressions",
   /** staff/{uid}: back-office roster (src/lib/db/repositories/staff.ts). */
   staff: "staff",
+  // Phase 3
+  listings: "listings",
+  listingStats: "listingStats",
+  uploads: "uploads",
+  searchOutbox: "searchOutbox",
+  contentOps: "contentOps",
+  revealLogs: "revealLogs",
+  moderationDecisions: "moderationDecisions",
+  /** system/backup (cursor state of backup-firestore), free-form documents. */
+  system: "system",
 } as const;

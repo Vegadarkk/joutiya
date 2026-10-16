@@ -117,6 +117,41 @@ export async function isDegraded(id: QuotaId): Promise<boolean> {
   return used !== null && classify(QUOTAS[id], used) === "degraded";
 }
 
+/** First of `ids` whose degraded mode applies (one MGET), or null. Unknown counts as available. */
+export async function firstDegraded(ids: readonly QuotaId[]): Promise<QuotaId | null> {
+  if (ids.length === 0 || !isValkeyConfigured("queue")) return null;
+  const at = new Date();
+  try {
+    const values = await valkey("queue").mget(ids.map((id) => counterKey(id, periodKey(QUOTAS[id], at))));
+    return ids.find((id, index) => typeof values[index] === "string" && classify(QUOTAS[id], Number(values[index])) === "degraded") ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Units left before the counter reaches `share` of its limit (never negative): the budget of a
+ * batch job that must leave room for the rest of the day. Null when the counter is unreadable.
+ */
+export async function headroom(id: QuotaId, share = 1): Promise<number | null> {
+  const definition = QUOTAS[id];
+  if (!isValkeyConfigured("queue")) return null;
+  try {
+    const value = await valkey("queue").get(counterKey(id, periodKey(definition, new Date())));
+    return Math.max(0, Math.floor(definition.limit * share) - (value === null ? 0 : Number(value)));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reads billed for a count() aggregation: one per batch of up to 1 000 index entries matched,
+ * at least one (Firestore pricing). `consume("firestore.reads", aggregationReads(count))`.
+ */
+export function aggregationReads(count: number): number {
+  return Math.max(1, Math.ceil(count / 1_000));
+}
+
 /**
  * True once the counter reached its limit, whatever `degradeAt` says: the share between the two
  * is a reserve (Resend keeps its last 10 % for security mails). Unknown counts as available.

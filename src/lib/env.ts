@@ -12,6 +12,33 @@ const flag = z
   .trim()
   .optional()
   .transform((value) => value === "true");
+/** Non-negative integer with a default; "" counts as unset. */
+const integer = (fallback: number) =>
+  z
+    .string()
+    .trim()
+    .optional()
+    .transform((value, ctx) => {
+      if (!value) return fallback;
+      if (!/^\d{1,15}$/.test(value)) {
+        ctx.addIssue({ code: "custom", message: "must be a non-negative integer" });
+        return z.NEVER;
+      }
+      return Number(value);
+    });
+/** Absolute http(s) URL or unset; the https requirement outside dev is checked in parseEnv. */
+const optionalUrl = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value, ctx) => {
+    if (!value) return undefined;
+    if (!/^https?:\/\/[^\s/]+/.test(value) || !URL.canParse(value)) {
+      ctx.addIssue({ code: "custom", message: "must be an absolute http(s) URL" });
+      return z.NEVER;
+    }
+    return value;
+  });
 
 const schema = z.object({
   APP_ENV: z.enum(["dev", "staging", "prod"]).default("dev"),
@@ -53,8 +80,27 @@ const schema = z.object({
   CF_ACCESS_AUD: optional,
   TURNSTILE_SITE_KEY: optional,
   TURNSTILE_SECRET_KEY: optional,
-  MEDIA_BASE_URL: optional,
+  // R2 object storage (§5 uploads, phase 3): the S3 endpoint, one token per environment and the
+  // three bucket names (checked against infra/targets.json by scripts/assert-target.ts). Set all
+  // of them with MEDIA_BASE_URL, or none: without them dev stores files under os.tmpdir()
+  // (src/lib/storage/fs.ts) and deployed environments refuse uploads.
+  /** Public media host, e.g. https://media.joutiya.ma; dev defaults to the dev storage route. */
+  MEDIA_BASE_URL: optionalUrl,
   R2_S3_ENDPOINT: optional,
+  R2_ACCESS_KEY_ID: optional,
+  R2_SECRET_ACCESS_KEY: optional,
+  R2_BUCKET_QUARANTINE: optional,
+  R2_BUCKET_MEDIA: optional,
+  R2_BUCKET_PRIVATE: optional,
+  /**
+   * Bytes stored in the shared Cloudflare account by its other project (D15): added to our own
+   * byte accounting before the r2.storage gauge, so the 8 GB alert reflects the account total.
+   */
+  R2_STORAGE_BASELINE_BYTES: integer(4_140_000_000),
+  /** Morocco PMTiles archive for the interactive map (D10); unset = static SVG map only. */
+  MAP_PMTILES_URL: optionalUrl,
+  /** Worker only: directory holding the local ONNX models (nudity, faces; docs/models.md). */
+  MEDIA_MODELS_DIR: optional,
   MAIL_PROVIDER: z.enum(["resend"]).default("resend"),
   MAIL_API_KEY: optional,
   MAIL_WEBHOOK_SECRET: optional,
@@ -66,12 +112,30 @@ const schema = z.object({
   /** Joutiya's WhatsApp number in international format, digits only (wa.me link). */
   WHATSAPP_DISPLAY_NUMBER: optional,
   SENTRY_DSN: optional,
+  /** age public key of the nightly Firestore backups (D17); the private key stays offline. */
+  BACKUP_AGE_RECIPIENT: optional,
   /** Development only: keeps sent e-mails in memory, readable at /api/dev/mailbox (e2e tests). */
   DEV_MAILBOX: flag,
 });
 
 export type ServerEnv = z.infer<typeof schema>;
 export type AppEnv = ServerEnv["APP_ENV"];
+
+/** The R2 configuration is complete or absent: a partial one is a deployment mistake (parseEnv). */
+export const R2_STORAGE_VARS = [
+  "R2_S3_ENDPOINT",
+  "R2_ACCESS_KEY_ID",
+  "R2_SECRET_ACCESS_KEY",
+  "R2_BUCKET_QUARANTINE",
+  "R2_BUCKET_MEDIA",
+  "R2_BUCKET_PRIVATE",
+  "MEDIA_BASE_URL",
+] as const satisfies readonly (keyof ServerEnv)[];
+
+/** True when every R2 variable is set: the S3 adapter applies (src/lib/storage). */
+export function isR2Configured(env: Pick<ServerEnv, (typeof R2_STORAGE_VARS)[number]>): boolean {
+  return R2_STORAGE_VARS.every((name) => Boolean(env[name]));
+}
 
 /**
  * Variables without which staging and production must not start. The identifiers checked
@@ -107,6 +171,9 @@ export const RECOMMENDED_DEPLOYED = [
   "WHATSAPP_VERIFY_TOKEN",
   "WHATSAPP_DISPLAY_NUMBER",
   "SENTRY_DSN",
+  // Photos and backups (phase 3): recommended, not required, until the bucket tokens exist.
+  ...R2_STORAGE_VARS,
+  "BACKUP_AGE_RECIPIENT",
 ] as const satisfies readonly (keyof ServerEnv)[];
 
 /** Cloudflare's documented dummy Turnstile keys: never in production. */
@@ -143,6 +210,15 @@ export function parseEnv(source: Record<string, string | undefined>): ParsedEnv 
     for (const name of REQUIRED_DEPLOYED) if (!env[name]) errors.push(`${name} is required when APP_ENV=${env.APP_ENV}`);
     for (const name of RECOMMENDED_DEPLOYED) if (!env[name]) warnings.push(`${name} is not set: the feature that needs it is unavailable`);
     if (!env.SITE_URL.startsWith("https://")) errors.push("SITE_URL must be https outside dev");
+    // Object storage: half a configuration would sign uploads nobody can process.
+    const r2Set = R2_STORAGE_VARS.filter((name) => env[name]);
+    if (r2Set.length > 0 && r2Set.length < R2_STORAGE_VARS.length) {
+      const missing = R2_STORAGE_VARS.filter((name) => !env[name]);
+      errors.push(`R2 storage needs all of ${R2_STORAGE_VARS.join(", ")} or none (missing: ${missing.join(", ")})`);
+    }
+    for (const name of ["MEDIA_BASE_URL", "MAP_PMTILES_URL"] as const) {
+      if (env[name] && !env[name].startsWith("https://")) errors.push(`${name} must be https outside dev`);
+    }
     if (env.FIRESTORE_EMULATOR_HOST) errors.push("FIRESTORE_EMULATOR_HOST must not be set outside dev");
     if (env.FIREBASE_AUTH_EMULATOR_HOST) errors.push("FIREBASE_AUTH_EMULATOR_HOST must not be set outside dev");
     if (env.DEV_MAILBOX) errors.push("DEV_MAILBOX must not be set outside dev");

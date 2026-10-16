@@ -71,4 +71,13 @@ describe("startupReport", () => {
     const { fatal } = await startupReport("worker", { APP_ENV: "staging" });
     expect(fatal.some((problem) => problem.startsWith("CSP hash hook"))).toBe(false);
   });
+
+  it("warns about missing object storage and stops on a partial R2 configuration", async () => {
+    const missing = await startupReport("worker", { APP_ENV: "staging" });
+    expect(missing.warnings).toContain("R2_BUCKET_MEDIA is not set: the feature that needs it is unavailable");
+    expect(missing.warnings).toContain("BACKUP_AGE_RECIPIENT is not set: the feature that needs it is unavailable");
+    expect(missing.fatal.some((problem) => problem.startsWith("R2 storage needs all of"))).toBe(false);
+    const partial = await startupReport("worker", { APP_ENV: "staging", R2_BUCKET_MEDIA: "joutiya-staging-media" });
+    expect(partial.fatal.some((problem) => problem.startsWith("R2 storage needs all of"))).toBe(true);
+  });
 });

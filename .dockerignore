@@ -19,3 +19,6 @@ workers
 *.key
 **/*credentials*.json
 **/service-account*.json
+models/*.onnx
+public/vendor/*
+!public/vendor/.gitignore

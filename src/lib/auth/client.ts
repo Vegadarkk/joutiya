@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
-import { AUTH_API, type GoogleInput, type GoogleResponse, type SessionSummary } from "@/lib/contracts/auth";
+import type { GoogleInput, GoogleResponse, SessionSummary } from "@/lib/contracts/auth";
+import { AUTH_API } from "@/lib/contracts/endpoints";
 import type { ErrorCode } from "@/lib/http/errors";
 import { CSRF_COOKIE, CSRF_HEADER } from "@/lib/security/cookies";
 
@@ -9,8 +10,8 @@ export { safeNextPath } from "./next-path";
 // mutation, typed errors the UI translates, and one shared cache of GET /api/auth/me so the
 // header, the account pages and the forms agree on who is signed in.
 
-/** Server codes, plus `network` when the request never reached the server. */
-export type ApiErrorCode = ErrorCode | "network";
+/** Server codes, plus `network` when the request never reached the server and `aborted` for a cancelled upload. */
+export type ApiErrorCode = ErrorCode | "network" | "aborted";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -96,16 +97,71 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
-/** POST a JSON body. The CSRF header rides along whenever a session cookie is readable. */
-export function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const headers: Record<string, string> = { "content-type": "application/json", accept: "application/json" };
+/** Headers of a same-origin mutation: the CSRF header rides along whenever the cookie is readable. */
+function mutationHeaders(withBody: boolean): Record<string, string> {
+  const headers: Record<string, string> = { accept: "application/json" };
+  if (withBody) headers["content-type"] = "application/json";
   const csrf = csrfToken();
   if (csrf) headers[CSRF_HEADER] = csrf;
-  return request<T>(path, { method: "POST", headers, body: JSON.stringify(body ?? {}) });
+  return headers;
+}
+
+/** POST a JSON body. */
+export function apiPost<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, { method: "POST", headers: mutationHeaders(true), body: JSON.stringify(body ?? {}) });
+}
+
+/** PATCH a JSON body (partial updates: draft autosave). */
+export function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, { method: "PATCH", headers: mutationHeaders(true), body: JSON.stringify(body ?? {}) });
+}
+
+/** DELETE; a 204 answer resolves to undefined. */
+export function apiDelete<T = void>(path: string): Promise<T> {
+  return request<T>(path, { method: "DELETE", headers: mutationHeaders(false) });
 }
 
 export function apiGet<T>(path: string): Promise<T> {
   return request<T>(path, { method: "GET", headers: { accept: "application/json" } });
+}
+
+/** Upload progress: `fraction` in [0, 1] when the browser knows the total, plus the raw counts. */
+export type UploadProgress = (fraction: number, loaded: number, total: number) => void;
+
+/**
+ * PUT a file to a presigned URL (R2, or the dev storage route). Cross-origin by design: no
+ * cookie, no CSRF header, only the headers the signature covers (Content-Type). XMLHttpRequest
+ * is the one browser API that reports upload progress; `signal` cancels the request.
+ */
+export function uploadToPresignedUrl(url: string, headers: Record<string, string>, blob: Blob, onProgress?: UploadProgress, signal?: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new ApiError(0, "aborted"));
+      return;
+    }
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url, true);
+    xhr.withCredentials = false;
+    for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value);
+    xhr.upload.onprogress = (event: ProgressEvent) => {
+      if (!onProgress) return;
+      const total = event.lengthComputable ? event.total : blob.size;
+      onProgress(total > 0 ? Math.min(1, event.loaded / total) : 0, event.loaded, total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(1, blob.size, blob.size);
+        resolve();
+      } else {
+        reject(new ApiError(xhr.status, fallbackCode(xhr.status), { message: `upload failed (${xhr.status})` }));
+      }
+    };
+    xhr.onerror = () => reject(new ApiError(0, "network"));
+    xhr.ontimeout = () => reject(new ApiError(0, "network", { message: "upload timed out" }));
+    xhr.onabort = () => reject(new ApiError(0, "aborted"));
+    signal?.addEventListener("abort", () => xhr.abort(), { once: true });
+    xhr.send(blob);
+  });
 }
 
 /**

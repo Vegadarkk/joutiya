@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UNIFORM_RESPONSE_MS } from "@/lib/auth/anonymous";
 import { deleteAccountDocumentsIfPending, findUidByEmail, getUser, getUserPrivate } from "@/lib/db/repositories/users";
+import { getUserRecord } from "@/lib/db/repositories/profiles";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { auth, db } from "@/lib/firebase/admin";
 import { setClaims } from "@/lib/firebase/claims";
@@ -95,6 +96,8 @@ describe("sign-up, verification, session, profile, logout", () => {
 
     const who = await call<{ session: SignedInBody["session"] }>(me, ME, { jar });
     expect(who.body.session?.uid).toBe(session.uid);
+    // The activation write keeps the user document valid (strict schema) with the badge set.
+    expect(await getUserRecord(session.uid)).toMatchObject({ activation: "done", badges: { emailVerified: true, phoneVerified: false, proCertified: false } });
     expect(who.header("x-csrf-token")).toBe(jar.get("__Host-csrf"));
     // The sign-up and the sign-in from the verification link are both in connectionLogs.
     expect(await loggedEvents(session.uid)).toEqual(["signup", "login"]);

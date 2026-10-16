@@ -12,27 +12,7 @@ export const TRANSFERS_CONSENT_VERSION = "2026-10";
 export const PASSWORD_MIN = 8;
 export const PASSWORD_MAX = 128;
 
-export const AUTH_API = {
-  signup: "/api/auth/signup",
-  login: "/api/auth/login",
-  logout: "/api/auth/logout",
-  /** Google Identity Services credential -> session (existing account or sign-up with consents). */
-  google: "/api/auth/google",
-  /** Firebase ID token (google.com provider) -> session; kept for the SDK flow. */
-  session: "/api/auth/session",
-  clientToken: "/api/auth/client-token",
-  me: "/api/auth/me",
-  resetRequest: "/api/auth/password/reset",
-  resetConfirm: "/api/auth/password/confirm",
-  passwordChange: "/api/auth/password/change",
-  verifyResend: "/api/auth/verify/resend",
-  action: "/api/auth/action",
-  phoneStart: "/api/auth/phone/start",
-  phoneStatus: "/api/auth/phone/status",
-  profile: "/api/auth/profile",
-  staffLogin: "/api/admin/auth/login",
-  staffLogout: "/api/admin/auth/logout",
-} as const;
+export { AUTH_API } from "./endpoints";
 
 export const emailSchema = z.string().trim().toLowerCase().email().max(254);
 
@@ -55,7 +35,7 @@ export const turnstileTokenSchema = z.string().min(1).max(2048);
  * Turnstile `action` names: the widget declares one, siteverify echoes it and the server refuses a
  * token solved for another action. One list for both sides (a mismatch is a hard 403 in prod).
  */
-export const TURNSTILE_ACTIONS = ["signup", "login", "reset", "google", "verify-resend", "staff-login", "phone"] as const;
+export const TURNSTILE_ACTIONS = ["signup", "login", "reset", "google", "verify-resend", "staff-login", "phone", "listing"] as const;
 export type TurnstileAction = (typeof TURNSTILE_ACTIONS)[number];
 
 export const consentsSchema = z

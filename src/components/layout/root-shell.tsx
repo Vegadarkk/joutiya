@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { NextIntlClientProvider } from "next-intl";
-import { getTranslations } from "next-intl/server";
+import { getMessages, getTranslations } from "next-intl/server";
 import { isRtl, LOCALE_TAGS, type Locale } from "@/config/site";
 import { DEFAULT_LEGAL } from "@/config/legal";
 import { Footer } from "@/components/legal/footer";
 import type { PublicConfig } from "@/lib/config/public-types";
 import type { SessionSummary } from "@/lib/contracts/auth";
+import { pickMessages } from "@/i18n/client-messages";
 import { readex, tarifitFallback } from "@/lib/fonts";
 import { Providers } from "./providers";
 import { SiteHeader } from "./site-header";
@@ -20,6 +21,8 @@ interface RootShellProps {
   config?: PublicConfig;
   /** Private layout only: the session of this request (null = anonymous), so the header renders it on first paint. */
   initialSession?: SessionSummary | null;
+  /** The message namespaces the browser receives; the whole catalog when omitted (private layout). */
+  clientNamespaces?: readonly string[];
   children: ReactNode;
 }
 
@@ -27,8 +30,9 @@ interface RootShellProps {
  * <html> of the localized root layouts. Two root layouts share it: (public), static with a
  * hash-based CSP, and (private), dynamic with the request nonce and the runtime configuration.
  */
-export async function RootShell({ locale, nonce, config, initialSession, children }: RootShellProps) {
+export async function RootShell({ locale, nonce, config, initialSession, clientNamespaces, children }: RootShellProps) {
   const t = await getTranslations({ locale, namespace: "Nav" });
+  const messages = clientNamespaces ? pickMessages(await getMessages({ locale }), clientNamespaces) : undefined;
   const dir = isRtl(locale) ? "rtl" : "ltr";
   return (
     <html lang={LOCALE_TAGS[locale]} dir={dir} className={`${readex.variable} ${tarifitFallback.variable}`} suppressHydrationWarning>
@@ -40,7 +44,7 @@ export async function RootShell({ locale, nonce, config, initialSession, childre
         >
           {t("skip")}
         </a>
-        <NextIntlClientProvider>
+        <NextIntlClientProvider messages={messages}>
           <Providers dir={dir} config={config} initialSession={initialSession}>
             <SiteHeader locale={locale} />
             <main id="main" className="flex flex-1 flex-col">

@@ -10,6 +10,7 @@ import { DEVICE_COOKIE, setDeviceCookie } from "@/lib/security/cookies";
 import { buildCsp, createNonce, INLINE_HASH_MARKER, type CspVariant } from "@/lib/security/csp";
 import { newDeviceCookie, readDeviceId } from "@/lib/security/device";
 import { coopFor } from "@/lib/security/headers";
+import { mediaBaseUrl } from "@/lib/storage/keys";
 
 const handleI18nRouting = createMiddleware(routing);
 
@@ -38,6 +39,18 @@ function sentryOrigin(dsn: string | undefined): string | undefined {
   }
 }
 
+/**
+ * Where photos come from (img-src): MEDIA_BASE_URL when set, else the dev storage route on the
+ * public origin, which the admin host (another origin) must allow too. Null outside dev without it.
+ */
+function mediaOrigin(): string | undefined {
+  try {
+    return mediaBaseUrl() ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function cspHeaderName(): string {
   return process.env.CSP_REPORT_ONLY === "true" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy";
 }
@@ -47,8 +60,9 @@ function csp(variant: CspVariant, nonce?: string): string {
     variant,
     nonce,
     dev: process.env.NODE_ENV === "development",
-    mediaOrigin: process.env.MEDIA_BASE_URL,
+    mediaOrigin: mediaOrigin(),
     r2Origin: process.env.R2_S3_ENDPOINT,
+    tilesOrigin: process.env.MAP_PMTILES_URL,
     errorIngestOrigin: sentryOrigin(process.env.SENTRY_DSN),
     authEmulatorOrigin: process.env.FIREBASE_AUTH_EMULATOR_HOST ? `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}` : undefined,
     reportPath: "/api/csp-report",

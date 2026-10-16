@@ -10,7 +10,7 @@ import { currentUser } from "@/lib/auth/current-user";
 import { sessionSummary } from "@/lib/auth/summary";
 import { publicConfig } from "@/lib/config/public";
 import type { SessionSummary } from "@/lib/contracts/auth";
-import { rootMetadata } from "@/lib/i18n/metadata";
+import { rootMetadata, SITE_VIEWPORT } from "@/lib/i18n/metadata";
 
 // Private pages (auth, account, Pro): dynamic rendering with the per-request nonce (§1, §6), and
 // the runtime browser configuration (Turnstile, Google, Firebase) handed to the client from here
@@ -31,6 +31,8 @@ async function initialSession(): Promise<SessionSummary | null | undefined> {
     return undefined;
   }
 }
+
+export const viewport = SITE_VIEWPORT;
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;

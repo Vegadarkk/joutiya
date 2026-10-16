@@ -12,6 +12,7 @@ import { HttpError, forbidden, unavailable } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { logConnection } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
+import { assertQuotas, SIGNUP_QUOTAS } from "@/lib/quota/gate";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { safeEqual } from "@/lib/security/hash";
 import { errorCode, localPart, userByEmail } from "./accounts";
@@ -219,6 +220,9 @@ async function googleSignIn(request: Request): Promise<Response> {
   }
   // New account: the sign-up limits apply, a `needs_consent` pass included (§6).
   await enforceLimit("signup.ip", flow.identity.ipBucket);
+  // Firestore writes degraded (§2): refused before the consent step; members still sign in above.
+  // Before the device limit, which a refusal must not use up (as for a password sign-up).
+  await assertQuotas(SIGNUP_QUOTAS);
   await enforceLimit("signup.device", flow.identity.deviceKey);
   if (await findUidByEmail(identity.email)) throw new HttpError(409, "conflict", "an account exists under a variant of this e-mail");
   if (!input.consents) return respond<GoogleResponse>(flow, { status: "needs_consent", email: identity.email, displayName: identity.name });

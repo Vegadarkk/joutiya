@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { getTranslations } from "next-intl/server";
 import { CANONICAL_ORIGIN, HREFLANG_LOCALES, LOCALE_TAGS, type Locale } from "@/config/site";
 
@@ -33,3 +33,11 @@ export async function rootMetadata(locale: Locale): Promise<Metadata> {
     openGraph: { siteName: "Joutiya", locale: LOCALE_TAGS[locale].replace("-", "_"), type: "website" },
   };
 }
+
+/** Mobile browser chrome in the header's colour (surface-brand: cream-200, bab-800 in dark). */
+export const SITE_VIEWPORT: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f2e9d8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b3a3c" },
+  ],
+};

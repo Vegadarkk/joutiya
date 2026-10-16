@@ -43,6 +43,16 @@ const routes: Record<string, Handler> = {
     res.setHeader(INLINE_HASH_MARKER, "1");
     res.end(PAGE);
   },
+  // Next 16 ISR redirect: the same Location appended twice.
+  "/redirect": (res) => {
+    res.statusCode = 308;
+    res.setHeader("Content-Type", "text/html");
+    res.setHeader("Content-Security-Policy", FALLBACK);
+    res.setHeader(INLINE_HASH_MARKER, "1");
+    res.appendHeader("Location", "/fr/annonce/velo-abcd2345");
+    res.appendHeader("Location", "/fr/annonce/velo-abcd2345");
+    res.end(PAGE);
+  },
   "/oversized": (res) => {
     res.setHeader("Content-Type", "text/html");
     res.setHeader("Content-Security-Policy", FALLBACK);
@@ -65,12 +75,12 @@ beforeAll(async () => {
 afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
 
 /** Raw request: no automatic decompression (the "compressed" body is not really compressed). */
-function raw(path: string): Promise<{ headers: IncomingHttpHeaders; body: string }> {
+function raw(path: string): Promise<{ headers: IncomingHttpHeaders; rawHeaders: string[]; body: string }> {
   return new Promise((resolve, reject) => {
     get(base + path, (res) => {
       const chunks: Buffer[] = [];
       res.on("data", (chunk: Buffer) => chunks.push(chunk));
-      res.on("end", () => resolve({ headers: res.headers, body: Buffer.concat(chunks).toString("utf8") }));
+      res.on("end", () => resolve({ headers: res.headers, rawHeaders: res.rawHeaders, body: Buffer.concat(chunks).toString("utf8") }));
     }).on("error", reject);
   });
 }
@@ -105,6 +115,13 @@ describe("CSP hash hook", () => {
       expect(headers[INLINE_HASH_MARKER]).toBeUndefined();
     });
   }
+
+  it("sends a single Location on a buffered redirect", async () => {
+    const { rawHeaders } = await raw("/redirect");
+    const locations = rawHeaders.filter((_, index) => index % 2 === 0 && rawHeaders[index]?.toLowerCase() === "location");
+    expect(locations).toHaveLength(1);
+    expect(rawHeaders[rawHeaders.findIndex((name) => name.toLowerCase() === "location") + 1]).toBe("/fr/annonce/velo-abcd2345");
+  });
 
   it("passes oversized pages through with the fallback policy", async () => {
     const response = await fetch(`${base}/oversized`);
