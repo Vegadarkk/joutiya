@@ -8,7 +8,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { ACCESS_JWT_HEADER, verifyAccessJwt } from "@/lib/auth/access-jwt";
 import { serverEnv } from "@/lib/env";
 import { readex } from "@/lib/fonts";
-import { SITE_VIEWPORT } from "@/lib/i18n/metadata";
 import "@/styles/globals.css";
 
 // Back office, served only on the admin host (proxy.ts rewrites it to /admin): French only,
@@ -21,8 +20,6 @@ export const metadata: Metadata = {
   // Same file as the public pages (src/lib/i18n/metadata.ts), served as is on the admin host.
   icons: { icon: "/brand/joutiya-icon.svg" },
 };
-
-export const viewport = SITE_VIEWPORT;
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const requestHeaders = await headers();
