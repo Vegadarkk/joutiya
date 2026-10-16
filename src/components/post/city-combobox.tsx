@@ -149,7 +149,11 @@ export function CityCombobox({ value, onSelect, error, required, locale: localeP
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          // Close only if focus really left: the wizard moves focus to the step heading right after
+          // this field autofocuses, and a stale timer would hide the list while the person types.
+          onBlur={() => window.setTimeout(() => {
+            if (document.activeElement !== input.current) setOpen(false);
+          }, 120)}
           onKeyDown={(event) => {
             if (event.key === "ArrowDown") {
               event.preventDefault();

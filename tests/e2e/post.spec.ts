@@ -173,7 +173,7 @@ test.describe("posting wizard", () => {
 
     // 8. Contact: the verified badge unlocks the phone switch.
     await expect(page).toHaveURL(/\/contact$/);
-    await expect(page.getByText("Numéro vérifié")).toBeVisible();
+    await expect(page.getByText("Numéro vérifié", { exact: true })).toBeVisible();
     await page.getByRole("switch", { name: /Afficher mon numéro sur l'annonce/ }).click();
     await next(page);
 
