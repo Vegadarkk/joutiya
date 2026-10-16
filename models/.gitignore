@@ -1,0 +1,3 @@
+# Model weights are fetched by scripts/fetch-models.ts (pinned URL + sha256), never committed.
+*.onnx
+*.part
