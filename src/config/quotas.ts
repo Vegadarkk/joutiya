@@ -77,8 +77,9 @@ export const QUOTAS = {
     resetTimeZone: "UTC",
     kind: "counter",
     alertAt: 0.7,
-    degradeAt: 1,
-    degradedMode: "E-mails de sécurité par Brevo ; les autres attendent le lendemain.",
+    // The last 10 % stay for security mails (src/lib/mail/deliver.ts).
+    degradeAt: 0.9,
+    degradedMode: "Seuls les e-mails de sécurité partent encore (Resend, puis Brevo) ; les autres attendent le lendemain.",
   },
   "resend.monthly": {
     service: "Resend",
@@ -88,8 +89,8 @@ export const QUOTAS = {
     resetTimeZone: "UTC",
     kind: "counter",
     alertAt: 0.7,
-    degradeAt: 1,
-    degradedMode: "E-mails de sécurité par Brevo ; alertes de recherches suspendues.",
+    degradeAt: 0.9,
+    degradedMode: "Seuls les e-mails de sécurité partent encore (Resend, puis Brevo) ; alertes de recherches suspendues.",
   },
   "brevo.daily": {
     service: "Brevo",

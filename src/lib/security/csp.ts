@@ -21,8 +21,10 @@ export interface CspOptions {
   mediaOrigin?: string;
   /** R2 S3 host for presigned uploads, e.g. https://<account>.eu.r2.cloudflarestorage.com. */
   r2Origin?: string;
-  /** Error-reporting ingest origin (Sentry EU or GlitchTip), if configured. */
+  /** Error-reporting ingest origin (Sentry EU), if configured. */
   errorIngestOrigin?: string;
+  /** Development only: Firebase Auth emulator origin the browser SDK talks to. */
+  authEmulatorOrigin?: string;
   /** Same-origin endpoint receiving violation reports. */
   reportPath?: string;
   /** Adds upgrade-insecure-requests (default: outside dev). Off for a plain-http local server. */
@@ -36,12 +38,17 @@ const FIREBASE_ORIGINS = [
   "https://firestore.googleapis.com",
 ];
 const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
+/** Google Identity Services (Google sign-in, phase 2): script, button iframe, style sheet. */
+const GIS_SCRIPT = "https://accounts.google.com/gsi/client";
+const GIS_FRAME = "https://accounts.google.com/gsi/";
+const GIS_STYLE = "https://accounts.google.com/gsi/style";
 
 function origin(value: string | undefined): string | undefined {
   if (!value) return undefined;
   try {
     const url = new URL(value);
-    return url.protocol === "https:" || url.hostname === "localhost" ? url.origin : undefined;
+    const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    return url.protocol === "https:" || local ? url.origin : undefined;
   } catch {
     return undefined;
   }
@@ -68,10 +75,12 @@ export function buildCsp(options: CspOptions): string {
   // CSP3 browsers once a nonce is present; they only keep CSP1 browsers working.
   // Public: Next.js inlines the RSC payload as <script> tags whose content changes with each
   // render, so they cannot be pinned at build time; chunks are pinned by SRI instead.
+  // Turnstile and GIS are loaded by <script nonce> tags on private pages ('strict-dynamic' then
+  // ignores host sources); the hosts stay listed for CSP2 browsers and the public variant.
   const scriptSrc =
     variant === "private"
       ? [`'nonce-${options.nonce}'`, "'strict-dynamic'", "https:", "'unsafe-inline'"]
-      : ["'self'", "'unsafe-inline'"];
+      : ["'self'", "'unsafe-inline'", TURNSTILE_ORIGIN, GIS_SCRIPT];
   if (dev) scriptSrc.push("'unsafe-eval'");
 
   const media = origin(options.mediaOrigin);
@@ -79,18 +88,20 @@ export function buildCsp(options: CspOptions): string {
     "default-src": ["'self'"],
     "script-src": scriptSrc,
     // Radix and Sonner set inline style attributes; a nonce cannot cover attributes.
-    "style-src": ["'self'", "'unsafe-inline'"],
+    "style-src": ["'self'", "'unsafe-inline'", GIS_STYLE],
     "img-src": compact(["'self'", "data:", "blob:", media]),
     "font-src": ["'self'"],
     "connect-src": compact([
       "'self'",
       ...FIREBASE_ORIGINS,
+      GIS_FRAME,
       origin(options.r2Origin),
       origin(options.errorIngestOrigin),
+      origin(options.authEmulatorOrigin),
       dev ? "ws:" : undefined,
     ]),
-    // 'self' covers the /__/auth/* relay (Google sign-in, phase 2).
-    "frame-src": ["'self'", TURNSTILE_ORIGIN],
+    // Turnstile widget and the Google sign-in button (GIS) render in iframes.
+    "frame-src": ["'self'", TURNSTILE_ORIGIN, GIS_FRAME],
     "worker-src": ["'self'", "blob:"],
     "manifest-src": ["'self'"],
     "media-src": compact(["'self'", media]),

@@ -23,6 +23,9 @@ export function isRtl(locale: Locale): boolean {
 
 export const SITE_NAME = "Joutiya";
 
+/** Production origin, used for canonical URLs of prerendered pages (src/lib/i18n/metadata.ts). */
+export const CANONICAL_ORIGIN = "https://joutiya.ma";
+
 /**
  * First path segment (after the locale) of the private pages: account, auth and Pro areas.
  * They render dynamically with a nonce-based CSP; every other localized page is public

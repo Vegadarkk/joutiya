@@ -12,13 +12,15 @@
   "observability": { "enabled": true },
   // KV namespace "joutiya-uptime-state": its id is printed by `wrangler kv namespace create`.
   "kv_namespaces": [{ "binding": "STATE", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }],
-  // Free: delivers only to verified Email Routing destination addresses of the account.
-  "send_email": [{ "name": "EMAIL" }],
   "vars": {
-    "ALERT_EMAIL_FROM": "alertes@joutiya.ma",
+    // Alert e-mails leave through the Resend API (domain notif.joutiya.ma, phase 0 step 7), with a
+    // key dedicated to this Worker. No Email Routing: @joutiya.ma mail lives at Hostinger.
+    "ALERT_EMAIL_FROM": "Joutiya alertes <alertes@notif.joutiya.ma>",
     // Health endpoints probed every 5 minutes. Staging sits behind Access: service token headers.
     "PROBE_TARGETS": "[{\"name\":\"production\",\"url\":\"https://joutiya.ma/api/health\"},{\"name\":\"staging\",\"url\":\"https://staging.joutiya.ma/api/health\",\"access\":true}]"
   }
   // Secrets (wrangler secret put): TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ALERT_EMAIL_TO,
-  // ALERT_RELAY_SECRET, ACCESS_CLIENT_ID, ACCESS_CLIENT_SECRET.
+  // RESEND_API_KEY (sending access limited to notif.joutiya.ma; pipe it with `printf %s`, a trailing
+  // newline breaks the Authorization header), ALERT_RELAY_SECRET, ACCESS_CLIENT_ID, ACCESS_CLIENT_SECRET.
+  // ALERT_EMAIL_TO and RESEND_API_KEY go together: both unset turns e-mail off, one alone is an error.
 }

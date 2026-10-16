@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { HREFLANG_LOCALES, LOCALE_TAGS, type Locale } from "@/config/site";
+import { CANONICAL_ORIGIN, HREFLANG_LOCALES, LOCALE_TAGS, type Locale } from "@/config/site";
 
+/**
+ * Base of canonical and hreflang URLs. A constant on purpose: public pages are prerendered once
+ * for staging and production (one image, §2), so a runtime value would bake the build host in.
+ * Staging is noindex anyway.
+ */
 export function siteUrl(): URL {
-  return new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000");
+  return new URL(CANONICAL_ORIGIN);
 }
 
 /** Canonical URL and hreflang alternates: fr and ar only, Tarifit stays out of the cluster. */

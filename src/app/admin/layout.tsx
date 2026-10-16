@@ -4,14 +4,15 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { ThemeSync } from "@/components/layout/theme";
 import { ThemeScript } from "@/components/layout/theme-script";
+import { Toaster } from "@/components/ui/toaster";
 import { ACCESS_JWT_HEADER, verifyAccessJwt } from "@/lib/auth/access-jwt";
 import { serverEnv } from "@/lib/env";
 import { readex } from "@/lib/fonts";
 import "@/styles/globals.css";
 
 // Back office, served only on the admin host (proxy.ts rewrites it to /admin): French only,
-// dynamic, nonce CSP. Phase 1 checks the Cloudflare Access token; the staff session and roles
-// (requireStaff) arrive with phase 2.
+// dynamic, nonce CSP. This layout checks the Cloudflare Access token (first lock, §6); the staff
+// session decides between /connexion and the (protected) group, and every API route re-checks.
 
 export const metadata: Metadata = {
   title: { default: "Back-office", template: "%s · Back-office Joutiya" },
@@ -35,6 +36,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         <ThemeScript nonce={nonce} />
         <ThemeSync />
         {children}
+        <Toaster dir="ltr" />
       </body>
     </html>
   );

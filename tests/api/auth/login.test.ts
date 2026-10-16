@@ -1,0 +1,126 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { auth } from "@/lib/firebase/admin";
+import { setClaims } from "@/lib/firebase/claims";
+import { sendMail } from "@/lib/mail";
+import { resetRateLimiters } from "@/lib/rate-limit/limiter";
+import type * as Turnstile from "@/lib/security/turnstile";
+import { verifyTurnstile } from "@/lib/security/turnstile";
+import { POST as action } from "@/app/api/auth/action/route";
+import { POST as login } from "@/app/api/auth/login/route";
+import { GET as me } from "@/app/api/auth/me/route";
+import { POST as signup } from "@/app/api/auth/signup/route";
+import { CONSENTS, Jar, PASSWORD, call, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
+
+vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
+vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
+  ...(await importOriginal<typeof Turnstile>()),
+  verifyTurnstile: vi.fn(async () => ({ ok: true, codes: [] })),
+}));
+
+const LOGIN = "/api/auth/login";
+
+async function createAccount(verified: boolean, displayName = "Login Tester") {
+  const jar = new Jar();
+  const email = uniqueEmail("l");
+  const created = await call(signup, "/api/auth/signup", { jar, body: { email, password: PASSWORD, displayName, locale: "fr", consents: CONSENTS, turnstileToken: "t" } });
+  expect(created.status).toBe(202);
+  let uid: string | undefined;
+  if (verified) {
+    const verifiedResult = await call<SignedInBody>(action, "/api/auth/action", { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(lastMail(sendMail, "verifyEmail", email)!.data.actionUrl) } });
+    expect(verifiedResult.status).toBe(200);
+    uid = verifiedResult.body.session.uid;
+  }
+  return { email, uid };
+}
+
+beforeEach(() => resetRateLimiters());
+
+describe("POST /api/auth/login", () => {
+  it("signs a verified account in and the cookie works on /me", async () => {
+    const { email, uid } = await createAccount(true);
+    const jar = new Jar();
+    const result = await call<SignedInBody>(login, LOGIN, { jar, body: { email: email.toUpperCase(), password: PASSWORD } });
+    expect(result.status).toBe(200);
+    expect(result.body.status).toBe("signed_in");
+    expect(result.body.session.uid).toBe(uid);
+    expect(result.body.session.role).toBe("individual");
+    expect(result.header("x-csrf-token")).toBe(jar.get("__Host-csrf"));
+    expect(jar.get("__Host-did")).toBeDefined();
+    const who = await call<{ session: SignedInBody["session"] | null }>(me, "/api/auth/me", { jar });
+    expect(who.body.session?.uid).toBe(uid);
+    expect(who.body.session?.emailVerified).toBe(true);
+  });
+
+  it("asks for verification first on a pending account, without opening a session", async () => {
+    const { email } = await createAccount(false);
+    const jar = new Jar();
+    const result = await call<{ status: string }>(login, LOGIN, { jar, body: { email, password: PASSWORD } });
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ status: "verification_required" });
+    expect(jar.get("__Host-session")).toBeUndefined();
+  });
+
+  it("escalates to Turnstile after 3 failures and locks the account + IP after 5", async () => {
+    const { email } = await createAccount(true);
+    const jar = new Jar();
+    const wrong = { email, password: ["not", "the", "password", "1"].join("-") };
+    for (let i = 0; i < 3; i += 1) {
+      const failed = await call<ErrorBody>(login, LOGIN, { jar, body: wrong });
+      expect(failed.status).toBe(401);
+      expect(failed.body.error.code).toBe("invalid_credentials");
+    }
+    // 4th attempt without a token: the client must show the widget first.
+    const challenge = await call<{ status: string }>(login, LOGIN, { jar, body: wrong });
+    expect(challenge.status).toBe(200);
+    expect(challenge.body).toEqual({ status: "turnstile_required" });
+    // Right password without a token is not accepted either while the challenge stands.
+    const blockedRight = await call<{ status: string }>(login, LOGIN, { jar, body: { email, password: PASSWORD } });
+    expect(blockedRight.body).toEqual({ status: "turnstile_required" });
+    expect(jar.get("__Host-session")).toBeUndefined();
+
+    const withToken = await call<ErrorBody>(login, LOGIN, { jar, body: { ...wrong, turnstileToken: "solved" } });
+    expect(withToken.status).toBe(401);
+    expect(vi.mocked(verifyTurnstile)).toHaveBeenLastCalledWith("solved", expect.objectContaining({ action: "login", hostname: "localhost" }));
+    expect(jar.get("__Host-tsv")).toBeDefined();
+    // The pass lifts the challenge for this device: no token needed on the 5th failure.
+    const fifth = await call<ErrorBody>(login, LOGIN, { jar, body: wrong });
+    expect(fifth.status).toBe(401);
+
+    const locked = await call<ErrorBody>(login, LOGIN, { jar, body: { email, password: PASSWORD } });
+    expect(locked.status).toBe(429);
+    expect(locked.body.error.code).toBe("account_locked");
+    expect(locked.header("retry-after")).toBe("900");
+
+    // The lock is per account + IP: another network signs in normally.
+    const elsewhere = await call<SignedInBody>(login, LOGIN, { jar: new Jar(), body: { email, password: PASSWORD } });
+    expect(elsewhere.status).toBe(200);
+    expect(elsewhere.body.status).toBe("signed_in");
+  });
+
+  it("answers invalid_credentials for an unknown e-mail, like a wrong password", async () => {
+    const result = await call<ErrorBody>(login, LOGIN, { jar: new Jar(), body: { email: uniqueEmail("ghost"), password: PASSWORD } });
+    expect(result.status).toBe(401);
+    expect(result.body.error.code).toBe("invalid_credentials");
+    const jar = new Jar();
+    const { email } = await createAccount(true);
+    for (let i = 0; i < 3; i += 1) await call(login, LOGIN, { jar, body: { email, password: ["wrong", "wrong", "1"].join("-") } });
+    vi.mocked(verifyTurnstile).mockResolvedValueOnce({ ok: false, codes: ["invalid-input-response"] });
+    const refused = await call<ErrorBody>(login, LOGIN, { jar, body: { email, password: PASSWORD, turnstileToken: "bad" } });
+    expect(refused.status).toBe(403);
+    expect(refused.body.error.code).toBe("turnstile_failed");
+  });
+
+  it("refuses a disabled account and keeps staff accounts off the public host", async () => {
+    const { email, uid } = await createAccount(true);
+    await auth().updateUser(uid!, { disabled: true });
+    const disabled = await call<ErrorBody>(login, LOGIN, { jar: new Jar(), body: { email, password: PASSWORD } });
+    expect(disabled.status).toBe(403);
+    expect(disabled.body.error.code).toBe("account_disabled");
+
+    const staff = await createAccount(true, "Staff Member");
+    await setClaims(staff.uid!, { role: "moderator" });
+    const refused = await call<ErrorBody>(login, LOGIN, { jar: new Jar(), body: { email: staff.email, password: PASSWORD } });
+    expect(refused.status).toBe(403);
+    expect(refused.body.error.code).toBe("forbidden");
+  });
+});

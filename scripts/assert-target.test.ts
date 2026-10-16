@@ -136,6 +136,17 @@ describe("assertTargets", () => {
     STRIPE_SECRET_KEY: "rk_test_x",
   };
 
+  it("accepts the emulators' demo project in dev only", () => {
+    const emulator = { APP_ENV: "dev", FIREBASE_PROJECT_ID: "demo-joutiya", GCLOUD_PROJECT: "demo-joutiya", FIREBASE_CONFIG: '{"projectId":"demo-joutiya"}' };
+    const targets = recorded();
+    targets.environments.dev.firebase.projectId = null;
+    assert.deepEqual(assertTargets(targets, emulator), []);
+    assert.ok(assertTargets(targets, { ...emulator, FIREBASE_PROJECT_ID: "joutiya-dev" }).some((e) => e.includes("FIREBASE_PROJECT_ID is set but")));
+    const outsideDev = assertTargets(recorded(), { ...emulator, APP_ENV: "staging" });
+    assert.ok(outsideDev.some((e) => e.includes("FIREBASE_PROJECT_ID does not match")));
+    assert.ok(outsideDev.some((e) => e.includes("FIREBASE_CONFIG does not match")));
+  });
+
   it("passes when nothing is configured", () => {
     assert.deepEqual(assertTargets(recorded(), {}), []);
   });

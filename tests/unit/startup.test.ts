@@ -19,7 +19,8 @@ describe("startupReport", () => {
     expect(fatal.some((problem) => problem.startsWith("LOG_LEVEL:"))).toBe(true);
     expect(fatal.some((problem) => problem.includes("required in strict mode"))).toBe(true);
     expect(fatal.some((problem) => problem.startsWith("CSP hash hook not loaded"))).toBe(true);
-    expect(warnings).toEqual([]);
+    // Recommended-but-missing variables are warnings; a parse error never is.
+    expect(warnings.every((warning) => / is not set: /.test(warning))).toBe(true);
     expect((await startupReport("worker", { APP_ENV: "production" })).fatal.some((problem) => problem.startsWith("APP_ENV:"))).toBe(true);
   });
 

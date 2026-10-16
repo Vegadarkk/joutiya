@@ -6,10 +6,13 @@ import { hasLocale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import { RootShell } from "@/components/layout/root-shell";
+import { publicConfig } from "@/lib/config/public";
 import { rootMetadata } from "@/lib/i18n/metadata";
 
-// Private pages (auth, account, Pro): dynamic rendering with the per-request nonce (§1, §6).
-// Session guards arrive with phase 2; this layout is not an authorization barrier.
+// Private pages (auth, account, Pro): dynamic rendering with the per-request nonce (§1, §6), and
+// the runtime browser configuration (Turnstile, Google, Firebase) handed to the client from here
+// (§2: one image for staging and prod). Not an authorization barrier: (account)/layout.tsx and
+// every API route run their own guards.
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
@@ -23,7 +26,7 @@ export default async function PrivateLayout({ children, params }: { children: Re
   setRequestLocale(locale);
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
-    <RootShell locale={locale} nonce={nonce}>
+    <RootShell locale={locale} nonce={nonce} config={publicConfig()}>
       {children}
     </RootShell>
   );

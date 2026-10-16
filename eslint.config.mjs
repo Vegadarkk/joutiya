@@ -24,6 +24,14 @@ export default defineConfig([
     },
   },
   {
+    // zod must be configured (jitless, CSP) before the first schema is defined: src/lib/zod.ts.
+    files: ["src/**"],
+    ignores: ["src/lib/zod.ts"],
+    rules: {
+      "no-restricted-imports": ["error", { paths: [{ name: "zod", message: "Import zod from @/lib/zod (CSP: jitless must be set first)." }] }],
+    },
+  },
+  {
     // Scripts and tests print on purpose.
     files: ["scripts/**", "tests/**", "**/*.test.ts", "workers/**"],
     rules: { "no-console": "off" },

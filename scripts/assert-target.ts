@@ -100,6 +100,15 @@ const serviceAccount = (variable: string): Binding => ({
   normalize: (value) => SERVICE_ACCOUNT.exec(value)?.[1] ?? "",
 });
 
+/**
+ * Firebase's emulator convention: a project id starting with "demo-" is never a real project, so
+ * the emulators refuse to reach Google for it. Accepted in dev only (local runs, tests, CI).
+ */
+const DEMO_PROJECT = /^demo-[a-z0-9-]+$/;
+function isDemoProject(appEnv: AppEnv, projectId: unknown): boolean {
+  return appEnv === "dev" && typeof projectId === "string" && DEMO_PROJECT.test(projectId);
+}
+
 // Configured identifiers checked against the targets of APP_ENV.
 // GOOGLE_CLOUD_PROJECT, GCLOUD_PROJECT and CLOUDSDK_CORE_PROJECT are read implicitly by Google
 // tools, CLOUDFLARE_ACCOUNT_ID by Wrangler.
@@ -397,6 +406,7 @@ export function assertTargets(targets: Targets, env: Env, options: AssertOptions
   }
   for (const binding of configured) {
     const target = binding.target.replace("<env>", appEnv);
+    if (binding.target === "environments.<env>.firebase.projectId" && !binding.shape && isDemoProject(appEnv, value(binding.variable))) continue;
     if (binding.shape && !binding.shape.pattern.test(value(binding.variable))) {
       errors.push(`${binding.variable} must be ${binding.shape.description}`);
       continue;
@@ -421,7 +431,7 @@ export function assertTargets(targets: Targets, env: Env, options: AssertOptions
   const credentials = value("GOOGLE_APPLICATION_CREDENTIALS");
   if (credentials !== "") errors.push(...projectFileErrors("GOOGLE_APPLICATION_CREDENTIALS", credentials, expectedProject, appEnv, options));
   const firebaseConfig = value("FIREBASE_CONFIG");
-  if (firebaseConfig !== "") {
+  if (firebaseConfig !== "" && !(firebaseConfig.startsWith("{") && isDemoProject(appEnv, parseJson(firebaseConfig)?.projectId))) {
     if (expectedProject === null) {
       errors.push(`FIREBASE_CONFIG is set but environments.${appEnv}.firebase.projectId is not recorded in infra/targets.json`);
     } else if (firebaseConfig.startsWith("{")) {

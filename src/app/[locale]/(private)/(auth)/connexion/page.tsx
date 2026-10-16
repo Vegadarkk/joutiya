@@ -1,36 +1,39 @@
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
-import { Link } from "@/i18n/navigation";
-import { Container } from "@/components/layout/container";
-import { EmptyState } from "@/components/feedback/empty-state";
-import { Button } from "@/components/ui/button";
+import { headers } from "next/headers";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { AuthShell } from "@/components/auth/auth-shell";
+import { LoginForm } from "@/components/auth/login-form";
+import { Link, redirect } from "@/i18n/navigation";
 import { pageLocale } from "@/i18n/params";
-
-// Placeholder until phase 2 (Firebase Auth, sessions).
+import { currentMember } from "@/lib/auth/current-user";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const locale = pageLocale((await params).locale);
-  const t = await getTranslations({ locale, namespace: "Nav" });
-  return { title: t("signIn") };
+  const t = await getTranslations({ locale, namespace: "Auth.signIn" });
+  return { title: t("title") };
 }
 
 export default async function SignInPage({ params }: { params: Promise<{ locale: string }> }) {
   const locale = pageLocale((await params).locale);
-  const t = await getTranslations({ locale, namespace: "Private" });
-  const nav = await getTranslations({ locale, namespace: "Search" });
+  setRequestLocale(locale);
+  // Already signed in: nothing to do here.
+  if (await currentMember()) redirect({ href: "/parametres", locale });
+  const t = await getTranslations({ locale, namespace: "Auth.signIn" });
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
-    <Container>
-      <EmptyState
-        headingLevel="h1"
-        title={t("signInTitle")}
-        action={
-          <Button asChild variant="outline">
-            <Link href="/">{nav("backHome")}</Link>
-          </Button>
-        }
-      >
-        {t("signInBody")}
-      </EmptyState>
-    </Container>
+    <AuthShell
+      title={t("title")}
+      lead={t("lead")}
+      footer={
+        <p>
+          {t("noAccount")}{" "}
+          <Link href="/inscription" className="font-medium text-link underline-offset-2 hover:underline">
+            {t("create")}
+          </Link>
+        </p>
+      }
+    >
+      <LoginForm nonce={nonce} />
+    </AuthShell>
   );
 }

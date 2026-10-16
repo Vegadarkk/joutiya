@@ -3,8 +3,10 @@ import type { Alert, AlertChannel } from "./types";
 
 /**
  * E-mail through the uptime Worker (workers/uptime-probe): it relays signed alerts to the
- * owner's verified address with Cloudflare's free send_email binding. Independent of Resend,
- * so quota or outage there never silences an alert.
+ * owner's address through the Resend API, with a Resend key of its own that never sits on the
+ * VM. The Worker answers within 6 s, inside the 8 s timeout below, and caps relayed e-mails per
+ * day (429) so a flood cannot spend the site's shared Resend quota. Telegram, called directly by
+ * alert(), stays the guaranteed channel: a relay failure is logged and never blocks it.
  */
 export class RelayEmailChannel implements AlertChannel {
   readonly name = "email";

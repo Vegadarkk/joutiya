@@ -1,6 +1,7 @@
-import { CirclePlus, Search, UserRound } from "lucide-react";
+import { CirclePlus, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
+import { AccountMenu } from "@/components/auth/account-menu";
 import { Button } from "@/components/ui/button";
 import { inputClassName } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -47,13 +48,8 @@ export function SiteHeader({ locale }: { locale: string }) {
               <CirclePlus className="text-primary" aria-hidden="true" />
             </Link>
           </Button>
-          <Button asChild variant="ghost" className="px-2 md:px-3">
-            <Link href="/connexion">
-              <UserRound aria-hidden="true" />
-              <span className="hidden sm:inline">{t("signIn")}</span>
-              <span className="sr-only sm:hidden">{t("signIn")}</span>
-            </Link>
-          </Button>
+          {/* Anonymous first on every page (public pages are static); swaps after /api/auth/me. */}
+          <AccountMenu />
         </div>
       </Container>
     </header>

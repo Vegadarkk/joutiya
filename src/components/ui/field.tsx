@@ -30,10 +30,15 @@ export function Field({ label, hint, error, required, className, children }: Fie
     : children;
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <label htmlFor={id} className="text-sm font-medium text-foreground">
-        {label}
-        {required ? <span className="ms-0.5 text-danger" aria-hidden="true">*</span> : null}
-      </label>
+      {/* The marker sits outside the <label>, so the accessible name stays exactly the label text. */}
+      <span className="text-sm font-medium text-foreground">
+        <label htmlFor={id}>{label}</label>
+        {required ? (
+          <span className="ms-0.5 text-danger" aria-hidden="true">
+            *
+          </span>
+        ) : null}
+      </span>
       {control}
       {error ? (
         <InlineError id={errorId}>{error}</InlineError>

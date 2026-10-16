@@ -27,9 +27,20 @@ export default defineConfig({
     env: {
       PORT: String(PORT),
       APP_ENV: "dev",
-      NEXT_PUBLIC_SITE_URL: baseURL,
+      SITE_URL: baseURL,
       // Chromium resolves *.localhost to the loopback address.
       ADMIN_HOST: "admin.localhost",
+      // Firebase emulators (npm run test:e2e runs inside `firebase emulators:exec`): demo project.
+      FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID ?? "demo-joutiya",
+      FIREBASE_API_KEY: process.env.FIREBASE_API_KEY ?? "fake-api-key",
+      FIREBASE_AUTH_EMULATOR_HOST: process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9099",
+      FIRESTORE_EMULATOR_HOST: process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8080",
+      // Sent mails stay in memory and are read back by the tests at /api/dev/mailbox.
+      DEV_MAILBOX: "true",
+      // Turnstile test keys: always pass (Cloudflare's documented dummy pair).
+      TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+      TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
+      METADATA_SERVER_DETECTION: "none",
     },
   },
 });

@@ -28,6 +28,7 @@ export async function startupReport(service: Service, env: Record<string, string
   const deployed = rawAppEnv !== "" && rawAppEnv !== "dev";
 
   (deployed ? fatal : warnings).push(...parsed.errors);
+  warnings.push(...parsed.warnings);
 
   const fileErrors = validateTargets(targets);
   if (fileErrors.length > 0) fatal.push(...fileErrors.map((error) => `infra/targets.json: ${error}`));

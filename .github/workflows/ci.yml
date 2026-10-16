@@ -48,6 +48,8 @@ jobs:
       - run: npm test
       - name: Firestore rules (emulator)
         run: npm run test:rules
+      - name: API tests (Auth + Firestore emulators)
+        run: npm run test:api
       - name: VM scripts
         run: shellcheck infra/vm/*.sh
       - name: Compose projects
@@ -68,6 +70,11 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      # Auth and Firestore emulators around the e2e run (test:e2e wraps `firebase emulators:exec`).
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
       - run: npm ci --ignore-scripts
       - run: npm run build
       - run: npx playwright install --with-deps chromium

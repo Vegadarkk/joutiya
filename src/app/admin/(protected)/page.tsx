@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { QUOTAS } from "@/config/quotas";
 import { Badge } from "@/components/ui/badge";
-import { Logo } from "@/components/layout/logo";
 import { readQuotas, type QuotaStatus } from "@/lib/quota";
 
-// Phase 1: the free-quota board (§2). Moderation, reports and settings arrive with phase 5.
+// The free-quota board (§2), home of the signed-in back office. Moderation, reports and settings
+// arrive with phase 5.
+
+export const metadata: Metadata = { title: "Quotas" };
 
 const LEVEL = {
   ok: { label: "Normal", variant: "success" },
@@ -24,12 +27,8 @@ function amount(status: QuotaStatus): string {
 export default async function AdminHome() {
   const quotas = await readQuotas();
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">
-      <header className="flex items-center justify-between gap-4 border-b border-border pb-4">
-        <Logo label="Joutiya" className="h-10" />
-        <Badge variant="pro">Back-office</Badge>
-      </header>
-      <main className="flex flex-col gap-4">
+    <>
+      <section className="flex flex-col gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Quotas gratuits</h1>
           <p className="mt-1 text-sm text-foreground-muted">
@@ -66,7 +65,7 @@ export default async function AdminHome() {
             </tbody>
           </table>
         </div>
-      </main>
-    </div>
+      </section>
+    </>
   );
 }

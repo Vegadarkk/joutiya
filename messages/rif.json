@@ -4,5 +4,36 @@
   },
   "Legal": {
     "frenchPrevails": "Les textes légaux font foi en français. Un résumé en tarifit sera ajouté après relecture par un locuteur natif."
+  },
+  "Auth": {
+    "common": {
+      "email": "Imayl",
+      "password": "Awal uffir",
+      "or": "niɣ",
+      "backHome": "Dwel ɣer usebter amezwaru"
+    },
+    "signIn": {
+      "title": "Kcem",
+      "submit": "Kcem",
+      "create": "Snulfu-d amiḍan"
+    },
+    "signUp": {
+      "title": "Snulfu-d amiḍan",
+      "submit": "Snulfu-d amiḍan-inu",
+      "signIn": "Kcem"
+    },
+    "settings": {
+      "title": "Iɣewwaṛen-inu",
+      "signOut": "Ffeɣ"
+    },
+    "verifications": {
+      "openWhatsApp": "Ṛẓem WhatsApp",
+      "phone": "Uṭṭun n utilifun"
+    },
+    "menu": {
+      "account": "Amiḍan-inu",
+      "settings": "Iɣewwaṛen-inu",
+      "signOut": "Ffeɣ"
+    }
   }
 }

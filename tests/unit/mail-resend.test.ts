@@ -1,0 +1,164 @@
+import { describe, expect, it, vi } from "vitest";
+import { ProviderError } from "@/lib/mail/transports/errors";
+import { RESEND_ENDPOINT, ResendTransport, resendTags } from "@/lib/mail/transports/resend";
+import { BREVO_ENDPOINT, BrevoTransport } from "@/lib/mail/transports/brevo";
+import type { RenderedMail } from "@/lib/mail/types";
+
+const MAIL: RenderedMail = {
+  from: "Joutiya <no-reply@notif.joutiya.ma>",
+  to: "nadia@example.com",
+  subject: "Confirme ton adresse e-mail",
+  text: "Bonjour",
+  html: "<p>Bonjour</p>",
+  tags: { template: "verifyEmail", env: "staging" },
+  meta: { template: "verifyEmail", locale: "fr", data: { displayName: "Nadia", actionUrl: "https://x" } },
+};
+
+type Call = { url: string; init: RequestInit };
+
+function fetchMock(response: Response | (() => Response)) {
+  const calls: Call[] = [];
+  const fn = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(url), init: init ?? {} });
+    return typeof response === "function" ? response() : response;
+  });
+  return { fn: fn as unknown as typeof fetch, calls };
+}
+
+const jsonResponse = (status: number, body: unknown, headers: Record<string, string> = {}) =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
+
+describe("ResendTransport", () => {
+  it("posts the documented body with auth, user agent and idempotency key", async () => {
+    const { fn, calls } = fetchMock(jsonResponse(200, { id: "49a3999c-0ce1-4ea6-ab68-afcd6dc2e794" }));
+    const result = await new ResendTransport("re_test_key", fn, "joutiya/1.2.3").send(MAIL, "verify-uid-1");
+    expect(result).toEqual({ provider: "resend", id: "49a3999c-0ce1-4ea6-ab68-afcd6dc2e794" });
+    expect(calls).toHaveLength(1);
+    const [call] = calls as [Call];
+    expect(call.url).toBe(RESEND_ENDPOINT);
+    expect(call.init.method).toBe("POST");
+    const headers = call.init.headers as Record<string, string>;
+    expect(headers["Authorization"]).toBe("Bearer re_test_key");
+    expect(headers["Content-Type"]).toBe("application/json");
+    expect(headers["User-Agent"]).toBe("joutiya/1.2.3");
+    expect(headers["Idempotency-Key"]).toBe("verify-uid-1");
+    expect(call.init.signal).toBeInstanceOf(AbortSignal);
+    expect(JSON.parse(String(call.init.body))).toEqual({
+      from: MAIL.from,
+      to: [MAIL.to],
+      subject: MAIL.subject,
+      html: MAIL.html,
+      text: MAIL.text,
+      tags: [
+        { name: "template", value: "verifyEmail" },
+        { name: "env", value: "staging" },
+      ],
+    });
+  });
+
+  it("omits the idempotency header and adds reply_to and headers when given", async () => {
+    const { fn, calls } = fetchMock(jsonResponse(200, { id: "x" }));
+    await new ResendTransport("re_test_key", fn, "ua").send({ ...MAIL, replyTo: "contact@joutiya.ma", headers: { "X-Entity-Ref-ID": "1" }, tags: undefined });
+    const [call] = calls as [Call];
+    expect((call.init.headers as Record<string, string>)["Idempotency-Key"]).toBeUndefined();
+    const body = JSON.parse(String(call.init.body));
+    expect(body.reply_to).toBe("contact@joutiya.ma");
+    expect(body.headers).toEqual({ "X-Entity-Ref-ID": "1" });
+    expect(body.tags).toBeUndefined();
+  });
+
+  it("marks 429 as retryable with Retry-After and 5xx as retryable", async () => {
+    const limited = fetchMock(jsonResponse(429, { name: "daily_quota_exceeded", message: "You have reached your daily email sending quota.", statusCode: 429 }, { "retry-after": "3600" }));
+    const error = await new ResendTransport("k", limited.fn, "ua").send(MAIL).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ProviderError);
+    const provider = error as ProviderError;
+    expect(provider.retryable).toBe(true);
+    expect(provider.status).toBe(429);
+    expect(provider.retryAfterSeconds).toBe(3600);
+    expect(provider.message).toContain("daily_quota_exceeded");
+    expect(provider.message).not.toContain("k");
+
+    const down = fetchMock(new Response("<html>bad gateway</html>", { status: 502 }));
+    const second = (await new ResendTransport("k", down.fn, "ua").send(MAIL).catch((caught: unknown) => caught)) as ProviderError;
+    expect(second.retryable).toBe(true);
+    expect(second.status).toBe(502);
+  });
+
+  it("marks 422 and 403 as not retryable", async () => {
+    for (const status of [422, 403, 401]) {
+      const { fn } = fetchMock(jsonResponse(status, { name: "validation_error", message: "Invalid `to` field", statusCode: status }));
+      const error = (await new ResendTransport("k", fn, "ua").send(MAIL).catch((caught: unknown) => caught)) as ProviderError;
+      expect(error).toBeInstanceOf(ProviderError);
+      expect(error.retryable).toBe(false);
+      expect(error.status).toBe(status);
+    }
+  });
+
+  it("treats a concurrent idempotent request as retryable, a conflicting one as final", async () => {
+    const inFlight = fetchMock(jsonResponse(409, { name: "concurrent_idempotent_requests", statusCode: 409 }));
+    expect(((await new ResendTransport("k", inFlight.fn, "ua").send(MAIL, "a").catch((e: unknown) => e)) as ProviderError).retryable).toBe(true);
+    const conflict = fetchMock(jsonResponse(409, { name: "invalid_idempotent_request", statusCode: 409 }));
+    expect(((await new ResendTransport("k", conflict.fn, "ua").send(MAIL, "a").catch((e: unknown) => e)) as ProviderError).retryable).toBe(false);
+  });
+
+  it("wraps network failures as retryable", async () => {
+    const fn = vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    }) as unknown as typeof fetch;
+    const error = (await new ResendTransport("k", fn, "ua").send(MAIL).catch((caught: unknown) => caught)) as ProviderError;
+    expect(error).toBeInstanceOf(ProviderError);
+    expect(error.retryable).toBe(true);
+    expect(error.status).toBeUndefined();
+  });
+
+  it("reads the quota headers tolerantly", async () => {
+    const plain = fetchMock(jsonResponse(200, { id: "a" }, { "x-resend-daily-quota": "42", "x-resend-monthly-quota": "1200" }));
+    expect((await new ResendTransport("k", plain.fn, "ua").send(MAIL)).quota).toEqual({ daily: 42, monthly: 1200 });
+    const odd = fetchMock(jsonResponse(200, { id: "a" }, { "x-resend-daily-quota": "7/100", "x-resend-monthly-quota": "n/a" }));
+    expect((await new ResendTransport("k", odd.fn, "ua").send(MAIL)).quota).toEqual({ daily: 7 });
+    const none = fetchMock(jsonResponse(200, { id: "a" }));
+    expect((await new ResendTransport("k", none.fn, "ua").send(MAIL)).quota).toBeUndefined();
+    const broken = fetchMock(new Response("not json", { status: 200 }));
+    expect(await new ResendTransport("k", broken.fn, "ua").send(MAIL)).toEqual({ provider: "resend", id: "" });
+  });
+
+  it("cleans tags to Resend's alphabet", () => {
+    expect(resendTags({ template: "verify Email", env: "prod" })).toEqual([
+      { name: "template", value: "verify_Email" },
+      { name: "env", value: "prod" },
+    ]);
+    expect(resendTags(undefined)).toBeUndefined();
+    expect(resendTags({ empty: "" })).toBeUndefined();
+  });
+});
+
+describe("BrevoTransport", () => {
+  it("posts the Brevo body with the api-key header", async () => {
+    const { fn, calls } = fetchMock(jsonResponse(201, { messageId: "<202610161030.1@relay.brevo.com>" }));
+    const result = await new BrevoTransport("xkeysib-test", fn, "joutiya/1.2.3").send(MAIL);
+    expect(result).toEqual({ provider: "brevo", id: "<202610161030.1@relay.brevo.com>" });
+    const [call] = calls as [Call];
+    expect(call.url).toBe(BREVO_ENDPOINT);
+    const headers = call.init.headers as Record<string, string>;
+    expect(headers["api-key"]).toBe("xkeysib-test");
+    expect(headers["Content-Type"]).toBe("application/json");
+    expect(headers["User-Agent"]).toBe("joutiya/1.2.3");
+    const body = JSON.parse(String(call.init.body));
+    expect(body.sender).toEqual({ name: "Joutiya", email: "no-reply@notif.joutiya.ma" });
+    expect(body.to).toEqual([{ email: MAIL.to }]);
+    expect(body.subject).toBe(MAIL.subject);
+    expect(body.htmlContent).toBe(MAIL.html);
+    expect(body.textContent).toBe(MAIL.text);
+    expect(body.tags).toEqual(["template:verifyEmail", "env:staging"]);
+  });
+
+  it("classifies Brevo errors", async () => {
+    const limited = fetchMock(jsonResponse(429, { code: "too_many_requests", message: "Rate limit" }, { "x-sib-ratelimit-reset": "12" }));
+    const error = (await new BrevoTransport("k", limited.fn, "ua").send(MAIL).catch((e: unknown) => e)) as ProviderError;
+    expect(error.retryable).toBe(true);
+    expect(error.retryAfterSeconds).toBe(12);
+    expect(error.message).toContain("too_many_requests");
+    const bad = fetchMock(jsonResponse(400, { code: "invalid_parameter", message: "sender" }));
+    expect(((await new BrevoTransport("k", bad.fn, "ua").send(MAIL).catch((e: unknown) => e)) as ProviderError).retryable).toBe(false);
+  });
+});

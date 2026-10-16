@@ -1,5 +1,6 @@
 // Pure logic of the uptime probe (tested in Node): probe verdicts, state transitions, the signed
-// alert relay and the MIME message. No Workers runtime import here.
+// alert relay and the Resend e-mail call. No Workers runtime import or type here: the root
+// tsconfig excludes workers/, so this file must also compile with the app's types (tests/unit).
 
 export type Severity = "P0" | "P1" | "P2" | "info";
 export type Status = "up" | "degraded" | "down";
@@ -25,10 +26,23 @@ export interface ProbeState {
   since: number;
 }
 
+/** The KV subset used here (structurally matches the Workers KVNamespace binding). */
+export interface KeyValue {
+  get(key: string): Promise<string | null>;
+  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+}
+
 /** Probes that must agree before a change is announced (5-minute cron: about 10 minutes). */
 export const CONFIRMATIONS = 2;
 /** Signed relay requests older than this are refused (replay window). */
 export const MAX_SKEW_SECONDS = 300;
+/** Relayed app alerts e-mailed per UTC day: a flood must not spend the site's shared Resend quota (100/day). */
+export const RELAY_DAILY_CAP = 20;
+export const RESEND_URL = "https://api.resend.com/emails";
+/** Resend refuses requests without a User-Agent (403, Cloudflare error 1010); workerd sets none. */
+const RESEND_USER_AGENT = "joutiya-uptime-probe";
+/** Daily KV markers outlive their day by one, then expire. */
+const DAY_MARKER_TTL_SECONDS = 2 * 86_400;
 
 export function parseTargets(raw: string | undefined): Target[] {
   try {
@@ -137,29 +151,159 @@ export function alertText(alert: Alert): string {
   return `${ICON[alert.severity]} ${prefix}${alert.severity} · ${alert.title}\n\n${alert.body}`;
 }
 
-function base64(text: string): string {
-  let binary = "";
-  for (const byte of encoder.encode(text)) binary += String.fromCharCode(byte);
-  return btoa(binary);
+export interface EmailPayload {
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
 }
 
-/** RFC 5322 plain-text message. Header values are encoded, so alert text cannot inject headers. */
-export function mime(from: string, to: string, alert: Alert, now: Date, id: string): string {
-  const subject = `Joutiya ${alert.env && alert.env !== "prod" ? `[${alert.env}] ` : ""}${alert.severity} · ${alert.title}`;
-  const domain = from.split("@")[1] ?? "joutiya.ma";
-  const body = base64(alertText(alert)).replace(/.{1,76}/g, "$&\r\n");
-  return [
-    `From: Joutiya alertes <${from}>`,
-    `To: <${to}>`,
-    `Subject: =?UTF-8?B?${base64(subject)}?=`,
-    `Date: ${now.toUTCString().replace("GMT", "+0000")}`,
-    `Message-ID: <${id}@${domain}>`,
-    "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
-    "Content-Transfer-Encoding: base64",
-    "",
-    body,
-  ].join("\r\n");
+/** Resend request body. The subject stays one line whatever the alert carries (title and env come from the sender). */
+export function emailPayload(from: string, to: string, alert: Alert): EmailPayload {
+  const prefix = alert.env && alert.env !== "prod" ? `[${alert.env}] ` : "";
+  const subject = `Joutiya ${prefix}${alert.severity} · ${alert.title}`.replace(/[\r\n]+/g, " ");
+  return { from, to, subject, text: alertText(alert) };
+}
+
+/**
+ * Resend settings, or null when e-mail is off (both unset: the Worker exists before the app is
+ * configured). Exactly one set is a configuration error.
+ */
+export function emailSettings(to: string | undefined, apiKey: string | undefined): { to: string; apiKey: string } | null {
+  if (!to && !apiKey) return null;
+  if (!to || !apiKey) throw new Error("e-mail alerts misconfigured: ALERT_EMAIL_TO and RESEND_API_KEY must both be set");
+  return { to, apiKey };
+}
+
+export interface SendOptions {
+  /** Retry once on 429 rate_limit_exceeded. Cron path only: the relay must answer within the app's timeout. */
+  retryRateLimit?: boolean;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/** Used-quota headers of the free plan (value format undocumented: logged, never parsed). */
+export interface SendResult {
+  dailyQuota: string | null;
+  monthlyQuota: string | null;
+}
+
+const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Resend's error name when the body carries a plain identifier; the body itself is never surfaced. */
+async function errorName(response: Response): Promise<string | null> {
+  try {
+    const value = (await response.json()) as { name?: unknown };
+    return typeof value.name === "string" && /^[a-z_]{1,48}$/.test(value.name) ? value.name : null;
+  } catch {
+    return null;
+  }
+}
+
+async function failure(response: Response): Promise<Error> {
+  const name = await errorName(response);
+  return new Error(`resend: HTTP ${response.status}${name ? ` ${name}` : ""}`);
+}
+
+/** Resend's Retry-After, capped at 2 s (10 requests/s per team: the wait is short by nature). */
+function retryDelayMs(retryAfter: string | null): number {
+  const seconds = Number(retryAfter);
+  return Math.min(Number.isFinite(seconds) && seconds > 0 ? seconds : 2, 2) * 1000;
+}
+
+/**
+ * POST https://api.resend.com/emails. Errors read `resend: HTTP <status> <name>` or
+ * `resend: <error name>`: never the key, never the response body, never a fetch error message
+ * (it may echo request headers). A 3xx is a failure (redirect: "manual").
+ */
+export async function sendViaResend(
+  fetchImpl: typeof fetch,
+  apiKey: string,
+  payload: EmailPayload,
+  idempotencyKey: string,
+  timeoutMs: number,
+  options: SendOptions = {},
+): Promise<SendResult> {
+  const init: RequestInit = {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey.trim()}`,
+      "Content-Type": "application/json",
+      "User-Agent": RESEND_USER_AGENT,
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify(payload),
+    redirect: "manual",
+  };
+  const attempt = async (): Promise<Response> => {
+    try {
+      return await fetchImpl(RESEND_URL, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    } catch (error) {
+      throw new Error(`resend: ${error instanceof Error ? error.name : "fetch failed"}`);
+    }
+  };
+
+  let response = await attempt();
+  if (response.status === 429) {
+    const name = await errorName(response);
+    // Quota errors (daily_quota_exceeded, monthly_quota_exceeded) are final until the reset.
+    if (name !== "rate_limit_exceeded" || !options.retryRateLimit) throw new Error(`resend: HTTP 429${name ? ` ${name}` : ""}`);
+    await (options.sleep ?? defaultSleep)(retryDelayMs(response.headers.get("retry-after")));
+    response = await attempt();
+  }
+  if (!response.ok) throw await failure(response);
+  await response.body?.cancel();
+  return { dailyQuota: response.headers.get("x-resend-daily-quota"), monthlyQuota: response.headers.get("x-resend-monthly-quota") };
+}
+
+export function utcDay(nowMs: number): string {
+  return new Date(nowMs).toISOString().slice(0, 10);
+}
+
+/** True the first time `name` is seen on the current UTC day (one notice a day). */
+export async function markOncePerDay(kv: KeyValue, name: string, nowMs: number): Promise<boolean> {
+  const key = `${name}:${utcDay(nowMs)}`;
+  if (await kv.get(key)) return false;
+  await kv.put(key, "1", { expirationTtl: DAY_MARKER_TTL_SECONDS });
+  return true;
+}
+
+/** Takes one of today's relayed e-mail slots; false once the cap is reached. */
+export async function takeRelaySlot(kv: KeyValue, nowMs: number, cap = RELAY_DAILY_CAP): Promise<boolean> {
+  const key = `relay-count:${utcDay(nowMs)}`;
+  const used = Number((await kv.get(key)) ?? "0");
+  if (used >= cap) return false;
+  await kv.put(key, String(used + 1), { expirationTtl: DAY_MARKER_TTL_SECONDS });
+  return true;
+}
+
+export interface RelayDeps {
+  /** ALERT_RELAY_SECRET; empty refuses every request. */
+  secret: string;
+  nowMs: number;
+  maxBytes: number;
+  /** E-mails the alert; false when today's relay cap refuses it. Throws when sending fails. */
+  send(alert: Alert, idempotencyKey: string): Promise<boolean>;
+}
+
+/** POST /alert, signed by the app (src/lib/alert/relay.ts): 204 sent, 429 capped, 502 send failed. */
+export async function relay(request: Request, deps: RelayDeps): Promise<Response> {
+  if (Number(request.headers.get("content-length") ?? "0") > deps.maxBytes) return new Response(null, { status: 413 });
+  // Chunked bodies carry no Content-Length: the read itself is capped, before any signature work.
+  const body = await readCapped(request.body, deps.maxBytes);
+  if (body === null) return new Response(null, { status: 413 });
+  const signature = request.headers.get("X-Joutiya-Signature");
+  const valid = await verifySignature(deps.secret, request.headers.get("X-Joutiya-Timestamp"), signature, body, Math.floor(deps.nowMs / 1000));
+  if (!valid || !signature) return new Response(null, { status: 401 });
+  const alert = parseAlert(body);
+  if (!alert) return new Response(null, { status: 400 });
+  try {
+    // Keyed on the signature: a replay inside the 300 s window reaches Resend with the same key and body, so it is sent once.
+    const sent = await deps.send(alert, `relay/${signature.toLowerCase()}`);
+    return new Response(null, { status: sent ? 204 : 429 });
+  } catch (error) {
+    console.error(`email: ${(error as Error).message}`);
+    return new Response(null, { status: 502 });
+  }
 }
 
 /** Text of `body`, or null as soon as it exceeds `max` bytes: an oversized body is never held in memory. */

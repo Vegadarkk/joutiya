@@ -8,7 +8,7 @@ const request = (path: string, host = "joutiya.ma") => new NextRequest(`https://
 beforeEach(() => {
   vi.stubEnv("ADMIN_HOST", "admin.joutiya.ma");
   vi.stubEnv("APP_ENV", "prod");
-  vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://joutiya.ma");
+  vi.stubEnv("SITE_URL", "https://joutiya.ma");
 });
 afterEach(() => vi.unstubAllEnvs());
 

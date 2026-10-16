@@ -10,6 +10,7 @@ Architecture v3 validée le 12 octobre 2026.
 
 - Phase 0 : ouverture des comptes gratuits dédiés à Joutiya, pas à pas dans [`docs/phase-0.md`](docs/phase-0.md).
 - Phase 1 (fondations) : le code est prêt ; la mise en ligne se fait pas à pas avec [`docs/phase-1.md`](docs/phase-1.md). Pour reconstruire la VM : [`infra/redeploy.md`](infra/redeploy.md).
+- Phase 2 (comptes, connexion Google, vérification WhatsApp, back-office, e-mails, Sentry) : le code est prêt ; le branchement des services se fait pas à pas avec [`docs/phase-2.md`](docs/phase-2.md). Tests locaux : `npm run check`, puis `npm run test:api`, `npm run test:rules` et `npm run build && npm run test:e2e` (émulateurs Firebase, Java 21).
 
 ## Sécurité du dépôt
 
