@@ -126,6 +126,7 @@ describe("r2-buckets.json", () => {
   it("flags another environment's origin, a write on media and a rule that would empty a private bucket", () => {
     const settings: R2Settings = {
       jurisdiction: "eu",
+      defaultMultipartAbort: { name: "Default Multipart Abort Rule", abortAfterDays: 7 },
       buckets: {
         "joutiya-staging-quarantine": { cors: [{ AllowedOrigins: ["https://joutiya.ma"], AllowedMethods: ["PUT"] }] },
         "joutiya-prod-media": { cors: [{ AllowedOrigins: ["https://joutiya.ma"], AllowedMethods: ["GET", "PUT"] }] },
@@ -153,6 +154,7 @@ describe("preflightErrors", () => {
       "access-control-allow-headers": "content-type",
       "access-control-max-age": "3600",
     });
+    expect(preflightErrors(rule, "https://joutiya.ma", "PUT", 204, headers)).toEqual([]);
     expect(preflightErrors(rule, "https://joutiya.ma", "PUT", 200, headers)).toEqual([]);
   });
 

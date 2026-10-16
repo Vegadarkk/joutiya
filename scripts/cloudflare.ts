@@ -322,6 +322,8 @@ export interface R2CorsRule {
 }
 export interface R2Settings {
   jurisdiction: string;
+  /** Cloudflare's own rule on every bucket, kept: a lifecycle PUT by API would have to repeat it. */
+  defaultMultipartAbort: { name: string; abortAfterDays: number };
   buckets: Record<string, { cors?: R2CorsRule[]; lifecycle?: { name: string; prefix: string; deleteAfterDays: number }[] }>;
 }
 type BucketRole = keyof EnvTargets["r2"];
@@ -361,9 +363,12 @@ export function validateR2(settings: R2Settings, targets: Targets): string[] {
   return errors;
 }
 
+/** Browsers accept any 2xx answer to a preflight; R2 sends 204. */
+const okStatus = (status: number): boolean => status >= 200 && status <= 299;
+
 /** What a preflight answer lacks to let `origin` send `method` under `rule`; [] when it is allowed. */
 export function preflightErrors(rule: R2CorsRule, origin: string, method: string, status: number, headers: Headers): string[] {
-  if (status !== 200) return [`HTTP ${status}`];
+  if (!okStatus(status)) return [`HTTP ${status}`];
   const list = (name: string) => (headers.get(name) ?? "").split(",").map((value) => value.trim().toLowerCase());
   const errors: string[] = [];
   if (headers.get("access-control-allow-origin") !== origin) errors.push(`allow-origin ${headers.get("access-control-allow-origin") ?? "missing"}`);
@@ -404,11 +409,12 @@ async function checkR2(targets: Targets): Promise<void> {
     const firstMethod = cors[0]?.AllowedMethods[0];
     if (firstMethod !== undefined) {
       const foreign = await preflight(url, "https://example.org", firstMethod, []);
-      const admitted = foreign.status === 200 && foreign.headers.get("access-control-allow-origin") !== null;
+      const admitted = okStatus(foreign.status) && foreign.headers.get("access-control-allow-origin") !== null;
       if (admitted) failed += 1;
       console.log(`${admitted ? "FAIL" : "ok  "}  ${bucket}: a foreign origin is ${admitted ? "admitted" : "refused"}`);
     }
     for (const rule of lifecycle) console.log(`      ${bucket}: lifecycle ${rule.name} (prefix "${rule.prefix}", ${rule.deleteAfterDays} d), read back by Nav`);
+    console.log(`      ${bucket}: lifecycle ${settings.defaultMultipartAbort.name} (abort after ${settings.defaultMultipartAbort.abortAfterDays} d), read back by Nav`);
   }
   if (failed > 0) throw new Error(`${failed} CORS check(s) failed: apply r2-buckets.json in the dashboard (docs/phase-1.md, step 14)`);
 }
