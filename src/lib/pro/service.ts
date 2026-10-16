@@ -47,7 +47,7 @@ export async function submitApplication(actor: ProActor, input: ProApplyInput, n
   if (!user.badges.phoneVerified) throw new HttpError(403, "phone_required");
 
   const pieces = await getUploads(input.uploadIds);
-  const valid = pieces.filter((upload) => upload.ownerUid === uid && upload.purpose === "kyb" && upload.status !== "rejected");
+  const valid = pieces.filter((upload) => upload.ownerUid === uid && upload.purpose === "kyb" && upload.status === "ready");
   if (valid.length !== new Set(input.uploadIds).size) throw new HttpError(400, "invalid_pieces");
 
   const existing = user.proId ? await getProProfile(user.proId) : null;

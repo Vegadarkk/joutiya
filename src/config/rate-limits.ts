@@ -66,6 +66,9 @@ export const RATE_LIMITS = {
   "listing.edit.uid": { points: 30, duration: DAY, policy: "open", key: "uid" },
   // POST /api/listings: 5 per day per account (individuals, D5), 30 per hour per IP then Turnstile.
   "listing.create.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },
+  // Pros (phase 7): the plan's listingsPerDay is counted in Firestore at publish (25, 100 or
+  // unlimited); this only caps runaway scripts, Premium included.
+  "listing.create.pro.uid": { points: 500, duration: DAY, policy: "open", key: "uid" },
   "listing.create.ip": { points: 30, duration: HOUR, policy: "open", key: "ip" },
   // The owner's routes cost Firestore quota shared by the whole site (Spark: 20 000 writes and
   // 50 000 reads a day). POST /api/listings (a new draft; the 5 above count publications, at
