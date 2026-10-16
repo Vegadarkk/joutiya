@@ -1,159 +1,136 @@
 # Phase 1 : mettre les fondations en ligne
 
-Le code de la phase 1 est prêt (PR #8) : application, image Docker, configuration Cloudflare, scripts de la VM, CI. Il reste à créer la VM et à brancher les comptes. Ce guide vous dit quoi faire, dans l'ordre. Cody fait la plupart des étapes avec les prompts en fin de page. Coût : 0 €.
+Règle n° 1 : Claude fait la mise en ligne par API, avec des jetons dédiés et limités ; Nav (Claude dans votre navigateur) fait ce qui n'a pas d'API. Vous ne gardez que les mots de passe, la double authentification, les paiements, les pièces d'identité, et le clic qui affiche un jeton suivi de son enregistrement dans l'environnement. Coût : 0 €.
 
-## Avant de commencer
+Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans l'ordre, et où on en est.
 
-- Étapes 0 à 6 de `docs/phase-0.md` faites, et `infra/targets.json` rempli (Cloudflare, Oracle, Firebase).
-- PR #8 fusionnée dans `main`, et dossier du dépôt à jour (`git pull` sur `main`), Node 24 ou plus récent.
-- **Créez la VM (étape 5) dans les 30 jours qui suivent votre inscription chez Oracle** : un compte gratuit inactif peut être suspendu.
-- Les clés et jetons vont dans `.env.local`, sous les noms de `.env.example`, jamais dans le dépôt ni dans le chat. Cody les lit sans les afficher.
+## Où on en est (16 octobre 2026)
 
-## 1. Outils et clés SSH (prompt E)
+| # | Étape | Qui | État |
+|---|---|---|---|
+| 1 | Tunnels Cloudflare | Claude (API) | Fait |
+| 2 | DNS de `joutiya.ma` | Claude (API) | `joutiya.ma` et `www` faits ; les noms protégés attendent l'étape 6 |
+| 3 | Réseau et VM Oracle | Claude (API), Nav pour le quota | Réseau fait, quota corrigé par Nav ; VM en création |
+| 4 | Accès de Claude à la VM | Nav, sur votre phrase | Attend votre phrase dans le fil de Nav |
+| 5 | Connexion Google d'Access | Nav, puis vous | Attend le projet Firebase de production |
+| 6 | Applications Access et jetons de service | Claude (API), Nav | Après l'étape 5 |
+| 7 | Serveurs DNS chez Cloudflare | Nav (Hostinger) | Après la validation du .MA, avant le 12 novembre |
+| 8 | Déploiement automatique du staging | Claude (API), vous pour un jeton | Après les étapes 6 et 7 |
+| 9 | Accès sans clé de la VM à Firestore | Claude | Avec la phase 2 |
+| 10 | Mentions légales de la production | Claude | Après Firebase |
+| 11 | Alertes | Claude | Phase 2 |
+| 12 | Mise en production et contrôles | Claude | Après l'étape 8 |
+| 13 | Test de reconstruction de la VM | Claude | Avant le lancement |
 
-Cody installe `cloudflared`, `gcloud` et OpenSSH s'ils manquent. Il crée ensuite 3 clés SSH sur votre machine :
-- `joutiya_admin` : votre accès administrateur (utilisateur `ubuntu`) ;
-- `joutiya_deploy_prod` : la promotion en production, qui ne quitte jamais votre machine ;
-- `joutiya_deploy_staging` : la clé de la CI, qui ira dans GitHub.
+## Ce qui reste à vous
 
-Donnez une phrase de passe aux deux premières et rangez-la dans votre gestionnaire de mots de passe. Elle est demandée à la première connexion, puis gardée par l'agent SSH jusqu'à la fin de la session.
+- **Étape 4** : écrire dans le fil de Nav la phrase qu'il vous a proposée (accès Run Command ; le quota est déjà corrigé).
+- **Étape 5** : afficher le secret du client Google créé par Nav et le coller dans le formulaire Zero Trust que Nav a ouvert. Vérifier que la validation en deux étapes de votre compte Google est active.
+- **Étape 8** : sur la page de jeton GitHub préparée par Nav, cliquer sur **Generate token**, puis l'enregistrer dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
 
-## 2. Cloudflare : les 3 Tunnels
+Rien d'autre : ni clé SSH, ni commande, ni console.
 
-Zero Trust → **Networks** → **Tunnels** → **Create a tunnel** → **Cloudflared**. Créez-en 3, avec ces noms exacts :
-- `joutiya-ssh-tunnel`
-- `joutiya-prod-tunnel`
-- `joutiya-staging-tunnel`
+## 1. Tunnels Cloudflare (fait)
 
-Pour chacun :
-1. Copiez le jeton affiché (la longue chaîne après `--token` dans la commande d'installation) dans `.env.local` : `JOUTIYA_SSH_TUNNEL_TOKEN`, `JOUTIYA_PROD_TUNNEL_TOKEN`, `JOUTIYA_STAGING_TUNNEL_TOKEN`.
-2. N'installez rien et n'ajoutez aucun nom d'hôte public : le script s'en charge (étape 4). Si l'assistant insiste, quittez-le après la création.
-3. Notez l'**ID** du Tunnel (colonne *Tunnel ID*).
+Trois tunnels gérés par Cloudflare, créés par API le 16 octobre avec le jeton `joutiya-edge` :
+- `joutiya-ssh-tunnel` : SSH seulement, servi par cloudflared sur la VM elle-même ;
+- `joutiya-prod-tunnel` et `joutiya-staging-tunnel` : le site, servis dans Compose.
 
-## 3. Cloudflare : Access, connexion Google et jetons d'API
+Leurs ID sont dans `infra/targets.json`, leurs règles dans `infra/cloudflare/tunnel.*.json`, appliquées par `node scripts/cloudflare.ts tunnel:ssh tunnel:staging tunnel:prod --apply`. Leurs jetons ne sortent jamais de l'API : `scripts/oracle-vm.ts` les lit en mémoire et les place dans le démarrage de la VM.
 
-**Jetons de service** : Zero Trust → **Access** → **Service credentials** → **Service Tokens** → **Create**, deux fois.
-- `joutiya-ci` (durée : 1 an). Le Client ID et le Client Secret vont dans GitHub à l'étape 10. Ne les copiez nulle part ailleurs.
-- `joutiya-probe` (durée : 1 an). Ses deux valeurs vont dans le Worker à l'étape 9.
-- Le secret ne s'affiche qu'une fois. Gardez cette page ouverte jusqu'aux étapes 9 et 10, ou rangez-le dans votre gestionnaire de mots de passe.
-- Dans `.env.local`, notez l'**ID** de chaque jeton (pas le Client ID) : `ACCESS_CI_TOKEN_ID`, `ACCESS_PROBE_TOKEN_ID`. Ajoutez votre Gmail : `ACCESS_OWNER_EMAIL`.
+## 2. DNS
 
-**Connexion Google** : vous, et plus tard le personnel, entrez sur les pages protégées avec un compte Google (§6).
-1. Vérifiez que la validation en deux étapes est active sur votre compte Google : myaccount.google.com → **Sécurité**.
-2. Google Cloud console → projet Firebase de production (`environments.prod.firebase.projectId` dans `infra/targets.json`) → **Google Auth Platform** (anciennement *OAuth consent screen*) :
-   - **Branding** : nom « Joutiya », e-mail d'assistance = votre Gmail ;
-   - **Audience** : *External*, et ajoutez votre Gmail dans **Test users**.
-3. **Clients** → **Create client** → *Web application*, nom `cloudflare-access` :
-   - *Authorized JavaScript origins* : `https://<équipe>.cloudflareaccess.com`, où `<équipe>.cloudflareaccess.com` est `shared.cloudflare.accessTeamDomain` dans `infra/targets.json` ;
-   - *Authorized redirect URIs* : `https://<équipe>.cloudflareaccess.com/cdn-cgi/access/callback`.
-   - Gardez la fenêtre avec l'ID client et le secret ouverte.
-4. Zero Trust → **Settings** → **Authentication** → **Login methods** → **Add new** → **Google** : collez l'ID client et le secret, **Save**, puis **Test** : la connexion doit réussir. Ne créez qu'une seule méthode Google : le script la retrouve seul.
+- Fait : `joutiya.ma` et `www.joutiya.ma` pointent vers le tunnel de production. Avant, ils pointaient vers la page d'attente Hostinger (`2.57.91.91`).
+- `ssh`, `staging`, `admin-staging` et `admin` reçoivent leur enregistrement seulement une fois leur application Access créée (étape 6). Le script refuse de publier un nom protégé sans sa protection.
+- Les enregistrements du courrier Hostinger restent en DNS seul. L'Email Routing de Cloudflare reste éteint.
+- Tant que les serveurs DNS restent chez Hostinger (étape 7), rien de tout cela n'est visible sur Internet.
 
-**Jetons d'API** : My Profile → **API Tokens** → **Create Token** → **Custom token**, deux fois.
+## 3. Réseau et VM Oracle
 
-1. `joutiya-edge`, pour le script de configuration (votre machine, et l'environnement cloud Claude global si Claude doit appliquer la configuration lui-même) :
-   - Compte (Account resources : votre compte) : **Cloudflare Tunnel : Edit**, **Access: Apps and Policies : Edit** et **Access: Organizations, Identity Providers, and Groups : Read**.
-   - Zone (Zone resources : **Specific zone** → `joutiya.ma`) : **Zone : Read**, **Zone Settings : Edit**, **Zone WAF : Edit**, **Transform Rules : Edit**, **Cache Rules : Edit**, **Single Redirect : Edit** et **DNS : Edit**.
-   - Durée : 30 jours.
-   - Rangez-le dans `.env.local` sous `JOUTIYA_CLOUDFLARE_API_TOKEN`.
-2. `joutiya-purge`, pour vider le cache à chaque mise en production :
-   - Une seule permission : Zone `joutiya.ma` → **Cache Purge : Purge**.
-   - Sans date d'expiration.
-   - Rangez-le dans `.env.local` sous `JOUTIYA_CF_PURGE_TOKEN`. Il ira sur la VM.
+Claude lance `node scripts/oracle-vm.ts create --apply --retry-minutes=120` depuis son environnement cloud (variables `JOUTIYA_OCI_*` et `JOUTIYA_CLOUDFLARE_API_TOKEN`) :
+- réseau `joutiya-vcn` sans aucune règle d'entrée, ni SSH ni ICMP (`infra/vm/oci-security-list.json`), passerelle `joutiya-igw` pour la sortie, sous-réseau `joutiya-public` ;
+- VM `joutiya-vm` : `VM.Standard.A1.Flex`, 2 OCPU, 12 Go, Ubuntu 24.04 aarch64, disque de 100 Go, service de métadonnées v2 seulement, aucune clé SSH ;
+- démarrage (`infra/vm/bootstrap.sh`, rempli en mémoire) : agent Oracle, tunnel SSH, Docker, mémoire d'échange, mises à jour automatiques, puis les fichiers du dépôt (`infra/vm/install.sh`) et les jetons des tunnels Compose ;
+- si Oracle manque de capacité A1, le script réessaie chaque minute. Jamais de forme payante ;
+- chaque étape du démarrage peut être rejouée : si l'une échoue, tout le démarrage repart au redémarrage suivant (`node scripts/oracle-vm.ts reboot --apply`), sans perdre la VM. À la fin, il vérifie lui-même qu'aucun jeton n'est lisible par un autre utilisateur que root.
 
-## 4. Appliquer la configuration Cloudflare (prompt F)
+`node scripts/oracle-vm.ts status` montre l'état de la VM, les connexions du tunnel SSH et la progression du démarrage, lue sur la console série. Aucun secret n'y est écrit.
 
-Cody inscrit les 3 ID de Tunnel dans `infra/targets.json`. Il lance ensuite `scripts/cloudflare.ts` en simulation et vous montre ce qui va changer : réglages SSL, WAF, limitation de débit, cache, redirection `www`, Tunnels, enregistrements DNS et applications Access. Il n'applique qu'après votre accord.
+État au 16 octobre : réseau créé. La première création de la VM a été refusée par le quota `joutiya-free-tier` : ses lignes `zero` mettaient à 0 les quotas A1 régionaux, que ses lignes `set` ne relevaient pas. Nav a ajouté les deux lignes régionales (2 OCPU, 12 Go) à 01:31 UTC ; Claude relance la création.
 
-Le script refuse de remplacer un enregistrement DNS existant. Si une ancienne page d'attente Hostinger occupe encore `joutiya.ma` ou `www`, Cody vous la montre, et vous décidez.
+Oracle peut reprendre une VM gratuite inactive 7 jours de suite (processeur, réseau et mémoire sous 20 %). Le staging et la sonde réduisent ce risque. Ne passez pas en *Pay As You Go* sans en parler dans le projet.
 
-À la fin, il inscrit dans `infra/targets.json` le tag **AUD** des applications `admin.joutiya.ma` (prod) et `admin-staging.joutiya.ma` (staging), puis ouvre une PR « Record phase 1 identifiers ». Fusionnez-la (ou demandez-le à Claude dans le projet) avant l'étape 10 : l'image de l'application embarque `infra/targets.json`, et sans ces identifiants elle refuse de démarrer.
+## 4. Accès de Claude à la VM
 
-## 5. Oracle : créer la VM
+Claude administre la VM par OCI Run Command : il envoie un script par l'API Oracle avec sa clé `joutiya-claude`, et l'agent Oracle l'exécute en root. Aucun port ouvert, aucune clé SSH à garder, et cela marche avant la bascule DNS. Il s'en sert pour mettre à jour les fichiers de la VM, y déposer les secrets et faire les mises en production.
 
-1. Préparez le script de démarrage (prompt E, dernière partie) : Cody crée `infra/vm/bootstrap.local.sh` avec le jeton du Tunnel SSH. Git ignore ce fichier.
-2. Oracle → **Networking** → **Virtual Cloud Networks** → **Start VCN Wizard** → *Create VCN with Internet Connectivity* → nom `joutiya-vcn` → Create.
-3. Ouvrez `joutiya-vcn` → **Security Lists** → *Default Security List* → **supprimez toutes les règles d'entrée** (Ingress Rules), y compris SSH (port 22) et ICMP. Gardez la règle de sortie. Faites de même dans *Security List for Private Subnet-joutiya-vcn*, créée par l'assistant. La liste cible est décrite dans `infra/vm/oci-security-list.json`.
-4. **Compute** → **Instances** → **Create instance** :
-   - Nom `joutiya-vm`.
-   - Image **Canonical Ubuntu 24.04** (pas *Minimal*).
-   - Shape **Ampere** → `VM.Standard.A1.Flex`, **2 OCPU, 12 Go**. Le badge *Always Free* doit être visible.
-   - Réseau `joutiya-vcn`, sous-réseau public, adresse IPv4 publique : elle sert à sortir vers Internet, aucune entrée n'est ouverte.
-   - Clé SSH : **Paste public key** → contenu de `~/.ssh/joutiya_admin.pub`.
-   - Disque de démarrage : 100 Go (le quota gratuit est de 200 Go).
-   - **Show advanced options** → **Management** → **Paste cloud-init script** → tout le contenu de `bootstrap.local.sh`.
-   - Create.
-5. Attendez 10 minutes. Le Tunnel `joutiya-ssh-tunnel` passe à **Healthy** dans Cloudflare.
-6. Supprimez `bootstrap.local.sh` : le jeton reste chez Cloudflare, et la VM le garde.
+Nav crée, sur votre phrase écrite dans son fil :
+- le groupe dynamique `joutiya-vm`, qui regroupe les instances du compartiment `joutiya` ;
+- la politique `joutiya-run-command-policy`, en 3 lignes : le groupe `joutiya-automation` gère les commandes et lit l'état de l'agent dans `joutiya`, et la VM exécute ses propres commandes.
 
-Oracle reprend une VM gratuite inactive 7 jours de suite (processeur, réseau et mémoire sous 20 %). Le staging qui tourne dès l'étape 10 et la sonde réduisent ce risque. Ne passez pas en *Pay As You Go* sans en parler dans le projet.
+Limites : script de 4 Ko et sortie de 1 Ko par commande. Oracle garde le contenu 7 jours, lisible seulement par les administrateurs du compte et `joutiya-claude`. Sur la VM, `infra/vm/sudoers.oracle-run-command` rend root l'utilisateur `ocarun` de l'agent.
 
-## 6. Premier accès et fichiers de la VM (prompt G)
+Une fois l'accès créé, Claude ajoute à `scripts/oracle-vm.ts` la synchronisation des fichiers et la mise en production, puis vérifie l'agent.
 
-1. Dans un terminal : `ssh joutiya`. Votre navigateur s'ouvre pour la connexion Access avec Google, puis la session SSH démarre.
-2. Cody vérifie que le démarrage s'est bien terminé. Il installe ensuite les fichiers du dépôt sur la VM (`node scripts/deploy-prod.ts vm-sync`) : utilisateurs de déploiement, SSH, sudo, Compose, pare-feu des conteneurs.
-3. Il écrit les secrets dans `/etc/joutiya/staging/` et `/etc/joutiya/prod/`. Ceux qui manquent (mots de passe Valkey, `HASH_PEPPER`, `ALERT_RELAY_SECRET`) sont générés sur place.
-4. Il relève l'empreinte SSH de la VM pour GitHub (étape 10).
+## 5. Connexion Google d'Access
 
-## 7. Google : accès sans clé de la VM à Firestore (prompt H)
+Vous, et plus tard le personnel, entrez sur les pages protégées avec un compte Google (§6). Prérequis : le projet Firebase de production existe (phase 0, réponse de Google attendue).
 
-La VM s'authentifie auprès de Google par un certificat (fédération d'identité X.509), sans fichier de clé.
+1. Nav, dans Google Cloud, projet de production (`environments.prod.firebase.projectId`), **Google Auth Platform** : nom « Joutiya », e-mail d'assistance = votre Gmail, audience *External* avec votre Gmail en utilisateur test. Puis **Clients** → *Web application* `cloudflare-access`, origine `https://joutiya.cloudflareaccess.com`, redirection `https://joutiya.cloudflareaccess.com/cdn-cgi/access/callback`.
+2. Nav ouvre Zero Trust → **Settings** → **Authentication** → **Login methods** → **Add new** → **Google**.
+3. Vous affichez l'ID et le secret du client, les collez dans ce formulaire et cliquez sur **Save**. Nav lance **Test** : la connexion doit réussir.
 
-Cody fait, dans `joutiya-staging` puis `joutiya-prod` :
-- les comptes de service `joutiya-web` et `joutiya-worker`, avec les seuls rôles prévus ;
-- le pool d'identités `joutiya-vm` ;
-- un certificat par conteneur, signé par une autorité créée sur votre machine.
+Une seule méthode Google : le script la retrouve seul.
 
-La clé de cette autorité reste sur votre machine : rangez-la dans votre gestionnaire de mots de passe. Les certificats durent un an ; un rappel suivra.
+## 6. Applications Access et jetons de service
 
-Si Google exige un compte de facturation pour ces API sur Spark, Cody s'arrête. Prévenez Claude dans le projet : la solution de repli est une clé par conteneur, renouvelée tous les 90 jours, et elle demande votre accord.
+1. Nav ajoute au jeton `joutiya-edge`, sans changer sa valeur, deux permissions : **Access: Service Tokens : Edit** (compte) et **Cache Purge : Purge** (zone `joutiya.ma`).
+2. Claude crée par API les jetons de service `joutiya-ci` (déploiement du staging, étape 8) et `joutiya-probe` (la sonde ; son secret sera renouvelé par API quand la sonde sera déployée). Un secret va directement de l'API à sa destination, jamais dans un fichier ni dans le chat.
+3. Claude lance `node scripts/cloudflare.ts access --apply`, avec `ACCESS_OWNER_EMAIL` (votre Gmail), `ACCESS_CI_TOKEN_ID` et `ACCESS_PROBE_TOKEN_ID` : `admin`, `ssh`, `staging` et `admin-staging` n'acceptent que votre compte Google, plus le jeton de la CI pour `ssh` et celui de la sonde pour `staging`.
+4. Claude relance les parties `tunnel:*` : les noms protégés reçoivent leur enregistrement DNS.
+5. Claude inscrit par PR les tags AUD de `admin.joutiya.ma` et `admin-staging.joutiya.ma` dans `infra/targets.json`. L'image de l'application embarque ce fichier.
 
-## 8. Mentions légales de la production (prompt I)
+## 7. Serveurs DNS chez Cloudflare
 
-La production refuse de démarrer tant qu'une mention obligatoire manque (hébergeur, adresse et téléphone des hébergeurs de données).
-1. Relevez dans le contrat Oracle accepté à l'inscription l'entité, son adresse et son téléphone.
-2. Faites de même pour l'entité Google du contrat Firebase (Google Cloud EMEA ou Google Ireland).
-3. Cody écrit `config/legal` dans Firestore (prod, puis staging), après vous avoir montré le résultat.
+Après la validation du .MA par le registre, et avant le 12 novembre (Cloudflare supprime une zone en attente après 28 jours), Nav remplace chez Hostinger les serveurs DNS par `gloria.ns.cloudflare.com` et `rob.ns.cloudflare.com`. Le coordinateur fixe le moment. Cloudflare active alors la zone et émet le certificat. `joutiya.ma` sert le tunnel de production, et les noms protégés passent par Access.
 
-## 9. Sonde de disponibilité et alertes e-mail (prompt J)
+## 8. Déploiement automatique du staging
 
-Cody déploie le Worker `joutiya-uptime-probe` dans votre compte Cloudflare. Il vérifie `https://joutiya.ma` et le staging toutes les 5 minutes. Il prévient sur Telegram et par e-mail après 2 échecs de suite, puis au rétablissement. Il relaie aussi les alertes e-mail du site.
+1. Nav prépare un jeton GitHub à grain fin `joutiya-claude-actions` : dépôt `joutiya` seul, permissions **Secrets** et **Variables** en lecture et écriture, 90 jours. Vous cliquez sur **Generate token** et l'enregistrez dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
+2. Claude, dans une nouvelle session :
+   - crée la clé de `deploy-staging` : la clé privée va dans le secret GitHub `STAGING_DEPLOY_SSH_KEY`, la clé publique sur la VM ;
+   - met `STAGING_ACCESS_CLIENT_ID` et `STAGING_ACCESS_CLIENT_SECRET` (jeton `joutiya-ci`) ;
+   - met la variable `VM_SSH_KNOWN_HOSTS`, avec la clé d'hôte lue sur la console série ;
+   - puis met `STAGING_DEPLOY_ENABLED` à `true`.
+3. Claude lance *Deploy staging* sur `main`. Ensuite, chaque fusion sur `main` construit l'image et la déploie en staging toute seule.
 
-Prérequis : Email Routing actif (phase 0, étape 2) et votre Gmail vérifié comme destination.
+Le déploiement des règles Firestore du staging par la CI (`FIREBASE_STAGING_WIF_PROVIDER`, `FIREBASE_STAGING_DEPLOYER`) attend la phase 2.
 
-## 10. GitHub : déploiement automatique du staging
+## 9. Accès sans clé de la VM à Firestore
 
-Prérequis : la PR « Record phase 1 identifiers » de l'étape 4 est fusionnée.
+Fédération d'identité X.509 (§9) : comptes de service `joutiya-web` et `joutiya-worker`, pool `joutiya-vm`, un certificat par conteneur. Claude la met en place avec la phase 2, une fois les projets Firebase créés. Si Google exige la facturation, la solution de repli (une clé par conteneur, renouvelée tous les 90 jours) demande votre accord.
 
-GitHub → dépôt `joutiya` → **Settings** → **Secrets and variables** → **Actions**.
-- Onglet **Secrets** :
-  - `STAGING_DEPLOY_SSH_KEY` : contenu de `~/.ssh/joutiya_deploy_staging`, la clé privée sans `.pub`. Cody peut l'envoyer avec `gh` sans l'afficher.
-  - `STAGING_ACCESS_CLIENT_ID` et `STAGING_ACCESS_CLIENT_SECRET` : jeton `joutiya-ci`.
-- Onglet **Variables** :
-  - `VM_SSH_KNOWN_HOSTS` : la ligne donnée par Cody à l'étape 6.
-  - `STAGING_DEPLOY_ENABLED` = `true`, en dernier.
-- Le déploiement des règles Firestore du staging par la CI (`FIREBASE_STAGING_WIF_PROVIDER`, `FIREBASE_STAGING_DEPLOYER`) peut attendre. Les règles actuelles refusent tout, et Cody les déploie depuis votre machine.
+## 10. Mentions légales de la production
 
-Lancez ensuite le premier déploiement : onglet **Actions** → *Deploy staging* → **Run workflow** sur `main`. Après, chaque fusion sur `main` construit l'image et la déploie en staging toute seule.
+La production refuse de démarrer tant qu'une mention obligatoire manque : hébergeur, adresse et téléphone des hébergeurs de données. Claude relève les entités Oracle et Google dans leurs contrats publics, puis écrit `config/legal` dans Firestore avec `scripts/legal-config.ts`, en production puis en staging.
 
-## 11. Mise en production et contrôles (prompt K)
+## 11. Alertes
 
-1. Ouvrez `https://staging.joutiya.ma` (connexion Access) : la page d'accueil et les pages légales s'affichent.
-2. `node scripts/deploy-prod.ts promote` : le script montre la version du staging et demande de taper ses 7 premiers caractères.
-3. Contrôles de fin de phase, faits par Cody :
+Les alertes du site partent par Resend (phase 2, `/mnt/project-files/joutiya/phase-1/alertes-resend-spec.md`), puis aussi par Telegram quand le bot existera. Le Worker de sonde `joutiya-uptime-probe` vérifie `https://joutiya.ma` et le staging toutes les 5 minutes ; il est déployé avec les alertes. L'Email Routing de Cloudflare n'est pas utilisé.
+
+## 12. Mise en production et contrôles
+
+1. Claude vérifie que le dernier *Deploy staging* est vert, et que `https://staging.joutiya.ma` affiche l'accueil et les pages légales.
+2. Claude promeut la version du staging par Run Command (`joutiya-deploy prod promote`) : seules les images déjà en service en staging peuvent passer, désignées par leur identifiant exact. Il vide ensuite le cache Cloudflare par API.
+3. Contrôles de fin de phase :
    - `https://joutiya.ma/api/health` répond `ok` ;
    - un balayage de tous les ports de l'IP publique de la VM n'en trouve aucun ouvert ;
    - securityheaders.com donne au moins la note A ;
    - `https://admin.joutiya.ma` demande la connexion Google d'Access.
 
-## 12. Tester la reconstruction de la VM
+## 13. Tester la reconstruction de la VM
 
-La VM ne doit garder aucune donnée unique : on le vérifie une fois, avant le lancement, tant que personne n'utilise le site. Comptez une heure.
-1. Oracle → **Compute** → **Instances** → `joutiya-vm` → **Terminate**, en cochant la suppression du disque de démarrage.
-2. Suivez `infra/redeploy.md`, partie « Reconstruire », avec Cody (prompts E point 4, G et H).
-3. Refaites les contrôles de l'étape 11 et notez la durée totale.
-
-Si Oracle répond *Out of capacity* à la création, réessayez plus tard ou à une autre heure : rien n'est encore public.
+La VM ne doit garder aucune donnée unique. On le vérifie une fois, avant le lancement, tant que personne n'utilise le site : Claude supprime `joutiya-vm` (disque compris) et la reconstruit selon `infra/redeploy.md`, refait les contrôles de l'étape 12 et note la durée totale.
 
 **Fin de la phase 1 :**
 - `main` se déploie seul en staging ;
@@ -162,77 +139,3 @@ Si Oracle répond *Out of capacity* à la création, réessayez plus tard ou à 
 - la note est A ;
 - la reconstruction de la VM est testée ;
 - la CI est au vert.
-
-Donnez le résultat des contrôles à Claude dans le projet.
-
-## Prompts Cody
-
-À coller dans Cody, depuis le dossier du dépôt à jour.
-
-**E. Outils, clés SSH et script de démarrage** (étapes 1 et 5.1)
-
-```text
-Prépare mon poste pour la phase 1 de Joutiya (docs/phase-1.md). 1) Installe s'ils manquent cloudflared, la CLI gcloud et le client OpenSSH, depuis les sources officielles. 2) Crée dans ~/.ssh trois clés ed25519 : joutiya_admin et joutiya_deploy_prod (je tape moi-même leur phrase de passe), et joutiya_deploy_staging sans phrase de passe (elle ira dans GitHub). N'écrase aucune clé existante. 3) Ajoute à ~/.ssh/config deux hôtes, sans toucher aux autres : « joutiya » (HostName ssh.joutiya.ma, User ubuntu, IdentityFile ~/.ssh/joutiya_admin) et « joutiya-deploy-prod » (HostName ssh.joutiya.ma, User deploy-prod, IdentityFile ~/.ssh/joutiya_deploy_prod), tous deux avec IdentitiesOnly yes, AddKeysToAgent yes et ProxyCommand cloudflared access ssh --hostname %h. Vérifie qu'un agent SSH tourne sur ma machine (sinon, active-le). 4) Quand j'aurai mis JOUTIYA_SSH_TUNNEL_TOKEN dans .env.local : copie infra/vm/bootstrap.sh en infra/vm/bootstrap.local.sh en remplaçant __JOUTIYA_SSH_TUNNEL_TOKEN__ par ce jeton, sans jamais l'afficher, et vérifie avec git status que le fichier est ignoré. Ne commite rien.
-```
-
-**F. Configuration Cloudflare** (étape 4)
-
-```text
-Applique la configuration Cloudflare de Joutiya (docs/phase-1.md, étape 4). Crée une branche phase-1-identifiers depuis main à jour. Inscris dans infra/targets.json les ID de Tunnel que je te donne : shared.cloudflare.sshTunnelId, environments.prod.cloudflare.tunnelId et environments.staging.cloudflare.tunnelId. Lance node --env-file=.env.local scripts/assert-target.ts jusqu'au vert : il vérifie aussi que chaque jeton de Tunnel de .env.local correspond au bon Tunnel et au bon compte. Lance ensuite `node --env-file=.env.local scripts/cloudflare.ts zone tunnel:ssh tunnel:prod tunnel:staging access` (simulation) et résume-moi en français ce qui va changer. N'ajoute --apply qu'après mon accord, et --replace-dns seulement si je l'accepte pour les enregistrements précis que tu m'as montrés. N'affiche jamais un jeton. Inscris les tags AUD rendus par le script : celui d'admin.joutiya.ma dans environments.prod.cloudflare.accessAud, celui d'admin-staging.joutiya.ma dans environments.staging.cloudflare.accessAud. Relance assert-target, puis pousse la branche et ouvre une PR « Record phase 1 identifiers ».
-```
-
-**G. Fichiers et secrets de la VM** (étape 6)
-
-```text
-Configure la VM de Joutiya (docs/phase-1.md, étape 6). Ne lis ni n'affiche aucune valeur secrète. Fais passer les secrets par des fichiers ou des tubes, jamais par la ligne de commande. 1) `ssh joutiya 'sudo tail -n 5 /var/log/joutiya-bootstrap.log'` doit finir par « bootstrap: done ». Sinon, montre-moi l'erreur et arrête-toi. 2) Lance node scripts/deploy-prod.ts vm-sync et confirme. 3) Pour staging puis prod, écris sur la VM des fichiers root 0600, en envoyant leur contenu sur l'entrée standard de `ssh joutiya "sudo sh -c 'umask 077 && cat > <fichier>'"` (jamais sudo tee, qui le renvoie à l'écran) :
-- /etc/joutiya/<env>/valkey-queue.env et valkey-ratelimit.env : VALKEY_PASSWORD, générés sur la VM avec openssl rand -hex 32.
-- /etc/joutiya/<env>/tunnel.env : TUNNEL_TOKEN = JOUTIYA_STAGING_TUNNEL_TOKEN ou JOUTIYA_PROD_TUNNEL_TOKEN de mon .env.local.
-- /etc/joutiya/<env>/app.env avec :
-  - NEXT_PUBLIC_SITE_URL : https://staging.joutiya.ma ou https://joutiya.ma ;
-  - ADMIN_HOST : admin-staging.joutiya.ma ou admin.joutiya.ma ;
-  - QUEUE_REDIS_URL=redis://:<mot de passe>@valkey-queue:6379 et RATE_LIMIT_REDIS_URL=redis://:<mot de passe>@valkey-ratelimit:6379 ;
-  - TELEGRAM_BOT_TOKEN et TELEGRAM_CHAT_ID de .env.local ;
-  - HASH_PEPPER généré pour chaque environnement (openssl rand -hex 32) ;
-  - ALERT_RELAY_SECRET généré une seule fois (openssl rand -hex 32) et identique dans les deux environnements : le Worker de sonde n'en a qu'un ;
-  - ALERT_RELAY_URL vide jusqu'au prompt J (l'application ne démarre pas sans, et elle ne démarre qu'à l'étape 10) ;
-  - NEXT_PUBLIC_FIREBASE_PROJECT_ID depuis infra/targets.json ;
-  - CF_ACCESS_TEAM_DOMAIN depuis infra/targets.json, et CF_ACCESS_AUD avec le tag AUD de l'environnement ;
-  - LOG_LEVEL=info ;
-  - pour le staging seulement, CSP_REPORT_ONLY=true : la CSP y est d'abord en mode rapport (§6), les violations arrivent dans les journaux sans rien bloquer.
-- Pour la prod seulement, /etc/joutiya/prod/deploy.env : CF_ZONE_ID depuis infra/targets.json, CF_PURGE_TOKEN = JOUTIYA_CF_PURGE_TOKEN.
-4) Donne-moi la ligne à mettre dans la variable GitHub VM_SSH_KNOWN_HOSTS : « ssh.joutiya.ma » suivi du contenu de /etc/ssh/ssh_host_ed25519_key.pub sans le commentaire final.
-```
-
-**H. Accès Google de la VM** (étape 7)
-
-```text
-Mets en place la fédération d'identité X.509 de Joutiya (architecture §9 ; docs/phase-1.md, étape 7). Je me connecte moi-même avec `gcloud auth login`. Ne touche qu'aux projets de environments.staging et environments.prod dans infra/targets.json. Ne crée aucune clé JSON de compte de service et n'active aucune facturation. 1) Sur ma machine, dans ~/.joutiya-ca (droits 0700) : une autorité de certification ECDSA P-256 valable 5 ans (CA:TRUE, keyCertSign). Sa clé privée est chiffrée par une phrase de passe que je tape. 2) Pour chaque projet : active les API iam, iamcredentials, sts et cloudresourcemanager. Si l'activation exige la facturation, arrête-toi et dis-le-moi. Crée les comptes de service joutiya-web (roles/datastore.user et roles/firebaseauth.admin ; roles/iam.serviceAccountTokenCreator sur lui-même) et joutiya-worker (roles/datastore.user et roles/firebaseauth.admin). Crée le pool joutiya-vm et un fournisseur X.509 x509 avec gcloud iam workload-identity-pools providers create-x509 : magasin de confiance = mon autorité, attribute-mapping google.subject=assertion.subject.dn.cn. 3) Pour chaque environnement et chaque conteneur (web, worker) : une clé ECDSA P-256 et un certificat feuille de 365 jours (CN joutiya-<env>-<conteneur>, CA:FALSE, keyUsage digitalSignature). Donne au principal principal://iam.googleapis.com/projects/<numéro>/locations/global/workloadIdentityPools/joutiya-vm/subject/joutiya-<env>-<conteneur> le rôle roles/iam.workloadIdentityUser sur le compte de service du conteneur. Génère la config avec gcloud iam workload-identity-pools create-cred-config, avec --service-account=joutiya-<conteneur>@<projet>.iam.gserviceaccount.com (sans lui, l'application ne sait pas à quel projet appartient l'accès et refuse de démarrer), puis réécris les chemins des deux fichiers JSON pour qu'ils pointent vers /etc/joutiya/<env>/gcp/<conteneur>/ (cert.pem, key.pem, certificate_config.json, credentials.json). Copie ces 4 fichiers sur la VM par l'entrée standard de `ssh joutiya "sudo sh -c 'umask 077 && cat > <fichier>'"` (jamais sudo tee), puis relance node scripts/deploy-prod.ts vm-sync pour fixer les droits. Supprime les copies locales des clés feuilles. Ne touche jamais à la clé de l'autorité.
-```
-
-**I. Mentions légales** (étape 8)
-
-```text
-Prépare config/legal pour Joutiya (docs/phase-1.md, étape 8). Crée hors du dépôt un fichier legal.prod.json. Il ne contient que : host = l'entité Oracle que je te donne (nom, adresse, téléphone) ; dataHosts = les 3 entrées de DEFAULT_LEGAL dans src/config/legal.ts, la première complétée avec l'entité Google que je te donne. Lance `gcloud auth application-default login` (je valide), puis `node scripts/legal-config.ts prod legal.prod.json` et montre-moi le résultat. N'ajoute --apply qu'après mon accord. Fais de même pour staging avec le même fichier.
-```
-
-**J. Sonde et alertes** (étape 9)
-
-```text
-Déploie le Worker de sonde de Joutiya (workers/uptime-probe ; docs/phase-1.md, étape 9) avec npx wrangler@4.144.0, depuis le dossier workers/uptime-probe. Connecte-toi par `npx wrangler@4.144.0 login` (je valide) et vérifie avec whoami le compte où se trouve joutiya.ma. Crée le namespace KV joutiya-uptime-state et inscris son id dans wrangler.jsonc. Mets ensuite les secrets avec wrangler secret put, en les lisant depuis mon .env.local ou la VM, sans les afficher :
-- TELEGRAM_BOT_TOKEN et TELEGRAM_CHAT_ID ;
-- ALERT_EMAIL_TO = mon Gmail vérifié dans Email Routing ;
-- ALERT_RELAY_SECRET = celui de /etc/joutiya/prod/app.env ;
-- ACCESS_CLIENT_ID et ACCESS_CLIENT_SECRET = jeton joutiya-probe, que je te colle.
-Déploie, puis inscris l'URL du Worker suivie de /alert dans ALERT_RELAY_URL des deux app.env de la VM. Envoie une alerte de test signée (voir src/lib/alert/relay.ts) et vérifie que je la reçois par e-mail. Pousse la modification de wrangler.jsonc dans une PR.
-```
-
-**K. Mise en production et contrôles** (étape 11)
-
-```text
-Mets Joutiya en production (docs/phase-1.md, étape 11). 1) Vérifie que le dernier « Deploy staging » de GitHub Actions est vert et que node scripts/deploy-prod.ts status montre la même version en staging. 2) Lance node scripts/deploy-prod.ts promote ; c'est moi qui tape la confirmation. 3) Contrôles :
-- curl https://joutiya.ma/api/health doit répondre ok ;
-- nmap -Pn -p- sur l'IP publique de joutiya-vm (console Oracle) ne doit trouver aucun port ouvert ;
-- securityheaders.com sur https://joutiya.ma doit donner au moins A ;
-- https://admin.joutiya.ma doit demander la connexion Access.
-Donne-moi un résumé en français que je collerai dans le projet.
-```
