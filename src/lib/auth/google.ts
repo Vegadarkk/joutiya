@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import type { UpdateRequest, UserRecord } from "firebase-admin/auth";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from "jose";
 import { CGU_VERSION, TRANSFERS_CONSENT_VERSION, displayNameSchema, googleSchema, type GoogleInput, type GoogleResponse } from "@/lib/contracts/auth";
-import { createAccountDocuments, findUidByEmail, getUser, isEmailTaken, linkProvider, unlinkProvider } from "@/lib/db/repositories/users";
+import { createAccountDocuments, findUidByEmail, isEmailTaken, linkProvider, unlinkProvider } from "@/lib/db/repositories/users";
 import { serverEnv } from "@/lib/env";
 import { auth } from "@/lib/firebase/admin";
 import { isStaff, readClaims, setClaims } from "@/lib/firebase/claims";
@@ -16,6 +16,7 @@ import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { safeEqual } from "@/lib/security/hash";
 import { errorCode, localPart, userByEmail } from "./accounts";
 import { activateMember } from "./activation";
+import { recordState } from "./orphan";
 import { anonymous, beginAnonymous, checkTurnstile, finish, respond, type AnonymousFlow } from "./anonymous";
 import { signedIn } from "./respond";
 import { sessionSummary } from "./summary";
@@ -147,6 +148,8 @@ async function ensureAuthUser(identity: GoogleIdentity, displayName: string): Pr
     if (errorCode(error) !== "auth/email-already-exists") throw error;
     const record = await userByEmail(identity.email);
     if (!record) throw error;
+    // A staff account has no documents either: it never becomes a member (its claims would be replaced).
+    if ((await recordState(record)) === "staff") throw forbidden("staff accounts sign in on the back office");
     await linkGoogleOnRecord(record, identity);
     return { uid: record.uid, created: false };
   }
@@ -168,13 +171,12 @@ async function signUp(flow: AnonymousFlow, input: GoogleInput & { consents: NonN
       activated: true,
     });
   } catch (error) {
+    // Two first sign-ins at once and the other one won with this very record: the index points at
+    // it, so it is kept (never deleted below) and this call signs in to it.
+    if (isEmailTaken(error) && error.uid === uid) return signInExisting(flow, uid, identity, "google_login");
     if (created) await auth().deleteUser(uid).catch((cause: unknown) => logger.error({ err: (cause as Error).message }, "orphan auth record after failed google sign-up"));
-    if (isEmailTaken(error)) {
-      // Two first sign-ins at once: the other one won; sign in to that account.
-      if (error.uid === uid) return signInExisting(flow, uid, identity, "google_login");
-      // Another account owns a variant of this e-mail (+tag, Gmail dots): never merged into it.
-      throw new HttpError(409, "conflict", "an account exists under a variant of this e-mail");
-    }
+    // Another account owns a variant of this e-mail (+tag, Gmail dots): never merged into it.
+    if (isEmailTaken(error)) throw new HttpError(409, "conflict", "an account exists under a variant of this e-mail");
     throw error;
   }
   await setClaims(uid, { role: "individual" });
@@ -189,13 +191,13 @@ async function signUp(flow: AnonymousFlow, input: GoogleInput & { consents: NonN
  * record with this exact e-mail. The normalized index (+tag stripped, Gmail dots removed) is lossy
  * and never picks the account someone signs into.
  */
-async function existingUid(identity: GoogleIdentity): Promise<string | null> {
+async function existingRecord(identity: GoogleIdentity): Promise<UserRecord | null> {
   try {
-    return (await auth().getUserByProviderUid(PROVIDER, identity.sub)).uid;
+    return await auth().getUserByProviderUid(PROVIDER, identity.sub);
   } catch (error) {
     if (errorCode(error) !== "auth/user-not-found") throw error;
   }
-  return (await userByEmail(identity.email))?.uid ?? null;
+  return userByEmail(identity.email);
 }
 
 async function googleSignIn(request: Request): Promise<Response> {
@@ -207,9 +209,14 @@ async function googleSignIn(request: Request): Promise<Response> {
   assertNonce(identity, input.nonce);
   if (!identity.emailVerified) throw new HttpError(403, "email_not_verified");
 
-  const uid = await existingUid(identity);
-  // An Auth record without documents is an orphan of a failed sign-up: the sign-up path reuses it.
-  if (uid && (await getUser(uid))) return signInExisting(flow, uid, identity, "google_login");
+  const record = await existingRecord(identity);
+  if (record) {
+    const state = await recordState(record);
+    if (state === "member") return signInExisting(flow, record.uid, identity, "google_login");
+    // Staff accounts have no documents either and sign in on the back office only (§6).
+    if (state === "staff") throw forbidden("staff accounts sign in on the back office");
+    // Otherwise an orphan of a failed sign-up: the sign-up path reuses it.
+  }
   // New account: the sign-up limits apply, a `needs_consent` pass included (§6).
   await enforceLimit("signup.ip", flow.identity.ipBucket);
   await enforceLimit("signup.device", flow.identity.deviceKey);

@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UNIFORM_RESPONSE_MS } from "@/lib/auth/anonymous";
 import { deleteAccountDocumentsIfPending, findUidByEmail, getUser, getUserPrivate } from "@/lib/db/repositories/users";
 import { COLLECTIONS } from "@/lib/db/schemas";
-import { db } from "@/lib/firebase/admin";
+import { auth, db } from "@/lib/firebase/admin";
+import { setClaims } from "@/lib/firebase/claims";
 import { sendMail } from "@/lib/mail";
 import type { TemplateMail } from "@/lib/mail/types";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
@@ -223,6 +224,25 @@ describe("sign-up, verification, session, profile, logout", () => {
     expect(Date.now() - startedAt).toBeGreaterThanOrEqual(UNIFORM_RESPONSE_MS - 5);
     expect(unknown.status).toBe(202);
     expect(capturedMails(sendMail).filter((mail) => mail.template === "verifyEmail")).toHaveLength(2);
+  });
+
+  it("adopts an orphan Auth record without documents, never a staff account", async () => {
+    // Left by a failed sign-up or by a purge whose Auth deletion failed.
+    const email = uniqueEmail("orphan");
+    const orphan = await auth().createUser({ email, password: `left-over-${PASSWORD}`, emailVerified: false });
+    const mail = await signUp(new Jar(), email);
+    expect(mail.to).toBe(email);
+    expect(await findUidByEmail(email)).toBe(orphan.uid);
+    expect(await getUser(orphan.uid)).toMatchObject({ activation: "pending" });
+
+    const staffEmail = uniqueEmail("staff");
+    const staff = await auth().createUser({ email: staffEmail, emailVerified: true });
+    await setClaims(staff.uid, { role: "moderator" });
+    const result = await call<{ status: string }>(signup, SIGNUP, { jar: new Jar(), body: signupBody(staffEmail) });
+    expect(result.status).toBe(202);
+    expect(await getUser(staff.uid)).toBeNull();
+    expect(await findUidByEmail(staffEmail)).toBeNull();
+    expect((await auth().getUser(staff.uid)).customClaims).toMatchObject({ role: "moderator" });
   });
 
   it("purges the documents of a pending account only (deleteAccountDocumentsIfPending)", async () => {

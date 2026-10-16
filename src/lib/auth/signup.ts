@@ -12,6 +12,7 @@ import { HttpError } from "@/lib/http/errors";
 import { displayNameFor, errorCode, userByEmail } from "./accounts";
 import { anonymous, beginAnonymous, checkTurnstile, respond, uniformDuration, type AnonymousFlow } from "./anonymous";
 import { sendSignupExistingMail, sendVerificationMail } from "./mails";
+import { recordState } from "./orphan";
 import { assertPasswordPolicy } from "./password-policy";
 
 // Sign-up by e-mail (§6): Turnstile, limits, disposable domains, password policy, then an Auth
@@ -42,7 +43,11 @@ async function createAuthUser(input: SignupInput): Promise<{ uid: string; create
     if (errorCode(error) !== "auth/email-already-exists") throw error;
     const record = await userByEmail(input.email);
     if (!record) throw error;
-    return { uid: record.uid, created: false };
+    if ((await recordState(record)) !== "orphan") return { uid: record.uid, created: false };
+    // Orphan of a failed sign-up or of a purge whose Auth deletion failed: adopted by this sign-up,
+    // which otherwise could never use this e-mail again. The verification link still decides.
+    await auth().updateUser(record.uid, { password: input.password, displayName: input.displayName, emailVerified: false, disabled: false });
+    return { uid: record.uid, created: true };
   }
 }
 

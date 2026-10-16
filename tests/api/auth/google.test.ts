@@ -1,7 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { setGoogleVerifierForTests, type GoogleIdentity } from "@/lib/auth/google";
-import { findUidByEmail, getUserPrivate } from "@/lib/db/repositories/users";
+import { findUidByEmail, getUser, getUserPrivate } from "@/lib/db/repositories/users";
 import { auth } from "@/lib/firebase/admin";
+import { setClaims } from "@/lib/firebase/claims";
 import { signInWithCustomToken } from "@/lib/firebase/rest";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import type * as Turnstile from "@/lib/security/turnstile";
@@ -146,6 +147,21 @@ describe("POST /api/auth/google", () => {
     const created = await call<SignedInBody>(google, GOOGLE, { jar: new Jar(), body: body({ email }, { consents: CONSENTS, turnstileToken: "t" }) });
     expect(created.status).toBe(200);
     expect((await call<SignedInBody>(google, GOOGLE, { ip, body: body({ email }) })).status).toBe(200);
+  });
+
+  it("never turns a staff account into a member: 403, claims and roster untouched", async () => {
+    const email = uniqueEmail("staff");
+    const staff = await auth().createUser({ email, emailVerified: true, displayName: "Modo" });
+    await setClaims(staff.uid, { role: "admin" });
+    const jar = new Jar();
+    const first = await call<ErrorBody>(google, GOOGLE, { jar, body: body({ email }) });
+    expect(first.status).toBe(403);
+    expect(first.body.error.code).toBe("forbidden");
+    const withConsents = await call<ErrorBody>(google, GOOGLE, { jar, body: body({ email }, { consents: CONSENTS, turnstileToken: "t" }) });
+    expect(withConsents.status).toBe(403);
+    expect((await auth().getUser(staff.uid)).customClaims).toMatchObject({ role: "admin" });
+    expect(await getUser(staff.uid)).toBeNull();
+    expect(jar.get("__Host-session")).toBeUndefined();
   });
 
   it("refuses an unverified Google e-mail and a disabled account", async () => {

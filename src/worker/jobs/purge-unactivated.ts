@@ -10,8 +10,9 @@ import { consume, isDegraded } from "@/lib/quota";
 // activation that failed half-way), the member is activated instead. The documents are deleted in
 // one transaction that re-checks the pending state, so an activation that lands between the query
 // and the purge keeps the account (its Auth record is then left alone). Documents go first and the
-// Auth record last: an orphan Auth record has no role and is harmless, while a profile without
-// its Auth record would be listed again every hour. A uid that failed is skipped on the next run
+// Auth record last: an orphan Auth record has no role and is adopted by the next sign-up with its
+// e-mail (src/lib/auth/orphan.ts), while a profile without its Auth record would be listed again
+// every hour. A uid that failed is skipped on the next run
 // so it never starves the batch; it is retried the run after.
 
 export const PURGE_AFTER_MS = 24 * 3_600_000;
