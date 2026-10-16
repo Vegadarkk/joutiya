@@ -10,7 +10,7 @@ import { requestIdentity } from "@/lib/rate-limit/keys";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 import { completeKybcUpload, signKybcUpload } from "./kybc-uploads";
-import { submitApplication } from "./service";
+import { proSelf, submitApplication } from "./service";
 
 // Route handlers of /api/pro/** (phase 7 design §4): requireUser (Origin + CSRF on mutations),
 // strict body, per-account limiter before the first Firestore read, Turnstile on the application.
@@ -40,4 +40,11 @@ export async function handleKybcComplete(request: Request, rawId: unknown): Prom
   const id = uploadIdSchema.safeParse(rawId);
   if (!id.success) throw notFound();
   return json(await completeKybcUpload({ auth, ip: requestIdentity(request.headers).ip }, id.data));
+}
+
+/** GET /api/pro/me: the signed-in account's shop or application. */
+export async function handleMe(request: Request): Promise<Response> {
+  const auth = await requireUser(request);
+  await enforceLimit("pro.read.uid", auth.user.uid);
+  return json(await proSelf(auth));
 }

@@ -41,7 +41,7 @@ export function proRejected(data: TemplateData["proRejected"], ctx: TemplateCont
     title: copy.title,
     greeting: GREETING[ctx.lang](data.displayName),
     paragraphs: [copy.body(data.shopName), copy.reason(data.reason)],
-    action: { label: copy.button, url: pageUrl(ctx, "devenir-pro") },
+    action: { label: copy.button, url: pageUrl(ctx, "pro") },
     replyTo: data.contact,
     closing: [copy.closing(data.contact)],
   });

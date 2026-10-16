@@ -109,6 +109,7 @@ export interface ProDecisionResponse {
 
 export const PRO_API = {
   apply: "/api/pro/apply",
+  me: "/api/pro/me",
   kybcSign: "/api/pro/kybc/uploads",
   kybcComplete: (id: string) => `/api/pro/kybc/uploads/${id}/complete`,
 } as const;
@@ -131,3 +132,35 @@ export interface KybcSignResponse {
 }
 
 export type KybcCompleteResponse = { status: "ready"; uploadId: string } | { status: "rejected"; uploadId: string; reason: "too_large" | "bad_type" | "expired" };
+
+/** GET /api/pro/me: the signed-in account's shop (or application) and what it may do next. */
+export interface ProMeResponse {
+  signupOpen: boolean;
+  salesOpen: boolean;
+  eligibility: { emailVerified: boolean; phoneVerified: boolean; accountActive: boolean };
+  shop: ProSelfView | null;
+}
+
+export interface ProSelfView {
+  proId: string;
+  name: string;
+  slug: string;
+  description: string;
+  regionCode: string;
+  citySlug: string;
+  legalForm: string;
+  ice: string;
+  lifecycle: string;
+  plan: string;
+  planSource: string;
+  kybcStatus: string;
+  rejectReason: string | null;
+  /** ISO. */
+  submittedAt: string | null;
+  quotas: { activeListings: number | null; listingsPerDay: number | null; photosPerListing: number };
+  activeListings: number;
+  /** Launch offer in force for this shop (design D3); `endsAt` ISO or null while no end is announced. */
+  launchOffer: { endsAt: string | null; noticeDays: number } | null;
+  /** Public storefront path segment `{slug}-{proId}`, when the storefront is shown. */
+  storefront: string | null;
+}

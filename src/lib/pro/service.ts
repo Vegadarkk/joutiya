@@ -2,9 +2,10 @@ import "server-only";
 import { listingQuotas } from "@/config/pricing";
 import type { AuthContext } from "@/lib/auth/guards";
 import { getFlags, getPricing } from "@/lib/config/runtime";
-import type { ProApplyInput } from "@/lib/contracts/pro";
+import type { ProApplyInput, ProMeResponse } from "@/lib/contracts/pro";
 import { db } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
+import { countActive } from "@/lib/db/repositories/listings";
 import { getProProfile, proProfileFromSnapshot, proProfileRef, proProfileToFirestore } from "@/lib/db/repositories/pro-profiles";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { getUploads } from "@/lib/db/repositories/uploads";
@@ -13,7 +14,7 @@ import { HttpError } from "@/lib/http/errors";
 import { newListingId, slugify } from "@/lib/listings/ids";
 import { consume } from "@/lib/quota";
 import { iceFormatOk } from "./kybc";
-import { transition } from "./lifecycle";
+import { storefrontShown, transition } from "./lifecycle";
 import type { ProProfileDoc } from "./profile-schema";
 
 // Pro accounts (architecture §5 lifecycle, §6 "Devenir Pro", phase 7 design §4). The application
@@ -98,4 +99,39 @@ export async function submitApplication(actor: ProActor, input: ProApplyInput, n
   void consume("firestore.reads", 2);
   void consume("firestore.writes", 2);
   return { proId };
+}
+
+/** GET /api/pro/me: the account's shop or application, the switches and the eligibility checks. */
+export async function proSelf(auth: AuthContext): Promise<ProMeResponse> {
+  const uid = auth.user.uid;
+  const [flags, user] = await Promise.all([getFlags(), getUser(uid)]);
+  const eligibility = { emailVerified: user?.badges.emailVerified ?? false, phoneVerified: user?.badges.phoneVerified ?? false, accountActive: user?.status === "active" };
+  const base = { signupOpen: flags.proSignupEnabled, salesOpen: flags.salesEnabled, eligibility };
+  const profile = user?.proId ? await getProProfile(user.proId) : null;
+  if (!profile || profile.ownerUid !== uid) return { ...base, shop: null };
+  const pricing = await getPricing();
+  const active = profile.lifecycle === "pending_verification" || profile.lifecycle === "rejected" ? 0 : await countActive(uid);
+  return {
+    ...base,
+    shop: {
+      proId: profile.proId,
+      name: profile.name,
+      slug: profile.slug,
+      description: profile.description,
+      regionCode: profile.regionCode,
+      citySlug: profile.citySlug,
+      legalForm: profile.legal.form,
+      ice: profile.legal.ice,
+      lifecycle: profile.lifecycle,
+      plan: profile.plan,
+      planSource: profile.planSource,
+      kybcStatus: profile.kybc.status,
+      rejectReason: profile.kybc.rejectReason ?? null,
+      submittedAt: profile.kybc.submittedAt?.toISOString() ?? null,
+      quotas: profile.quotas,
+      activeListings: active,
+      launchOffer: profile.planSource === "launch_offer" ? { endsAt: pricing.launchOffer.endsAt, noticeDays: pricing.launchOffer.noticeDays } : null,
+      storefront: storefrontShown(profile.lifecycle, profile.plan) ? `${profile.slug}-${profile.proId}` : null,
+    },
+  };
 }

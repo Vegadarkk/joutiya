@@ -2487,5 +2487,115 @@
       "rangeTo": "{label} : jusqu'à {max}",
       "options": "{label} : {values}"
     }
+  },
+  "Pro": {
+    "metaTitle": "Espace Pro",
+    "title": "Espace Pro",
+    "loadFailed": "Votre espace Pro n'a pas pu être chargé",
+    "retry": "Réessayer",
+    "intro": {
+      "title": "Ouvrir une boutique Pro sur Joutiya",
+      "lead": "Pour les sociétés, commerçants et auto-entrepreneurs : une boutique à votre nom, des annonces marquées Pro et des quotas adaptés à votre activité.",
+      "offer": "L'offre Essentiel est offerte aux boutiques validées jusqu'à l'ouverture des ventes. Vous serez prévenu {days} jours avant tout paiement.",
+      "how": "Nous vérifions vos identifiants (ICE, registre) et une pièce justificative avant d'ouvrir la boutique, en général sous deux jours ouvrés."
+    },
+    "eligibility": {
+      "title": "Avant de commencer",
+      "email": "Adresse e-mail confirmée",
+      "phone": "Numéro de mobile vérifié",
+      "verifyPhone": "Vérifier mon numéro",
+      "settings": "Ouvrir mes paramètres",
+      "inactive": "Votre compte doit être actif pour demander un compte Pro."
+    },
+    "closed": "Les demandes de compte Pro sont fermées pour le moment. Revenez bientôt.",
+    "form": {
+      "shopTitle": "Votre boutique",
+      "legalTitle": "Votre statut",
+      "piecesTitle": "Vos justificatifs",
+      "commitTitle": "Votre engagement",
+      "name": "Nom de la boutique",
+      "nameHint": "Le nom affiché sur vos annonces et votre vitrine, de 2 à {max} caractères.",
+      "description": "Présentation",
+      "descriptionHint": "Facultatif. Ce que vous vendez, vos services, vos horaires.",
+      "city": "Ville de la boutique",
+      "legalForm": "Forme juridique",
+      "forms": {
+        "societe": "Société (SARL, SA…)",
+        "auto_entrepreneur": "Auto-entrepreneur",
+        "commercant": "Commerçant personne physique"
+      },
+      "ice": "ICE",
+      "iceHint": "Identifiant commun de l'entreprise : 15 chiffres.",
+      "rc": "Numéro de registre du commerce (RC)",
+      "if": "Identifiant fiscal (IF)",
+      "aeNumber": "Numéro d'auto-entrepreneur",
+      "tp": "Numéro de taxe professionnelle (TP)",
+      "rcOrTp": "Indiquez le RC ou la taxe professionnelle.",
+      "piecesLead": "Ajoutez de 1 à {max} documents : extrait du registre de commerce, attestation d'auto-entrepreneur ou de taxe professionnelle. Formats acceptés : PDF, JPEG ou PNG, 10 Mo au plus chacun.",
+      "addPiece": "Ajouter un document",
+      "removePiece": "Retirer {name}",
+      "pieceUploading": "Envoi en cours…",
+      "pieceReady": "Document reçu",
+      "pieceRejected": {
+        "bad_type": "Ce fichier n'est ni un PDF, ni une image JPEG ou PNG.",
+        "too_large": "Ce fichier dépasse 10 Mo.",
+        "expired": "L'envoi n'a pas abouti. Réessayez."
+      },
+      "pieceFailed": "Le document n'a pas pu être envoyé. Réessayez.",
+      "piecesRequired": "Ajoutez au moins un justificatif.",
+      "piecesPending": "Attendez la fin de l'envoi des documents.",
+      "commitment": "Je certifie que ces informations sont exactes et je m'engage à ne proposer que des produits et services conformes à la loi.",
+      "commitmentRequired": "Cochez l'engagement pour envoyer la demande.",
+      "submit": "Envoyer ma demande",
+      "resubmit": "Envoyer ma demande corrigée",
+      "required": "Ce champ est obligatoire.",
+      "nameLength": "Le nom doit compter de 2 à {max} caractères.",
+      "iceFormat": "L'ICE compte 15 chiffres.",
+      "identifierFormat": "Utilisez des chiffres et des lettres uniquement.",
+      "cityRequired": "Choisissez la ville de la boutique."
+    },
+    "pending": {
+      "title": "Demande en cours de vérification",
+      "body": "Nous avons reçu la demande de « {name} » le {date}. Vous recevrez un e-mail dès qu'elle aura été vérifiée."
+    },
+    "rejected": {
+      "title": "Votre demande n'a pas été validée",
+      "reason": "Motif : {reason}",
+      "fix": "Corrigez les informations concernées, puis envoyez à nouveau votre demande."
+    },
+    "dashboard": {
+      "verified": "Boutique vérifiée",
+      "suspended": "Boutique suspendue",
+      "suspendedBody": "Votre boutique est suspendue. Vous avez reçu un e-mail expliquant la décision et comment la contester.",
+      "plan": "Votre offre",
+      "plans": {
+        "none": "Aucune offre",
+        "essentiel": "Essentiel",
+        "business": "Business",
+        "premium": "Premium"
+      },
+      "launchOffer": "Offerte jusqu'à l'ouverture des ventes. Vous serez prévenu {days} jours avant tout paiement.",
+      "launchOfferEnds": "Offerte jusqu'au {date}.",
+      "noPlan": "Sans offre, vous ne pouvez pas publier de nouvelle annonce en tant que professionnel.",
+      "salesClosed": "Les abonnements ouvriront prochainement.",
+      "grace": "Le dernier paiement a échoué : mettez à jour votre moyen de paiement pour garder votre offre.",
+      "active": "Annonces en ligne",
+      "activeCount": "{count} sur {limit}",
+      "activeUnlimited": "{count}, sans limite",
+      "perDay": "Jusqu'à {count} nouvelles annonces par jour",
+      "perDayUnlimited": "Nouvelles annonces sans limite par jour",
+      "photos": "Jusqu'à {count} photos par annonce",
+      "storefront": "Voir ma vitrine",
+      "myListings": "Mes annonces",
+      "newListing": "Déposer une annonce",
+      "signInAgain": "Votre compte vient de passer Pro : reconnectez-vous pour publier en tant que professionnel.",
+      "signIn": "Me reconnecter"
+    },
+    "errors": {
+      "pro_signup_closed": "Les demandes de compte Pro sont fermées pour le moment.",
+      "already_pro": "Votre compte est déjà un compte Pro.",
+      "pro_application_exists": "Une demande est déjà en cours pour ce compte.",
+      "invalid_pieces": "Un des documents n'est plus disponible. Retirez-le et ajoutez-le de nouveau."
+    }
   }
 }
