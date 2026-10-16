@@ -164,7 +164,7 @@ describe("retention-purge: listings", () => {
     expect(recordMediaBytes).toHaveBeenCalledWith(-40_000, NOW);
   });
 
-  it("frees nothing for an upload document another path deleted meanwhile (owner DELETE, purge-quarantine)", async () => {
+  it("frees nothing for, and does not count, an upload document another path deleted meanwhile (owner DELETE, purge-quarantine)", async () => {
     const record = listing("gone2345", { photos: [] });
     seed(record.id, "photogone0000001");
     seed(record.id, "photokept0000002");
@@ -172,7 +172,7 @@ describe("retention-purge: listings", () => {
     vi.mocked(uploadsRepo.deleteUploadDocument).mockResolvedValueOnce(null);
     vi.mocked(retention.listListingsPastPurge).mockResolvedValueOnce(page([record]));
 
-    expect(await retentionPurge(NOW, { store })).toMatchObject({ listings: 1, uploads: 2, failed: 0 });
+    expect(await retentionPurge(NOW, { store })).toMatchObject({ listings: 1, uploads: 1, failed: 0 });
     expect(store.keys("media")).toEqual([]);
     expect(recordMediaBytes).toHaveBeenCalledExactlyOnceWith(-25_000, NOW);
   });

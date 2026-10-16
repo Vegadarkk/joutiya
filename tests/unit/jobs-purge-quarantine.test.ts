@@ -208,7 +208,7 @@ describe("purge-quarantine: documents past purgeAt", () => {
     expect(recordMediaBytes).toHaveBeenCalledWith(-50_000, NOW);
   });
 
-  it("frees the bytes of the document as it removed it: none for one another path removed or ended meanwhile", async () => {
+  it("frees the bytes of the document as it removed it: none for one another path removed or ended meanwhile, which is not counted", async () => {
     const gone = upload("readygone001", { ...past, status: "ready", size: 50_000 });
     const ended = upload("readyended01", { ...past, status: "ready", size: 30_000 });
     const kept = upload("readykept001", { ...past, status: "ready", size: 20_000 });
@@ -221,7 +221,7 @@ describe("purge-quarantine: documents past purgeAt", () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ ...ended, status: "rejected", rejectReason: "expired" });
 
-    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: 3, freedBytes: 20_000, failed: 0 });
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: 2, freedBytes: 20_000, failed: 0 });
     expect(store.keys("media")).toEqual([]);
     expect(recordMediaBytes).toHaveBeenCalledExactlyOnceWith(-20_000, NOW);
   });
@@ -303,6 +303,14 @@ describe("purge-quarantine: documents past purgeAt", () => {
     expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: PURGE_QUARANTINE_BATCH + 1 });
     expect(vi.mocked(repo.listPastPurge).mock.calls[1]?.[2]).toEqual({ purgeAt: past.purgeAt, id: page[page.length - 1]!.id });
     expect(repo.listPastPurge).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives the bytes of the documents already removed back to the gauge when a later page's query fails", async () => {
+    const page = Array.from({ length: PURGE_QUARANTINE_BATCH }, (_, i) => upload(`page${String(i).padStart(8, "0")}`, { ...past, status: "ready", size: 1_000 }));
+    vi.mocked(repo.listPastPurge).mockResolvedValueOnce(page).mockRejectedValueOnce(new Error("deadline exceeded"));
+
+    await expect(purgeQuarantine(NOW, { store })).rejects.toThrow("deadline exceeded");
+    expect(recordMediaBytes).toHaveBeenCalledExactlyOnceWith(-PURGE_QUARANTINE_BATCH * 1_000, NOW);
   });
 
   it("defers the document purge while the Firestore delete quota is degraded", async () => {

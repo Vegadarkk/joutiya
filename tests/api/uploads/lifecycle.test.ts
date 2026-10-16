@@ -507,6 +507,29 @@ describe("DELETE /api/uploads/{id} twice at once (a retry, a double tap)", () =>
   });
 });
 
+describe("DELETE /api/uploads/{id} cut short by a storage error", () => {
+  it("takes the bytes off with the transition: the retry that removes the objects and the document frees nothing more", async () => {
+    const owner = await member();
+    const live = await publishedListing(owner, 2, { title: "Lanterne en laiton ciselé" });
+    const [photo] = live.photoIds as [string, string];
+    const size = (await getUpload(photo))!.size!;
+    const bytesBefore = await sumStoredBytes();
+    vi.mocked(recordMediaBytes).mockClear();
+    vi.spyOn(store, "delete").mockRejectedValueOnce(new Error("storage unavailable"));
+
+    expect((await call(remove, "DELETE", `/api/uploads/${photo}`, { member: owner })).status).toBe(500);
+    expect((await getUpload(photo))!.status).toBe("rejected");
+    // Off the gauge already, as the nightly recount sees it.
+    expect(await sumStoredBytes()).toBe(bytesBefore - size);
+    expect(recordMediaBytes).toHaveBeenCalledExactlyOnceWith(-size, expect.any(Date));
+
+    expect((await call(remove, "DELETE", `/api/uploads/${photo}`, { member: owner })).status).toBe(204);
+    expect(await getUpload(photo)).toBeNull();
+    expect(store.keys("media").filter((key) => key.includes(photo))).toEqual([]);
+    expect(recordMediaBytes).toHaveBeenCalledOnce();
+  });
+});
+
 describe("deleteUploadDocument", () => {
   it("returns the document it removed, then null: one caller removes it", async () => {
     const owner = await member();

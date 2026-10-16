@@ -87,8 +87,10 @@ async function deleteUpload(store: ObjectStore, listing: ListingRecord, upload: 
   await store.delete("quarantine", upload.quarantineKey);
   state.result.objects += 1;
   // By the document as this run removed it: an owner DELETE or purge-quarantine may have ended or
-  // removed it since the listing, and then its bytes were theirs.
-  state.freedBytes += storedBytes(await deleteUploadDocument(upload.id));
+  // removed it since the listing, and then its bytes were theirs (no delete either: none counted).
+  const removed = await deleteUploadDocument(upload.id);
+  state.freedBytes += storedBytes(removed);
+  if (!removed) return;
   state.result.uploads += 1;
   state.budget -= 1;
 }

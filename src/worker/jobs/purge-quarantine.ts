@@ -252,6 +252,15 @@ export function retainedUntil(listing: Pick<ListingRecord, "purgeAt">, now: Date
 }
 
 async function purgeExpiredDocuments(store: ObjectStore, now: Date, result: PurgeQuarantineResult): Promise<void> {
+  try {
+    await purgeExpiredPages(store, now, result);
+  } finally {
+    // Documents already removed give their bytes back even when a later page's query fails.
+    if (result.freedBytes > 0) await recordMediaBytes(-result.freedBytes, now);
+  }
+}
+
+async function purgeExpiredPages(store: ObjectStore, now: Date, result: PurgeQuarantineResult): Promise<void> {
   let page: PurgeCursor | undefined;
   for (let pages = 0; pages < PURGE_PAGES; pages += 1) {
     const uploads = await listPastPurge(now, PURGE_QUARANTINE_BATCH, page);
@@ -276,9 +285,10 @@ async function purgeExpiredDocuments(store: ObjectStore, now: Date, result: Purg
           // An orphan may have been a removed listing's: its variants can be in either bucket.
           await deleteObjects(store, upload, upload.bucket === "private" || !listing ? ["media", "private"] : ["media"]);
           // By the document as this run removed it: an owner DELETE or retention-purge may have ended
-          // or removed it since the listing, and then its bytes were theirs.
-          result.freedBytes += storedBytes(await deleteUploadDocument(upload.id));
-          result.purged += 1;
+          // or removed it since the listing, and then its bytes (and its count) were theirs.
+          const removed = await deleteUploadDocument(upload.id);
+          result.freedBytes += storedBytes(removed);
+          if (removed) result.purged += 1;
         }
       } catch (error) {
         result.failed += 1;
@@ -289,7 +299,6 @@ async function purgeExpiredDocuments(store: ObjectStore, now: Date, result: Purg
     page = { purgeAt: last.purgeAt, id: last.id };
     if (uploads.length < PURGE_QUARANTINE_BATCH) break;
   }
-  if (result.freedBytes > 0) await recordMediaBytes(-result.freedBytes, now);
 }
 
 export async function purgeQuarantine(now = new Date(), deps: { store?: ObjectStore } = {}): Promise<PurgeQuarantineResult> {

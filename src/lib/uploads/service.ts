@@ -214,10 +214,9 @@ export async function deleteUpload(uploader: Uploader, id: string, now = new Dat
   if (listing && !PHOTO_TARGET_STATUSES.includes(listing.status)) throw new HttpError(409, "conflict", `the photos of a ${listing.status} listing are retained with it`);
   if (listing) await detach(uploader, listing.id, id, LIVE_STATUSES, now);
   const held = listing !== null && listing.legalHold.length > 0;
-  // Bytes this call takes off the storage gauge, once even when the same upload is deleted twice at
-  // once (a retry, a double tap, purge-quarantine): those of the photo this call's transition took
-  // out of `ready`, then those of a document still counted when this call removes it.
-  let freedBytes = 0;
+  // Bytes come off the storage gauge once even when the same upload is deleted twice at once (a
+  // retry, a double tap, purge-quarantine): those of the photo this call's transition took out of
+  // `ready`, then those of a document still counted when this call removes it.
   if (upload.status !== "rejected") {
     // Out of `ready` first, hold or not: a document kept as evidence is never attached or offered
     // for the next save again (the owner's view lists it as refused until it is purged). Its
@@ -230,9 +229,11 @@ export async function deleteUpload(uploader: Uploader, id: string, now = new Dat
       now,
     );
     if (!ended.ok && !ended.upload) throw notFound();
-    // Ready when read, or finished by the pipeline before the transition: its bytes were counted. A
-    // concurrent DELETE that lost the transition frees nothing; under a hold they stay (heldObjects).
-    if (ended.ok && !held && (upload.status === "ready" || ended.upload.variants)) freedBytes = ended.upload.size ?? 0;
+    // Ready when read, or finished by the pipeline before the transition: its bytes were counted, and
+    // come off now, as the nightly recount no longer counts them (a failed object delete below must
+    // not keep them: a retry finds the upload rejected). A concurrent DELETE that lost the transition
+    // frees nothing; under a hold they stay (heldObjects).
+    if (ended.ok && !held && (upload.status === "ready" || ended.upload.variants) && ended.upload.size) await recordMediaBytes(-ended.upload.size, now);
     // Past the point of no return: the photo goes even if it was the last one.
     if (listing && upload.status !== "ready") await detach(uploader, listing.id, id, [], now);
   }
@@ -246,6 +247,6 @@ export async function deleteUpload(uploader: Uploader, id: string, now = new Dat
   const buckets: readonly PhotoBucket[] = upload.bucket === "private" ? ["private", "media"] : ["media"];
   for (const bucket of buckets) for (const variant of PHOTO_VARIANTS) await objects.delete(bucket, photoObjectKey(bucket, upload.targetId, id, variant));
   // A photo deleted earlier under a hold now lifted still has its variants, and its bytes counted.
-  freedBytes += storedBytes(await deleteUploadDocument(id));
+  const freedBytes = storedBytes(await deleteUploadDocument(id));
   if (freedBytes > 0) await recordMediaBytes(-freedBytes, now);
 }
