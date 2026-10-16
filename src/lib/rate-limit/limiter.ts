@@ -73,6 +73,17 @@ function run<T>(call: () => Promise<T>): Promise<T> {
   return withTimeout(storeReady().then(call), 500);
 }
 
+/** A store outage logs once a minute per limiter: the proxy meters every page view. */
+const UNAVAILABLE_LOG_INTERVAL_MS = 60_000;
+const unavailableLoggedAt = new Map<RateLimitId, number>();
+
+function logUnavailable(id: RateLimitId, error: unknown): void {
+  const now = Date.now();
+  if (now - (unavailableLoggedAt.get(id) ?? -Infinity) < UNAVAILABLE_LOG_INTERVAL_MS) return;
+  unavailableLoggedAt.set(id, now);
+  logger.warn({ limiter: id, err: (error as Error).message }, "rate limiter unavailable");
+}
+
 /** Consumes `points` for `rawKey`. Never throws: the outcome carries the decision. */
 export async function consumeLimit(id: RateLimitId, rawKey: string, points = 1): Promise<LimitOutcome> {
   try {
@@ -80,7 +91,7 @@ export async function consumeLimit(id: RateLimitId, rawKey: string, points = 1):
     return { ok: true, remaining: result.remainingPoints };
   } catch (error) {
     if (error instanceof RateLimiterRes) return { ok: false, reason: "limited", retryAfterSeconds: Math.ceil(error.msBeforeNext / 1000) };
-    logger.warn({ limiter: id, err: (error as Error).message }, "rate limiter unavailable");
+    logUnavailable(id, error);
     return { ok: false, reason: "unavailable" };
   }
 }
@@ -154,4 +165,5 @@ export function isRateLimitError(error: unknown): boolean {
 export function resetRateLimiters(): void {
   limiters.clear();
   connecting = undefined;
+  unavailableLoggedAt.clear();
 }
