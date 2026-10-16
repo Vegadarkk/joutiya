@@ -1964,5 +1964,155 @@
     "scrollHint": "Utilisez Ctrl + molette pour zoomer sur la carte",
     "scrollHintMac": "Utilisez ⌘ + molette pour zoomer sur la carte",
     "touchHint": "Utilisez deux doigts pour déplacer la carte"
+  },
+  "ListingCard": {
+    "donation": "Don",
+    "toDiscuss": "Prix à discuter",
+    "negotiable": "Négociable",
+    "per": {
+      "night": "par nuit",
+      "month": "par mois",
+      "day": "par jour"
+    },
+    "photos": "{count, plural, one {# photo} other {# photos}}",
+    "pro": "Pro",
+    "noPhoto": "Pas de photo"
+  },
+  "ListingPage": {
+    "home": "Accueil",
+    "breadcrumb": "Fil d'Ariane",
+    "sellerLabel": "Vendeur et contact",
+    "place": "{place}, {region}",
+    "publishedOn": "Publiée le {date}",
+    "criteriaTitle": "Caractéristiques",
+    "descriptionTitle": "Description",
+    "locationTitle": "Localisation",
+    "locationHint": "Position approximative : l'adresse exacte n'est jamais publiée.",
+    "meta": {
+      "title": "{title} à {city}"
+    },
+    "gallery": {
+      "roledescription": "carrousel",
+      "label": "Photos de l'annonce, {count, plural, one {# photo} other {# photos}}",
+      "trackLabel": "Photos : faites défiler pour voir la suite",
+      "photoAlt": "{title}, photo {index} sur {count}",
+      "open": "Agrandir la photo",
+      "previous": "Photo précédente",
+      "next": "Photo suivante",
+      "thumbnails": "Miniatures des photos",
+      "show": "Afficher la photo {index} sur {count}",
+      "position": "Photo {index} sur {count}",
+      "close": "Fermer",
+      "lightboxHint": "Utilisez les flèches du clavier ou faites glisser pour changer de photo, et Échap pour fermer.",
+      "empty": "Le vendeur n'a pas encore ajouté de photo."
+    },
+    "criteria": {
+      "yes": "Oui",
+      "no": "Non",
+      "units": {
+        "km": "km",
+        "cv": "CV",
+        "m2": "m²",
+        "an": "an",
+        "go": "Go",
+        "nuit": "nuits",
+        "mois": "mois"
+      }
+    },
+    "seller": {
+      "roleIndividual": "Particulier",
+      "roleBusiness": "Professionnel",
+      "pro": "Pro",
+      "memberSince": "Membre depuis {date}",
+      "listingsOnline": "{count, plural, one {# annonce en ligne} other {# annonces en ligne}}",
+      "phoneVerified": "Téléphone vérifié",
+      "emailVerified": "E-mail vérifié",
+      "proCertified": "Pro certifié"
+    },
+    "contact": {
+      "showPhone": "Voir le numéro",
+      "showWhatsapp": "Contacter sur WhatsApp",
+      "call": "Appeler le {number}",
+      "whatsapp": "WhatsApp",
+      "message": "Envoyer un message",
+      "messageShort": "Message",
+      "soon": "Bientôt",
+      "messagingSoon": "La messagerie Joutiya arrive bientôt. En attendant, utilisez le contact proposé par le vendeur.",
+      "messagingSoonOnly": "Ce vendeur sera joignable par la messagerie Joutiya, qui arrive bientôt.",
+      "signInBody": "Connectez-vous pour voir le numéro du vendeur. Vous reviendrez ensuite sur cette annonce.",
+      "signIn": "Se connecter",
+      "own": "C'est votre annonce. Les acheteurs voient ici les boutons pour vous contacter.",
+      "manage": "Gérer mes annonces",
+      "errors": {
+        "reveal_not_allowed": "Les numéros s'affichent pour les comptes créés depuis plus de 24 heures, avec une adresse e-mail confirmée. Confirmez votre adresse ou réessayez demain.",
+        "listing_unavailable": "Cette annonce n'est plus en ligne : son numéro ne s'affiche plus.",
+        "not_found": "Le vendeur n'affiche plus de numéro pour cette annonce.",
+        "turnstile_required": "De nombreux numéros ont été consultés depuis votre connexion internet. Réessayez plus tard.",
+        "turnstile_failed": "De nombreux numéros ont été consultés depuis votre connexion internet. Réessayez plus tard.",
+        "rate_limited": "Vous avez consulté de nombreux numéros. Réessayez {wait}.",
+        "later": "plus tard",
+        "unavailable": "L'affichage des numéros est momentanément indisponible. Réessayez dans quelques minutes.",
+        "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez."
+      }
+    },
+    "safety": {
+      "title": "Conseils de sécurité",
+      "tips": {
+        "noAdvance": "Ne payez jamais à l'avance : ni acompte, ni frais d'envoi, ni réservation avant d'avoir vu l'article.",
+        "meetPublic": "Rencontrez le vendeur dans un lieu public et fréquenté, de préférence en journée.",
+        "checkItem": "Vérifiez l'article et ses papiers avant de payer.",
+        "noCodes": "Ne communiquez jamais vos codes bancaires, ni un code reçu par SMS ou WhatsApp."
+      },
+      "host": "Joutiya héberge les annonces de ses utilisateurs : elle n'est ni vendeur ni acheteur, et n'est partie ni aux transactions ni aux litiges entre eux.",
+      "more": "Tous nos conseils de confiance et de sécurité"
+    },
+    "status": {
+      "paused": {
+        "title": "Annonce en pause",
+        "body": "Le vendeur a mis cette annonce en pause : il n'est pas possible de le contacter à son sujet pour le moment."
+      },
+      "sold": {
+        "title": "Article vendu",
+        "body": "Le vendeur a indiqué que cet article est vendu."
+      },
+      "expired": {
+        "title": "Annonce expirée",
+        "body": "Cette annonce n'est plus en ligne : sa durée de publication est terminée."
+      },
+      "browse": "Voir d'autres annonces"
+    },
+    "ad": {
+      "label": "Espace promotionnel",
+      "title": "Un objet qui dort chez vous ?",
+      "body": "Déposez une annonce gratuitement, en quelques minutes.",
+      "cta": "Déposer une annonce"
+    },
+    "report": {
+      "listing": {
+        "link": "Signaler l'annonce",
+        "subject": "Signalement de l'annonce {id}"
+      },
+      "profile": {
+        "link": "Signaler ce profil",
+        "subject": "Signalement du profil {id}"
+      },
+      "body": "Adresse de la page : {url}\n\nMotif du signalement :\n",
+      "hint": "Le signalement part par e-mail vers notre équipe de modération. Indiquez le motif : nous vous informerons de la suite donnée."
+    }
+  },
+  "Profile": {
+    "roleIndividual": "Particulier",
+    "roleBusiness": "Professionnel",
+    "pro": "Pro",
+    "memberSince": "Membre depuis {date}",
+    "listingsTitle": "{count, plural, one {# annonce en ligne} other {# annonces en ligne}}",
+    "emptyTitle": "Aucune annonce en ligne pour le moment",
+    "emptyBody": "Les prochaines annonces de {name} apparaîtront ici.",
+    "browse": "Parcourir les annonces",
+    "newest": "Les {shown} annonces les plus récentes sont affichées.",
+    "meta": {
+      "title": "Annonces de {name}",
+      "description": "{name}, membre depuis {date} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya."
+    }
   }
 }
