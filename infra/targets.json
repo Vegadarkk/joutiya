@@ -13,7 +13,7 @@
       "userId": "ocid1.user.oc1..aaaaaaaapcgofwhegeb4jkc3xzmd6kqsug5zlhunsgxyuwlqbnk7udeqgiiq"
     },
     "anthropic": {
-      "organizationId": null
+      "organizationId": "de60375e-fd8c-47a8-bbbc-c40672c4eee5"
     },
     "stripe": {
       "accountId": "acct_1UQxR07tCjk226ma"
