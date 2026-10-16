@@ -430,3 +430,22 @@ describe("DELETE /api/uploads/{id} under a legal hold", () => {
     expect(store.keys("media").filter((key) => key.includes(held))).toEqual([]);
   });
 });
+
+describe("DELETE /api/uploads/{id} of an orphan photo moved to the private bucket", () => {
+  it("deletes its variants from the private bucket and any public copy left by a move cut short", async () => {
+    const owner = await member();
+    const live = await publishedListing(owner, 2, { title: "Commode ancienne en noyer" });
+    const [moved] = live.photoIds as [string];
+    for (const variant of ["l", "s"]) {
+      store.seed("private", `removed/listings/${live.id}/${moved}-${variant}.webp`, Buffer.from("webp"), { contentType: "image/webp" });
+      store.seed("media", `listings/${live.id}/${moved}-${variant}.webp`, Buffer.from("webp"), { contentType: "image/webp" });
+    }
+    await db().collection(COLLECTIONS.uploads).doc(moved).update({ bucket: "private", finalKey: `removed/listings/${live.id}/${moved}` });
+    await db().collection(COLLECTIONS.listings).doc(live.id).delete();
+
+    expect((await call(remove, "DELETE", `/api/uploads/${moved}`, { member: owner })).status).toBe(204);
+    expect(await getUpload(moved)).toBeNull();
+    expect(store.keys("private").filter((key) => key.includes(moved))).toEqual([]);
+    expect(store.keys("media").filter((key) => key.includes(moved))).toEqual([]);
+  });
+});

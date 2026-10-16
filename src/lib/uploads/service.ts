@@ -31,7 +31,7 @@ import { revalidateListingPaths } from "@/lib/listings/revalidate";
 import { logger } from "@/lib/logging/logger";
 import { expireUpload } from "@/lib/media/pipeline";
 import { dispatchUpload, enqueueMediaJob, isMediaQueueEnabled } from "@/lib/media/queue";
-import { mediaObjectKey, quarantineObjectKey } from "@/lib/media/urls";
+import { photoObjectKey, quarantineObjectKey, type PhotoBucket } from "@/lib/media/urls";
 import { captureServerException } from "@/lib/observability/capture";
 import { assertQuotas, DEPOSIT_QUOTAS } from "@/lib/quota/gate";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
@@ -229,7 +229,10 @@ export async function deleteUpload(uploader: Uploader, id: string, now = new Dat
     return;
   }
   await objects.delete("quarantine", upload.quarantineKey);
-  for (const variant of PHOTO_VARIANTS) await objects.delete("media", mediaObjectKey(upload.targetId, id, variant));
+  // A photo moved off the public bucket (removed listing, now an orphan) is in `private`; a move cut
+  // short may have left its public copy too, so both go (as in retention-purge).
+  const buckets: readonly PhotoBucket[] = upload.bucket === "private" ? ["private", "media"] : ["media"];
+  for (const bucket of buckets) for (const variant of PHOTO_VARIANTS) await objects.delete(bucket, photoObjectKey(bucket, upload.targetId, id, variant));
   await deleteUploadDocument(id);
   if (freedBytes > 0) await recordMediaBytes(-freedBytes, now);
 }
