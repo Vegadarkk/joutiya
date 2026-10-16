@@ -13,7 +13,7 @@ import type { RateLimitId } from "@/config/rate-limits";
 // approve or reject with a reason template). Moderators and admins, admin host only.
 
 /** Per-staff decision limit (closed policy); a dedicated "moderation.decision.uid" entry can replace it. */
-const DECISION_LIMIT: RateLimitId = "account.mutation.uid";
+const DECISION_LIMIT: RateLimitId = "moderation.decision.uid";
 
 async function listingId(context: { params: Promise<Record<string, string | string[] | undefined>> }): Promise<string> {
   const id = listingIdSchema.safeParse((await context.params)["id"]);

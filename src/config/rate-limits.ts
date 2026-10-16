@@ -78,6 +78,8 @@ export const RATE_LIMITS = {
   // Public listing and profile reads (API; the SSR page limit lives in the proxy, phase 4).
   "listing.read.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
   "profile.read.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
+  // Staff moderation decisions (admin host, behind Access): a moderator working the queue.
+  "moderation.decision.uid": { points: 300, duration: HOUR, policy: "closed", key: "uid" },
 } as const satisfies Record<string, RateLimitDefinition>;
 
 export type RateLimitId = keyof typeof RATE_LIMITS;

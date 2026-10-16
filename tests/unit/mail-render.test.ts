@@ -21,6 +21,9 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
   listingPublished: { displayName: "Nadia", title: "Vélo de ville", url: `${SITE}/fr/annonce/velo-de-ville-casablanca-abcd2345`, expiresAt: "2026-12-15T09:30:00.000Z" },
   listingPendingReview: { displayName: "Nadia", title: "Vélo de ville", listingId: "abcd2345", statement: { measure: "hold", facts: ["new_account", "dup_text"], ground: "CGU §7", automated: true, redress: "dsa@joutiya.ma" } },
   listingRejected: { displayName: "Nadia", title: "Vélo de ville", listingId: "abcd2345", statement: { measure: "reject", facts: ["prohibited_kw"], ground: "CGU §7.2", automated: true, redress: "dsa@joutiya.ma" } },
+  listingApproved: { displayName: "Nadia", title: "Vélo de ville", url: `${SITE}/fr/annonce/velo-de-ville-casablanca-abcd2345`, expiresAt: "2026-12-15T09:30:00.000Z" },
+  listingExpiringSoon: { displayName: "Nadia", title: "Vélo de ville", url: `${SITE}/fr/annonce/velo-de-ville-casablanca-abcd2345`, expiresAt: "2026-12-15T09:30:00.000Z" },
+  listingExpired: { displayName: "Nadia", title: "Vélo de ville", purgeAt: "2027-12-15T09:30:00.000Z" },
 };
 
 /** Every URL a template receives must appear in both bodies. */
@@ -73,7 +76,8 @@ describe("renderMail", () => {
           expect(rendered.text).toMatch(/[؀-ۿ]/);
         } else {
           expect(rendered.html).toContain('<html lang="fr" dir="ltr">');
-          expect(rendered.text).toContain("E-mail automatique, merci de ne pas répondre.");
+          // Statement mails carry a Reply-To (dsa@): their footer invites the reply instead.
+          expect(rendered.text).toContain(rendered.replyTo ? "Votre réponse à cet e-mail parvient à notre équipe." : "E-mail automatique, merci de ne pas répondre.");
         }
       });
     }
