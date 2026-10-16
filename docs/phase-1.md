@@ -12,8 +12,8 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | 2 | DNS de `joutiya.ma` | Claude (API) | `joutiya.ma` et `www` faits ; les noms protégés attendent l'étape 6 |
 | 3 | Réseau et VM Oracle | Claude (API), Nav pour le quota | Réseau fait, quota corrigé par Nav ; VM en création |
 | 4 | Accès de Claude à la VM | Nav, sur votre phrase | Fait ; vérifié sur la VM dès sa création |
-| 5 | Connexion Google d'Access | Nav, puis vous | Attend le projet Firebase de production |
-| 6 | Applications Access et jetons de service | Claude (API), Nav | Après l'étape 5 |
+| 5 | Connexion Google d'Access | Nav, puis vous | Prête : projets Firebase créés le 16 octobre |
+| 6 | Applications Access et jetons de service | Claude (API), Nav | Après les étapes 5 et 7 (Access exige une zone active) |
 | 7 | Serveurs DNS chez Cloudflare | Nav (Hostinger) | Après la validation du .MA, avant le 12 novembre |
 | 8 | Déploiement automatique du staging | Claude (API), vous pour un jeton | Après les étapes 6 et 7 |
 | 9 | Accès sans clé de la VM à Firestore | Claude | Avec la phase 2 |
@@ -24,7 +24,7 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 
 ## Ce qui reste à vous
 
-- **Étape 5** : afficher le secret du client Google créé par Nav et le coller dans le formulaire Zero Trust que Nav a ouvert. Vérifier que la validation en deux étapes de votre compte Google est active.
+- **Étape 5** : cliquer sur **Create** du client Google préparé par Nav (Google n'affiche le secret qu'à ce moment), puis coller l'ID et le secret dans le formulaire Zero Trust que Nav a ouvert. Vérifier que la validation en deux étapes de votre compte Google est active.
 - **Étape 8** : sur la page de jeton GitHub préparée par Nav, cliquer sur **Generate token**, puis l'enregistrer dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
 
 Rien d'autre : ni clé SSH, ni commande, ni console.
@@ -76,15 +76,21 @@ Commandes de Claude (`scripts/oracle-vm.ts`) :
 
 ## 5. Connexion Google d'Access
 
-Vous, et plus tard le personnel, entrez sur les pages protégées avec un compte Google (§6). Prérequis : le projet Firebase de production existe (phase 0, réponse de Google attendue).
+Vous, et plus tard le personnel, entrez sur les pages protégées avec un compte Google (§6). Les projets Firebase existent depuis le 16 octobre ; cette étape n'attend ni la VM ni la zone.
 
-1. Nav, dans Google Cloud, projet de production (`environments.prod.firebase.projectId`), **Google Auth Platform** : nom « Joutiya », e-mail d'assistance = votre Gmail, audience *External* avec votre Gmail en utilisateur test. Puis **Clients** → *Web application* `cloudflare-access`, origine `https://joutiya.cloudflareaccess.com`, redirection `https://joutiya.cloudflareaccess.com/cdn-cgi/access/callback`.
-2. Nav ouvre Zero Trust → **Settings** → **Authentication** → **Login methods** → **Add new** → **Google**.
-3. Vous affichez l'ID et le secret du client, les collez dans ce formulaire et cliquez sur **Save**. Nav lance **Test** : la connexion doit réussir.
+Le client OAuth d'Access vit dans le projet de staging (`environments.staging.firebase.projectId`), pas en production. Sa redirection oblige à inscrire `cloudflareaccess.com` dans les domaines autorisés du projet ([Google](https://support.google.com/cloud/answer/15549049)), et la validation de la marque exige d'être propriétaire de chacun d'eux ([Google](https://support.google.com/cloud/answer/13464321)) : en production, il bloquerait celle de la connexion Google du site. Le staging, réservé aux testeurs, n'en a jamais besoin.
 
-Une seule méthode Google : le script la retrouve seul.
+1. Nav, dans Google Cloud, projet `joutiya-staging`, **Google Auth Platform** : les réglages de `docs/phase-2.md` §2 (nom « Joutiya », e-mail d'assistance = votre Gmail, audience *External*, statut *Testing*, votre Gmail en utilisateur test), plus `cloudflareaccess.com` dans **Branding** → **Authorized domains**.
+2. Nav ouvre dans un autre onglet Zero Trust → **Integrations** → **Identity providers** (ancien chemin : **Settings** → **Authentication** → **Login methods**) → **Add new** → **Google** : nom « Google », **PKCE** activé, ID et secret laissés vides.
+3. Nav prépare **Clients** → **Create client** → *Web application* `cloudflare-access` : origine `https://joutiya.cloudflareaccess.com`, redirection `https://joutiya.cloudflareaccess.com/cdn-cgi/access/callback`. Il s'arrête avant **Create** : Google n'affiche le secret qu'une fois, à la création ([Google](https://support.google.com/cloud/answer/15549257)).
+4. Vous cliquez sur **Create**, collez l'ID du client dans **App ID** et le secret dans **Client secret** du formulaire Zero Trust, puis cliquez sur **Save**. Fenêtre fermée trop tôt : **Clients** → `cloudflare-access` → **Add secret**, même copie.
+5. Nav lance **Test** : la connexion doit réussir avec votre Gmail.
+
+Une seule méthode Google dans le compte : le script la retrouve seul, et Claude vérifie par API qu'il n'y en a qu'une. Un futur membre du personnel entre dans la règle Access (étape 6) et, si Google le refuse en *Testing*, dans les utilisateurs test du projet de staging (100 au plus).
 
 ## 6. Applications Access et jetons de service
+
+Cloudflare n'accepte une application Access que sur une zone active ([doc](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/)) : cette étape suit la bascule des serveurs DNS (étape 7).
 
 1. Nav ajoute au jeton `joutiya-edge`, sans changer sa valeur, deux permissions : **Access: Service Tokens : Edit** (compte) et **Cache Purge : Purge** (zone `joutiya.ma`).
 2. Claude crée par API les jetons de service `joutiya-ci` (déploiement du staging, étape 8) et `joutiya-probe` (la sonde ; son secret sera renouvelé par API quand la sonde sera déployée). Un secret va directement de l'API à sa destination, jamais dans un fichier ni dans le chat.
@@ -94,7 +100,7 @@ Une seule méthode Google : le script la retrouve seul.
 
 ## 7. Serveurs DNS chez Cloudflare
 
-Après la validation du .MA par le registre, et avant le 12 novembre (Cloudflare supprime une zone en attente après 28 jours), Nav remplace chez Hostinger les serveurs DNS par `gloria.ns.cloudflare.com` et `rob.ns.cloudflare.com`. Le coordinateur fixe le moment. Cloudflare active alors la zone et émet le certificat. `joutiya.ma` sert le tunnel de production, et les noms protégés passent par Access.
+Après la validation du .MA par le registre, et avant le 12 novembre (Cloudflare supprime une zone en attente après 28 jours), Nav remplace chez Hostinger les serveurs DNS par `gloria.ns.cloudflare.com` et `rob.ns.cloudflare.com`. Le coordinateur fixe le moment. Cloudflare active alors la zone et émet le certificat. `joutiya.ma` sert le tunnel de production ; les noms protégés passent par Access dès l'étape 6, que Claude enchaîne.
 
 ## 8. Déploiement automatique du staging
 

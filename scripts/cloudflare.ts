@@ -261,11 +261,11 @@ async function applyTunnel(api: CloudflareApi, targets: Targets, name: TunnelNam
   if (blocked.length > 0) throw new Error(`DNS records in the way (rerun with --replace-dns to replace them):\n  ${blocked.join("\n  ")}`);
 }
 
-/** The account's Google login method, created by the owner in Zero Trust (docs/phase-1.md, step 3). */
+/** The account's Google login method, set up in Zero Trust with the owner (docs/phase-1.md, step 5). */
 export function googleIdp(providers: { id: string; type: string }[]): string {
   const google = providers.filter((provider) => provider.type === "google");
   const [only] = google;
-  if (!only || google.length > 1) throw new Error(`expected one Google login method in Zero Trust, found ${google.length} (docs/phase-1.md, step 3)`);
+  if (!only || google.length > 1) throw new Error(`expected one Google login method in Zero Trust, found ${google.length} (docs/phase-1.md, step 5)`);
   return only.id;
 }
 
