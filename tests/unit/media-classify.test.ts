@@ -15,6 +15,7 @@ vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => true) }));
 
 const { alert } = await import("@/lib/alert");
 const {
+  checkModelsAtStartup,
   ClassifierUnavailableError,
   createImageClassifier,
   decodeYunet,
@@ -167,6 +168,21 @@ describe("createImageClassifier", () => {
     expect(vi.mocked(alert).mock.calls[0]?.[0]).toMatchObject({ severity: "P1", title: MODELS_MISSING_ALERT_TITLE, body: expect.stringContaining(dir) });
     // The process-wide instance is the failing one too.
     expect(imageClassifier(env({ APP_ENV: "prod", MEDIA_MODELS_DIR: dir }))).toBeInstanceOf(UnavailableImageClassifier);
+  });
+
+  it("reports missing models at worker start outside dev only (error log, P1 alert), present ones silently", async () => {
+    const dir = temp();
+    expect(await checkModelsAtStartup(env({ MEDIA_MODELS_DIR: dir }))).toBe(true);
+    expect(alert).not.toHaveBeenCalled();
+    for (const APP_ENV of ["staging", "prod"] as const) expect(await checkModelsAtStartup(env({ APP_ENV, MEDIA_MODELS_DIR: dir }))).toBe(false);
+    expect(logger.error).toHaveBeenCalledTimes(2);
+    expect(alert).toHaveBeenCalledTimes(2);
+    // Same alert as a refused photo: the hour's dedupe sends one.
+    expect(vi.mocked(alert).mock.calls[0]?.[0]).toMatchObject({ severity: "P1", title: MODELS_MISSING_ALERT_TITLE, body: expect.stringContaining(dir) });
+    vi.mocked(alert).mockClear();
+    for (const file of Object.values(MODEL_FILES)) writeFileSync(path.join(dir, file), "");
+    expect(await checkModelsAtStartup(env({ APP_ENV: "prod", MEDIA_MODELS_DIR: dir }))).toBe(true);
+    expect(alert).not.toHaveBeenCalled();
   });
 
   it("chooses ONNX when both files exist and shares one instance per process", async () => {

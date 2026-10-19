@@ -136,6 +136,17 @@ describe("POST /api/uploads/sign", () => {
     expect((await signFor(owner, busy)).body.error.code).toBe("photo_limit");
   });
 
+  it("removes the signed document when presigning fails: no photo slot held, no upload counted", async () => {
+    const owner = await member();
+    const id = await draft(owner);
+    for (let i = 0; i < 9; i += 1) expect((await signFor(owner, id)).status).toBe(201);
+    vi.spyOn(store, "presignPut").mockRejectedValueOnce(new Error("storage unavailable"));
+    expect((await signFor(owner, id)).status).toBe(500);
+    expect(await countUploadsByTarget(id)).toBe(9);
+    // The 10th photo keeps its slot: no orphan in the in-flight hold.
+    expect((await signFor(owner, id)).status).toBe(201);
+  });
+
   it("caps the upload documents of a listing at 3x its photo limit, refused ones included, until some are removed", async () => {
     const owner = await member();
     const id = await draft(owner);

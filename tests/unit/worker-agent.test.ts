@@ -61,7 +61,7 @@ vi.mock("@/lib/observability/sentry-server", () => ({ flushObservability: vi.fn(
 vi.mock("@/lib/mail/deliver", () => ({ deliverMail: vi.fn(), MailDeferredError: class extends Error {} }));
 vi.mock("@/lib/mail/render", () => ({ isTemplateMail: () => true }));
 vi.mock("@/lib/mail/send", () => ({ closeMailQueue: vi.fn(async () => undefined), MAIL_QUEUE: "mail" }));
-vi.mock("@/lib/media/classify", () => ({ resetImageClassifier: vi.fn(async () => undefined) }));
+vi.mock("@/lib/media/classify", () => ({ checkModelsAtStartup: vi.fn(async () => undefined), resetImageClassifier: vi.fn(async () => undefined) }));
 vi.mock("@/lib/media/queue", () => ({ closeMediaQueue: vi.fn(async () => undefined), MEDIA_CONCURRENCY: 1, MEDIA_QUEUE: "media" }));
 vi.mock("@/lib/firebase/admin", () => ({ isFirebaseConfigured: () => true }));
 vi.mock("@/lib/search/types", () => ({ SearchUnavailableError: class extends Error {} }));
@@ -81,6 +81,7 @@ vi.mock("@/worker/jobs", async () => {
   const agent = await import("@/worker/jobs/agent");
   return { JOBS: {}, SYSTEM_QUEUE: "system", SCHEDULES: {}, AGENT_QUEUE: agent.AGENT_QUEUE, AGENT_CONCURRENCY: agent.AGENT_CONCURRENCY, createAgentWorker: agent.createAgentWorker, processAgentJob: agent.processAgentJob };
 });
+vi.mock("@/worker/system-queue", () => ({ onSystemJobFailed: vi.fn(async () => undefined), syncSchedulers: vi.fn(async () => []) }));
 vi.mock("@/worker/jobs/media", () => ({ onMediaJobFailed: vi.fn(async () => false), processMediaJob: vi.fn() }));
 vi.mock("@/worker/jobs/search", () => ({
   ensureEngineReady: vi.fn(async () => undefined),

@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations } from "next-intl/server";
 import { isRtl, LOCALE_TAGS, type Locale } from "@/config/site";
-import { DEFAULT_LEGAL } from "@/config/legal";
 import { Footer } from "@/components/legal/footer";
 import type { PublicConfig } from "@/lib/config/public-types";
 import type { SessionSummary } from "@/lib/contracts/auth";
+import { getLegalConfig } from "@/lib/legal/config";
 import { pickMessages } from "@/i18n/client-messages";
 import { readex, tarifitFallback } from "@/lib/fonts";
 import { Providers } from "./providers";
@@ -33,6 +33,8 @@ interface RootShellProps {
 export async function RootShell({ locale, nonce, config, initialSession, clientNamespaces, children }: RootShellProps) {
   const t = await getTranslations({ locale, namespace: "Nav" });
   const messages = clientNamespaces ? pickMessages(await getMessages({ locale }), clientNamespaces) : undefined;
+  // Live config/legal (cached 5 minutes); it reads no request data, so (public) stays static (ISR).
+  const { companyName } = await getLegalConfig();
   const dir = isRtl(locale) ? "rtl" : "ltr";
   return (
     <html lang={LOCALE_TAGS[locale]} dir={dir} className={`${readex.variable} ${tarifitFallback.variable}`} suppressHydrationWarning>
@@ -50,8 +52,7 @@ export async function RootShell({ locale, nonce, config, initialSession, clientN
             <main id="main" className="flex flex-1 flex-col">
               {children}
             </main>
-            {/* Static default; the legal pages render the live config/legal values. */}
-            <Footer publisher={DEFAULT_LEGAL.companyName} />
+            <Footer publisher={companyName} />
           </Providers>
         </NextIntlClientProvider>
       </body>

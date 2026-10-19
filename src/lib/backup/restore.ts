@@ -14,7 +14,9 @@ import { openPart, parseBackupKey, type BackupMode } from "./parts.ts";
 //      paths and Firestore types (Timestamp, GeoPoint, bytes, references) intact.
 // Rolling fulls and incrementals mix capture dates, so "last file wins" would let an old
 // incremental overwrite a newer full slice: the version is chosen per document instead.
-// A date without a manifest (a run that did not finish) is restored unverified, with a warning.
+// A date without a manifest (a run that did not finish, or one still running) is refused: its
+// parts have no count or SHA-256 to check. allowUnverified (--allow-unverified) restores them,
+// each listed in a warning.
 // Pure module (no server-only, no "@/"): plain Node runs it.
 
 export interface BackupSource {
@@ -59,6 +61,8 @@ export interface PlanOptions {
   collections?: readonly string[] | null;
   /** Ignore backups after this UTC date (YYYY-MM-DD): the state as of that night. */
   until?: string | null;
+  /** Restore the parts of dates without a manifest (unchecked) instead of refusing them. */
+  allowUnverified?: boolean;
 }
 
 const MODE_RANK: Record<BackupMode, number> = { incremental: 0, full: 1 };
@@ -141,6 +145,11 @@ async function decryptManifest(source: BackupSource, key: string, identity: stri
 
 // --- Plan ----------------------------------------------------------------------------------------
 
+/** The UTC date before `date` (YYYY-MM-DD). */
+function previousDate(date: string): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+}
+
 /** Lists the source, reads each manifest and decides which parts to restore, in capture order. */
 export async function planRestore(source: BackupSource, identity: string, options: PlanOptions = {}): Promise<RestorePlan> {
   if (options.until && !DATE.test(options.until)) throw new RestoreError("--until must be a date (YYYY-MM-DD)");
@@ -168,6 +177,7 @@ export async function planRestore(source: BackupSource, identity: string, option
     if (missing > 0) warnings.push(`no backup for ${missing} day(s) before ${date} (failed runs, or an incomplete download)`);
   }
   const selected: RestorePart[] = [];
+  const unverified: RestorePart[] = [];
   const verifiedDates: string[] = [];
   const seenCollections = new Set<string>();
   for (const date of dates) {
@@ -187,12 +197,24 @@ export async function planRestore(source: BackupSource, identity: string, option
       verifiedDates.push(date);
     } else {
       parts = [...found.values()];
-      if (parts.length > 0) warnings.push(`${date}: no manifest (the run did not finish), ${parts.length} part(s) restored without verification`);
     }
     for (const part of parts) {
       seenCollections.add(part.collection);
-      if (!wanted || wanted.has(part.collection)) selected.push(part);
+      if (wanted && !wanted.has(part.collection)) continue;
+      selected.push(part);
+      if (!manifestKey) unverified.push(part);
     }
+  }
+  if (unverified.length > 0) {
+    const listed = unverified.map((part) => part.logical).sort();
+    if (!options.allowUnverified) {
+      const first = unverified.map((part) => part.date).sort()[0] as string;
+      throw new RestoreError(
+        `${listed.length} part(s) from date(s) without manifest (a run that did not finish), nothing to check them against: ${listed.join(", ")}. ` +
+          `Stop before them with --until ${previousDate(first)}, or add --allow-unverified to restore them unchecked.`,
+      );
+    }
+    warnings.push(`${listed.length} part(s) without manifest restored unchecked (--allow-unverified): ${listed.join(", ")}`);
   }
   if (wanted) for (const id of wanted) if (!seenCollections.has(id)) warnings.push(`collection "${id}" is in no backup part`);
   selected.sort((a, b) => (a.date === b.date ? MODE_RANK[a.mode] - MODE_RANK[b.mode] || a.collection.localeCompare(b.collection) || (a.part ?? 0) - (b.part ?? 0) : a.date < b.date ? -1 : 1));

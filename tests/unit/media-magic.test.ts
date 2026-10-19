@@ -2,7 +2,7 @@ import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { ACCEPTED_IMAGE_TYPES, checkImageType, isAcceptedImageType, SNIFF_BYTES, sniffImageType } from "@/lib/media/magic";
 
-// Real-type sniffing from magic bytes (research/libs-media.md §7): fixtures are generated at test
+// Real-type sniffing from magic bytes (phase-3/research/libs-media.md §7): fixtures are generated at test
 // time by sharp or built by hand (ISO-BMFF boxes), nothing binary is committed.
 
 const base = () => sharp({ create: { width: 16, height: 8, channels: 3, background: { r: 10, g: 120, b: 200 } } });

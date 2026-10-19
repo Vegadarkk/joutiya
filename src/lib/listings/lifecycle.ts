@@ -13,9 +13,9 @@ export type { ListingFieldPatch, TransitionEffects, TransitionResult } from "./l
 // held by the pre-moderation. `pending_review ->` published, paused or expired: a moderator's
 // approval gives back what the owner had (`approveHold` only, see `approvalOutcome`). `-> purged`:
 // the retention purge at purgeAt (§5: expiry, sale or removal + 12 months; a moderator's rejection
-// is a removal, its purgeAt is set the same way).
+// is a removal, its purgeAt is set the same way; a draft 30 days after its last edit, A4-04).
 export const TRANSITIONS: Record<ListingStatus, readonly ListingStatus[]> = {
-  draft: ["pending_review", "published", "removed"],
+  draft: ["pending_review", "published", "removed", "purged"],
   pending_review: ["published", "paused", "expired", "rejected", "removed"],
   published: ["paused", "sold", "expired", "removed", "pending_review"],
   paused: ["published", "sold", "expired", "removed", "pending_review"],
@@ -52,6 +52,14 @@ export function expiresAtFor(publishedAt: Date, lifetime: Lifetime): Date {
 
 export function purgeAtFor(from: Date, lifetime: Lifetime): Date {
   return addMonths(from, lifetime.purgeMonths);
+}
+
+/** A draft left this many days without an edit is purged with its photos (§7 retention table, audit A4-04). */
+export const DRAFT_PURGE_DAYS = 30;
+
+/** purgeAt of a draft created or edited at `now`: every edit pushes it back. */
+export function draftPurgeAt(now: Date): Date {
+  return addDays(now, DRAFT_PURGE_DAYS);
 }
 
 export function canTransition(from: ListingStatus, to: ListingStatus): boolean {
@@ -211,7 +219,7 @@ function apply(listing: Listing, to: ListingStatus, ctx: TransitionContext): Tra
         // Publish held by the pre-moderation: dated like a publication, not indexed, seller told.
         // Not published yet (a reopened rejected listing drops its old date): the approval dates it.
         return {
-          patch: { ...base, status: "pending_review", sortAt: now, sortSource: "publish", publishedAt: null },
+          patch: { ...base, status: "pending_review", sortAt: now, sortSource: "publish", publishedAt: null, purgeAt: null },
           effects: effects({ contentOp: contentOp("listing.publish"), audit: "listing.publish", mail: "listingPendingReview" }),
         };
       }
@@ -268,8 +276,8 @@ function apply(listing: Listing, to: ListingStatus, ctx: TransitionContext): Tra
         effects: effects({ search: "delete", audit: "listing.reject", revalidate: true, mail: "listingRejected" }),
       };
     case "draft":
-      // Rejected listing edited again: back to the wizard, purge clock stopped.
-      return { patch: { ...base, status: "draft", purgeAt: null }, effects: effects({ audit: "listing.edit" }) };
+      // Rejected listing edited again: back to the wizard, on the draft clock (30 days without an edit).
+      return { patch: { ...base, status: "draft", purgeAt: draftPurgeAt(now) }, effects: effects({ audit: "listing.edit" }) };
     case "purged":
       return { patch: { ...base, status: "purged" }, effects: effects({ search: "delete", audit: "listing.purge", revalidate: true }) };
   }

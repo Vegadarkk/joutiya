@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { encryptAge, generateIdentity, identityToRecipient } from "@/lib/backup/crypto";
 import { manifestKey, partKey, sealPart } from "@/lib/backup/parts";
-import { bucketProblems, parseCli, projectProblem } from "../../scripts/restore-firestore.ts";
+import { bucketProblems, parseCli, projectProblem, SPARK_DAILY_WRITES, writesProblem } from "../../scripts/restore-firestore.ts";
 import type { Targets } from "../../scripts/assert-target.ts";
 
 // scripts/restore-firestore.ts: arguments, the target guard (never production by accident), and a
@@ -29,8 +29,21 @@ function targets(projects: { dev?: string | null; staging?: string | null; prod?
 
 describe("parseCli", () => {
   it("reads the options, dry run by default", () => {
-    expect(parseCli(["--identity", "k.txt", "--from", "dl", "--project", "joutiya-staging"])).toEqual({ identity: "k.txt", from: "dl", fromBucket: false, project: "joutiya-staging", collections: null, until: null, apply: false, allowProduction: false });
-    expect(parseCli(["--identity", "k", "--from-bucket", "--project", "p-123x", "--collections", "users, listings,", "--until", "2026-10-16", "--apply", "--allow-production"])).toEqual({
+    expect(parseCli(["--identity", "k.txt", "--from", "dl", "--project", "joutiya-staging"])).toEqual({
+      identity: "k.txt",
+      from: "dl",
+      fromBucket: false,
+      project: "joutiya-staging",
+      collections: null,
+      until: null,
+      apply: false,
+      allowProduction: false,
+      allowUnverified: false,
+      allowOverQuota: false,
+    });
+    expect(
+      parseCli(["--identity", "k", "--from-bucket", "--project", "p-123x", "--collections", "users, listings,", "--until", "2026-10-16", "--apply", "--allow-production", "--allow-unverified", "--allow-over-quota"]),
+    ).toEqual({
       identity: "k",
       from: null,
       fromBucket: true,
@@ -39,6 +52,8 @@ describe("parseCli", () => {
       until: "2026-10-16",
       apply: true,
       allowProduction: true,
+      allowUnverified: true,
+      allowOverQuota: true,
     });
   });
 
@@ -66,6 +81,22 @@ describe("projectProblem", () => {
     expect(projectProblem(recorded, "joutiya-prod", { emulated: false, allowProduction: true })).toBeNull();
     expect(projectProblem(targets({}), "joutiya-prod", { emulated: false, allowProduction: true })).toMatch(/not recorded/);
     expect(projectProblem(recorded, "Bad_Id", { emulated: true, allowProduction: false })).toMatch(/not a Firebase project id/);
+  });
+});
+
+describe("writesProblem", () => {
+  it("refuses more than Spark's daily writes into a real project, with the way to split it", () => {
+    expect(SPARK_DAILY_WRITES).toBe(20_000);
+    expect(writesProblem(20_000, { emulated: false, allowOverQuota: false })).toBeNull();
+    const problem = writesProblem(20_001, { emulated: false, allowOverQuota: false });
+    expect(problem).toMatch(/^20001 documents exceed Spark's 20000 writes a day/);
+    expect(problem).toContain("--collections");
+    expect(problem).toContain("--allow-over-quota");
+  });
+
+  it("lets the emulator and an explicit --allow-over-quota (Blaze) through", () => {
+    expect(writesProblem(1_000_000, { emulated: true, allowOverQuota: false })).toBeNull();
+    expect(writesProblem(1_000_000, { emulated: false, allowOverQuota: true })).toBeNull();
   });
 });
 

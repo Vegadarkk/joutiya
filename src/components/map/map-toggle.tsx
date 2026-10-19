@@ -73,7 +73,7 @@ export function MapToggle({ center, description, children, className }: MapToggl
         ) : null}
       </div>
       {map && webgl2 && mode === "static" ? (
-        <Button type="button" variant="outline" size="sm" className="self-start" data-testid="map-toggle" onClick={() => setMode("interactive")}>
+        <Button type="button" variant="outline" size="sm" className="self-start max-sm:h-11" data-testid="map-toggle" onClick={() => setMode("interactive")}>
           <MapIcon aria-hidden="true" />
           {t("showInteractive")}
         </Button>

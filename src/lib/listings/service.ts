@@ -46,7 +46,7 @@ import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
 import { notifySearchIndex } from "@/lib/search/queue";
 import { escalateOnIp } from "./escalation";
 import { buildSlugId, newListingId } from "./ids";
-import { IllegalTransitionError, canRenew, canTransition, renew, renewForReview, transition, type Lifetime, type TransitionContext, type TransitionEffects, type TransitionResult } from "./lifecycle";
+import { IllegalTransitionError, canRenew, canTransition, draftPurgeAt, renew, renewForReview, transition, type Lifetime, type TransitionContext, type TransitionEffects, type TransitionResult } from "./lifecycle";
 import { ownerListingView } from "./owner-view";
 import { PUBLIC_STATES } from "./public";
 import { assessReadiness } from "./readiness";
@@ -155,6 +155,8 @@ export async function createDraft(actor: Actor, input: CreateListingInput, now =
     legalHold: [],
     createdAt: now,
     updatedAt: now,
+    // A draft nobody edits for 30 days goes with its photos (retention-purge, audit A4-04).
+    purgeAt: draftPurgeAt(now),
     version: 0,
   });
   try {
@@ -311,6 +313,8 @@ export async function patchListing(actor: Actor, id: string, patch: ListingPatch
   const fields = changedFields(listing, await fieldsOf(listing, patch, { uid, quotas: seller.quotas, now }));
   // Nothing changes: nothing is written. A rejected listing's save reopens it, even an empty one.
   if (Object.keys(fields).length === 0 && listing.status !== "rejected") return ownerListingView(listing);
+  // Every draft edit restarts its 30-day clock (written with the edit: no extra write).
+  if (listing.status === "draft") fields.purgeAt = draftPurgeAt(now);
   let effects: TransitionEffects = { search: null, contentOp: null, audit: null, revalidate: false, mail: null };
   let mail: MailJob | null = null;
   let hold: ModerationDecisionInput | undefined;

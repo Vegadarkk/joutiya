@@ -34,8 +34,8 @@ import { RETAINED_STATUSES, storedBytes } from "@/lib/uploads/policy";
 import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 
 // Nightly at 03:00 UTC (architecture §5 "Purges sans TTL", table of §7 retention, design D16):
-// 1. listings past purgeAt (expired, sold, removed or rejected + listingPurgeMonths) without a
-//    legal hold: replaced by a tombstone (transaction re-checking status, hold and date, with the
+// 1. listings past purgeAt (expired, sold, removed or rejected + listingPurgeMonths, or a draft
+//    30 days after its last edit, A4-04) without a legal hold: replaced by a tombstone (transaction re-checking status, hold and date, with the
 //    searchOutbox delete), then their photo variants, quarantine objects and upload documents go.
 //    A removed listing keeps its text and its photos until then (architecture §5: removal + 12
 //    months): purge-quarantine (hourly) moves its photos to the private bucket
@@ -74,7 +74,7 @@ export const USER_BLOCKS_SCAN = 200;
 const EVIDENCE_PURGE_PAGES = 10;
 
 /** Statuses whose purgeAt ends the listing; published, paused and pending listings are never purged. */
-export const PURGEABLE_STATUSES: readonly ListingStatus[] = ["expired", "sold", "removed", "rejected"];
+export const PURGEABLE_STATUSES: readonly ListingStatus[] = ["expired", "sold", "removed", "rejected", "draft"];
 
 export interface RetentionResult {
   /** Listings replaced by a tombstone. */
@@ -109,6 +109,8 @@ interface RunState {
   store: ObjectStore | null;
   budget: number;
   freedBytes: number;
+  /** Steps that failed, with their error: one alert per run. */
+  failedSteps: string[];
   result: RetentionResult;
 }
 
@@ -479,7 +481,7 @@ export async function retentionPurge(now = new Date(), deps: { store?: ObjectSto
     if (!isStorageNotConfigured(error)) throw error;
     store = null;
   }
-  const state: RunState = { now, store, budget: PURGE_DELETE_BUDGET, freedBytes: 0, result };
+  const state: RunState = { now, store, budget: PURGE_DELETE_BUDGET, freedBytes: 0, failedSteps: [], result };
 
   // Without object storage the photos could not be deleted: listings and uploads wait (no orphan objects).
   if (store) {
@@ -496,6 +498,14 @@ export async function retentionPurge(now = new Date(), deps: { store?: ObjectSto
   await step("aiDecisions", state, () => purgeAiDecisions(state));
   await step("auditLogs", state, () => purgeJournal(COLLECTIONS.auditLogs, "auditLogs", state));
   await step("userBlocks", state, () => purgeUserBlocks(state));
+  // The job completes anyway, so the worker's failed handler never hears of a failed step.
+  if (state.failedSteps.length > 0) {
+    await alert({
+      severity: "P2",
+      title: "Tâche système en échec : retention-purge",
+      body: `Étape(s) en échec : ${state.failedSteps.join(" ; ")}. La nuit suivante réessaie.`,
+    });
+  }
 
   await auditPhase5(state);
   if (state.freedBytes > 0) await recordMediaBytes(-state.freedBytes, now);
@@ -514,6 +524,7 @@ async function step(name: string, state: RunState, run: () => Promise<void>): Pr
     await run();
   } catch (error) {
     state.result.failed += 1;
+    state.failedSteps.push(`${name} (${(error as Error).message.slice(0, 200)})`);
     logger.error({ step: name, err: (error as Error).message }, "retention-purge step failed");
   }
 }

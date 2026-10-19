@@ -15,17 +15,20 @@ subscriptions, Google Ads slots, moderation).
   questionable, say so with facts and recommend the stronger option.
 - No "I'm not a lawyer/doctor" disclaimers.
 
-## Project state (2026-10-15)
+## Project state (2026-10-19)
 
-- Architecture v3 ("start at 0 EUR") validated by the owner on 2026-10-12; launch is
-  planned after phases 0-6 (~week 16). Source of truth: the architecture doc (Claude Doc
-  "Architecture du MVP v3"), copy in the project files as `joutiya/architecture-final.md`;
-  read only the section you need (11 sections, ~175 KB). Deviations need the owner's
-  approval.
-- Phase 0 (owner accounts and services, `docs/phase-0.md`) is in progress on the owner's
-  side. Phase 1 code (app, Docker, VM, Cloudflare, CI) is merged; its owner steps are in
-  `docs/phase-1.md`. Phase 2 must deliver client config at runtime: one image serves
-  staging and prod, so no build-time `NEXT_PUBLIC_*`.
+- Architecture v3 ("start at 0 EUR") validated by the owner on 2026-10-12. Launch comes
+  after every phase, run in the order P0-P5, P7, P6 (~week 19); Pro offers ship before
+  launch with sales off (`salesEnabled=false`) until their own gate. Source of truth: the
+  architecture doc (Claude Doc "Architecture du MVP v3"), copy in the project files as
+  `joutiya/architecture-final.md`; read only the section you need (11 sections, ~220 KB).
+  Deviations need the owner's approval.
+- Phases 1-4 are merged on main; phase 5 (PR #53) and phase 7 (PR #56) are open. Phase 0
+  waits on the `.ma` domain and the DNS switch (`docs/phase-0.md`); the VM waits for free
+  A1 capacity in Paris (`docs/phase-1.md`). The 50 % audit (2026-10-19, go with
+  conditions) is in the project files under `joutiya/audit-jalon-50/`.
+- One image serves staging and prod: client config is served at runtime, never as
+  build-time `NEXT_PUBLIC_*`.
 - Brand: final logo files are in `public/brand/` (Moroccan door; ochre, green, gold, cream).
 - No cloud resource is created, and no existing account completed, without the owner's
   explicit approval; all targets are listed in `infra/targets.json` and checked by
@@ -33,21 +36,25 @@ subscriptions, Google Ads slots, moderation).
 
 ## Architecture
 
-- **App**: one Next.js 16 (App Router, strict TypeScript, Tailwind v4, shadcn/ui,
-  next-intl FR/AR/RIF) app + a BullMQ worker sharing `src/lib`; one Docker image,
-  targets `web` and `worker`. Public anonymous pages: ISR + hash CSP; private pages:
-  dynamic + nonce CSP. `admin.joutiya.ma` is rewritten to `src/app/admin` by `proxy.ts`.
+- **App**: one Next.js 16 (App Router, strict TypeScript, Tailwind v4, shadcn-style
+  components on `radix-ui` + `cva` without the shadcn CLI, next-intl FR/AR/RIF) app + a
+  BullMQ worker sharing `src/lib`; one Docker image, targets `web` and `worker`. Public
+  anonymous pages: ISR + hash CSP; private pages: dynamic + nonce CSP.
+  `admin.joutiya.ma` is rewritten to `src/app/admin` by `proxy.ts`.
 - **Hosting**: Oracle Cloud Always Free ARM VM (Docker Compose, staging as a separate
   Compose project), Cloudflare Free in front, traffic only via Cloudflare Tunnel (no
   inbound port, SSH included). The VM holds no unique data (`infra/redeploy.md`).
 - **Data**: Firebase Spark (Auth without Identity Platform, Firestore Standard, EU),
   projects dev / staging / prod. All reads and writes go through the Next.js API (server
-  first, rate limited); Firestore rules deny everything except realtime messaging.
+  first, rate limited). The browser has no Firebase SDK and Firestore rules deny
+  everything: live messaging is pushed by the API over SSE (`/api/messages/stream`, Valkey
+  pub/sub; decision of 2026-10-19).
 - **Services**: Meilisearch (search), R2 + `sharp` + local ONNX models (photos),
   Valkey x2 (queue `noeviction`, rate limit `allkeys-lru`), Resend (mail), WhatsApp
-  inbound phone check, Turnstile, Sentry EU, Stripe + RevenueCat (credits wallet, Pro
-  subscriptions), Claude Haiku 5.5 / Sonnet 5.5 for moderation and the assistant,
-  hard cap 5 USD/month.
+  inbound phone check (parked with Meta since 2026-10-19: messaging is the only
+  buyer-seller channel, a Pro's phone is checked by an admin call at KYBC), Turnstile,
+  Sentry EU, Stripe + RevenueCat (credits wallet, Pro subscriptions), Claude Haiku 5.5 /
+  Sonnet 5.5 for moderation and the assistant, hard cap 5 USD/month.
 - **Adapters**: every free service sits behind an interface (`MailTransport`,
   `PhoneVerifier`, `AiProvider`, `ModerationClassifier`, `ObjectStore`,
   `PaymentProvider`, `Alerter`); switch by config, never by rewrite.
@@ -66,6 +73,9 @@ subscriptions, Google Ads slots, moderation).
 - **Secrets**: never put keys, tokens or `.env` files in Git, PRs, logs or chat; print
   variable names, never values. Only `.env.example` (no values) is versioned; local
   secrets live in `.env.local`.
+- **Public at launch**: the repo goes public at launch (owner, 2026-10-19), history
+  included. Never commit personal data, internal ids that should stay private, or
+  anything you would not publish; the pre-publication checklist is in spec §10 (phase 6).
 - **Legal**: publisher Adark Prime; the only address to display is 6 rue
   d'Armaillé, 75017 Paris. Never use or ask for a personal address. Legal form,
   capital and VAT are config variables, never hardcoded. The platform is a neutral
