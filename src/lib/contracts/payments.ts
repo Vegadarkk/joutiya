@@ -13,6 +13,8 @@ export const buyOptionSchema = z
     optionId: z.enum(OPTION_IDS),
     /** Client-generated per attempt: a retried request debits once. */
     requestId: z.uuid(),
+    /** Credits the buyer agreed to pay (the offer's price, 0 when the plan's allowance covers it): any other cost is refused. */
+    expectedCost: z.number().int().min(0).max(1_000_000),
     /** "J'accepte les CGV ... droit de rétractation de 14 jours." */
     acceptTerms: z.literal(true),
     /** "Je demande l'exécution immédiate ... je perdrai mon droit de rétractation ..." */
@@ -54,6 +56,8 @@ export interface ListingOptionsResponse {
   options: OptionOffer[];
   wallet: WalletSummary;
   boosts: { bumpedAt: string | null; featuredUntil: string | null };
+  /** End of the listing's publication: À la Une days past it are lost unless the listing is renewed. */
+  expiresAt: string | null;
   consentVersion: string;
 }
 

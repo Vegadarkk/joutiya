@@ -91,6 +91,8 @@ export type ErrorCode =
   | "wallet_frozen"
   /** Plan credits + balance below the price (402). */
   | "insufficient_credits"
+  /** The option's cost moved since the buyer saw it (price, allowance or plan credits; 409). */
+  | "price_changed"
   /** Firestore daily quota degraded (src/lib/quota/gate.ts): deposit or sign-up suspended until the reset. */
   | "quota_exhausted"
   // Messaging, reports, appeals, assistant (phase 5). Messages: Messaging.errors / Report.errors.

@@ -60,6 +60,12 @@ export async function getWalletTx(tx: Transaction, accountId: string): Promise<W
   return walletFromSnapshot(snapshot);
 }
 
+export async function getLedgerEntry(accountId: string, entryId: string): Promise<LedgerRecord | null> {
+  const snapshot = await ledgerRef(accountId, entryId).get();
+  void consume("firestore.reads", 1);
+  return ledgerFromSnapshot(snapshot);
+}
+
 export async function getLedgerEntryTx(tx: Transaction, accountId: string, entryId: string): Promise<LedgerRecord | null> {
   const snapshot = await tx.get(ledgerRef(accountId, entryId));
   void consume("firestore.reads", 1);

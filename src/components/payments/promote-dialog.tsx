@@ -27,10 +27,14 @@ import { cn } from "@/lib/utils";
 // unticked consent boxes of every purchase. A purchase keeps one request id per option while the
 // dialog is open, so a retry after a lost answer debits once.
 
-type State = { kind: "loading" } | { kind: "failed"; error: unknown } | { kind: "ready"; data: ListingOptionsResponse };
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+type Note = { text: string; tone?: "warning" };
+
+type State = { kind: "loading" } | { kind: "failed"; error: unknown } | { kind: "ready"; data: ListingOptionsResponse; at: number };
 
 /** Codes the dialog explains in its own words (Options.errors). */
-const OPTION_ERRORS = ["sales_closed", "billing_owner_only", "listing_not_promotable", "bump_too_soon", "wallet_frozen", "insufficient_credits"] as const;
+const OPTION_ERRORS = ["sales_closed", "billing_owner_only", "listing_not_promotable", "bump_too_soon", "wallet_frozen", "insufficient_credits", "price_changed"] as const;
 type OptionError = (typeof OPTION_ERRORS)[number];
 
 interface PromoteDialogProps {
@@ -61,7 +65,8 @@ export function PromoteDialog({ listingId, title, onClose }: PromoteDialogProps)
   // State changes only once the answer is in (the first render is already "loading").
   const fetchOptions = useCallback(async () => {
     try {
-      setState({ kind: "ready", data: await loadListingOptions(listingId) });
+      const data = await loadListingOptions(listingId);
+      setState({ kind: "ready", data, at: Date.now() });
     } catch (error) {
       setState({ kind: "failed", error });
     }
@@ -97,16 +102,35 @@ export function PromoteDialog({ listingId, title, onClose }: PromoteDialogProps)
     setSubmitting(true);
     setFailure(undefined);
     try {
-      const result = await buyListingOption(listingId, offer.id, requestId);
+      const result = await buyListingOption(listingId, offer.id, requestId, offer.coveredByAllowance ? 0 : offer.price);
       toast.success(result.optionId === "bump" || !result.boosts.featuredUntil ? t("success.bump") : t("success.featured", { date: date(result.boosts.featuredUntil) }));
       onClose();
     } catch (error) {
       // A refusal the dialog can show better reloads the prices and the wallet.
-      if (isApiError(error, "insufficient_credits", "wallet_frozen", "listing_not_promotable")) void load();
+      if (isApiError(error, "insufficient_credits", "wallet_frozen", "listing_not_promotable", "price_changed")) {
+        // The reloaded offer has its own price: a new request id for it.
+        requests.current = {};
+        setChoice(null);
+        load();
+      }
       setFailure(error);
     } finally {
       setSubmitting(false);
     }
+  }
+
+  /** Under each option: what runs already, and À la Une days the listing's end would cut short. */
+  function notesOf(offer: OptionOffer, options: ListingOptionsResponse, at: number): Note[] {
+    const notes: Note[] = [];
+    if (offer.id === "bump") {
+      if (options.boosts.bumpedAt) notes.push({ text: t("bumpedOn", { date: date(options.boosts.bumpedAt) }) });
+      return notes;
+    }
+    const running = options.boosts.featuredUntil ? Date.parse(options.boosts.featuredUntil) : 0;
+    if (options.boosts.featuredUntil) notes.push({ text: t("featuredRunning", { date: date(options.boosts.featuredUntil) }) });
+    const end = Math.max(at, running) + (offer.days ?? 0) * DAY_MS;
+    if (options.expiresAt && end > Date.parse(options.expiresAt)) notes.push({ text: t("expiresFirst", { date: date(options.expiresAt) }), tone: "warning" });
+    return notes;
   }
 
   const data = state.kind === "ready" ? state.data : null;
@@ -171,7 +195,7 @@ export function PromoteDialog({ listingId, title, onClose }: PromoteDialogProps)
                         setChoice(offer.id);
                         setProblems((current) => ({ ...current, choice: false }));
                       }}
-                      note={offer.id !== "bump" && data.boosts.featuredUntil ? t("featuredRunning", { date: date(data.boosts.featuredUntil) }) : offer.id === "bump" && data.boosts.bumpedAt ? t("bumpedOn", { date: date(data.boosts.bumpedAt) }) : null}
+                      notes={notesOf(offer, data, state.kind === "ready" ? state.at : 0)}
                     />
                   ))}
                   {problems.choice ? <InlineError>{t("choose")}</InlineError> : null}
@@ -234,7 +258,7 @@ function WalletLine({ data }: { data: ListingOptionsResponse }) {
   );
 }
 
-function OptionCard({ offer, frozen, selected, onSelect, note, time }: { offer: OptionOffer; frozen: boolean; selected: boolean; onSelect: () => void; note: string | null; time: (iso: string) => string }) {
+function OptionCard({ offer, frozen, selected, onSelect, notes, time }: { offer: OptionOffer; frozen: boolean; selected: boolean; onSelect: () => void; notes: Note[]; time: (iso: string) => string }) {
   const t = useNumbersTranslations("Options");
   const card = useTranslations("ListingCard");
   const disabled = !offer.affordable || offer.availableAt !== null;
@@ -270,7 +294,11 @@ function OptionCard({ offer, frozen, selected, onSelect, note, time }: { offer: 
           {offer.availableAt ? <span className="text-xs font-medium text-foreground-muted">{t("availableAt", { time: time(offer.availableAt) })}</span> : null}
           {!offer.affordable && !frozen && !offer.availableAt ? <span className="text-xs font-medium text-danger">{t("insufficient")}</span> : null}
         </span>
-        {note ? <span className="text-xs text-foreground-muted text-pretty">{note}</span> : null}
+        {notes.map((note) => (
+          <span key={note.text} className={cn("text-xs text-pretty", note.tone === "warning" ? "text-warning" : "text-foreground-muted")}>
+            {note.text}
+          </span>
+        ))}
       </span>
     </label>
   );

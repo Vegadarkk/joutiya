@@ -4,7 +4,7 @@ import { requireOwner, type AuthContext } from "@/lib/auth/guards";
 import { OPTION_CONSENT_VERSION, type BuyOptionInput, type BuyOptionResponse, type ListingOptionsResponse, type OptionOffer, type WalletSummary } from "@/lib/contracts/payments";
 import { getListing, getListingTx, updateListingTx, type ListingFieldPatch } from "@/lib/db/repositories/listings";
 import { enqueueSearchOutboxTx } from "@/lib/db/repositories/search-outbox";
-import { getLedgerEntryTx, getWallet, getWalletTx, recordWalletOperationTx, walletStateAt, type LedgerRecord } from "@/lib/db/repositories/wallets";
+import { getLedgerEntry, getLedgerEntryTx, getWallet, getWalletTx, recordWalletOperationTx, walletStateAt, type LedgerRecord } from "@/lib/db/repositories/wallets";
 import type { ListingDoc, WalletDoc } from "@/lib/db/schemas";
 import { getFlags, getPricing } from "@/lib/config/runtime";
 import { db } from "@/lib/firebase/admin";
@@ -46,8 +46,9 @@ function payerOf(auth: AuthContext, listing: Pick<ListingDoc, "ownerUid" | "proI
   return billingAccountId(listing);
 }
 
-function promotable(listing: Pick<ListingDoc, "status" | "moderation">): boolean {
-  return listing.status === "published" && !listing.moderation.hiddenBy;
+/** Published, visible and not past its end (the nightly expiry may not have run yet). */
+function promotable(listing: Pick<ListingDoc, "status" | "moderation" | "expiresAt">, now: Date): boolean {
+  return listing.status === "published" && !listing.moderation.hiddenBy && (listing.expiresAt === undefined || listing.expiresAt.getTime() > now.getTime());
 }
 
 export function walletSummary(wallet: WalletDoc | null, now: Date): WalletSummary {
@@ -99,10 +100,11 @@ export async function listingOptions(auth: AuthContext, listingId: string, now =
   const [flags, pricing, wallet] = await Promise.all([getFlags(), getPricing(), getWallet(accountId)]);
   return {
     salesOpen: flags.salesEnabled,
-    promotable: promotable(listing),
+    promotable: promotable(listing, now),
     options: offers(listing, walletStateAt(wallet, now), pricing, now),
     wallet: walletSummary(wallet, now),
     boosts: boostsView(listing, now),
+    expiresAt: listing.expiresAt?.toISOString() ?? null,
     consentVersion: OPTION_CONSENT_VERSION,
   };
 }
@@ -126,20 +128,37 @@ interface Outcome {
   featuredUntil?: Date;
 }
 
+const sameOrder = (entry: LedgerRecord, listingId: string, option: OptionId) => entry.reason === "option" && entry.refs.optionId === option && entry.refs.listingId === listingId;
+
+/** Credits a purchase takes from the plan's and the purchased pools together (0 when the allowance pays). */
+const creditsTaken = (ledger: Pick<LedgerRecord, "delta" | "planCreditsDelta">) => -(ledger.delta + ledger.planCreditsDelta);
+
 /**
- * POST: buys `input.optionId` for the listing. 403 `sales_closed` while `salesEnabled` is off,
- * 404 for someone else's listing, 409 `listing_not_promotable` / `bump_too_soon` / `wallet_frozen`,
- * 402 `insufficient_credits`, 409 `conflict` when the request id was used for another option.
+ * POST: buys `input.optionId` for the listing. A retry of a committed purchase (same request id)
+ * is answered from the ledger first, whatever the sales gate and the limits say now. Then: 403
+ * `sales_closed` while `salesEnabled` is off, 404 for someone else's listing, 409
+ * `listing_not_promotable` / `bump_too_soon` / `wallet_frozen`, 402 `insufficient_credits`, 409
+ * `price_changed` when the cost is not the `expectedCost` the buyer agreed to, 409 `conflict` when
+ * the request id was used for another option. `beforePurchase` runs the per-attempt limits of a new
+ * purchase only.
  */
-export async function buyOption(auth: AuthContext, listingId: string, input: BuyOptionInput, now = new Date()): Promise<BuyOptionResponse> {
-  const flags = await getFlags();
-  if (!flags.salesEnabled) throw new HttpError(403, "sales_closed");
+export async function buyOption(auth: AuthContext, listingId: string, input: BuyOptionInput, options: { now?: Date; beforePurchase?: () => Promise<void> } = {}): Promise<BuyOptionResponse> {
+  const now = options.now ?? new Date();
   const listing = await getListing(listingId);
   if (!listing) throw notFound();
   const accountId = payerOf(auth, listing);
-  const pricing = await getPricing();
   const entryId = `option_${listingId}_${input.requestId}`;
   const option = input.optionId;
+
+  const committed = await getLedgerEntry(accountId, entryId);
+  if (committed) {
+    if (!sameOrder(committed, listingId, option)) throw new HttpError(409, "conflict", "request id already used for another purchase");
+    return response(option, true, committed, await getWallet(accountId), listing.boosts, now);
+  }
+  const flags = await getFlags();
+  if (!flags.salesEnabled) throw new HttpError(403, "sales_closed");
+  await options.beforePurchase?.();
+  const pricing = await getPricing();
 
   let outcome: Outcome;
   try {
@@ -151,14 +170,16 @@ export async function buyOption(auth: AuthContext, listingId: string, input: Buy
       // Turned into a shop listing (or back) since the first read: another wallet pays now.
       if (current.proId !== listing.proId) throw new HttpError(409, "conflict", "listing changed meanwhile, reload it");
       if (previous) {
-        if (previous.reason !== "option" || previous.refs.optionId !== option || previous.refs.listingId !== listingId) throw new ReplayConflictError();
+        if (!sameOrder(previous, listingId, option)) throw new ReplayConflictError();
         return { replayed: true, entry: previous, wallet, boosts: current.boosts };
       }
-      if (!promotable(current)) throw new HttpError(409, "listing_not_promotable");
+      if (!promotable(current, now)) throw new HttpError(409, "listing_not_promotable");
       if (option === "bump" && bumpAvailableAt(current.sortAt, now)) throw new HttpError(409, "bump_too_soon");
       // Price at the listing's category as read in the transaction (a category edit meanwhile counts).
       const price = optionPrice(option, current.categoryId, pricing);
       const spent = spendOption(walletStateAt(wallet, now), price, { useAllowance: usesAllowance(option) });
+      // The price or the allowance moved since the dialog showed them (another purchase, an admin edit, a new period).
+      if (creditsTaken(spent.ledger) !== input.expectedCost) throw new HttpError(409, "price_changed");
       const version = current.version + 1;
       const patch: ListingFieldPatch = { ...optionPatch(current, option, now), version, updatedAt: now };
       updateListingTx(tx, listingId, patch);
@@ -187,12 +208,15 @@ export async function buyOption(auth: AuthContext, listingId: string, input: Buy
     if (outcome.featuredUntil) await scheduleBoostExpiry(listingId, outcome.featuredUntil, now);
     logger.info({ listingId, option, accountKind: listing.proId ? "shop" : "personal" }, "listing option bought");
   }
-  const { entry } = outcome;
+  return response(option, outcome.replayed, outcome.entry, outcome.wallet, outcome.boosts, now);
+}
+
+function response(option: OptionId, replayed: boolean, entry: Outcome["entry"], wallet: WalletDoc | null, boosts: ListingDoc["boosts"], now: Date): BuyOptionResponse {
   return {
     optionId: option,
-    replayed: outcome.replayed,
+    replayed,
     cost: { planCredits: -entry.planCreditsDelta, credits: -entry.delta, allowance: -entry.featuredAllowanceDelta },
-    wallet: walletSummary(outcome.wallet, now),
-    boosts: boostsView({ boosts: outcome.boosts }, now),
+    wallet: walletSummary(wallet, now),
+    boosts: boostsView({ boosts }, now),
   };
 }

@@ -61,7 +61,9 @@ async function fund(accountId: string, wallet: Partial<WalletDoc>): Promise<void
   await setWallet(accountId, { balance: 0, frozen: false, planCredits: 0, allowances: { featured: 0 }, createdAt: now, updatedAt: now, ...wallet });
 }
 
-const order = (optionId: string, requestId: string = randomUUID()) => ({ optionId, requestId, acceptTerms: true, immediateExecutionConsent: true });
+/** Prices of the vehicles tier (the bicycle of `published`). */
+const VEHICLE_PRICES: Record<string, number> = { bump: 20, featured7: 59, featured30: 149 };
+const order = (optionId: string, requestId: string = randomUUID(), expectedCost = VEHICLE_PRICES[optionId]) => ({ optionId, requestId, expectedCost, acceptTerms: true, immediateExecutionConsent: true });
 const purchase = (owner: Member, id: string, body: unknown) => api<BuyOptionResponse & ErrorBody>(buy, "POST", `/api/listings/${id}/options`, { member: owner, body });
 
 describe("buying an option", () => {
@@ -107,6 +109,44 @@ describe("buying an option", () => {
     expect(code(reused.body)).toBe("conflict");
   });
 
+  it("refuses a cost the buyer did not agree to, and answers a committed retry after sales closed", async () => {
+    const owner = await member();
+    const id = await published(owner);
+    await fund(owner.uid, { balance: 100, allowances: { featured: 1, resetsAt: new Date(Date.now() + 10 * DAY_MS) } });
+    // The dialog showed 59 credits, the allowance now covers it (a new period): nothing is taken.
+    const moved = await purchase(owner, id, order("featured7"));
+    expect(moved.status).toBe(409);
+    expect(code(moved.body)).toBe("price_changed");
+    expect(await getWallet(owner.uid)).toMatchObject({ balance: 100, allowances: { featured: 1 } });
+
+    const requestId = randomUUID();
+    expect((await purchase(owner, id, order("featured7", requestId, 0))).status).toBe(200);
+    // Another tab still shows "included": the allowance is spent, the credits are not taken silently.
+    const second = await purchase(owner, id, order("featured7", randomUUID(), 0));
+    expect(second.status).toBe(409);
+    expect(code(second.body)).toBe("price_changed");
+    expect((await getWallet(owner.uid))?.balance).toBe(100);
+
+    // The answer of the first purchase was lost and sales closed meanwhile: the retry still gets it.
+    flags.salesEnabled = false;
+    const replay = await purchase(owner, id, order("featured7", requestId, 0));
+    expect(replay.status).toBe(200);
+    expect(replay.body).toMatchObject({ replayed: true, cost: { allowance: 1, credits: 0 } });
+  });
+
+  it("refuses a listing past its end that the nightly expiry has not reached yet", async () => {
+    const owner = await member();
+    const id = await published(owner);
+    await updateListing(id, { expiresAt: new Date(Date.now() - 60_000) });
+    await fund(owner.uid, { balance: 100 });
+    const offer = await api<ListingOptionsResponse>(options, "GET", `/api/listings/${id}/options`, { member: owner });
+    expect(offer.body.promotable).toBe(false);
+    const result = await purchase(owner, id, order("featured7"));
+    expect(result.status).toBe(409);
+    expect(code(result.body)).toBe("listing_not_promotable");
+    expect((await getWallet(owner.uid))?.balance).toBe(100);
+  });
+
   it("refuses a bump while the listing is at the top already", async () => {
     const owner = await member();
     const id = await published(owner);
@@ -126,7 +166,7 @@ describe("buying an option", () => {
     const id = await published(owner);
     await fund(owner.uid, { balance: 200, allowances: { featured: 1, resetsAt: new Date(Date.now() + 10 * DAY_MS) } });
 
-    const first = await purchase(owner, id, order("featured7"));
+    const first = await purchase(owner, id, order("featured7", randomUUID(), 0));
     expect(first.status).toBe(200);
     expect(first.body.cost).toEqual({ planCredits: 0, credits: 0, allowance: 1 });
     expect(first.body.wallet).toMatchObject({ balance: 200, featuredAllowance: 0 });

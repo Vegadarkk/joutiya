@@ -40,9 +40,14 @@ export async function handleBuyOption(request: Request, params: Params): Promise
   const auth = await requireUser(request, { mutation: true });
   const id = await listingIdOf(params);
   const input = await readJson(request, buyOptionSchema);
-  await enforceLimit("listing.options.uid", auth.user.uid);
-  await assertQuotas(DEPOSIT_QUOTAS);
-  return json(await buyOption(auth, id, input));
+  // The listing and the ledger entry are read first (a retry is answered from it); a new purchase
+  // then passes the closed per-attempt limit and the write quota.
+  await enforceLimit("wallet.read.uid", auth.user.uid, 2);
+  const beforePurchase = async () => {
+    await enforceLimit("listing.options.uid", auth.user.uid);
+    await assertQuotas(DEPOSIT_QUOTAS);
+  };
+  return json(await buyOption(auth, id, input, { beforePurchase }));
 }
 
 /** Ledger entry ids are deterministic (`option_{listingId}_{uuid}`, `purchase_{...}`). */

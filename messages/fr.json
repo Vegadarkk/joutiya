@@ -3090,9 +3090,11 @@
       "listing_not_promotable": "Cette annonce n'est plus en ligne : elle ne peut pas être mise en avant.",
       "bump_too_soon": "Votre annonce est déjà en tête des résultats. Réessayez dans une heure.",
       "wallet_frozen": "Votre porte-monnaie est bloqué après un remboursement.",
-      "insufficient_credits": "Vos crédits ne suffisent pas pour cette option."
+      "insufficient_credits": "Vos crédits ne suffisent pas pour cette option.",
+      "price_changed": "Le prix de cette option vient de changer. Vérifiez-le, puis commandez à nouveau."
     },
-    "availableAt": "Disponible à partir de {time} : l'annonce est déjà en tête."
+    "availableAt": "Disponible à partir de {time} : l'annonce est déjà en tête.",
+    "expiresFirst": "Votre annonce expire le {date}, avant la fin de cet À la Une : renouvelez-la pour en profiter jusqu'au bout."
   },
   "Wallet": {
     "metaTitle": "Porte-monnaie",
