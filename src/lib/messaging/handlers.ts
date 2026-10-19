@@ -34,8 +34,9 @@ export const MESSAGE_BODY_MAX = 32 * 1024;
 
 /**
  * The send limiters (D4, audit D1a-01): a burst per minute, an hour and a day per account, and an
- * hour per account and thread. Consumed together (one round trip), asserted in that order; every
- * one is open (a Valkey outage never blocks a reply).
+ * hour per account and thread. Consumed in that order and stopped at the first refusal, so a
+ * refused send (a client retrying on 429) never uses up the hour and day budgets; every one is
+ * open (a Valkey outage never blocks a reply).
  */
 async function enforceSendLimits(uid: string, cid: string): Promise<void> {
   const checks: readonly (readonly [RateLimitId, string])[] = [
@@ -44,8 +45,7 @@ async function enforceSendLimits(uid: string, cid: string): Promise<void> {
     ["message.send.day.uid", uid],
     ["message.send.thread", `${uid}:${cid}`],
   ];
-  const outcomes = await Promise.all(checks.map(([id, key]) => consumeLimit(id, key)));
-  checks.forEach(([id], index) => assertLimit(id, outcomes[index]!));
+  for (const [id, key] of checks) assertLimit(id, await consumeLimit(id, key));
 }
 
 async function cidOf(params: Params): Promise<string> {

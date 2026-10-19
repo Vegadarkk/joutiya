@@ -496,8 +496,9 @@ async function applyTx(tx: Transaction, run: TxInput): Promise<Committed> {
     now,
     // notifiedAt is written here, before the mail leaves: sendMail only enqueues the statement on the
     // BullMQ mail queue (5 attempts, exponential backoff, deferred while the provider is down), so a
-    // transient failure never loses it. The degraded mail quota skips non-security mails for good:
-    // POST /api/admin/decisions/{id}/notify re-sends the statement (renotify.ts, audit D1a-08).
+    // transient failure never loses it, and its security priority keeps it out of the mail quota's
+    // skips. A failed enqueue is logged with the decision id: POST /api/admin/decisions/{id}/notify
+    // re-sends the statement (renotify.ts, audit D1a-08).
     notified: notify && isRestrictive(template.action),
   };
   const main = createDecisionTx(tx, run.mainRef, mainInput);

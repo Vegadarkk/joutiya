@@ -11,10 +11,11 @@ import { sendDecisionNotice, type NoticeInput } from "./notify";
 import { decisionRef, getDecision, getSuspension, type DecisionRecord } from "./repository";
 
 // The statement of reasons sent again (audit D1a-08). decide() records `notifiedAt` when it
-// enqueues the statement: the mail queue retries transient failures, but a degraded mail quota
-// skips the mail for good (src/lib/mail/deliver.ts) and the affected user would learn of the
-// measure without the statement and its appeal link. A staff member re-sends it from the stored
-// decision; every re-send is audited (`decision.notify`).
+// enqueues the statement: the mail queue retries transient failures and the statement has the
+// security priority (never skipped by the mail quota, Brevo fallback), but a failed enqueue or a
+// lost address leaves the user without the statement and its appeal link (the failure is logged
+// with the decision id). A staff member re-sends it from the stored decision; every re-send is
+// audited (`decision.notify`).
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -37,14 +38,19 @@ async function suspensionEnd(record: DecisionRecord): Promise<Date | null> {
 
 /**
  * POST /api/admin/decisions/{id}/notify. 404 unknown decision; 409 `conflict` when the decision
- * carries no statement (restore, no_action, a phase 3 demotion) or when an authority order forbade
- * informing the user (never notified). `sent: false` when the account has no address any more.
+ * carries no statement (restore, no_action, a phase 3 demotion), when its template is not in the
+ * decision catalogue (listing rejections and automated holds have their own mails: the statement
+ * would lose its facts and ground), when an appeal reversed it (`supersededBy`: no longer in force)
+ * or when an authority order forbade informing the user (never notified). `sent: false` when the
+ * account has no address any more.
  */
 export async function resendDecisionNotice(actor: DecisionActor & { role: "moderator" | "admin" }, decisionId: string, options: { now?: Date; ip?: string } = {}): Promise<ResendNoticeResponse> {
   const now = options.now ?? new Date();
   const record = await getDecision(decisionId);
   if (!record) throw notFound();
   if (!(RESTRICTIVE_ACTIONS as readonly string[]).includes(record.action)) throw new HttpError(409, "conflict", "this decision carries no statement of reasons");
+  if (!decisionTemplate(record.templateId)) throw new HttpError(409, "conflict", "this decision's template has no statement mail");
+  if (record.supersededBy) throw new HttpError(409, "conflict", "this decision was reversed on appeal");
   if (record.origin === "authority_order" && !record.notifiedAt) throw new HttpError(409, "conflict", "the order forbids informing the user");
   const targetType = record.target.type as DecisionTargetType;
   if (!DECISION_TARGET_TYPES.includes(targetType)) throw new HttpError(409, "conflict", "this decision's target has no statement mail");

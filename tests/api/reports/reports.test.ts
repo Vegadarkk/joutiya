@@ -198,6 +198,21 @@ describe("member notices", () => {
     expect(mail).toMatchObject({ to: reporter.email, locale: "fr", data: { displayName: "Salma Signale" } });
   });
 
+  it("never caps a member's acknowledgements: a visitor typing the member's address cannot use them up", async () => {
+    for (const reasonId of ["scam", "misleading"]) {
+      const { id } = await publishedListing();
+      expect((await report(listingNotice(id, reasonId, { name: "Anonyme", email: reporter.email }), { as: visitor() })).status).toBe(201);
+    }
+    clearLimiterCalls();
+    sendMailMock.mockClear();
+    const { id } = await publishedListing();
+    const result = await report(listingNotice(id, "spam"), { as: reporter });
+    expect(result.status).toBe(201);
+    const mails = capturedMails(sendMailMock).filter((mail) => mail.template === "reportReceived");
+    expect(mails.map((mail) => (mail.data as { reportId: string }).reportId)).toEqual([result.body.reportId]);
+    expect(limiterCalls()).not.toContain("report.ack.email");
+  });
+
   it("checks CSRF on a member's notice", async () => {
     const result = await report(listingNotice(listingId, "spam"), { as: reporter, csrf: false });
     expect(result.status).toBe(403);

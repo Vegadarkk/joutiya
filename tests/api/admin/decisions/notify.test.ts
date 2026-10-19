@@ -1,3 +1,4 @@
+import { FieldValue } from "firebase-admin/firestore";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The statement of reasons sent again (design D13, audit D1a-08) against the Firebase emulators: a
@@ -19,6 +20,7 @@ import { POST as notifyRoute } from "@/app/api/admin/decisions/[id]/notify/route
 import { POST as decideRoute } from "@/app/api/admin/decisions/route";
 import type { DecideResponse, ResendNoticeResponse } from "@/lib/decisions/contracts";
 import { setDecisionAiHooks } from "@/lib/decisions/hooks";
+import { decisionRef } from "@/lib/decisions/repository";
 import { resetServerEnv } from "@/lib/env";
 import { sendMail } from "@/lib/mail";
 import type { TemplateMail } from "@/lib/mail/types";
@@ -64,7 +66,8 @@ describe("POST /api/admin/decisions/{id}/notify", () => {
     expect(resent.body.notifiedAt).toBe((await decision(decisionId)).notifiedAt?.toISOString());
     const again = mailTo(sendMail, "decisionNotice", seller.email);
     expect(again?.idempotencyKey).toMatch(new RegExp(`^decisionNotice-${decisionId}-resend-\\d+$`));
-    expect(again?.priority).toBe("transactional");
+    // Art. 17: the statement is never dropped by the mail quota.
+    expect(again?.priority).toBe("security");
     expect(again?.data).toMatchObject({
       decisionId,
       action: "remove",
@@ -100,5 +103,24 @@ describe("POST /api/admin/decisions/{id}/notify", () => {
     expect((await adminCall(notifyRoute, "POST", `/api/admin/decisions/${"Z".repeat(20)}/notify`, { as: moderator, params: { id: "Z".repeat(20) } })).status).toBe(404);
     expect((await adminCall(notifyRoute, "POST", `/api/admin/decisions/${dismissed.body.decisionId}/notify`, { params: { id: dismissed.body.decisionId } })).status).toBe(401);
     expect(vi.mocked(sendMail)).not.toHaveBeenCalled();
+  });
+
+  it("refuses a decision reversed on appeal and one whose template has no statement mail (409)", async () => {
+    const { id } = await publishedListing();
+    expect((await report(listingNotice(id, "scam"), { as: await member() })).status).toBe(201);
+    const decided = await adminCall<DecideResponse>(decideRoute, "POST", "/api/admin/decisions", { as: moderator, body: { target: `listing:${id}`, templateId: "listing.remove.scam" } });
+    expect(decided.status).toBe(201);
+    const decisionId = decided.body.decisionId;
+    const resend = () => adminCall(notifyRoute, "POST", `/api/admin/decisions/${decisionId}/notify`, { as: moderator, params: { id: decisionId } });
+
+    await decisionRef(decisionId).update({ supersededBy: "Z".repeat(20) });
+    vi.mocked(sendMail).mockClear();
+    expect((await resend()).status).toBe(409);
+
+    // A listing rejection or an automated hold: its own mail, outside the decision catalogue.
+    await decisionRef(decisionId).update({ supersededBy: FieldValue.delete(), templateId: "listingRejected" });
+    expect((await resend()).status).toBe(409);
+    expect(vi.mocked(sendMail)).not.toHaveBeenCalled();
+    expect(await audits("decision.notify", decisionId)).toHaveLength(0);
   });
 });

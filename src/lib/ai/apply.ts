@@ -181,7 +181,7 @@ async function notifySeller(listing: ListingRecord, kind: "approve" | "reject", 
     if (!to) return;
     const restored = listing.status === "paused" || listing.status === "expired" ? listing.status : null;
     const template = kind === "reject" ? "listingRejected" : restored ? "listingChangesApproved" : "listingApproved";
-    const base = { locale: to.locale, to: to.email, priority: "transactional" as const, idempotencyKey: `${template}-${listing.id}-${listing.version}` };
+    const base = { locale: to.locale, to: to.email, priority: template === "listingRejected" ? ("security" as const) : ("transactional" as const), idempotencyKey: `${template}-${listing.id}-${listing.version}` };
     if (kind === "approve" && restored) {
       const until = (restored === "paused" ? listing.expiresAt : listing.purgeAt) ?? listing.updatedAt;
       const url = siteUrl(to.locale, `mes-annonces?onglet=${restored === "paused" ? "active" : "ended"}`);

@@ -24,14 +24,27 @@ export const cidSchema = z.string().regex(/^[A-Za-z0-9_-]{22}$/);
 export const messageIdSchema = z.string().regex(/^[A-Za-z0-9]{20}$/);
 
 /**
- * Format characters (Unicode Cf: zero-width spaces, bidi marks and overrides, soft hyphen, BOM...)
- * except ZWNJ and ZWJ (U+200C, U+200D: Arabic and emoji sequences need them). Invisible, they split
- * a keyword, a bank account or a domain past the risk rules and spoof the display direction.
+ * Format characters (Unicode Cf: zero-width spaces and joiners, bidi marks and overrides, soft
+ * hyphen, BOM...). Invisible, they split a keyword, a bank account or a domain past the risk rules
+ * and spoof the display direction. ZWNJ and ZWJ (U+200C, U+200D) stay only where scripts need them:
+ * between two Arabic-script characters, and inside an emoji sequence (after a pictograph, a skin
+ * tone or VS16, before a pictograph). Anywhere else they go too (audit D1a-11: "w\u200Dhatsapp").
  */
-const FORMAT_CHARACTERS = /(?![‌‍])\p{Cf}/gu;
+const FORMAT_CHARACTERS = /\p{Cf}/gu;
+const ARABIC = /^\p{Script=Arabic}$/u;
+const EMOJI_BEFORE = /^[\p{Extended_Pictographic}\p{Emoji_Modifier}\uFE0F]$/u;
+const EMOJI_AFTER = /^\p{Extended_Pictographic}$/u;
+
+function joinerNeeded(text: string, offset: number): boolean {
+  const before = Array.from(text.slice(Math.max(0, offset - 2), offset)).pop() ?? "";
+  const next = text.codePointAt(offset + 1);
+  const after = next === undefined ? "" : String.fromCodePoint(next);
+  return (ARABIC.test(before) && ARABIC.test(after)) || (EMOJI_BEFORE.test(before) && EMOJI_AFTER.test(after));
+}
 
 /** `text` without its format characters: applied before validation and risk analysis (D5). */
-export const stripFormatCharacters = (text: string): string => text.replace(FORMAT_CHARACTERS, "");
+export const stripFormatCharacters = (text: string): string =>
+  text.replace(FORMAT_CHARACTERS, (char: string, offset: number) => ((char === "\u200C" || char === "\u200D") && joinerNeeded(text, offset) ? char : ""));
 
 const messageTextSchema = z.preprocess(
   (value) => (typeof value === "string" ? stripFormatCharacters(value) : value),

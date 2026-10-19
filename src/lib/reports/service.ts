@@ -188,7 +188,9 @@ async function afterCommit({ id, doc, signal, change, now, ack, triage }: AfterC
   if (doc.priority === "P0") {
     await alert(p0Alert({ reportId: id, targetType: doc.target.type, reasonId: doc.reasonId, signal, hidden, slaDueAt: doc.slaDueAt, source: doc.source }));
   }
-  if (ack && (await ackAllowed(ack.to, id))) {
+  // A member's acknowledgement goes to the account's verified address: never capped, so a visitor
+  // typing that address cannot use up the member's acknowledgements (audit D1a-04 review).
+  if (ack && (doc.reporter.uid !== undefined || (await ackAllowed(ack.to, id)))) {
     try {
       // A courtesy (the response carries the report id): bulk priority, dropped first under the mail quota.
       await sendMail({
@@ -208,8 +210,8 @@ async function afterCommit({ id, doc, signal, change, now, ack, triage }: AfterC
 }
 
 /**
- * The per-address cap of the acknowledgements (audit D1a-04): 2 per day per normalized e-mail,
- * counted by the rate-limit store (HMAC key, nothing in clear). A visitor types any address; a
+ * The per-address cap of the visitors' acknowledgements (audit D1a-04): 2 per day per normalized
+ * e-mail, counted by the rate-limit store (HMAC key, nothing in clear). A visitor types any address; a
  * flood of notices must not become a flood of mails to a stranger, nor eat the mail quota. Store
  * down (closed policy): no acknowledgement, the report stands.
  */

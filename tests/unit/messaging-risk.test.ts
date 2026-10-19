@@ -140,6 +140,19 @@ describe("message text contract", () => {
       expect(sendMessageSchema.safeParse({ text: `${"x".repeat(2000)}​` }).success).toBe(true);
     });
 
+    it("keeps ZWNJ and ZWJ only between Arabic letters and inside emoji sequences", () => {
+      expect(stripFormatCharacters("w\u200Dhats\u200Capp")).toBe("whatsapp");
+      expect(stripFormatCharacters("06\u200D12\u200C34")).toBe("061234");
+      expect(stripFormatCharacters("\u200Dسلام\u200C")).toBe("سلام");
+      expect(stripFormatCharacters("👍🏽\u200D👍")).toBe("👍🏽\u200D👍");
+      expect(stripFormatCharacters("❤\uFE0F\u200D🔥")).toBe("❤\uFE0F\u200D🔥");
+      const whatsapp = parse("virement puis on parle sur w\u200Dh\u200Ca\u200Dt\u200Csapp");
+      expect(whatsapp).toBe("virement puis on parle sur whatsapp");
+      expect(analyzeMessage(whatsapp).flags).toEqual(["payment_kw", "contact_with_payment_kw"]);
+      // Matching ignores every format character, even a joiner kept in the stored text.
+      expect(tokenize("w\u200Dhats\u200Capp")).toEqual(["whatsapp"]);
+    });
+
     it("keeps a zero-width-split WhatsApp mention, an RTL-override IBAN and a split domain detectable", () => {
       const whatsapp = parse("virement puis on parle sur w​h​a​t​s​a​p​p");
       expect(analyzeMessage(whatsapp).flags).toEqual(["payment_kw", "contact_with_payment_kw"]);

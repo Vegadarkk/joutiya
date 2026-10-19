@@ -69,7 +69,8 @@ export async function sendDecisionNotice(input: NoticeInput, options: { resentAt
   };
   const key = options.resentAt ? `decisionNotice-${input.decisionId}-resend-${Math.floor(options.resentAt.getTime() / 60_000)}` : `decisionNotice-${input.decisionId}`;
   return quietly("decisionNotice", { decisionId: input.decisionId }, () =>
-    sendMail({ template: "decisionNotice", locale: to.locale, to: to.email, priority: "transactional", idempotencyKey: key, data }),
+    // Art. 17 DSA: the statement of reasons is owed, never dropped by the mail quota (security priority).
+    sendMail({ template: "decisionNotice", locale: to.locale, to: to.email, priority: "security", idempotencyKey: key, data }),
   );
 }
 
