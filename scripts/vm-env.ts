@@ -296,32 +296,22 @@ export function parseNames(output: string): Set<string> {
 }
 
 /**
- * Root scripts for Run Command: the payload (base64) appended in chunks to a root-only file, then
- * checked against its SHA-256 and merged into app.env. The merge keeps the lines of other names,
- * generates CSRF_SECRET and each Valkey password once, rebuilds the two Redis URLs from those
- * passwords, replaces app.env atomically (0600), then prints the names it holds and, last (Run
- * Command returns the last 1 KB), the required names still missing.
+ * The merge of a root-only file of app.env lines (envPayload's form, names already checked) into
+ * <etc>/<env>/app.env: it keeps the lines of other names, generates CSRF_SECRET and each Valkey
+ * password once, rebuilds the two Redis URLs from those passwords, replaces app.env atomically
+ * (0600), then prints the names it holds and, last (Run Command returns the last 1 KB), the
+ * required names still missing. The caller's EXIT trap removes "$new". Shared with the PC2
+ * staging (scripts/wsl-staging.ts env).
  */
-export function envScripts(env: DeployedEnv, payload: string, dirs: EnvDirs = VM_DIRS, chunkSize = 3_000): string[] {
-  const names = [...payload.matchAll(/^([A-Z][A-Z0-9_]*)=/gm)].map((match) => match[1] ?? "");
-  if (names.length === 0) throw new Error("nothing to write");
-  const encoded = Buffer.from(payload).toString("base64");
-  const staged = `${dirs.stage}/${env}.b64`;
+export function mergeLines(env: DeployedEnv, payload: string, dirs: EnvDirs = VM_DIRS): string[] {
   const dir = `${dirs.etc}/${env}`;
-  const chunks = encoded.match(new RegExp(`.{1,${chunkSize}}`, "g")) ?? [];
-  const append = chunks.map((chunk, index) =>
-    [...(index === 0 ? [`install -d -m 0700 ${dirs.stage}`, `: > ${staged}`] : []), `printf '%s' '${chunk}' >> ${staged}`, `echo "chunk ${index + 1}/${chunks.length}"`].join("\n"),
-  );
-  const sha256 = createHash("sha256").update(encoded).digest("hex");
-  const replaced = [...names, "QUEUE_REDIS_URL", "RATE_LIMIT_REDIS_URL"].join("|");
-  const merge = [
-    `trap 'rm -f ${staged} "\${new:-}"' EXIT`,
-    `echo "${sha256}  ${staged}" | sha256sum -c --quiet`,
+  return [
     "umask 077",
     `install -d -m 0700 ${dir}`,
     `new="$(mktemp ${dir}/.app.env.XXXXXX)"`,
-    `if [[ -f ${dir}/app.env ]]; then grep -v -E '^(${replaced})=' ${dir}/app.env > "$new" || [[ $? -eq 1 ]]; fi`,
-    `base64 -d ${staged} >> "$new"`,
+    `replaced="$(cut -d= -f1 ${payload} | sort -u | tr '\\n' '|')QUEUE_REDIS_URL|RATE_LIMIT_REDIS_URL"`,
+    `if [[ -f ${dir}/app.env ]]; then grep -v -E "^(\${replaced})=" ${dir}/app.env > "$new" || [[ $? -eq 1 ]]; fi`,
+    `cat ${payload} >> "$new"`,
     `grep -q '^CSRF_SECRET=' "$new" || printf "CSRF_SECRET='%s'\\n" "$(openssl rand -hex 32)" >> "$new"`,
     "for role in queue ratelimit; do",
     `  file=${dir}/valkey-$role.env`,
@@ -340,6 +330,30 @@ export function envScripts(env: DeployedEnv, payload: string, dirs: EnvDirs = VM
     'missing=""',
     `for name in ${REQUIRED.join(" ")}; do grep -q "^$name=" ${dir}/app.env || missing="$missing $name"; done`,
     'echo "missing:$missing"',
+  ];
+}
+
+/**
+ * Root scripts for Run Command: the payload (base64) appended in chunks to a root-only file, then
+ * checked against its SHA-256, decoded and merged into app.env (mergeLines).
+ */
+export function envScripts(env: DeployedEnv, payload: string, dirs: EnvDirs = VM_DIRS, chunkSize = 3_000): string[] {
+  const names = [...payload.matchAll(/^([A-Z][A-Z0-9_]*)=/gm)].map((match) => match[1] ?? "");
+  if (names.length === 0) throw new Error("nothing to write");
+  const encoded = Buffer.from(payload).toString("base64");
+  const staged = `${dirs.stage}/${env}.b64`;
+  const chunks = encoded.match(new RegExp(`.{1,${chunkSize}}`, "g")) ?? [];
+  const append = chunks.map((chunk, index) =>
+    [...(index === 0 ? [`install -d -m 0700 ${dirs.stage}`, `: > ${staged}`] : []), `printf '%s' '${chunk}' >> ${staged}`, `echo "chunk ${index + 1}/${chunks.length}"`].join("\n"),
+  );
+  const sha256 = createHash("sha256").update(encoded).digest("hex");
+  const plain = `${dirs.stage}/${env}.env`;
+  const merge = [
+    `trap 'rm -f ${staged} ${plain} "\${new:-}"' EXIT`,
+    `echo "${sha256}  ${staged}" | sha256sum -c --quiet`,
+    "umask 077",
+    `base64 -d ${staged} > ${plain}`,
+    ...mergeLines(env, plain, dirs),
   ].join("\n");
   return [...append, merge];
 }

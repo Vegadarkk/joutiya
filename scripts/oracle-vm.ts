@@ -282,7 +282,7 @@ function tunnelId(targets: Targets, name: TunnelName): { id: string; field: stri
   return { id, field };
 }
 
-async function tunnelToken(targets: Targets, name: TunnelName): Promise<string> {
+export async function tunnelToken(targets: Targets, name: TunnelName): Promise<string> {
   const account = targets.shared.cloudflare.accountId;
   if (!account) throw new Error("shared.cloudflare.accountId must be recorded in infra/targets.json first");
   const { id, field } = tunnelId(targets, name);
