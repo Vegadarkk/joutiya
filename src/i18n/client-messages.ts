@@ -49,6 +49,12 @@ export const SEARCH_PAGE_CLIENT_NAMESPACES = [
   "SavedSearches.dialog",
 ] as const;
 
+/**
+ * Added on the help centre pages only (src/app/[locale]/(public)/aide/layout.tsx): the article
+ * search box and the Assistant Joutiya widget (design phase-5 D25).
+ */
+export const HELP_PAGE_CLIENT_NAMESPACES = ["Help.search", "Help.assistant"] as const;
+
 /** The subtrees of `messages` named by `paths` ("Auth.menu" keeps `{ Auth: { menu } }`); unknown paths are skipped. */
 export function pickMessages(messages: AbstractIntlMessages, paths: readonly string[]): AbstractIntlMessages {
   const out: AbstractIntlMessages = {};

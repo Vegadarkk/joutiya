@@ -6,7 +6,7 @@ describe("search-setup", () => {
     expect(SEARCH_KEYS.map((key) => key.envName)).toEqual(["MEILI_SEARCH_KEY", "MEILI_INDEX_KEY"]);
     for (const key of SEARCH_KEYS) {
       expect(key.uid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-      expect(key.indexes).toEqual(["listings_*"]);
+      expect(key.indexes).toEqual(["listings_*", "help"]);
     }
     expect(SEARCH_KEYS[0]?.actions).toEqual(["search", "documents.get"]);
     expect(SEARCH_KEYS[1]?.actions).toEqual(["documents.*", "indexes.*", "settings.*", "tasks.get", "stats.get"]);
@@ -17,11 +17,13 @@ describe("search-setup", () => {
     if (!search || !index) throw new Error("keys");
     expect(planKeys([]).map((step) => step.action)).toEqual(["create", "create"]);
     const plan = planKeys([
-      { uid: search.uid, actions: [...search.actions].reverse(), indexes: ["listings_*"] },
+      { uid: search.uid, actions: [...search.actions].reverse(), indexes: ["help", "listings_*"] },
       { uid: index.uid, actions: ["*"], indexes: ["*"] },
       { uid: "other", actions: ["*"], indexes: ["*"] },
     ]);
     expect(plan.map((step) => step.action)).toEqual(["keep", "recreate"]);
+    // A key from before the help index (phase-5 D25) is recreated with the same value.
+    expect(planKeys([{ uid: search.uid, actions: [...search.actions], indexes: ["listings_*"] }])[0]?.action).toBe("recreate");
   });
 
   it("sets key lines in an env file and keeps the others", () => {

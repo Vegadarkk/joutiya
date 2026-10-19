@@ -73,6 +73,7 @@ vi.mock("@/lib/search/queue", () => ({
   SEARCH_QUEUE: "search",
 }));
 vi.mock("@/lib/startup/checks", () => ({ runStartupChecks: vi.fn(async () => undefined) }));
+vi.mock("@/lib/help/search", () => ({ syncHelpIndex: vi.fn(async () => false) }));
 vi.mock("@/lib/valkey/clients", () => ({ clientOptions: (_role: string, overrides: object) => ({ ...overrides }) }));
 vi.mock("@/lib/ai/queue", async (importOriginal) => ({ ...(await importOriginal<typeof AgentQueue>()), closeAgentQueue: mocks.closeAgentQueue }));
 vi.mock("@/lib/ai/run", () => ({ runAgentTask: mocks.runAgentTask }));

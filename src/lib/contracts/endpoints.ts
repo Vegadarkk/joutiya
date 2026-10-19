@@ -85,6 +85,16 @@ export const APPEAL_API = {
   link: "/api/appeals/link",
 } as const;
 
+/** Assistant Joutiya (assistant.ts re-exports them): question, earlier turns, how many turns. */
+export const ASSISTANT_QUESTION_MAX = 500;
+export const ASSISTANT_TURN_MAX = 1500;
+export const ASSISTANT_HISTORY_MAX = 6;
+
+export const ASSISTANT_API = {
+  /** POST AssistantRequest -> AssistantResponse (`ai`, or `search` when the AI is unavailable). */
+  assistant: "/api/assistant",
+} as const;
+
 export const SEARCH_API = {
   /** GET ?<search params> -> SearchApiResponse. Over the limits: 403 turnstile_required, then 429. */
   search: "/api/search",
