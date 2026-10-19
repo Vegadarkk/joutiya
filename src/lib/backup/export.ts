@@ -71,6 +71,7 @@ const TABLE: Record<BackedUpId, Omit<BackupCollection, "id">> = {
   moderationDecisions: { scope: "root", timeField: "createdAt" },
   favorites: { scope: "group", timeField: "createdAt" },
   savedSearches: { scope: "group", timeField: "updatedAt" },
+  proProfiles: { scope: "root", timeField: "updatedAt" },
   // Phase 5: messages and their evidence are subcollections of conversations/{cid}.
   conversations: { scope: "root", timeField: "updatedAt" },
   messages: { scope: "group", timeField: "createdAt" },

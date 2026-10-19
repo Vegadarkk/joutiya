@@ -34,6 +34,9 @@ export type TemplateId =
   | "reporterWarning"
   // Search (phase 4): the daily digest of the saved searches with an alert (design D19).
   | "savedSearchAlert"
+  // Pro accounts (phase 7): the moderator's decision on the application.
+  | "proApproved"
+  | "proRejected"
   // Messaging (phase 5, L5): the grouped new-messages mail (design D21).
   | "newMessages";
 
@@ -145,6 +148,10 @@ export interface TemplateData {
    * List-Unsubscribe header and the "Se désabonner" link.
    */
   savedSearchAlert: { displayName: string; searches: SavedSearchAlertSection[]; unsubscribeToken: string };
+  /** `launchOffer`: Essentiel offered until sales open, `noticeDays` of notice before any payment. */
+  proApproved: { displayName: string; shopName: string; launchOffer: boolean; noticeDays: number };
+  /** The moderator's reason; `contact` is where to object (legal configuration). */
+  proRejected: { displayName: string; shopName: string; reason: string; contact: string };
   /**
    * Grouped new-messages mail (bulk, D21): the unread total and up to 3 conversations (listing
    * title, the other member's display name). Never the text of a message.

@@ -18,6 +18,8 @@ import { listingRejected } from "./templates/listingRejected";
 import { passwordChanged } from "./templates/passwordChanged";
 import { phoneRemoved } from "./templates/phoneRemoved";
 import { phoneVerified } from "./templates/phoneVerified";
+import { proApproved } from "./templates/proApproved";
+import { proRejected } from "./templates/proRejected";
 import { reportReceived } from "./templates/reportReceived";
 import { resetPassword } from "./templates/resetPassword";
 import { savedSearchAlert } from "./templates/savedSearchAlert";
@@ -52,6 +54,8 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   appealOutcome,
   reporterWarning,
   savedSearchAlert,
+  proApproved,
+  proRejected,
   newMessages,
 };
 

@@ -118,7 +118,7 @@ describe("listingSchema", () => {
     expect(MODERATION_STATES).toEqual(["auto_ok", "needs_review", "auto_rejected", "human_ok", "human_rejected"]);
     expect(MODERATION_FLAGS).toEqual(["prohibited_kw", "prohibited_soft", "sensitive_text", "third_party_phone", "face", "nsfw_review", "price_outlier", "dup_text", "dup_photo", "new_account", "volume"]);
     expect(UPLOAD_STATUSES).toEqual(["signed", "processing", "ready", "rejected"]);
-    expect(UPLOAD_REJECT_REASONS).toEqual(["too_large", "bad_type", "decode_failed", "nsfw", "expired", "quota"]);
+    expect(UPLOAD_REJECT_REASONS).toEqual(["too_large", "bad_type", "decode_failed", "nsfw", "expired", "quota", "active_content"]);
     expect(CONDITIONS).toEqual(["new_tagged", "like_new", "very_good", "good", "for_parts"]);
   });
 });

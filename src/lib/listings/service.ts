@@ -34,7 +34,9 @@ import { getUserRecord, type UserRecord } from "@/lib/db/repositories/profiles";
 import { enqueueSearchOutboxTx } from "@/lib/db/repositories/search-outbox";
 import { getUploads, updateUpload } from "@/lib/db/repositories/uploads";
 import { getUserPrivate } from "@/lib/db/repositories/users";
+import { getProProfile } from "@/lib/db/repositories/pro-profiles";
 import { listingSchema, type ListingDoc, type ListingModeration } from "@/lib/db/schemas";
+import { getPricing } from "@/lib/config/runtime";
 import { serverEnv } from "@/lib/env";
 import { db } from "@/lib/firebase/admin";
 import { HttpError, notFound } from "@/lib/http/errors";
@@ -43,6 +45,7 @@ import { logger } from "@/lib/logging/logger";
 import { sendMail } from "@/lib/mail";
 import type { ModerationStatement, TemplateData } from "@/lib/mail/types";
 import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
+import { publishesAsPro } from "@/lib/pro/lifecycle";
 import { notifySearchIndex } from "@/lib/search/queue";
 import { escalateOnIp } from "./escalation";
 import { buildSlugId, newListingId } from "./ids";
@@ -88,9 +91,15 @@ interface SellerContext {
 async function sellerOf(auth: AuthContext): Promise<SellerContext> {
   const user = await getUserRecord(auth.user.uid);
   if (!user) throw new HttpError(403, "forbidden", "account record missing");
-  // Phase 3 publishes individuals; a verified Pro without a plan has the `none` quotas (D5).
-  const seller: Seller = user.type === "pro" || auth.user.claims.role === "pro" ? { type: "pro", plan: "none" } : { type: "individual" };
-  return { user, seller, quotas: listingQuotas(seller) };
+  const pricing = await getPricing();
+  if (user.type !== "pro" && auth.user.claims.role !== "pro") return { user, seller: { type: "individual" }, quotas: listingQuotas({ type: "individual" }, pricing) };
+  // Phase 7: the shop's plan (subscription or launch offer). Suspended, or no profile: the `none`
+  // quotas (nothing new as a Pro).
+  const proId = auth.user.claims.proId ?? user.proId;
+  const profile = proId ? await getProProfile(proId) : null;
+  const plan = profile && profile.ownerUid === user.uid && publishesAsPro(profile.lifecycle) ? profile.plan : "none";
+  const seller: Seller = { type: "pro", plan };
+  return { user, seller, quotas: listingQuotas(seller, pricing) };
 }
 
 async function lifetime(): Promise<Lifetime> {
@@ -399,7 +408,7 @@ export async function publish(actor: Actor, request: Request, id: string, option
 
   await assertWithinQuota(uid, seller.quotas);
   const turnstilePassed = await escalateOnIp(request, "listing.create.ip", options.device, options.turnstileToken, "listing");
-  await enforceDailyLimit(uid, seller.quotas, now);
+  await enforceDailyLimit(uid, seller.seller, seller.quotas, now);
 
   const city = cityBySlug(listing.location!.citySlug)!;
   const slugId = buildSlugId({ id, title: listing.title, city: cityName(city, "fr"), categoryId: listing.categoryId });
@@ -424,11 +433,15 @@ export async function publish(actor: Actor, request: Request, id: string, option
   };
 }
 
-/** 5 listings a day per account (D5): the limiter, else (store down, policy open) the Firestore count. */
-async function enforceDailyLimit(uid: string, quotas: ListingQuotas, now: Date): Promise<void> {
-  const outcome = await consumeLimit("listing.create.uid", uid);
-  if (outcome.ok) return;
-  if (outcome.reason === "limited") throw new HttpError(429, "listing_daily_limit", undefined, { headers: { "Retry-After": String(Math.max(1, outcome.retryAfterSeconds)) } });
+/**
+ * Publications a day (D5). Individuals: 5, by the limiter, else (store down, policy open) the
+ * Firestore count. Pros (phase 7): the plan's `listingsPerDay` by the Firestore count, the plans
+ * differ too much for one limiter, under the coarse `listing.create.pro.uid` abuse cap.
+ */
+async function enforceDailyLimit(uid: string, seller: Seller, quotas: ListingQuotas, now: Date): Promise<void> {
+  const outcome = await consumeLimit(seller.type === "pro" ? "listing.create.pro.uid" : "listing.create.uid", uid);
+  if (!outcome.ok && outcome.reason === "limited") throw new HttpError(429, "listing_daily_limit", undefined, { headers: { "Retry-After": String(Math.max(1, outcome.retryAfterSeconds)) } });
+  if (outcome.ok && seller.type !== "pro") return;
   if (quotas.listingsPerDay !== null && (await countPublishedSince(uid, new Date(now.getTime() - DAY_MS))) >= quotas.listingsPerDay) {
     throw new HttpError(429, "listing_daily_limit", undefined, { headers: { "Retry-After": "3600" } });
   }

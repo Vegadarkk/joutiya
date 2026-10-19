@@ -16,6 +16,8 @@ vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => undefined) }));
 vi.mock("@/lib/search/queue", () => ({ notifySearchIndex: vi.fn(async () => undefined) }));
 vi.mock("@/lib/firebase/admin", () => ({ isFirestoreConfigured: () => true, isFirebaseConfigured: () => true, db: vi.fn() }));
 vi.mock("@/lib/db/repositories/uploads", () => ({ UPLOADS_BY_TARGET_LIMIT: 100, listUploadsByTarget: vi.fn(async () => []), deleteUploadDocument: vi.fn(), updateUpload: vi.fn() }));
+// Phase 7 step (rejected Pro applications): nothing to purge here, tests/unit/jobs-retention-purge.test.ts covers it.
+vi.mock("@/lib/db/repositories/pro-profiles", () => ({ listProProfilesPastPurge: vi.fn(async () => []), purgeProProfile: vi.fn() }));
 vi.mock("@/lib/db/repositories/retention", () => ({
   listListingsPastPurge: vi.fn(),
   purgeListing: vi.fn(),

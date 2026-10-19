@@ -1,6 +1,7 @@
 import "server-only";
 import { Timestamp } from "firebase-admin/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase/admin";
+import { unavailable } from "@/lib/http/errors";
 import { logger } from "@/lib/logging/logger";
 import { consume } from "@/lib/quota";
 import { COLLECTIONS, auditLogSchema, type AuditLogDoc } from "@/lib/db/schemas";
@@ -19,6 +20,14 @@ export interface AuditInput extends Omit<AuditLogDoc, "at" | "ipHash" | "purgeAt
   at?: Date;
 }
 
+export interface AuditOptions {
+  /**
+   * The action must not happen without its entry (a staff read of identity documents): a failed
+   * write answers 503 instead of being logged. Default: logged, the action goes on.
+   */
+  required?: boolean;
+}
+
 /** `at` + 5 calendar years (UTC). */
 export function auditPurgeAt(at: Date): Date {
   const purgeAt = new Date(at.getTime());
@@ -26,7 +35,7 @@ export function auditPurgeAt(at: Date): Date {
   return purgeAt;
 }
 
-export async function audit(input: AuditInput): Promise<void> {
+export async function audit(input: AuditInput, options: AuditOptions = {}): Promise<void> {
   const { ip, at = new Date(), ...rest } = input;
   const purgeAt = auditPurgeAt(at);
   const document = auditLogSchema.parse({ ...rest, ...(ip ? { ipHash: pepperedHash("ip", ip) } : {}), at, purgeAt });
@@ -39,5 +48,6 @@ export async function audit(input: AuditInput): Promise<void> {
     void consume("firestore.writes", 1);
   } catch (error) {
     logger.error({ err: (error as Error).message, action: input.action }, "audit log failed");
+    if (options.required) throw unavailable("audit log unavailable");
   }
 }

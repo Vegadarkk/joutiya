@@ -71,10 +71,14 @@ async function ownedListing(uploader: Uploader, listingId: string): Promise<List
   return listing;
 }
 
-/** The caller's upload; anyone else's (or a missing one) answers 404, never 403 (IDOR). */
+/**
+ * The caller's listing photo; anyone else's (or a missing one) answers 404, never 403 (IDOR). So
+ * does an upload of another purpose: a KYBC piece (phase 7) has its own routes, its own objects
+ * and its own retention, and the photo delete would orphan its private copy.
+ */
 async function ownedUpload(uploader: Uploader, id: string): Promise<UploadRecord> {
   const upload = await getUpload(id);
-  if (!upload || upload.ownerUid !== uploader.auth.user.uid) throw notFound();
+  if (!upload || upload.ownerUid !== uploader.auth.user.uid || upload.purpose !== "listing") throw notFound();
   return upload;
 }
 

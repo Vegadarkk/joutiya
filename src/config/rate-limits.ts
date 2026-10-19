@@ -64,11 +64,19 @@ export const RATE_LIMITS = {
   "listing.edit.uid": { points: 30, duration: DAY, policy: "open", key: "uid" },
   // POST /api/listings: 5 per day per account (individuals, D5), 30 per hour per IP then Turnstile.
   "listing.create.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },
+  // Pros (phase 7): the plan's listingsPerDay is counted in Firestore at publish (25, 100 or
+  // unlimited); this only caps runaway scripts, Premium included.
+  "listing.create.pro.uid": { points: 500, duration: DAY, policy: "open", key: "uid" },
   "listing.create.ip": { points: 30, duration: HOUR, policy: "open", key: "ip" },
   // The owner's routes cost Firestore quota shared by the whole site (Spark: 20 000 writes and
   // 50 000 reads a day). POST /api/listings (a new draft; the 5 above count publications, at
   // publish): 20 per day per account. MAX_DRAFTS caps live drafts, this caps create-delete loops.
   "listing.new.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
+  // POST /api/pro/apply (phase 7): a few attempts a day per account (reads the account, the
+  // owner's shop and up to 6 uploads, then one transaction).
+  "pro.apply.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },
+  // GET /api/pro/me (3 to 4 reads: account, shop, active count): the Pro area's page loads.
+  "pro.read.uid": { points: 300, duration: HOUR, policy: "open", key: "uid" },
   // DELETE /api/listings/{id} and pause / resume / sold / renew (~4 writes and an ISR
   // revalidation each): 120 per day per account (an individual has at most 20 active listings).
   "listing.status.uid": { points: 120, duration: DAY, policy: "open", key: "uid" },
@@ -85,6 +93,8 @@ export const RATE_LIMITS = {
   // Closed: every signed upload costs R2 operations and storage.
   "upload.sign.uid": { points: 30, duration: HOUR, policy: "closed", key: "uid" },
   "upload.bytes.uid": { points: 200 * MIB, duration: DAY, policy: "closed", key: "uid" },
+  // KYBC pieces of a Pro application (phase 7): a few documents, resent after a rejection.
+  "pro.kybc.sign.uid": { points: 20, duration: DAY, policy: "closed", key: "uid" },
   // GET /api/uploads/{id} (polling) and repeated completes: one Firestore read each.
   "upload.status.uid": { points: 900, duration: HOUR, policy: "open", key: "uid" },
   // DELETE /api/uploads/{id} (~3 reads, the detach transaction, the document delete and up to 3
@@ -105,6 +115,12 @@ export const RATE_LIMITS = {
   "profile.read.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
   // Staff moderation decisions (admin host, behind Access): a moderator working the queue.
   "moderation.decision.uid": { points: 300, duration: HOUR, policy: "closed", key: "uid" },
+  // Pro applications (phase 7): a moderator's verify or reject; each verification retags the
+  // owner's listings (up to RETAG_PAGE x RETAG_MAX_PAGES writes), so far fewer than listings.
+  "pro.decision.uid": { points: 60, duration: HOUR, policy: "closed", key: "uid" },
+  // Staff reads of KYBC pieces (identity documents, admin host): a review opens a few; closed, a
+  // bulk download by a careless or stolen staff session stops at the ceiling.
+  "pro.kybc.view.uid": { points: 300, duration: HOUR, policy: "closed", key: "uid" },
   // --- Search and discovery (phase 4, design §6) ---------------------------------------------
   // /api/search and /recherche pages: 30 per minute and 600 per hour per device (or uid), 120 per
   // minute per IP; over: Turnstile, then 429. Open: reading and searching stay up without Valkey.

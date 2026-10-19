@@ -15,7 +15,7 @@ import {
   regionCodeSchema,
   slugIdSchema,
 } from "@/lib/contracts/listings";
-import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, UPLOAD_DECLARED_TYPES, UPLOAD_REJECT_REASONS, UPLOAD_STATUSES, listingPhotoSchema, uploadIdSchema } from "@/lib/contracts/media";
+import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, UPLOAD_DOC_DECLARED_TYPES, UPLOAD_REJECT_REASONS, UPLOAD_STATUSES, listingPhotoSchema, uploadIdSchema } from "@/lib/contracts/media";
 import { ROLES } from "@/lib/firebase/claims";
 import { SAVED_SEARCH_ALERTS, SAVED_SEARCH_NAME_MAX } from "@/lib/contracts/search";
 import { storedSearchParamsSchema } from "@/lib/search/params";
@@ -58,6 +58,7 @@ export const userSchema = z
     displayName: displayNameSchema,
     avatarKey: z.string().max(200).optional(),
     type: z.enum(["individual", "pro"]),
+    /** The account's shop, set by the Pro application (phase 7); `type` and the claims turn pro at the KYBC verification. */
     proId: z.string().max(64).optional(),
     regionCode: z.string().regex(/^(0[1-9]|1[0-2])$/).optional(),
     citySlug: z.string().max(64).optional(),
@@ -281,10 +282,10 @@ export const uploadSchema = z
   .object({
     ownerUid: uid,
     purpose: z.enum(UPLOAD_DOC_PURPOSES),
-    /** Listing id for photos. */
+    /** Listing id for photos; the applicant's uid for KYBC pieces (phase 7). */
     targetId: z.string().min(1).max(128),
     declaredSize: z.number().int().min(1).max(MAX_UPLOAD_BYTES),
-    declaredType: z.enum(UPLOAD_DECLARED_TYPES),
+    declaredType: z.enum(UPLOAD_DOC_DECLARED_TYPES),
     status: z.enum(UPLOAD_STATUSES),
     quarantineKey: z.string().min(1).max(200),
     /**
@@ -681,6 +682,8 @@ export const COLLECTIONS = {
   // Phase 4 (subcollections of users/{uid})
   favorites: "favorites",
   savedSearches: "savedSearches",
+  // Phase 7
+  proProfiles: "proProfiles",
   // Phase 5
   conversations: "conversations",
   /** conversations/{cid}/messages/{mid} */

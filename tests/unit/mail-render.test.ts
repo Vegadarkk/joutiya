@@ -69,6 +69,8 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
     ],
     unsubscribeToken: "djEudWlkLio.c2lnbmF0dXJlLW9mLWZvcnR5LXRocmVlLWNoYXJhY3RlcnMtYWE", // gitleaks:allow (fake fixture)
   },
+  proApproved: { displayName: "Nadia", shopName: "Atlas Vélos", launchOffer: true, noticeDays: 30 },
+  proRejected: { displayName: "Nadia", shopName: "Atlas Vélos", reason: "L'ICE ne correspond pas au registre du commerce.", contact: "dsa@joutiya.ma" },
   newMessages: { displayName: "Nadia", count: 4, conversations: [{ listingTitle: "Vélo de ville", counterpartName: "Karim" }] },
 };
 
