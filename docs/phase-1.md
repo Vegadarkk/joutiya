@@ -233,6 +233,15 @@ La clé Oracle de Claude reste dans l'environnement cloud (décision du 19 octob
 Dans le dépôt Joutiya sur mon PC, lance `node scripts/vm-env.ts pepper .env.local` (docs/phase-1.md, étape 16) : il ajoute HASH_PEPPER_STAGING et HASH_PEPPER_PROD à la fin du fichier s'ils manquent, sans montrer de valeur. Ce fichier sert aussi à un autre produit : ne le lis pas toi-même (ni cat, head, tail, sed, ni grep sans -q), ne l'affiche pas, ne le réécris pas et ne change ni l'ordre ni le texte de ses lignes. Dis-moi ensuite de copier ces deux lignes dans mon gestionnaire de mots de passe. Ne me donne aucune valeur.
 ```
 
+## Staging provisoire sur le PC2
+
+En attendant la VM (votre accord du 19 octobre), le staging tourne sur votre PC2 dans une distribution WSL2 dédiée, `joutiya-staging` (Ubuntu 24.04), avec Docker Engine et l'organisation exacte de la VM : mêmes fichiers Compose, mêmes chemins, même commande de déploiement, même tunnel `joutiya-staging-tunnel`. Aucun port n'est ouvert sur le PC2 : le site se verra à `staging.joutiya.ma` une fois la zone Cloudflare active. Nav pilote tout avec `node scripts/wsl-staging.ts` (`setup`, `wif`, `deploy`, `status`, `stop`) depuis son clone de main, et une tâche planifiée à votre ouverture de session garde la distribution allumée. La distribution ne voit ni vos disques ni vos programmes Windows. Docker Desktop n'est pas utilisé : s'il démarre, son intégration WSL doit rester désactivée pour `joutiya-staging` (l'outil refuse son moteur).
+
+- **Variables** : votre `.env.local` est sur l'autre PC. Elles arrivent chiffrées pour la distribution, dont la clé ne sort jamais, comme prévu à l'étape 16 pour la VM. Tant qu'il en manque, `deploy` construit les images et dit ce qu'attend le démarrage.
+- **Certificats Google** (étape 9) : signés sur le PC2 pour 90 jours ; `wif --apply` les renouvelle.
+- **Passage à la VM** : d'abord `node scripts/wsl-staging.ts stop --apply` (sinon les deux machines se partageraient le trafic du tunnel), puis la procédure de la VM. Firestore et R2 ne bougent pas ; la recherche est réindexée sur la VM.
+- **Retrait** : `wsl --unregister joutiya-staging`, puis supprimer `~/.joutiya/wsl` et la tâche planifiée `joutiya-staging`. Rien en production ne dépend du PC2.
+
 ## Renouvellements
 
 Toutes les échéances du projet sont dans `joutiya/echeances.md`, dans les fichiers du projet. Celles de cette phase :
