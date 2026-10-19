@@ -73,9 +73,12 @@ subscriptions, Google Ads slots, moderation).
 - **Secrets**: never put keys, tokens or `.env` files in Git, PRs, logs or chat; print
   variable names, never values. Only `.env.example` (no values) is versioned; local
   secrets live in `.env.local`.
-- **Public at launch**: the repo goes public at launch (owner, 2026-10-19), history
-  included. Never commit personal data, internal ids that should stay private, or
-  anything you would not publish; the pre-publication checklist is in spec §10 (phase 6).
+- **Public during development**: the repo is public since 2026-10-19 (unlimited Actions
+  minutes) and goes back to private on the day the site opens to visitors (owner,
+  2026-10-19; launch checklist in spec §10, phase 6). Private on GitHub Free means 2,000
+  Actions minutes a month and branch protection no longer enforced. Going private erases
+  nothing already published (forks, archives): never commit personal data, internal ids
+  that should stay private, or anything you would not publish.
 - **Legal**: publisher Adark Prime; the only address to display is 6 rue
   d'Armaillé, 75017 Paris. Never use or ask for a personal address. Legal form,
   capital and VAT are config variables, never hardcoded. The platform is a neutral
