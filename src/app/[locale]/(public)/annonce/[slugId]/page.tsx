@@ -202,7 +202,15 @@ export default async function ListingPage({ params }: { params: Params }) {
             <div className="flex flex-col gap-6 lg:sticky lg:top-24">
               <SellerCard seller={seller} fallbackName={listing.seller.name} fallbackType={listing.seller.type} locale={locale}>
                 {published ? (
-                  <ContactBar listingId={listing.id} slugId={listing.slugId} sellerPublicId={listing.seller.publicId} showPhone={listing.contact.showPhone} whatsapp={listing.contact.whatsapp} />
+                  <ContactBar
+                    listingId={listing.id}
+                    slugId={listing.slugId}
+                    sellerPublicId={listing.seller.publicId}
+                    sellerName={listing.seller.name}
+                    listingTitle={listing.title}
+                    showPhone={listing.contact.showPhone}
+                    whatsapp={listing.contact.whatsapp}
+                  />
                 ) : null}
               </SellerCard>
               <AdSlot slot="listing-aside" className="hidden lg:flex" />

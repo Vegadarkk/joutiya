@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Link, usePathname } from "@/i18n/navigation";
 import { useSession } from "@/lib/auth/client";
 import { lazyIsland } from "@/components/layout/lazy-island";
+import { canMessage } from "@/components/messages/can-message";
+import { MessagesLinkPlain } from "@/components/messages/messages-link-plain";
 import type { SessionSummary } from "@/lib/contracts/auth";
 import { cn } from "@/lib/utils";
 import type { AccountDropdownProps } from "./account-dropdown";
@@ -19,6 +21,9 @@ import type { AccountDropdownProps } from "./account-dropdown";
 // If that chunk cannot be loaded, the trigger links to the account settings (sign-out included).
 
 const AccountDropdown = lazyIsland(() => import("./account-dropdown"), AccountSettingsLink);
+// Messages link with the unread badge (phase 5): it opens the live stream, so members only and
+// in its own chunk; the plain link stands in while it loads or if it cannot be downloaded.
+const MessagesLink = lazyIsland(() => import("@/components/messages/messages-link"), MessagesLinkPlain);
 
 /** The account menu without its chunk (download failed): the trigger leads to the settings page. */
 export function AccountSettingsLink({ triggerClassName, children }: AccountDropdownProps) {
@@ -83,16 +88,23 @@ export function AccountMenu() {
     </>
   );
   return (
-    <Suspense
-      fallback={
-        <button type="button" aria-haspopup="menu" aria-expanded={false} className={triggerClassName}>
+    <>
+      {canMessage(session) ? (
+        <Suspense fallback={<MessagesLinkPlain />}>
+          <MessagesLink />
+        </Suspense>
+      ) : null}
+      <Suspense
+        fallback={
+          <button type="button" aria-haspopup="menu" aria-expanded={false} className={triggerClassName}>
+            {triggerContent}
+          </button>
+        }
+      >
+        <AccountDropdown session={session} name={name} triggerClassName={triggerClassName}>
           {triggerContent}
-        </button>
-      }
-    >
-      <AccountDropdown session={session} name={name} triggerClassName={triggerClassName}>
-        {triggerContent}
-      </AccountDropdown>
-    </Suspense>
+        </AccountDropdown>
+      </Suspense>
+    </>
   );
 }

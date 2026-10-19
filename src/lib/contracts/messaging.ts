@@ -1,11 +1,13 @@
 import { z } from "@/lib/zod";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
+import { MESSAGE_TEXT_MAX } from "@/lib/contracts/endpoints";
 import { listingIdSchema } from "@/lib/contracts/listings";
 
 // Messaging contracts shared by the browser and the route handlers (design D1-D7). Messages are plain
 // text; the server masks URLs before storage and the reader renders the markers below as chips.
 
-export const MESSAGE_TEXT_MAX = 2000;
+// The limit lives in endpoints.ts: the listing page's message button needs it without zod.
+export { MESSAGE_TEXT_MAX };
 /** Stored in place of every URL of a message (D5); the UI shows a localized "link hidden" chip. */
 export const URL_MARKER = "⟦url⟧";
 /** Text of a message hidden by moderation. */

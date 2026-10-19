@@ -330,7 +330,10 @@
       "verifications": "Vérifications",
       "signOut": "Déconnexion",
       "favorites": "Mes favoris",
-      "savedSearches": "Mes recherches"
+      "savedSearches": "Mes recherches",
+      "messages": "Mes messages",
+      "messagesLink": "Messages",
+      "unreadCount": "{count, plural, one {# message non lu} other {# messages non lus}}"
     },
     "errors": {
       "invalid_body": "Certaines informations sont incorrectes. Vérifiez le formulaire, puis réessayez.",
@@ -2128,10 +2131,9 @@
       "whatsapp": "WhatsApp",
       "message": "Envoyer un message",
       "messageShort": "Message",
-      "soon": "Bientôt",
-      "messagingSoon": "La messagerie Joutiya arrive bientôt. En attendant, utilisez le contact proposé par le vendeur.",
-      "messagingSoonOnly": "Ce vendeur sera joignable par la messagerie Joutiya, qui arrive bientôt.",
+      "messageHint": "Votre message arrive dans la messagerie Joutiya du vendeur. Ni votre e-mail ni votre numéro ne lui sont transmis.",
       "signInBody": "Connectez-vous pour voir le numéro du vendeur. Vous reviendrez ensuite sur cette annonce.",
+      "signInMessage": "Connectez-vous pour écrire au vendeur. Vous reviendrez ensuite sur cette annonce.",
       "signIn": "Se connecter",
       "own": "C'est votre annonce. Les acheteurs voient ici les boutons pour vous contacter.",
       "manage": "Gérer mes annonces",
@@ -2149,7 +2151,31 @@
       },
       "challenge": "Beaucoup de numéros ont été consultés depuis votre connexion internet : confirmez que vous n'êtes pas un robot pour afficher celui-ci.",
       "challengeFailed": "La vérification n'a pas abouti. Réessayez.",
-      "reload": "Recharger la page"
+      "reload": "Recharger la page",
+      "compose": {
+        "title": "Écrire à {name}",
+        "titleFallback": "Écrire au vendeur",
+        "about": "À propos de « {title} »",
+        "label": "Votre message",
+        "placeholder": "Bonjour, l'article est-il toujours disponible ?",
+        "privacy": "Le vendeur voit votre nom affiché, jamais votre e-mail ni votre numéro.",
+        "safety": "Ne payez jamais à l'avance : voyez l'article avant de payer.",
+        "send": "Envoyer le message",
+        "cancel": "Annuler",
+        "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}",
+        "empty": "Écrivez votre message.",
+        "reserved": "Retirez les caractères ⟦ et ⟧ : ils ne sont pas acceptés.",
+        "challenge": "Confirmez que vous n'êtes pas un robot pour envoyer ce premier message.",
+        "errors": {
+          "listing_unavailable": "Cette annonce n'est plus disponible : vous ne pouvez plus écrire au vendeur.",
+          "not_found": "Cette annonce n'est plus disponible : vous ne pouvez plus écrire au vendeur.",
+          "conversation_blocked": "Vous ne pouvez pas écrire à ce vendeur.",
+          "account_suspended": "Votre compte est suspendu : vous ne pouvez pas envoyer de message.",
+          "rate_limited": "Vous avez envoyé beaucoup de messages. Réessayez {wait}.",
+          "later": "plus tard",
+          "quota_exhausted": "La messagerie est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc)."
+        }
+      }
     },
     "safety": {
       "title": "Conseils de sécurité",
@@ -2499,6 +2525,101 @@
       "rangeFrom": "{label} : dès {min}",
       "rangeTo": "{label} : jusqu'à {max}",
       "options": "{label} : {values}"
+    }
+  },
+  "Messaging": {
+    "page": {
+      "title": "Messages",
+      "views": "Dossiers de la messagerie",
+      "inbox": "Boîte de réception",
+      "archived": "Archivées",
+      "loading": "Chargement de vos conversations",
+      "loadFailedTitle": "Vos conversations n'ont pas pu être chargées",
+      "retry": "Réessayer",
+      "more": "Afficher plus de conversations",
+      "emptyTitle": "Aucune conversation pour l'instant",
+      "emptyBody": "Écrivez à un vendeur depuis son annonce : vos échanges apparaîtront ici.",
+      "browse": "Parcourir les annonces",
+      "archivedEmptyTitle": "Aucune conversation archivée",
+      "archivedEmptyBody": "Une conversation archivée revient dans la boîte de réception dès qu'un nouveau message arrive.",
+      "selectTitle": "Choisissez une conversation",
+      "selectBody": "Vos échanges avec les vendeurs et les acheteurs s'affichent ici.",
+      "offline": "Mise à jour en direct interrompue : les nouveaux messages s'afficheront dès le retour de la connexion."
+    },
+    "row": {
+      "you": "Vous :",
+      "unread": "{count, plural, one {# message non lu} other {# messages non lus}}",
+      "hidden": "Message masqué par la modération",
+      "maskedLink": "[lien masqué]",
+      "blocked": "Bloqué",
+      "frozen": "Suspendue",
+      "yesterday": "Hier"
+    },
+    "thread": {
+      "back": "Toutes les conversations",
+      "listing": "Voir l'annonce « {title} »",
+      "older": "Afficher les messages précédents",
+      "start": "Début de la conversation",
+      "loading": "Chargement de la conversation",
+      "loadFailedTitle": "Cette conversation n'a pas pu être chargée",
+      "retry": "Réessayer",
+      "missingTitle": "Conversation introuvable",
+      "missingBody": "Elle a été supprimée de votre messagerie, ou le lien est incomplet.",
+      "today": "Aujourd'hui",
+      "yesterday": "Hier",
+      "mine": "Vous",
+      "seen": "Vu",
+      "sending": "Envoi en cours",
+      "hidden": "Message masqué par la modération",
+      "maskedLink": "lien masqué",
+      "maskedLinkTitle": "Les liens ne sont pas transmis par la messagerie Joutiya.",
+      "system": "Message de Joutiya",
+      "actions": "Actions sur la conversation",
+      "archive": "Archiver",
+      "unarchive": "Désarchiver",
+      "archivedToast": "Conversation archivée",
+      "unarchivedToast": "Conversation remise dans la boîte de réception",
+      "block": "Bloquer {name}",
+      "unblock": "Débloquer {name}",
+      "blockTitle": "Bloquer {name} ?",
+      "blockBody": "Vous ne pourrez plus vous écrire, dans aucune conversation. Vous pourrez annuler le blocage à tout moment depuis cette conversation.",
+      "blockConfirm": "Bloquer",
+      "blockedToast": "Vous avez bloqué {name}",
+      "unblockedToast": "Vous avez débloqué {name}",
+      "delete": "Supprimer de ma messagerie",
+      "deleteTitle": "Supprimer cette conversation ?",
+      "deleteBody": "Elle disparaît de votre messagerie ; {name} la garde dans la sienne. Si un nouveau message arrive, elle réapparaîtra.",
+      "deleteConfirm": "Supprimer",
+      "deletedToast": "Conversation supprimée",
+      "cancel": "Annuler",
+      "blockedByMe": "Vous avez bloqué {name} : vous ne pouvez plus vous écrire.",
+      "blockedMe": "Vous ne pouvez plus écrire dans cette conversation.",
+      "frozen": "Cette conversation est suspendue : vous pouvez la lire, mais plus y écrire.",
+      "suspended": "Votre compte est suspendu : vous pouvez lire vos conversations, mais plus envoyer de message."
+    },
+    "composer": {
+      "label": "Votre message",
+      "placeholder": "Écrire un message",
+      "send": "Envoyer",
+      "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}",
+      "reserved": "Retirez les caractères ⟦ et ⟧ : ils ne sont pas acceptés."
+    },
+    "risk": {
+      "title": "Prudence",
+      "payment_kw": "Ce message parle de paiement à l'avance (acompte, virement, mandat…). Ne payez jamais avant d'avoir vu l'article.",
+      "iban": "Ce message contient des coordonnées bancaires. Ne faites jamais de virement à un inconnu avant d'avoir vu l'article.",
+      "external_url": "Un lien a été masqué. Restez sur Joutiya pour échanger et n'ouvrez pas les liens envoyés par des inconnus.",
+      "contact_with_payment_kw": "Ce message propose de continuer ailleurs, avec un paiement : c'est la méthode d'arnaque la plus courante.",
+      "more": "Nos conseils de sécurité"
+    },
+    "errors": {
+      "rate_limited": "Vous envoyez beaucoup de messages. Réessayez {wait}.",
+      "later": "plus tard",
+      "quota_exhausted": "La messagerie est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc).",
+      "account_suspended": "Votre compte est suspendu : vous ne pouvez plus envoyer de message.",
+      "not_found": "Cette conversation n'est plus disponible.",
+      "listing_unavailable": "Cette annonce n'est plus disponible : vous ne pouvez plus écrire à son vendeur.",
+      "invalid_body": "Ce message ne peut pas être envoyé tel quel. Vérifiez-le, puis réessayez."
     }
   }
 }

@@ -45,6 +45,9 @@ export const LISTING_API = {
 } as const;
 
 // Phase 5 (design phase-5 §3, §4).
+/** Longest message text (characters after trimming); messaging.ts re-exports it. */
+export const MESSAGE_TEXT_MAX = 2000;
+
 export const MESSAGING_API = {
   /** POST: first message about a listing (Turnstile). GET ?cursor=&archived=1 -> ConversationsPage. */
   conversations: "/api/conversations",
