@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
+import { useNumbersTranslations } from "@/i18n/numbers";
 import { SAVED_SEARCHES_MAX, SAVED_SEARCH_NAME_MAX, type SavedSearchView } from "@/lib/contracts/search";
 import { intlLocale } from "@/lib/listings/client/format";
 import { deleteSavedSearch, listSavedSearches, updateSavedSearch } from "@/lib/saved-searches/client";
@@ -196,7 +197,7 @@ function SearchRow({
 }
 
 export function SavedSearchesView() {
-  const t = useTranslations("SavedSearches.page");
+  const t = useNumbersTranslations("SavedSearches.page");
   const apiMessage = useApiErrorMessage();
   const [view, setView] = useState<View>({ kind: "loading" });
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());

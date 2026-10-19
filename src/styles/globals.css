@@ -242,3 +242,153 @@
 .theme-switching *::after {
   transition: none !important;
 }
+
+/* ── welcome ──────────────────────────────────────────────────────────────────────────────────
+ * Welcome threshold of the home page (design C7). The pre-paint script (src/lib/welcome/script.ts)
+ * sets html[data-welcome] on a first visit: "screen" (the welcome screen) or "door" (a sign-in just
+ * landed here: the door opens). Until the visitor goes through, only the threshold paints, on its
+ * night ground: the page is laid out underneath but hidden (nothing shifts when it appears), it does
+ * not scroll, and the scrollbar keeps its room so that the page does not move sideways afterwards.
+ * The client (src/components/welcome/welcome-dialog.tsx) adds "open" while the door opens: the page
+ * shows through as the ground fades. Animated with transform and opacity only.
+ */
+.welcome {
+  --welcome-door-h: min(52svh, 68vw);
+  --ring: var(--color-gold-300);
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--color-cream-200);
+  background:
+    radial-gradient(60% 50% at 50% 34%, color-mix(in oklab, var(--color-bab-700) 80%, transparent), transparent 75%),
+    var(--color-bab-800);
+}
+.welcome:focus {
+  outline: none;
+}
+html[data-welcome] {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+  background: var(--color-bab-800);
+}
+html[data-welcome]:not([data-welcome~="open"]) body {
+  visibility: hidden;
+}
+html[data-welcome] .welcome {
+  display: flex;
+  visibility: visible;
+}
+html[data-welcome~="open"] .welcome {
+  overflow: hidden;
+}
+/* While the door opens the actions fade out: a tap there skips the opening, it never follows a link. */
+html[data-welcome~="open"] .welcome-copy {
+  pointer-events: none;
+}
+/* The ground fades: the scrollbar's room takes the page's colour. */
+html[data-welcome~="lit"] {
+  background: var(--background);
+}
+html[data-welcome~="door"] .welcome-copy {
+  visibility: hidden;
+}
+/* Before hydration, "Découvrir sans compte" is a plain link to #main: once it is the target, the visitor is through. */
+html[data-welcome]:has(#main:target) {
+  overflow: visible;
+  scrollbar-gutter: auto;
+  background: none;
+}
+html[data-welcome]:has(#main:target) body {
+  visibility: visible;
+}
+html[data-welcome]:has(#main:target) .welcome {
+  display: none;
+}
+/* Focus lands on the page at the end (tabindex -1 while it holds focus): no ring around the whole page. */
+#main[tabindex="-1"]:focus {
+  outline: none;
+}
+@media (min-width: 40rem) {
+  .welcome {
+    --welcome-door-h: 56svh;
+  }
+}
+
+.welcome-tagline {
+  font-size: clamp(2rem, 1.25rem + 3vw, 3.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+}
+:lang(ar) .welcome-tagline {
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+/* The door (src/components/welcome/door-scene.tsx): layers sharing the logo's viewBox. */
+.welcome-door {
+  position: relative;
+  flex: none;
+  height: var(--welcome-door-h);
+  aspect-ratio: 240 / 386;
+}
+.welcome-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.welcome-light,
+.welcome-shade,
+.welcome-spill {
+  opacity: 0;
+}
+.welcome-light-core {
+  stop-color: var(--color-cream-50);
+}
+.welcome-light-mid {
+  stop-color: var(--color-cream-100);
+}
+.welcome-light-edge {
+  stop-color: var(--color-gold-200);
+}
+.welcome-shade path {
+  fill-opacity: 0.55;
+}
+/* The light pouring out over the threshold onto the ground. */
+.welcome-spill {
+  position: absolute;
+  top: 90%;
+  left: -40%;
+  width: 180%;
+  height: 26%;
+  background: radial-gradient(closest-side, color-mix(in oklab, var(--color-gold-300) 45%, transparent), transparent);
+  pointer-events: none;
+}
+/* The leaf turns on its hinge, the start side of the doorway. */
+.welcome-hinge {
+  position: absolute;
+  perspective: calc(var(--welcome-door-h) * 1.8);
+}
+.welcome-leaf {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform-origin: var(--welcome-hinge) 50%;
+}
+[dir="rtl"] .welcome-leaf {
+  transform-origin: calc(100% - var(--welcome-hinge)) 50%;
+}
+.welcome-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+.welcome-face-back {
+  transform: rotateY(180deg);
+}
+/* ── end welcome ── */

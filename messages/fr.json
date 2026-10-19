@@ -64,6 +64,12 @@
       "all": "Voir toutes les annonces"
     }
   },
+  "Welcome": {
+    "name": "Joutiya",
+    "createAccount": "Créer un compte",
+    "signIn": "Se connecter",
+    "discover": "Découvrir sans compte"
+  },
   "Search": {
     "bar": {
       "label": "Rechercher des annonces",

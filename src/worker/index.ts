@@ -22,6 +22,8 @@ import { closeMediaQueue, MEDIA_CONCURRENCY, MEDIA_QUEUE } from "@/lib/media/que
 import { isFirebaseConfigured } from "@/lib/firebase/admin";
 import { SearchUnavailableError } from "@/lib/search/types";
 import { closeSearchQueue, enqueueIndexJobs, indexJobSchema, OUTBOX_POLL_JOB, SEARCH_QUEUE } from "@/lib/search/queue";
+import { setGauge } from "@/lib/quota";
+import { usedMemoryBytes } from "@/lib/quota/valkey-memory";
 import { runStartupChecks } from "@/lib/startup/checks";
 import { clientOptions } from "@/lib/valkey/clients";
 import { AGENT_QUEUE, createAgentWorker, JOBS, SYSTEM_QUEUE, SCHEDULES } from "./jobs";
@@ -119,6 +121,9 @@ async function main(): Promise<void> {
     try {
       await connection.set(WORKER_HEARTBEAT_KEY, new Date().toISOString(), "EX", WORKER_HEARTBEAT_TTL);
       await writeFile(HEARTBEAT_FILE, "").catch(() => undefined);
+      // valkey-queue never evicts: the gauge alerts before a full memory blinds every quota guard.
+      const used = usedMemoryBytes(await connection.info("memory"));
+      if (used !== null) await setGauge("valkey.queueMemory", used);
     } catch (error) {
       logger.warn({ err: (error as Error).message }, "heartbeat failed");
     }

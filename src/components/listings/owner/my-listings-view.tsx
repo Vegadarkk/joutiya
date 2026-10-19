@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { useSearchParams } from "next/navigation";
-import { useLocale, useTranslations } from "next-intl";
+import { useLocale } from "next-intl";
 import { toast } from "sonner";
 import { FormMessage, useApiErrorMessage } from "@/components/auth/form-message";
 import { EmptyState } from "@/components/feedback/empty-state";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isRtl, type Locale } from "@/config/site";
 import { Link, useRouter } from "@/i18n/navigation";
+import { useNumbersTranslations } from "@/i18n/numbers";
 import { isApiError } from "@/lib/auth/client";
 import { usePublicConfig } from "@/lib/config/client";
 import { MAX_DRAFTS, OWNER_LIST_BUCKETS, type OwnerListBucket, type OwnerListing, type OwnerListingSummary } from "@/lib/contracts/listings";
@@ -79,7 +80,7 @@ function summaryAfter(summary: OwnerListingSummary, listing: OwnerListing): Owne
 }
 
 export function MyListingsView() {
-  const t = useTranslations("MyListings");
+  const t = useNumbersTranslations("MyListings");
   const locale = useLocale() as Locale;
   const rtl = isRtl(locale);
   const apiMessage = useApiErrorMessage();
@@ -274,8 +275,9 @@ export function MyListingsView() {
               onKeyDown={(event) => onTabKey(event, index)}
               className={cn(
                 "relative flex min-h-11 shrink-0 items-center gap-2 px-3 text-sm font-medium transition-colors duration-150 ease-door",
-                "after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:transition-[background-color,transform] after:duration-200 after:ease-door",
-                "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25",
+                "after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:transition-[background-color,scale] after:duration-200 after:ease-door",
+                // The tab row scrolls and clips outside its tabs: the focus ring goes inside.
+                "focus-visible:-outline-offset-2",
                 selected ? "text-foreground after:scale-x-100 after:bg-featured" : "text-foreground-muted after:scale-x-0 after:bg-transparent hover:text-foreground",
               )}
             >

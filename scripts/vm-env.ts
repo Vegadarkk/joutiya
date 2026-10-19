@@ -96,6 +96,11 @@ export function appEnvNames(example: string): string[] {
 }
 
 /** Values that follow from infra/targets.json and the hosts of §1 (R2's join only with its keys). */
+/** The S3 endpoint of the account's R2 buckets (EU jurisdiction). */
+export function r2Endpoint(accountId: string): string {
+  return `https://${accountId}.eu.r2.cloudflarestorage.com`;
+}
+
 export function derivedValues(env: DeployedEnv, targets: Targets): Record<string, string> {
   const recorded = targets.environments[env];
   const { accountId, accessTeamDomain } = targets.shared.cloudflare;
@@ -121,7 +126,7 @@ export function derivedValues(env: DeployedEnv, targets: Targets): Record<string
     WHATSAPP_PHONE_NUMBER_ID: recorded.whatsapp.phoneNumberId,
     MAIL_PROVIDER: "resend",
     MAIL_FROM: "Joutiya <no-reply@notif.joutiya.ma>",
-    R2_S3_ENDPOINT: accountId === null ? null : `https://${accountId}.eu.r2.cloudflarestorage.com`,
+    R2_S3_ENDPOINT: accountId === null ? null : r2Endpoint(accountId),
     R2_BUCKET_QUARANTINE: recorded.r2.quarantine,
     R2_BUCKET_MEDIA: recorded.r2.media,
     R2_BUCKET_PRIVATE: recorded.r2.private,

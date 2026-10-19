@@ -71,7 +71,7 @@ export function AccountMenu() {
 
   const name = session.displayName ?? session.email ?? "";
   const triggerClassName = cn(
-    "inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-md px-1.5 text-sm font-medium text-foreground hover:bg-surface-muted md:px-2",
+    "inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-md px-1.5 text-sm font-medium text-foreground transition-[background-color,scale] duration-150 ease-door hover:bg-surface-muted active:scale-[0.98] md:px-2",
     "data-[state=open]:bg-surface-muted",
   );
   // Named by its text, not aria-label, so the name holds what is visible (WCAG 2.5.3): "Mon compte"

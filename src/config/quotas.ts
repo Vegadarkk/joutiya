@@ -23,6 +23,7 @@ export interface QuotaDefinition {
 }
 
 const GB = 1_000_000_000;
+const MIB = 1024 * 1024;
 
 /**
  * Internal Claude budget per month, in micro-USD (§7, §9 "budget interne réduit en staging"): the
@@ -160,6 +161,19 @@ export const QUOTAS = {
     alertAt: 0.7,
     degradeAt: 0.8,
     degradedMode: "Bascule sur le secours gratuit (Workers AI, modération OpenAI), puis votre seule file.",
+  },
+  "valkey.queueMemory": {
+    service: "Valkey (file de travaux)",
+    // maxmemory of docker/valkey/queue.conf, measured by the worker heartbeat. noeviction: at 100 %
+    // every write fails, quota counters included, so the alert comes early.
+    limit: 192 * MIB,
+    unit: "bytes",
+    period: "day",
+    resetTimeZone: "UTC",
+    kind: "gauge",
+    alertAt: 0.7,
+    degradeAt: 0.9,
+    degradedMode: "À 100 %, la file refuse toute écriture (travaux, compteurs de quotas) : purger les travaux terminés ou relever maxmemory.",
   },
   "workersAi.neurons": {
     service: "Cloudflare Workers AI",

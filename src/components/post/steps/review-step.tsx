@@ -12,6 +12,7 @@ import { criterionById, subcategoryById } from "@/config/categories";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
+import { useNumbersTranslations } from "@/i18n/numbers";
 import { isApiError } from "@/lib/auth/client";
 import { SENSITIVE_DECLARATION_KINDS, type FieldIssue, type PublishListingResponse, type SensitiveDeclarationKind, type WizardStep } from "@/lib/contracts/listings";
 import { publishListing } from "@/lib/listings/client/api";
@@ -43,7 +44,7 @@ interface ReviewStepProps {
 
 export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: ReviewStepProps) {
   const { listing, photos, photosBusy, blockers, setBlockers, save, saveState, saveError, saveMode, listingId, update } = useWizard();
-  const t = useTranslations("Listing");
+  const t = useNumbersTranslations("Listing");
   const names = useCategoryLabels();
   const criteria = useCriteriaLabels();
   const locale = useLocale() as Locale;
@@ -367,7 +368,7 @@ function EditButton({ onClick, label, className }: { onClick: () => void; label:
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={cn("-my-2 inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium text-link underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25", className)}
+      className={cn("-my-2 inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium text-link underline-offset-2 hover:underline", className)}
     >
       {t("edit")}
     </button>
@@ -391,7 +392,7 @@ function IssueList<T extends FieldIssue & { step: WizardStep }>({
     <ul className="flex flex-col gap-2">
       {groups.map((group) => (
         <li key={group.step} className="flex flex-col gap-0.5">
-          <button type="button" onClick={() => onEdit(group.step)} className="-my-1.5 inline-flex min-h-11 w-fit items-center rounded-sm text-start font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25" aria-label={fixLabel(group.step)}>
+          <button type="button" onClick={() => onEdit(group.step)} className="-my-1.5 inline-flex min-h-11 w-fit items-center rounded-sm text-start font-medium underline underline-offset-2" aria-label={fixLabel(group.step)}>
             {stepLabel(group.step)}
           </button>
           <ul className="list-disc ps-5 text-sm">

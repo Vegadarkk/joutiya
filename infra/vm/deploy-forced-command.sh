@@ -11,6 +11,8 @@
 #
 # Production can only run images already loaded and running in staging, pinned by image ID, and
 # the staging key can never load a tarball that would move the tags of a production release.
+# `load` records the sha256 of each release's tarball; `oracle-vm.ts promote` compares it with the
+# one the CI recorded on the commit, so a leaked staging key cannot get its own images promoted.
 set -euo pipefail
 umask 077
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -34,6 +36,7 @@ valid_release() { [[ "$1" =~ ^[0-9a-f]{12,40}$ ]]; }
 valid_image_id() { [[ "$1" =~ ^sha256:[0-9a-f]{64}$ ]]; }
 image_id() { docker image inspect --format '{{.Id}}' "$1" 2>/dev/null || true; }
 current_release() { cat "$STATE_DIR/$1.release" 2>/dev/null || true; }
+tarball_digest() { cat "$STATE_DIR/tarballs/$1" 2>/dev/null || true; }
 
 compose() {
   local env="$1" release="$2"
@@ -81,6 +84,10 @@ prune() {
         if grep -qx "$tag" <<< "$keep"; then continue; fi
         echo "$ref"
       done | tail -n +"$((KEEP_RELEASES * 2 + 1))" | xargs -r docker image rm >/dev/null 2>&1 || true
+  local record
+  for record in "$STATE_DIR"/tarballs/*; do
+    if [[ -f "$record" && -z "$(image_id "joutiya-web:${record##*/}")" ]]; then rm -f "$record"; fi
+  done
 }
 
 purge_cdn_cache() {
@@ -104,9 +111,10 @@ status() {
   printf '{'
   for env in staging prod; do
     release="$(current_release "$env")"
-    printf '"%s":{"release":"%s","web":"%s","worker":"%s"}' "$env" "$release" \
+    printf '"%s":{"release":"%s","web":"%s","worker":"%s","tarball":"%s"}' "$env" "$release" \
       "$( [[ -n "$release" ]] && image_id "joutiya-web:$release")" \
-      "$( [[ -n "$release" ]] && image_id "joutiya-worker:$release")"
+      "$( [[ -n "$release" ]] && image_id "joutiya-worker:$release")" \
+      "$( [[ -n "$release" ]] && tarball_digest "$release")"
     [[ "$env" == "staging" ]] && printf ','
   done
   printf '}\n'
@@ -139,7 +147,7 @@ PY
 
 load() {
   [[ "$ENV_NAME" == "staging" ]] || die "load is reserved to staging"
-  local release="${ARGS[1]:-}" tarball names name output loaded
+  local release="${ARGS[1]:-}" tarball digest names name output loaded
   valid_release "$release" || die "invalid release"
   # Production runs its images by tag: loading one of its releases again would replace them.
   if [[ "$release" == "$(current_release prod)" || "$release" == "$(cat "$STATE_DIR/prod.previous" 2>/dev/null || true)" ]]; then
@@ -149,6 +157,7 @@ load() {
   # shellcheck disable=SC2064 # expanded now: $tarball is local to this function
   trap "rm -f '$tarball'" EXIT
   head -c "$MAX_IMAGE_BYTES" | zstd -dc | head -c "$MAX_IMAGE_BYTES" > "$tarball" || die "unreadable or oversized tarball"
+  digest="sha256:$(sha256sum "$tarball" | cut -d ' ' -f 1)"
   # Names are checked before docker load: once loaded, a tag already points to the new image.
   names="$(tarball_names "$tarball")" || die "unreadable tarball"
   while read -r name; do
@@ -169,6 +178,9 @@ load() {
     xargs -r docker image rm <<< "$loaded" >/dev/null 2>&1 || true
     die "unexpected images in the tarball"
   fi
+  # The tags of this release now name this tarball's images, whether or not they start.
+  install -d -m 0700 "$STATE_DIR/tarballs"
+  echo "$digest" > "$STATE_DIR/tarballs/$release"
   start staging "$release"
   prune
 }

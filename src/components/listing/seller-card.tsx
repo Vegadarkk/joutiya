@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import { BadgeCheck, MailCheck, MapPin, ShieldCheck } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { quietLinkClassName, textLinkClassName } from "@/components/ui/text-link";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
+import { useNumbersTranslations } from "@/i18n/numbers";
 import { intlLocale } from "@/lib/listings/client/format";
 import type { PublicSeller } from "@/lib/listings/public";
 import { cn } from "@/lib/utils";
@@ -43,7 +44,7 @@ export function SellerAvatar({ name, size = "md", className }: { name: string; s
 }
 
 export function SellerBadges({ badges, sellerType, className }: Pick<PublicSeller, "badges" | "sellerType"> & { className?: string }) {
-  const t = useTranslations("ListingPage.seller");
+  const t = useNumbersTranslations("ListingPage.seller");
   const items: { key: string; icon: typeof ShieldCheck; label: string }[] = [];
   if (sellerType === "pro" && badges.proCertified) items.push({ key: "pro", icon: BadgeCheck, label: t("proCertified") });
   if (badges.phoneVerified) items.push({ key: "phone", icon: ShieldCheck, label: t("phoneVerified") });
@@ -74,7 +75,7 @@ export interface SellerCardProps {
 }
 
 export function SellerCard({ seller, fallbackName, fallbackType, locale, children, className }: SellerCardProps) {
-  const t = useTranslations("ListingPage.seller");
+  const t = useNumbersTranslations("ListingPage.seller");
   const name = seller?.displayName ?? fallbackName;
   const type = seller?.sellerType ?? fallbackType;
   const city = seller?.citySlug ? cityBySlug(seller.citySlug) : undefined;
@@ -87,7 +88,7 @@ export function SellerCard({ seller, fallbackName, fallbackType, locale, childre
           <p className="text-xs text-foreground-muted">{type === "pro" ? t("roleBusiness") : t("roleIndividual")}</p>
           <h2 id="seller-name" className="flex flex-wrap items-center gap-2 text-lg font-semibold leading-tight">
             {seller ? (
-              <Link href={`/profil/${seller.publicId}`} prefetch={false} dir="auto" className="break-words rounded-sm hover:underline hover:underline-offset-2">
+              <Link href={`/profil/${seller.publicId}`} prefetch={false} dir="auto" className={cn("break-words rounded-sm", quietLinkClassName)}>
                 {name}
               </Link>
             ) : (
@@ -108,7 +109,7 @@ export function SellerCard({ seller, fallbackName, fallbackType, locale, childre
       </div>
       {seller ? <SellerBadges badges={seller.badges} sellerType={seller.sellerType} /> : null}
       {seller ? (
-        <Link href={`/profil/${seller.publicId}`} prefetch={false} className="-my-3 inline-flex min-h-11 items-center self-start rounded-sm text-sm font-medium text-link underline underline-offset-4 hover:no-underline">
+        <Link href={`/profil/${seller.publicId}`} prefetch={false} className={cn("-my-3 inline-flex min-h-11 items-center self-start rounded-sm text-sm font-medium text-link", textLinkClassName)}>
           {t("listingsOnline", { count: seller.publishedCount })}
         </Link>
       ) : null}

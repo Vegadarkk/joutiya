@@ -82,16 +82,25 @@ Depuis votre PC (le fichier de clé ne le quitte jamais), avec Node 24 :
 ```
 # 1. Simulation : déchiffre et vérifie chaque partie en mémoire, n'affiche que des nombres.
 node scripts/restore-firestore.ts --identity joutiya-backup.key --from ./backups --project <project-id>
-# Directement depuis le bucket au lieu d'une copie téléchargée (variables R2_* dans .env.local) :
-node --env-file=.env.local scripts/restore-firestore.ts --identity joutiya-backup.key --from-bucket --project <project-id>
+# Directement depuis le bucket privé d'un environnement au lieu d'une copie téléchargée :
+node --env-file=.env.local scripts/restore-firestore.ts --identity joutiya-backup.key --from-bucket <staging|prod> --project <project-id>
 # 2. Écriture.
 node scripts/restore-firestore.ts ... --apply
 ```
 
-- Cible : avec `FIRESTORE_EMULATOR_HOST`, l'émulateur local (n'importe quel identifiant de projet). Sinon un
-  projet enregistré dans `infra/targets.json` ; celui de production demande en plus `--allow-production`.
-  Identifiants : Application Default Credentials (`gcloud auth application-default login` ; voir les points
-  ouverts plus bas).
+- Source : `--from` prend une copie téléchargée du préfixe `backups/` (le dossier qui contient les dates).
+  `--from-bucket <staging|prod>` lit le bucket privé de cet environnement : nom et adresse viennent de
+  `infra/targets.json`, les clés de votre `.env.local` sous `R2_ACCESS_KEY_ID_<ENV>` et
+  `R2_SECRET_ACCESS_KEY_<ENV>` (les noms sans suffixe sont ignorés : ils peuvent être ceux de l'autre produit).
+
+- Cible : avec `FIRESTORE_EMULATOR_HOST`, l'émulateur local (n'importe quel identifiant de projet). Sinon le
+  projet du staging ou de la production enregistré dans `infra/targets.json` ; celui de production demande
+  en plus `--allow-production`. `joutiya-dev` est refusé : il n'a pas d'identité de worker, ses données vont
+  dans l'émulateur.
+- Identifiants : la simulation n'en demande aucun. `--apply` dans un vrai projet écrit en tant que worker de
+  cet environnement, avec un certificat d'un jour signé par l'autorité de `scripts/google-wif.ts` : il se
+  lance donc sur le PC2, qui la détient (dossier `~/.joutiya`), avec le fichier de clé age. Aucune connexion
+  gcloud, jamais `gcloud auth application-default login` ; le certificat et sa clé sont effacés à la fin.
 - Options : `--collections users,listings` (identifiants de la table de sauvegarde, `private` =
   `users/{uid}/private/*`), `--until YYYY-MM-DD` (l'état de cette nuit-là, par exemple avant un mauvais
   déploiement).
@@ -139,41 +148,35 @@ encore : identifiants du worker -> bucket privé -> cycle de vie -> clé age hor
 `restore-firestore.ts --apply` sur un vrai projet. Elle se répète deux fois :
 
 - **A, critère de sortie de la phase 3**, dès que le staging tourne et a au moins deux nuits de sauvegarde
-  dont un cycle complet (jauge `firestore.storage` connue au back-office) : sauvegardes du staging vers le
-  projet `joutiya-dev`.
-- **B, avant le lancement (porte de la phase 6)** : sauvegardes de la production vers le staging. Avant le
-  lancement, la production ne contient pas encore de données de vrais utilisateurs ; après, ne copiez plus
-  la production vers le staging.
+  dont un cycle complet (jauge `firestore.storage` connue au back-office) : sauvegardes du staging vers
+  l'émulateur Firestore du PC (`npx firebase emulators:start --only firestore --project demo-joutiya`, Java 21,
+  puis `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080`). Toute la chaîne y passe sauf l'écriture dans un vrai projet,
+  que B couvre.
+- **B, avant le lancement (porte de la phase 6)** : sauvegardes de la production vers le staging, écrites en
+  tant que worker du staging, donc sur le PC2. Avant le lancement, la production ne contient pas encore de
+  données de vrais utilisateurs ; après, ne copiez plus la production vers le staging.
 
-Prérequis : le fichier de clé age sur votre PC ; les deux points ouverts plus bas réglés ; le projet cible
+Prérequis : le fichier de clé age sur le PC qui lance la restauration (le PC2 pour B) ; le projet cible
 vide ou jetable.
 
-1. Cody note l'heure, puis lance la simulation depuis le bucket de la source (`--from-bucket`,
-   `--project joutiya-dev` pour A, `--project joutiya-staging` pour B). Notez la plage de dates, le nombre
+1. Notez l'heure, puis lancez la simulation depuis le bucket de la source (`--from-bucket staging` et
+   l'émulateur pour A, `--from-bucket prod --project joutiya-staging` pour B). Notez la plage de dates, le nombre
    de parties, les dates vérifiées et les documents par collection. Toute alerte (jour manquant, partie
    ignorée, date sans manifeste) est un résultat à noter, pas à contourner.
 2. Si la simulation dépasse 20 000 documents, découpez comme ci-dessus.
 3. Même commande avec `--apply` ; notez l'heure de fin et le nombre de documents écrits. Il doit égaler le
    total de la simulation.
-4. Dans la console Firebase du projet cible, comparez trois documents avec la source : une annonce, un
-   utilisateur, son document `private/account` (dates, position, références intactes).
+4. Comparez trois documents avec la source : une annonce, un utilisateur, son document `private/account`
+   (dates, position, références intactes). Pour B dans la console Firebase du staging ; pour A dans
+   l'émulateur, sans interface, par son API REST sur le PC (`curl
+   "http://127.0.0.1:8080/v1/projects/demo-joutiya/databases/(default)/documents/listings/<id>"`).
 5. Remplissez une ligne du tableau. Pour B, gardez le staging tel quel (données d'avant le lancement) ou
-   videz-le ; pour A, `joutiya-dev` peut rester tel quel.
+   videz-le ; pour A, arrêtez l'émulateur (il ne garde rien).
 
 | Date | Répétition | Source -> cible | Nuits (de … à …) | Parties | Documents (simulation) | Documents écrits | Durée simulation | Durée écriture | Écarts, remarques |
 |---|---|---|---|---|---|---|---|---|---|
-| | A | staging -> `joutiya-dev` | | | | | | | |
+| | A | staging -> émulateur du PC | | | | | | | |
 | | B | prod -> `joutiya-staging` | | | | | | | |
-
-### Points ouverts avant la répétition
-
-- Identifiants Google : le script prend les Application Default Credentials. `gcloud auth
-  application-default login` remplace celles de vos autres projets sur ce PC ; le reste de Joutiya passe
-  par la configuration à part `~/.joutiya/gcloud` (`scripts/google-wif.ts login`, `scripts/legal-config.ts`).
-  À aligner avant la répétition.
-- `--from-bucket` lit `R2_S3_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` et `R2_BUCKET_PRIVATE`
-  sans suffixe, alors que votre `.env.local` range les clés sous `R2_ACCESS_KEY_ID_STAGING`,
-  `R2_ACCESS_KEY_ID_PROD`, etc. À aligner aussi (sinon : télécharger `backups/` et utiliser `--from`).
 
 ## Limites connues
 

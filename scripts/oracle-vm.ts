@@ -422,24 +422,41 @@ export function launchDetails(input: {
     createVnicDetails: { subnetId: input.subnetId, assignPublicIp: true, displayName: NAMES.instance, hostnameLabel: NAMES.instance },
     // No SSH key: administration goes through OCI Run Command; ssh.joutiya.ma serves the CI only.
     metadata: { user_data: input.userData },
-    agentConfig: {
-      isMonitoringDisabled: false,
-      isManagementDisabled: false,
-      pluginsConfig: [{ name: "Compute Instance Run Command", desiredState: "ENABLED" }],
-    },
-    // Metadata service v2 only (header-authenticated); v1 endpoints are disabled.
-    instanceOptions: { areLegacyImdsEndpointsDisabled: true },
-    freeformTags: { project: "joutiya" },
+    ...INSTANCE_SETTINGS,
   };
 }
 
-async function create(oci: Oci, targets: Targets, compartmentId: string, retryMinutes: number, smallFallback: boolean): Promise<void> {
-  const existing = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance);
-  if (existing) {
-    console.log(`instance ${NAMES.instance} already exists (${existing.lifecycleState}): nothing to create`);
-    return;
-  }
-  const subnetId = await ensureNetwork(oci, compartmentId);
+/** Settings of launchDetails that `rebuild` also applies to an existing VM. */
+const INSTANCE_SETTINGS = {
+  agentConfig: {
+    isMonitoringDisabled: false,
+    isManagementDisabled: false,
+    pluginsConfig: [{ name: "Compute Instance Run Command", desiredState: "ENABLED" }],
+  },
+  // Metadata service v2 only (header-authenticated); v1 endpoints are disabled.
+  instanceOptions: { areLegacyImdsEndpointsDisabled: true },
+  freeformTags: { project: "joutiya" },
+};
+
+/** Tunnel token value of a user data built for the launcher Worker: bootstrap.sh then skips the tunnels. */
+export const NO_TOKEN = "none";
+
+/** The subnet `create` made, found without writing anything (for `launcher`). */
+async function existingSubnet(oci: Oci, compartmentId: string): Promise<string> {
+  const vcn = await findOne<Vcn>(oci, "/20160918/vcns", { compartmentId }, NAMES.vcn);
+  const subnet = vcn && (await findOne<Resource>(oci, "/20160918/subnets", { compartmentId, vcnId: vcn.id }, NAMES.subnet));
+  if (!subnet) throw new Error(`subnet ${NAMES.subnet} not found: run create --apply once first`);
+  return subnet.id;
+}
+
+/** The create request (availability domain, newest image, user data), with or without tunnel tokens. */
+async function launchPlan(
+  oci: Oci,
+  targets: Targets,
+  compartmentId: string,
+  subnetId: string,
+  withTokens: boolean,
+): Promise<{ userData: string; imageId: string; details: (shapeConfig: ShapeConfig) => Record<string, unknown> }> {
   const tenancy = targets.shared.oracle.tenancyId as string;
   const [ad] = await oci.call<{ name: string }[]>("GET", "identity", `/20160918/availabilityDomains${query({ compartmentId: tenancy })}`);
   if (!ad) throw new Error("no availability domain");
@@ -448,14 +465,24 @@ async function create(oci: Oci, targets: Targets, compartmentId: string, retryMi
   );
   console.log(`image    ${image.displayName}`);
 
+  const token = (name: TunnelName): Promise<string> => (withTokens ? tunnelToken(targets, name) : Promise.resolve(NO_TOKEN));
   const userData = buildUserData({
     template: readFileSync(new URL("../infra/vm/bootstrap.sh", import.meta.url), "utf8"),
-    sshTunnelToken: await tunnelToken(targets, "ssh"),
-    stagingTunnelToken: await tunnelToken(targets, "staging"),
-    prodTunnelToken: await tunnelToken(targets, "prod"),
+    sshTunnelToken: await token("ssh"),
+    stagingTunnelToken: await token("staging"),
+    prodTunnelToken: await token("prod"),
     vmFiles: vmFilesTarball(),
   });
-  const details = (shapeConfig: ShapeConfig) => launchDetails({ availabilityDomain: ad.name, compartmentId, subnetId, imageId: image.id, userData, shapeConfig });
+  return { userData, imageId: image.id, details: (shapeConfig) => launchDetails({ availabilityDomain: ad.name, compartmentId, subnetId, imageId: image.id, userData, shapeConfig }) };
+}
+
+async function create(oci: Oci, targets: Targets, compartmentId: string, retryMinutes: number, smallFallback: boolean): Promise<void> {
+  const existing = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance);
+  if (existing) {
+    console.log(`instance ${NAMES.instance} already exists (${existing.lifecycleState}): nothing to create`);
+    return;
+  }
+  const { userData, details } = await launchPlan(oci, targets, compartmentId, await ensureNetwork(oci, compartmentId), true);
   const shown = { ...details(shapeForAttempt(1, false)), metadata: { user_data: `<bootstrap.sh with tokens, ${userData.length} bytes>` } };
   const size = ({ ocpus, memoryInGBs }: ShapeConfig) => `${ocpus} OCPU, ${memoryInGBs} GB`;
   if (smallFallback) console.log(`every other attempt asks for ${size(SMALL_SHAPE_CONFIG)}`);
@@ -464,27 +491,156 @@ async function create(oci: Oci, targets: Targets, compartmentId: string, retryMi
     return;
   }
   const deadline = Date.now() + retryMinutes * 60_000;
-  for (let attempt = 1; ; attempt += 1) {
+  let attempt = 0;
+  let launched: Instance | undefined;
+  while (!launched) {
+    // Look before every launch but the first (checked above): a request cut off earlier may have
+    // launched the VM, and in --small-fallback mode two 1 OCPU VMs fit the quota. Never launch
+    // while the lookup fails: wait and look again.
+    if (attempt > 0) {
+      try {
+        launched = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance);
+      } catch (error) {
+        if ((!isTransientError(error) && !isCapacityError(error)) || Date.now() > deadline) throw error;
+        console.log(`instance lookup failed (${(error as Error).message}): looking again in 60 s`);
+        await sleep(60_000);
+        continue;
+      }
+      if (launched) break;
+    }
+    attempt += 1;
     const shapeConfig = shapeForAttempt(attempt, smallFallback);
-    let launched: Instance | undefined;
     try {
       launched = await oci.write<Instance>("POST", "/20160918/instances", details(shapeConfig), attempt === 1 ? shown : { attempt, ...shapeConfig });
     } catch (error) {
       const capacity = isCapacityError(error);
       if ((!capacity && !isTransientError(error)) || Date.now() > deadline) throw error;
-      // A request cut off may still have launched the VM (the quota allows one): look before retrying.
-      if (!capacity) launched = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance).catch(() => undefined);
-      if (!launched) {
-        console.log(`${capacity ? `no A1 capacity for ${size(shapeConfig)}` : `transient error (${(error as Error).message})`} (attempt ${attempt}): retrying in 60 s`);
-        await sleep(60_000);
-        continue;
-      }
+      console.log(`${capacity ? `no A1 capacity for ${size(shapeConfig)}` : `transient error (${(error as Error).message})`} (attempt ${attempt}): retrying in 60 s`);
+      await sleep(60_000);
     }
-    if (!launched) return;
-    const running = await waitFor<Instance>(oci, `/20160918/instances/${launched.id}`, "RUNNING", 15);
-    console.log(`instance ${NAMES.instance} ${running.lifecycleState} (${running.id}), ${size(running.shapeConfig ?? shapeConfig)}`);
-    return;
   }
+  const running = await waitFor<Instance>(oci, `/20160918/instances/${launched.id}`, "RUNNING", 15);
+  console.log(`instance ${NAMES.instance} ${running.lifecycleState} (${running.id})${running.shapeConfig ? `, ${size(running.shapeConfig)}` : ""}`);
+}
+
+/** Request file of the free launcher Worker, written by `launcher` (no secret: commit it). */
+export const LAUNCHER_FILE = "workers/vm-launcher/src/launch.json";
+/** The same first boot for a joutiya-vm created by hand in the OCI console, also written by `launcher`. */
+export const CONSOLE_CLOUD_INIT_FILE = "workers/vm-launcher/console-cloud-init.sh";
+
+/**
+ * Cloud-init script to paste in the console's form, which base64-encodes it into the metadata: the
+ * plain bootstrap would not fit, so it carries the gzipped user data and unpacks it as root.
+ */
+export function consoleCloudInit(userData: string): string {
+  const text = [
+    "#!/bin/bash",
+    "# First boot of a joutiya-vm created in the OCI console: paste this whole file as its cloud-init",
+    "# script. It runs infra/vm/bootstrap.sh without tunnel tokens, like the launcher Worker (written by",
+    "# `node scripts/oracle-vm.ts launcher`).",
+    "set -euo pipefail",
+    "umask 077",
+    "base64 -d << 'JOUTIYA_BOOTSTRAP' | gunzip > /root/joutiya-bootstrap.sh",
+    ...(userData.match(/.{1,76}/g) ?? []),
+    "JOUTIYA_BOOTSTRAP",
+    "status=0",
+    "bash /root/joutiya-bootstrap.sh || status=$?",
+    "rm -f /root/joutiya-bootstrap.sh",
+    'exit "$status"',
+    "",
+  ].join("\n");
+  const encoded = Math.ceil(Buffer.byteLength(text) / 3) * 4;
+  if (encoded > MAX_METADATA_BYTES) throw new Error(`console cloud-init is ${encoded} bytes once encoded, OCI allows ${MAX_METADATA_BYTES}`);
+  return text;
+}
+
+/**
+ * `launcher`: the create request the Worker sends every minute (workers/vm-launcher), with "none"
+ * for each tunnel token and both shapes, plus the same first boot for the console. Read-only on OCI;
+ * the files may lag infra/vm, since `sync` brings a new VM up to date anyway.
+ */
+async function launcher(oci: Oci, targets: Targets, compartmentId: string): Promise<void> {
+  const { userData, details } = await launchPlan(oci, targets, compartmentId, await existingSubnet(oci, compartmentId), false);
+  const { shapeConfig: _shape, ...request } = details(shapeForAttempt(1, false));
+  const config = {
+    tenancy: targets.shared.oracle.tenancyId,
+    region: targets.shared.oracle.homeRegion,
+    compartmentId,
+    displayName: NAMES.instance,
+    request,
+    shapes: [shapeForAttempt(1, false), SMALL_SHAPE_CONFIG],
+  };
+  const text = `${JSON.stringify(config, null, 2)}\n`;
+  writeFileSync(join(root, LAUNCHER_FILE), text);
+  console.log(`${LAUNCHER_FILE}: ${text.length} bytes, no tunnel token; commit it, then redeploy the Worker`);
+  const script = consoleCloudInit(userData);
+  writeFileSync(join(root, CONSOLE_CLOUD_INIT_FILE), script);
+  console.log(`${CONSOLE_CLOUD_INIT_FILE}: ${script.length} bytes, for a VM created in the console`);
+}
+
+/** Root script of `tunnels`: the three tunnel tokens a VM launched by the Worker lacks, then the SSH tunnel. */
+export function tunnelsScript(tokens: Record<TunnelName, string>): string {
+  for (const [name, token] of Object.entries(tokens)) {
+    if (!/^[A-Za-z0-9+/=_-]+$/.test(token) || token === NO_TOKEN) throw new Error(`token of joutiya-${name}-tunnel is not a base64 value`);
+  }
+  return [
+    "[[ -d /etc/joutiya/staging && -d /etc/joutiya/prod ]] || { echo 'the bootstrap has not finished' >&2; exit 1; }",
+    "umask 077",
+    `printf 'TUNNEL_TOKEN=%s\\n' '${tokens.ssh}' > /etc/joutiya/ssh-tunnel.env`,
+    `printf 'TUNNEL_TOKEN=%s\\n' '${tokens.staging}' > /etc/joutiya/staging/tunnel.env`,
+    `printf 'TUNNEL_TOKEN=%s\\n' '${tokens.prod}' > /etc/joutiya/prod/tunnel.env`,
+    "systemctl enable cloudflared.service",
+    "systemctl restart cloudflared.service",
+    'echo "ssh tunnel: $(systemctl is-active cloudflared.service)"',
+  ].join("\n");
+}
+
+async function tunnels(oci: Oci, targets: Targets, compartmentId: string): Promise<void> {
+  const instance = await runningInstance(oci, compartmentId);
+  const script = tunnelsScript({ ssh: await tunnelToken(targets, "ssh"), staging: await tunnelToken(targets, "staging"), prod: await tunnelToken(targets, "prod") });
+  const output = await runCommand(oci, compartmentId, instance.id, "joutiya tunnels", rootCommand(script));
+  if (oci.apply) console.log(output.trimEnd());
+}
+
+/**
+ * Boot volume replacement of `rebuild`: a new boot volume from the image and a new first boot. Oracle
+ * accepts new user data only together with a new boot volume; any SSH key stays as it is.
+ */
+export function rebuildDetails(input: { imageId: string; userData: string; metadata?: Record<string, string>; keepDisk: boolean }): Record<string, unknown> {
+  return {
+    metadata: { ...input.metadata, user_data: input.userData },
+    sourceDetails: { sourceType: "image", imageId: input.imageId, bootVolumeSizeInGBs: BOOT_VOLUME_GB, isPreserveBootVolumeEnabled: input.keepDisk },
+  };
+}
+
+/**
+ * `rebuild`: the compartment's VM gets a new boot volume (newest image) and a new first boot with the
+ * tunnel tokens, keeping the instance and its A1 capacity (guide step 13, infra/redeploy.md). Also
+ * repairs a VM created in the console without the cloud-init script or public IP, whatever its name. --keep-disk
+ * keeps the old boot volume, detached, as evidence after an incident.
+ */
+async function rebuild(oci: Oci, targets: Targets, compartmentId: string, keepDisk: boolean): Promise<void> {
+  const instances = await oci.call<Instance[]>("GET", "iaas", `/20160918/instances${query({ compartmentId })}`);
+  const live = instances.filter((instance) => !["TERMINATING", "TERMINATED"].includes(instance.lifecycleState));
+  if (live.length !== 1 || !live[0]) throw new Error(`expected one instance in the compartment, found ${live.length}: nothing done`);
+  const instance = await oci.call<Instance & { metadata?: Record<string, string> }>("GET", "iaas", `/20160918/instances/${live[0].id}`);
+  if (!["RUNNING", "STOPPED"].includes(instance.lifecycleState)) throw new Error(`instance ${instance.displayName} is ${instance.lifecycleState}: nothing done`);
+  console.log(`instance ${instance.displayName} ${instance.lifecycleState} (${instance.id})`);
+  const { userData, imageId } = await launchPlan(oci, targets, compartmentId, await existingSubnet(oci, compartmentId), true);
+  await oci.write("PUT", `/20160918/instances/${instance.id}`, { displayName: NAMES.instance, ...INSTANCE_SETTINGS });
+  // Without a public IP the VM cannot reach the internet (no NAT gateway): an ephemeral one, free.
+  const attachments = await oci.call<{ vnicId: string; lifecycleState: string }[]>("GET", "iaas", `/20160918/vnicAttachments${query({ compartmentId, instanceId: instance.id })}`);
+  for (const attachment of attachments.filter((item) => item.lifecycleState === "ATTACHED")) {
+    const vnic = await oci.call<{ id: string; isPrimary?: boolean; publicIp?: string }>("GET", "iaas", `/20160918/vnics/${attachment.vnicId}`);
+    if (!vnic.isPrimary || vnic.publicIp) continue;
+    const primary = (await oci.call<{ id: string; isPrimary: boolean }[]>("GET", "iaas", `/20160918/privateIps${query({ vnicId: vnic.id })}`)).find((ip) => ip.isPrimary);
+    if (!primary) throw new Error(`vnic ${vnic.id} has no primary private IP`);
+    await oci.write("POST", "/20160918/publicIps", { compartmentId, lifetime: "EPHEMERAL", privateIpId: primary.id, displayName: NAMES.instance });
+  }
+  const details = rebuildDetails({ imageId, userData, metadata: instance.metadata, keepDisk });
+  const shown = { ...details, metadata: { keys: Object.keys(details.metadata as object), user_data: `<bootstrap.sh with tokens, ${userData.length} bytes>` } };
+  await oci.write("PUT", `/20160918/instances/${instance.id}`, details, shown);
+  if (oci.apply) console.log("boot volume replacement requested: follow it with `node scripts/oracle-vm.ts status`");
 }
 
 /** Bootstrap lines (joutiya-bootstrap: ...) and cloud-init's verdict, from the serial console. */
@@ -707,15 +863,20 @@ async function envFiles(oci: Oci, targets: Targets, compartmentId: string, env: 
 // ---------------------------------------------------------------------------------------------
 // Production releases (§2), run by root through Run Command with the forced command of the deploy
 // users (infra/vm/deploy-forced-command.sh, environment prod). Production only runs images already
-// running in staging, pinned by image ID; no production key exists anywhere.
+// running in staging, pinned by image ID, from the tarball the CI recorded; no production key exists
+// anywhere.
 
 const RELEASE = /^[0-9a-f]{12,40}$/;
 const IMAGE_ID = /^sha256:[0-9a-f]{64}$/;
+/** Check run of deploy-staging.yml that records, on each release's commit, the tarball sent to the VM. */
+export const RELEASE_CHECK = "Release images";
 
 export interface EnvStatus {
   release: string;
   web: string;
   worker: string;
+  /** sha256 of the tarball the release's images were loaded from (empty before the first load). */
+  tarball?: string;
 }
 export type VmStatus = Record<"staging" | "prod", EnvStatus>;
 
@@ -736,6 +897,30 @@ export function promoteCommand(staging: EnvStatus): string {
   if (!RELEASE.test(staging.release)) throw new Error("staging runs no valid release");
   if (!IMAGE_ID.test(staging.web) || !IMAGE_ID.test(staging.worker)) throw new Error("staging image IDs are missing");
   return `promote ${staging.release} ${staging.web} ${staging.worker}`;
+}
+
+/**
+ * Tarball digests that the GitHub Actions app recorded for a release, from a GitHub "list check runs
+ * for a Git reference" answer. Nobody else can write these: the staging deploy key and its Access
+ * token cannot.
+ */
+export function recordedTarballs(answer: unknown, release: string): string[] {
+  const runs = (answer as { check_runs?: unknown } | null)?.check_runs;
+  if (!Array.isArray(runs)) throw new Error("unexpected answer from GitHub");
+  return (runs as { name?: unknown; head_sha?: unknown; conclusion?: unknown; app?: { slug?: unknown }; output?: { summary?: unknown } }[]).flatMap((run) => {
+    if (run.name !== RELEASE_CHECK || run.app?.slug !== "github-actions" || run.conclusion !== "success") return [];
+    if (typeof run.head_sha !== "string" || !run.head_sha.startsWith(release)) return [];
+    const digest = /^tarball (sha256:[0-9a-f]{64})$/m.exec(typeof run.output?.summary === "string" ? run.output.summary : "")?.[1];
+    return digest ? [digest] : [];
+  });
+}
+
+/** The CI's records of a release, read through curl: in the Claude environment its proxy signs requests to the private repository. */
+function ciTarballs(repository: string, release: string): string[] {
+  const url = `https://api.github.com/repos/${repository}/commits/${release}/check-runs?check_name=${encodeURIComponent(RELEASE_CHECK)}&filter=all&per_page=100`;
+  const answer = spawnSync("curl", ["-fsS", "--max-time", "30", "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28", url], { encoding: "utf8" });
+  if (answer.status !== 0) throw new Error(`the CI's record of ${release} could not be read from GitHub (${answer.stderr.trim() || `curl exit ${answer.status}`}): not promoted`);
+  return recordedTarballs(JSON.parse(answer.stdout), release);
 }
 
 /** Root script sending one request to the forced command of production (it splits the request on spaces, no shell parses it). */
@@ -783,6 +968,12 @@ async function release(oci: Oci, targets: Targets, compartmentId: string, action
     request = promoteCommand(current.staging);
     if (current.staging.release === current.prod.release) throw new Error("production already runs this release");
     if (!isOnMain(current.staging.release)) throw new Error(`release ${current.staging.release} is not a commit of origin/main: not promoted`);
+    const { tarball } = current.staging;
+    const repository = targets.shared.github.repository;
+    if (!repository) throw new Error("shared.github.repository is not recorded in infra/targets.json");
+    if (!tarball || !ciTarballs(repository, current.staging.release).includes(tarball)) {
+      throw new Error(`staging's images of ${current.staging.release} do not come from the tarball the CI recorded (check run "${RELEASE_CHECK}"): not promoted`);
+    }
   }
   const output = await runCommand(oci, compartmentId, instance.id, `joutiya-deploy ${request.split(" ").slice(0, 2).join(" ")}`, rootCommand(deployScript(request)));
   if (!oci.apply) return;
@@ -951,12 +1142,12 @@ async function main(): Promise<void> {
   const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);
   const smallFallback = args.includes("--small-fallback");
-  const actions = ["create", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback"];
+  const actions = ["create", "launcher", "tunnels", "rebuild", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback"];
   const perEnv = action === "env" || action === "search-setup" || action === "wif";
   const argument = action === "run" || perEnv;
   if (!action || !actions.includes(action) || argument !== (file !== undefined) || (perEnv && !(DEPLOYED_ENVS as readonly string[]).includes(file ?? ""))) {
     throw new Error(
-      "usage: scripts/oracle-vm.ts <create|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
+      "usage: scripts/oracle-vm.ts <create|launcher|tunnels|rebuild [--keep-disk]|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
     );
   }
 
@@ -973,6 +1164,9 @@ async function main(): Promise<void> {
   const oci = new Oci(credentials, args.includes("--apply"));
   const compartment = compartmentId as string;
   if (action === "create") await create(oci, targets, compartment, retry, smallFallback);
+  else if (action === "launcher") await launcher(oci, targets, compartment);
+  else if (action === "tunnels") await tunnels(oci, targets, compartment);
+  else if (action === "rebuild") await rebuild(oci, targets, compartment, args.includes("--keep-disk"));
   else if (action === "reboot") await reboot(oci, compartment);
   else if (action === "agent") await agent(oci, compartment);
   else if (action === "run") await run(oci, compartment, file as string);
@@ -983,7 +1177,7 @@ async function main(): Promise<void> {
   else if (action === "deploy-status") await release(oci, targets, compartment, "status");
   else if (action === "promote" || action === "rollback") await release(oci, targets, compartment, action);
   else await status(oci, targets, compartment);
-  if (!["status", "agent", "deploy-status"].includes(action)) console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
+  if (!["status", "agent", "deploy-status", "launcher"].includes(action)) console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
 }
 
 const self = fileURLToPath(import.meta.url);

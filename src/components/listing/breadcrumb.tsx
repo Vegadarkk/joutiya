@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { quietLinkClassName } from "@/components/ui/text-link";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +43,7 @@ export function Breadcrumb({ items, current, className }: { items: BreadcrumbIte
         {items.map((item, index) => (
           <li key={`${index}-${item.label}`} className="flex min-w-0 items-center gap-1">
             {item.href ? (
-              <Link href={item.href} prefetch={false} className="inline-flex min-h-11 items-center rounded-sm hover:text-foreground hover:underline hover:underline-offset-2 sm:min-h-0 sm:py-1">
+              <Link href={item.href} prefetch={false} className={cn("inline-flex min-h-11 items-center rounded-sm hover:text-foreground sm:min-h-0 sm:py-1", quietLinkClassName)}>
                 {item.label}
               </Link>
             ) : (

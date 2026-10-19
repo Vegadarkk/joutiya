@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import registry from "../../infra/targets.json";
 import type { Targets } from "../../scripts/assert-target";
 import {
+  containsEdge,
   dnsChange,
   googleIdp,
   needsAccess,
   preflightErrors,
   readEdgeFile,
+  rulesetDrift,
+  settingsDrift,
   substitute,
   tunnelHostnames,
   validateEdge,
@@ -16,7 +19,9 @@ import {
   type DnsRecord,
   type R2CorsRule,
   type R2Settings,
+  type Ruleset,
   type TunnelConfig,
+  type ZoneSettings,
 } from "../../scripts/cloudflare";
 
 const record = (type: string, content: string, proxied = true): DnsRecord => ({ id: `${type}-${content}`, type, name: "joutiya.ma", content, proxied });
@@ -162,5 +167,32 @@ describe("preflightErrors", () => {
     expect(preflightErrors(rule, "https://joutiya.ma", "PUT", 403, new Headers())).toEqual(["HTTP 403"]);
     const partial = new Headers({ "access-control-allow-origin": "https://joutiya.ma", "access-control-allow-methods": "GET, HEAD" });
     expect(preflightErrors(rule, "https://joutiya.ma", "PUT", 200, partial)).toEqual(["allow-methods lacks PUT", "allow-headers lacks Content-Type", "max-age missing"]);
+  });
+});
+
+describe("zone --check", () => {
+  const transform = readEdgeFile<Ruleset>("transform-rules.json");
+  // The API answers each rule with its id, version and defaults on top of what was sent.
+  const live = transform.rules.map((rule, index) => ({ ...rule, id: `r${index}`, version: "1", enabled: true, last_updated: "2026-10-15T22:43:00Z" }));
+
+  it("accepts the live rules when they hold every field of the file", () => {
+    expect(rulesetDrift(transform, live)).toEqual([]);
+    expect(containsEdge({ a: [1, { b: "x" }] }, { a: [1, { b: "x", c: 2 }], d: 3 })).toBe(true);
+    expect(containsEdge({ a: [1] }, { a: [1, 2] })).toBe(false);
+  });
+
+  it("reports a missing ruleset, a dropped or reordered rule and an edited one", () => {
+    expect(rulesetDrift(transform, null)).toEqual(["http_request_late_transform: no ruleset on the zone (2 rules expected)"]);
+    expect(rulesetDrift(transform, live.slice(0, 1))).toEqual(["http_request_late_transform: rules verified_bot_reset instead of verified_bot_reset, verified_bot_set"]);
+    expect(rulesetDrift(transform, [...live].reverse())[0]).toMatch(/^http_request_late_transform: rules verified_bot_set, verified_bot_reset instead of/);
+    const edited = live.map((rule) => (rule.ref === "verified_bot_set" ? { ...rule, expression: "true" } : rule));
+    expect(rulesetDrift(transform, edited)).toEqual(["http_request_late_transform: rule verified_bot_set differs from the file"]);
+  });
+
+  it("compares every zone setting", () => {
+    const settings = readEdgeFile<ZoneSettings>("zone-settings.json");
+    const values = Object.fromEntries(settings.settings.map((setting) => [setting.id, setting.value]));
+    expect(settingsDrift(settings, values)).toEqual([]);
+    expect(settingsDrift(settings, { ...values, email_obfuscation: "on" })).toEqual(['setting email_obfuscation is "on", expected "off"']);
   });
 });

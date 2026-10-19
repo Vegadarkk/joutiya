@@ -106,8 +106,7 @@ export function FavoriteButton({ listingId, className, variant = "overlay" }: Fa
         data-active={active || undefined}
         className={cn(
           "inline-flex h-11 shrink-0 items-center gap-2 rounded-md border px-4 text-base font-medium",
-          "transition-[background-color,border-color,color,transform] duration-150 ease-door active:scale-[0.98]",
-          "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25",
+          "transition-[background-color,border-color,color,scale] duration-150 ease-door active:scale-[0.98]",
           active ? "border-primary/40 bg-ochre-50 text-primary-hover dark:bg-ochre-900/40 dark:text-primary" : "border-border-strong bg-surface text-foreground hover:bg-surface-muted",
           className,
         )}
@@ -131,14 +130,16 @@ export function FavoriteButton({ listingId, className, variant = "overlay" }: Fa
       className={cn(
         // 44 px target, a 36 px disc: legible over any photo, light or dark.
         "group/fav relative z-10 inline-flex size-11 shrink-0 items-center justify-center rounded-full outline-none",
-        "focus-visible:ring-3 focus-visible:ring-ring/40",
+        // The focus ring hugs the visible disc (not the 44 px target around it), with no gap: the
+        // light disc, not the photo, is what it has to stand out from.
+        "[&:focus-visible>span]:outline-2 [&:focus-visible>span]:outline-offset-0 [&:focus-visible>span]:outline-ring",
         className,
       )}
     >
       <span
         className={cn(
           "inline-flex size-9 items-center justify-center rounded-full bg-surface/90 text-foreground shadow-sm shadow-bab-950/20 backdrop-blur-sm",
-          "transition-[background-color,transform] duration-150 ease-door group-hover/fav:bg-surface group-active/fav:scale-90",
+          "transition-[background-color,scale] duration-150 ease-door group-hover/fav:bg-surface group-active/fav:scale-90",
         )}
       >
         {icon}

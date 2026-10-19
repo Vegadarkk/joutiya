@@ -3,7 +3,11 @@
 // each tunnel must be joutiya-<name>-tunnel. Dry run by default (prints the requests); --apply sends.
 //
 //   node --env-file=<owner env file> scripts/cloudflare.ts <part>... [--apply] [--replace-dns]
+//   node --env-file=<owner env file> scripts/cloudflare.ts zone --check
 //   parts: zone (settings and rules), tunnel:staging, tunnel:prod, tunnel:ssh, access, r2
+// zone --check reads the live settings and rules, compares them with the files and exits 1 on any
+// drift (a missing transform rule lets a client forge X-Verified-Bot); zone --apply runs it after
+// its writes.
 //
 // Environment (never printed): JOUTIYA_CLOUDFLARE_API_TOKEN, a custom token limited to the Joutiya
 // account and the joutiya.ma zone (a prefixed name: a shared shell may hold other projects' tokens);
@@ -187,6 +191,34 @@ export function dnsChange(existing: DnsRecord[], target: string, replace: boolea
   return replace ? { create: true, deletes: blocking, conflicts: [] } : { create: false, deletes: [], conflicts: blocking };
 }
 
+/** True when every key of `expected` holds the same value in `live` (live may add API defaults). */
+export function containsEdge(expected: unknown, live: unknown): boolean {
+  if (Array.isArray(expected)) {
+    return Array.isArray(live) && live.length === expected.length && expected.every((item, index) => containsEdge(item, live[index]));
+  }
+  if (expected !== null && typeof expected === "object") {
+    if (live === null || typeof live !== "object" || Array.isArray(live)) return false;
+    return Object.entries(expected).every(([key, value]) => containsEdge(value, (live as Record<string, unknown>)[key]));
+  }
+  return expected === live;
+}
+
+/** Differences between a ruleset file and the live entrypoint of its phase (null: none exists). */
+export function rulesetDrift(expected: Ruleset, live: Rule[] | null): string[] {
+  if (live === null) return [`${expected.phase}: no ruleset on the zone (${expected.rules.length} rules expected)`];
+  const wanted = expected.rules.map((rule) => rule.ref);
+  const found = live.map((rule) => rule.ref);
+  if (wanted.join(",") !== found.join(",")) return [`${expected.phase}: rules ${found.join(", ") || "(none)"} instead of ${wanted.join(", ")}`];
+  return expected.rules.flatMap((rule, index) => (containsEdge(rule, live[index]) ? [] : [`${expected.phase}: rule ${rule.ref} differs from the file`]));
+}
+
+/** Differences between zone-settings.json and the live values. */
+export function settingsDrift(expected: ZoneSettings, live: Record<string, unknown>): string[] {
+  return expected.settings.flatMap((setting) =>
+    containsEdge(setting.value, live[setting.id]) ? [] : [`setting ${setting.id} is ${JSON.stringify(live[setting.id])}, expected ${JSON.stringify(setting.value)}`],
+  );
+}
+
 class CloudflareApi {
   private readonly token: string;
   readonly apply: boolean;
@@ -241,6 +273,30 @@ async function applyZone(api: CloudflareApi, targets: Targets): Promise<void> {
     // PUT replaces every rule of the phase: the file is the whole truth.
     await api.write({ method: "PUT", path: `/zones/${zoneId}/rulesets/phases/${phase}/entrypoint`, body: { description, rules } });
   }
+}
+
+/** Reads the live zone settings and rulesets back and throws on any difference with the files. */
+async function verifyZone(api: CloudflareApi, targets: Targets): Promise<void> {
+  const { zoneId } = await checkZone(api, targets);
+  const expected = readEdgeFile<ZoneSettings>("zone-settings.json");
+  const live: Record<string, unknown> = {};
+  for (const setting of expected.settings) {
+    live[setting.id] = (await api.call<{ value: unknown }>({ method: "GET", path: `/zones/${zoneId}/settings/${setting.id}` })).value;
+  }
+  const drift = settingsDrift(expected, live);
+  for (const file of RULESET_FILES) {
+    const ruleset = readEdgeFile<Ruleset>(file);
+    const rules = await api
+      .call<{ rules?: Rule[] }>({ method: "GET", path: `/zones/${zoneId}/rulesets/phases/${ruleset.phase}/entrypoint` })
+      .then((result) => result.rules ?? [])
+      .catch((error: unknown) => {
+        if (/HTTP 404/.test((error as Error).message)) return null;
+        throw error;
+      });
+    drift.push(...rulesetDrift(ruleset, rules));
+  }
+  if (drift.length > 0) throw new Error(`the zone differs from infra/cloudflare:\n${drift.join("\n")}\nRe-apply with: scripts/cloudflare.ts zone --apply`);
+  console.log("zone settings and rules match infra/cloudflare");
 }
 
 async function applyTunnel(api: CloudflareApi, targets: Targets, name: TunnelName, replaceDns: boolean): Promise<void> {
@@ -423,10 +479,12 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const apply = args.includes("--apply");
   const replaceDns = args.includes("--replace-dns");
+  const check = args.includes("--check");
   const parts = args.filter((arg) => !arg.startsWith("--"));
   const known = ["zone", "access", "r2", ...TUNNELS.map((name) => `tunnel:${name}`)];
   const unknown = parts.filter((part) => !known.includes(part));
-  if (parts.length === 0 || unknown.length > 0) throw new Error(`usage: scripts/cloudflare.ts <${known.join("|")}>... [--apply] [--replace-dns]`);
+  if (parts.length === 0 || unknown.length > 0) throw new Error(`usage: scripts/cloudflare.ts <${known.join("|")}>... [--apply] [--replace-dns] | zone --check`);
+  if (check && (apply || parts.join() !== "zone")) throw new Error("--check reads the zone only: scripts/cloudflare.ts zone --check");
 
   const edgeErrors = validateEdge();
   if (edgeErrors.length > 0) throw new Error(edgeErrors.join("\n"));
@@ -440,12 +498,16 @@ async function main(): Promise<void> {
   const api = new CloudflareApi(token, apply);
   for (const part of parts) {
     console.log(`\n== ${part}`);
-    if (part === "zone") await applyZone(api, targets);
+    if (part === "zone" && check) await verifyZone(api, targets);
+    else if (part === "zone") {
+      await applyZone(api, targets);
+      if (apply) await verifyZone(api, targets);
+    }
     else if (part === "access") await applyAccess(api, targets);
     else if (part === "r2") await checkR2(targets);
     else await applyTunnel(api, targets, part.slice("tunnel:".length) as TunnelName, replaceDns);
   }
-  if (parts.every((part) => part === "r2")) console.log("\nChecks only: the r2 part writes nothing.");
+  if (check || parts.every((part) => part === "r2")) console.log(`\nChecks only: ${check ? "zone --check" : "the r2 part"} writes nothing.`);
   else console.log(apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
 }
 

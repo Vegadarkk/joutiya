@@ -12,6 +12,7 @@ import { useCategoryLabels } from "@/components/post/labels";
 import { Button } from "@/components/ui/button";
 import { CATEGORIES, CONDITIONS, subcategoryById, type Condition } from "@/config/categories";
 import type { Locale } from "@/config/site";
+import { useNumbersTranslations } from "@/i18n/numbers";
 import { currencyLabel } from "@/lib/listings/client/format";
 import { canonicalSearchParams, RADIUS_KM, type SearchParams, type SellerTypeFilter } from "@/lib/search/params";
 import type { SearchFacets } from "@/lib/search/types";
@@ -89,7 +90,7 @@ interface FiltersSheetProps {
 }
 
 export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
-  const t = useTranslations("SearchFilters");
+  const t = useNumbersTranslations("SearchFilters");
   const conditionNames = useTranslations("Criteria.condition.options");
   const location = useTranslations("Search.location");
   const names = useCategoryLabels();

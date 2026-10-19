@@ -22,12 +22,15 @@ import {
   parseStatus,
   pickImage,
   promoteCommand,
+  rebuildDetails,
+  recordedTarballs,
   rootCommand,
   securityList,
   shapeForAttempt,
   signedHeaders,
   signingString,
   syncCommands,
+  tunnelsScript,
 } from "../../scripts/oracle-vm";
 
 const template = readFileSync(new URL("../../infra/vm/bootstrap.sh", import.meta.url), "utf8");
@@ -135,6 +138,17 @@ describe("instance", () => {
   });
 });
 
+describe("rebuild", () => {
+  it("replaces the boot volume and the user data together, keeping any SSH key", () => {
+    const details = rebuildDetails({ imageId: "ocid1.image.oc1.x", userData: "bmV3", metadata: { user_data: "b2xk", ssh_authorized_keys: "ssh-ed25519 AAAA" }, keepDisk: false });
+    expect(details).toEqual({
+      metadata: { user_data: "bmV3", ssh_authorized_keys: "ssh-ed25519 AAAA" },
+      sourceDetails: { sourceType: "image", imageId: "ocid1.image.oc1.x", bootVolumeSizeInGBs: 100, isPreserveBootVolumeEnabled: false },
+    });
+    expect(rebuildDetails({ imageId: "i", userData: "bmV3", keepDisk: true })).toMatchObject({ metadata: { user_data: "bmV3" }, sourceDetails: { isPreserveBootVolumeEnabled: true } });
+  });
+});
+
 describe("OCI Run Command", () => {
   // The commands run here as the test user: a sudo stub drops -n and runs the rest.
   const work = mkdtempSync(join(tmpdir(), "joutiya-run-command-"));
@@ -187,6 +201,16 @@ describe("OCI Run Command", () => {
     expect(install.stdout).not.toContain("installed");
     expect(() => syncCommands("not base64!")).toThrow("not base64");
   });
+  it("writes the tunnel tokens of a launcher VM root-only, then starts the SSH tunnel", () => {
+    const script = tunnelsScript({ ssh: token("ssh"), staging: token("staging"), prod: token("prod") });
+    const lines = script.split("\n");
+    expect(lines.indexOf("umask 077")).toBeLessThan(lines.findIndex((line) => line.startsWith("printf")));
+    expect(lines).toContain(`printf 'TUNNEL_TOKEN=%s\\n' '${token("prod")}' > /etc/joutiya/prod/tunnel.env`);
+    expect(lines.slice(-3, -1)).toEqual(["systemctl enable cloudflared.service", "systemctl restart cloudflared.service"]);
+    expect(() => rootCommand(script)).not.toThrow();
+    expect(() => tunnelsScript({ ssh: "none", staging: token("staging"), prod: token("prod") })).toThrow("joutiya-ssh-tunnel");
+    expect(() => tunnelsScript({ ssh: token("ssh"), staging: "x' y", prod: token("prod") })).toThrow("joutiya-staging-tunnel");
+  });
 });
 
 describe("production releases", () => {
@@ -196,6 +220,23 @@ describe("production releases", () => {
     const text = JSON.stringify({ staging: { release: "0123456789ab", web: id("a"), worker: id("b") }, prod: { release: "", web: "", worker: "" } });
     expect(parseStatus(text).staging.release).toBe("0123456789ab");
     expect(() => parseStatus('{"staging":{}}')).toThrow(/staging is missing/);
+  });
+
+  it("trusts only the tarballs GitHub Actions recorded on the release's commit", () => {
+    const sha = "0123456789ab".padEnd(40, "c");
+    const run = { name: "Release images", head_sha: sha, conclusion: "success", app: { slug: "github-actions" }, output: { summary: `tarball ${id("d")}` } };
+    const answer = {
+      check_runs: [
+        run,
+        { ...run, app: { slug: "some-app" }, output: { summary: `tarball ${id("e")}` } },
+        { ...run, conclusion: "failure", output: { summary: `tarball ${id("f")}` } },
+        { ...run, head_sha: "f".repeat(40), output: { summary: `tarball ${id("1")}` } },
+        { ...run, name: "Dependabot", output: { summary: null } },
+      ],
+    };
+    expect(recordedTarballs(answer, "0123456789ab")).toEqual([id("d")]);
+    expect(recordedTarballs({ check_runs: [] }, "0123456789ab")).toEqual([]);
+    expect(() => recordedTarballs({ message: "Not Found" }, "0123456789ab")).toThrow("unexpected answer");
   });
 
   it("promotes only a valid release with both image IDs", () => {
