@@ -9,6 +9,10 @@ export const ADMIN_API = {
   logout: "/api/admin/auth/logout",
   password: "/api/admin/auth/password",
   staff: "/api/admin/staff",
+  decisions: "/api/admin/decisions",
+  appeals: "/api/admin/appeals",
+  authorities: "/api/admin/authorities",
+  conversations: "/api/admin/conversations",
 } as const;
 
 const CSRF_COOKIE = "__Host-csrf";
@@ -38,7 +42,7 @@ export class ApiError extends Error {
 }
 
 interface FetchOptions {
-  method: "POST" | "DELETE";
+  method: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
   /** Authenticated mutation: sends the CSRF header. */
   csrf?: boolean;
@@ -66,6 +70,8 @@ const COMMON_MESSAGES: Record<string, string> = {
   csrf: "Votre session a expiré. Rechargez la page.",
   origin: "Requête refusée. Rechargez la page.",
   rate_limited: "Trop de tentatives. Réessayez plus tard.",
+  forbidden: "Action réservée à un autre rôle.",
+  not_found: "Introuvable : rechargez la page.",
   unavailable: "Service indisponible. Réessayez dans un instant.",
   network: "Connexion au serveur impossible. Vérifiez votre réseau.",
   internal: "Une erreur est survenue. Réessayez.",

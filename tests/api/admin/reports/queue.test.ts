@@ -211,7 +211,7 @@ describe("target view", () => {
             provider: "rules",
             model: "rules",
             promptVersion: "triage-v1",
-            output: { action: "escalate", policy: "scam", severity: "P1", confidence: 0.7, rationale: "Demande d'avance.", templateId: "listing_remove_scam" },
+            output: { action: "escalate", verdict: "needs_human", policy: "scam", severity: "P1", confidence: 0.7, rationale: "Demande d'avance.", templateId: "listing_remove_scam" },
             applied: "pending",
             costMicroUsd: 0,
             inputHash: "h",
@@ -235,7 +235,7 @@ describe("target view", () => {
     expect(view.owner).toMatchObject({ uid: seller.uid, status: "active", strikes: 0 });
     expect(view.history).toEqual([]);
     expect(view.decisions).toEqual([]);
-    expect(view.ai).toMatchObject({ id: ai.id, action: "escalate", policy: "scam", confidence: 0.7, templateId: "listing_remove_scam", applied: "pending" });
+    expect(view.ai).toMatchObject({ id: ai.id, action: "escalate", verdict: "needs_human", policy: "scam", confidence: 0.7, templateId: "listing_remove_scam", applied: "pending" });
     expect(JSON.stringify(view)).not.toMatch(/nadia\.cachee|Nadia Visiteuse|ipPrefixHash|deviceHash/);
   });
 

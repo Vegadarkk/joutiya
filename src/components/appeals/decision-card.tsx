@@ -72,7 +72,7 @@ export function DecisionCard({ decision: initial, mode, formOpen = false, headin
     >
       <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-5 pt-5 sm:px-6">
         <div className="flex min-w-0 flex-col gap-1">
-          <p className="text-sm text-foreground-muted">{t("decidedOn", { date: date(decision.createdAt) })}</p>
+          <p className="text-sm text-foreground-muted" suppressHydrationWarning>{t("decidedOn", { date: date(decision.createdAt) })}</p>
           <Heading className="text-lg font-semibold text-balance">{title}</Heading>
         </div>
         {chip ? <Badge variant={chip.variant}>{t(`status.${chip.key}`)}</Badge> : null}
@@ -156,7 +156,7 @@ function AppealPart({ status, decision, showForm, filed, date, form, onStart }: 
   if (status === "form") {
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-pretty">{decision.by === "reporter" ? t("appeal.reporterIntro", { date: deadline }) : t("appeal.intro", { date: deadline })}</p>
+        <p className="text-sm text-pretty" suppressHydrationWarning>{decision.by === "reporter" ? t("appeal.reporterIntro", { date: deadline }) : t("appeal.intro", { date: deadline })}</p>
         {showForm ? (
           form
         ) : (
@@ -208,7 +208,7 @@ function AppealPart({ status, decision, showForm, filed, date, form, onStart }: 
     );
   }
   const note = status === "expired" ? t("appeal.expired", { date: deadline }) : status === "authority" ? t("appeal.authority") : status === "superseded" ? t("appeal.superseded") : null;
-  return note ? <p className="text-sm text-foreground-muted text-pretty">{note}</p> : null;
+  return note ? <p className="text-sm text-foreground-muted text-pretty" suppressHydrationWarning>{note}</p> : null;
 }
 
 interface StepProps {
@@ -234,7 +234,7 @@ function Step({ label, detail, done, current, last, children }: StepProps) {
       />
       <div className="flex min-w-0 flex-col gap-0.5">
         <p className="text-sm font-medium">{label}</p>
-        {detail ? <p className="text-sm text-foreground-muted">{detail}</p> : null}
+        {detail ? <p className="text-sm text-foreground-muted" suppressHydrationWarning>{detail}</p> : null}
         {children ? <div className="mt-1">{children}</div> : null}
       </div>
     </li>
