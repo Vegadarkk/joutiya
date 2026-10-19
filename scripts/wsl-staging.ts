@@ -114,6 +114,28 @@ const OWN_ENGINE = [
   '[[ -n "$engine" && "$engine" != *"Docker Desktop"* ]] || { echo "docker does not reach the Docker Engine of this distro (found: ${engine:-nothing}): turn off Docker Desktop\'s WSL integration for joutiya-staging" >&2; exit 1; }',
 ];
 
+/**
+ * No Windows program may start from the distro: [interop] enabled=false in /etc/wsl.conf leaves
+ * WSL's binfmt handlers registered (WSL 3.0 with systemd, seen on PC2), and through them a process
+ * of the distro would run Windows programs as the owner. Removed at every boot and before each deploy.
+ */
+const NO_INTEROP = "/usr/local/sbin/joutiya-no-interop";
+const NO_INTEROP_SCRIPT = `#!/bin/sh
+for entry in /proc/sys/fs/binfmt_misc/WSLInterop*; do
+  if [ -e "$entry" ]; then echo -1 > "$entry"; fi
+done`;
+const NO_INTEROP_UNIT = `[Unit]
+Description=Joutiya staging: no Windows program started from this distro
+After=systemd-binfmt.service
+
+[Service]
+Type=oneshot
+ExecStart=${NO_INTEROP}
+
+[Install]
+WantedBy=multi-user.target`;
+const INTEROP_CHECK = `if compgen -G '/proc/sys/fs/binfmt_misc/WSLInterop*' > /dev/null; then echo "WSL interop is still registered" >&2; exit 1; fi`;
+
 /** Docker's daemon settings, as on the VM (infra/vm/bootstrap.sh). */
 export const DAEMON_JSON = `{
   "log-driver": "json-file",
@@ -129,6 +151,17 @@ export function setupScript(): string {
     ". /etc/os-release",
     '[[ "$ID" == ubuntu && "$VERSION_ID" == 24.04 ]] || { echo "joutiya-staging runs $PRETTY_NAME, not Ubuntu 24.04" >&2; exit 1; }',
     '[[ "$(ps -p 1 -o comm=)" == systemd ]] || { echo "systemd is not running: set [boot] systemd=true in /etc/wsl.conf, then wsl.exe --terminate joutiya-staging" >&2; exit 1; }',
+    `cat > ${NO_INTEROP} << 'EOF'`,
+    NO_INTEROP_SCRIPT,
+    "EOF",
+    `chmod 0755 ${NO_INTEROP}`,
+    "cat > /etc/systemd/system/joutiya-no-interop.service << 'EOF'",
+    NO_INTEROP_UNIT,
+    "EOF",
+    "systemctl daemon-reload",
+    "systemctl enable --quiet joutiya-no-interop.service",
+    "systemctl start joutiya-no-interop.service",
+    INTEROP_CHECK,
     "export DEBIAN_FRONTEND=noninteractive",
     "APT=(apt-get -o DPkg::Lock::Timeout=600 -o Acquire::Retries=5)",
     '"${APT[@]}" update -q',
@@ -186,6 +219,9 @@ export function deployScript(commit?: string): string {
   return [
     // The image keeps the modes of the build context: files checked out as the CI's are (0644).
     "umask 022",
+    `[[ -x ${NO_INTEROP} ]] || { echo "${NO_INTEROP} is missing: run setup first" >&2; exit 1; }`,
+    NO_INTEROP,
+    INTEROP_CHECK,
     ...OWN_ENGINE,
     `[[ -d ${src}/.git ]] || { echo "no clone in ${src}: run setup first" >&2; exit 1; }`,
     `git -C ${src} fetch --quiet origin main`,

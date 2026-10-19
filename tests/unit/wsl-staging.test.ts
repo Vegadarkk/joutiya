@@ -34,6 +34,14 @@ describe("wsl-staging scripts", () => {
     expect(setupScript()).toContain("groupadd --gid 2002 joutiya-staging");
   });
 
+  it("keep Windows programs out of reach of the distro, at every boot and before each deploy", () => {
+    for (const script of [setupScript(), deployScript()]) {
+      expect(script).toContain("/usr/local/sbin/joutiya-no-interop");
+      expect(script).toContain("compgen -G '/proc/sys/fs/binfmt_misc/WSLInterop*'");
+    }
+    expect(setupScript()).toContain("systemctl enable --quiet joutiya-no-interop.service");
+  });
+
   it("deploy the VM's files from a commit of origin/main, and start only with every secret in place", () => {
     expect(() => deployScript("main; reboot")).toThrow(/commit SHA/);
     const script = deployScript();
