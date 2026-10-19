@@ -81,7 +81,7 @@ jobs:
           echo "::add-mask::$MEILI_INDEX_KEY"
           unset MEILI_MASTER_KEY
           npm run test:search
-          node scripts/bench-search.ts --docs 20000 --requests 300 --concurrency 4
+          node scripts/bench-search.ts --docs 20000 --requests 300 --concurrency 4 --fail-above-ms 300
       - name: VM scripts
         run: shellcheck infra/vm/*.sh
       - name: Compose projects
