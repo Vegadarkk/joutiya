@@ -235,12 +235,22 @@ Dans le dépôt Joutiya sur mon PC, lance `node scripts/vm-env.ts pepper .env.lo
 
 ## Staging provisoire sur le PC2
 
-En attendant la VM (votre accord du 19 octobre), le staging tourne sur votre PC2 dans une distribution WSL2 dédiée, `joutiya-staging` (Ubuntu 24.04), avec Docker Engine et l'organisation exacte de la VM : mêmes fichiers Compose, mêmes chemins, même commande de déploiement, même tunnel `joutiya-staging-tunnel`. Aucun port n'est ouvert sur le PC2 : le site se verra à `staging.joutiya.ma` une fois la zone Cloudflare active. Nav pilote tout avec `node scripts/wsl-staging.ts` (`setup`, `wif`, `deploy`, `status`, `stop`) depuis son clone de main, et une tâche planifiée à votre ouverture de session garde la distribution allumée. La distribution ne voit ni vos disques ni vos programmes Windows. Docker Desktop n'est pas utilisé : s'il démarre, son intégration WSL doit rester désactivée pour `joutiya-staging` (l'outil refuse son moteur).
+En attendant la VM (votre accord du 19 octobre), le staging tourne sur votre PC2 dans une distribution WSL2 dédiée, `joutiya-staging` (Ubuntu 24.04), avec Docker Engine et l'organisation exacte de la VM : mêmes fichiers Compose, mêmes chemins, même commande de déploiement, même tunnel `joutiya-staging-tunnel`. Aucun port n'est ouvert sur le PC2 : le site se verra à `staging.joutiya.ma` une fois la zone Cloudflare active. Nav pilote tout avec `node scripts/wsl-staging.ts` (`setup`, `wif`, `env`, `deploy`, `status`, `stop`) depuis son clone de main, et une tâche planifiée à votre ouverture de session garde la distribution allumée. La distribution ne voit ni vos disques ni vos programmes Windows. Docker Desktop n'est pas utilisé : s'il démarre, son intégration WSL doit rester désactivée pour `joutiya-staging` (l'outil refuse son moteur).
 
-- **Variables** : votre `.env.local` est sur l'autre PC. Elles arrivent chiffrées pour la distribution, dont la clé ne sort jamais, comme prévu à l'étape 16 pour la VM. Tant qu'il en manque, `deploy` construit les images et dit ce qu'attend le démarrage.
+- **Variables** : votre `.env.local` est sur l'autre PC. Cody y scelle celles du staging (prompt Q) pour le certificat de transfert de la distribution, dont la clé ne sort jamais. Claude scelle de la même façon, depuis le cloud, le jeton du tunnel et les deux valeurs Telegram (`node scripts/seal-env.ts`). Un fichier scellé peut passer par le fil : seule la distribution l'ouvre, et un octet changé le rend illisible. Nav les pose avec `node scripts/wsl-staging.ts env --sealed=<fichier>,<fichier> --apply`, qui fusionne `app.env` comme sur la VM et génère sur place `CSRF_SECRET`, les mots de passe Valkey et la clé de Meilisearch. Tant qu'il en manque, `deploy` construit les images et dit ce qu'attend le démarrage. Le certificat de transfert vaut 30 jours (« Échéances »).
 - **Certificats Google** (étape 9) : signés sur le PC2 pour 90 jours ; `wif --apply` les renouvelle.
 - **Passage à la VM** : d'abord `node scripts/wsl-staging.ts stop --apply` (sinon les deux machines se partageraient le trafic du tunnel), puis la procédure de la VM. Firestore et R2 ne bougent pas ; la recherche est réindexée sur la VM.
 - **Retrait** : `wsl --unregister joutiya-staging`, puis supprimer `~/.joutiya/wsl` et la tâche planifiée `joutiya-staging`. Rien en production ne dépend du PC2.
+
+**Q. Variables du staging du PC2** (prompt Cody, sur votre PC principal ; Claude donne dans le fil le certificat et son empreinte)
+
+```text
+Dans le dépôt Joutiya sur mon PC, fais `git pull` sur main, puis prépare les variables du staging du PC2 (docs/phase-1.md, « Staging provisoire sur le PC2 ») :
+1. Lance `node scripts/vm-env.ts pepper .env.local` : il ajoute HASH_PEPPER_STAGING et HASH_PEPPER_PROD s'ils manquent, sans montrer de valeur. S'il en ajoute, dis-moi de copier ces deux lignes dans mon gestionnaire de mots de passe.
+2. Lance `node scripts/seal-env.ts app staging --from=.env.local --to=<certificat> --fingerprint=<empreinte> --out=joutiya-staging.sealed`.
+3. Montre-moi la sortie de l'outil (des noms, jamais une valeur) et le chemin complet de joutiya-staging.sealed, que je joindrai dans le fil de Claude.
+Ce .env.local sert aussi à un autre produit : ne le lis pas toi-même (ni cat, head, tail, sed, ni grep sans -q), ne l'affiche pas et ne le modifie pas autrement que par l'étape 1. Ne me donne aucune valeur.
+```
 
 ## Renouvellements
 

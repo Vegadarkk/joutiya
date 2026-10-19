@@ -19,6 +19,11 @@
 //       then started by infra/vm/deploy-forced-command.sh `load` as on the VM (health checks,
 //       rollback). While a required variable or secret file is missing, the images are built and
 //       the start waits: the output names what is missing.
+//   node scripts/wsl-staging.ts env --sealed=<file>[,<file>...] [--apply]
+//       files made by scripts/seal-env.ts for this distro's transfer certificate, opened in the
+//       distro with its key: their app.env lines are merged as on the VM (vm-env.ts mergeLines, which
+//       also generates CSRF_SECRET, the Valkey passwords and Meilisearch's key once), a tunnel.env
+//       replaces the current one. Prints names only; `deploy --apply` then starts staging.
 //   node scripts/wsl-staging.ts status
 //       release, containers and images (read only).
 //   node scripts/wsl-staging.ts stop [--apply]
@@ -31,7 +36,8 @@ import { fileURLToPath } from "node:url";
 import { validateTargets, type Targets } from "./assert-target.ts";
 import { WIF_SERVICES, caFiles, certificateConfig, credentialConfig, csrFromOutput, readCa, signCsr, subjectName } from "./google-wif.ts";
 import { wifDir, wifInstallScript, wifKeyScript, wifRecreateScript } from "./oracle-vm.ts";
-import { REQUIRED } from "./vm-env.ts";
+import { type Sealed, parseSealed, sealedHeader } from "./seal-env.ts";
+import { REQUIRED, mergeLines } from "./vm-env.ts";
 
 export const DISTRO = "joutiya-staging";
 const ENV = "staging";
@@ -256,6 +262,52 @@ export function statusScript(): string {
   ].join("\n");
 }
 
+/**
+ * Opens the sealed files with the transfer key made by setup, in a root-only directory removed on
+ * exit. Each one must carry inside the label it shows outside; app.env lines must be NAME='value'
+ * (envPayload's form), with one value per name across files; a tunnel.env holds one token.
+ */
+export function envScript(files: Sealed[], etc = "/etc/joutiya"): string {
+  if (files.length === 0) throw new Error("env needs --sealed=<file>[,<file>...]");
+  const dir = `${etc}/${ENV}`;
+  const open = files.flatMap((file, index) => {
+    if (file.env !== ENV) throw new Error(`sealed file ${index + 1} is for ${file.env}: this host runs staging only`);
+    const base = `"$work/${index + 1}`;
+    return [
+      `cat > ${base}.pem" << 'JOUTIYA_SEALED'`,
+      file.pem.trimEnd(),
+      "JOUTIYA_SEALED",
+      `openssl cms -decrypt -binary -inform PEM -in ${base}.pem" -inkey ${dir}/transfer.key -recip ${dir}/transfer.pem -out ${base}.txt" 2> /dev/null || { echo "sealed file ${index + 1}: not sealed for this distro, or changed on the way" >&2; exit 1; }`,
+      `[[ "$(head -n 1 ${base}.txt")" == '${sealedHeader(ENV, file.target)}' ]] || { echo "sealed file ${index + 1}: its label does not match its content" >&2; exit 1; }`,
+      `tail -n +2 ${base}.txt" > ${base}.lines"`,
+      ...(file.target === "app.env"
+        ? [`if grep -qvE "$line" ${base}.lines"; then echo "sealed file ${index + 1}: a line is not NAME='value'" >&2; exit 1; fi`, `cat ${base}.lines" >> "$work/app.env"`]
+        : [
+            `[[ "$(wc -l < ${base}.lines")" -eq 1 ]] && grep -qE '^TUNNEL_TOKEN=[A-Za-z0-9+/=_-]{32,}$' ${base}.lines" || { echo "sealed file ${index + 1}: not a tunnel token" >&2; exit 1; }`,
+            `install -m 0600 ${base}.lines" ${dir}/tunnel.env`,
+            'echo "tunnel.env written"',
+          ]),
+    ];
+  });
+  return [
+    "umask 077",
+    `[[ -s ${dir}/transfer.key ]] || { echo "no transfer key in ${dir}: run setup first" >&2; exit 1; }`,
+    `work="$(mktemp -d ${dir}/.sealed.XXXXXX)"`,
+    `trap 'rm -rf "$work" "\${new:-}"' EXIT`,
+    `line="^[A-Z][A-Z0-9_]*='[^'[:cntrl:]]*'\$"`,
+    ': > "$work/app.env"',
+    ...open,
+    'if [[ -s "$work/app.env" ]]; then',
+    '  LC_ALL=C sort -u -o "$work/app.env" "$work/app.env"',
+    `  twice="$(cut -d= -f1 "$work/app.env" | LC_ALL=C uniq -d | tr '\\n' ' ')"`,
+    '  [[ -z "$twice" ]] || { echo "sealed files disagree on: $twice" >&2; exit 1; }',
+    ...mergeLines(ENV, "$work/app.env", { etc, stage: dir }).map((line) => `  ${line}`),
+    "else",
+    '  echo "app.env unchanged"',
+    "fi",
+  ].join("\n");
+}
+
 export function stopScript(): string {
   return [
     'release="$(cat /var/lib/joutiya/staging.release 2> /dev/null || true)"',
@@ -295,9 +347,9 @@ async function wif(host: Host, targets: Targets): Promise<void> {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const [action, extra] = args.filter((arg) => !arg.startsWith("--"));
-  const actions = ["setup", "wif", "deploy", "status", "stop"];
+  const actions = ["setup", "wif", "deploy", "env", "status", "stop"];
   if (!action || !actions.includes(action) || extra !== undefined) {
-    throw new Error("usage: scripts/wsl-staging.ts <setup|wif|deploy [--commit=<sha>]|status|stop> [--apply]");
+    throw new Error("usage: scripts/wsl-staging.ts <setup|wif|deploy [--commit=<sha>]|env --sealed=<file>[,<file>...]|status|stop> [--apply]");
   }
   const raw: unknown = JSON.parse(readFileSync(new URL("../infra/targets.json", import.meta.url), "utf8"));
   const errors = validateTargets(raw);
@@ -306,7 +358,19 @@ async function main(): Promise<void> {
   if (action === "setup") await host.exec("setup", setupScript());
   else if (action === "wif") await wif(host, raw as Targets);
   else if (action === "deploy") await host.exec("deploy", deployScript(args.find((arg) => arg.startsWith("--commit="))?.slice("--commit=".length)));
-  else if (action === "stop") await host.exec("stop", stopScript());
+  else if (action === "env") {
+    const sealed = args.find((arg) => arg.startsWith("--sealed="))?.slice("--sealed=".length).split(",").filter((file) => file !== "") ?? [];
+    const files = sealed.map((file) => {
+      try {
+        return parseSealed(readFileSync(file, "utf8"));
+      } catch (error) {
+        throw new Error(`${file}: ${(error as Error).message}`);
+      }
+    });
+    const interop = [`[[ -x ${NO_INTEROP} ]] || { echo "${NO_INTEROP} is missing: run setup first" >&2; exit 1; }`, NO_INTEROP, INTEROP_CHECK];
+    await host.exec("env", [...interop, envScript(files)].join("\n"));
+    if (host.apply) console.log("app.env and the secret files are in place: `deploy --apply` starts staging once nothing is missing.");
+  } else if (action === "stop") await host.exec("stop", stopScript());
   else await host.exec("status", statusScript(), true);
   if (action !== "status") console.log(host.apply ? "\nDone." : "\nDry run: nothing changed in the distro. Add --apply to run these scripts.");
 }
