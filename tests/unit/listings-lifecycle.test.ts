@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LISTING_STATUSES, type ListingStatus } from "@/lib/contracts/listings";
 import {
+  DRAFT_PURGE_DAYS,
   IllegalTransitionError,
   RENEW_WINDOW_DAYS,
   TRANSITIONS,
@@ -10,6 +11,7 @@ import {
   approveHold,
   canRenew,
   canTransition,
+  draftPurgeAt,
   expiresAtFor,
   holdKind,
   purgeAtFor,
@@ -32,7 +34,7 @@ function listing(status: ListingStatus, extra: Partial<{ version: number; publis
 describe("transition table", () => {
   it("covers every status with the designed targets", () => {
     expect(Object.keys(TRANSITIONS).sort()).toEqual([...LISTING_STATUSES].sort());
-    expect(TRANSITIONS.draft).toEqual(["pending_review", "published", "removed"]);
+    expect(TRANSITIONS.draft).toEqual(["pending_review", "published", "removed", "purged"]);
     expect(TRANSITIONS.pending_review).toEqual(["published", "paused", "expired", "rejected", "removed"]);
     expect(TRANSITIONS.published).toEqual(["paused", "sold", "expired", "removed", "pending_review"]);
     expect(TRANSITIONS.paused).toEqual(["published", "sold", "expired", "removed", "pending_review"]);
@@ -43,9 +45,14 @@ describe("transition table", () => {
     expect(TRANSITIONS.purged).toEqual([]);
   });
 
-  it("purges every status the retention job purges (expired, sold, removed, rejected), never a live one", () => {
+  it("purges every status the retention job purges (expired, sold, removed, rejected, draft), never a live one", () => {
     const purgeable = LISTING_STATUSES.filter((status) => TRANSITIONS[status].includes("purged"));
-    expect(purgeable.sort()).toEqual(["expired", "rejected", "removed", "sold"]);
+    expect(purgeable.sort()).toEqual(["draft", "expired", "rejected", "removed", "sold"]);
+  });
+
+  it("puts a draft on a 30-day clock that every edit pushes back (A4-04)", () => {
+    expect(DRAFT_PURGE_DAYS).toBe(30);
+    expect(draftPurgeAt(NOW)).toEqual(addDays(NOW, 30));
   });
 
   it("refuses what the table does not list, with the pair in the error", () => {
@@ -97,6 +104,8 @@ describe("publish and hold", () => {
     expect(patch).toMatchObject({ status: "pending_review", sortAt: NOW, sortSource: "publish", version: 4 });
     // Not published yet: a reopened rejected listing drops the date of its earlier publication.
     expect(patch.publishedAt).toBeNull();
+    // Held for review: off the draft clock (the approval or the rejection sets the next purge date).
+    expect(patch.purgeAt).toBeNull();
     expect(effects).toEqual({ search: null, contentOp: { op: "listing.publish", ip: "41.250.1.2" }, audit: "listing.publish", revalidate: false, mail: "listingPendingReview" });
   });
 
@@ -172,12 +181,12 @@ describe("publish and hold", () => {
     expect(approvalOutcome({ publishedAt: addDays(NOW, -5), expiresAt: addDays(NOW, 1), pausedReason: "quota" }, NOW)).toEqual({ status: "paused", kind: "edit" });
   });
 
-  it("rejects with a purge date and the rejection mail; editing again reopens a draft without purge", () => {
+  it("rejects with a purge date and the rejection mail; editing again reopens a draft on the draft clock", () => {
     const rejected = transition(listing("pending_review"), "rejected", ctx);
     expect(rejected.patch).toMatchObject({ status: "rejected", purgeAt: addMonths(NOW, 12) });
     expect(rejected.effects).toMatchObject({ search: "delete", audit: "listing.reject", mail: "listingRejected" });
     const reopened = transition(listing("rejected", { purgeAt: addMonths(NOW, 12) }), "draft", ctx);
-    expect(reopened.patch).toMatchObject({ status: "draft", purgeAt: null });
+    expect(reopened.patch).toMatchObject({ status: "draft", purgeAt: addDays(NOW, 30) });
     expect(reopened.effects).toMatchObject({ search: null, audit: "listing.edit", mail: null });
   });
 });

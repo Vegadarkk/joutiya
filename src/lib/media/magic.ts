@@ -1,8 +1,8 @@
-// Real image type from the first bytes (research/libs-media.md §7): the browser's Content-Type and
-// the extension are never trusted. Shared by the browser (first 256 bytes of the File) and the
-// worker (quarantine object): no Buffer, no server-only import. ISO-BMFF brands are read from the
-// whole ftyp box, major and compatible, because iPhone HEIC files use the major brand `mif1` and
-// AVIF files may too; AVIF is tested first so a `mif1` + `avif` file is not called HEIC.
+// Real image type from the first bytes (phase-3/research/libs-media.md §7): the browser's
+// Content-Type and the extension are never trusted. Shared by the browser (first 256 bytes of the
+// File) and the worker (quarantine object): no Buffer, no server-only import. ISO-BMFF brands are
+// read from the whole ftyp box, major and compatible, because iPhone HEIC files use the major brand
+// `mif1` and AVIF files may too; AVIF is tested first so a `mif1` + `avif` file is not called HEIC.
 
 export type SniffedImageType = "image/jpeg" | "image/png" | "image/webp" | "image/gif" | "image/heic" | "image/avif";
 

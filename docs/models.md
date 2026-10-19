@@ -25,7 +25,7 @@ publiée sans les deux contrôles (nudité et visages).
 Empreintes recalculées sur les fichiers téléchargés le 2026-10-16 (identiques aux valeurs publiées).
 Les deux exports ONNX ont été chargés avec ORT 1.30 ; sur une image unie et un dégradé générés
 par sharp, P(NSFW) < 0,5 et aucun visage (test `tests/unit/media-classify.test.ts`, exécuté
-seulement quand les fichiers sont présents).
+seulement quand les fichiers sont présents, donc à chaque CI : le job `checks` les télécharge).
 
 ## Seuils (`src/config/ai.ts`, surchargeables plus tard par Firestore `config/ai`)
 
@@ -54,8 +54,10 @@ chargement des sessions 20–230 ms, +26 à 101 MB de RSS par session.
 2. Changer de modèle = nouvelle entrée dans `models/MANIFEST.json` (URL épinglée sur un commit,
    sha256 recalculé localement avec `sha256sum`), mise à jour de `MODEL_FILES` dans `classify.ts`,
    de ce document et du test de cohérence (`media-classify.test.ts`).
-3. La CI (job `image`) ouvre une session ORT sur le modèle de visages dans l'image `worker` : les
-   binaires arm64 et la présence des fichiers sont ainsi prouvés à chaque PR qui touche l'image.
+3. La CI (job `checks`) télécharge les modèles avant les tests unitaires (cache par empreinte de
+   `models/MANIFEST.json`) : le test sur les vrais modèles tourne à chaque PR. Le job `image` ouvre
+   une session ORT sur le modèle de visages dans l'image `worker` : les binaires arm64 et la
+   présence des fichiers sont ainsi prouvés à chaque PR qui touche l'image.
 
 ## Points ouverts
 
@@ -65,4 +67,5 @@ chargement des sessions 20–230 ms, +26 à 101 MB de RSS par session.
 - Les deux fichiers sont des conversions tierces (ICIJ, OpenCV Zoo). Alternative : ré-exporter les
   poids Marqo une fois et héberger le fichier sur R2.
 - Aucune mesure sur Oracle A1 (arm64) : vérifier la latence et la mémoire du worker en staging
-  (limite 384 Mo) avant d'augmenter la concurrence.
+  (limite 1024 Mo dont 512 Mo de tas V8, `docker/compose.staging.yml` et `compose.prod.yml`) avant
+  d'augmenter la concurrence.

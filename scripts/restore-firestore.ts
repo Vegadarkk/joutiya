@@ -2,7 +2,8 @@
 // emulator, from the owner's machine: the age identity (private key) never leaves it.
 //
 //   node scripts/restore-firestore.ts --identity <age key file> --from <dir> --project <id> \
-//     [--collections users,listings] [--until YYYY-MM-DD] [--apply] [--allow-production]
+//     [--collections users,listings] [--until YYYY-MM-DD] [--apply] [--allow-production] \
+//     [--allow-unverified] [--allow-over-quota]
 //   node --env-file=.env.local scripts/restore-firestore.ts --identity <file> --from-bucket --project <id> ...
 //
 // <dir> is a download of the private bucket's `backups/` prefix (the files stay encrypted);
@@ -11,6 +12,9 @@
 // part is decrypted in memory, checked against its manifest and decoded, and the plan is printed
 // (counts only, never document contents, never the identity). With --apply the newest version of
 // each document is written with set() in batches of 500.
+// Refusals: parts of a date without manifest (a run that did not finish) unless --allow-unverified;
+// more than Spark's 20 000 daily writes into a real project unless --allow-over-quota (a project on
+// Blaze, where they are billed): split with --collections over several days (docs/backups.md).
 // Target: with FIRESTORE_EMULATOR_HOST set, the emulator (any project id); otherwise a project
 // recorded in infra/targets.json, the production one only with --allow-production. Credentials:
 // Application Default Credentials (`gcloud auth application-default login`).
@@ -24,10 +28,10 @@ import { applyRestore, checkRestore, directorySource, planRestore, type BackupSo
 import { APP_ENVS, validateTargets, type Targets } from "./assert-target.ts";
 
 const USAGE =
-  "usage: scripts/restore-firestore.ts --identity <age key file> (--from <dir> | --from-bucket) --project <id> [--collections a,b] [--until YYYY-MM-DD] [--apply] [--allow-production]";
+  "usage: scripts/restore-firestore.ts --identity <age key file> (--from <dir> | --from-bucket) --project <id> [--collections a,b] [--until YYYY-MM-DD] [--apply] [--allow-production] [--allow-unverified] [--allow-over-quota]";
 const PROJECT_ID = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
-/** Spark: 20 000 document writes a day. */
-const SPARK_DAILY_WRITES = 20_000;
+/** Spark: 20 000 document writes a day, the app's own included; past it every write fails until the Pacific midnight. */
+export const SPARK_DAILY_WRITES = 20_000;
 
 export interface RestoreArgs {
   identity: string;
@@ -38,6 +42,8 @@ export interface RestoreArgs {
   until: string | null;
   apply: boolean;
   allowProduction: boolean;
+  allowUnverified: boolean;
+  allowOverQuota: boolean;
 }
 
 export function parseCli(argv: readonly string[]): RestoreArgs {
@@ -52,6 +58,8 @@ export function parseCli(argv: readonly string[]): RestoreArgs {
       until: { type: "string" },
       apply: { type: "boolean", default: false },
       "allow-production": { type: "boolean", default: false },
+      "allow-unverified": { type: "boolean", default: false },
+      "allow-over-quota": { type: "boolean", default: false },
     },
     strict: true,
   });
@@ -69,7 +77,18 @@ export function parseCli(argv: readonly string[]): RestoreArgs {
   if (collections?.some((id) => !/^[A-Za-z][A-Za-z0-9_]*$/.test(id))) throw new Error(`--collections: comma-separated collection ids expected\n${USAGE}`);
   const until = values.until?.trim() || null;
   if (until !== null && !/^\d{4}-\d{2}-\d{2}$/.test(until)) throw new Error(`--until: a date (YYYY-MM-DD) expected\n${USAGE}`);
-  return { identity, from, fromBucket, project, collections: collections?.length ? collections : null, until, apply: values.apply === true, allowProduction: values["allow-production"] === true };
+  return {
+    identity,
+    from,
+    fromBucket,
+    project,
+    collections: collections?.length ? collections : null,
+    until,
+    apply: values.apply === true,
+    allowProduction: values["allow-production"] === true,
+    allowUnverified: values["allow-unverified"] === true,
+    allowOverQuota: values["allow-over-quota"] === true,
+  };
 }
 
 /**
@@ -84,6 +103,20 @@ export function projectProblem(targets: Targets, projectId: string, options: { e
   if (!env) return `--project ${projectId} is not recorded in infra/targets.json (environments.<env>.firebase.projectId): record it first`;
   if (env === "prod" && !options.allowProduction) return `--project ${projectId} is the production project: check the dry run, then add --allow-production to write into it`;
   return null;
+}
+
+/**
+ * Why `documents` writes must not go into the target; null when they may. Spark refuses every
+ * write past 20 000 a day: a restore cut half-way leaves a mix of restored and live documents, and
+ * the app's own writes fail with it. The emulator has no quota; --allow-over-quota is for a project
+ * on Blaze (writes past the free tier billed).
+ */
+export function writesProblem(documents: number, options: { emulated: boolean; allowOverQuota: boolean }): string | null {
+  if (options.emulated || options.allowOverQuota || documents <= SPARK_DAILY_WRITES) return null;
+  return (
+    `${documents} documents exceed Spark's ${SPARK_DAILY_WRITES} writes a day (the app's included): restore with --collections ` +
+    `over several days, one batch of collections under that number a day, or, on a project switched to Blaze, add --allow-over-quota`
+  );
 }
 
 /** Why the R2 variables cannot be used for --from-bucket (names only, never values); empty when they can. */
@@ -135,7 +168,7 @@ async function main(): Promise<void> {
   console.log(`Identity for ${recipient}`);
   console.log(`Source ${source.label}; target ${args.project} (${emulated ? "Firestore emulator" : "Application Default Credentials"})`);
 
-  const plan = await planRestore(source, identity, { collections: args.collections, until: args.until });
+  const plan = await planRestore(source, identity, { collections: args.collections, until: args.until, allowUnverified: args.allowUnverified });
   for (const warning of plan.warnings) console.warn(`Warning: ${warning}`);
   if (plan.parts.length === 0) throw new Error(`no backup part to restore in ${source.label}`);
   console.log(`${plan.parts.length} part(s) from ${plan.dates[0]} to ${plan.dates[plan.dates.length - 1]}; manifests checked for ${plan.verifiedDates.length} of ${plan.dates.length} date(s)`);
@@ -143,13 +176,13 @@ async function main(): Promise<void> {
   const check = await checkRestore(source, plan, identity);
   console.log(`${check.lines} lines decrypted and decoded; ${check.documents} documents to write:`);
   for (const [collection, count] of Object.entries(check.byCollection).sort()) console.log(`  ${collection}: ${count}`);
+  const writes = writesProblem(check.documents, { emulated, allowOverQuota: args.allowOverQuota });
   if (!args.apply) {
+    if (writes) console.warn(`Warning: --apply will refuse: ${writes}.`);
     console.log(`\nDry run: nothing written. Add --apply to write these ${check.documents} documents into ${args.project}.`);
     return;
   }
-  if (!emulated && check.documents > SPARK_DAILY_WRITES) {
-    console.warn(`Warning: ${check.documents} writes exceed the Spark daily quota (${SPARK_DAILY_WRITES}): restore in several days with --collections.`);
-  }
+  if (writes) throw new Error(writes);
 
   const { applicationDefault, initializeApp } = await import("firebase-admin/app");
   const { getFirestore } = await import("firebase-admin/firestore");

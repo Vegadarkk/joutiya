@@ -50,7 +50,7 @@ describe("MemoryObjectStore", () => {
 });
 
 describe("MeteredObjectStore", () => {
-  it("counts Class A operations for mutations and Class B for reads", async () => {
+  it("counts Class A operations for writes and Class B for reads; deletes are free", async () => {
     const inner = new MemoryObjectStore();
     const store = new MeteredObjectStore(inner);
     expect(store.name).toBe("memory");
@@ -59,7 +59,7 @@ describe("MeteredObjectStore", () => {
     await store.head("media", "k");
     await store.get("media", "k");
     await store.delete("media", "k");
-    expect(quota.consume.mock.calls.map(([id]) => id)).toEqual(["r2.classA", "r2.classA", "r2.classB", "r2.classB", "r2.classA"]);
+    expect(quota.consume.mock.calls.map(([id]) => id)).toEqual(["r2.classA", "r2.classA", "r2.classB", "r2.classB"]);
     expect(inner.calls.map((call) => call.op)).toEqual(["presignPut", "put", "head", "get", "delete"]);
   });
 });

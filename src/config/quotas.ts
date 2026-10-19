@@ -62,7 +62,10 @@ export const QUOTAS = {
     service: "Firestore (Spark)",
     limit: 1 * GB,
     unit: "bytes",
-    period: "day",
+    // A floor estimated by the nightly backup from its last complete rolling full
+    // (src/lib/backup/export.ts). A gauge never resets: the period only scopes the stored value and
+    // the alert markers, so the warning comes once a month, not every night.
+    period: "month",
     resetTimeZone: "UTC",
     kind: "gauge",
     alertAt: 0.7,

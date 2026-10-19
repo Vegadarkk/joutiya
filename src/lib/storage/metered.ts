@@ -2,10 +2,11 @@ import "server-only";
 import { consume } from "@/lib/quota";
 import type { BucketRole, GetOptions, ObjectHead, ObjectStore, PresignedPut, PresignPutInput, PutOptions } from "./types";
 
-// R2 free tier accounting (§2 quota guards): every mutation is a Class A operation, every read a
-// Class B one. The wrapper counts for whichever adapter is active, so the dev store exercises the
-// same counters as R2. A presigned PUT is counted when signed: the browser's request is not
-// observable from here, and an unused URL over-counts by one at most.
+// R2 free tier accounting (§2 quota guards): every write (PUT, presigned PUT) is a Class A
+// operation, every read (GET, HEAD) a Class B one; a DELETE is free (Cloudflare R2 pricing) and not
+// counted. The wrapper counts for whichever adapter is active, so the dev store exercises the same
+// counters as R2. A presigned PUT is counted when signed: the browser's request is not observable
+// from here, and an unused URL over-counts by one at most.
 
 export class MeteredObjectStore implements ObjectStore {
   readonly name: string;
@@ -39,6 +40,5 @@ export class MeteredObjectStore implements ObjectStore {
 
   async delete(bucket: BucketRole, key: string): Promise<void> {
     await this.inner.delete(bucket, key);
-    await consume("r2.classA");
   }
 }

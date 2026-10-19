@@ -3,7 +3,7 @@ import { Decrypter, Encrypter, generateIdentity, identityToRecipient } from "age
 // age encryption of the backup objects (D17): the public key (recipient) lives on the VM as
 // BACKUP_AGE_RECIPIENT, the identity (secret key) stays offline with the owner. Only X25519
 // recipients are accepted: 62 chars, short enough for an env var and readable by every age
-// version (research/libs-map-backup.md B1). Pure module (no server-only, no "@/" alias): the
+// version (phase-3/research/libs-map-backup.md B1). Pure module (no server-only, no "@/" alias): the
 // restore script runs it under plain Node.
 
 /** X25519 recipient: "age1" + 58 bech32 chars (MEASURED on a real key). */

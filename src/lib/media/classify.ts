@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import type * as Ort from "onnxruntime-node";
 import { DEFAULT_AI, type AiConfig } from "@/config/ai";
-import { alert } from "@/lib/alert";
+import { alert, type Alert } from "@/lib/alert";
 import type { ServerEnv } from "@/lib/env";
 import { logger } from "@/lib/logging/logger";
 import { openImage } from "./sharp-setup";
@@ -244,6 +244,29 @@ export class ClassifierUnavailableError extends Error {
 /** Title of the alert raised while deployed photo checks cannot run (alert() sends it at most once an hour). */
 export const MODELS_MISSING_ALERT_TITLE = "Contrôle des photos indisponible : modèles ONNX absents";
 
+function modelsMissingAlert(dir: string, appEnv: string): Alert {
+  return {
+    severity: "P1",
+    title: MODELS_MISSING_ALERT_TITLE,
+    body: `Les fichiers ${MODEL_FILES.nsfw} et ${MODEL_FILES.face} sont introuvables dans ${dir} (${appEnv}) : aucune photo ne passe à l'état prêt, les envois finissent refusés après les nouvelles tentatives. Lancer node scripts/fetch-models.ts --check dans l'image du worker, puis redéployer.`,
+  };
+}
+
+/**
+ * Worker start outside dev: missing model files are reported at boot (error log, and the P1 alert a
+ * refused photo raises: same title, so the hour's dedupe joins them) instead of at the first upload.
+ * Not fatal: mail, search and system jobs still run, and the classifier keeps failing closed. False
+ * when the files are missing.
+ */
+export async function checkModelsAtStartup(env: Pick<ServerEnv, "APP_ENV" | "MEDIA_MODELS_DIR">): Promise<boolean> {
+  if (env.APP_ENV === "dev") return true;
+  const dir = modelsDir(env);
+  if (modelsPresent(dir)) return true;
+  logger.error({ modelsDir: dir }, "ONNX models missing at worker start: photo checks fail closed");
+  await alert(modelsMissingAlert(dir, env.APP_ENV));
+  return false;
+}
+
 /** Deployed without the model files: refuses every photo instead of letting it through unchecked. */
 export class UnavailableImageClassifier implements ImageClassifier {
   readonly name = "unavailable";
@@ -255,11 +278,7 @@ export class UnavailableImageClassifier implements ImageClassifier {
 
   async classify(): Promise<ImageClassification> {
     logger.error({ modelsDir: this.modelsDir }, "ONNX models missing: photo refused for processing (fail closed)");
-    await alert({
-      severity: "P1",
-      title: MODELS_MISSING_ALERT_TITLE,
-      body: `Les fichiers ${MODEL_FILES.nsfw} et ${MODEL_FILES.face} sont introuvables dans ${this.modelsDir} (${this.appEnv}) : aucune photo ne passe à l'état prêt, les envois finissent refusés après les nouvelles tentatives. Lancer node scripts/fetch-models.ts --check dans l'image du worker, puis redéployer.`,
-    });
+    await alert(modelsMissingAlert(this.modelsDir, this.appEnv));
     throw new ClassifierUnavailableError();
   }
 }

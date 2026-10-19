@@ -271,13 +271,20 @@ describe("cursors across nights", () => {
     expect(vi.mocked(alert).mock.calls.map(([event]) => event.title)).toEqual(["Sauvegarde Firestore : rotation complète trop lente"]);
     expect(results[3]?.cursors?.full.cycleStartedAt).toEqual(night(0));
     expect(results[3]?.cursors?.full.cycleCompletedAt).toEqual(night(3));
-    const { check } = await restore(store, database());
+    const { plan, check } = await restore(store, database());
     expect(check.documents).toBe(10);
     expect(check.lines).toBe(10);
-    // The next night starts a new cycle.
+    // The cycle's NDJSON, summed over its four nights, is the Firestore storage estimate (x2).
+    const cycleBytes = plan.parts.reduce((sum, part) => sum + (part.expected?.plainBytes ?? 0), 0);
+    expect(cycleBytes).toBeGreaterThan(0);
+    expect(results.map((result) => result.firestoreStorageBytes)).toEqual([null, null, null, 2 * cycleBytes]);
+    expect(results[3]?.cursors?.full).toMatchObject({ cycleBytes, lastCycleBytes: cycleBytes });
+    // The next night starts a new cycle; the estimate stays the last complete one.
     const fifth = await runBackup({ db, store, recipient, now: night(4), config });
     expect(fifth.counts.full).toEqual({ auditLogs: 3 });
     expect(fifth.cursors?.full.cycleStartedAt).toEqual(night(4));
+    expect(fifth.cursors?.full.cycleBytes).toBeLessThan(cycleBytes);
+    expect(fifth.firestoreStorageBytes).toBe(2 * cycleBytes);
   });
 
   it("leaves the cursors untouched when an upload fails, and the retry completes the backup", async () => {

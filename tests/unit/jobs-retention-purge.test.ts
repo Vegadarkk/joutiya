@@ -117,9 +117,9 @@ beforeEach(() => {
 });
 
 describe("isPurgeable", () => {
-  it("only ended listings, past purgeAt, without a legal hold", () => {
-    for (const status of ["expired", "sold", "removed", "rejected"] as const) expect(isPurgeable(listing("x", { status }), NOW)).toBe(true);
-    for (const status of ["published", "paused", "pending_review", "draft", "purged"] as const) expect(isPurgeable(listing("x", { status }), NOW)).toBe(false);
+  it("only ended listings and stale drafts, past purgeAt, without a legal hold", () => {
+    for (const status of ["expired", "sold", "removed", "rejected", "draft"] as const) expect(isPurgeable(listing("x", { status }), NOW)).toBe(true);
+    for (const status of ["published", "paused", "pending_review", "purged"] as const) expect(isPurgeable(listing("x", { status }), NOW)).toBe(false);
     expect(isPurgeable(listing("x", { legalHold: ["report:r1"] }), NOW)).toBe(false);
     expect(isPurgeable(listing("x", { purgeAt: new Date(NOW.getTime() + 1) }), NOW)).toBe(false);
     expect(isPurgeable(listing("x", { purgeAt: undefined }), NOW)).toBe(false);
@@ -345,9 +345,23 @@ describe("retention-purge: journals and budget", () => {
     vi.mocked(retention.listListingsPastPurge).mockRejectedValueOnce(new Error("FAILED_PRECONDITION"));
     vi.mocked(retention.deleteJournalPastPurge).mockResolvedValue(1);
     expect(await retentionPurge(NOW, { store })).toMatchObject({ failed: 1, contentOps: 1, revealLogs: 1 });
+    // The job completes: the step alerts, since the worker's failed handler never sees it.
+    expect(alert).toHaveBeenCalledExactlyOnceWith({ severity: "P2", title: "Tâche système en échec : retention-purge", body: expect.stringContaining("listings (FAILED_PRECONDITION)") });
     configured.value = false;
     vi.mocked(retention.deleteJournalPastPurge).mockClear();
     expect(await retentionPurge(NOW, { store })).toMatchObject({ contentOps: 0, failed: 0 });
     expect(retention.deleteJournalPastPurge).not.toHaveBeenCalled();
+  });
+
+  it("alerts once per run however many steps fail, never for a clean run", async () => {
+    vi.mocked(retention.deleteJournalPastPurge).mockResolvedValue(1);
+    expect(await retentionPurge(NOW, { store })).toMatchObject({ failed: 0 });
+    expect(alert).not.toHaveBeenCalled();
+
+    vi.mocked(retention.listListingsPastPurge).mockRejectedValueOnce(new Error("FAILED_PRECONDITION"));
+    vi.mocked(retention.deleteJournalPastPurge).mockRejectedValueOnce(new Error("PERMISSION_DENIED")).mockResolvedValue(1);
+    expect(await retentionPurge(NOW, { store })).toMatchObject({ failed: 2, contentOps: 0, revealLogs: 1 });
+    expect(alert).toHaveBeenCalledOnce();
+    expect(vi.mocked(alert).mock.calls[0]?.[0].body).toContain("listings (FAILED_PRECONDITION) ; contentOps (PERMISSION_DENIED)");
   });
 });

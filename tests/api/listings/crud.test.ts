@@ -18,7 +18,7 @@ import { resetServerEnv } from "@/lib/env";
 import { LISTING_ID_PATTERN } from "@/lib/listings/ids";
 import { logger } from "@/lib/logging/logger";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
-import { api, attachPhoto, member, readyPatch, seedReadyUpload, type ErrorBody, type ListingBody, type Member } from "./helpers";
+import { api, attachPhoto, DAY_MS, member, readyPatch, seedReadyUpload, type ErrorBody, type ListingBody, type Member } from "./helpers";
 
 beforeAll(() => resetServerEnv());
 beforeEach(() => resetRateLimiters());
@@ -46,6 +46,20 @@ describe("POST /api/listings", () => {
     expect((await api<OwnerListingsResponse>(mine, "GET", "/api/listings/mine?status=active", { member: owner })).body.listings).toEqual([]);
     // The creation is recorded with the clear IP (LCEN).
     expect(await listContentOps(listingContentRef(id))).toEqual([expect.objectContaining({ uid: owner.uid, op: "listing.create", ip: owner.jar.ip })]);
+  });
+
+  it("puts the draft on a 30-day clock that each save restarts (A4-04)", async () => {
+    const owner = await member();
+    const before = Date.now();
+    const id = await draft(owner);
+    const created = (await getListing(id))!.purgeAt!.getTime();
+    expect(created).toBeGreaterThanOrEqual(before + 30 * DAY_MS);
+    expect(created).toBeLessThanOrEqual(Date.now() + 30 * DAY_MS);
+    // An old clock (as if left untouched for 20 days) is pushed back by the next save.
+    await updateListing(id, { purgeAt: new Date(before + 10 * DAY_MS) });
+    const beforeSave = Date.now();
+    expect((await api<ListingBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { title: "Vélo de ville" } })).status).toBe(200);
+    expect((await getListing(id))!.purgeAt!.getTime()).toBeGreaterThanOrEqual(beforeSave + 30 * DAY_MS);
   });
 
   it("refuses a sixth draft (draft_limit) and an unknown or inconsistent tree", async () => {
@@ -285,7 +299,8 @@ describe("rejected listings reopened as drafts", () => {
     const reopened = await api<ListingBody>(patch, "PATCH", `/api/listings/${rejected}`, { member: owner, body: { title: "Vélo de ville corrigé" } });
     expect(reopened.status).toBe(200);
     expect(reopened.body.listing).toMatchObject({ status: "draft", title: "Vélo de ville corrigé" });
-    expect((await getListing(rejected))?.purgeAt).toBeUndefined();
+    // Back on the draft clock: 30 days from this edit, not the rejection's 12 months.
+    expect((await getListing(rejected))!.purgeAt!.getTime()).toBeLessThanOrEqual(Date.now() + 30 * DAY_MS);
   });
 
   it("reopens it on an empty save too (the wizard's reopen); the draft then writes nothing on one", async () => {

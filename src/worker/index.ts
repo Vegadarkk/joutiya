@@ -14,7 +14,7 @@ import { flushObservability, initServerObservability } from "@/lib/observability
 import { deliverMail, MailDeferredError } from "@/lib/mail/deliver";
 import { isTemplateMail } from "@/lib/mail/render";
 import { closeMailQueue, MAIL_QUEUE } from "@/lib/mail/send";
-import { resetImageClassifier } from "@/lib/media/classify";
+import { checkModelsAtStartup, resetImageClassifier } from "@/lib/media/classify";
 import { closeMediaQueue, MEDIA_CONCURRENCY, MEDIA_QUEUE } from "@/lib/media/queue";
 import { isFirebaseConfigured } from "@/lib/firebase/admin";
 import { SearchUnavailableError } from "@/lib/search/types";
@@ -24,6 +24,7 @@ import { clientOptions } from "@/lib/valkey/clients";
 import { JOBS, SYSTEM_QUEUE, SCHEDULES } from "./jobs";
 import { onMediaJobFailed, processMediaJob } from "./jobs/media";
 import { ensureEngineReady, holdFailedListing, OUTBOX_POLL_EVERY_MS, OUTBOX_POLL_SCHEDULER, processSearchJob, watchSearchOutbox } from "./jobs/search";
+import { onSystemJobFailed, syncSchedulers } from "./system-queue";
 
 /** Touched after each successful heartbeat; the container healthcheck reads its age. */
 const HEARTBEAT_FILE = "/tmp/joutiya-worker-heartbeat";
@@ -36,13 +37,13 @@ async function main(): Promise<void> {
     logger.fatal("QUEUE_REDIS_URL is not set: the worker has nothing to process");
     process.exit(1);
   }
+  // Missing ONNX models alert now rather than at the first photo (the classifier still fails closed).
+  await checkModelsAtStartup(env);
   // BullMQ requires maxRetriesPerRequest: null on worker connections.
   const connection = new Redis(env.QUEUE_REDIS_URL, clientOptions("queue", { lazyConnect: false, maxRetriesPerRequest: null }));
   const queue = new Queue(SYSTEM_QUEUE, { connection });
 
-  for (const [id, schedule] of Object.entries(SCHEDULES)) {
-    await queue.upsertJobScheduler(id, { pattern: schedule.pattern, tz: "UTC" }, { name: schedule.job, opts: { removeOnComplete: 100, removeOnFail: 500 } });
-  }
+  await syncSchedulers(queue, SCHEDULES);
 
   const systemWorker = new Worker(
     SYSTEM_QUEUE,
@@ -53,10 +54,7 @@ async function main(): Promise<void> {
     },
     { connection, concurrency: 1 },
   );
-  systemWorker.on("failed", (job, error) => {
-    logger.error({ queue: SYSTEM_QUEUE, job: job?.name, err: error.message }, "job failed");
-    captureServerException(error, { queue: SYSTEM_QUEUE, job: job?.name });
-  });
+  systemWorker.on("failed", (job, error) => void onSystemJobFailed(job, error, SYSTEM_QUEUE));
 
   const mailWorker = new Worker(
     MAIL_QUEUE,

@@ -2021,6 +2021,7 @@
     "pausedQuota": "En pause : le nombre d'annonces actives de votre compte est atteint.",
     "loading": "Chargement de vos annonces…",
     "draftsLimit": "{count, plural, one {# brouillon} other {# brouillons}} sur {max} possibles",
+    "draftsRetention": "Un brouillon non modifié pendant 30 jours est supprimé avec ses photos.",
     "errors": {
       "renewBlocked": "Votre annonce doit être corrigée avant d'être renouvelée : corrigez les points signalés et enregistrez, puis renouvelez-la depuis « Mes annonces ».",
       "listingLimit": "Vous avez atteint le nombre maximal d'annonces actives. Mettez en pause ou supprimez une autre annonce pour remettre celle-ci en ligne."

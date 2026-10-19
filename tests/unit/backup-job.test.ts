@@ -1,8 +1,8 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // backup-firestore (03:30 UTC, D17): the runs that must write nothing (no or bad recipient, read
-// quota degraded, already done today, no storage) and the failure alert. Full runs are in
-// tests/api/backup/restore.test.ts (emulator).
+// quota degraded, already done today, no storage), the failure alert and the Firestore storage
+// gauge. Full runs are in tests/api/backup/restore.test.ts (emulator).
 
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => true) }));
@@ -12,6 +12,7 @@ vi.mock("@/lib/valkey/clients", () => ({ isValkeyConfigured: () => valkeyState.c
 vi.mock("@/lib/quota", () => ({
   consume: vi.fn(async () => ({ id: "firestore.reads", period: "p", used: 0, limit: 50_000, ratio: 0, level: "unknown" })),
   isDegraded: vi.fn(async () => false),
+  setGauge: vi.fn(async () => null),
 }));
 const firebase = { configured: true, db: vi.fn() };
 vi.mock("@/lib/firebase/admin", () => ({ isFirestoreConfigured: () => firebase.configured, isFirebaseConfigured: () => firebase.configured, db: () => firebase.db() }));
@@ -26,7 +27,7 @@ vi.mock("@/lib/storage", () => ({
 }));
 
 const { alert } = await import("@/lib/alert");
-const { isDegraded } = await import("@/lib/quota");
+const { isDegraded, setGauge } = await import("@/lib/quota");
 const { generateIdentity, identityToRecipient } = await import("@/lib/backup/crypto");
 const { manifestKey } = await import("@/lib/backup/parts");
 const { resetBackupAlertMemory, runBackup } = await import("@/lib/backup/export");
@@ -47,6 +48,15 @@ function cursorDb(data: Record<string, unknown> | undefined) {
   return { db: { collection: () => ({ doc: () => doc }) } as never, doc };
 }
 
+type FakeQuery = { [method: string]: (...args: unknown[]) => unknown };
+
+/** A Firestore whose collections are all empty, with system/backup holding `data`. */
+function emptyDb(data: Record<string, unknown>) {
+  const cursor = cursorDb(data);
+  const query: FakeQuery = { where: () => query, orderBy: () => query, limit: () => query, startAfter: () => query, get: async () => ({ size: 0, docs: [] }) };
+  return { db: { collection: (id: string) => (id === "system" ? { doc: () => cursor.doc } : query), collectionGroup: () => query } as never, doc: cursor.doc };
+}
+
 beforeAll(async () => {
   recipient = await identityToRecipient(await generateIdentity());
 });
@@ -55,6 +65,7 @@ beforeEach(() => {
   resetBackupAlertMemory();
   vi.mocked(alert).mockClear();
   vi.mocked(isDegraded).mockResolvedValue(false);
+  vi.mocked(setGauge).mockClear();
   valkeyState.configured = false;
   set.mockReset();
   set.mockResolvedValue("OK");
@@ -147,6 +158,23 @@ describe("backup-firestore job", () => {
     const done = cursorDb({ lastDate: "2026-10-16" });
     firebase.db.mockReturnValue(done.db);
     expect(await backupFirestore(NOW)).toMatchObject({ status: "skipped", reason: "already_done" });
+  });
+
+  it("sets the Firestore storage gauge from the last complete rolling full, twice its NDJSON", async () => {
+    // The cycle in progress had exported 6 000 bytes; tonight's collections are empty: it completes.
+    const continued = emptyDb({ full: { next: "staff", after: {}, cycleStartedAt: new Date("2026-10-14T03:30:00Z"), cycleBytes: 6_000, lastCycleBytes: 5_000 } });
+    const result = await backupFirestore(NOW, { db: continued.db, store: new MemoryObjectStore(), recipient });
+    expect(result).toMatchObject({ status: "done", firestoreStorageBytes: 12_000 });
+    expect(result?.cursors?.full).toMatchObject({ next: null, cycleBytes: 6_000, lastCycleBytes: 6_000 });
+    expect(setGauge).toHaveBeenCalledExactlyOnceWith("firestore.storage", 12_000, NOW);
+    expect(continued.doc.set).toHaveBeenCalledWith(expect.objectContaining({ full: expect.objectContaining({ lastCycleBytes: 6_000 }) }));
+  });
+
+  it("leaves the gauge alone until a cycle was summed from its start", async () => {
+    // A cycle begun before the byte sum existed: its total is unknown, no estimate.
+    const legacy = emptyDb({ full: { next: "staff", after: {}, cycleStartedAt: new Date("2026-10-14T03:30:00Z") } });
+    expect(await backupFirestore(NOW, { db: legacy.db, store: new MemoryObjectStore(), recipient })).toMatchObject({ status: "done", firestoreStorageBytes: null });
+    expect(setGauge).not.toHaveBeenCalled();
   });
 
   it("alerts on a failure and rethrows it (one attempt, the cursors stay)", async () => {

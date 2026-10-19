@@ -11,8 +11,9 @@ import { firstDegraded, nextReset } from "./index";
 
 /**
  * Listing deposit: create, edit, publish, renew and resume, photo uploads ("Dépôt d'annonces
- * suspendu"). Not firestore.storage: nothing measures it on Spark, and it does not reset at night
- * (a full store would need its own code and message, like storage_full for R2).
+ * suspendu"). Not firestore.storage: the nightly backup only estimates it (a floor, refreshed when a
+ * rolling full cycle completes, src/lib/backup/export.ts), so it alerts but gates nothing; it does
+ * not reset at night either (a full store would need its own code and message, like storage_full).
  */
 export const DEPOSIT_QUOTAS = ["firestore.writes"] as const satisfies readonly QuotaId[];
 
