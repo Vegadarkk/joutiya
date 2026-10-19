@@ -44,6 +44,10 @@ const SHARED_SHAPE = {
     // compartment's instances) and policy `joutiya-run-command-policy`.
     vmDynamicGroupId: /^ocid1\.dynamicgroup\.oc1\.\.[a-z0-9]{20,}$/,
     runCommandPolicyId: /^ocid1\.policy\.oc1\.\.[a-z0-9]{20,}$/,
+    // Free launcher Worker (workers/vm-launcher): IAM user `joutiya-launcher` (API keys only) and its
+    // group, which `joutiya-launcher-policy` limits to listing and creating instances in `joutiya`.
+    launcherUserId: /^ocid1\.user\.oc1\.\.[a-z0-9]{20,}$/,
+    launcherGroupId: /^ocid1\.group\.oc1\.\.[a-z0-9]{20,}$/,
   },
   anthropic: { organizationId: UUID },
   // The repository whose deploy-staging.yml on main alone may deploy staging's Firestore rules
