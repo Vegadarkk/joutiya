@@ -1,6 +1,6 @@
 import "server-only";
 import { Timestamp } from "firebase-admin/firestore";
-import { DECISION_TARGET_TYPES, RESTRICTIVE_ACTIONS, decisionTemplate, fillTemplateText, type DecisionAction, type DecisionTargetType } from "@/config/decision-templates";
+import { DECISION_TARGET_TYPES, RESTRICTIVE_ACTIONS, decisionTemplate, type DecisionAction, type DecisionTargetType } from "@/config/decision-templates";
 import { audit } from "@/lib/audit";
 import { getListing } from "@/lib/db/repositories/listings";
 import { HttpError, notFound } from "@/lib/http/errors";
@@ -9,6 +9,7 @@ import type { ResendNoticeResponse } from "./contracts";
 import type { DecisionActor } from "./decide";
 import { sendDecisionNotice, type NoticeInput } from "./notify";
 import { decisionRef, getDecision, getSuspension, type DecisionRecord } from "./repository";
+import { detailsOf } from "./views";
 
 // The statement of reasons sent again (audit D1a-08). decide() records `notifiedAt` when it
 // enqueues the statement: the mail queue retries transient failures and the statement has the
@@ -19,14 +20,6 @@ import { decisionRef, getDecision, getSuspension, type DecisionRecord } from "./
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** The moderator's own words, quoted after the template facts in `facts` (null when the template text moved since). */
-export function detailsOf(record: Pick<DecisionRecord, "templateId" | "facts" | "durationDays">): string | null {
-  const template = decisionTemplate(record.templateId);
-  if (!template) return null;
-  const facts = fillTemplateText(template.facts.fr, { ...(record.durationDays ? { days: record.durationDays } : {}) });
-  if (record.facts === facts) return null;
-  return record.facts.startsWith(`${facts}\n\n`) ? record.facts.slice(facts.length + 2) : null;
-}
 
 /** End of the suspension the decision imposed: the running one it opened, else createdAt + its length. */
 async function suspensionEnd(record: DecisionRecord): Promise<Date | null> {

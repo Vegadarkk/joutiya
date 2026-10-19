@@ -10,7 +10,7 @@ import { MESSAGING_ERROR_KEYS, messagingErrorKey } from "@/components/messages/e
 import { formatDayLabel, formatRowTime } from "@/components/messages/format";
 import { previewText, threadHref } from "@/components/messages/inbox";
 import { firstPage, removeRow, shouldLoadMore, withFreshHead, withPage, withRow, type InboxList } from "@/components/messages/inbox-state";
-import { MessageItem, textParts, warningsFor } from "@/components/messages/message-item";
+import { canReport, MessageItem, textParts, warningsFor } from "@/components/messages/message-item";
 import { badgeText } from "@/components/messages/messages-link";
 import { selectedConversation } from "@/components/messages/messages-shell";
 import { afterAction, stateChangeOf, type ThreadAction } from "@/components/messages/thread-actions";
@@ -296,6 +296,20 @@ describe("messages", () => {
     expect(mine).not.toContain('data-testid="risk-warning"');
     expect(mine).toContain('data-testid="seen"');
     expect(mine).toContain('data-mine="true"');
+  });
+
+  it("offers to report an incoming text message only, when a handler is given", () => {
+    expect(canReport(message("m1", 1))).toBe(true);
+    expect(canReport(message("m1", 1, { mine: true }))).toBe(false);
+    expect(canReport(message("m1", 1, { hidden: true, text: HIDDEN_MARKER }))).toBe(false);
+    expect(canReport(message("m1", 1, { type: "system" }))).toBe(false);
+    const withReport = renderToStaticMarkup(
+      <NextIntlClientProvider locale="fr" messages={fr} timeZone="Africa/Casablanca">
+        <MessageItem message={message("m1", 1)} time="10:00" sender="Salma" onReport={() => {}} />
+      </NextIntlClientProvider>,
+    );
+    expect(withReport).toContain(`aria-label="${fr.Report.trigger.message}"`);
+    expect(render(message("m1", 1))).not.toContain(`aria-label="${fr.Report.trigger.message}"`);
   });
 
   it("writes text in its own direction (Arabic interface, French message)", () => {

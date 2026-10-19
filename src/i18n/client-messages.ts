@@ -21,6 +21,8 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   "Auth.common",
   "Auth.errors",
   "Listing.errors",
+  // Report button of the listing and profile pages; its dialog loads on demand (phase 5).
+  "Report",
   // Search islands shared by the home, category and listing pages (phase 4): favorite heart,
   // À la Une badge, search bar and place field, home search panel.
   "Favorites.button",

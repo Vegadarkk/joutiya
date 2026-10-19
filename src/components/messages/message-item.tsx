@@ -1,15 +1,16 @@
 "use client";
 
 import { Fragment } from "react";
-import { Check, CheckCheck, Clock3, EyeOff, Link2Off, ShieldAlert } from "lucide-react";
+import { Check, CheckCheck, Clock3, EyeOff, Flag, Link2Off, ShieldAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { HIDDEN_MARKER, URL_MARKER, type MessageRiskFlag, type MessageView } from "@/lib/contracts/messaging";
 import { cn } from "@/lib/utils";
 
-// One message of a thread (design phase-5 D5): plain text in its own direction, each masked link
-// as a "lien masqué" chip, a message hidden by moderation as a muted placeholder, and the safety
-// warning under a flagged message for its recipient only (the sender sees the masked chips).
+// One message of a thread (design phase-5 D5, D10): plain text in its own direction, each masked
+// link as a "lien masqué" chip, a message hidden by moderation as a muted placeholder, the safety
+// warning under a flagged message for its recipient only (the sender sees the masked chips), and
+// the report button beside a message received (shown on hover or focus where a pointer hovers).
 
 /** Flags in the order their warnings read, the most specific first. */
 const FLAG_ORDER: readonly MessageRiskFlag[] = ["contact_with_payment_kw", "payment_kw", "iban", "external_url"];
@@ -83,10 +84,18 @@ export interface MessageItemProps {
   status?: "sent" | "seen" | "sending";
   /** Shown to screen readers before the text ("Vous", or the other participant's name). */
   sender: string;
+  /** Opens the notice form about this message (received text messages only). */
+  onReport?: (message: MessageView) => void;
 }
 
-export function MessageItem({ message, time, status, sender }: MessageItemProps) {
+/** Only a text message received, still shown, can be reported (the server refuses the rest). */
+export function canReport(message: Pick<MessageView, "mine" | "type" | "hidden" | "text">): boolean {
+  return !message.mine && message.type === "text" && !message.hidden && message.text !== HIDDEN_MARKER;
+}
+
+export function MessageItem({ message, time, status, sender, onReport }: MessageItemProps) {
   const t = useTranslations("Messaging.thread");
+  const report = useTranslations("Report.trigger");
   if (message.type === "system") {
     return (
       <li className="flex justify-center py-1">
@@ -100,43 +109,60 @@ export function MessageItem({ message, time, status, sender }: MessageItemProps)
   const mine = message.mine;
   const hidden = message.hidden || message.text === HIDDEN_MARKER;
   const warnings = warningsFor(message);
+  const reportable = onReport !== undefined && canReport(message);
   return (
-    <li data-testid="message" data-mine={mine} className={cn("flex flex-col gap-1.5", mine ? "items-end" : "items-start")}>
-      <div
-        className={cn(
-          "max-w-[85%] rounded-2xl px-3.5 pt-2 pb-1.5 sm:max-w-[70%]",
-          mine ? "rounded-ee-md bg-structure text-structure-foreground" : "rounded-es-md bg-cream-100 text-foreground dark:bg-surface-muted",
-          hidden && "bg-transparent text-foreground-muted ring-1 ring-border ring-inset dark:bg-transparent",
-          status === "sending" && "opacity-70",
-        )}
-      >
-        <span className="sr-only">{sender} : </span>
-        {hidden ? (
-          <p className="flex items-center gap-1.5 text-sm italic">
-            <EyeOff className="size-4 shrink-0" aria-hidden="true" />
-            {t("hidden")}
+    <li data-testid="message" data-mine={mine} className={cn("group/message flex flex-col gap-1.5", mine ? "items-end" : "items-start")}>
+      <div className={cn("flex w-full items-center gap-1", mine && "justify-end")}>
+        <div
+          className={cn(
+            "max-w-[85%] rounded-2xl px-3.5 pt-2 pb-1.5 sm:max-w-[70%]",
+            mine ? "rounded-ee-md bg-structure text-structure-foreground" : "rounded-es-md bg-cream-100 text-foreground dark:bg-surface-muted",
+            hidden && "bg-transparent text-foreground-muted ring-1 ring-border ring-inset dark:bg-transparent",
+            status === "sending" && "opacity-70",
+          )}
+        >
+          <span className="sr-only">{sender} : </span>
+          {hidden ? (
+            <p className="flex items-center gap-1.5 text-sm italic">
+              <EyeOff className="size-4 shrink-0" aria-hidden="true" />
+              {t("hidden")}
+            </p>
+          ) : (
+            <p dir="auto" className="break-words whitespace-pre-wrap [unicode-bidi:plaintext]">
+              <MessageText text={message.text} />
+            </p>
+          )}
+          <p className={cn("mt-0.5 flex items-center justify-end gap-1 text-[0.6875rem] leading-4 tabular-nums", mine && !hidden ? "text-structure-foreground/75" : "text-foreground-muted")}>
+            <time dateTime={new Date(message.createdAt).toISOString()}>{time}</time>
+            {status === "sending" ? (
+              <>
+                <Clock3 className="size-3" aria-hidden="true" />
+                <span className="sr-only">{t("sending")}</span>
+              </>
+            ) : status === "seen" ? (
+              <>
+                <CheckCheck className="size-3.5 text-gold-300" aria-hidden="true" />
+                <span data-testid="seen">{t("seen")}</span>
+              </>
+            ) : status === "sent" ? (
+              <Check className="size-3.5" aria-hidden="true" />
+            ) : null}
           </p>
-        ) : (
-          <p dir="auto" className="break-words whitespace-pre-wrap [unicode-bidi:plaintext]">
-            <MessageText text={message.text} />
-          </p>
-        )}
-        <p className={cn("mt-0.5 flex items-center justify-end gap-1 text-[0.6875rem] leading-4 tabular-nums", mine && !hidden ? "text-structure-foreground/75" : "text-foreground-muted")}>
-          <time dateTime={new Date(message.createdAt).toISOString()}>{time}</time>
-          {status === "sending" ? (
-            <>
-              <Clock3 className="size-3" aria-hidden="true" />
-              <span className="sr-only">{t("sending")}</span>
-            </>
-          ) : status === "seen" ? (
-            <>
-              <CheckCheck className="size-3.5 text-gold-300" aria-hidden="true" />
-              <span data-testid="seen">{t("seen")}</span>
-            </>
-          ) : status === "sent" ? (
-            <Check className="size-3.5" aria-hidden="true" />
-          ) : null}
-        </p>
+        </div>
+        {reportable ? (
+          <button
+            type="button"
+            onClick={() => onReport(message)}
+            aria-label={report("message")}
+            title={report("message")}
+            className={cn(
+              "inline-flex size-10 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-opacity duration-150 ease-door hover:bg-surface-muted hover:text-foreground",
+              "[@media(hover:hover)]:opacity-0 group-hover/message:opacity-100 focus-visible:opacity-100",
+            )}
+          >
+            <Flag className="size-4" aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
       {warnings.length > 0 ? <RiskWarning flags={warnings} /> : null}
     </li>

@@ -13,10 +13,10 @@ import { Gallery } from "@/components/listing/gallery";
 import { JsonLd } from "@/components/listing/json-ld";
 import { ListingStatusBanner } from "@/components/listing/listing-status-banner";
 import { PriceTag } from "@/components/listing/price-tag";
-import { ReportLink } from "@/components/listing/report-link";
 import { SafetyTips } from "@/components/listing/safety-tips";
 import { SellerCard } from "@/components/listing/seller-card";
 import { ListingMapBlock } from "@/components/map/listing-map-block";
+import { ReportButton } from "@/components/report/report-button";
 import { categoryById, subcategoryById } from "@/config/categories";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
@@ -241,7 +241,7 @@ export default async function ListingPage({ params }: { params: Params }) {
 
             <SafetyTips />
             <AdSlot slot="listing-bottom" className="lg:hidden" />
-            <ReportLink email={legal.dsaContactEmail} target="listing" id={listing.id} url={canonicalUrl} />
+            <ReportButton target={{ type: "listing", id: listing.id }} subject={listing.title} ownerPublicId={listing.seller.publicId} email={legal.dsaContactEmail} url={canonicalUrl} />
           </div>
         </div>
       </Container>

@@ -8,8 +8,8 @@ import { EmptyState } from "@/components/feedback/empty-state";
 import { Container } from "@/components/layout/container";
 import { AdSlot } from "@/components/listing/ad-slot";
 import { ListingCard } from "@/components/listing/listing-card";
-import { ReportLink } from "@/components/listing/report-link";
 import { formatMemberSince, SellerAvatar, SellerBadges } from "@/components/listing/seller-card";
+import { ReportButton } from "@/components/report/report-button";
 import { Button } from "@/components/ui/button";
 import { cityBySlug, cityName } from "@/config/regions";
 import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
@@ -126,7 +126,13 @@ export default async function ProfilePage({ params }: { params: Params }) {
       </section>
 
       <AdSlot slot="profile-bottom" />
-      <ReportLink email={legal.dsaContactEmail} target="profile" id={profile.publicId} url={`${CANONICAL_ORIGIN}${profilePath(locale, profile.publicId)}`} />
+      <ReportButton
+        target={{ type: "user", id: profile.publicId }}
+        subject={profile.displayName}
+        ownerPublicId={profile.publicId}
+        email={legal.dsaContactEmail}
+        url={`${CANONICAL_ORIGIN}${profilePath(locale, profile.publicId)}`}
+      />
     </Container>
   );
 }

@@ -1,17 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { FormMessage } from "@/components/auth/form-message";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { EmptyState } from "@/components/feedback/empty-state";
+import { loadWithRetry } from "@/components/layout/chunk-retry";
+import type { ReportDialogProps } from "@/components/report/report-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Locale } from "@/config/site";
 import { getPathname, Link, useRouter } from "@/i18n/navigation";
 import { isApiError, refreshSession, useSession } from "@/lib/auth/client";
-import type { ConversationView, MessageView } from "@/lib/contracts/messaging";
+import { URL_MARKER, type ConversationView, type MessageView } from "@/lib/contracts/messaging";
 import { isolate } from "@/lib/i18n/bidi";
 import { formatPrice } from "@/lib/listings/client/format";
 import { changeConversationState, fetchConversation, fetchThread, markConversationRead, sendMessage } from "@/lib/messaging/client";
@@ -37,6 +40,12 @@ import {
   type ThreadData,
 } from "./thread-state";
 import { useMessagingStream } from "./use-live";
+
+/** The notice form loads on demand; while its chunk cannot be downloaded nothing opens. */
+const ReportDialog = dynamic(() => loadWithRetry<ReportDialogProps>(() => import("@/components/report/report-dialog").then((module) => module.ReportDialog), () => null)(), { ssr: false });
+
+/** What the thread reports: the other participant (menu) or one message received. */
+type ReportSubject = { kind: "user" } | { kind: "message"; message: MessageView };
 
 // One conversation (design phase-5 D2-D9): its newest page, older pages on demand, live updates
 // from the stream (a new message fetches only what follows `latest`), the read receipt while the
@@ -323,6 +332,7 @@ export function ThreadView({ cid }: { cid: string }) {
     putRow(conversation);
   }
 
+  const [report, setReport] = useState<{ subject: ReportSubject; open: boolean } | null>(null);
   const [unblocking, setUnblocking] = useState(false);
   async function unblock(conversation: ConversationView) {
     setUnblocking(true);
@@ -414,7 +424,7 @@ export function ThreadView({ cid }: { cid: string }) {
             <span className={cn("shrink-0 font-medium tabular-nums", conversation.listing.isDonation ? "text-success" : "text-foreground")}>{price}</span>
           </p>
         </div>
-        <ThreadActions conversation={conversation} onDone={onAction} />
+        <ThreadActions conversation={conversation} onDone={onAction} onReport={() => setReport({ subject: { kind: "user" }, open: true })} />
       </header>
 
       {suspended ? (
@@ -467,6 +477,7 @@ export function ThreadView({ cid }: { cid: string }) {
                       sender={message.mine ? t("mine") : name}
                       time={formatClock(message.createdAt, locale)}
                       status={mine?.id === message.id && pending.length === 0 ? (mine.seen ? "seen" : "sent") : undefined}
+                      onReport={(item) => setReport({ subject: { kind: "message", message: item }, open: true })}
                     />
                   ))}
                 </ol>
@@ -490,6 +501,18 @@ export function ThreadView({ cid }: { cid: string }) {
       </div>
 
       {writable ? <Composer onSend={send} error={sendError} onTyping={() => setSendError(null)} /> : sendError ? <p className="px-4 pb-3 text-sm text-danger">{sendError}</p> : null}
+      {report ? (
+        <ReportDialog
+          // One form per subject: another message starts a new notice.
+          key={report.subject.kind === "message" ? report.subject.message.id : "user"}
+          open={report.open}
+          onOpenChange={(open) => setReport((current) => (current ? { ...current, open } : current))}
+          target={report.subject.kind === "message" ? { type: "message", id: `${cid}/${report.subject.message.id}` } : { type: "user", id: conversation.counterpart.publicId }}
+          context={report.subject.kind === "message" ? "message" : "conversation"}
+          subject={name}
+          quote={report.subject.kind === "message" ? report.subject.message.text.replaceAll(URL_MARKER, `[${t("maskedLink")}]`) : undefined}
+        />
+      ) : null}
     </div>
   );
 }

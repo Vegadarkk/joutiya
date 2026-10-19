@@ -176,7 +176,7 @@ test.describe("listing page", () => {
     await expect(map).toBeVisible();
     await expect(map).toContainText("OpenStreetMap");
     await expect(page.getByTestId("safety-tips")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Signaler l'annonce" })).toHaveAttribute("href", /^mailto:/);
+    await expect(page.getByRole("button", { name: "Signaler l'annonce" })).toBeVisible();
 
     await page.waitForLoadState("networkidle");
     expect(violations).toEqual([]);

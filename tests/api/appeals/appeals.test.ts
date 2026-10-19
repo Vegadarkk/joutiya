@@ -19,7 +19,7 @@ vi.mock("@/lib/rate-limit/limiter", { spy: true });
 import { POST as reviewRoute } from "@/app/api/admin/appeals/[decisionId]/route";
 import { POST as decideRoute } from "@/app/api/admin/decisions/route";
 import { GET as linkViewRoute, POST as linkRoute } from "@/app/api/appeals/link/route";
-import { POST as appealRoute } from "@/app/api/appeals/route";
+import { GET as myDecisionsRoute, POST as appealRoute } from "@/app/api/appeals/route";
 import { appealToken } from "@/lib/decisions/appeal-token";
 import type { AppealableDecision, DecideResponse, OpenAppealResponse, ReviewAppealResponse } from "@/lib/decisions/contracts";
 import { setDecisionAiHooks } from "@/lib/decisions/hooks";
@@ -58,6 +58,11 @@ describe("notifier appeals", () => {
     const dismissed = await adminCall<DecideResponse>(decideRoute, "POST", "/api/admin/decisions", { as: moderator, body: { target: `listing:${id}`, templateId: "listing.no_action" } });
     expect(dismissed.status).toBe(201);
     const decisionId = dismissed.body.decisionId;
+
+    // The seller never learns of the dismissed notice: it is not among his decisions.
+    const mine = await publicCall<{ items: { decisionId: string }[] }>(myDecisionsRoute, "GET", "/api/appeals", { as: seller });
+    expect(mine.status).toBe(200);
+    expect(mine.body.items.map((item) => item.decisionId)).not.toContain(decisionId);
 
     // The seller cannot appeal a decision in his favour.
     const sellerAppeal = await publicCall(appealRoute, "POST", "/api/appeals", { as: seller, body: { decisionId, text: "Je ne suis pas d'accord." } });
@@ -101,7 +106,7 @@ describe("notifier appeals", () => {
     expect(token).toBeTruthy();
 
     const shown = await publicCall<{ decision: AppealableDecision }>(linkViewRoute, "GET", `/api/appeals/link?token=${encodeURIComponent(token)}`);
-    expect(shown.body.decision).toMatchObject({ decisionId, by: "reporter", appealable: true, action: "no_action" });
+    expect(shown.body.decision).toMatchObject({ decisionId, by: "reporter", appealable: true, action: "no_action", details: null });
     const appeal = await publicCall<OpenAppealResponse>(linkRoute, "POST", "/api/appeals/link", { body: { token, text: "L'annonce annonce un modèle qui n'existe pas." } });
     expect(appeal.status).toBe(201);
     expect(appeal.body.by).toBe("reporter");

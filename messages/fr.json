@@ -337,6 +337,7 @@
       "signOut": "Déconnexion",
       "favorites": "Mes favoris",
       "savedSearches": "Mes recherches",
+      "decisions": "Décisions et recours",
       "messages": "Mes messages",
       "messagesLink": "Messages",
       "unreadCount": "{count, plural, one {# message non lu} other {# messages non lus}}"
@@ -2215,18 +2216,6 @@
       "body": "Déposez une annonce gratuitement, en quelques minutes.",
       "cta": "Déposer une annonce"
     },
-    "report": {
-      "listing": {
-        "link": "Signaler l'annonce",
-        "subject": "Signalement de l'annonce {id}"
-      },
-      "profile": {
-        "link": "Signaler ce profil",
-        "subject": "Signalement du profil {id}"
-      },
-      "body": "Adresse de la page : {url}\n\nMotif du signalement :\n",
-      "hint": "Le signalement part par e-mail vers notre équipe de modération. Indiquez le motif : nous vous informerons de la suite donnée."
-    },
     "cityDistrict": "{city}, {district}"
   },
   "Profile": {
@@ -2626,6 +2615,214 @@
       "not_found": "Cette conversation n'est plus disponible.",
       "listing_unavailable": "Cette annonce n'est plus disponible : vous ne pouvez plus écrire à son vendeur.",
       "invalid_body": "Ce message ne peut pas être envoyé tel quel. Vérifiez-le, puis réessayez."
+    }
+  },
+  "Report": {
+    "trigger": {
+      "listing": "Signaler l'annonce",
+      "user": "Signaler ce profil",
+      "conversation": "Signaler {name}",
+      "message": "Signaler ce message"
+    },
+    "hint": "Contenu illégal ou contraire à nos règles ? Un modérateur examinera votre signalement.",
+    "title": {
+      "listing": "Signaler cette annonce",
+      "user": "Signaler ce profil",
+      "conversation": "Signaler {name}",
+      "message": "Signaler ce message"
+    },
+    "subject": {
+      "listing": "Annonce « {title} »",
+      "user": "Profil de {name}",
+      "conversation": "Profil de {name}, à propos de cette conversation",
+      "message": "Message de {name}"
+    },
+    "reasonLegend": "Pourquoi signalez-vous ce contenu ?",
+    "group": {
+      "illegal": "Contenu illégal",
+      "terms": "Contraire à nos règles"
+    },
+    "groupHint": {
+      "illegal": "Une loi est enfreinte.",
+      "terms": "Nos conditions générales d'utilisation ne sont pas respectées."
+    },
+    "urgent": "Traité dans l'heure",
+    "ground": "Fondement :",
+    "continue": "Continuer",
+    "back": "Retour",
+    "change": "Changer de motif",
+    "reason": "Motif",
+    "emergency": "En cas de danger immédiat, appelez la police : 19 au Maroc, 17 en France.",
+    "explanation": "Ce que vous avez constaté",
+    "explanationHint": "Décrivez les faits : ce qui pose problème, où, et pourquoi. {min} caractères au moins.",
+    "explanationPlaceholder": "Ex. : le vendeur demande un acompte par virement avant toute visite.",
+    "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}",
+    "name": "Votre nom",
+    "email": "Votre adresse e-mail",
+    "contactHint": "Pour vous informer de la décision prise.",
+    "contactOptional": "Facultatif pour ce motif : vous pouvez signaler sans vous identifier.",
+    "member": "Vous signalez avec votre compte : la décision vous sera envoyée par e-mail.",
+    "anonymity": "La personne concernée ne connaîtra pas votre identité.",
+    "goodFaith": "Je déclare de bonne foi que les informations de ce signalement sont exactes et complètes.",
+    "host": "Joutiya héberge les contenus de ses utilisateurs sans en être l'auteur. Des signalements manifestement infondés et répétés peuvent entraîner la suspension de vos signalements.",
+    "submit": "Envoyer le signalement",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "challenge": "Cochez la vérification anti-robots, puis envoyez à nouveau le signalement.",
+    "problems": {
+      "reasonId": "Choisissez un motif.",
+      "explanation": {
+        "required": "Décrivez ce que vous avez constaté.",
+        "short": "Ajoutez quelques détails : {min} caractères au moins.",
+        "long": "{max} caractères au maximum.",
+        "invalid": "Ce texte ne peut pas être envoyé tel quel."
+      },
+      "name": {
+        "required": "Indiquez votre nom.",
+        "short": "Le nom doit faire au moins 2 caractères.",
+        "long": "Le nom ne peut pas dépasser 80 caractères.",
+        "invalid": "Indiquez un nom valide."
+      },
+      "email": {
+        "required": "Indiquez votre adresse e-mail.",
+        "invalid": "Entrez une adresse e-mail valide."
+      },
+      "goodFaith": "Cochez cette déclaration pour envoyer le signalement."
+    },
+    "sent": "Signalement envoyé",
+    "duplicate": "Signalement déjà envoyé",
+    "sentBody": "Merci. Notre équipe de modération l'examinera {delay}.",
+    "duplicateBody": "Vous avez déjà signalé ce contenu. Votre signalement est en cours d'examen : nous le traiterons {delay}.",
+    "delay": {
+      "hour": "en priorité, dans l'heure",
+      "hours": "sous {count} heures",
+      "days": "sous {count} jours"
+    },
+    "reference": "Référence",
+    "copy": "Copier la référence",
+    "copied": "Référence copiée",
+    "mailed": "Vous recevrez la décision par e-mail, avec les moyens de la contester.",
+    "notMailed": "Notez cette référence : sans adresse e-mail, nous ne pourrons pas vous informer de la décision.",
+    "signIn": "Se connecter",
+    "signInBody": "Votre session a expiré. Reconnectez-vous pour envoyer ce signalement.",
+    "errors": {
+      "report_not_allowed": "Ce signalement n'est pas accepté : il vise votre propre contenu, ou vos signalements sont suspendus après plusieurs signalements manifestement infondés.",
+      "report_target_invalid": "Ce contenu n'est plus en ligne ou ne peut pas être signalé.",
+      "rate_limited": "Vous avez envoyé beaucoup de signalements. Réessayez {wait}.",
+      "later": "plus tard",
+      "unavailable": "Le signalement est momentanément indisponible. Réessayez dans quelques minutes.",
+      "quota_exhausted": "Le signalement est momentanément indisponible. Réessayez dans quelques minutes.",
+      "turnstile_failed": "La vérification anti-robots a échoué. Cochez à nouveau la case, puis renvoyez le signalement.",
+      "byMail": "Vous pouvez aussi nous écrire :"
+    },
+    "fallback": "Le formulaire de signalement n'a pas pu se charger. Rechargez la page, ou écrivez-nous :",
+    "reload": "Recharger la page",
+    "mail": {
+      "listing": "Signalement de l'annonce {id}",
+      "user": "Signalement du profil {id}",
+      "body": "Adresse de la page : {url}\n\nMotif du signalement :\n"
+    }
+  },
+  "Appeals": {
+    "page": {
+      "title": "Décisions et recours",
+      "intro": "Les décisions de modération qui concernent votre compte, vos annonces ou vos messages, avec leurs motifs. Vous pouvez contester une décision pendant 6 mois : une autre personne que celle qui a décidé la réexamine et vous répond sous 14 jours.",
+      "loading": "Chargement de vos décisions",
+      "loadFailed": "Vos décisions n'ont pas pu être chargées",
+      "retry": "Réessayer",
+      "emptyTitle": "Aucune décision vous concernant",
+      "emptyBody": "Si une mesure de modération touche un jour votre compte ou vos contenus, elle apparaîtra ici avec ses motifs et la possibilité de la contester.",
+      "emptyAction": "Voir mes annonces"
+    },
+    "link": {
+      "title": "Contester une décision",
+      "intro": "Le recours prévu par la décision que nous vous avons envoyée par e-mail. Aucun compte n'est nécessaire.",
+      "invalidTitle": "Ce lien n'est pas valide",
+      "invalidBody": "Il est incomplet ou a été modifié. Ouvrez à nouveau le lien reçu par e-mail, en entier.",
+      "expiredTitle": "Le délai de recours est dépassé",
+      "expiredBody": "Une décision se conteste dans les 6 mois qui suivent sa notification. Vous pouvez toujours saisir le tribunal compétent.",
+      "limitedTitle": "Trop de tentatives",
+      "limitedBody": "Ce lien a été ouvert trop souvent depuis votre connexion. Réessayez dans une heure.",
+      "home": "Revenir à l'accueil",
+      "account": "Voir toutes mes décisions"
+    },
+    "measure": {
+      "remove": {
+        "listing": "Annonce retirée",
+        "message": "Message masqué",
+        "upload": "Photo refusée",
+        "other": "Contenu retiré"
+      },
+      "restrict_visibility": "Visibilité de l'annonce restreinte",
+      "demote": "Annonce moins visible dans les résultats",
+      "warn": "Avertissement",
+      "suspend_account": "Compte suspendu{days, plural, =0 {} one { # jour} other { # jours}}",
+      "ban": "Compte fermé",
+      "restore": "Contenu rétabli",
+      "no_action": "Aucune mesure"
+    },
+    "reporter": {
+      "dismissed": "Votre signalement a été classé sans suite",
+      "actioned": "Une mesure a été prise après votre signalement",
+      "dismissedFacts": "Après examen, le contenu signalé ne nous paraît ni illicite ni contraire à nos conditions générales d'utilisation.",
+      "actionedBody": "Il n'y a rien à contester de votre côté."
+    },
+    "decidedOn": "Décision du {date}",
+    "reference": "Référence : {id}",
+    "facts": "Faits constatés",
+    "details": "Précisions du modérateur",
+    "ground": "Fondement",
+    "origin": "Origine",
+    "origins": {
+      "notice": "Un signalement.",
+      "own_initiative": "Un contrôle de notre équipe, de sa propre initiative.",
+      "authority_order": "L'injonction d'une autorité compétente."
+    },
+    "automation": "Moyens automatisés",
+    "automations": {
+      "full": "Décision prise automatiquement, sans intervention humaine. Un modérateur la réexaminera si vous la contestez.",
+      "detected": "Contenu repéré par un outil automatisé ; un modérateur a pris la décision.",
+      "human": "Aucun : un modérateur a pris la décision."
+    },
+    "legacy": {
+      "listingRejected": "Votre annonce a été refusée lors de la vérification qui précède sa publication.",
+      "photoRejectedNsfw": "Une photo a été refusée à l'envoi par notre contrôle automatique des images."
+    },
+    "status": {
+      "appealable": "Recours possible",
+      "open": "Recours en cours",
+      "upheld": "Décision maintenue",
+      "reversed": "Décision annulée"
+    },
+    "appeal": {
+      "intro": "Vous pouvez contester cette décision jusqu'au {date}. Une autre personne que celle qui a décidé la réexaminera et vous répondra sous 14 jours. Vous pouvez aussi saisir le tribunal compétent.",
+      "reporterIntro": "Vous pouvez contester ce classement jusqu'au {date}. Une autre personne que celle qui a décidé réexaminera votre signalement et vous répondra sous 14 jours.",
+      "start": "Contester la décision",
+      "label": "Pourquoi contestez-vous cette décision ?",
+      "hint": "Expliquez les faits de votre point de vue et ce qui, selon vous, a été mal apprécié. {min} caractères au moins.",
+      "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}",
+      "short": "Expliquez votre recours en {min} caractères au moins.",
+      "submit": "Envoyer mon recours",
+      "cancel": "Annuler",
+      "sent": "Recours envoyé. Nous vous répondrons sous 14 jours.",
+      "timeline": "Suivi du recours",
+      "decided": "Décision",
+      "filed": "Recours déposé",
+      "answer": "Réponse",
+      "answerBy": "Au plus tard le {date}",
+      "upheld": "La décision est maintenue.",
+      "reversed": "La décision est annulée.",
+      "note": "Réponse du modérateur",
+      "expired": "Le délai de recours a expiré le {date}. Vous pouvez toujours saisir le tribunal compétent.",
+      "authority": "Cette mesure exécute l'injonction d'une autorité : elle se conteste devant les juridictions de l'État qui l'a émise.",
+      "superseded": "Cette décision a été remplacée par une décision ultérieure."
+    },
+    "host": "Joutiya héberge les contenus de ses utilisateurs sans en être l'auteur et n'est pas partie aux échanges ni aux transactions entre utilisateurs.",
+    "errors": {
+      "not_found": "Cette décision n'est plus disponible.",
+      "rate_limited": "Trop de tentatives. Réessayez {wait}.",
+      "later": "plus tard",
+      "unavailable": "Le recours est momentanément indisponible. Réessayez dans quelques minutes."
     }
   }
 }
