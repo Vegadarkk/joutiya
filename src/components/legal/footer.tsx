@@ -40,6 +40,11 @@ export function Footer({ publisher }: { publisher: string }) {
             {t("trustTitle")}
           </h2>
           <ul className="flex flex-col gap-2.5 text-sm">
+            <li>
+              <Link href="/aide" className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>
+                {t("help")}
+              </Link>
+            </li>
             {column("trust").map((page) => (
               <li key={page.slug}>
                 <Link href={`/legal/${page.slug}`} className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>

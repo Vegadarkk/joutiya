@@ -94,6 +94,7 @@
     "about": "Joutiya, la place de marché des petites annonces au Maroc. Une porte ouverte sur le monde.",
     "legalTitle": "Informations légales",
     "trustTitle": "Mentions et autorités",
+    "help": "Centre d'aide",
     "disclaimer": "Joutiya héberge les annonces de ses utilisateurs : elle n'est ni vendeur, ni acheteur, ni partie aux ventes conclues entre eux.",
     "copyright": "© {year} {publisher}",
     "links": {
@@ -117,6 +118,68 @@
     "frenchPrevails": "Les textes légaux font foi en français.",
     "updated": "Mise à jour : {date}",
     "contents": "Sommaire"
+  },
+  "Help": {
+    "metaTitle": "Centre d'aide",
+    "metaDescription": "Les réponses aux questions sur Joutiya : compte, annonces, recherche, messagerie, sécurité, signalements et recours.",
+    "title": "Centre d'aide",
+    "lead": "Votre compte, vos annonces, la messagerie, la sécurité : trouvez la réponse, ou posez la question à l'Assistant Joutiya.",
+    "search": {
+      "label": "Rechercher dans le centre d'aide",
+      "placeholder": "Ex. : renouveler une annonce",
+      "clear": "Effacer la recherche",
+      "results": "{count, plural, one {# article correspond à votre recherche} other {# articles correspondent à votre recherche}}",
+      "noResults": "Aucun article ne correspond à « {query} ». Essayez d'autres mots, ou posez la question à l'Assistant Joutiya."
+    },
+    "browse": "Parcourir par thème",
+    "articleCount": "{count, plural, one {# article} other {# articles}}",
+    "home": "Centre d'aide",
+    "breadcrumb": "Fil d'Ariane",
+    "related": "Pour aller plus loin",
+    "stillTitle": "Votre question reste sans réponse ?",
+    "stillBody": "L'Assistant Joutiya, une intelligence artificielle, vous répond à partir des articles du centre d'aide.",
+    "pages": {
+      "inscription": "Créer un compte",
+      "connexion": "Se connecter",
+      "motDePasse": "Mot de passe oublié",
+      "parametres": "Mes paramètres",
+      "deposer": "Déposer une annonce",
+      "mesAnnonces": "Mes annonces",
+      "recherche": "Rechercher une annonce",
+      "favoris": "Mes favoris",
+      "recherches": "Mes recherches",
+      "messages": "Mes messages",
+      "recours": "Décisions et recours"
+    },
+    "assistant": {
+      "open": "Poser une question à l'Assistant",
+      "title": "Assistant Joutiya",
+      "badge": "IA",
+      "disclosure": "Vous échangez avec une intelligence artificielle, pas avec une personne. Elle répond à partir du centre d'aide et peut se tromper : vérifiez dans l'article cité.",
+      "privacy": "Ne donnez aucune donnée personnelle (nom, téléphone, e-mail, adresse, mot de passe, code). L'assistant n'a pas accès à votre compte et ne peut rien modifier.",
+      "welcome": "Posez votre question sur Joutiya : déposer une annonce, contacter un vendeur, éviter une arnaque, contester une décision…",
+      "conversation": "Conversation avec l'Assistant Joutiya",
+      "you": "Vous",
+      "label": "Votre question",
+      "placeholder": "Écrivez votre question",
+      "send": "Envoyer",
+      "close": "Fermer l'assistant",
+      "restart": "Nouvelle conversation",
+      "thinking": "L'assistant prépare sa réponse…",
+      "sources": "Articles utilisés",
+      "degradedTitle": "L'assistant n'est pas disponible pour le moment",
+      "degradedBody": "Voici les articles du centre d'aide qui correspondent à votre question.",
+      "degradedEmpty": "Aucun article ne correspond à votre question. Reformulez-la, ou parcourez les thèmes du centre d'aide.",
+      "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}",
+      "empty": "Écrivez votre question avant de l'envoyer.",
+      "challenge": "Cochez la vérification anti-robots, puis envoyez à nouveau votre question.",
+      "errors": {
+        "rate_limited": "Vous avez posé beaucoup de questions. Réessayez {wait}.",
+        "later": "plus tard",
+        "unavailable": "L'assistant est momentanément indisponible. Les articles du centre d'aide restent consultables.",
+        "turnstile_failed": "La vérification anti-robots a échoué. Cochez à nouveau la case, puis renvoyez votre question."
+      }
+    }
   },
   "NotFound": {
     "title": "Cette page n'existe pas",
@@ -338,6 +401,7 @@
       "favorites": "Mes favoris",
       "savedSearches": "Mes recherches",
       "decisions": "Décisions et recours",
+      "help": "Aide",
       "messages": "Mes messages",
       "messagesLink": "Messages",
       "unreadCount": "{count, plural, one {# message non lu} other {# messages non lus}}"

@@ -19,8 +19,8 @@ Le code de la phase 4 est sur la branche `claude/mvp-phase-4-recherche-npqs2s` (
 | Service | Clé ou réglage | Portée | Où il va | Qui |
 |---|---|---|---|---|
 | Meilisearch | `MEILI_MASTER_KEY` (32 octets aléatoires) | Administration seulement, jamais dans l'application | `/etc/joutiya/<env>/meilisearch.env` (0600) | Claude, générée sur la VM, jamais affichée |
-| Meilisearch | `MEILI_SEARCH_KEY` | `search` et `documents.get` sur `listings_*` | `app.env` (site) | Claude, `search-setup` |
-| Meilisearch | `MEILI_INDEX_KEY` | Documents, index, réglages, tâches et statistiques sur `listings_*` | `app.env` (worker) | Claude, `search-setup` |
+| Meilisearch | `MEILI_SEARCH_KEY` | `search` et `documents.get` sur `listings_*` et `help` | `app.env` (site) | Claude, `search-setup` |
+| Meilisearch | `MEILI_INDEX_KEY` | Documents, index, réglages, tâches et statistiques sur `listings_*` et `help` | `app.env` (worker) | Claude, `search-setup` |
 | Meilisearch | `MEILI_URL` | `http://meilisearch:7700` (réseau Docker interne, aucun port ouvert) | `app.env` | Claude |
 | Firestore | Index de `firestore.indexes.json` (favoris, recherches sauvegardées, À la Une, réconciliation) | Staging : CI ; production : `scripts/deploy-prod.ts firestore` | Projet Firebase | Claude (staging), **Vous :** prompt O (production) |
 

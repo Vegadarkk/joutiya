@@ -24,6 +24,7 @@ import { SearchUnavailableError } from "@/lib/search/types";
 import { closeSearchQueue, enqueueIndexJobs, indexJobSchema, OUTBOX_POLL_JOB, SEARCH_QUEUE } from "@/lib/search/queue";
 import { setGauge } from "@/lib/quota";
 import { usedMemoryBytes } from "@/lib/quota/valkey-memory";
+import { syncHelpIndex } from "@/lib/help/search";
 import { runStartupChecks } from "@/lib/startup/checks";
 import { clientOptions } from "@/lib/valkey/clients";
 import { AGENT_QUEUE, createAgentWorker, JOBS, SYSTEM_QUEUE, SCHEDULES } from "./jobs";
@@ -111,6 +112,11 @@ async function main(): Promise<void> {
     if (data.success) holdFailedListing(data.data.id);
   });
   void ensureEngineReady().catch((error: unknown) => logger.warn({ err: (error as Error).message }, "search index not prepared yet: the first search job retries"));
+  // Help index (phase 5 D25): replaced with the corpus of this image; the assistant searches in
+  // process meanwhile or when it fails.
+  void syncHelpIndex()
+    .then((synced) => synced && logger.info("help index synced"))
+    .catch((error: unknown) => logger.warn({ err: (error as Error).message }, "help index not synced: in-process help search until the next start"));
   const outboxWatch = isFirebaseConfigured() ? watchSearchOutbox({ dispatch: (ids) => enqueueIndexJobs(ids) }) : null;
 
   // Moderation agent (phase 5 D19): one task at a time; its "failed" listener (log, Sentry on the

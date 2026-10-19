@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import fr from "../../messages/fr.json";
-import { pickMessages, PUBLIC_CLIENT_NAMESPACES, SEARCH_PAGE_CLIENT_NAMESPACES } from "@/i18n/client-messages";
+import { HELP_PAGE_CLIENT_NAMESPACES, pickMessages, PUBLIC_CLIENT_NAMESPACES, SEARCH_PAGE_CLIENT_NAMESPACES } from "@/i18n/client-messages";
 
 // The public pages ship only PUBLIC_CLIENT_NAMESPACES to the browser. A client component that reads
 // another namespace would show raw keys there: this walks the import graph of the public routes
@@ -77,12 +77,15 @@ const lookup = (tree: unknown, dotted: string) => dotted.split(".").reduce<unkno
 
 /** The search page wraps its content in its own provider with the extra search namespaces. */
 const SEARCH_PAGE = path.join(SRC, "app/[locale]/(public)/recherche/page.tsx");
+/** The help centre's layout wraps its pages in a provider with the extra help namespaces (phase-5 D25). */
+const HELP_DIR = path.join(SRC, "app/[locale]/(public)/aide");
 
 describe("public client messages", () => {
   const entries = filesUnder(path.join(SRC, "app/[locale]/(public)"))
     .filter((file) => /\/(page|layout|error|not-found|loading|template)\.tsx$/.test(file))
-    .filter((file) => file !== SEARCH_PAGE);
+    .filter((file) => file !== SEARCH_PAGE && !file.startsWith(`${HELP_DIR}${path.sep}`));
   const used = clientNamespaces(entries);
+  const helpEntries = filesUnder(HELP_DIR).filter((file) => /\/page\.tsx$/.test(file));
 
   it("covers what the search page's islands read with the public and search lists", () => {
     const search = clientNamespaces([SEARCH_PAGE]);
@@ -91,6 +94,16 @@ describe("public client messages", () => {
     const missing = [...search].filter(([namespace]) => !both(namespace)).map(([namespace, files]) => `${namespace} (${[...files].join(", ")})`);
     expect(missing).toEqual([]);
     for (const namespace of SEARCH_PAGE_CLIENT_NAMESPACES) expect(lookup(fr, namespace), namespace).toBeTypeOf("object");
+  });
+
+  it("covers what the help pages' islands read with the public and help lists", () => {
+    expect(helpEntries.length).toBe(2);
+    const help = clientNamespaces(helpEntries);
+    expect(help.has("Help.assistant")).toBe(true);
+    const both = coveredBy([...PUBLIC_CLIENT_NAMESPACES, ...HELP_PAGE_CLIENT_NAMESPACES]);
+    const missing = [...help].filter(([namespace]) => !both(namespace)).map(([namespace, files]) => `${namespace} (${[...files].join(", ")})`);
+    expect(missing).toEqual([]);
+    for (const namespace of HELP_PAGE_CLIENT_NAMESPACES) expect(lookup(fr, namespace), namespace).toBeTypeOf("object");
   });
 
   it("finds the client islands of the public routes", () => {
@@ -115,7 +128,7 @@ describe("public client messages", () => {
 
 describe("listing page JavaScript", () => {
   it("pulls no validation schemas (zod): client islands import paths and limits from contracts/endpoints", () => {
-    const entries = ["app/[locale]/(public)/layout.tsx", "app/[locale]/(public)/annonce/[slugId]/page.tsx"].map((file) => path.join(SRC, file));
+    const entries = ["app/[locale]/(public)/layout.tsx", "app/[locale]/(public)/annonce/[slugId]/page.tsx", "app/[locale]/(public)/aide/[slug]/page.tsx"].map((file) => path.join(SRC, file));
     const modules = clientModules(entries);
     expect(modules.has(path.join(SRC, "components/favorites/favorite-button.tsx"))).toBe(true);
     const withZod = [...modules].filter((file) => /from\s+["'](?:zod|@\/lib\/zod)["']/.test(readFileSync(file, "utf8"))).map((file) => path.relative(SRC, file));
