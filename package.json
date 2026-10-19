@@ -26,6 +26,7 @@
     "create-admin": "node scripts/create-admin.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.131.0",
     "@hookform/resolvers": "5.9.1",
     "@protomaps/basemaps": "5.7.2",
     "@sentry/browser": "11.8.0",

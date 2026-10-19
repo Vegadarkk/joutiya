@@ -60,6 +60,16 @@ export async function listDecisionsForUser(uid: string, limit = 10): Promise<Mod
   });
 }
 
+/** Decisions about one target, newest first (index target.id asc, createdAt desc); the agent reads a held listing's history with it (audit D1b-02). */
+export async function listDecisionsForTarget(target: ModerationDecisionDoc["target"], limit = 10): Promise<ModerationDecisionRecord[]> {
+  const snapshot = await decisions().where("target.id", "==", target.id).orderBy("createdAt", "desc").limit(limit).get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  return snapshot.docs.flatMap((doc) => {
+    const parsed = moderationDecisionSchema.safeParse(timestampsToDates(doc.data()));
+    return parsed.success && parsed.data.target.type === target.type ? [{ id: doc.id, ...parsed.data }] : [];
+  });
+}
+
 /**
  * Listings awaiting a moderator, least recently changed first (index listings status asc,
  * updatedAt asc): the hold, or the seller's last edit while held, dates the entry. `after` pages on.

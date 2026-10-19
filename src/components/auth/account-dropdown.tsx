@@ -1,10 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { BadgeCheck, BellRing, Heart, LogOut, Settings } from "lucide-react";
+import { BadgeCheck, BellRing, Heart, LogOut, MessageSquare, Settings } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { toast } from "sonner";
+import { canMessage } from "@/components/messages/can-message";
+import { useLiveSnapshot } from "@/components/messages/use-live";
 import { Link, useRouter } from "@/i18n/navigation";
 import { signOut } from "@/lib/auth/client";
 import type { SessionSummary } from "@/lib/contracts/auth";
@@ -25,6 +27,8 @@ export default function AccountDropdown({ session, name, triggerClassName, child
   const t = useTranslations("Auth.menu");
   const s = useTranslations("Auth.settings");
   const router = useRouter();
+  // The header's messages link holds the stream; the menu only reads its total.
+  const unread = useLiveSnapshot().unread ?? 0;
 
   async function onSignOut() {
     await signOut();
@@ -59,6 +63,20 @@ export default function AccountDropdown({ session, name, triggerClassName, child
             ) : null}
           </div>
           <DropdownMenu.Separator className="my-1 h-px bg-border" />
+          {canMessage(session) ? (
+            <DropdownMenu.Item asChild>
+              <Link href="/messages" className={item}>
+                <MessageSquare aria-hidden="true" />
+                <span className="flex-1">{t("messages")}</span>{" "}
+                {unread > 0 ? (
+                  <span className="min-w-5 rounded-full bg-primary px-1.5 text-center text-xs leading-5 font-semibold text-primary-foreground tabular-nums">
+                    <span aria-hidden="true">{unread > 99 ? "99+" : unread}</span>
+                    <span className="sr-only">{t("unreadCount", { count: unread })}</span>
+                  </span>
+                ) : null}
+              </Link>
+            </DropdownMenu.Item>
+          ) : null}
           <DropdownMenu.Item asChild>
             <Link href="/favoris" className={item}>
               <Heart aria-hidden="true" />

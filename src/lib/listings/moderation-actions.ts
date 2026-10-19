@@ -334,7 +334,7 @@ async function notifySeller(listing: ListingRecord, input: ModerationDecisionReq
   try {
     const to = await listingRecipient(listing.ownerUid);
     if (!to) return;
-    const base = { locale: to.locale, to: to.email, priority: "transactional" as const, idempotencyKey: `${template}-${listing.id}-${listing.version}` };
+    const base = { locale: to.locale, to: to.email, priority: template === "listingRejected" ? ("security" as const) : ("transactional" as const), idempotencyKey: `${template}-${listing.id}-${listing.version}` };
     if (input.action === "approve" && restored) {
       // Paused: resumable until its expiry; expired: renewable until its purge date.
       const until = (restored === "paused" ? listing.expiresAt : listing.purgeAt) ?? listing.updatedAt;

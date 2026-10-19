@@ -1,9 +1,8 @@
 import "server-only";
 import { NextResponse } from "next/server";
-import { optionalUser, requireSameOrigin, requireUser } from "@/lib/auth/guards";
-import { sessionSchema, type ClientTokenResponse, type MeResponse, type SessionResponse } from "@/lib/contracts/auth";
+import { optionalUser, requireSameOrigin } from "@/lib/auth/guards";
+import { sessionSchema, type MeResponse, type SessionResponse } from "@/lib/contracts/auth";
 import { linkProvider } from "@/lib/db/repositories/users";
-import { auth } from "@/lib/firebase/admin";
 import { isStaff } from "@/lib/firebase/claims";
 import { createSessionFromIdToken, revokeSessions, verifySession } from "@/lib/firebase/session";
 import { forbidden } from "@/lib/http/errors";
@@ -18,7 +17,7 @@ import { anonymous, beginAnonymous, finish, userAgentOf } from "./anonymous";
 import { deviceOf, jsonResponse, signedIn, withDevice } from "./respond";
 import { sessionSummary } from "./summary";
 
-// Session plumbing: who am I, logout, the SDK's custom token, and the Google popup exchange.
+// Session plumbing: who am I, logout, and the Google popup exchange.
 
 /** The session of the caller, or null (a revoked cookie reads as signed out); the CSRF header lets the UI recover its token. */
 export async function handleMe(request: Request): Promise<Response> {
@@ -41,14 +40,6 @@ export async function handleLogout(request: Request): Promise<Response> {
   const response = new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   clearSessionCookies(response);
   return withDevice(response, request);
-}
-
-/** Custom token for the browser SDK (realtime messaging only, in-memory persistence); never for a revoked cookie. */
-export async function handleClientToken(request: Request): Promise<Response> {
-  const context = await requireUser(request, { mutation: true, checkRevoked: true });
-  await enforceLimit("clientToken.uid", context.user.uid);
-  const body: ClientTokenResponse = { token: await auth().createCustomToken(context.user.uid) };
-  return withDevice(jsonResponse(body), request);
 }
 
 /** Firebase ID token of a Google popup sign-in (existing account) -> session cookie (§6). */

@@ -1,6 +1,7 @@
 import type { Job } from "bullmq";
 import { backupFirestore } from "./backup-firestore";
 import { expireListings } from "./expire-listings";
+import { liftSuspensions } from "./lift-suspensions";
 import { sendExpiryReminders } from "./listing-expiry-reminders";
 import { purgeConnectionLogs } from "./purge-connection-logs";
 import { purgeQuarantine } from "./purge-quarantine";
@@ -11,6 +12,12 @@ import { retentionPurge } from "./retention-purge";
 import { reconcileSearch } from "./reconcile-search";
 import { sweepExpiredBoosts } from "./expire-boosts";
 import { sendSavedSearchAlerts } from "./saved-search-alerts";
+import { exportAuditLogs } from "./audit-export";
+import { sendMessageDigests } from "./message-digest";
+import { sweepReportSla } from "./report-sla-sweep";
+
+// Phase 5 (design D19): queue "agent", its own consumer at concurrency 1 (createAgentWorker).
+export { AGENT_CONCURRENCY, AGENT_QUEUE, createAgentWorker, processAgentJob } from "./agent";
 
 export const SYSTEM_QUEUE = "system";
 
@@ -27,6 +34,10 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "expire-boosts": () => sweepExpiredBoosts(),
   "saved-search-alerts": () => sendSavedSearchAlerts(),
   "purge-connection-logs": () => purgeConnectionLogs(),
+  "lift-suspensions": () => liftSuspensions(),
+  "message-digest": () => sendMessageDigests(),
+  "report-sla-sweep": () => sweepReportSla(),
+  "audit-export": () => exportAuditLogs(),
 };
 
 /** Repeatable jobs (UTC cron patterns), upserted at every start. */
@@ -38,7 +49,8 @@ export const SCHEDULES = {
   // 02:30 UTC (D16): published listings past expiresAt -> expired; 02:40: reminder 3 days before.
   "expire-listings-nightly": { pattern: "30 2 * * *", job: "expire-listings" },
   "listing-expiry-reminders-nightly": { pattern: "40 2 * * *", job: "listing-expiry-reminders" },
-  // 03:00 UTC: documents and objects past purgeAt (listings, uploads, contentOps, revealLogs).
+  // 03:00 UTC: documents and objects past purgeAt (listings, uploads, contentOps, revealLogs; phase 5
+  // D22: conversations, reports, decisions, authority requests, AI proposals, auditLogs, userBlocks).
   "retention-purge-nightly": { pattern: "0 3 * * *", job: "retention-purge" },
   // Every hour at :20 (§6: unprocessed uploads purged after 24 h).
   "purge-quarantine-hourly": { pattern: "20 * * * *", job: "purge-quarantine" },
@@ -55,4 +67,12 @@ export const SCHEDULES = {
   "reconcile-search-nightly": { pattern: "20 4 * * *", job: "reconcile-search" },
   // 07:00 UTC (08:00 in Morocco): one digest e-mail per user for the saved searches with alerts.
   "saved-search-alerts-daily": { pattern: "0 7 * * *", job: "saved-search-alerts" },
+  // Phase 5 (D14). Every hour at :35: suspensions past `until` lifted (claim, status, listings).
+  "lift-suspensions-hourly": { pattern: "35 * * * *", job: "lift-suspensions" },
+  // Phase 5 (D21). Every 10 minutes from :01: grouped new-messages mails due (30 min after the first unread).
+  "message-digest-10min": { pattern: "1-59/10 * * * *", job: "message-digest" },
+  // Phase 5 (D12). Every 10 minutes from :07: open P0 reports past their 1-hour target -> one more P0 alert.
+  "report-sla-sweep-10min": { pattern: "7-59/10 * * * *", job: "report-sla-sweep" },
+  // Phase 5 (D23). 03:22 UTC: yesterday's auditLogs -> age-encrypted NDJSON in the private bucket, before the backup (03:30).
+  "audit-export-nightly": { pattern: "22 3 * * *", job: "audit-export" },
 } as const;

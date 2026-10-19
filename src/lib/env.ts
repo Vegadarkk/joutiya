@@ -122,6 +122,13 @@ const schema = z.object({
   MEILI_URL: optionalUrl,
   MEILI_SEARCH_KEY: optional,
   MEILI_INDEX_KEY: optional,
+  // AI agent (phase 5, design D19), worker only. Each key is optional: an absent key disables its
+  // provider, and the deterministic rules provider always runs (src/lib/ai).
+  ANTHROPIC_API_KEY: optional,
+  OPENAI_API_KEY: optional,
+  CF_WORKERS_AI_TOKEN: optional,
+  /** Cloudflare account of the Workers AI REST endpoint (also listed in infra/targets.json). */
+  CF_ACCOUNT_ID: optional,
 });
 
 export type ServerEnv = z.infer<typeof schema>;
