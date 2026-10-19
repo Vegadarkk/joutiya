@@ -222,6 +222,8 @@ export interface AiProposal {
   provider: string;
   model: string;
   action: AiDecisionDoc["output"]["action"];
+  /** Triage and appeal proposals: what the agent says of the report (D19, audit D1b-10); read it rather than `action`. */
+  verdict: NonNullable<AiDecisionDoc["output"]["verdict"]> | null;
   policy: string;
   severity: string;
   confidence: number;
@@ -300,7 +302,8 @@ async function decisionsOnTarget(id: string): Promise<ModerationDecisionRecord[]
   });
 }
 
-async function aiProposal(id: string | undefined): Promise<AiProposal | null> {
+/** An agent proposal by id, as the back office shows it (null: none, unreadable). */
+export async function aiProposal(id: string | undefined): Promise<AiProposal | null> {
   if (!id) return null;
   const snapshot = await db().collection(COLLECTIONS.aiDecisions).doc(id).get();
   void consume("firestore.reads", 1);
@@ -315,6 +318,7 @@ async function aiProposal(id: string | undefined): Promise<AiProposal | null> {
     provider: parsed.data.provider,
     model: parsed.data.model,
     action: output.action,
+    verdict: output.verdict ?? null,
     policy: output.policy,
     severity: output.severity,
     confidence: output.confidence,
@@ -342,7 +346,10 @@ async function ownerSummary(uid: string): Promise<OwnerSummary | null> {
 
 const isSignal = (value: unknown): value is HideSignal => typeof value === "string" && (HIDE_SIGNALS as readonly string[]).includes(value);
 
-async function messageSnapshot(id: string, staff: StaffContext, identity: RequestIdentity | undefined, now: Date): Promise<TargetSnapshot> {
+/** Who reads the view (the message snapshot's audit entry): an API staff context or a page's staff session. */
+export type TargetViewReader = { user: Pick<StaffContext["user"], "uid">; role: StaffContext["role"] };
+
+async function messageSnapshot(id: string, staff: TargetViewReader, identity: RequestIdentity | undefined, now: Date): Promise<TargetSnapshot> {
   const ids = splitMessageId(id);
   if (!ids) return null;
   const [conversation, message, evidence] = await Promise.all([readConversationFacts(ids.cid), messageRef(ids.cid, ids.mid).get(), evidenceRef(ids.cid, ids.mid).get()]);
@@ -379,7 +386,7 @@ async function messageSnapshot(id: string, staff: StaffContext, identity: Reques
  * The back-office view of a reported target (`targetKey`), or null when nothing is known about it
  * (no report, no content). The message snapshot is journaled (`message.read`).
  */
-export async function reportTargetView(key: string, staff: StaffContext, identity?: RequestIdentity, now = new Date()): Promise<ReportTargetView | null> {
+export async function reportTargetView(key: string, staff: TargetViewReader, identity?: RequestIdentity, now = new Date()): Promise<ReportTargetView | null> {
   const target = parseTargetKey(key);
   if (!target) return null;
   const reports = await listTargetReports(target);
