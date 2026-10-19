@@ -33,7 +33,7 @@ function recorded(): Targets {
   return {
     shared: {
       cloudflare: { accountId: ACCOUNT, zoneId: "fedcba9876543210fedcba9876543210", accessTeamDomain: "joutiya.cloudflareaccess.com", sshTunnelId: null, accessOauthClientId: `100000000001-${"b".repeat(32)}.apps.googleusercontent.com` },
-      oracle: { homeRegion: "eu-paris-1", tenancyId: `ocid1.tenancy.oc1..${"a".repeat(60)}`, compartmentId: `ocid1.compartment.oc1..${"b".repeat(60)}`, userId: `ocid1.user.oc1..${"d".repeat(60)}`, vmDynamicGroupId: null, runCommandPolicyId: null },
+      oracle: { homeRegion: "eu-paris-1", tenancyId: `ocid1.tenancy.oc1..${"a".repeat(60)}`, compartmentId: `ocid1.compartment.oc1..${"b".repeat(60)}`, userId: `ocid1.user.oc1..${"d".repeat(60)}`, vmDynamicGroupId: null, runCommandPolicyId: null, launcherUserId: null, launcherGroupId: null },
       anthropic: { organizationId: "123e4567-e89b-12d3-a456-426614174000" },
       github: { repository: "octo-org/joutiya", repositoryId: "123456789" },
       stripe: { accountId: "acct_1Q2w3E4r5T6y7U8i" },

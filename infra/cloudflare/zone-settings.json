@@ -1,11 +1,13 @@
 {
-  "description": "Zone settings of joutiya.ma (§2, §6), applied in order by scripts/cloudflare.ts. ssl_automatic_mode=custom first, otherwise Automatic SSL/TLS may change the mode on its own.",
+  "description": "Zone settings of joutiya.ma (§2, §6), applied in order by scripts/cloudflare.ts. ssl_automatic_mode=custom first, otherwise Automatic SSL/TLS may change the mode on its own. Email obfuscation and Rocket Loader off: both rewrite the HTML and inject a script the CSP would refuse.",
   "settings": [
     { "id": "ssl_automatic_mode", "value": "custom" },
     { "id": "ssl", "value": "strict" },
     { "id": "min_tls_version", "value": "1.2" },
     { "id": "tls_1_3", "value": "on" },
     { "id": "always_use_https", "value": "on" },
-    { "id": "automatic_https_rewrites", "value": "on" }
+    { "id": "automatic_https_rewrites", "value": "on" },
+    { "id": "email_obfuscation", "value": "off" },
+    { "id": "rocket_loader", "value": "off" }
   ]
 }

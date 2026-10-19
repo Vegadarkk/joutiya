@@ -49,6 +49,9 @@ jobs:
     timeout-minutes: 40
     permissions:
       contents: read
+      # The "Release images" check run: `oracle-vm.ts promote` refuses images that staging did not
+      # load from the tarball recorded there (a leaked staging key can send its own).
+      checks: write
     outputs:
       release: ${{ steps.release.outputs.id }}
     steps:
@@ -71,6 +74,17 @@ jobs:
             echo '|---|---|'
             for target in web worker; do echo "| joutiya-$target | \`$(docker image inspect --format '{{.Id}}' "joutiya-$target:$RELEASE")\` |"; done
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Save and record the tarball
+        env:
+          RELEASE: ${{ steps.release.outputs.id }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          docker save -o "$RUNNER_TEMP/release.tar" "joutiya-web:$RELEASE" "joutiya-worker:$RELEASE"
+          digest="sha256:$(sha256sum "$RUNNER_TEMP/release.tar" | cut -d ' ' -f 1)"
+          echo "| tarball | \`$digest\` |" >> "$GITHUB_STEP_SUMMARY"
+          gh api "repos/$GITHUB_REPOSITORY/check-runs" -f name="Release images" -f head_sha="$SHA" \
+            -f status=completed -f conclusion=success -f "output[title]=Release $RELEASE" -f "output[summary]=tarball $digest" > /dev/null
       - name: Send to the VM
         env:
           RELEASE: ${{ steps.release.outputs.id }}
@@ -89,7 +103,7 @@ jobs:
           CLOUDFLARED_IMAGE="$(grep -m 1 -oE 'cloudflare/cloudflared:[^[:space:]]+' docker/compose.yml)"
           test -n "$CLOUDFLARED_IMAGE" || { echo "cloudflared image not found in docker/compose.yml"; exit 1; }
           docker pull --quiet "$CLOUDFLARED_IMAGE"
-          docker save "joutiya-web:$RELEASE" "joutiya-worker:$RELEASE" | zstd -T0 -10 -q \
+          zstd -T0 -10 -q -c "$RUNNER_TEMP/release.tar" \
             | ssh -i ~/.ssh/deploy_staging -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
                 -o ProxyCommand="docker run --rm -i -e TUNNEL_SERVICE_TOKEN_ID -e TUNNEL_SERVICE_TOKEN_SECRET $CLOUDFLARED_IMAGE access ssh --hostname %h" \
                 deploy-staging@ssh.joutiya.ma "load $RELEASE"

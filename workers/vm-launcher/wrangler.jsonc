@@ -1,0 +1,16 @@
+// Free launcher of joutiya-vm (docs/phase-1.md, step 3): one launch request a minute while the
+// compartment has no instance. Free plan: 1 of the 5 cron triggers, 2 subrequests and about 2 ms
+// of CPU per run. Deploy: npx wrangler@4.144.0 deploy, from the owner's machine; delete the Worker
+// once the VM is configured.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "joutiya-vm-launcher",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-29",
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": { "crons": ["* * * * *"] },
+  "observability": { "enabled": true }
+  // Secrets (wrangler secret put): OCI_USER and OCI_FINGERPRINT of the OCI user joutiya-launcher,
+  // OCI_PRIVATE_KEY (its API private key, PEM). The rest comes from src/launch.json.
+}
