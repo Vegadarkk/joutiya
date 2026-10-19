@@ -28,6 +28,14 @@ export { clampIndex, stepForKey, targetIndex, type GalleryStep } from "./gallery
 
 const loadLightbox = () => import("./lightbox");
 
+// Focus over a photo: the global 2 px ring, then a 2 px surface band between it and the picture
+// (the gap the outline offset leaves elsewhere), so it reads on any photo. Drawn inside, on top of
+// the image: the track and the thumbnail strip scroll and clip anything outside a control.
+const PHOTO_FOCUS = cn(
+  "focus-visible:outline-none focus-visible:after:pointer-events-none focus-visible:after:absolute focus-visible:after:inset-0 focus-visible:after:rounded-[inherit]",
+  "focus-visible:after:shadow-[inset_0_0_0_2px_var(--ring),inset_0_0_0_4px_var(--surface)]",
+);
+
 /** Stands in for the lightbox while its chunk cannot be downloaded: closes at once, under a reload prompt. */
 export function LightboxUnavailable({ open, start, onClose }: LightboxProps) {
   const t = useTranslations("ListingPage.gallery");
@@ -128,7 +136,7 @@ export function Gallery({ listingId, title, photos, mediaBaseUrl, className }: G
                     setLightboxMounted(true);
                     setLightbox(position);
                   }}
-                  className="group absolute inset-0 flex cursor-zoom-in items-center justify-center bg-bab-950/10 outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring"
+                  className={cn("group absolute inset-0 flex cursor-zoom-in items-center justify-center bg-bab-950/10", PHOTO_FOCUS)}
                 >
                   {first || restMounted ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -178,7 +186,8 @@ export function Gallery({ listingId, title, photos, mediaBaseUrl, className }: G
                   aria-current={current ? "true" : undefined}
                   aria-label={t("show", { index: position + 1, count })}
                   className={cn(
-                    "relative block h-14 w-[4.5rem] overflow-hidden rounded-md bg-surface-muted outline-none transition-opacity duration-150 focus-visible:ring-3 focus-visible:ring-ring",
+                    "relative block h-14 w-[4.5rem] overflow-hidden rounded-md bg-surface-muted transition-opacity duration-150 ease-door focus-visible:opacity-100",
+                    PHOTO_FOCUS,
                     current ? "ring-2 ring-primary" : "opacity-70 hover:opacity-100",
                   )}
                 >
@@ -228,7 +237,7 @@ function ArrowButton({ direction, label, disabled, onClick, className }: { direc
       disabled={disabled}
       aria-label={label}
       className={cn(
-        "absolute top-1/2 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full bg-surface/90 text-foreground shadow-lg shadow-bab-950/15 transition-opacity duration-150 hover:bg-surface focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 sm:flex",
+        "absolute top-1/2 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full bg-surface/90 text-foreground shadow-lg shadow-bab-950/15 transition-[background-color,opacity,scale] duration-150 ease-door hover:bg-surface active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 sm:flex",
         className,
       )}
     >

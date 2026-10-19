@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { quietLinkClassName } from "@/components/ui/text-link";
 import type { Locale } from "@/config/site";
 import { cityName, type City } from "@/config/regions";
 import { Link } from "@/i18n/navigation";
@@ -31,7 +32,7 @@ export function LandingBreadcrumb({ steps, className }: { steps: readonly Landin
           <li key={`${index}-${step.label}`} className="flex min-w-0 items-center gap-1">
             {index > 0 ? <ChevronRight className="size-3.5 shrink-0 rtl:-scale-x-100" aria-hidden="true" /> : null}
             {step.href ? (
-              <Link href={step.href} prefetch={false} className="inline-flex min-h-11 items-center rounded-sm hover:text-foreground hover:underline hover:underline-offset-2 sm:min-h-0 sm:py-1">
+              <Link href={step.href} prefetch={false} className={cn("inline-flex min-h-11 items-center rounded-sm hover:text-foreground sm:min-h-0 sm:py-1", quietLinkClassName)}>
                 {step.label}
               </Link>
             ) : (
@@ -66,7 +67,9 @@ export function SubcategoryChips({ chips, label }: { chips: readonly LandingChip
               prefetch={false}
               aria-current={chip.current ? "page" : undefined}
               className={cn(
-                "inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors duration-150 ease-door",
+                "inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-[background-color,border-color,color,scale] duration-150 ease-door active:scale-[0.98]",
+                // The phone row scrolls and clips outside its chips: the focus ring goes inside.
+                "max-sm:focus-visible:-outline-offset-2",
                 chip.current
                   ? "border-structure bg-structure text-structure-foreground"
                   : "border-border-strong bg-surface text-foreground hover:border-foreground/40 hover:bg-surface-muted",
@@ -99,7 +102,7 @@ export function CityLinks({ links, locale, title, id }: { links: readonly Landin
         {links.map((link) => (
           <li key={link.city.slug} className="min-w-0 border-b border-border/70">
             <Link href={link.href} prefetch={false} className="group flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
-              <span className="truncate text-foreground group-hover:underline group-hover:underline-offset-2">{cityName(link.city, locale)}</span>
+              <span className={cn(quietLinkClassName, "truncate text-foreground group-hover:decoration-current")}>{cityName(link.city, locale)}</span>
               <span className="shrink-0 tabular-nums text-foreground-muted">{formatCount(link.count)}</span>
             </Link>
           </li>

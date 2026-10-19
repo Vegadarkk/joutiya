@@ -52,8 +52,7 @@ export function CategoryPicker({ categoryId, subcategoryId, onCategory, onSubcat
               onClick={() => onCategory(item.id)}
               className={cn(
                 "flex min-h-24 flex-col items-start justify-between gap-3 rounded-lg border border-border bg-surface p-4 text-start",
-                "transition-[border-color,background-color,transform] duration-150 ease-door hover:border-structure/60 hover:bg-surface-muted active:scale-[0.99]",
-                "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25",
+                "transition-[border-color,background-color,scale] duration-150 ease-door hover:border-structure/60 hover:bg-surface-muted active:scale-[0.99]",
               )}
             >
               <Icon className="size-6 text-structure" aria-hidden="true" strokeWidth={1.75} />
@@ -96,7 +95,7 @@ export function CategoryPicker({ categoryId, subcategoryId, onCategory, onSubcat
               onClick={() => (locked ? undefined : onSubcategory(subcategory))}
               className={cn(
                 "flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-start transition-colors duration-150 ease-door",
-                "first:rounded-t-lg last:rounded-b-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25 focus-visible:ring-inset",
+                "first:rounded-t-lg last:rounded-b-lg focus-visible:-outline-offset-2",
                 locked ? "cursor-not-allowed text-foreground-muted" : "hover:bg-surface-muted",
                 checked && "bg-structure text-structure-foreground hover:bg-bab-600",
               )}

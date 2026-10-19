@@ -3,6 +3,7 @@ import { Camera, ImageOff } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { BoostBadge } from "@/components/search/boost-badge";
 import type { CardBadge } from "@/components/search/filter-model";
+import { quietLinkClassName } from "@/components/ui/text-link";
 import { subcategoryById } from "@/config/categories";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
@@ -60,7 +61,7 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
           href={`/annonce/${listing.slugId}`}
           prefetch={false}
           dir="auto"
-          className="line-clamp-2 break-words outline-none group-hover:underline group-hover:underline-offset-2 after:absolute after:inset-0 after:rounded-lg"
+          className={cn("line-clamp-2 break-words outline-none", quietLinkClassName, "group-hover:decoration-current after:absolute after:inset-0 after:rounded-lg")}
         >
           {listing.title}
         </Link>

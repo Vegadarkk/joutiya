@@ -12,6 +12,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Link } from "@/i18n/navigation";
 import { apiPost, isApiError, setSession } from "@/lib/auth/client";
 import { AUTH_API, passwordSchema, type ActionResponse, type SessionSummary } from "@/lib/contracts/auth";
+import { markWelcomeSeen, queueDoorOpening } from "@/lib/welcome/flags";
 import { FormMessage, useApiErrorMessage, useFieldMessage } from "./form-message";
 import { PasswordField } from "./password-field";
 import { ResendVerification } from "./resend-verification";
@@ -52,7 +53,11 @@ export function ActionView({ nonce }: { nonce?: string }) {
     try {
       const answer = await apiPost<ActionResponse>(AUTH_API.action, { mode, oobCode });
       if (answer.status === "verified") {
-        if (answer.session) setSession(answer.session);
+        if (answer.session) {
+          setSession(answer.session);
+          // A member's device: the home page no longer greets it with the welcome screen.
+          markWelcomeSeen();
+        }
         setState({ kind: "verified", session: answer.session });
       } else {
         setState({ kind: "reset", email: answer.email });
@@ -114,7 +119,10 @@ export function ActionView({ nonce }: { nonce?: string }) {
                 <Link href="/parametres">{t("goSettings")}</Link>
               </Button>
               <Button asChild variant="outline">
-                <Link href="/">{t("goHome")}</Link>
+                {/* The account is created: the door of the home page opens for it (once per device). */}
+                <Link href="/" onClick={queueDoorOpening}>
+                  {t("goHome")}
+                </Link>
               </Button>
             </>
           ) : (

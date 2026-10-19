@@ -13,8 +13,7 @@ export function SponsoredInfo({ label, text, className }: { label: string; text:
           type="button"
           aria-label={label}
           className={cn(
-            "inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors duration-150 ease-door hover:bg-surface hover:text-foreground sm:size-9",
-            "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25",
+            "inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-[background-color,color,scale] duration-150 ease-door hover:bg-surface hover:text-foreground active:scale-[0.98] sm:size-9",
             className,
           )}
         >

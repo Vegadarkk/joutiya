@@ -274,8 +274,9 @@ export function MyListingsView() {
               onKeyDown={(event) => onTabKey(event, index)}
               className={cn(
                 "relative flex min-h-11 shrink-0 items-center gap-2 px-3 text-sm font-medium transition-colors duration-150 ease-door",
-                "after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:transition-[background-color,transform] after:duration-200 after:ease-door",
-                "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25",
+                "after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:transition-[background-color,scale] after:duration-200 after:ease-door",
+                // The tab row scrolls and clips outside its tabs: the focus ring goes inside.
+                "focus-visible:-outline-offset-2",
                 selected ? "text-foreground after:scale-x-100 after:bg-featured" : "text-foreground-muted after:scale-x-0 after:bg-transparent hover:text-foreground",
               )}
             >

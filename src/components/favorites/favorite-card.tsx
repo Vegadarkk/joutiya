@@ -7,6 +7,7 @@ import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { blurhashPlaceholder, photoSources } from "@/components/listing/photo";
 import { PriceTag } from "@/components/listing/price-tag";
+import { quietLinkClassName, textLinkClassName } from "@/components/ui/text-link";
 import { Link } from "@/i18n/navigation";
 import type { FavoriteView } from "@/lib/contracts/search";
 import { intlLocale } from "@/lib/listings/client/format";
@@ -87,9 +88,9 @@ export function FavoriteCard({ favorite, mediaBaseUrl, locale, busy = false, onR
             onClick={onRemove}
             disabled={busy}
             aria-label={t("removeOf", { title: card.title })}
-            className="group/fav absolute top-0 end-0 z-10 inline-flex size-11 items-center justify-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/40 disabled:opacity-60"
+            className="group/fav absolute top-0 end-0 z-10 inline-flex size-11 items-center justify-center rounded-full outline-none disabled:opacity-60 [&:focus-visible>span]:outline-2 [&:focus-visible>span]:outline-offset-0 [&:focus-visible>span]:outline-ring"
           >
-            <span className="inline-flex size-9 items-center justify-center rounded-full bg-surface/90 shadow-sm shadow-bab-950/20 backdrop-blur-sm transition-[background-color,transform] duration-150 ease-door group-hover/fav:bg-surface group-active/fav:scale-90">
+            <span className="inline-flex size-9 items-center justify-center rounded-full bg-surface/90 shadow-sm shadow-bab-950/20 backdrop-blur-sm transition-[background-color,scale] duration-150 ease-door group-hover/fav:bg-surface group-active/fav:scale-90">
               <Heart aria-hidden="true" className="size-5 fill-primary text-primary" />
             </span>
           </button>
@@ -100,7 +101,7 @@ export function FavoriteCard({ favorite, mediaBaseUrl, locale, busy = false, onR
           <Link
             href={`/annonce/${card.slugId}`}
             prefetch={false}
-            className="line-clamp-2 break-words outline-none group-hover:underline group-hover:underline-offset-2 after:absolute after:inset-0 after:rounded-lg"
+            className={cn("line-clamp-2 break-words outline-none", quietLinkClassName, "group-hover:decoration-current after:absolute after:inset-0 after:rounded-lg")}
           >
             {card.title}
           </Link>
@@ -119,7 +120,7 @@ export function FavoriteCard({ favorite, mediaBaseUrl, locale, busy = false, onR
           onClick={onRemove}
           disabled={busy}
           aria-label={t("removeOf", { title: card.title })}
-          className="mt-1 inline-flex min-h-11 items-center gap-1.5 self-start rounded-md px-1 text-sm font-medium text-link underline underline-offset-4 hover:no-underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25 disabled:opacity-60 sm:min-h-9"
+          className={cn("mt-1 inline-flex min-h-11 items-center gap-1.5 self-start rounded-md px-1 text-sm font-medium text-link disabled:opacity-60 sm:min-h-9", textLinkClassName)}
         >
           {t("remove")}
         </button>

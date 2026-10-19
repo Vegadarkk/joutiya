@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Button } from "@/components/ui/button";
+import { quietLinkClassName } from "@/components/ui/text-link";
 import { Link, getPathname } from "@/i18n/navigation";
 import type { OwnerListingSummary } from "@/lib/contracts/listings";
 import { isolate } from "@/lib/i18n/bidi";
@@ -70,11 +71,11 @@ export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, bu
         <div className="flex items-start justify-between gap-2">
           <h2 className="min-w-0 text-base font-semibold leading-snug">
             {href ? (
-              <Link href={href} dir="auto" className="line-clamp-2 break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
+              <Link href={href} dir="auto" className={cn("line-clamp-2 break-words rounded-sm", quietLinkClassName)}>
                 {title}
               </Link>
             ) : (
-              <a href={publicHref ?? undefined} dir="auto" className="line-clamp-2 break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
+              <a href={publicHref ?? undefined} dir="auto" className={cn("line-clamp-2 break-words rounded-sm", quietLinkClassName)}>
                 {title}
               </a>
             )}
