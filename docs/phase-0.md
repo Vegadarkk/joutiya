@@ -7,7 +7,7 @@ Ce qui reste à faire pour clore la phase 0 (architecture v3, §9 et §10). Tout
 - **Claude** (les sessions du projet claude.ai) agit par API. Pour chaque service qui en a une, il reçoit un jeton dédié, à la portée la plus petite possible, rangé dans votre environnement cloud Claude sous un nom commençant par `JOUTIYA_`.
 - **Nav** (Claude dans votre navigateur, sur PC2, fil « Consoles via ton navigateur ») fait tout ce qui n'a pas d'API : ouverture des comptes, réglages dans les consoles, préparation de chaque jeton jusqu'à l'écran qui le crée. Le coordinateur lui envoie les étapes de ce guide dans l'ordre de la file ci-dessous. Nav ne voit, ne tape et ne photographie jamais la valeur d'un secret.
 - **Vous** : mots de passe, codes de double authentification, CAPTCHA, cartes bancaires, pièces d'identité, et le clic qui révèle un secret, suivi de son rangement ; plus une autorisation écrite dans le fil de Nav avant qu'il crée quoi que ce soit (sa session l'exige ; une phrase de vous couvre toute la file : donnée le 15 octobre pour la politique Oracle, le jeton `joutiya-edge` et les étapes N1 à N10). Ces moments sont signalés par **Vous :** dans ce guide ; rien d'autre ne vous est demandé.
-- **Cody** (votre Claude Code local, PC1) : le bot Telegram (prompt C) et, si vous le souhaitez, l'encodage de la clé Oracle (prompt O).
+- **Cody** (votre Claude Code local, PC1) : si vous le souhaitez, l'encodage de la clé Oracle (prompt O).
 
 ## Règles pour chaque compte
 
@@ -19,14 +19,14 @@ Ce qui reste à faire pour clore la phase 0 (architecture v3, §9 et §10). Tout
 - **Adresse** : quand un service demande l'adresse de l'entreprise, uniquement la domiciliation, 6 rue d'Armaillé, 75017 Paris.
 - **Identifiants** (identifiant de projet ou de compte, nom de bucket, OCID) : Nav les rapporte, Claude les consigne dans `infra/targets.json` par une PR (étape 12). Ce ne sont pas des secrets.
 - **Clés secrètes** : créées seulement à la phase qui s'en sert. Deux maisons : votre fichier local `.env.local`, sous le nom prévu par `.env.example`, pour les clés du site et du déploiement (lues par Cody) ; votre environnement cloud Claude pour les accès propres à Claude. Cet environnement est partagé avec vos autres projets : d'où le préfixe `JOUTIYA_`, qui évite d'écraser la variable d'un autre projet, et l'interdiction pour une session Joutiya d'utiliser une clé sans ce préfixe. Une variable ajoutée n'est visible que des sessions démarrées ensuite : après chaque rangement, prévenez Claude, un nouveau fil vérifie l'accès par une simple lecture. L'éditeur de l'environnement prend une ligne `NOM=valeur` par variable : un secret sur plusieurs lignes (une clé privée) y passe encodé en base64 sur une ligne. Jamais de clé dans le dépôt ni dans le chat.
-- Si vous avez un `.env` dans le dossier du dépôt, renommez-le en `.env.local` et alignez-le sur `.env.example` : des noms ont changé (par exemple `CF_ACCOUNT_ID`). N'y gardez que des clés propres à Joutiya ; une clé qui ouvre tout un compte (Global API Key Cloudflare, clé d'un autre projet Google) n'a rien à y faire.
+- Votre `.env.local` sert aussi à un autre de vos produits : Cody ne le lit pas lui-même, ne l'affiche pas et ne le réécrit jamais ; seuls les scripts du dépôt le lisent, sous les noms prévus par `.env.example` (guide de la phase 1, prompt O). Rien à renommer ni à aligner à la main. Pour Joutiya, aucune clé qui ouvre tout un compte (Global API Key Cloudflare, clé d'un autre projet Google).
 - **Réseau de Claude** : la politique réseau de votre environnement cloud doit laisser passer les hôtes des API. Vérifié le 15 octobre depuis l'environnement actuel : `*.oraclecloud.com`, `api.cloudflare.com`, `api.resend.com`, `api.brevo.com`, `api.hostinger.com`, `api.stripe.com`, `graph.facebook.com`, `sentry.io`, `de.sentry.io`, `api.telegram.org` et `*.googleapis.com` passent tous, rien à ajouter. Si un fil signale un jour un hôte bloqué, ajoutez-le dans les réglages de l'environnement (domaines autorisés) : ce réglage est à vous seul, et seules les sessions démarrées ensuite en profitent.
 
 **Ordre.** File de Nav au 15 octobre : accès limité Oracle (étape 4), pièces .MA (0), zone Cloudflare et jeton `joutiya-edge` (1), puis N1 Firebase (5), N2 Zero Trust (3), N3 boîtes (2), N4 jeton mail (2), N5 Resend (7), N6 Brevo (7), N7 buckets R2 (3), N8 Meta (9), N9 Console Claude (8), N10 Stripe (10). Les étapes 0 à 7 bloquent la phase 1 (ses alertes partent par Resend et Telegram) ; les étapes 8 à 10 servent aux phases 2 à 7 ; l'étape 11 attend l'avant-lancement ; l'étape 12 suit au fil de l'eau.
 
 ## 0. Le domaine `joutiya.ma` (fil « Documents du domaine .MA »)
 
-Le registre .MA valide chaque domaine sur pièces, envoyées dans les 14 jours suivant l'achat : pour `joutiya.ma`, acheté le 5 octobre 2026, au plus tard le **19 octobre 2026** selon cette règle (échéance en cours de confirmation auprès de Hostinger). L'examen prend 2 à 4 semaines. Sans pièces, le domaine est suspendu, puis peut être supprimé, sans remboursement ([aide Hostinger](https://www.hostinger.com/support/requirements-to-register-a-ma-domain/)). « Actif » dans hPanel ne prouve pas la validation.
+Le registre .MA valide chaque domaine sur pièces, envoyées dans les 14 jours suivant l'achat : pour `joutiya.ma`, acheté le 5 octobre 2026, le 19 octobre 2026 selon cette règle ; Hostinger a fixé l'échéance au **20 octobre 2026, 15:24 UTC**. L'examen prend 2 à 4 semaines. Sans pièces, le domaine est suspendu, puis peut être supprimé, sans remboursement ([aide Hostinger](https://www.hostinger.com/support/requirements-to-register-a-ma-domain/)). « Actif » dans hPanel ne prouve pas la validation.
 1. Nav remplit le formulaire officiel de vérification .MA de Hostinger (description de l'usage du site comprise), puis suit le dossier avec le Customer Success par le chat de hPanel ; chaque réponse exacte est rapportée au fil.
 2. **Vous :** les pièces que le registre demande selon l'inscription du titulaire (passeport pour une personne, certificat d'immatriculation pour une organisation : Hostinger a inscrit le titulaire comme organisation « Adark Prime », le fil .MA vous dit laquelle fournir), et le contact administratif, personne physique résidant au Maroc, de nationalité marocaine selon certains registraires (nom, adresse, téléphone). Le nom du titulaire doit correspondre à la pièce : le corriger plus tard impose un transfert payant. Pas de protection WHOIS sur un .MA.
 3. Validation confirmée par écrit : Nav change alors les nameservers vers Cloudflare (étape 1, point 4). Les étapes 1 à 7 avancent en attendant.
@@ -45,12 +45,12 @@ Le courrier arrive dans les boîtes Hostinger de l'offre gratuite liée à votre
 2. Nav (N3) crée les boîtes `dsa@`, `abuse@` et `dpo@` (`contact@` existe ; un alias par boîte au plus, boîtes gratuites). **Vous :** leurs mots de passe, tapés par vous et gardés dans votre gestionnaire.
 3. Nav (N4) prépare dans **Agentic Mail** → **Accès API** un jeton `joutiya-claude-mail` (l'interface impose les deux permissions, actions SMTP/IMAP et webhooks). Le jeton créé le 15 octobre couvre toutes les boîtes de `joutiya.ma`, actuelles et futures (hPanel ne modifie pas un jeton, il ne sait que le supprimer) ; il est conservé tel quel, toutes les boîtes du domaine étant celles de Joutiya. **Vous :** le clic qui le crée, rangement sous `JOUTIYA_HOSTINGER_MAIL_API_TOKEN`, puis prévenez Claude : un nouveau fil lit `contact@` pour vérifier. Nav a vérifié le 15 octobre que la section Agentic Mail (« Boîte mail IA », bêta) est bien présente pour cette offre, sans paiement demandé.
 4. Pas de jeton API Hostinger complet pour Claude (carte du 15 octobre, recommandation « Nav seulement », appliquée sauf avis contraire de votre part) : ces jetons n'ont aucune portée (facturation, moyens de paiement, codes de transfert du domaine). Les quelques actions hPanel restantes sont faites par Nav.
-5. **Z11, à la fin seulement** : quand tout fonctionne, Nav révoque dans hPanel l'ancien jeton mail en clair et le jeton API à tous droits ; **Vous :** supprimez le fichier « Cody Joutiya API.txt », corbeille comprise. Rien n'est révoqué avant.
+5. **Z11, à la fin seulement** : quand tout fonctionne, Nav révoque dans hPanel l'ancien jeton mail en clair et le jeton API à tous droits ; **Vous :** supprimez les fichiers « Cody Joutiya API.txt » et « Cody Joutiya API.png » du dossier partagé `Joutiya/`, corbeille comprise. Rien n'est révoqué avant : risque accepté par vous le 19 octobre (audit du jalon 50 %), ce jeton en clair restant lisible par toutes les sessions du projet jusque-là.
 
 ## 3. Cloudflare : R2 et Zero Trust
 
 - **R2** est activé sur votre compte : les 10 Go gratuits sont partagés avec `punkrecords.fr`, qui en occupe déjà 4,14 Go (relevé de Nav du 15 octobre), soit environ 5,8 Go pour Joutiya ; le garde-fou R2 de la phase 3 lira l'usage du compte entier, pas seulement celui de Joutiya. Nav (N7) crée 9 buckets en juridiction **European Union (EU)**, non modifiable ensuite : `joutiya-dev-quarantine`, `joutiya-dev-media`, `joutiya-dev-private`, puis les mêmes avec `staging` et `prod`. Pourquoi Nav : la permission qui crée des buckets couvre tous les buckets du compte, un jeton ne peut pas être limité à des noms. Les clés S3 du site (phase 3) seront limitées aux buckets Joutiya. Nav rapporte les noms exacts.
-- **Zero Trust** : Nav (N2) → nom d'équipe `joutiya` (ou `joutiya-ma` s'il est pris) → offre **Free**. **Vous :** la carte bancaire (0 €). Nav a vérifié le 15 octobre que Zero Trust n'est pas encore activé sur ce compte. Les applications Access arrivent en phase 1. Nav rapporte le domaine d'équipe `<équipe>.cloudflareaccess.com`.
+- **Zero Trust** : Nav (N2) → nom d'équipe `joutiya` (ou `joutiya-ma` s'il est pris) → offre **Free**. **Vous :** la carte bancaire (0 €). Fait le 15 octobre (22:35 UTC) : domaine d'équipe `joutiya.cloudflareaccess.com`, consigné dans `infra/targets.json`. Les applications Access arrivent en phase 1.
 
 ## 4. Oracle Cloud (Z1)
 
@@ -92,12 +92,9 @@ Pourquoi Nav : un compte de service ne peut pas créer de projet hors d'une orga
 
 Nav rapporte : les 3 identifiants, le numéro de chaque projet (**Paramètres du projet**) et la région de chaque base.
 
-## 6. Bot Telegram (alertes) : vous et Cody
+## 6. Bot Telegram (alertes) : fait le 16 octobre
 
-Pas d'API : seul @BotFather crée un bot, et il affiche le jeton dans la conversation.
-1. Telegram → **@BotFather** → `/newbot` → nom « Joutiya Alertes » → identifiant finissant par `bot`, par exemple `joutiya_alertes_bot`.
-2. Copiez le jeton dans `.env.local` : `TELEGRAM_BOT_TOKEN=…` (`/token` chez BotFather le régénère en cas de doute).
-3. Ouvrez votre bot, envoyez-lui `/start`, puis lancez le prompt C dans les 24 h : Telegram ne garde les messages que 24 h. Cody rend votre identifiant de conversation : `TELEGRAM_CHAT_ID=…` dans `.env.local`.
+Pas d'API : seul @BotFather crée un bot, et il affiche le jeton dans la conversation. Fait par vous le 16 octobre 2026 depuis votre téléphone : bot « Joutiya », `@Joutiyabot`, jeton rangé dans l'environnement cloud sous `JOUTIYA_TELEGRAM_BOT_TOKEN`, `/start` envoyé. Le fil « Vérification du bot Telegram » a lu le bot et votre identifiant de conversation (aucun webhook) ; le fil « Mise en ligne phase 1 » les reprend pour les alertes. En cas de doute sur le jeton, `/token` chez BotFather le régénère : rangez la nouvelle valeur sous le même nom.
 
 ## 7. E-mail : Resend et Brevo (après l'étape 1)
 
@@ -127,7 +124,7 @@ Nav (N8), depuis votre profil Facebook :
 2. developers.facebook.com → **Créer une app** → cas d'usage WhatsApp (« Connect with customers through WhatsApp » ou équivalent) → nom **Joutiya**, rattachée au portefeuille Joutiya → produit WhatsApp : Meta fournit un numéro de test, qui servira en dev et en staging.
 3. Rien d'autre maintenant : pas de numéro, pas de moyen de paiement (Joutiya ne fait que recevoir, et la réception est gratuite), pas de vérification de l'entreprise, pas d'utilisateur système ni de jeton. **Vous :** mot de passe Facebook et code.
 
-En phase 2, par API : ajout du vrai numéro (carte SIM prépayée marocaine jamais inscrite sur WhatsApp, qui ne pourra plus servir dans l'application ; **Vous :** le code reçu par SMS ou appel), enregistrement avec un PIN à 6 chiffres, utilisateur système `joutiya-claude` et son jeton (`whatsapp_business_management`, `whatsapp_business_messaging` ; **Vous :** le clic qui le révèle, rangement sous `JOUTIYA_META_SYSTEM_TOKEN`). Le webhook de l'app se règle dans le tableau de bord (Nav). Le nom affiché n'est examiné par Meta qu'après la vérification de l'entreprise (pièces : **Vous**).
+En phase 2, par API : ajout du vrai numéro de production, la ligne professionnelle d'Adark Prime (décision du 16 octobre 2026, à la place d'une carte SIM marocaine ; un numéro inscrit sur l'API peut être retiré de l'application WhatsApp du téléphone, voir le guide de la phase 2 ; le développement et le staging gardent le numéro de test de Meta ; **Vous :** le code reçu par SMS ou appel), enregistrement avec un PIN à 6 chiffres, utilisateur système `joutiya-claude` et son jeton (`whatsapp_business_management`, `whatsapp_business_messaging` ; **Vous :** le clic qui le révèle, rangement sous `JOUTIYA_META_SYSTEM_TOKEN`). Le webhook de l'app se règle dans le tableau de bord (Nav). Le nom affiché n'est examiné par Meta qu'après la vérification de l'entreprise (pièces : **Vous**).
 
 Nav rapporte : Business ID, App ID, le **WhatsApp Business Account ID** et le **Phone number ID** du numéro de test (dev et staging) ; ceux du vrai numéro suivront en phase 2 (prod : le garde-fou exige qu'il diffère).
 
@@ -147,17 +144,11 @@ Claude consigne dans `infra/targets.json`, par PR, les identifiants rapportés p
 
 Pour la phase 2, Sentry (organisation en région UE, choisie à l'inscription par Nav ; jeton d'intégration interne pour Claude : `project:write`, `event:read`, `event:write`, `org:ci`) suit le même modèle.
 
-**Fin de la phase 0 :** `infra/targets.json` rempli et garde-fou au vert en CI ; chaque jeton rangé (`JOUTIYA_CLOUDFLARE_API_TOKEN`, `JOUTIYA_HOSTINGER_MAIL_API_TOKEN`, `JOUTIYA_RESEND_API_KEY`, `JOUTIYA_BREVO_API_KEY`, `JOUTIYA_OCI_*`) vérifié par un nouveau fil ; clé Oracle tournée (nouvelle `JOUTIYA_OCI_KEY_B64`, ancienne clé supprimée dans la console) ; Z11 : anciens jetons Hostinger révoqués et fichier « Cody Joutiya API.txt » supprimé ; aucune clé dans le dépôt ni dans le chat.
+**Fin de la phase 0 :** `infra/targets.json` rempli et garde-fou au vert en CI ; chaque jeton rangé (`JOUTIYA_CLOUDFLARE_API_TOKEN`, `JOUTIYA_HOSTINGER_MAIL_API_TOKEN`, `JOUTIYA_RESEND_API_KEY`, `JOUTIYA_BREVO_API_KEY`, `JOUTIYA_TELEGRAM_BOT_TOKEN`, `JOUTIYA_OCI_*`) vérifié par un nouveau fil ; clé Oracle tournée (nouvelle `JOUTIYA_OCI_KEY_B64`, ancienne clé supprimée dans la console) ; Z11 : anciens jetons Hostinger révoqués, ancienne clé Brevo `joutiya-web-staging` supprimée, fichiers « Cody Joutiya API.txt » et « Cody Joutiya API.png » supprimés ; vos documents personnels retirés du dossier partagé ; aucune clé dans le dépôt ni dans le chat.
 
 ## Prompts Cody
 
-À coller dans Cody, depuis le dossier du dépôt à jour (`git pull`). Node 24 ou plus récent (`node --version`). Les anciens prompts A (buckets R2), B (projets Firebase) et D (identifiants) ne servent plus : Nav crée les buckets et les projets, Claude consigne les identifiants.
-
-**C. Identifiant de conversation Telegram** (étape 6)
-
-```text
-J'ai mis TELEGRAM_BOT_TOKEN dans .env.local et envoyé /start à mon bot. Vérifie d'abord que TELEGRAM_BOT_TOKEN et TELEGRAM_CHAT_ID ne sont pas déjà définis dans le shell (une variable du shell l'emporte sur .env.local) ; si c'est le cas, arrête-toi et dis-le-moi. Appelle la méthode getUpdates de l'API Telegram en lisant le jeton depuis .env.local (par exemple avec `node --env-file=.env.local`), sans jamais afficher le jeton, et donne-moi seulement le chat id. Envoie ensuite le message « Joutiya : alertes OK » à ce chat avec sendMessage.
-```
+À coller dans Cody, depuis le dossier du dépôt à jour (`git pull`). Node 24 ou plus récent (`node --version`). Les anciens prompts A (buckets R2), B (projets Firebase), C (Telegram) et D (identifiants) ne servent plus : Nav crée les buckets et les projets, un fil cloud a lu le bot Telegram, Claude consigne les identifiants.
 
 **O. Clé Oracle de Claude** (étape 4, points 3 et 5)
 
