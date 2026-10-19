@@ -27,7 +27,7 @@ export function DescriptionStep({ onNext }: { onNext: () => void }) {
     control,
     setError,
     formState: { errors },
-  } = useForm<Form>({ resolver: zodResolver(descriptionStepSchema), defaultValues: { description: listing.description }, mode: "onBlur" });
+  } = useForm<Form>({ resolver: zodResolver(descriptionStepSchema), defaultValues: { description: listing.description }, mode: "onTouched" });
   const description = useWatch({ control, name: "description" });
 
   useEffect(() => {

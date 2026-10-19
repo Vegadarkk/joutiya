@@ -1,4 +1,6 @@
+import { Timestamp } from "firebase-admin/firestore";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { COLLECTIONS } from "@/lib/db/schemas";
 import type { QuotaStatus } from "@/lib/quota";
 
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
@@ -34,11 +36,12 @@ beforeEach(() => {
 });
 
 describe("quota-report", () => {
-  it("snapshots the closed UTC day into quotaDaily/{date} without an alert", async () => {
+  it("snapshots the closed UTC day into quotaDaily/{date} through the typed repository, without an alert", async () => {
     await quotaReport();
     expect(readQuotas).toHaveBeenCalledWith(new Date("2026-10-15T08:15:00Z"));
-    expect(collection).toHaveBeenCalledWith("quotaDaily");
+    expect(collection).toHaveBeenCalledWith(COLLECTIONS.quotaDaily);
     expect(doc).toHaveBeenCalledWith("2026-10-15");
+    // The repository stores the date as a Firestore Timestamp (like every other repository).
     expect(set).toHaveBeenCalledWith(
       {
         date: "2026-10-15",
@@ -46,7 +49,7 @@ describe("quota-report", () => {
           "resend.daily": { period: "2026-10-15", used: 72, limit: 100, ratio: 0.72, level: "warning" },
           "firestore.reads": { period: "2026-10-15", used: 1234, limit: 50_000, ratio: 0.0247, level: "ok" },
         },
-        createdAt: new Date("2026-10-16T08:15:00Z"),
+        createdAt: Timestamp.fromDate(new Date("2026-10-16T08:15:00Z")),
       },
       { merge: true },
     );

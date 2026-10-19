@@ -71,6 +71,31 @@ export async function consume(id: QuotaId, amount = 1, at = new Date()): Promise
   }
 }
 
+/**
+ * Raises a counter to the usage the provider reports (Resend's headers count the whole account:
+ * the uptime Worker's relay mails, increments lost with a counter). GET then SET, only when the
+ * provider's value is higher, same lifetime as consume; a crossing alerts as usual. Never throws.
+ */
+export async function raiseTo(id: QuotaId, value: number, at = new Date()): Promise<QuotaStatus> {
+  const definition = QUOTAS[id];
+  const period = periodKey(definition, at);
+  if (!isValkeyConfigured("queue")) return status(id, period, null);
+  try {
+    const key = counterKey(id, period);
+    const target = Math.round(value);
+    const stored = await valkey("queue").get(key);
+    const used = stored === null ? 0 : Number(stored);
+    if (target <= used) return status(id, period, used);
+    await valkey("queue").set(key, String(target), "EX", retentionSeconds(definition));
+    const current = status(id, period, target);
+    await notifyCrossing(current);
+    return current;
+  } catch (error) {
+    logger.warn({ quota: id, err: (error as Error).message }, "quota counter unavailable");
+    return status(id, period, null);
+  }
+}
+
 /** Records a measured value (stored bytes) for a gauge quota. Never throws. */
 export async function setGauge(id: QuotaId, value: number, at = new Date()): Promise<QuotaStatus> {
   const definition = QUOTAS[id];

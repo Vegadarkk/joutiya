@@ -56,7 +56,7 @@ export type LegalConfig = z.infer<typeof legalConfigSchema>;
 export const DEFAULT_LEGAL: LegalConfig = {
   legalForm: "EI",
   companyName: "Adark Prime",
-  // To align with the exact name in the register (the memento reads "DARKAOUI ADIL").
+  // Legal-notice defaults of the EI publisher; overridden by Firestore config/legal.
   entrepreneurName: "Adil DARKAOUI DAHMANI",
   shareCapital: "",
   hqAddress: "6 rue d'Armaillé, 75017 Paris",

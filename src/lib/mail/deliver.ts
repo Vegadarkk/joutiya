@@ -3,7 +3,7 @@ import { alert } from "@/lib/alert";
 import { serverEnv } from "@/lib/env";
 import { getLegalConfig } from "@/lib/legal/config";
 import { logger } from "@/lib/logging/logger";
-import { consume, isDegraded, isExhausted, nextReset } from "@/lib/quota";
+import { consume, isDegraded, isExhausted, nextReset, raiseTo } from "@/lib/quota";
 import { isValkeyConfigured, valkey } from "@/lib/valkey/clients";
 import { renderMail } from "./render";
 import { isSuppressed } from "./suppressions";
@@ -17,10 +17,14 @@ import type { MailPriority, MailTransport, RenderedMail, SendResult, TemplateMai
 // One delivery (worker job, or inline without a queue). Transport choice (§2 adapters, §9 quotas):
 //   dev + DEV_MAILBOX, or no provider key      → memory mailbox
 //   otherwise                                  → Resend
-//   Resend degraded (90 %)                     → other mails skipped; security mails keep the last 10 %
+//   Resend degraded (90 %)                     → security mails keep the last 10 %; transactional
+//                                                mails wait for the reset (deferred); bulk skipped
 //   Resend exhausted (100 %) or unavailable    → Brevo, security mails only (alert once a day)
+//   Resend refuses for its quota (429)         → Brevo for security mails, else wait for the daily
+//                                                reset (its own count includes the uptime Worker)
 //   Resend transient failure (429, 5xx, net)   → Brevo for security mails, else rethrown (backoff)
-//   nothing left (both quotas, no key)         → MailDeferredError: the worker delays the job
+//   nothing left (both quotas, no key)         → MailDeferredError: the worker delays the job; a
+//                                                waiting security mail raises a P1 once a day
 // A rejected mail (bad address or payload) is logged and dropped.
 
 export type DeliverOutcome = SendResult | { skipped: "suppressed" | "quota" | "rejected" };
@@ -37,6 +41,7 @@ export class MailDeferredError extends Error {
 }
 
 const RESEND_QUOTAS = ["resend.daily", "resend.monthly"] as const;
+type ResendQuota = (typeof RESEND_QUOTAS)[number];
 
 /** A provider refusing the key or the domain is tried again hourly, not five times in eight minutes. */
 export const PROVIDER_UNAVAILABLE_RETRY_MS = 3_600_000;
@@ -85,9 +90,21 @@ async function alertUnavailable(error: ProviderError, canFallback: boolean): Pro
   });
 }
 
-async function resendDegraded(): Promise<boolean> {
-  for (const id of RESEND_QUOTAS) if (await isDegraded(id)) return true;
-  return false;
+/** Security mails waiting in the queue: the owner hears it once a day, whatever the quota alerts said. */
+async function alertSecurityDeferred(cause: string, retryAt: Date): Promise<void> {
+  if (!(await firstToday("security-deferred", new Date().toISOString().slice(0, 10)))) return;
+  await alert({
+    severity: "P1",
+    title: "Mail: e-mails de sécurité en attente",
+    body: `${cause}, reprise à ${retryAt.toISOString()}. Les e-mails de sécurité (vérification d'adresse, mot de passe) attendent dans la file "mail".`,
+  });
+}
+
+/** The Resend quotas in degraded mode (from 90 %): the resets a non-security mail waits for. */
+async function degradedResendQuotas(): Promise<ResendQuota[]> {
+  const degraded: ResendQuota[] = [];
+  for (const id of RESEND_QUOTAS) if (await isDegraded(id)) degraded.push(id);
+  return degraded;
 }
 
 /** When Resend can send again: once every exhausted counter has reset, or now. */
@@ -101,9 +118,17 @@ async function resendAvailableAt(): Promise<Date | undefined> {
   return latest;
 }
 
-function deferral(candidates: Date[], reason: string): MailDeferredError {
+/** Waits for the earliest of `candidates` plus the margin, or for `notBefore` when later (the provider's Retry-After). */
+function deferral(candidates: Date[], reason: string, notBefore?: Date): MailDeferredError {
   const earliest = candidates.reduce((best, date) => (date < best ? date : best));
-  return new MailDeferredError(new Date(earliest.getTime() + RESET_MARGIN_MS), reason);
+  const retryAt = new Date(earliest.getTime() + RESET_MARGIN_MS);
+  return new MailDeferredError(notBefore && notBefore > retryAt ? notBefore : retryAt, reason);
+}
+
+async function securityDeferral(candidates: Date[], reason: string, cause: string, notBefore?: Date): Promise<MailDeferredError> {
+  const error = deferral(candidates, reason, notBefore);
+  await alertSecurityDeferred(cause, error.retryAt);
+  return error;
 }
 
 async function sendWith(transport: MailTransport, rendered: RenderedMail, mail: TemplateMail): Promise<SendResult> {
@@ -117,6 +142,15 @@ async function sendBrevo(apiKey: string, rendered: RenderedMail, mail: TemplateM
   await consume("brevo.daily");
   await alertFallback(reason);
   return result;
+}
+
+/**
+ * Resend's headers count the whole account (the uptime Worker's relay mails included) and survive
+ * a lost local counter: the local counters never stay below them.
+ */
+async function syncResendCounters(quota: SendResult["quota"]): Promise<void> {
+  if (quota?.daily !== undefined) await raiseTo("resend.daily", quota.daily);
+  if (quota?.monthly !== undefined) await raiseTo("resend.monthly", quota.monthly);
 }
 
 export async function deliverMail(mail: TemplateMail): Promise<DeliverOutcome> {
@@ -141,22 +175,33 @@ export async function deliverMail(mail: TemplateMail): Promise<DeliverOutcome> {
   const canFallback = security && Boolean(fallbackKey);
   const brevoOpen = async () => canFallback && !(await isExhausted("brevo.daily"));
 
-  // Quotas: from 90 % only security mails still use Resend (the reserved last 10 %); at 100 %
-  // they move to Brevo, and once nothing is left the job waits for the earliest reset.
-  if (!security && (await resendDegraded())) {
-    logger.info({ template: mail.template, priority }, "mail skipped: Resend quota degraded");
-    return { skipped: "quota" };
+  // Quotas: from 90 % only security mails still use Resend (the reserved last 10 %); transactional
+  // mails (statements of reasons included) wait in the queue for the reset of the degraded quota,
+  // bulk mails are dropped (the digest job stops itself). At 100 % security mails move to Brevo,
+  // and once nothing is left the job waits for the earliest reset.
+  if (!security) {
+    const degraded = await degradedResendQuotas();
+    if (degraded.length > 0) {
+      if (priority === "bulk") {
+        logger.info({ template: mail.template, priority }, "mail skipped: Resend quota degraded");
+        return { skipped: "quota" };
+      }
+      throw deferral(degraded.map((id) => nextReset(id)), "Resend reserved for security mails");
+    }
   }
   const resendBackAt = security ? await resendAvailableAt() : undefined;
   if (resendBackAt) {
     if (await brevoOpen()) return sendBrevo(fallbackKey as string, rendered, mail, "quota Resend atteint");
     const resets = [resendBackAt, ...(fallbackKey ? [nextReset("brevo.daily")] : [])];
-    throw deferral(resets, fallbackKey ? "Resend and Brevo quotas exhausted" : "Resend quota exhausted, no fallback key");
+    throw fallbackKey
+      ? await securityDeferral(resets, "Resend and Brevo quotas exhausted", "Resend et Brevo épuisés")
+      : await securityDeferral(resets, "Resend quota exhausted, no fallback key", "Resend épuisé, pas de clé Brevo");
   }
 
   try {
     const result = await sendWith(new ResendTransport(env.MAIL_API_KEY), rendered, mail);
     for (const id of RESEND_QUOTAS) await consume(id);
+    await syncResendCounters(result.quota);
     return result;
   } catch (error) {
     if (!(error instanceof ProviderError)) throw error;
@@ -170,6 +215,19 @@ export async function deliverMail(mail: TemplateMail): Promise<DeliverOutcome> {
       await alertUnavailable(error, canFallback);
       if (await brevoOpen()) return sendBrevo(fallbackKey as string, rendered, mail, `Resend HTTP ${error.status ?? "?"}`);
       throw new MailDeferredError(new Date(Date.now() + PROVIDER_UNAVAILABLE_RETRY_MS), `${error.message}: retry in one hour`);
+    }
+    if (error.kind === "quota") {
+      // Resend's own count says the account is spent (the uptime Worker shares it, a local counter
+      // may have been lost): Brevo now for security mails, else wait for the daily reset, or for the
+      // provider's Retry-After when it is later. The quick retries would only burn the attempts.
+      logger.warn({ template: mail.template, priority, err: error.message, retryAfterSeconds: error.retryAfterSeconds }, "Resend refused: quota spent");
+      if (await brevoOpen()) return sendBrevo(fallbackKey as string, rendered, mail, "quota Resend refusé");
+      const resets = [nextReset("resend.daily")];
+      const notBefore = error.retryAfterSeconds === undefined ? undefined : new Date(Date.now() + error.retryAfterSeconds * 1000);
+      if (!security) throw deferral(resets, "Resend quota refused", notBefore);
+      throw fallbackKey
+        ? await securityDeferral(resets, "Resend quota refused, Brevo exhausted", "Resend refuse (quota atteint) et Brevo épuisé", notBefore)
+        : await securityDeferral(resets, "Resend quota refused, no fallback key", "Resend refuse (quota atteint), pas de clé Brevo", notBefore);
     }
     // Transient (429, 5xx, network): Brevo now for security mails, else the queue's backoff.
     if (await brevoOpen()) {

@@ -1,12 +1,16 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { stubGoogleScript } from "./gsi-stub";
 
 // Account flows against the production build and the Firebase emulators (npm run test:e2e).
 // Mails stay in memory (DEV_MAILBOX=true) and are read back from /api/dev/mailbox; Turnstile runs
 // with Cloudflare's always-pass test keys (playwright.config.ts). The revocation test talks to the
 // Auth emulator directly (`npm run test:e2e` runs inside `firebase emulators:exec`).
 process.env.FIREBASE_AUTH_EMULATOR_HOST ??= "127.0.0.1:9099";
+
+// The auth pages render the Google button (stub client id): never the real script.
+test.beforeEach(({ page }) => stubGoogleScript(page));
 
 // Assembled at runtime: a literal would look like a credential to the secret scan.
 const PASSWORD = ["Souk", "Tanger", "2026!"].join("-");
@@ -91,23 +95,6 @@ async function createVerifiedAccount(page: Page, request: APIRequestContext, pre
   await page.context().clearCookies();
   return { email, name };
 }
-
-/**
- * Stand-in for https://accounts.google.com/gsi/client: records the `initialize` configuration and
- * renders a button that fires the callback with a fake credential (the server rejects it).
- */
-const GSI_STUB = `
-window.google = { accounts: { id: {
-  initialize(config) { window.__gsi = config; },
-  renderButton(parent) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = "Continuer avec Google (stub)";
-    button.addEventListener("click", () => window.__gsi.callback({ credential: "stub-credential-" + "x".repeat(40), select_by: "btn" }));
-    parent.appendChild(button);
-  },
-} } };
-`;
 
 test.describe("account", () => {
   test("signs up, confirms the e-mail, edits the profile, signs out and back in", async ({ page, request }) => {
@@ -296,21 +283,30 @@ test.describe("account", () => {
     await expect(page.getByRole("button", { name: "Mon compte" })).toBeVisible();
   });
 
-  test("the Google button hands a rejected credential to the form message", async ({ page, request }) => {
-    const config = (await (await request.get("/api/config")).json()) as { googleClientId: string | null };
-    // Without a client id the button never renders (playwright.config.ts sets no GOOGLE_OAUTH_CLIENT_ID).
-    test.skip(!config.googleClientId, "GOOGLE_OAUTH_CLIENT_ID is not set for the e2e server: the Google button does not render");
-    await page.route("https://accounts.google.com/gsi/client", (route) => route.fulfill({ status: 200, contentType: "application/javascript", body: GSI_STUB }));
+  test("the Google button hands a rejected credential to the form message, under a device-bound nonce", async ({ page }) => {
+    const stubButton = page.getByRole("button", { name: "Continuer avec Google (stub)" });
+    const gisNonce = () => page.evaluate(() => (window as unknown as { __gsi?: { nonce?: string } }).__gsi?.nonce ?? "");
     await page.goto("/fr/connexion");
-    await page.getByRole("button", { name: "Continuer avec Google (stub)" }).click();
-    // The fake token is refused server side: the form says so, and the page stays.
-    // Next's empty route announcer is an alert too: the message is the alert with text.
+    const [post] = await Promise.all([page.waitForResponse((candidate) => candidate.url().includes("/api/auth/google")), stubButton.click()]);
+    // The fake token is refused server side (no Google signature): the form says so, and the page
+    // stays. Next's empty route announcer is an alert too: the message is the alert with text.
+    expect(post.status()).toBe(401);
+    expect(post.request().postDataJSON()).toEqual({ credential: expect.stringMatching(/^stub-credential-/), locale: "fr" });
     await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toBeVisible({ timeout: 15_000 });
     await expect(page).toHaveURL(/\/fr\/connexion/);
-    // GIS was initialised with a per-page nonce (replay protection).
-    const nonce = await page.evaluate(() => (window as unknown as { __gsi?: { nonce?: string } }).__gsi?.nonce ?? "");
-    expect(nonce.length).toBeGreaterThanOrEqual(16);
-    expect(nonce).toMatch(/^[A-Za-z0-9_-]+$/);
+    // GIS was initialised with the nonce the page derived from the device cookie (an HMAC, never
+    // posted back): the same one on the next page of this device, another one without the cookie.
+    const nonce = await gisNonce();
+    expect(nonce).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    await page.goto("/fr/inscription");
+    await expect(stubButton).toBeVisible();
+    expect(await gisNonce()).toBe(nonce);
+    await page.context().clearCookies();
+    await page.goto("/fr/connexion");
+    await expect(stubButton).toBeVisible();
+    const fresh = await gisNonce();
+    expect(fresh).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(fresh).not.toBe(nonce);
   });
 
   test("/rif/connexion is consistently French, with a notice", async ({ page }) => {

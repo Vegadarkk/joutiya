@@ -7,7 +7,7 @@ import { audit } from "@/lib/audit";
 import { accessIdentity, requireSameOrigin, type StaffContext } from "@/lib/auth/guards";
 import { assertPasswordPolicy } from "@/lib/auth/password-policy";
 import { displayNameSchema, emailSchema, PASSWORD_MAX } from "@/lib/contracts/auth";
-import { getStaff, listStaff, revokeStaff, staffRoleSchema, upsertStaff, type StaffRecord, type StaffRole } from "@/lib/db/repositories/staff";
+import { getStaff, listActiveAdmins, listStaff, revokeStaff, staffRoleSchema, upsertStaff, type StaffRecord, type StaffRole } from "@/lib/db/repositories/staff";
 import { emailNormHash } from "@/lib/db/repositories/users";
 import { serverEnv } from "@/lib/env";
 import { auth } from "@/lib/firebase/admin";
@@ -207,8 +207,7 @@ export async function login(request: Request): Promise<Response> {
 
   const minted = await createSessionForUid(record.uid);
   await resetLimit(LOGIN_LIMIT, accountIp);
-  const userAgent = request.headers.get("user-agent")?.slice(0, 200);
-  await logConnection({ uid: record.uid, event: "staff_login", ip: identity.ip, ...(userAgent ? { userAgent } : {}) });
+  await logConnection({ uid: record.uid, event: "staff_login", ip: identity.ip });
 
   const payload: StaffLoginResponse = {
     status: "signed_in",
@@ -302,16 +301,27 @@ async function isStaffAccount(record: UserRecord): Promise<boolean> {
   return isStaff(readClaims(record.customClaims ?? {})) || (await getStaff(record.uid)) !== null;
 }
 
+/** 409 unless another active admin remains once `targetUid` is demoted or revoked: the back office keeps at least one. */
+async function assertAnotherAdmin(targetUid: string): Promise<void> {
+  const others = (await listActiveAdmins()).filter((admin) => admin.uid !== targetUid);
+  if (others.length === 0) throw new HttpError(409, "conflict", "the last active admin cannot be demoted or revoked");
+}
+
 /**
  * POST /api/admin/staff: creates the Auth account (or reuses a staff one, revoked included), writes
  * the roster entry, sets the staff claims and mails the set-password link. Refused with 409: the
- * caller themself (nobody grants a role to themself, §6) and any existing non-staff account (staff
- * accounts are separate from shopper accounts).
+ * caller themself (nobody grants a role to themself, §6), any existing non-staff account (staff
+ * accounts are separate from shopper accounts) and the demotion of the last active admin. A new
+ * role on an active colleague is audited as `staff.role_change` on top of the invitation.
  */
 export async function invite(ctx: StaffContext, input: InviteInput, identity: RequestIdentity): Promise<StaffInviteResponse> {
   const existing = await auth().getUserByEmail(input.email).catch(() => null);
   if (existing && existing.uid === ctx.user.uid) throw new HttpError(409, "conflict", "cannot invite yourself");
   if (existing && !(await isStaffAccount(existing))) throw new HttpError(409, "conflict", "a Joutiya account exists with this e-mail");
+  const current = existing ? await getStaff(existing.uid) : null;
+  /** The roster role of an active colleague (a revoked entry is a re-invitation, not a role change). */
+  const activeRole = current && !current.revokedAt ? current.role : null;
+  if (current && activeRole === "admin" && input.role !== "admin") await assertAnotherAdmin(current.uid);
   const uid = existing?.uid ?? (await auth().createUser({ email: input.email, emailVerified: true, displayName: input.displayName })).uid;
   if (existing && (existing.disabled || existing.displayName !== input.displayName)) {
     // Re-invitation of a revoked or renamed member: the account is active again.
@@ -346,28 +356,45 @@ export async function invite(ctx: StaffContext, input: InviteInput, identity: Re
     ip: identity.ip,
     reason: input.role,
   });
+  if (activeRole && activeRole !== input.role) {
+    await audit({
+      actorUid: ctx.user.uid,
+      actorRole: ctx.role,
+      action: "staff.role_change",
+      target: { type: "staff", id: uid },
+      automated: false,
+      ip: identity.ip,
+      reason: `${activeRole}->${input.role}`,
+    });
+  }
   return { uid };
 }
 
 /** Revocation here never touches Cloudflare Access: the admin removes the person from its policy by hand. */
 export const REVOKE_ACCESS_REMINDER = "retirer aussi de Cloudflare Access";
 
+/** An account with staff claims but no roster entry (a bootstrap stopped halfway), or 404. */
+async function staffClaimsOf(uid: string): Promise<{ email: string; displayName: string; role: StaffRole }> {
+  const record = await auth().getUser(uid).catch(() => null);
+  const claims = record ? readClaims(record.customClaims ?? {}) : {};
+  if (!record?.email || !isStaff(claims) || !claims.role) throw notFound();
+  const displayName = displayNameSchema.safeParse(record.displayName);
+  return { email: record.email, displayName: displayName.success ? displayName.data : "Membre", role: claims.role as StaffRole };
+}
+
 /**
  * DELETE /api/admin/staff/[uid]: clears the claims, revokes every session, disables the Auth
- * account and marks the roster entry revoked. Never on oneself (403); unknown member: 404. An
- * account with staff claims but no roster entry (a bootstrap stopped halfway) is revoked all the
- * same, with a roster tombstone so the /personnel page shows it.
+ * account and marks the roster entry revoked. Never on oneself (403), never the last active admin
+ * (409); unknown member: 404. An account with staff claims but no roster entry (a bootstrap
+ * stopped halfway) is revoked all the same, with a roster tombstone so the /personnel page shows it.
  */
 export async function revoke(ctx: StaffContext, uid: string, identity: RequestIdentity): Promise<void> {
   if (uid === ctx.user.uid) throw forbidden("a member cannot revoke themself");
   const target = await getStaff(uid);
-  if (!target) {
-    const record = await auth().getUser(uid).catch(() => null);
-    const claims = record ? readClaims(record.customClaims ?? {}) : {};
-    if (!record?.email || !isStaff(claims) || !claims.role) throw notFound();
-    const displayName = displayNameSchema.safeParse(record.displayName);
-    await upsertStaff({ uid, email: record.email, displayName: displayName.success ? displayName.data : "Membre", role: claims.role as StaffRole, invitedBy: "script" });
-  }
+  const ghost = target ? null : await staffClaimsOf(uid);
+  const activeRole = target ? (target.revokedAt ? null : target.role) : (ghost?.role ?? null);
+  if (activeRole === "admin") await assertAnotherAdmin(uid);
+  if (ghost) await upsertStaff({ uid, ...ghost, invitedBy: "script" });
   await setClaims(uid, null);
   await revokeSessions(uid);
   await auth().updateUser(uid, { disabled: true });

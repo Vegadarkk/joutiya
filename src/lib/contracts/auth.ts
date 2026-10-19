@@ -70,10 +70,11 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 export const googleSchema = z
   .object({
-    /** Google ID token from Google Identity Services. */
+    /**
+     * Google ID token from Google Identity Services. Its `nonce` claim is checked against the value
+     * derived from the request's device cookie, never against a value sent in this body.
+     */
     credential: z.string().min(20).max(4096),
-    /** Random value the page gave GIS (`initialize({ nonce })`); must match the token's `nonce` claim. */
-    nonce: z.string().min(16).max(256),
     /** Sign-up only: consents and Turnstile; absent on a first call, the answer is `needs_consent`. */
     consents: consentsSchema.optional(),
     turnstileToken: turnstileTokenSchema.optional(),

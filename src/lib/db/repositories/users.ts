@@ -2,15 +2,19 @@ import "server-only";
 import { randomInt } from "node:crypto";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import type { Locale } from "@/config/site";
+import type { z } from "@/lib/zod";
 import { db } from "@/lib/firebase/admin";
 import { HttpError } from "@/lib/http/errors";
+import { captureServerException } from "@/lib/observability/capture";
 import { consume } from "@/lib/quota";
 import { pepperedHash } from "@/lib/security/hash";
 import { normalizeEmail } from "@/lib/security/email-normalize";
 import { COLLECTIONS, emailIndexSchema, userPrivateSchema, userSchema, type UserDoc, type UserPrivateDoc } from "../schemas";
+import { timestampsToDates } from "./timestamps";
 
 // users, users/{uid}/private/account and emailIndex (§5). The server is the only writer. Every
-// operation is counted against the Firestore Spark quotas (`consume`).
+// operation is counted against the Firestore Spark quotas (`consume`). Reads are parsed by their
+// schema (Dates, not Timestamps): a drifted or restored document never reaches a guard unchecked.
 
 const PUBLIC_ID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
@@ -41,6 +45,8 @@ export interface CreateAccountInput {
   provider: "password" | "google.com";
   /** Google accounts arrive with a verified e-mail: the account is activated at once. */
   activated?: boolean;
+  /** pepperedHash("did", deviceId) of the sign-up's browser (e-mail sign-ups): see userPrivateSchema. */
+  signupDeviceHash?: string;
   now?: Date;
 }
 
@@ -79,6 +85,7 @@ export async function createAccountDocuments(input: CreateAccountInput): Promise
     strikes: { level: 0 },
     reporter: { recent: [], total: 0 },
     providers: [input.provider],
+    ...(input.signupDeviceHash ? { signupDeviceHash: input.signupDeviceHash } : {}),
   });
   await db().runTransaction(async (tx) => {
     const existing = await tx.get(emailRef(hash));
@@ -99,16 +106,27 @@ export async function findUidByEmail(email: string): Promise<string | null> {
   return snapshot.exists ? String(snapshot.get("uid")) : null;
 }
 
+/**
+ * Snapshot data parsed by its schema. A document the schema refuses (drift, a partial restore)
+ * reads as absent: it is reported with the uid and the offending paths, never with values.
+ */
+function parseAccountDocument<T>(schema: z.ZodType<T>, kind: "users" | "private", uid: string, data: unknown): T | null {
+  const parsed = schema.safeParse(timestampsToDates(data));
+  if (parsed.success) return parsed.data;
+  captureServerException(new Error(`invalid ${kind} document`), { uid, issues: parsed.error.issues.map((issue) => issue.path.map(String).join(".")) });
+  return null;
+}
+
 export async function getUser(uid: string): Promise<UserDoc | null> {
   const snapshot = await userRef(uid).get();
   void consume("firestore.reads", 1);
-  return snapshot.exists ? (snapshot.data() as UserDoc) : null;
+  return snapshot.exists ? parseAccountDocument(userSchema, "users", uid, snapshot.data()) : null;
 }
 
 export async function getUserPrivate(uid: string): Promise<UserPrivateDoc | null> {
   const snapshot = await privateRef(uid).get();
   void consume("firestore.reads", 1);
-  return snapshot.exists ? (snapshot.data() as UserPrivateDoc) : null;
+  return snapshot.exists ? parseAccountDocument(userPrivateSchema, "private", uid, snapshot.data()) : null;
 }
 
 /** Marks the e-mail verified and the account activated (the role claim is set by the caller). */
@@ -176,15 +194,30 @@ export async function deleteAccountDocumentsIfPending(uid: string): Promise<bool
   });
 }
 
-/** Deletes the documents of an account (Auth record deleted by the caller). */
+/**
+ * Deletes the documents of an account (Auth record deleted by the caller), in one transaction:
+ * the e-mail index entry goes only while it still points at this uid, so a re-registration of the
+ * address that landed in between keeps its own entry (same rule as deleteAccountDocumentsIfPending).
+ */
 export async function deleteAccountDocuments(uid: string): Promise<void> {
-  const account = await getUserPrivate(uid);
-  const batch = db().batch();
-  if (account) batch.delete(emailRef(account.emailNormHash));
-  batch.delete(privateRef(uid));
-  batch.delete(userRef(uid));
-  await batch.commit();
-  void consume("firestore.deletes", account ? 3 : 2);
+  await db().runTransaction(async (tx) => {
+    const account = await tx.get(privateRef(uid));
+    void consume("firestore.reads", 1);
+    const hash: unknown = account.exists ? account.get("emailNormHash") : undefined;
+    const index = typeof hash === "string" && hash ? await tx.get(emailRef(hash)) : null;
+    if (index) void consume("firestore.reads", 1);
+    let deletions = 1;
+    if (index?.exists && String(index.get("uid")) === uid) {
+      tx.delete(index.ref);
+      deletions += 1;
+    }
+    if (account.exists) {
+      tx.delete(privateRef(uid));
+      deletions += 1;
+    }
+    tx.delete(userRef(uid));
+    void consume("firestore.deletes", deletions);
+  });
 }
 
 /** Translates a repository failure into the API answer (never reveals the other account). */

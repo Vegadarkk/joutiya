@@ -14,7 +14,7 @@ import { logger } from "@/lib/logging/logger";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { CSRF_HEADER, SESSION_COOKIE, clearSessionCookies } from "@/lib/security/cookies";
 import { csrfToken } from "@/lib/security/csrf";
-import { anonymous, beginAnonymous, finish, userAgentOf } from "./anonymous";
+import { anonymous, beginAnonymous, finish } from "./anonymous";
 import { deviceOf, jsonResponse, signedIn, withDevice } from "./respond";
 import { sessionSummary } from "./summary";
 
@@ -36,7 +36,7 @@ export async function handleLogout(request: Request): Promise<Response> {
   const user = cookie ? await verifySession(cookie) : null;
   if (user) {
     await revokeSessions(user.uid);
-    await logConnection({ uid: user.uid, event: "logout", ip: deviceOf(request).identity.ip, userAgent: userAgentOf(request) });
+    await logConnection({ uid: user.uid, event: "logout", ip: deviceOf(request).identity.ip });
   }
   const response = new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   clearSessionCookies(response);
@@ -60,7 +60,7 @@ async function session(request: Request): Promise<Response> {
   const minted = await createSessionFromIdToken(input.idToken, { providers: ["google.com"] });
   if (isStaff(minted.user.claims)) throw forbidden("staff accounts sign in on the back office");
   await linkProvider(minted.user.uid, "google.com").catch((error: unknown) => logger.warn({ err: (error as Error).message }, "providers update skipped"));
-  await logConnection({ uid: minted.user.uid, event: "google_login", ip: flow.identity.ip, userAgent: flow.userAgent });
+  await logConnection({ uid: minted.user.uid, event: "google_login", ip: flow.identity.ip });
   const body: SessionResponse = { status: "signed_in", session: await sessionSummary(minted.user) };
   return finish(flow, signedIn(minted, body));
 }

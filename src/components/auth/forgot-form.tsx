@@ -35,6 +35,7 @@ export function ForgotForm({ nonce }: { nonce?: string }) {
   } = useForm<ForgotForm, unknown, ResetRequestInput>({
     resolver: zodResolver(resetRequestSchema),
     defaultValues: { email: "", locale, turnstileToken: "" },
+    mode: "onTouched",
   });
 
   async function onValid(values: ResetRequestInput) {

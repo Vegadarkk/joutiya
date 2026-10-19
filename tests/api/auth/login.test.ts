@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RATE_LIMITS } from "@/config/rate-limits";
+import { TURNSTILE_AFTER_FAILURES } from "@/lib/auth/login";
 import { auth } from "@/lib/firebase/admin";
 import { setClaims } from "@/lib/firebase/claims";
+import { signInWithPassword } from "@/lib/firebase/rest";
 import { sendMail } from "@/lib/mail";
 import { consumeLimit, limitState, resetRateLimiters } from "@/lib/rate-limit/limiter";
 import type * as Turnstile from "@/lib/security/turnstile";
@@ -10,10 +12,12 @@ import { POST as action } from "@/app/api/auth/action/route";
 import { POST as login } from "@/app/api/auth/login/route";
 import { GET as me } from "@/app/api/auth/me/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
-import { CONSENTS, Jar, PASSWORD, call, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
+import { CONSENTS, Jar, PASSWORD, call, freshIp, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/rate-limit/limiter", { spy: true });
+// Spies around the real Identity Toolkit calls: counts how many password checks a burst reaches.
+vi.mock("@/lib/firebase/rest", { spy: true });
 vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
   ...(await importOriginal<typeof Turnstile>()),
   verifyTurnstile: vi.fn(async () => ({ ok: true, codes: [] })),
@@ -100,6 +104,29 @@ describe("POST /api/auth/login", () => {
     const elsewhere = await call<SignedInBody>(login, LOGIN, { jar: new Jar(), body: { email, password: PASSWORD } });
     expect(elsewhere.status).toBe(200);
     expect(elsewhere.body.status).toBe("signed_in");
+  });
+
+  it("counts the attempt before the password check: a burst past the allowance never reaches Firebase Auth (TOCTOU on the lock)", async () => {
+    const { email } = await createAccount(true);
+    const limit = RATE_LIMITS["login.fail.accountIp"].points;
+    const ip = freshIp();
+    const wrong = { email, password: ["not", "the", "password", "3"].join("-") };
+    vi.mocked(signInWithPassword).mockClear();
+    // Eight attempts at once, all reading "no failure yet": only `limit` of them may be checked.
+    const burst = await Promise.all(Array.from({ length: limit + 3 }, () => call<ErrorBody>(login, LOGIN, { ip, body: wrong })));
+    expect(burst.filter((result) => result.status === 401 && result.body.error.code === "invalid_credentials")).toHaveLength(limit);
+    expect(burst.filter((result) => result.status === 429 && result.body.error.code === "account_locked")).toHaveLength(3);
+    expect(vi.mocked(signInWithPassword)).toHaveBeenCalledTimes(limit);
+    // The lock stands for the right password too.
+    expect((await call<ErrorBody>(login, LOGIN, { ip, body: { email, password: PASSWORD } })).status).toBe(429);
+
+    // Elsewhere, a right password forgets the attempts counted so far: no lock builds up on sign-ins.
+    const other = freshIp();
+    for (let i = 0; i < TURNSTILE_AFTER_FAILURES; i += 1) expect((await call(login, LOGIN, { ip: other, body: wrong })).status).toBe(401);
+    expect((await call<SignedInBody>(login, LOGIN, { ip: other, body: { email, password: PASSWORD, turnstileToken: "solved" } })).status).toBe(200);
+    // Counter back to zero: a failure is the first one again (no Turnstile), the right password signs in without a token.
+    expect((await call(login, LOGIN, { ip: other, body: wrong })).status).toBe(401);
+    expect((await call<SignedInBody>(login, LOGIN, { ip: other, body: { email, password: PASSWORD } })).status).toBe(200);
   });
 
   it("makes Turnstile mandatory after 20 failures per hour on the account, whatever the IP or the pass", async () => {
