@@ -1,5 +1,5 @@
 import "server-only";
-import { FieldValue, Timestamp, type DocumentSnapshot, type Query, type QueryDocumentSnapshot, type Transaction } from "firebase-admin/firestore";
+import { FieldPath, FieldValue, Timestamp, type DocumentSnapshot, type Query, type QueryDocumentSnapshot, type Transaction } from "firebase-admin/firestore";
 import { HIDDEN_MARKER, type MessageRiskFlag } from "@/lib/contracts/messaging";
 import {
   COLLECTIONS,
@@ -260,24 +260,26 @@ export async function getParticipantConversation(cid: string, uid: string): Prom
 
 /**
  * Read receipt (D7): zeroes `unread[uid]` and sets `readAt` on the newest message of the other
- * participant only. No write when nothing was unread. True when something changed.
+ * participant only. No write when nothing was unread. Returns the other participant's uid when
+ * something changed (the live receipt goes to him), else null.
  */
-export async function markConversationRead(cid: string, uid: string, now: Date): Promise<boolean> {
-  const writes = await db().runTransaction(async (tx) => {
+export async function markConversationRead(cid: string, uid: string, now: Date): Promise<string | null> {
+  const { writes, other } = await db().runTransaction(async (tx) => {
     const conversation = await participantConversationTx(tx, cid, uid);
-    if ((conversation.unread[uid] ?? 0) === 0) return 0;
-    const incoming = await tx.get(messagesRef(cid).where("senderUid", "==", counterpartOf(conversation, uid)).orderBy("createdAt", "desc").limit(1));
+    const counterpart = counterpartOf(conversation, uid);
+    if ((conversation.unread[uid] ?? 0) === 0) return { writes: 0, other: counterpart };
+    const incoming = await tx.get(messagesRef(cid).where("senderUid", "==", counterpart).orderBy("createdAt", "desc").limit(1));
     const newest = incoming.docs[0];
     tx.update(conversationRef(cid), { unread: { ...conversation.unread, [uid]: 0 } });
     if (newest && !newest.get("readAt")) {
       tx.update(newest.ref, { readAt: Timestamp.fromDate(now) });
-      return 2;
+      return { writes: 2, other: counterpart };
     }
-    return 1;
+    return { writes: 1, other: counterpart };
   });
   void consume("firestore.reads", writes > 0 ? 2 : 1);
   if (writes > 0) void consume("firestore.writes", writes);
-  return writes > 0;
+  return writes > 0 ? other : null;
 }
 
 export type ParticipantState = { archived: boolean } | { hidden: true };
@@ -405,6 +407,64 @@ export async function unreadSummary(uid: string, options: { limit?: number; item
   return { total, items };
 }
 
+// ---- Participant reads (D2: the browser reads through the API only) -------------------------
+
+/** Position in a newest-first list: the sort time and the document id (ties broken by id). */
+export interface PagePosition {
+  at: Date;
+  id: string;
+}
+
+export interface ReadPage<T> {
+  items: T[];
+  /** Position of the last item when an older page follows. */
+  next?: PagePosition;
+  /** More documents matched than `limit` (an `after` read left newer ones out). */
+  more: boolean;
+  /** Documents read (Spark charges one for an empty result). */
+  reads: number;
+}
+
+function pageOf<T>(docs: readonly QueryDocumentSnapshot[], limit: number, field: string, parse: (doc: QueryDocumentSnapshot) => T | null): ReadPage<T> {
+  const kept = docs.slice(0, limit);
+  const last = kept[kept.length - 1];
+  const at: unknown = last?.get(field);
+  const more = docs.length > limit;
+  return {
+    items: kept.map(parse).filter((item): item is T => item !== null),
+    ...(more && last && at instanceof Timestamp ? { next: { at: at.toDate(), id: last.id } } : {}),
+    more,
+    reads: Math.max(1, docs.length),
+  };
+}
+
+/**
+ * One inbox page of `uid`: the `limit` conversations with the newest activity after `cursor`
+ * (updatedAt desc, then id desc; the participants + updatedAt index), whatever their archive or
+ * delete-for-me state (the caller filters). Reads one document more to know whether a page follows.
+ */
+export async function listInboxPage(uid: string, limit: number, cursor?: PagePosition): Promise<ReadPage<ConversationRecord>> {
+  let query = conversations().where("participants", "array-contains", uid).orderBy("updatedAt", "desc").orderBy(FieldPath.documentId(), "desc");
+  if (cursor) query = query.startAfter(Timestamp.fromDate(cursor.at), cursor.id);
+  const snapshot = await query.limit(limit + 1).get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  return pageOf(snapshot.docs, limit, "updatedAt", conversationFromSnapshot);
+}
+
+/**
+ * One thread page, newest first (createdAt desc, then id desc): the `limit` newest messages, those
+ * older than `before`, or the `limit` newest of those newer than `after` (`more` when some newer
+ * ones were left out). Reads one document more than `limit`.
+ */
+export async function listThreadPage(cid: string, limit: number, range: { before?: PagePosition; after?: PagePosition } = {}): Promise<ReadPage<MessageRecord>> {
+  let query = messagesRef(cid).orderBy("createdAt", "desc").orderBy(FieldPath.documentId(), "desc");
+  if (range.before) query = query.startAfter(Timestamp.fromDate(range.before.at), range.before.id);
+  if (range.after) query = query.endBefore(Timestamp.fromDate(range.after.at), range.after.id);
+  const snapshot = await query.limit(limit + 1).get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  return pageOf(snapshot.docs, limit, "createdAt", messageFromSnapshot);
+}
+
 // ---- Staff and moderation (D11, D17, D18) ---------------------------------------------------
 
 export interface ConversationTranscript {
@@ -447,13 +507,14 @@ function isLastMessage(conversation: ConversationRecord, message: MessageRecord)
 
 /**
  * Hides a message (D11, D13): text replaced by HIDDEN_MARKER, original kept in evidence (an
- * existing "masked" evidence already holds it). False when the message is missing or hidden.
+ * existing "masked" evidence already holds it). Returns the participants (the live event goes to
+ * them), or null when the message is missing or already hidden.
  */
-export async function hideMessageDoc(cid: string, mid: string, now: Date): Promise<boolean> {
+export async function hideMessageDoc(cid: string, mid: string, now: Date): Promise<readonly string[] | null> {
   const changed = await db().runTransaction(async (tx) => {
     const [messageSnap, evidenceSnap, conversationSnap] = await Promise.all([tx.get(messagesRef(cid).doc(mid)), tx.get(evidenceRef(cid, mid)), tx.get(conversationRef(cid))]);
     const message = messageFromSnapshot(messageSnap);
-    if (!message || message.hidden) return false;
+    if (!message || message.hidden) return null;
     const evidence = evidenceFromSnapshot(evidenceSnap);
     if (evidence) tx.update(evidenceRef(cid, mid), { reason: "hidden" });
     else {
@@ -463,7 +524,7 @@ export async function hideMessageDoc(cid: string, mid: string, now: Date): Promi
     tx.update(messagesRef(cid).doc(mid), { text: HIDDEN_MARKER, hidden: true });
     const conversation = conversationFromSnapshot(conversationSnap);
     if (conversation && isLastMessage(conversation, message)) tx.update(conversationRef(cid), { "lastMessage.preview": HIDDEN_MARKER });
-    return true;
+    return message.participants;
   });
   void consume("firestore.reads", 3);
   if (changed) void consume("firestore.writes", 3);
@@ -472,22 +533,22 @@ export async function hideMessageDoc(cid: string, mid: string, now: Date): Promi
 
 /**
  * Restores a hidden message from its evidence (links masked again; the evidence stays as "masked"
- * when there were links, else it is deleted). False when the message is missing, not hidden, or
- * has no evidence to restore from.
+ * when there were links, else it is deleted). Returns the participants, or null when the message
+ * is missing, not hidden, or has no evidence to restore from.
  */
-export async function unhideMessageDoc(cid: string, mid: string): Promise<boolean> {
+export async function unhideMessageDoc(cid: string, mid: string): Promise<readonly string[] | null> {
   const changed = await db().runTransaction(async (tx) => {
     const [messageSnap, evidenceSnap, conversationSnap] = await Promise.all([tx.get(messagesRef(cid).doc(mid)), tx.get(evidenceRef(cid, mid)), tx.get(conversationRef(cid))]);
     const message = messageFromSnapshot(messageSnap);
     const evidence = evidenceFromSnapshot(evidenceSnap);
-    if (!message?.hidden || !evidence) return false;
+    if (!message?.hidden || !evidence) return null;
     const restored = maskLinks(evidence.text);
     tx.update(messagesRef(cid).doc(mid), { text: restored.text, hidden: FieldValue.delete() });
     if (restored.count > 0) tx.update(evidenceRef(cid, mid), { reason: "masked" });
     else tx.delete(evidenceRef(cid, mid));
     const conversation = conversationFromSnapshot(conversationSnap);
     if (conversation && isLastMessage(conversation, message)) tx.update(conversationRef(cid), { "lastMessage.preview": messagePreview(restored.text) });
-    return true;
+    return message.participants;
   });
   void consume("firestore.reads", 3);
   if (changed) void consume("firestore.writes", 3);
@@ -496,22 +557,28 @@ export async function unhideMessageDoc(cid: string, mid: string): Promise<boolea
 
 export const isFreezeHold = (hold: string) => FREEZE_HOLD_PREFIXES.some((prefix) => hold.startsWith(prefix));
 
+export interface HoldChange {
+  participants: readonly string[];
+  /** The conversation was frozen or reopened (visible to its participants). */
+  statusChanged: boolean;
+}
+
 /**
  * Adds or removes a legal hold (D10, D17). `freeze`: the hold also freezes the conversation (on),
- * and removing it reopens the conversation unless another freezing hold remains. False when the
- * conversation does not exist. Throws when 50 holds are already set (schema bound).
+ * and removing it reopens the conversation unless another freezing hold remains. Null when the
+ * conversation does not exist or nothing changed. Throws when 50 holds are already set (schema bound).
  */
-export async function setConversationHoldDoc(cid: string, holdId: string, on: boolean, options: { freeze?: boolean } = {}): Promise<boolean> {
-  const changed = await db().runTransaction(async (tx) => {
+export async function setConversationHoldDoc(cid: string, holdId: string, on: boolean, options: { freeze?: boolean } = {}): Promise<HoldChange | null> {
+  const changed = await db().runTransaction(async (tx): Promise<HoldChange | null> => {
     const conversation = conversationFromSnapshot(await tx.get(conversationRef(cid)));
-    if (!conversation) return false;
+    if (!conversation) return null;
     const holds = on ? [...new Set([...conversation.legalHold, holdId])] : conversation.legalHold.filter((hold) => hold !== holdId);
     if (holds.length > 50) throw new Error("conversation legal hold list full");
     let status = conversation.status;
     if (options.freeze) status = on || holds.some(isFreezeHold) ? "frozen" : "open";
-    if (holds.length === conversation.legalHold.length && status === conversation.status) return false;
+    if (holds.length === conversation.legalHold.length && status === conversation.status) return null;
     tx.update(conversationRef(cid), { legalHold: holds, status });
-    return true;
+    return { participants: conversation.participants, statusChanged: status !== conversation.status };
   });
   void consume("firestore.reads", 1);
   if (changed) void consume("firestore.writes", 1);

@@ -8,7 +8,7 @@ import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { csrfToken } from "@/lib/security/csrf";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { POST as action } from "@/app/api/auth/action/route";
-import { POST as clientToken } from "@/app/api/auth/client-token/route";
+import { GET as inbox } from "@/app/api/conversations/route";
 import { POST as login } from "@/app/api/auth/login/route";
 import { GET as me } from "@/app/api/auth/me/route";
 import { POST as passwordChange } from "@/app/api/auth/password/change/route";
@@ -167,15 +167,15 @@ describe("POST /api/auth/password/change", () => {
     expect((await call<{ session: SignedInBody["session"] | null }>(me, "/api/auth/me", { jar })).body.session?.uid).toBe(uid);
     expect((await call<SignedInBody>(login, "/api/auth/login", { jar: new Jar(), body: { email, password: NEW_PASSWORD } })).status).toBe(200);
 
-    // The revoked cookie mutates nothing any more, even with its own CSRF token: no SDK token, signed out on /me.
+    // The revoked cookie reads and mutates nothing any more: no conversation (checkRevoked, D2), signed out on /me.
     const stale = new Jar();
     stale.cookies.set("__Host-session", oldCookie!);
     stale.cookies.set("__Host-csrf", csrfToken(oldCookie!));
-    const token = await call<ErrorBody>(clientToken, "/api/auth/client-token", { jar: stale, body: {} });
-    expect(token.status).toBe(401);
-    expect(token.body.error.code).toBe("unauthenticated");
+    const conversations = await call<ErrorBody>(inbox, "/api/conversations", { jar: stale });
+    expect(conversations.status).toBe(401);
+    expect(conversations.body.error.code).toBe("unauthenticated");
     expect((await call<{ session: SignedInBody["session"] | null }>(me, "/api/auth/me", { jar: stale })).body.session).toBeNull();
-    const otherToken = await call<ErrorBody>(clientToken, "/api/auth/client-token", { jar: other, body: {} });
-    expect(otherToken.status).toBe(401);
+    const otherConversations = await call<ErrorBody>(inbox, "/api/conversations", { jar: other });
+    expect(otherConversations.status).toBe(401);
   });
 });

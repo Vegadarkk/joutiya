@@ -7,25 +7,19 @@ vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
   verifyTurnstile: vi.fn(async () => ({ ok: true, codes: [] })),
 }));
 
-import { POST as clientToken } from "@/app/api/auth/client-token/route";
 import { HIDDEN_MARKER, URL_MARKER } from "@/lib/contracts/messaging";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { db } from "@/lib/firebase/admin";
-import { setClaims } from "@/lib/firebase/claims";
-import { createSessionForUid } from "@/lib/firebase/session";
 import { freezeConversation, getConversationForStaff, hideMessage, readUnreadTotal, scheduleDigest, setConversationHold, unhideMessage, unreadSummary } from "@/lib/messaging";
 import { getConversation } from "@/lib/messaging/repository";
 import { MESSAGING_KEYS, setMessagingValkeyForTests } from "@/lib/messaging/unread";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
-import { csrfToken } from "@/lib/security/csrf";
 import { FakeValkey } from "../../unit/messaging-fake-valkey";
-import { call } from "../favorites/helpers";
 import { member, send, seedListing, setState, startOk, type Member } from "./helpers";
 
 // What the other phase 5 lots call (design §4 L1 exports): hide and restore a message with its
 // evidence (L2 strong signal, L3 decisions), the staff transcript (D18), legal holds and freezes
-// (L2, L3 authority requests), the unread total and the digest queue (L5); and the custom token of
-// a suspended account (D9: it still reads its conversations).
+// (L2, L3 authority requests), the unread total and the digest queue (L5).
 
 let valkey: FakeValkey;
 
@@ -164,18 +158,5 @@ describe("unread total and digest (lot L5)", () => {
       ],
     });
     expect(await unreadSummary(a.uid)).toEqual({ total: 0, items: [] });
-  });
-});
-
-describe("POST /api/auth/client-token", () => {
-  it("still gives a suspended member his realtime token (D9)", async () => {
-    const someone = await member();
-    await setClaims(someone.uid, { role: "individual", st: "suspended" });
-    const minted = await createSessionForUid(someone.uid);
-    someone.jar.cookies.set("__Host-session", minted.cookie);
-    someone.jar.cookies.set("__Host-csrf", csrfToken(minted.cookie));
-    const token = await call<{ token: string }>(clientToken, "POST", "/api/auth/client-token", { member: someone, body: {} });
-    expect(token.status).toBe(200);
-    expect(typeof token.body.token).toBe("string");
   });
 });

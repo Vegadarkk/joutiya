@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
-import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
-import { collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, limit, limitToLast, orderBy, query, setDoc, startAfter, updateDoc, where } from "firebase/firestore";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { assertFails, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
+import { collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, setDoc, updateDoc, where } from "firebase/firestore";
+import { afterAll, beforeAll, describe, it } from "vitest";
 
-// Firestore rules (§6, phase 5 design D2): a member reads his own conversations and their messages
-// through queries constrained on `participants` (or a shop's `sellerProId`, phase 7); everything
-// else is denied to every client: other collections, other people's conversations, unconstrained
-// queries, the evidence subcollection, staff and role-less tokens, and every write.
+// Firestore rules (§6, phase 5 design D2 revised 19 Oct): deny-all. The browser never reads or
+// writes Firestore, its own conversations included (the API serves them, the event stream says when
+// to refetch). Every client is refused everywhere: visitors, members (suspended or pro), shop
+// members, staff and role-less tokens, by id, by query and for every write.
 // Run with `npm run test:rules` (emulator).
 
 let env: RulesTestEnvironment;
@@ -31,7 +31,6 @@ beforeAll(async () => {
     await setDoc(doc(db, "revealLogs/r1"), { viewerUid: "bob", listingId: "l1", ipPrefixHash: "h", deviceHash: "d" });
     await setDoc(doc(db, "moderationDecisions/d1"), { target: { type: "listing", id: "l1" }, affectedUid: "alice", action: "restrict_visibility" });
     await setDoc(doc(db, "system/backup"), { cursor: "2026-10-16" });
-    // Phase 5 collections other than conversations: server only.
     await setDoc(doc(db, "userBlocks/alice"), { uids: ["mallory"] });
     await setDoc(doc(db, "reports/rep1"), { target: { type: "listing", id: "l1", ownerUid: "alice" }, reporter: { uid: "bob" }, status: "open" });
     await setDoc(doc(db, "aiDecisions/ai1"), { task: "listing_screen", target: { type: "listing", id: "l1" } });
@@ -54,13 +53,9 @@ afterAll(async () => {
 /** The emulator context's client. */
 type Firestore = ReturnType<ReturnType<RulesTestEnvironment["unauthenticatedContext"]>["firestore"]>;
 
-const member = (uid: string, claims: Record<string, unknown> = {}) => env.authenticatedContext(uid, { role: "individual", email_verified: true, ...claims }).firestore();
+const token = (uid: string, claims: Record<string, unknown>) => env.authenticatedContext(uid, { email_verified: true, ...claims }).firestore();
 
-const inbox = (db: Firestore, uid: string) => query(collection(db, "conversations"), where("participants", "array-contains", uid), orderBy("updatedAt", "desc"), limit(30));
-const thread = (db: Firestore, cid: string, uid: string) => query(collection(db, `conversations/${cid}/messages`), where("participants", "array-contains", uid), orderBy("createdAt", "desc"), limit(50));
-const shopInbox = (db: Firestore, proId: string) => query(collection(db, "conversations"), where("sellerProId", "==", proId), orderBy("updatedAt", "desc"), limit(30));
-
-const SERVER_ONLY = [
+const DOCUMENTS = [
   "config/legal",
   "users/alice",
   "listings/l1",
@@ -76,151 +71,63 @@ const SERVER_ONLY = [
   "aiDecisions/ai1",
   "authorityRequests/ar1",
   "suspensions/alice",
+  "conversations/c1",
+  "conversations/c1/messages/m1",
   "conversations/c1/evidence/m1",
+  "conversations/c2",
+  "conversations/c2/messages/m2",
 ];
 
-describe("participants", () => {
-  it("read their conversation and its messages, by id and with the constrained queries", async () => {
-    for (const uid of ["alice", "bob"]) {
-      const db = member(uid);
-      await assertSucceeds(getDoc(doc(db, "conversations/c1")));
-      await assertSucceeds(getDoc(doc(db, "conversations/c1/messages/m1")));
-      await assertSucceeds(getDocs(inbox(db, uid)));
-      await assertSucceeds(getDocs(thread(db, "c1", uid)));
-    }
-  });
+const COLLECTIONS = ["listings", "users", "uploads", "searchOutbox", "contentOps", "revealLogs", "moderationDecisions", "listingStats", "system", "userBlocks", "reports", "aiDecisions", "authorityRequests", "suspensions", "conversations", "conversations/c1/messages", "conversations/c1/evidence"];
 
-  it("keep reading while suspended, and as a pro member", async () => {
-    await assertSucceeds(getDoc(doc(member("alice", { st: "suspended" }), "conversations/c1")));
-    await assertSucceeds(getDocs(inbox(member("alice", { role: "pro" }), "alice")));
-  });
+const CONTEXTS: Record<string, () => Firestore> = {
+  visitor: () => env.unauthenticatedContext().firestore(),
+  "participant (alice)": () => token("alice", { role: "individual" }),
+  "participant (bob)": () => token("bob", { role: "individual" }),
+  "suspended participant": () => token("alice", { role: "individual", st: "suspended" }),
+  "pro participant": () => token("alice", { role: "pro", proId: "shop1" }),
+  "shop member of shop9": () => token("erin", { role: "pro", proId: "shop9" }),
+  "no role": () => token("alice", {}),
+  moderator: () => token("alice", { role: "moderator" }),
+  admin: () => token("root", { role: "admin" }),
+};
 
-  it("cannot read someone else's conversation or messages", async () => {
-    const db = member("alice");
-    await assertFails(getDoc(doc(db, "conversations/c2")));
-    await assertFails(getDoc(doc(db, "conversations/c2/messages/m2")));
-    await assertFails(getDocs(inbox(db, "carol")));
-    await assertFails(getDocs(thread(db, "c2", "carol")));
-    // Constrained on her own uid the query is allowed, and finds nothing: no message leaks.
-    expect((await assertSucceeds(getDocs(thread(db, "c2", "alice")))).size).toBe(0);
-    expect((await assertSucceeds(getDocs(inbox(db, "alice")))).docs.map((item) => item.id)).toEqual(["c1"]);
-  });
-
-  it("cannot run unconstrained queries", async () => {
-    const db = member("alice");
-    await assertFails(getDocs(collection(db, "conversations")));
-    await assertFails(getDocs(query(collection(db, "conversations"), orderBy("updatedAt", "desc"), limit(30))));
-    await assertFails(getDocs(collection(db, "conversations/c1/messages")));
-    await assertFails(getDocs(query(collection(db, "conversations/c1/messages"), orderBy("createdAt", "desc"), limit(50))));
-    await assertFails(getDocs(query(collectionGroup(db, "messages"), where("participants", "array-contains", "alice"))));
-  });
-
-  it("list only with a limit of at most 30 conversations or 50 messages (D2, audit D1a-02)", async () => {
-    const db = member("alice");
-    const conversations = collection(db, "conversations");
-    const messages = collection(db, "conversations/c1/messages");
-    // No limit, or past the page size: denied, however well constrained.
-    await assertFails(getDocs(query(conversations, where("participants", "array-contains", "alice"), orderBy("updatedAt", "desc"))));
-    await assertFails(getDocs(query(conversations, where("participants", "array-contains", "alice"), orderBy("updatedAt", "desc"), limit(31))));
-    await assertFails(getDocs(query(messages, where("participants", "array-contains", "alice"), orderBy("createdAt", "desc"))));
-    await assertFails(getDocs(query(messages, where("participants", "array-contains", "alice"), orderBy("createdAt", "desc"), limit(51))));
-    await assertFails(getDocs(query(messages, where("participants", "array-contains", "alice"), orderBy("createdAt", "desc"), limitToLast(51))));
-    // The page sizes of the listeners and of the older pages (startAfter): allowed.
-    await assertSucceeds(getDocs(query(conversations, where("participants", "array-contains", "alice"), orderBy("updatedAt", "desc"), limit(30))));
-    await assertSucceeds(getDocs(query(messages, where("participants", "array-contains", "alice"), orderBy("createdAt", "desc"), limit(50))));
-    await assertSucceeds(getDocs(query(messages, where("participants", "array-contains", "alice"), orderBy("createdAt", "desc"), startAfter(at("2026-10-16T12:00:00Z")), limit(50))));
-    await assertSucceeds(getDocs(query(messages, where("participants", "array-contains", "alice"), orderBy("createdAt", "desc"), limit(1))));
-    // The shop inbox too.
-    const shop = member("erin", { role: "pro", proId: "shop9" });
-    await assertFails(getDocs(query(collection(shop, "conversations"), where("sellerProId", "==", "shop9"), orderBy("updatedAt", "desc"))));
-    await assertSucceeds(getDocs(shopInbox(shop, "shop9")));
-  });
-
-  it("never read the evidence of masked or hidden messages", async () => {
-    const db = member("bob");
-    await assertFails(getDoc(doc(db, "conversations/c1/evidence/m1")));
-    await assertFails(getDocs(collection(db, "conversations/c1/evidence")));
-  });
-
-  it("cannot write anything, not even in their conversation", async () => {
-    const db = member("bob");
-    await assertFails(setDoc(doc(db, "conversations/c1/messages/m9"), { senderUid: "bob", participants: ["bob", "alice"], text: "x", createdAt: new Date() }));
-    await assertFails(updateDoc(doc(db, "conversations/c1"), { unread: { bob: 0 } }));
-    await assertFails(updateDoc(doc(db, "conversations/c1/messages/m1"), { readAt: new Date() }));
-    await assertFails(deleteDoc(doc(db, "conversations/c1")));
-    await assertFails(setDoc(doc(db, "conversations/c3"), { participants: ["bob", "alice"] }));
-    await assertFails(setDoc(doc(db, "conversations/c1/evidence/m1"), { text: "x" }));
-  });
-});
-
-describe("shop members (phase 7 shared inbox)", () => {
-  it("read the shop's conversations through the sellerProId query", async () => {
-    const db = member("erin", { role: "pro", proId: "shop9" });
-    await assertSucceeds(getDoc(doc(db, "conversations/c2")));
-    await assertSucceeds(getDocs(shopInbox(db, "shop9")));
-    await assertSucceeds(getDocs(query(collection(db, "conversations/c2/messages"), where("sellerProId", "==", "shop9"), orderBy("createdAt", "desc"), limit(50))));
-  });
-
-  it("read nothing of another shop or of a non-shop conversation", async () => {
-    const db = member("erin", { role: "pro", proId: "shop9" });
-    await assertFails(getDoc(doc(db, "conversations/c1")));
-    await assertFails(getDocs(shopInbox(db, "shop1")));
-    await assertFails(getDocs(shopInbox(member("frank", { role: "pro", proId: "shop1" }), "shop9")));
-  });
-});
-
-describe("tokens that read nothing", () => {
-  const cases = {
-    visitor: () => env.unauthenticatedContext().firestore(),
-    "no role": () => env.authenticatedContext("alice", { email_verified: true }).firestore(),
-    moderator: () => env.authenticatedContext("alice", { role: "moderator", email_verified: true }).firestore(),
-    admin: () => env.authenticatedContext("alice", { role: "admin", email_verified: true }).firestore(),
-  };
-
-  for (const [name, make] of Object.entries(cases)) {
-    it(`${name}: no conversation, even as a participant uid`, async () => {
+for (const [name, make] of Object.entries(CONTEXTS)) {
+  describe(name, () => {
+    it("cannot read any document, its own conversation and messages included", async () => {
       const db = make();
-      await assertFails(getDoc(doc(db, "conversations/c1")));
-      await assertFails(getDoc(doc(db, "conversations/c1/messages/m1")));
-      await assertFails(getDocs(inbox(db, "alice")));
-      await assertFails(getDocs(thread(db, "c1", "alice")));
+      for (const path of DOCUMENTS) await assertFails(getDoc(doc(db, path)));
     });
-  }
-});
 
-describe("server-only collections", () => {
-  const contexts = {
-    visitor: () => env.unauthenticatedContext().firestore(),
-    member: () => member("alice"),
-    admin: () => env.authenticatedContext("root", { role: "admin", email_verified: true }).firestore(),
-  };
-
-  for (const [name, make] of Object.entries(contexts)) {
-    describe(name, () => {
-      it("cannot read any document, even its own", async () => {
-        const db = make();
-        for (const path of SERVER_ONLY) await assertFails(getDoc(doc(db, path)));
-      });
-
-      it("cannot list or query collections", async () => {
-        const db = make();
-        for (const name of ["listings", "users", "uploads", "searchOutbox", "contentOps", "revealLogs", "moderationDecisions", "listingStats", "system", "userBlocks", "reports", "aiDecisions", "authorityRequests", "suspensions"]) {
-          await assertFails(getDocs(collection(db, name)));
-        }
-        await assertFails(getDocs(query(collection(db, "listings"), where("ownerUid", "==", "alice"))));
-        await assertFails(getDocs(collectionGroup(db, "messages")));
-        await assertFails(getDocs(collectionGroup(db, "evidence")));
-      });
-
-      it("cannot create, update or delete", async () => {
-        const db = make();
-        await assertFails(setDoc(doc(db, "listings/new"), { ownerUid: "alice", title: "x" }));
-        await assertFails(updateDoc(doc(db, "users/alice"), { role: "admin" }));
-        await assertFails(deleteDoc(doc(db, "listings/l1")));
-        await assertFails(setDoc(doc(db, "config/legal"), { companyName: "x" }));
-        await assertFails(setDoc(doc(db, "reports/new"), { target: { type: "listing", id: "l1" } }));
-        await assertFails(setDoc(doc(db, "userBlocks/alice"), { uids: [] }));
-      });
+    it("cannot list or query any collection, however constrained", async () => {
+      const db = make();
+      for (const path of COLLECTIONS) await assertFails(getDocs(collection(db, path)));
+      // The queries of the former realtime inbox (participants, shop, page limits): denied too.
+      await assertFails(getDocs(query(collection(db, "conversations"), where("participants", "array-contains", "alice"), orderBy("updatedAt", "desc"), limit(30))));
+      await assertFails(getDocs(query(collection(db, "conversations"), where("participants", "array-contains", "bob"), orderBy("updatedAt", "desc"), limit(1))));
+      await assertFails(getDocs(query(collection(db, "conversations"), where("sellerProId", "==", "shop9"), orderBy("updatedAt", "desc"), limit(30))));
+      await assertFails(getDocs(query(collection(db, "conversations/c1/messages"), where("participants", "array-contains", "alice"), orderBy("createdAt", "desc"), limit(50))));
+      await assertFails(getDocs(query(collection(db, "listings"), where("ownerUid", "==", "alice"))));
+      await assertFails(getDocs(collectionGroup(db, "messages")));
+      await assertFails(getDocs(query(collectionGroup(db, "messages"), where("participants", "array-contains", "alice"))));
+      await assertFails(getDocs(collectionGroup(db, "evidence")));
     });
-  }
-});
+
+    it("cannot create, update or delete anything", async () => {
+      const db = make();
+      await assertFails(setDoc(doc(db, "conversations/c1/messages/m9"), { senderUid: "bob", participants: ["bob", "alice"], text: "x", createdAt: new Date() }));
+      await assertFails(updateDoc(doc(db, "conversations/c1"), { unread: { bob: 0 } }));
+      await assertFails(updateDoc(doc(db, "conversations/c1/messages/m1"), { readAt: new Date() }));
+      await assertFails(deleteDoc(doc(db, "conversations/c1")));
+      await assertFails(setDoc(doc(db, "conversations/c3"), { participants: ["bob", "alice"] }));
+      await assertFails(setDoc(doc(db, "conversations/c1/evidence/m1"), { text: "x" }));
+      await assertFails(setDoc(doc(db, "listings/new"), { ownerUid: "alice", title: "x" }));
+      await assertFails(updateDoc(doc(db, "users/alice"), { role: "admin" }));
+      await assertFails(deleteDoc(doc(db, "listings/l1")));
+      await assertFails(setDoc(doc(db, "config/legal"), { companyName: "x" }));
+      await assertFails(setDoc(doc(db, "reports/new"), { target: { type: "listing", id: "l1" } }));
+      await assertFails(setDoc(doc(db, "userBlocks/alice"), { uids: [] }));
+      await assertFails(setDoc(doc(db, "anything/new"), { x: 1 }));
+    });
+  });
+}

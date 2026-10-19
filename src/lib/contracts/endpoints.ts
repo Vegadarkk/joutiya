@@ -16,7 +16,6 @@ export const AUTH_API = {
   google: "/api/auth/google",
   /** Firebase ID token (google.com provider) -> session; kept for the SDK flow. */
   session: "/api/auth/session",
-  clientToken: "/api/auth/client-token",
   me: "/api/auth/me",
   resetRequest: "/api/auth/password/reset",
   resetConfirm: "/api/auth/password/confirm",
@@ -47,9 +46,11 @@ export const LISTING_API = {
 
 // Phase 5 (design phase-5 §3, §4).
 export const MESSAGING_API = {
-  /** POST: first message about a listing (Turnstile). */
+  /** POST: first message about a listing (Turnstile). GET ?cursor=&archived=1 -> ConversationsPage. */
   conversations: "/api/conversations",
-  /** POST a message. */
+  /** GET -> ConversationResponse (one inbox row). */
+  conversation: (cid: string) => `/api/conversations/${cid}`,
+  /** POST a message. GET ?cursor= (older) or ?after= (newer) -> MessagesPage. */
   messages: (cid: string) => `/api/conversations/${cid}/messages`,
   /** POST: zero my unread count. */
   read: (cid: string) => `/api/conversations/${cid}/read`,
@@ -57,6 +58,8 @@ export const MESSAGING_API = {
   state: (cid: string) => `/api/conversations/${cid}/state`,
   /** GET { total } (Valkey). */
   unread: "/api/messages/unread",
+  /** GET text/event-stream of MessagingEvent (session cookie; one per tab, D2). */
+  stream: "/api/messages/stream",
 } as const;
 
 export const REPORT_API = {

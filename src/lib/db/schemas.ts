@@ -452,16 +452,16 @@ export type SavedSearchDoc = z.infer<typeof savedSearchSchema>;
 const hold = z.array(z.string().min(1).max(64)).max(50);
 const participantsSchema = z.tuple([uid, uid]);
 
-/** conversations/{cid}: one per (listing, buyer); cid derived on the server (D1). Read by participants (rules). */
+/** conversations/{cid}: one per (listing, buyer); cid derived on the server (D1). Served to participants by the API (D2). */
 export const conversationSchema = z
   .object({
     listingId: listingIdSchema,
     listingSlugId: slugIdSchema,
     sellerUid: uid,
-    /** Pro listing: the shop's shared inbox (rules `shopMember`, phase 7). */
+    /** Pro listing: the shop's shared inbox (phase 7). */
     sellerProId: z.string().max(64).optional(),
     buyerUid: uid,
-    /** [buyerUid, sellerUid]: the rules and the inbox query filter on it. */
+    /** [buyerUid, sellerUid]: the inbox query filters on it. */
     participants: participantsSchema,
     sellerName: z.string().max(80),
     sellerPublicId: publicIdSchema,
@@ -494,7 +494,7 @@ export const conversationSchema = z
   .strict();
 export type ConversationDoc = z.infer<typeof conversationSchema>;
 
-/** conversations/{cid}/messages/{mid}: participants duplicated so the rules need no get() (AF §6). */
+/** conversations/{cid}/messages/{mid}: participants duplicated from the conversation (AF §6). */
 export const messageSchema = z
   .object({
     senderUid: uid,

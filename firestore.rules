@@ -1,44 +1,13 @@
 rules_version = '2';
 
 // Every read and write goes through the Next.js API with the Admin SDK, which bypasses these
-// rules (§3, §6). Browsers get one thing: realtime reads of their own conversations and messages
-// (phase 5, design D2), signed in with the custom token of /api/auth/client-token. No client write
-// anywhere; staff read nothing from the client (the back office goes through the API, which logs);
-// listings are never read from the client (that would bypass the rate limits). Rules check the
-// query's constraints, not each document: the client filters on `participants` (or `sellerProId`
-// for a shop's shared inbox, phase 7), with the composite indexes of firestore.indexes.json.
-// A suspended account (`st` claim) still reads its conversations (D9).
+// rules (§3, §6). No client reads or writes anything: not the listings (that would bypass the rate
+// limits), not the conversations either. Messaging reads come from the API and live updates from
+// its event stream (phase 5 design D2, revised 19 Oct: the browser never reads Firestore).
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
-      return request.auth != null && request.auth.token.get('role', null) in ['individual', 'pro'];
+    match /{document=**} {
+      allow read, write: if false;
     }
-    // Shared inbox of a shop: proId claim (owner at MVP, editor in V1.1).
-    function shopMember(data) {
-      return request.auth.token.get('proId', null) != null
-        && data.get('sellerProId', null) == request.auth.token.proId;
-    }
-    function canRead(data) {
-      return signedIn() && (request.auth.uid in data.participants || shopMember(data));
-    }
-
-    match /conversations/{cid} {
-      // Query: where('participants', 'array-contains', uid) or where('sellerProId', '==', proId), orderBy('updatedAt', 'desc'), limit(30).
-      // A list without a limit, or past the page size, is denied: every document read is Spark quota.
-      allow get: if canRead(resource.data);
-      allow list: if canRead(resource.data) && request.query.limit <= 30;
-      allow write: if false;
-      match /messages/{mid} {
-        // Query: the same filter (duplicated on each message), orderBy('createdAt', 'desc'), limit(50).
-        allow get: if canRead(resource.data);
-        allow list: if canRead(resource.data) && request.query.limit <= 50;
-        allow write: if false;
-      }
-      // Originals of masked or hidden messages: server only.
-      match /evidence/{mid} {
-        allow read, write: if false;
-      }
-    }
-    // Everything else: no rule, denied.
   }
 }

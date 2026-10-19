@@ -9,6 +9,7 @@ import { HttpError, notFound, unavailable } from "@/lib/http/errors";
 import { PUBLIC_STATES } from "@/lib/listings/public";
 import { logger } from "@/lib/logging/logger";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
+import { publishConversationChange, publishNewMessage, publishRead } from "./events";
 import { conversationId } from "./ids";
 import {
   BlockListFullError,
@@ -36,8 +37,9 @@ import { fileRepeatRiskReport } from "./system-report";
 import { UnreadUnavailableError, clearUnread, markSeen, recordRiskyMessage, recordUnread, scheduleDigest, unreadTotal } from "./unread";
 
 // Messaging rules (design D4-D9, D21): who may write to whom, the risk flags and masking of every
-// message, the per-participant state, and what follows a committed message (unread badge, digest
-// mail, repeat-risk report). Route handlers (handlers.ts) authenticate, bound and rate-limit first.
+// message, the per-participant state, and what follows a committed write (unread badge, live
+// events of D2, digest mail, repeat-risk report). Route handlers (handlers.ts) authenticate, bound
+// and rate-limit first.
 
 /** Messaging is suspended with the deposit when the Firestore write quota is degraded (quotas.ts). */
 export const MESSAGING_QUOTAS = ["firestore.writes"] as const satisfies readonly QuotaId[];
@@ -76,11 +78,13 @@ const publicIdOf = (conversation: Pick<ConversationDoc, "buyerUid" | "buyerPubli
   conversation.buyerUid === uid ? conversation.buyerPublicId : conversation.sellerPublicId;
 
 /**
- * After a committed message, never failing the send: the recipient's badge (and the digest mail
- * when the badge goes from 0 to 1, or cannot be read), then the repeat-risk rule for the sender.
+ * After a committed message, never failing the send: the recipient's badge, the live events of
+ * both participants (D2), the digest mail when the badge goes from 0 to 1 (or cannot be read),
+ * then the repeat-risk rule for the sender.
  */
 async function afterMessage(input: { cid: string; messageId: string; senderUid: string; senderPublicId: string; recipientUid: string; flags: MessageRiskFlag[]; now: Date }): Promise<void> {
   const total = await recordUnread(input.recipientUid, input.cid);
+  await publishNewMessage({ cid: input.cid, mid: input.messageId, senderUid: input.senderUid, recipientUid: input.recipientUid, recipientUnread: total, at: input.now });
   if (total === null || total === 1) await scheduleDigest(input.recipientUid, input.now);
   if (input.flags.length === 0) return;
   if (!(await recordRiskyMessage(input.senderUid, `${input.cid}/${input.messageId}`, input.now))) return;
@@ -187,14 +191,16 @@ export async function sendMessage(actor: MessagingActor, cid: string, text: stri
   return { messageId, flags: analysis.flags };
 }
 
-/** Read receipt (D7); the badge forgets the conversation either way. */
+/** Read receipt (D7); the badge forgets the conversation either way. Live receipt when something changed. */
 export async function readConversation(uid: string, cid: string, now = new Date()): Promise<void> {
+  let other: string | null = null;
   try {
-    await markConversationRead(cid, uid, now);
+    other = await markConversationRead(cid, uid, now);
   } catch (error) {
     accessError(error);
   }
-  await clearUnread(uid, cid);
+  const total = await clearUnread(uid, cid);
+  if (other) await publishRead({ cid, readerUid: uid, otherUid: other, readerUnread: total, at: now });
 }
 
 export type StateChange = { archived: boolean } | { hidden: true } | { blocked: boolean };
@@ -216,13 +222,17 @@ export async function changeConversationState(uid: string, cid: string, change: 
         throw error;
       }
       if (changed || conversation.blockedBy.includes(uid) !== change.blocked) await setPairBlockedBy(uid, other, change.blocked);
+      // Both rows show the block (blockedByMe, blockedMe); the pair's other conversations follow on refetch.
+      await publishConversationChange(cid, [uid, other], now);
       return;
     }
     await setParticipantState(cid, uid, change);
   } catch (error) {
     accessError(error);
   }
-  if ("hidden" in change) await clearUnread(uid, cid);
+  // Archive and delete for me concern this account only (its other tabs).
+  if ("hidden" in change) await publishConversationChange(cid, [uid], now, { uid, total: await clearUnread(uid, cid) });
+  else await publishConversationChange(cid, [uid], now);
 }
 
 /** Total of `uid`'s unread messages (Valkey, rebuilt from Firestore when missing). */

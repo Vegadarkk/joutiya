@@ -136,4 +136,3 @@ export type PasswordChangeResponse = { status: "changed"; session: SessionSummar
 export type ProfileResponse = { session: SessionSummary };
 export type SessionResponse = { status: "signed_in"; session: SessionSummary };
 export type MeResponse = { session: SessionSummary | null };
-export type ClientTokenResponse = { token: string };

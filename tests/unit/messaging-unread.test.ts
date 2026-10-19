@@ -64,10 +64,12 @@ describe("unread badge", () => {
     expect(await unreadTotal("u1", async () => ({ c1: 1 }))).toBe(1);
     expect(await recordUnread("u1", "c1")).toBe(2);
     expect(await recordUnread("u1", "c2")).toBe(3);
-    await clearUnread("u1", "c1");
+    // The new total rides the live stream (D2): null while the hash is not trusted.
+    expect(await clearUnread("u1", "c1")).toBe(1);
     expect(await unreadTotal("u1", async () => ({}))).toBe(1);
-    await clearUnread("u1", "c2");
+    expect(await clearUnread("u1", "c2")).toBe(0);
     expect(await unreadTotal("u1", async () => ({ c9: 9 }))).toBe(0);
+    expect(await clearUnread("u9", "c1")).toBeNull();
   });
 
   it("drops a rebuild that raced with a new message (version check), so the next read rebuilds again", async () => {
@@ -110,7 +112,7 @@ describe("unread badge", () => {
     expect(load).toHaveBeenCalledTimes(2);
     // Writes are best effort.
     expect(await recordUnread("u5", "c1")).toBeNull();
-    await expect(clearUnread("u5", "c1")).resolves.toBeUndefined();
+    expect(await clearUnread("u5", "c1")).toBeNull();
     await expect(markSeen("u5")).resolves.toBeUndefined();
     expect(await scheduleDigest("u5")).toBe(false);
     expect(await recordRiskyMessage("u5", "c/m")).toBe(false);

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 
 // Conversation id (design D1): one conversation per (listing, buyer), derived on the server so no
 // lookup query is needed and no uid appears in /messages/{cid}. The browser never derives it: it
-// gets the cid from POST /api/conversations or from its realtime inbox.
+// gets the cid from POST /api/conversations or from its inbox (GET /api/conversations).
 
 const VERSION = "conv:v1";
 

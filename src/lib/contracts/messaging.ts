@@ -10,9 +10,9 @@ export const MESSAGE_TEXT_MAX = 2000;
 export const URL_MARKER = "⟦url⟧";
 /** Text of a message hidden by moderation. */
 export const HIDDEN_MARKER = "⟦hidden⟧";
-/** Inbox page size of the realtime listener (D2). */
+/** Inbox page size of GET /api/conversations (D2). */
 export const INBOX_PAGE = 30;
-/** Thread page size of the realtime listener and of older pages (D2). */
+/** Thread page size of GET /api/conversations/{cid}/messages (D2). */
 export const THREAD_PAGE = 50;
 
 export const MESSAGE_RISK_FLAGS = ["external_url", "iban", "payment_kw", "contact_with_payment_kw"] as const;
@@ -90,7 +90,7 @@ export interface UnreadResponse {
   total: number;
 }
 
-/** What the browser maps a conversation document to (listener, D2). Dates are epoch ms. */
+/** One conversation as its participant sees it (inbox row, thread header; D2). Dates are epoch ms. */
 export interface ConversationView {
   cid: string;
   listingId: string;
@@ -117,3 +117,58 @@ export interface MessageView {
   createdAt: number;
   readAt: number | null;
 }
+
+/**
+ * GET /api/conversations?cursor=&archived=1: the caller's conversations, newest activity first.
+ * Conversations deleted for the caller never appear; archived ones only with `archived=1`. A page
+ * scans INBOX_PAGE conversations, so it may hold fewer rows (even none) while `next` is set.
+ */
+export interface ConversationsPage {
+  conversations: ConversationView[];
+  /** Opaque cursor of the next page; absent at the end. */
+  next?: string;
+}
+
+/** GET /api/conversations/{cid}: one inbox row (404 when deleted for the caller). */
+export interface ConversationResponse {
+  conversation: ConversationView;
+}
+
+/**
+ * GET /api/conversations/{cid}/messages?cursor= (older page) or ?after= (only newer messages):
+ * the conversation and up to THREAD_PAGE messages, newest first. Hidden messages keep their place
+ * with `hidden: true` and the HIDDEN_MARKER text.
+ */
+export interface MessagesPage {
+  conversation: ConversationView;
+  messages: MessageView[];
+  /** Cursor of the older page; absent at the beginning of the conversation. */
+  next?: string;
+  /** First page and `after` reads: position of the newest message (else the `after` given), the next `after`. */
+  latest?: string;
+  /** `after` only: more than THREAD_PAGE newer messages exist; reload the first page instead. */
+  gap?: boolean;
+}
+
+// Live stream (GET /api/messages/stream, D2): server-sent events, each one `data:` JSON of a
+// MessagingEvent (no event name). Ids only, never a message text: the page refetches through the API.
+export const MESSAGING_EVENT_TYPES = ["ready", "resync", "message", "message_updated", "read", "conversation", "unread", "revoked"] as const;
+export type MessagingEventType = (typeof MESSAGING_EVENT_TYPES)[number];
+
+export type MessagingEvent =
+  /** First event of a stream opened without Last-Event-ID: live from now on. */
+  | { type: "ready" }
+  /** First event of a reconnection (Last-Event-ID): events may have been missed, refetch. */
+  | { type: "resync" }
+  /** A new message in `cid` (either participant's). */
+  | { type: "message"; cid: string; mid: string; at: number }
+  /** A message hidden or restored by moderation: refetch the page holding it. */
+  | { type: "message_updated"; cid: string; mid: string; at: number }
+  /** The other participant read `cid` at `at` (read receipt of my messages). */
+  | { type: "read"; cid: string; at: number }
+  /** The inbox row of `cid` changed: read here or in another tab, archived, deleted for me, blocked, frozen. */
+  | { type: "conversation"; cid: string; at: number }
+  /** New unread total of the badge. */
+  | { type: "unread"; total: number }
+  /** The account was banned or suspended: the stream ends, do not reconnect before /api/auth/me. */
+  | { type: "revoked" };

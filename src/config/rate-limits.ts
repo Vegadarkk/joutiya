@@ -46,8 +46,6 @@ export const RATE_LIMITS = {
   "verify.resend.uid": { points: 3, duration: HOUR, policy: "closed", key: "uid" },
   // Action codes (verification and reset links): per IP, brute force on oobCode.
   "action.ip": { points: 60, duration: HOUR, policy: "closed", key: "ip" },
-  // /api/auth/client-token: 120 per hour per uid.
-  "clientToken.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
   // WhatsApp verification: 3 per day per account, 5 per day per IP /64, 1 per minute per number and account.
   "phone.uid": { points: 3, duration: DAY, policy: "closed", key: "uid" },
   "phone.ip": { points: 5, duration: DAY, policy: "closed", key: "ip" },
@@ -159,6 +157,14 @@ export const RATE_LIMITS = {
   // Read, archive, hide, block calls of the inbox, and the unread badge.
   "conversation.state.uid": { points: 600, duration: HOUR, policy: "open", key: "uid" },
   "messages.unread.uid": { points: 600, duration: HOUR, policy: "open", key: "uid" },
+  // The browser reads conversations through the API only (D2, 19 Oct): inbox pages, inbox rows and
+  // thread pages, 1 200 calls per hour (a live thread refetches its newer messages on each event),
+  // and the documents they read (an inbox page up to 31, a thread page up to 52, a refetch 2 or 3):
+  // 5 000 per day per account, a tenth of the Spark day, like listing.owner.read.uid.
+  "conversation.read.uid": { points: 1200, duration: HOUR, policy: "open", key: "uid" },
+  "conversation.docs.uid": { points: 5000, duration: DAY, policy: "open", key: "uid" },
+  // GET /api/messages/stream opens (one per tab; the stream ends after 30 min and reconnects).
+  "messages.stream.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
   // Reports: signed in 20 per day; anonymous 5 per hour per device and 20 per hour per IP (Turnstile
   // always); P0 reasons 3 per day per account, 2 per device, 5 per IP /64. Open: a report is always
   // accepted, and without Valkey a P0 hides nothing (no "multi" strong signal).

@@ -7,8 +7,9 @@ import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { csrfToken } from "@/lib/security/csrf";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { POST as action } from "@/app/api/auth/action/route";
-import { POST as clientToken } from "@/app/api/auth/client-token/route";
 import { GET as me } from "@/app/api/auth/me/route";
+import { GET as inbox, POST as startConversation } from "@/app/api/conversations/route";
+import { GET as unread } from "@/app/api/messages/unread/route";
 import { POST as profile } from "@/app/api/auth/profile/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
 import { CONSENTS, Jar, ORIGIN, PASSWORD, call, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
@@ -20,7 +21,7 @@ vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
 }));
 
 // Guards on a suspended account (§6 "Contrôle d'accès"): the session is refused everywhere except
-// on the routes that opt in (conversations, export, appeal).
+// on the routes that opt in (reading conversations, export, appeal).
 
 async function verifiedAccount() {
   const jar = new Jar();
@@ -47,7 +48,7 @@ function requestWith(jar: Jar): Request {
 beforeEach(() => resetRateLimiters());
 
 describe("suspended account", () => {
-  it("answers 403 account_suspended unless the route allows suspended members (client token does, D9)", async () => {
+  it("answers 403 account_suspended unless the route allows suspended members (messaging reads do, D9)", async () => {
     const { uid } = await verifiedAccount();
     await setClaims(uid, { role: "individual", st: "suspended" });
     const jar = await jarFor(uid);
@@ -57,9 +58,14 @@ describe("suspended account", () => {
     const refused = await call<ErrorBody>(profile, "/api/auth/profile", { jar, body: { displayName: "Still Me" } });
     expect(refused.status).toBe(403);
     expect(refused.body.error.code).toBe("account_suspended");
-    // Phase 5 (D9): a suspended member still reads their conversations and decisions in real time.
-    const token = await call<{ token: string }>(clientToken, "/api/auth/client-token", { jar, body: {} });
-    expect(token.status).toBe(200);
+    // Phase 5 (D2, D9): a suspended member still reads their conversations through the API, never writes.
+    const conversations = await call<{ conversations: unknown[] }>(inbox, "/api/conversations", { jar });
+    expect(conversations.status).toBe(200);
+    expect(conversations.body.conversations).toEqual([]);
+    expect((await call<{ total: number }>(unread, "/api/messages/unread", { jar })).status).toBe(200);
+    const write = await call<ErrorBody>(startConversation, "/api/conversations", { jar, body: { listingId: "abcd2345", text: "Salam", turnstileToken: "t" } });
+    expect(write.status).toBe(403);
+    expect(write.body.error.code).toBe("account_suspended");
 
     await expect(requireUser(requestWith(jar), { mutation: true })).rejects.toMatchObject({ status: 403, code: "account_suspended" });
     const allowed = await requireUser(requestWith(jar), { mutation: true, allowSuspended: true });

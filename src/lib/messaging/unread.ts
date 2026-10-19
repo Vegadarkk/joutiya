@@ -127,23 +127,30 @@ export async function recordUnread(uid: string, cid: string): Promise<number | n
   }
 }
 
-/** The account read (or hid) `cid`: its count leaves the badge. Best effort. */
-export async function clearUnread(uid: string, cid: string): Promise<void> {
+/**
+ * The account read (or hid) `cid`: its count leaves the badge. Returns the account's new total when
+ * the hash is trusted (init marker present), null otherwise or when Valkey fails. Best effort.
+ */
+export async function clearUnread(uid: string, cid: string): Promise<number | null> {
   const redis = client();
-  if (!redis) return;
+  if (!redis) return null;
   try {
-    results(
+    const [, , , exists, values] = results(
       await timed(
         redis
           .multi()
           .incr(MESSAGING_KEYS.unreadVersion(uid))
           .pexpire(MESSAGING_KEYS.unreadVersion(uid), UNREAD_TTL_MS)
           .hdel(MESSAGING_KEYS.unread(uid), cid)
+          .exists(MESSAGING_KEYS.unreadInit(uid))
+          .hvals(MESSAGING_KEYS.unread(uid))
           .exec(),
       ),
     );
+    return Number(exists) === 1 ? sum(values as unknown[]) : null;
   } catch (error) {
     logger.warn({ err: (error as Error).message }, "messaging unread clear failed");
+    return null;
   }
 }
 

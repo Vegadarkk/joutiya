@@ -48,6 +48,14 @@ describe("buildCsp", () => {
     expect(directives(buildCsp({ variant: "public", tilesOrigin: "http://localhost:3000/api/dev/storage/m/maps/x.pmtiles" })).get("connect-src")).toContain("http://localhost:3000");
   });
 
+  it("lets the browser reach no Firebase host: messaging reads go through the API (phase 5 D2)", () => {
+    for (const variant of ["public", "private"] as const) {
+      const text = buildCsp({ variant, nonce: "abc" });
+      expect(directives(text).get("connect-src")).toEqual(["'self'", "https://accounts.google.com/gsi/"]);
+      for (const host of ["firestore.googleapis.com", "identitytoolkit.googleapis.com", "securetoken.googleapis.com"]) expect(text).not.toContain(host);
+    }
+  });
+
   it("locks framing, plugins, base and form targets", () => {
     const policy = directives(buildCsp({ variant: "public" }));
     expect(policy.get("frame-ancestors")).toEqual(["'none'"]);

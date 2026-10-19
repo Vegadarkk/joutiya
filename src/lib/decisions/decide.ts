@@ -24,7 +24,7 @@ import { HttpError, notFound } from "@/lib/http/errors";
 import { IllegalTransitionError, transition, type Lifetime } from "@/lib/listings/lifecycle";
 import { revalidateListingPaths } from "@/lib/listings/revalidate";
 import { logger } from "@/lib/logging/logger";
-import { hideMessage, unhideMessage } from "@/lib/messaging";
+import { hideMessage, publishRevoked, unhideMessage } from "@/lib/messaging";
 import { consume } from "@/lib/quota";
 import { adsEligibleOf, closeReportsTx, openReportsForTarget, recordReporterOutcomes, targetKey, unhideTarget, type TargetRef } from "@/lib/reports";
 import { splitMessageId } from "@/lib/reports/target-key";
@@ -598,6 +598,8 @@ async function afterCommit(run: AfterInput): Promise<void> {
   // Account measure.
   const clearHiddenFor = target.type === "user" ? new Set(committed.closedIds) : undefined;
   const accountDecisionId = committed.sanction?.id ?? mainId;
+  // Live messaging streams of a suspended or banned account end at once (phase-5 D2 security).
+  if (plan?.kind === "sanction" && (plan.sanction.action === "suspend_account" || plan.sanction.action === "ban")) await step("messaging revoke", context, () => publishRevoked(ownerUid));
   if (plan?.kind === "sanction" && plan.sanction.action === "suspend_account") await step("listings pause", context, () => pauseListingsForSuspension(ownerUid, now, clearHiddenFor));
   if (plan?.kind === "sanction" && plan.sanction.action === "ban") await step("listings removal", context, () => removeListingsForBan(ownerUid, accountDecisionId, actor.uid, now, clearHiddenFor));
   if (plan?.kind === "reverse" && plan.action === "suspend_account" && plan.suspensionLifted) await step("listings resume", context, () => resumeModerationPaused(ownerUid, now));

@@ -10,7 +10,7 @@ import type { TemplateMail } from "@/lib/mail/types";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { POST as action } from "@/app/api/auth/action/route";
-import { POST as clientToken } from "@/app/api/auth/client-token/route";
+import { GET as inbox } from "@/app/api/conversations/route";
 import { POST as logout } from "@/app/api/auth/logout/route";
 import { GET as me } from "@/app/api/auth/me/route";
 import { POST as profile } from "@/app/api/auth/profile/route";
@@ -118,11 +118,9 @@ describe("sign-up, verification, session, profile, logout", () => {
     expect(updated.body.session.displayName).toBe("Yasmine B.");
     expect(updated.body.session.locale).toBe("ar");
 
-    const token = await call<{ token: string }>(clientToken, "/api/auth/client-token", { jar, body: {} });
-    expect(token.status).toBe(200);
-    expect(token.body.token.split(".")).toHaveLength(3);
-    const tokenNoCsrf = await call<ErrorBody>(clientToken, "/api/auth/client-token", { jar, csrf: false, body: {} });
-    expect(tokenNoCsrf.status).toBe(403);
+    const conversations = await call<{ conversations: unknown[] }>(inbox, "/api/conversations", { jar });
+    expect(conversations.status).toBe(200);
+    expect(conversations.body.conversations).toEqual([]);
 
     await nextSecond();
     const stale = new Jar();
@@ -135,10 +133,10 @@ describe("sign-up, verification, session, profile, logout", () => {
     expect((await call<{ session: null }>(me, ME, { jar })).body.session).toBeNull();
     const anonymous = await call<ErrorBody>(profile, PROFILE, { jar, body: { displayName: "Ghost" } });
     expect(anonymous.status).toBe(401);
-    // A copy of the cookie kept from before the logout is revoked: no SDK token, no mutation, signed out.
-    const staleToken = await call<ErrorBody>(clientToken, "/api/auth/client-token", { jar: stale, body: {} });
-    expect(staleToken.status).toBe(401);
-    expect(staleToken.body.error.code).toBe("unauthenticated");
+    // A copy of the cookie kept from before the logout is revoked: no conversation, no mutation, signed out.
+    const staleRead = await call<ErrorBody>(inbox, "/api/conversations", { jar: stale });
+    expect(staleRead.status).toBe(401);
+    expect(staleRead.body.error.code).toBe("unauthenticated");
     expect((await call<ErrorBody>(profile, PROFILE, { jar: stale, body: { displayName: "Ghost" } })).status).toBe(401);
     expect((await call<{ session: null }>(me, ME, { jar: stale })).body.session).toBeNull();
     expect(await loggedEvents(session.uid)).toEqual(["signup", "login", "logout"]);
