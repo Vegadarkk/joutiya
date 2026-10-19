@@ -198,6 +198,8 @@ export interface ProMeResponse {
   salesOpen: boolean;
   /** How an unverified number gets verified: by WhatsApp before applying, or by a moderator's call during the review ("call": the form asks the number). */
   phoneVerification: "whatsapp" | "call";
+  /** The launch offer a shop verified now receives (design D3), or null when none is open. */
+  launchOffer: { noticeDays: number } | null;
   eligibility: { emailVerified: boolean; phoneVerified: boolean; accountActive: boolean };
   shop: ProSelfView | null;
 }

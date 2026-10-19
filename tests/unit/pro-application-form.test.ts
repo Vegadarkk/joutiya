@@ -1,0 +1,69 @@
+import { describe, expect, it } from "vitest";
+import { draftProblems, initialDraft, type Draft } from "@/components/pro/pro-application-form";
+import type { PieceState } from "@/components/pro/kybc-pieces";
+import { cityBySlug } from "@/config/regions";
+import type { ProSelfView } from "@/lib/contracts/pro";
+
+// Pro application form (phase 7 design §4): the client checks mirror proApplySchema and
+// proLegalSchema, so a refusal shows on its field before anything is sent.
+
+const ready: PieceState = { key: "p1", name: "rc.pdf", phase: "ready", uploadId: "up1" };
+
+function draft(overrides: Partial<Draft> = {}): Draft {
+  return {
+    name: "Atelier Salma",
+    description: "",
+    city: cityBySlug("casablanca") ?? null,
+    form: "societe",
+    ids: { ice: "001 234 567 000 089", rc: "12345", if: "4567890", aeNumber: "", tp: "" },
+    phone: "",
+    commitment: true,
+    ...overrides,
+  };
+}
+
+describe("draftProblems", () => {
+  it("accepts a complete application", () => {
+    expect(cityBySlug("casablanca")).toBeDefined();
+    expect(draftProblems(draft(), [ready], false, "token")).toEqual({});
+  });
+
+  it("flags each missing or malformed field", () => {
+    const empty = draft({ name: " ", city: null, form: null, commitment: false });
+    expect(draftProblems(empty, [], false, null)).toEqual({ name: "required", city: "cityRequired", form: "required", pieces: "piecesRequired", commitment: "commitmentRequired", challenge: "challenge" });
+    expect(draftProblems(draft({ name: "A" }), [ready], false, "t").name).toBe("nameLength");
+    expect(draftProblems(draft({ ids: { ice: "12345", rc: "", if: "IF#1", aeNumber: "", tp: "" } }), [ready], false, "t")).toEqual({ ice: "iceFormat", rc: "required", if: "identifierFormat" });
+  });
+
+  it("asks the identifiers of the chosen legal form only", () => {
+    const ae = draft({ form: "auto_entrepreneur", ids: { ice: "001234567000089", rc: "", if: "", aeNumber: "", tp: "" } });
+    expect(draftProblems(ae, [ready], false, "t")).toEqual({ aeNumber: "required" });
+    const trader = draft({ form: "commercant", ids: { ice: "001234567000089", rc: "", if: "", aeNumber: "", tp: "" } });
+    expect(draftProblems(trader, [ready], false, "t")).toEqual({ rc: "rcOrTp" });
+    expect(draftProblems({ ...trader, ids: { ...trader.ids, tp: "TP-55" } }, [ready], false, "t")).toEqual({});
+  });
+
+  it("asks the number to call only when the form needs it", () => {
+    expect(draftProblems(draft(), [ready], true, "t")).toEqual({ phone: "phoneRequired" });
+    expect(draftProblems(draft({ phone: "05 22 00 00 00" }), [ready], true, "t")).toEqual({ phone: "phoneFormat" });
+    for (const phone of ["06 12 34 56 78", "+212 712-345-678", "00212612345678"]) expect(draftProblems(draft({ phone }), [ready], true, "t"), phone).toEqual({});
+  });
+
+  it("waits for pieces still uploading and ignores refused ones", () => {
+    const uploading: PieceState = { key: "p2", name: "tp.jpg", phase: "uploading", progress: 0.4 };
+    const refused: PieceState = { key: "p3", name: "x.gif", phase: "rejected", reason: "bad_type" };
+    expect(draftProblems(draft(), [ready, uploading], false, "t")).toEqual({ pieces: "piecesPending" });
+    expect(draftProblems(draft(), [refused], false, "t")).toEqual({ pieces: "piecesRequired" });
+  });
+});
+
+describe("initialDraft", () => {
+  it("prefills a rejected application with what the server sends back", () => {
+    const previous = { name: "Atelier Salma", description: "Céramique", citySlug: "casablanca", legalForm: "commercant", ice: "001234567000089" } as ProSelfView;
+    const filled = initialDraft(previous);
+    expect(filled).toMatchObject({ name: "Atelier Salma", description: "Céramique", form: "commercant", commitment: false });
+    expect(filled.city?.slug).toBe("casablanca");
+    expect(filled.ids).toEqual({ ice: "001234567000089", rc: "", if: "", aeNumber: "", tp: "" });
+    expect(initialDraft(null).form).toBeNull();
+  });
+});

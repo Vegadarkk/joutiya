@@ -340,7 +340,8 @@
       "decisions": "Décisions et recours",
       "messages": "Mes messages",
       "messagesLink": "Messages",
-      "unreadCount": "{count, plural, one {# message non lu} other {# messages non lus}}"
+      "unreadCount": "{count, plural, one {# message non lu} other {# messages non lus}}",
+      "pro": "Espace Pro"
     },
     "errors": {
       "invalid_body": "Certaines informations sont incorrectes. Vérifiez le formulaire, puis réessayez.",
@@ -2526,6 +2527,7 @@
   "Pro": {
     "metaTitle": "Espace Pro",
     "title": "Espace Pro",
+    "lead": "Votre boutique sur Joutiya : la demande, sa vérification, puis votre offre et vos quotas.",
     "loadFailed": "Votre espace Pro n'a pas pu être chargé",
     "retry": "Réessayer",
     "intro": {
@@ -2540,7 +2542,9 @@
       "phone": "Numéro de mobile vérifié",
       "verifyPhone": "Vérifier mon numéro",
       "settings": "Ouvrir mes paramètres",
-      "inactive": "Votre compte doit être actif pour demander un compte Pro."
+      "inactive": "Votre compte doit être actif pour demander un compte Pro.",
+      "phoneCall": "Votre numéro de mobile sera vérifié par un appel de notre équipe pendant l'examen de la demande.",
+      "ready": "Votre compte remplit les conditions pour demander un compte Pro."
     },
     "closed": "Les demandes de compte Pro sont fermées pour le moment. Revenez bientôt.",
     "form": {
@@ -2589,7 +2593,20 @@
       "nameLength": "Le nom doit compter de 2 à {max} caractères.",
       "iceFormat": "L'ICE compte 15 chiffres.",
       "identifierFormat": "Utilisez des chiffres et des lettres uniquement.",
-      "cityRequired": "Choisissez la ville de la boutique."
+      "cityRequired": "Choisissez la ville de la boutique.",
+      "phoneTitle": "Votre numéro",
+      "phone": "Numéro de mobile",
+      "phoneHint": "Un modérateur vous appellera à ce numéro pendant l'examen de la demande. Il sera ensuite vérifié sur votre compte.",
+      "phoneRequired": "Indiquez votre numéro de mobile.",
+      "phoneFormat": "Saisissez un mobile marocain (06 ou 07).",
+      "challenge": "Confirmez que vous n'êtes pas un robot pour envoyer la demande.",
+      "submitted": "Demande envoyée",
+      "submittedBody": "Vous recevrez un e-mail dès qu’elle aura été vérifiée.",
+      "legalFormHint": {
+        "societe": "ICE, RC et identifiant fiscal.",
+        "auto_entrepreneur": "ICE et numéro d'auto-entrepreneur.",
+        "commercant": "ICE, et RC ou taxe professionnelle."
+      }
     },
     "pending": {
       "title": "Demande en cours de vérification",
@@ -2626,13 +2643,20 @@
       "myListings": "Mes annonces",
       "newListing": "Déposer une annonce",
       "signInAgain": "Votre compte vient de passer Pro : reconnectez-vous pour publier en tant que professionnel.",
-      "signIn": "Me reconnecter"
+      "signIn": "Me reconnecter",
+      "grace_title": "Paiement à régulariser",
+      "downgraded": "Boutique sans offre",
+      "quotasTitle": "Vos quotas",
+      "shortcuts": "Raccourcis"
     },
     "errors": {
       "pro_signup_closed": "Les demandes de compte Pro sont fermées pour le moment.",
       "already_pro": "Votre compte est déjà un compte Pro.",
       "pro_application_exists": "Une demande est déjà en cours pour ce compte.",
-      "invalid_pieces": "Un des documents n'est plus disponible. Retirez-le et ajoutez-le de nouveau."
+      "invalid_pieces": "Un des documents n'est plus disponible. Retirez-le et ajoutez-le de nouveau.",
+      "phone_required": "Indiquez le numéro de mobile qu'un modérateur appellera.",
+      "account_suspended": "Votre compte est suspendu : vous ne pouvez pas demander de compte Pro.",
+      "email_not_verified": "Confirmez d'abord votre adresse e-mail."
     }
   },
   "Messaging": {
@@ -2936,6 +2960,16 @@
       "rate_limited": "Trop de tentatives. Réessayez {wait}.",
       "later": "plus tard",
       "unavailable": "Le recours est momentanément indisponible. Réessayez dans quelques minutes."
+    }
+  },
+  "Storefront": {
+    "label": "Boutique professionnelle",
+    "verified": "Boutique vérifiée",
+    "verifiedNote": "Joutiya a vérifié les identifiants professionnels de cette boutique (ICE, registre). Les ventes se font directement entre vous et la boutique : Joutiya n'est pas partie à la vente et ne garantit pas les produits.",
+    "about": "Présentation",
+    "meta": {
+      "title": "{name}, boutique à {city}",
+      "description": "{name}, boutique vérifiée à {city} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya."
     }
   }
 }
