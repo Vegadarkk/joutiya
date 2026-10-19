@@ -41,7 +41,7 @@ const configured = { value: true };
 vi.mock("@/lib/valkey/clients", () => ({ isValkeyConfigured: () => configured.value, valkey: () => fake }));
 
 const { alert } = await import("@/lib/alert");
-const { aggregationReads, consume, firstDegraded, headroom, isDegraded, isExhausted, nextReset, readQuotas, setGauge } = await import("@/lib/quota");
+const { aggregationReads, consume, firstDegraded, headroom, isDegraded, isExhausted, nextReset, raiseTo, readQuotas, setGauge } = await import("@/lib/quota");
 
 const AT = new Date("2026-10-16T10:00:00Z");
 const TOMORROW = new Date("2026-10-17T10:00:00Z");
@@ -55,28 +55,28 @@ beforeEach(() => {
 });
 
 describe("consume", () => {
-  it("counts per period and alerts once per level and period", async () => {
-    expect(await consume("resend.daily", 69, AT)).toMatchObject({ id: "resend.daily", period: "2026-10-16", used: 69, limit: 100, level: "ok" });
+  it("counts per period and alerts once per level and period (resend.daily: 80 a day, the uptime Worker keeps 20)", async () => {
+    expect(await consume("resend.daily", 55, AT)).toMatchObject({ id: "resend.daily", period: "2026-10-16", used: 55, limit: 80, level: "ok" });
     expect(alert).not.toHaveBeenCalled();
 
     // 70 %: one P2, not repeated by the next increments.
-    expect(await consume("resend.daily", 1, AT)).toMatchObject({ used: 70, ratio: 0.7, level: "warning" });
-    expect(await consume("resend.daily", 1, AT)).toMatchObject({ used: 71, level: "warning" });
+    expect(await consume("resend.daily", 1, AT)).toMatchObject({ used: 56, ratio: 0.7, level: "warning" });
+    expect(await consume("resend.daily", 1, AT)).toMatchObject({ used: 57, level: "warning" });
     expect(alert).toHaveBeenCalledTimes(1);
     expect(alert).toHaveBeenCalledWith(expect.objectContaining({ severity: "P2", title: expect.stringContaining("70 %") }));
     expect(vi.mocked(alert).mock.calls[0]?.[0].title).toContain("resend.daily");
-    expect(vi.mocked(alert).mock.calls[0]?.[0].body).toContain("70 / 100 emails pour 2026-10-16");
+    expect(vi.mocked(alert).mock.calls[0]?.[0].body).toContain("56 / 80 emails pour 2026-10-16");
 
     // 90 %: the degraded level, one P1 with the degraded mode.
-    expect(await consume("resend.daily", 19, AT)).toMatchObject({ used: 90, level: "degraded" });
-    expect(await consume("resend.daily", 5, AT)).toMatchObject({ used: 95, level: "degraded" });
+    expect(await consume("resend.daily", 15, AT)).toMatchObject({ used: 72, level: "degraded" });
+    expect(await consume("resend.daily", 4, AT)).toMatchObject({ used: 76, level: "degraded" });
     expect(alert).toHaveBeenCalledTimes(2);
     expect(vi.mocked(alert).mock.calls[1]?.[0]).toMatchObject({ severity: "P1", title: expect.stringContaining("mode dégradé") });
     expect(vi.mocked(alert).mock.calls[1]?.[0].body).toContain("Seuls les e-mails de sécurité");
     expect(fake.set).toHaveBeenCalledWith("quota:alerted:resend.daily:2026-10-16:warning", "1", "EX", expect.any(Number), "NX");
 
     // A new period starts from zero and alerts again.
-    expect(await consume("resend.daily", 70, TOMORROW)).toMatchObject({ period: "2026-10-17", used: 70, level: "warning" });
+    expect(await consume("resend.daily", 56, TOMORROW)).toMatchObject({ period: "2026-10-17", used: 56, level: "warning" });
     expect(alert).toHaveBeenCalledTimes(3);
   });
 
@@ -96,10 +96,10 @@ describe("isDegraded and isExhausted", () => {
   it("separate the degraded mode (90 %) from the exhausted counter (100 %)", async () => {
     expect(await isDegraded("resend.daily")).toBe(false);
     expect(await isExhausted("resend.daily")).toBe(false);
-    await consume("resend.daily", 90);
+    await consume("resend.daily", 72);
     expect(await isDegraded("resend.daily")).toBe(true);
     expect(await isExhausted("resend.daily")).toBe(false);
-    await consume("resend.daily", 10);
+    await consume("resend.daily", 8);
     expect(await isExhausted("resend.daily")).toBe(true);
     // Brevo degrades at 100 %: both flip together.
     await consume("brevo.daily", 299);
@@ -150,6 +150,37 @@ describe("firstDegraded and headroom", () => {
     configured.value = true;
     fake.get.mockRejectedValueOnce(new Error("connection closed"));
     expect(await headroom("firestore.deletes", 0.9)).toBeNull();
+  });
+});
+
+describe("raiseTo", () => {
+  it("lifts a counter to the provider's higher count, never lowers it, and alerts on the crossing", async () => {
+    // Today's period (isDegraded reads the current one), like the increments of a real send.
+    await consume("resend.daily", 10);
+    // Resend's header counts the uptime Worker's relay mails too: the local counter catches up.
+    expect(await raiseTo("resend.daily", 30)).toMatchObject({ used: 30, level: "ok" });
+    expect(await consume("resend.daily", 1)).toMatchObject({ used: 31 });
+    // A lower provider value (another day's header, a stale read) changes nothing.
+    expect(await raiseTo("resend.daily", 20)).toMatchObject({ used: 31, level: "ok" });
+    expect(await raiseTo("resend.daily", 31)).toMatchObject({ used: 31 });
+    expect(alert).not.toHaveBeenCalled();
+    expect(fake.set).toHaveBeenCalledWith(expect.stringMatching(/^quota:resend\.daily:\d{4}-\d{2}-\d{2}$/), "30", "EX", expect.any(Number));
+    // The raise crosses 90 %: the same P1 as an increment would have raised, once.
+    expect(await raiseTo("resend.daily", 75)).toMatchObject({ used: 75, level: "degraded" });
+    expect(alert).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(alert).mock.calls[0]?.[0]).toMatchObject({ severity: "P1", title: expect.stringContaining("resend.daily") });
+    expect(await isDegraded("resend.daily")).toBe(true);
+    // An unset counter starts at the provider's value.
+    expect(await raiseTo("resend.monthly", 1_200, AT)).toMatchObject({ period: "2026-10", used: 1_200, level: "ok" });
+  });
+
+  it("reports unknown, without throwing, when Valkey is missing or down", async () => {
+    configured.value = false;
+    expect(await raiseTo("resend.daily", 50, AT)).toMatchObject({ used: 0, level: "unknown" });
+    configured.value = true;
+    fake.get.mockRejectedValueOnce(new Error("connection closed"));
+    expect(await raiseTo("resend.daily", 50, AT)).toMatchObject({ level: "unknown" });
+    expect(store.has("quota:resend.daily:2026-10-16")).toBe(false);
   });
 });
 

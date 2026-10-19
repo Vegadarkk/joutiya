@@ -2,12 +2,16 @@ import { logger } from "@/lib/logging/logger";
 
 // Provider failures carry what the queue should do with them (deliverMail decides, the worker
 // applies):
-//   transient   429, 5xx, network: BullMQ retries with backoff (five quick attempts);
+//   transient   429 (rate limit), 5xx, network: BullMQ retries with backoff (five quick attempts);
+//   quota       a 429 for a spent sending quota (Resend: daily_quota_exceeded,
+//               monthly_quota_exceeded), or any 429 asking to wait more than a minute. Retrying
+//               in place would burn the attempts: the mail waits for the provider's reset
+//               (security mails take Brevo first);
 //   unavailable 401/402/403/404: revoked key, unverified domain, unpaid account or a moved
 //               endpoint. Never retried on the same provider: alert, fallback or wait an hour;
 //   rejected    400/422 and the rest: a retry would fail the same way. Logged and dropped.
 
-export type ProviderErrorKind = "transient" | "unavailable" | "rejected";
+export type ProviderErrorKind = "transient" | "quota" | "unavailable" | "rejected";
 
 export class ProviderError extends Error {
   /** True for transient failures only: the queue's exponential backoff makes sense for them. */
@@ -26,7 +30,22 @@ export class ProviderError extends Error {
   }
 }
 
-export function classifyStatus(status: number): ProviderErrorKind {
+/** A 429 asking to wait longer than this is a spent quota, not a rate limit (Resend's is per second). */
+export const QUOTA_RETRY_AFTER_SECONDS = 60;
+
+/**
+ * True for a 429 that refuses for a spent sending quota: the error name or message says "quota"
+ * (Resend: daily_quota_exceeded, monthly_quota_exceeded), or Retry-After exceeds a minute.
+ */
+export function isQuotaRefusal(status: number, detail: { name?: string; message?: string }, retryAfterSeconds?: number): boolean {
+  if (status !== 429) return false;
+  if (/quota/i.test(detail.name ?? "") || /quota/i.test(detail.message ?? "")) return true;
+  return retryAfterSeconds !== undefined && retryAfterSeconds > QUOTA_RETRY_AFTER_SECONDS;
+}
+
+/** Kind of a non-2xx answer; with the error body and Retry-After, a quota refusal is told from a rate limit. */
+export function classifyStatus(status: number, detail: { name?: string; message?: string } = {}, retryAfterSeconds?: number): ProviderErrorKind {
+  if (isQuotaRefusal(status, detail, retryAfterSeconds)) return "quota";
   if (status === 429 || status >= 500) return "transient";
   if (status === 401 || status === 402 || status === 403 || status === 404) return "unavailable";
   return "rejected";

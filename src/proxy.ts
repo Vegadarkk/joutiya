@@ -10,7 +10,7 @@ import { PRIVATE_SEGMENTS } from "@/config/site";
 import { DEVICE_COOKIE, setDeviceCookie } from "@/lib/security/cookies";
 import { buildCsp, createNonce, INLINE_HASH_MARKER, type CspVariant } from "@/lib/security/csp";
 import { PINNED_SCRIPT_HASHES } from "@/lib/security/inline-hashes";
-import { newDeviceCookie, readDeviceId } from "@/lib/security/device";
+import { DEVICE_ID_HEADER, newDeviceCookie, readDeviceId } from "@/lib/security/device";
 import { coopFor } from "@/lib/security/headers";
 import { checkPageLimits, isMeteredPath, pathLocale, tooManyPagesHtml, TOO_MANY_CSP } from "@/lib/rate-limit/proxy-limits";
 import { challengeUrlPath } from "@/lib/security/challenge-path";
@@ -89,10 +89,10 @@ function decorate(response: NextResponse, host: "public" | "admin", policy: stri
 
 /**
  * Forwards the request to the app with extra request headers (the nonce and the CSP, read by
- * Next.js to stamp its scripts), keeping what the locale routing decided: rewrite target,
- * request header overrides, cookies and response headers.
+ * Next.js to stamp its scripts; the verified device id of a private page), keeping what the locale
+ * routing decided: rewrite target, request header overrides, cookies and response headers.
  */
-function forwardWithNonce(routed: NextResponse, request: NextRequest, policy: string, nonce: string): NextResponse {
+function forwardWithNonce(routed: NextResponse, request: NextRequest, policy: string, nonce: string, deviceId?: string): NextResponse {
   const headers = new Headers(request.headers);
   const overridden = routed.headers.get("x-middleware-override-headers");
   if (overridden) {
@@ -105,6 +105,10 @@ function forwardWithNonce(routed: NextResponse, request: NextRequest, policy: st
   headers.set("Content-Security-Policy", policy);
   // Read by the (account) layout to send an anonymous visitor back here after sign-in.
   headers.set("x-pathname", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+  // Private pages only: the device the cookie names (or the one this response creates), read by
+  // the auth pages for the Google sign-in nonce. Never the client's value (stripped in proxy()).
+  headers.delete(DEVICE_ID_HEADER);
+  if (deviceId) headers.set(DEVICE_ID_HEADER, deviceId);
 
   const rewrite = routed.headers.get("x-middleware-rewrite");
   const response = rewrite
@@ -182,6 +186,8 @@ async function pageLimitResponse(request: NextRequest): Promise<NextResponse | n
 }
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
+  // Internal request header: a client must never choose the device id a render trusts.
+  request.headers.delete(DEVICE_ID_HEADER);
   const host = normalizeHost(request.headers.get("host"));
   const adminHostName = normalizeHost(process.env.ADMIN_HOST);
   if (adminHostName && host === adminHostName) return adminHost(request);
@@ -212,20 +218,25 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   if (isPrivatePath(pathname) || dynamicPublic) {
     const nonce = createNonce();
     const policy = csp("private", nonce, dynamicPublic ? [...PINNED_SCRIPT_HASHES] : undefined);
-    const response = decorate(forwardWithNonce(routed, request, policy, nonce), "public", policy);
+    const deviceId = readDeviceId(request.cookies.get(DEVICE_COOKIE)?.value);
     if (dynamicPublic) {
+      const response = decorate(forwardWithNonce(routed, request, policy, nonce), "public", policy);
       // Like shared pages, no locale cookie. The device cookie makes the per-device search limits
       // apply (D13) instead of the anonymous bucket of the IP. It is not forwarded to this render:
       // a request without it is an unknown device on its IP (§6), or dropping cookies would skip
       // the device limits; over that bucket, a first search escalates to Turnstile.
       response.headers.delete("set-cookie");
-      if (!readDeviceId(request.cookies.get(DEVICE_COOKIE)?.value)) appendDeviceCookie(response);
+      if (!deviceId) appendDeviceCookie(response);
       return response;
     }
     // The device cookie exists before the first API call: sign-up and sign-in limits are counted
     // per device, and a browser without the cookie would share the anonymous bucket of its IP
-    // (src/lib/rate-limit/keys.ts). Private pages are dynamic, so the cookie costs no cache.
-    if (!readDeviceId(request.cookies.get(DEVICE_COOKIE)?.value)) setDeviceCookie(response, newDeviceCookie().value);
+    // (src/lib/rate-limit/keys.ts). Private pages are dynamic, so the cookie costs no cache. The
+    // render gets the id (x-device-id) the cookie names, or the one set here: the auth pages derive
+    // the Google sign-in nonce from it, and the API recomputes it from the same cookie.
+    const fresh = deviceId ? null : newDeviceCookie();
+    const response = decorate(forwardWithNonce(routed, request, policy, nonce, fresh?.id ?? deviceId ?? undefined), "public", policy);
+    if (fresh) setDeviceCookie(response, fresh.value);
     return response;
   }
   // Fallback policy; the server hook swaps 'unsafe-inline' for the hashes of this HTML.

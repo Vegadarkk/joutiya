@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { QUOTA_IDS, QUOTAS } from "@/config/quotas";
 import { classify, periodKey, retentionSeconds } from "@/lib/quota/period";
+import { RELAY_DAILY_CAP } from "../../workers/uptime-probe/src/lib";
 
 describe("quota periods", () => {
   it("buckets Firestore by the Pacific day and others by UTC", () => {
@@ -30,6 +31,23 @@ describe("quota periods", () => {
       expect(quota.alertAt).toBeLessThan(quota.degradeAt);
       expect(quota.degradedMode.length).toBeGreaterThan(10);
     }
+  });
+
+  it("leaves the uptime Worker's relay cap out of the app's share of Resend's 100 mails a day", () => {
+    expect(QUOTAS["resend.daily"].limit + RELAY_DAILY_CAP).toBe(100);
+    // Non-security mails stop at 90 % of the app's share; security mails keep the rest.
+    expect(classify(QUOTAS["resend.daily"], 72)).toBe("degraded");
+    expect(classify(QUOTAS["resend.daily"], 71)).toBe("warning");
+  });
+
+  it("guards the delivery incidents and the Sentry events too (alert at 70 %, no silent spending)", () => {
+    expect(QUOTAS["resend.bounces"]).toMatchObject({ limit: 10, period: "day", resetTimeZone: "UTC", kind: "counter", alertAt: 0.7, degradeAt: 1 });
+    expect(QUOTAS["resend.complaints"]).toMatchObject({ limit: 3, period: "day", resetTimeZone: "UTC", kind: "counter", alertAt: 0.7, degradeAt: 1 });
+    expect(classify(QUOTAS["resend.bounces"], 7)).toBe("warning");
+    expect(classify(QUOTAS["resend.complaints"], 3)).toBe("degraded");
+    expect(QUOTAS["sentry.events"]).toMatchObject({ limit: 5_000, period: "month", resetTimeZone: "UTC", kind: "counter", alertAt: 0.7, degradeAt: 0.9 });
+    expect(classify(QUOTAS["sentry.events"], 4_500)).toBe("degraded");
+    expect(periodKey(QUOTAS["sentry.events"], new Date("2026-10-13T05:00:00Z"))).toBe("2026-10");
   });
 });
 

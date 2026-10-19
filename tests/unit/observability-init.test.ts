@@ -9,7 +9,12 @@ const sentry = vi.hoisted(() => ({
 }));
 vi.mock("@sentry/node", () => sentry);
 
+// The sentry.events quota (B3-07): counted in beforeSend, read once at init.
+const quota = vi.hoisted(() => ({ consume: vi.fn(), isDegraded: vi.fn() }));
+vi.mock("@/lib/quota", () => quota);
+
 const DSN = "https://examplePublicKey@o0.ingest.de.sentry.io/0";
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 const saved = { SENTRY_DSN: process.env.SENTRY_DSN, LOG_LEVEL: process.env.LOG_LEVEL };
 
 async function load() {
@@ -22,6 +27,8 @@ async function load() {
 beforeEach(() => {
   process.env.LOG_LEVEL = "silent";
   for (const fn of Object.values(sentry)) fn.mockReset();
+  quota.consume.mockReset().mockResolvedValue({ level: "ok" });
+  quota.isDegraded.mockReset().mockResolvedValue(false);
 });
 
 afterEach(() => {
@@ -87,5 +94,62 @@ describe("initServerObservability", () => {
     sentry.flush.mockRejectedValueOnce(new Error("offline"));
     await expect(flushObservability(500)).resolves.toBeUndefined();
     expect(sentry.flush).toHaveBeenCalledWith(500);
+  });
+});
+
+describe("beforeSend and the sentry.events quota (B3-07)", () => {
+  type BeforeSend = (event: { message?: string }) => { message?: string } | null;
+
+  async function sendingHook() {
+    process.env.SENTRY_DSN = DSN;
+    const { initServerObservability, beforeSendServerEvent } = await load();
+    initServerObservability("web");
+    // The latest init: load() gives every call a fresh module (and a fresh cached level).
+    const options = sentry.init.mock.calls.at(-1)?.[0] as { beforeSend: BeforeSend };
+    expect(options.beforeSend).toBe(beforeSendServerEvent);
+    return options.beforeSend;
+  }
+
+  it("scrubs, counts one event per sent event and drops every event once the month's quota is degraded", async () => {
+    const beforeSend = await sendingHook();
+    expect(beforeSend({ message: "boom for nadia@example.com" })).toEqual({ message: "boom for [email]" });
+    expect(quota.consume).toHaveBeenCalledTimes(1);
+    expect(quota.consume).toHaveBeenCalledWith("sentry.events");
+    // Control flow is dropped by the scrubber and never counted.
+    expect(beforeSend({ message: "NEXT_REDIRECT" })).toBeNull();
+    expect(quota.consume).toHaveBeenCalledTimes(1);
+    // The event that crosses 90 % still leaves (counted after the decision); the next ones do not.
+    quota.consume.mockResolvedValue({ level: "degraded" });
+    expect(beforeSend({ message: "crossing" })).toEqual({ message: "crossing" });
+    await tick();
+    expect(beforeSend({ message: "dropped" })).toBeNull();
+    expect(beforeSend({ message: "dropped too" })).toBeNull();
+    expect(quota.consume).toHaveBeenCalledTimes(2);
+  });
+
+  it("reads the quota once at init so a restart in a spent month drops at once; unknown counts as available", async () => {
+    quota.isDegraded.mockResolvedValue(true);
+    const beforeSend = await sendingHook();
+    expect(quota.isDegraded).toHaveBeenCalledWith("sentry.events");
+    await tick();
+    expect(beforeSend({ message: "boom" })).toBeNull();
+    expect(quota.consume).not.toHaveBeenCalled();
+
+    quota.isDegraded.mockResolvedValue(false);
+    const fresh = await sendingHook();
+    await tick();
+    quota.consume.mockResolvedValue({ level: "unknown" });
+    expect(fresh({ message: "sent" })).toEqual({ message: "sent" });
+    await tick();
+    expect(fresh({ message: "still sent" })).toEqual({ message: "still sent" });
+  });
+
+  it("never waits for Valkey nor loses an event over a failing counter", async () => {
+    const beforeSend = await sendingHook();
+    quota.consume.mockRejectedValue(new Error("connection closed"));
+    expect(beforeSend({ message: "first" })).toEqual({ message: "first" });
+    await tick();
+    expect(beforeSend({ message: "second" })).toEqual({ message: "second" });
+    expect(quota.consume).toHaveBeenCalledTimes(2);
   });
 });

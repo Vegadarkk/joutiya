@@ -16,7 +16,8 @@ import type { GoogleNeedsConsent } from "./google-button";
 import { TurnstileWidget, type TurnstileHandle } from "./turnstile-widget";
 
 // Second step of a Google sign-up: the account is created only once the consents are given
-// (§6, §7). The same credential (and its nonce) is posted again, now with consents and a Turnstile token.
+// (§6, §7). The same credential is posted again (same device, so its nonce still matches), now
+// with consents and a Turnstile token.
 const consentStepSchema = z.object({ consents: consentsSchema, turnstileToken: turnstileTokenSchema }).strict();
 type ConsentForm = z.input<typeof consentStepSchema>;
 type ConsentInput = z.output<typeof consentStepSchema>;
@@ -43,12 +44,13 @@ export function GoogleConsentStep({ payload, nonce, onDone, onCancel }: GoogleCo
   } = useForm<ConsentForm, unknown, ConsentInput>({
     resolver: zodResolver(consentStepSchema),
     defaultValues: { consents: { marketing: false }, turnstileToken: "" },
+    mode: "onTouched",
   });
 
   async function onValid(values: ConsentInput) {
     setServerError(undefined);
     try {
-      const answer = await googleSignIn({ credential: payload.credential, nonce: payload.nonce, locale, ...values });
+      const answer = await googleSignIn({ credential: payload.credential, locale, ...values });
       if (answer.status === "signed_in") {
         setSession(answer.session);
         onDone(answer.session);

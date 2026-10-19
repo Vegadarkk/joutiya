@@ -163,7 +163,7 @@ function PhoneForm({
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
-  } = useForm<PhoneForm, unknown, PhoneInput>({ resolver: zodResolver(phoneStartSchema), defaultValues: { phone: defaultPhone } });
+  } = useForm<PhoneForm, unknown, PhoneInput>({ resolver: zodResolver(phoneStartSchema), defaultValues: { phone: defaultPhone }, mode: "onTouched" });
 
   const submit = handleSubmit(async ({ phone }) => {
     setServerError(undefined);

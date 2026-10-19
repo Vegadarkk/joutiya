@@ -17,7 +17,6 @@ const flows = new WeakMap<Request, AnonymousFlow>();
 export interface AnonymousFlow {
   device: Device;
   identity: RequestIdentity;
-  userAgent: string | undefined;
   /** Whether this request passed a Turnstile check: the response then carries the pass cookie. */
   turnstilePassed: boolean;
   /** Handler entry, milliseconds since the epoch (uniformDuration). */
@@ -36,17 +35,19 @@ export async function uniformDuration(flow: AnonymousFlow, minMs = UNIFORM_RESPO
   if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
 }
 
-/** User agent for connectionLogs (schema: 200 characters at most). */
-export function userAgentOf(request: Request): string | undefined {
-  const value = request.headers.get("user-agent")?.trim();
-  return value ? value.slice(0, 200) : undefined;
+/**
+ * Device id the browser holds once this flow has answered: the one it sent, else the fresh one the
+ * answer sets (the sign-up stores its hash so the verification link recognises the device).
+ */
+export function deviceIdOf(flow: AnonymousFlow): string | null {
+  return flow.identity.deviceId ?? flow.device.fresh?.id ?? null;
 }
 
 /** Origin must be this host's; the request's identity and device cookie are prepared. */
 export function beginAnonymous(request: Request): AnonymousFlow {
   requireSameOrigin(request);
   const device = deviceOf(request);
-  const flow: AnonymousFlow = { device, identity: device.identity, userAgent: userAgentOf(request), turnstilePassed: false, startedAt: Date.now() };
+  const flow: AnonymousFlow = { device, identity: device.identity, turnstilePassed: false, startedAt: Date.now() };
   flows.set(request, flow);
   return flow;
 }

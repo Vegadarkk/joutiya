@@ -1,7 +1,8 @@
 import { alert } from "@/lib/alert";
-import { db, isFirestoreConfigured } from "@/lib/firebase/admin";
+import { writeQuotaDaily } from "@/lib/db/repositories/quota-daily";
+import { isFirestoreConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
-import { consume, readQuotas } from "@/lib/quota";
+import { readQuotas } from "@/lib/quota";
 
 /**
  * Nightly snapshot of the free-quota counters (§5 `quotaDaily/{date}`): the day that just ended
@@ -14,10 +15,7 @@ export async function quotaReport(): Promise<void> {
   const snapshot = Object.fromEntries(
     quotas.map((quota) => [quota.id, { period: quota.period, used: quota.used, limit: quota.limit, ratio: Number(quota.ratio.toFixed(4)), level: quota.level }]),
   );
-  if (isFirestoreConfigured()) {
-    await db().collection("quotaDaily").doc(date).set({ date, quotas: snapshot, createdAt: new Date() }, { merge: true });
-    void consume("firestore.writes", 1);
-  }
+  if (isFirestoreConfigured()) await writeQuotaDaily({ date, quotas: snapshot, createdAt: new Date() });
   const unknown = quotas.filter((quota) => quota.level === "unknown");
   if (unknown.length > 0) {
     await alert({ severity: "P1", title: "Compteurs de quotas illisibles", body: `Valkey (file) ne répond pas : ${unknown.length} compteurs inconnus pour le ${date}.` });

@@ -3,12 +3,15 @@
 // credentials (`gcloud auth application-default login`), or against the local emulators when
 // FIREBASE_AUTH_EMULATOR_HOST is set (no credentials needed then).
 //
-//   APP_ENV=prod FIREBASE_PROJECT_ID=<project> SITE_URL=https://joutiya.ma ADMIN_HOST=admin.joutiya.ma \
-//     node scripts/create-admin.ts --email <e-mail> --name <name> [--apply]
+//   APP_ENV=prod node scripts/create-admin.ts --email <e-mail> --name <name> [--apply]
 //
-// FIREBASE_PROJECT_ID must be the project recorded for APP_ENV in infra/targets.json (§9,
-// scripts/assert-target.ts); against the emulators APP_ENV defaults to dev and a demo-* project
-// passes. Dry run by default: prints the planned steps and exits 0. With --apply:
+// For staging and prod, FIREBASE_PROJECT_ID, SITE_URL and ADMIN_HOST follow from infra/targets.json
+// and the hosts of §1 (derivedValues of scripts/vm-env.ts: the values the VM itself gets) unless
+// set in the environment, so no --env-file is needed (the owner's .env.local holds dev values). A
+// FIREBASE_PROJECT_ID that is set must be the project recorded for APP_ENV in infra/targets.json
+// (§9, scripts/assert-target.ts), and SITE_URL must be https there. Dev keeps the environment as
+// given; against the emulators APP_ENV defaults to dev and a demo-* project passes. Dry run by
+// default: prints the planned steps and exits 0. With --apply:
 //   1. getUserByEmail: reused only when it is already a staff account (staff claims, or a staff/{uid}
 //      entry: a revoked admin), refused for any other existing account (it keeps its own password),
 //      else createUser({ email, emailVerified: true, displayName });
@@ -27,6 +30,7 @@ import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { assertTargets, validateTargets, type Targets } from "./assert-target.ts";
+import { DEPLOYED_ENVS, derivedValues, type DeployedEnv } from "./vm-env.ts";
 
 export interface CreateAdminArgs {
   email: string;
@@ -79,6 +83,44 @@ export function projectErrors(targets: unknown, env: { APP_ENV?: string | undefi
   return assertTargets(targets as Targets, { APP_ENV: env.APP_ENV, FIREBASE_PROJECT_ID: env.FIREBASE_PROJECT_ID });
 }
 
+export interface RunSettings {
+  projectId: string;
+  /** Origin of the back office the set-password link points to. */
+  origin: string;
+  emulated: boolean;
+}
+
+const isDeployedEnv = (env: string | undefined): env is DeployedEnv => (DEPLOYED_ENVS as readonly string[]).includes(env ?? "");
+
+/**
+ * Project and admin origin of the run. For staging and prod they follow from infra/targets.json and
+ * the hosts of §1 (derivedValues of scripts/vm-env.ts) unless set in the environment; a set
+ * FIREBASE_PROJECT_ID must match the registry (projectErrors) and SITE_URL must be https, so a dev
+ * .env.local loaded by mistake never yields a localhost link. Dev keeps the environment as given.
+ * Throws with the names of what is wrong; no configured value is ever printed.
+ */
+export function resolveSettings(env: Record<string, string | undefined>, targets: unknown): RunSettings {
+  const fileErrors = validateTargets(targets);
+  if (fileErrors.length > 0) throw new Error(fileErrors.map((error) => `infra/targets.json: ${error}`).join("\n"));
+  const emulated = Boolean(env["FIREBASE_AUTH_EMULATOR_HOST"]);
+  const appEnv = env["APP_ENV"]?.trim() || (emulated ? "dev" : undefined);
+  const derived = isDeployedEnv(appEnv) ? derivedValues(appEnv, targets as Targets) : {};
+  const projectId = env["FIREBASE_PROJECT_ID"]?.trim() || derived["FIREBASE_PROJECT_ID"];
+  if (!projectId) {
+    throw new Error(
+      isDeployedEnv(appEnv)
+        ? `FIREBASE_PROJECT_ID is required: environments.${appEnv}.firebase.projectId is not recorded in infra/targets.json`
+        : "FIREBASE_PROJECT_ID is required (derived from infra/targets.json for APP_ENV staging or prod only)",
+    );
+  }
+  const problems = projectErrors(targets, { APP_ENV: appEnv, FIREBASE_PROJECT_ID: projectId });
+  if (problems.length > 0) throw new Error(problems.join("\n"));
+  const siteUrl = env["SITE_URL"]?.trim() || derived["SITE_URL"] || "http://localhost:3000";
+  const origin = adminOrigin(siteUrl, env["ADMIN_HOST"]?.trim() || derived["ADMIN_HOST"]);
+  if (isDeployedEnv(appEnv) && !origin.startsWith("https://")) throw new Error(`SITE_URL must be https when APP_ENV=${appEnv} (unset it to use the hosts of infra/targets.json)`);
+  return { projectId, origin, emulated };
+}
+
 export interface ExistingAccount {
   /** `role` custom claim of the Auth record, whatever its value. */
   role: unknown;
@@ -117,13 +159,7 @@ function readTargets(): unknown {
 
 async function main(): Promise<void> {
   const args = parseCli(process.argv.slice(2));
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  if (!projectId) throw new Error("FIREBASE_PROJECT_ID is required");
-  const emulated = Boolean(process.env.FIREBASE_AUTH_EMULATOR_HOST);
-  const appEnv = process.env.APP_ENV?.trim() || (emulated ? "dev" : undefined);
-  const problems = projectErrors(readTargets(), { APP_ENV: appEnv, FIREBASE_PROJECT_ID: projectId });
-  if (problems.length > 0) throw new Error(problems.join("\n"));
-  const origin = adminOrigin(process.env.SITE_URL ?? "http://localhost:3000", process.env.ADMIN_HOST);
+  const { projectId, origin, emulated } = resolveSettings(process.env, readTargets());
   if (!args.apply) {
     for (const line of planSteps({ args, projectId, origin, emulated })) console.log(line);
     return;

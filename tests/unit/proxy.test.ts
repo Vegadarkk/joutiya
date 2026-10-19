@@ -107,6 +107,33 @@ describe("proxy", () => {
     expect((await proxy(request("/fr"))).headers.get("set-cookie")).toBeNull();
   });
 
+  it("tells private renders the verified device id (x-device-id), never the client's; public renders get none", async () => {
+    const spoof = { "x-device-id": "spoofed-device-id-0000" };
+    // The cookie this very response sets names the device the render learns.
+    const fresh = await proxy(new NextRequest("https://joutiya.ma/fr/connexion", { headers: { host: "joutiya.ma", ...spoof } }));
+    const value = fresh.cookies.get("__Host-did")?.value ?? "";
+    const id = value.split(".")[0];
+    expect(id).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(fresh.headers.get("x-middleware-request-x-device-id")).toBe(id);
+    // A valid cookie: its id, whatever the client claims.
+    const kept = await proxy(new NextRequest("https://joutiya.ma/fr/inscription", { headers: { host: "joutiya.ma", cookie: `__Host-did=${value}`, ...spoof } }));
+    expect(kept.headers.get("x-middleware-request-x-device-id")).toBe(id);
+    expect(kept.cookies.get("__Host-did")).toBeUndefined();
+    // A forged cookie is replaced: the render learns the replacement.
+    const forged = await proxy(new NextRequest("https://joutiya.ma/fr/connexion", { headers: { host: "joutiya.ma", cookie: "__Host-did=aaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbb" } }));
+    const replaced = forged.cookies.get("__Host-did")?.value.split(".")[0];
+    expect(replaced).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(replaced).not.toBe("aaaaaaaaaaaaaaaaaaaaaa");
+    expect(forged.headers.get("x-middleware-request-x-device-id")).toBe(replaced);
+    // Shared and streamed public pages never learn a device, and the client's header is dropped there too.
+    for (const path of ["/fr", "/fr/legal/cgu", "/fr/recherche?q=velo", "/fr/annonce/velo-casablanca-abcd2345"]) {
+      const response = await proxy(new NextRequest(`https://joutiya.ma${path}`, { headers: { host: "joutiya.ma", cookie: `__Host-did=${value}`, ...spoof } }));
+      expect(response.status, path).toBe(200);
+      expect(response.headers.get("x-middleware-request-x-device-id"), path).toBeNull();
+      expect(response.headers.get("x-middleware-override-headers") ?? "", path).not.toContain("x-device-id");
+    }
+  });
+
   it("lets the admin host show photos from the media host, and from the public origin's dev route in development", async () => {
     vi.stubEnv("MEDIA_BASE_URL", "https://media.joutiya.ma/");
     resetServerEnv();

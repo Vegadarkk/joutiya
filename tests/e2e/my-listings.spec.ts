@@ -7,6 +7,10 @@ import { getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import sharp from "sharp";
 import { isolate } from "../../src/lib/i18n/bidi";
+import { stubGoogleScript } from "./gsi-stub";
+
+// The sign-up page renders the Google button (stub client id): never the real script.
+test.beforeEach(({ page }) => stubGoogleScript(page));
 
 // "Mes annonces" (phase 3 lot C) against the production build and the Firebase emulators
 // (npm run test:e2e): a fresh individual signs up through the UI; a published listing (with its

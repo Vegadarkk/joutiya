@@ -202,7 +202,7 @@ function ResetPasswordForm({ oobCode, email, onDone }: { oobCode: string; email:
     setError,
     control,
     formState: { errors, isSubmitting },
-  } = useForm<ResetForm>({ resolver: zodResolver(resetFormSchema), defaultValues: { password: "" } });
+  } = useForm<ResetForm>({ resolver: zodResolver(resetFormSchema), defaultValues: { password: "" }, mode: "onTouched" });
   const password = useWatch({ control, name: "password" });
 
   async function onValid(values: ResetForm) {

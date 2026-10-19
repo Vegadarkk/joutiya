@@ -1,4 +1,6 @@
 import { createHmac } from "node:crypto";
+import type { QuotaId } from "@/config/quotas";
+import { consume } from "@/lib/quota";
 import { z } from "@/lib/zod";
 import { safeEqual } from "@/lib/security/hash";
 import { addSuppression as storeSuppression } from "./suppressions";
@@ -47,15 +49,29 @@ const eventSchema = z.looseObject({
 
 export type MailEventOutcome = { handled: "bounce" | "complaint"; recipients: number } | { handled: "ignored"; reason: string };
 
+export type MailEventReason = "bounce" | "complaint";
+
 export interface SuppressionStore {
-  addSuppression(email: string, reason: "bounce" | "complaint", provider: string): Promise<void>;
+  addSuppression(email: string, reason: MailEventReason, provider: string): Promise<void>;
+  /** Counts the day's delivery incidents, one per recipient (quota guards: 70 % and 100 % alerts). */
+  countEvent(reason: MailEventReason, recipients: number): Promise<void>;
 }
 
+/** Day counters of the bounce and complaint rates (§2 "taux de rebond"): src/config/quotas.ts. */
+const EVENT_QUOTA = { bounce: "resend.bounces", complaint: "resend.complaints" } as const satisfies Record<MailEventReason, QuotaId>;
+
+async function countMailEvent(reason: MailEventReason, recipients: number): Promise<void> {
+  if (recipients > 0) await consume(EVENT_QUOTA[reason], recipients);
+}
+
+const defaultStore: SuppressionStore = { addSuppression: storeSuppression, countEvent: countMailEvent };
+
 /**
- * Applies one Resend event: permanent bounces and complaints suppress each recipient; soft bounces
- * (Transient, Temporary, Undetermined) and every other event are ignored.
+ * Applies one Resend event: permanent bounces and complaints are counted (quota alerts) and
+ * suppress each recipient; soft bounces (Transient, Temporary, Undetermined) and every other event
+ * are ignored.
  */
-export async function handleMailEvent(raw: string, store: SuppressionStore = { addSuppression: storeSuppression }): Promise<MailEventOutcome> {
+export async function handleMailEvent(raw: string, store: SuppressionStore = defaultStore): Promise<MailEventOutcome> {
   let payload: unknown;
   try {
     payload = JSON.parse(raw);
@@ -67,7 +83,7 @@ export async function handleMailEvent(raw: string, store: SuppressionStore = { a
   const { type, data } = parsed.data;
   const recipients = data?.to === undefined ? [] : Array.isArray(data.to) ? data.to : [data.to];
 
-  let reason: "bounce" | "complaint";
+  let reason: MailEventReason;
   if (type === "email.bounced") {
     if (data?.bounce?.type?.toLowerCase() !== "permanent") return { handled: "ignored", reason: "soft_bounce" };
     reason = "bounce";
@@ -76,6 +92,8 @@ export async function handleMailEvent(raw: string, store: SuppressionStore = { a
   } else {
     return { handled: "ignored", reason: type };
   }
+  // Counted first: a failing suppression write (logged by the route) must not hide the incident.
+  await store.countEvent(reason, recipients.length);
   for (const email of recipients) await store.addSuppression(email, reason, "resend");
   return { handled: reason, recipients: recipients.length };
 }
