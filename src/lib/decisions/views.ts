@@ -1,7 +1,17 @@
+import { decisionTemplate, fillTemplateText } from "@/config/decision-templates";
 import type { AppealableDecision, DecisionView } from "./contracts";
 import type { DecisionRecord } from "./repository";
 
 // Response shapes of the decisions (dates as ISO strings). Pure: no Firestore access.
+
+/** The moderator's own words, quoted after the template facts in `facts` (null when the template text moved since). */
+export function detailsOf(record: Pick<DecisionRecord, "templateId" | "facts" | "durationDays">): string | null {
+  const template = decisionTemplate(record.templateId);
+  if (!template) return null;
+  const facts = fillTemplateText(template.facts.fr, { ...(record.durationDays ? { days: record.durationDays } : {}) });
+  if (record.facts === facts) return null;
+  return record.facts.startsWith(`${facts}\n\n`) ? record.facts.slice(facts.length + 2) : null;
+}
 
 const iso = (date: Date | undefined | null): string | null => (date ? date.toISOString() : null);
 
@@ -73,6 +83,9 @@ export function appealableView(record: DecisionRecord, by: "affected" | "reporte
     durationDays: record.durationDays ?? null,
     origin: record.origin,
     automated: { detection: record.automation.detection, decision: record.automation.decision },
+    ground: { type: record.ground.type, ref: record.ground.ref },
+    // The notifier reads the outcome of their notice, not the words written about the other user.
+    details: by === "affected" ? detailsOf(record) : null,
     createdAt: record.createdAt.toISOString(),
     appealDeadline: record.appealDeadline.toISOString(),
     appealable: appealRefusal(record, by, now) === null,

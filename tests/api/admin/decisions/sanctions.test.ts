@@ -22,9 +22,9 @@ import { POST as decideRoute } from "@/app/api/admin/decisions/route";
 import { GET as userRoute } from "@/app/api/admin/users/[uid]/route";
 import { GET as lookupRoute } from "@/app/api/admin/users/route";
 import { GET as linkViewRoute, POST as linkRoute } from "@/app/api/appeals/link/route";
-import { POST as appealRoute } from "@/app/api/appeals/route";
+import { GET as myDecisionsRoute, POST as appealRoute } from "@/app/api/appeals/route";
 import { POST as pauseRoute } from "@/app/api/listings/[id]/pause/route";
-import type { AppealableDecision, DecideResponse, OpenAppealResponse, ReviewAppealResponse, UserModerationView } from "@/lib/decisions/contracts";
+import type { AppealableDecision, DecideResponse, MyDecisionsResponse, OpenAppealResponse, ReviewAppealResponse, UserModerationView } from "@/lib/decisions/contracts";
 import { setDecisionAiHooks } from "@/lib/decisions/hooks";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { resetServerEnv } from "@/lib/env";
@@ -113,8 +113,19 @@ describe("suspension", () => {
     expect(decided.body.sanctionDecisionId).toBeNull();
     expect(await listing(id)).toMatchObject({ status: "paused", pausedReason: "moderation" });
 
-    // The suspended member signs in again (the sanction revoked the tokens) and appeals.
+    // The suspended member signs in again (the sanction revoked the tokens), reads the statement
+    // (ground, the moderator's words) and appeals.
     const suspended = await resignIn(seller);
+    const mine = await publicCall<MyDecisionsResponse>(myDecisionsRoute, "GET", "/api/appeals", { as: suspended });
+    expect(mine.status).toBe(200);
+    expect(mine.body.items.find((item) => item.decisionId === decided.body.decisionId)).toMatchObject({
+      by: "affected",
+      action: "suspend_account",
+      durationDays: 7,
+      ground: { type: "terms", ref: expect.any(String) as string },
+      details: "Annonces trompeuses répétées.",
+      appealable: true,
+    });
     const appeal = await publicCall<OpenAppealResponse>(appealRoute, "POST", "/api/appeals", { as: suspended, body: { decisionId: decided.body.decisionId, text: "Ces annonces décrivaient fidèlement les objets." } });
     expect(appeal.status).toBe(201);
 

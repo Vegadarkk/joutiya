@@ -65,15 +65,23 @@ export const MESSAGING_API = {
   stream: "/api/messages/stream",
 } as const;
 
+/** Explanation of a notice, in characters after trimming (reports.ts re-exports them). */
+export const REPORT_EXPLANATION_MIN = 10;
+export const REPORT_EXPLANATION_MAX = 2000;
+
 export const REPORT_API = {
-  /** POST the notice form. */
+  /** POST the notice form -> 201 (new) or 200 (duplicate) CreateReportResponse. */
   reports: "/api/reports",
 } as const;
 
+/** Text of an appeal, in characters after trimming (appeals.ts re-exports them). */
+export const APPEAL_TEXT_MIN = 10;
+export const APPEAL_TEXT_MAX = 2000;
+
 export const APPEAL_API = {
-  /** POST (signed in). */
+  /** GET -> MyDecisionsResponse (signed in, suspended included); POST { decisionId, text } -> 201. */
   appeals: "/api/appeals",
-  /** POST with the signed token of the e-mail. */
+  /** GET ?token= -> { decision }; POST { token, text } -> 201 (the signed link of the e-mail). */
   link: "/api/appeals/link",
 } as const;
 

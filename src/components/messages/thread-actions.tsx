@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, ArchiveRestore, Ban, CircleCheck, EllipsisVertical, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Ban, CircleCheck, EllipsisVertical, Flag, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { toast } from "sonner";
@@ -13,9 +13,9 @@ import { changeConversationState } from "@/lib/messaging/client";
 import { cn } from "@/lib/utils";
 import { useMessagingErrorMessage } from "./errors";
 
-// The thread's menu (design phase-5 D6, D7): archive or unarchive, block or unblock the other
-// participant (account wide), delete for me. Blocking and deleting ask first; every action is
-// allowed to a suspended account (D9). Reporting is lot U2.
+// The thread's menu (design phase-5 D6, D7, D10): archive or unarchive, block or unblock the other
+// participant (account wide), report them (the notice form, opened by the thread), delete for me.
+// Blocking and deleting ask first; every action is allowed to a suspended account (D9).
 
 export type ThreadAction = "archive" | "unarchive" | "block" | "unblock" | "delete";
 
@@ -52,10 +52,13 @@ export function afterAction(conversation: ConversationView, action: ThreadAction
 export interface ThreadActionsProps {
   conversation: ConversationView;
   onDone: (action: ThreadAction, conversation: ConversationView) => void;
+  /** Opens the notice form about the other participant. */
+  onReport: () => void;
 }
 
-export function ThreadActions({ conversation, onDone }: ThreadActionsProps) {
+export function ThreadActions({ conversation, onDone, onReport }: ThreadActionsProps) {
   const t = useTranslations("Messaging.thread");
+  const report = useTranslations("Report.trigger");
   const errorMessage = useMessagingErrorMessage();
   const [confirm, setConfirm] = useState<"block" | "delete" | null>(null);
   const [busy, setBusy] = useState<ThreadAction | null>(null);
@@ -109,6 +112,10 @@ export function ThreadActions({ conversation, onDone }: ThreadActionsProps) {
             <DropdownMenu.Item className={item} disabled={busy !== null} onSelect={() => (conversation.blockedByMe ? void run("unblock") : setConfirm("block"))}>
               {conversation.blockedByMe ? <CircleCheck aria-hidden="true" /> : <Ban aria-hidden="true" />}
               <span dir="auto">{conversation.blockedByMe ? t("unblock", { name }) : t("block", { name })}</span>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item className={item} onSelect={onReport}>
+              <Flag aria-hidden="true" />
+              <span dir="auto">{report("conversation", { name })}</span>
             </DropdownMenu.Item>
             <DropdownMenu.Separator className="my-1 h-px bg-border" />
             <DropdownMenu.Item className={cn(item, "text-danger [&_svg]:text-danger")} disabled={busy !== null} onSelect={() => setConfirm("delete")}>

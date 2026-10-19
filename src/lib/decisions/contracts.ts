@@ -163,6 +163,10 @@ export interface AppealableDecision {
   durationDays: number | null;
   origin: DecisionView["origin"];
   automated: { detection: boolean; decision: boolean };
+  /** The stored ground (legal or contractual reference, French); templates outside the registry (phase 3 records) have no other. */
+  ground: { type: "illegal" | "terms"; ref: string };
+  /** The moderator's own words quoted in the statement; the affected user's view only (null for a notifier). */
+  details: string | null;
   createdAt: string;
   appealDeadline: string;
   /** An appeal may be opened now. */

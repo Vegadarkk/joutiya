@@ -94,7 +94,13 @@ describe("report -> decision -> notification -> appeal -> reversal", () => {
     // The seller sees the decision and appeals it.
     const mine = await publicCall<MyDecisionsResponse>(myDecisionsRoute, "GET", "/api/appeals", { as: seller });
     expect(mine.status).toBe(200);
-    expect(mine.body.items.find((item) => item.decisionId === decisionId)).toMatchObject({ appealable: true, by: "affected", appeal: null });
+    expect(mine.body.items.find((item) => item.decisionId === decisionId)).toMatchObject({
+      appealable: true,
+      by: "affected",
+      appeal: null,
+      ground: { type: "terms", ref: expect.any(String) as string },
+      details: "Paiement par Wafacash exigé avant toute visite.",
+    });
     const appeal = await publicCall<OpenAppealResponse>(appealRoute, "POST", "/api/appeals", { as: seller, body: { decisionId, text: "Je n'ai jamais demandé de paiement à l'avance." } });
     expect(appeal.status).toBe(201);
     expect(appeal.body).toMatchObject({ decisionId, by: "affected", status: "open" });

@@ -232,7 +232,7 @@ describe("page content", () => {
     expect(html).toContain('data-testid="safety-tips"');
     expect(html).toContain('data-testid="map-block" data-city="casablanca" data-seed="abcd2345" class="w-full max-w-[35rem]"');
     expect(html).toContain('data-ad-slot="listing-aside"');
-    expect(html).toContain("mailto:dsa@joutiya.test");
+    expect(html).toContain(fr.Report.trigger.listing.replace(/'/g, "&#x27;"));
     expect(html).not.toContain('data-testid="listing-status"');
   });
 

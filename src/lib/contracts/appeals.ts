@@ -1,10 +1,10 @@
 import { z } from "@/lib/zod";
+import { APPEAL_TEXT_MAX, APPEAL_TEXT_MIN } from "./endpoints";
 
 // Internal complaint against a moderation decision (art. 20 DSA, design D16): open 6 months after
 // the notification, reviewed by another moderator, answered within 14 days.
 
-export const APPEAL_TEXT_MIN = 10;
-export const APPEAL_TEXT_MAX = 2000;
+export { APPEAL_TEXT_MAX, APPEAL_TEXT_MIN };
 export const APPEAL_SLA_DAYS = 14;
 
 const appealTextSchema = z.string().trim().min(APPEAL_TEXT_MIN).max(APPEAL_TEXT_MAX);

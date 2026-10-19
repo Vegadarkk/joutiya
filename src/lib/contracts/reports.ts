@@ -1,13 +1,12 @@
 import { z } from "@/lib/zod";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
 import { REPORT_PRIORITIES, REPORT_REASON_IDS, REPORT_TARGET_TYPES, type ReportPriority } from "@/config/report-reasons";
+import { REPORT_EXPLANATION_MAX, REPORT_EXPLANATION_MIN } from "./endpoints";
 
 // Notice-and-action form (art. 16 DSA, design D10): target, reason, explanation, good-faith
 // statement; name and e-mail of an anonymous reporter (optional for P0 reasons, art. 16(2)(c)).
 
-export { REPORT_PRIORITIES, REPORT_TARGET_TYPES };
-export const REPORT_EXPLANATION_MIN = 10;
-export const REPORT_EXPLANATION_MAX = 2000;
+export { REPORT_EXPLANATION_MAX, REPORT_EXPLANATION_MIN, REPORT_PRIORITIES, REPORT_TARGET_TYPES };
 
 /**
  * Target as the browser knows it: listing id, profile publicId, `{cid}/{messageId}` for a message,

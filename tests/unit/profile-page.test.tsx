@@ -160,7 +160,7 @@ describe("profile page", () => {
     expect(html.match(/data-testid="listing-card"/g)).toHaveLength(2);
     expect(html).toContain('href="/fr/annonce/annonce-abcd2345"');
     expect(html).toContain('href="/fr/annonce/annonce-bcde3456"');
-    expect(html).toContain("mailto:dsa@joutiya.test");
+    expect(html).toContain(fr.Report.trigger.user);
     expect(html).not.toContain("uid-secret-1");
     expect(html).not.toContain(fr.Profile.emptyTitle);
   });

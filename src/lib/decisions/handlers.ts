@@ -242,7 +242,8 @@ export async function handleStaffConversation(request: Request, context: Params)
 
 /** GET /api/appeals: the decisions about the signed-in account. */
 export async function handleMyDecisions(request: Request): Promise<Response> {
-  const { user } = await requireUser(request, { allowSuspended: true });
+  // Revocation checked, as the messaging reads: a cookie from before a ban or a sign-out everywhere reads nothing (D9).
+  const { user } = await requireUser(request, { checkRevoked: true, allowSuspended: true });
   return json<MyDecisionsResponse>({ items: await myDecisions(user.uid) });
 }
 

@@ -130,10 +130,14 @@ export async function openAppealByLink(input: { token: string; text: string }, n
   return opened(stored, appellant, slaDueAt);
 }
 
-/** GET /api/appeals: the decisions about the signed-in account (newest first), with their appeal state. */
+/**
+ * GET /api/appeals: the decisions about the signed-in account (newest first), with their appeal
+ * state. A dismissal (`no_action`) stays hidden: the account was never told of the notice and must
+ * not learn of it here.
+ */
 export async function myDecisions(uid: string, now = new Date()): Promise<AppealableDecision[]> {
   const records = await listDecisionsForUser(uid, MY_DECISIONS_LIMIT);
-  return records.map((record) => appealableView(record, "affected", now));
+  return records.filter((record) => record.action !== "no_action").map((record) => appealableView(record, "affected", now));
 }
 
 // ---- Review (staff) -----------------------------------------------------------------------------
