@@ -285,6 +285,10 @@ html[data-welcome] .welcome {
 html[data-welcome~="open"] .welcome {
   overflow: hidden;
 }
+/* While the door opens the actions fade out: a tap there skips the opening, it never follows a link. */
+html[data-welcome~="open"] .welcome-copy {
+  pointer-events: none;
+}
 /* The ground fades: the scrollbar's room takes the page's colour. */
 html[data-welcome~="lit"] {
   background: var(--background);

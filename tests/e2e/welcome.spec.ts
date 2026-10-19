@@ -70,8 +70,15 @@ test.describe("welcome threshold", () => {
     await page.goto("/fr");
     await expect(welcome(page)).toBeVisible();
     await page.waitForLoadState("networkidle");
-    await page.keyboard.press("Escape");
-    // 200 ms crossfade, no swing or push.
+    // What Escape starts, read in the same task: one 200 ms crossfade, no swing or push.
+    const started = await page.evaluate(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      return document
+        .querySelector(".welcome")
+        ?.getAnimations({ subtree: true })
+        .map((animation) => ({ target: (animation.effect as KeyframeEffect).target?.className, duration: animation.effect?.getTiming().duration }));
+    });
+    expect(started).toEqual([{ target: "welcome", duration: 200 }]);
     await expect(welcome(page)).toHaveCount(0, { timeout: 1_500 });
     await expect(page.locator("#main")).toBeFocused();
   });
@@ -115,9 +122,13 @@ test.describe("welcome threshold", () => {
     test.use({ storageState: { cookies: [], origins: [{ origin: ORIGIN, localStorage: [{ name: "welcome", value: "seen" }, { name: "door", value: "queued" }] }] } });
 
     test("the door opens once, without the welcome screen", async ({ page }) => {
-      await page.goto("/fr");
-      await expect(page.locator("html")).toHaveAttribute("data-welcome", /^door/);
-      await expect(welcome(page).getByRole("link", { name: "Créer un compte" })).toBeHidden();
+      await page.goto("/fr", { waitUntil: "domcontentloaded" });
+      // Read once, before the door is through: the screen's texts and actions never show.
+      const copy = await page.evaluate(() => {
+        const element = document.querySelector(".welcome-copy");
+        return { state: document.documentElement.getAttribute("data-welcome"), visibility: element && getComputedStyle(element).visibility };
+      });
+      expect(copy).toEqual({ state: expect.stringMatching(/^door/), visibility: "hidden" });
       await expect(welcome(page)).toHaveCount(0, { timeout: 5_000 });
       await expect(page.locator("#main")).toBeFocused();
       expect(await page.evaluate(() => localStorage.getItem("door"))).toBe("opened");

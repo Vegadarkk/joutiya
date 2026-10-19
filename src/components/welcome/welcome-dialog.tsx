@@ -41,10 +41,13 @@ export function WelcomeDialog({ labelledBy, children }: { labelledBy: string; ch
   const entry = useRef<WelcomeState>("screen");
   const animations = useRef<Animation[]>([]);
   const litTimer = useRef<number | undefined>(undefined);
+  const unmountedState = useRef<string | null>(null);
   const [done, setDone] = useState(false);
 
   const lit = useCallback(() => {
     window.clearTimeout(litTimer.current);
+    // Unmounted on the way: the state has gone with it.
+    if (!root.current) return;
     document.documentElement.setAttribute(WELCOME_ATTRIBUTE, `${entry.current} ${OPEN} ${LIT}`);
   }, []);
 
@@ -105,20 +108,29 @@ export function WelcomeDialog({ labelledBy, children }: { labelledBy: string; ch
   // Before paint: a sign-in that navigated here client-side (no pre-paint script ran) shows the door
   // from the first frame, not after a glimpse of the page.
   useLayoutEffect(() => {
-    // Once per page load (React strict mode runs effects twice in development).
-    if (phase.current !== "pending") return;
-    const element = root.current;
     const html = document.documentElement;
-    if (!html.hasAttribute(WELCOME_ATTRIBUTE) && takeQueuedDoor()) html.setAttribute(WELCOME_ATTRIBUTE, "door");
-    const state = html.getAttribute(WELCOME_ATTRIBUTE);
-    // No state, or the visitor already went through by the #main link before hydration (globals.css).
-    if (!element || (state !== "screen" && state !== "door") || window.location.hash === "#main") {
-      finish(false);
-      return;
+    if (phase.current === "pending") {
+      const element = root.current;
+      if (!html.hasAttribute(WELCOME_ATTRIBUTE) && takeQueuedDoor()) html.setAttribute(WELCOME_ATTRIBUTE, "door");
+      const state = html.getAttribute(WELCOME_ATTRIBUTE);
+      // No state, or the visitor already went through by the #main link before hydration (globals.css).
+      if (!element || (state !== "screen" && state !== "door") || window.location.hash === "#main") {
+        finish(false);
+        return;
+      }
+      phase.current = state;
+      if (state === "door") open();
+      else if (!element.contains(document.activeElement)) element.focus({ preventScroll: true });
+    } else if (phase.current !== "done" && unmountedState.current) {
+      // React strict mode mounts twice in development: the state the cleanup took away comes back.
+      html.setAttribute(WELCOME_ATTRIBUTE, unmountedState.current);
     }
-    phase.current = state;
-    if (state === "door") open();
-    else if (!element.contains(document.activeElement)) element.focus({ preventScroll: true });
+    return () => {
+      // Unmounted on the way (an error boundary replaced the page): never leave the page hidden.
+      if (phase.current === "done") return;
+      unmountedState.current = html.getAttribute(WELCOME_ATTRIBUTE);
+      html.removeAttribute(WELCOME_ATTRIBUTE);
+    };
   }, [finish, open]);
 
   useEffect(() => {

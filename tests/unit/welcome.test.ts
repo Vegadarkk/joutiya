@@ -3,7 +3,8 @@ import { PINNED_SCRIPT_HASHES, scriptHash } from "@/lib/security/inline-hashes";
 import { cycleFocus } from "@/lib/welcome/focus";
 import { isHomePathname, queueDoorOpening, takeQueuedDoor, welcomeAfterSignIn } from "@/lib/welcome/flags";
 import { DOOR_DURATION_MS, doorSteps, MIN_PUSH_SCALE, pushScale, REDUCED_FADE_MS, reducedSteps, stepsEnd } from "@/lib/welcome/motion";
-import { CRAWLER_AGENT, HOME_PATH, WELCOME_SCRIPT } from "@/lib/welcome/script";
+import { CSRF_COOKIE } from "@/lib/security/cookies";
+import { CRAWLER_AGENT, DOOR_FALLBACK_MS, HOME_PATH, SIGNED_IN_COOKIE, WELCOME_SCRIPT } from "@/lib/welcome/script";
 
 // The welcome threshold of the home page (design C7): the pre-paint decision, the device flags
 // written by the sign-in flow, the dialog's focus trap and the door's timeline.
@@ -32,45 +33,92 @@ interface Visit {
   path: string;
   referrer?: string;
   agent?: string;
+  cookie?: string;
+  /** CSS.supports("selector(:has(*))"). */
+  has?: boolean;
   storage?: Record<string, string>;
   broken?: boolean;
 }
 
-/** Runs the inline script against a fake document; returns html[data-welcome] and the storage after it. */
-function run({ path, referrer = "", agent = CHROME, storage = {}, broken = false }: Visit) {
+/** Runs the inline script against a fake document; returns html[data-welcome], the storage and the timers after it. */
+function run({ path, referrer = "", agent = CHROME, cookie = "", has = true, storage = {}, broken = false }: Visit) {
   const attributes = new Map<string, string>();
-  const document = { referrer, documentElement: { setAttribute: (name: string, value: string) => attributes.set(name, value) } };
+  const documentElement = {
+    getAttribute: (name: string) => attributes.get(name) ?? null,
+    setAttribute: (name: string, value: string) => void attributes.set(name, value),
+    removeAttribute: (name: string) => void attributes.delete(name),
+  };
+  const document = { referrer, cookie, documentElement };
   const location = { pathname: path, origin: "https://joutiya.ma" };
   const localStorage = new MemoryStorage(storage, broken);
-  new Function("document", "location", "navigator", "localStorage", WELCOME_SCRIPT)(document, location, { userAgent: agent }, localStorage);
-  return { state: attributes.get("data-welcome") ?? null, storage: Object.fromEntries(localStorage.items) };
+  const css = { supports: (condition: string) => condition === "selector(:has(*))" && has };
+  const timers: { callback: () => void; delay: number }[] = [];
+  const setTimeout = (callback: () => void, delay: number) => timers.push({ callback, delay });
+  new Function("document", "location", "navigator", "localStorage", "CSS", "setTimeout", WELCOME_SCRIPT)(
+    document,
+    location,
+    { userAgent: agent },
+    localStorage,
+    css,
+    setTimeout,
+  );
+  return { state: attributes.get("data-welcome") ?? null, storage: Object.fromEntries(localStorage.items), timers, documentElement };
 }
+
+/** The state and storage of a visit, without its timers. */
+const outcome = (visit: Visit) => {
+  const { state, storage } = run(visit);
+  return { state, storage };
+};
 
 describe("pre-paint script", () => {
   it("shows the screen on the first visit of a home page, and marks the device", () => {
     for (const path of ["/fr", "/fr/", "/ar", "/ar/", "/rif", "/rif/"]) {
-      expect(run({ path }), path).toEqual({ state: "screen", storage: { welcome: "seen" } });
+      expect(outcome({ path }), path).toEqual({ state: "screen", storage: { welcome: "seen" } });
     }
     // Same-origin referrer (an internal link to home) still counts as a first visit.
     expect(run({ path: "/fr", referrer: "https://joutiya.ma/fr/legal/cgu" }).state).toBe("screen");
   });
 
   it("never shows it twice, on a deep link, to a crawler or to a visitor from another site", () => {
-    expect(run({ path: "/fr", storage: { welcome: "seen" } })).toEqual({ state: null, storage: { welcome: "seen" } });
+    expect(outcome({ path: "/fr", storage: { welcome: "seen" } })).toEqual({ state: null, storage: { welcome: "seen" } });
     for (const path of ["/", "/fr/recherche", "/fr/annonce/velo-ab12cd34", "/en", "/frx", "/fr//"]) {
-      expect(run({ path }), path).toEqual({ state: null, storage: {} });
+      expect(outcome({ path }), path).toEqual({ state: null, storage: {} });
     }
     for (const agent of ["Mozilla/5.0 (compatible; Googlebot/2.1)", "facebookexternalhit/1.1", "WhatsApp/2.23", "TelegramBot (like TwitterBot)", "Mozilla/5.0 (compatible; bingbot/2.0)"]) {
       expect(run({ path: "/fr", agent }).state, agent).toBeNull();
     }
-    expect(run({ path: "/fr", referrer: "https://www.google.com/" })).toEqual({ state: null, storage: {} });
+    expect(outcome({ path: "/fr", referrer: "https://www.google.com/" })).toEqual({ state: null, storage: {} });
+  });
+
+  it("skips the screen for a signed-in browser and where :has() is missing, never the door", () => {
+    expect(outcome({ path: "/fr", cookie: `theme=dark; ${CSRF_COOKIE}=abc` })).toEqual({ state: null, storage: {} });
+    expect(outcome({ path: "/fr", cookie: `${CSRF_COOKIE}=abc` }).state).toBeNull();
+    // Another cookie ending with the same name is not the session's.
+    expect(outcome({ path: "/fr", cookie: "x__Host-csrf=abc" }).state).toBe("screen");
+    expect(outcome({ path: "/fr", has: false })).toEqual({ state: null, storage: {} });
+    const queued = { welcome: "seen", door: "queued" };
+    expect(outcome({ path: "/fr", cookie: `${CSRF_COOKIE}=abc`, has: false, storage: queued }).state).toBe("door");
   });
 
   it("opens the door once after a sign-in lands on home", () => {
-    expect(run({ path: "/ar", storage: { welcome: "seen", door: "queued" } })).toEqual({ state: "door", storage: { welcome: "seen", door: "opened" } });
+    expect(outcome({ path: "/ar", storage: { welcome: "seen", door: "queued" } })).toEqual({ state: "door", storage: { welcome: "seen", door: "opened" } });
     expect(run({ path: "/ar", storage: { welcome: "seen", door: "opened" } }).state).toBeNull();
     // Queued on another page: it waits for the home page.
     expect(run({ path: "/fr/parametres", storage: { welcome: "seen", door: "queued" } }).storage.door).toBe("queued");
+  });
+
+  it("lets the page through when the door has not started in time, and only then", () => {
+    const stuck = run({ path: "/fr", storage: { welcome: "seen", door: "queued" } });
+    expect(stuck.timers.map((timer) => timer.delay)).toEqual([DOOR_FALLBACK_MS]);
+    stuck.timers[0]?.callback();
+    expect(stuck.documentElement.getAttribute("data-welcome")).toBeNull();
+    const opening = run({ path: "/fr", storage: { welcome: "seen", door: "queued" } });
+    opening.documentElement.setAttribute("data-welcome", "door open");
+    opening.timers[0]?.callback();
+    expect(opening.documentElement.getAttribute("data-welcome")).toBe("door open");
+    // The screen waits for the visitor.
+    expect(run({ path: "/fr" }).timers).toEqual([]);
   });
 
   it("does nothing when storage throws (private modes): the page shows as usual", () => {
@@ -80,6 +128,9 @@ describe("pre-paint script", () => {
   it("keeps the documented patterns and is pinned by hash for the public CSP", () => {
     expect(WELCOME_SCRIPT).toContain(HOME_PATH.source);
     expect(WELCOME_SCRIPT).toContain(CRAWLER_AGENT.source);
+    expect(WELCOME_SCRIPT).toContain(SIGNED_IN_COOKIE.source);
+    expect(WELCOME_SCRIPT).toContain(`},${DOOR_FALLBACK_MS})`);
+    expect(SIGNED_IN_COOKIE.test(`${CSRF_COOKIE}=token`)).toBe(true);
     expect(PINNED_SCRIPT_HASHES.has(scriptHash(WELCOME_SCRIPT))).toBe(true);
   });
 });
