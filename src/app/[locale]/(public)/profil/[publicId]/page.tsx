@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CalendarDays, MapPin } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { Container } from "@/components/layout/container";
 import { AdSlot } from "@/components/listing/ad-slot";
@@ -105,7 +106,7 @@ export default async function ProfilePage({ params }: { params: Params }) {
           <ul className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
             {profile.listings.map((listing) => (
               <li key={listing.id} className="min-w-0">
-                <ListingCard listing={listing} mediaBaseUrl={media} locale={locale} />
+                <ListingCard listing={listing} mediaBaseUrl={media} locale={locale} action={<FavoriteButton listingId={listing.id} />} />
               </li>
             ))}
           </ul>

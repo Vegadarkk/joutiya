@@ -44,6 +44,8 @@ export const MAX_SKEW_SECONDS = 300;
 export const RELAY_DAILY_CAP = 20;
 /** Probe (cron) alerts e-mailed per UTC day: a flapping target must not spend it either. Telegram stays uncapped. */
 export const PROBE_DAILY_CAP = 10;
+/** Relay e-mails of the day kept for P0 alerts: a flood of lesser alerts never drops a P0. */
+export const RELAY_P0_RESERVE = 5;
 export const RESEND_URL = "https://api.resend.com/emails";
 /** Resend refuses requests without a User-Agent (403, Cloudflare error 1010); workerd sets none. */
 const RESEND_USER_AGENT = "joutiya-uptime-probe";
@@ -296,6 +298,11 @@ export async function markOncePerDay(kv: KeyValue, name: string, nowMs: number):
 /** The two e-mail counters, one KV key each per UTC day. */
 export type DailyCounter = "relay" | "probe";
 const DAILY_CAPS: Record<DailyCounter, number> = { relay: RELAY_DAILY_CAP, probe: PROBE_DAILY_CAP };
+
+/** The relay cap an alert may use: below P0, it stops RELAY_P0_RESERVE short of RELAY_DAILY_CAP. */
+export function relayCap(severity: Severity): number {
+  return severity === "P0" ? RELAY_DAILY_CAP : RELAY_DAILY_CAP - RELAY_P0_RESERVE;
+}
 
 /** Takes one of today's e-mail slots of `counter`; false once its cap is reached. */
 export async function takeDailySlot(kv: KeyValue, counter: DailyCounter, nowMs: number, cap = DAILY_CAPS[counter]): Promise<boolean> {

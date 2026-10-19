@@ -8,6 +8,9 @@ import { purgeUnactivated } from "./purge-unactivated";
 import { quotaReport } from "./quota-report";
 import { r2StorageGauge } from "./r2-storage-gauge";
 import { retentionPurge } from "./retention-purge";
+import { reconcileSearch } from "./reconcile-search";
+import { sweepExpiredBoosts } from "./expire-boosts";
+import { sendSavedSearchAlerts } from "./saved-search-alerts";
 
 export const SYSTEM_QUEUE = "system";
 
@@ -20,6 +23,9 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "expire-listings": () => expireListings(),
   "listing-expiry-reminders": () => sendExpiryReminders(),
   "retention-purge": () => retentionPurge(),
+  "reconcile-search": () => reconcileSearch(),
+  "expire-boosts": () => sweepExpiredBoosts(),
+  "saved-search-alerts": () => sendSavedSearchAlerts(),
   "purge-connection-logs": () => purgeConnectionLogs(),
 };
 
@@ -43,4 +49,10 @@ export const SCHEDULES = {
   "purge-connection-logs-nightly": { pattern: "15 3 * * *", job: "purge-connection-logs" },
   // 03:30 UTC (D17): encrypted Firestore backup, after retention-purge (03:00) and the R2 gauge (03:10).
   "backup-firestore-nightly": { pattern: "30 3 * * *", job: "backup-firestore" },
+  // Phase 4. 04:05 UTC: À la Une ended since the last sweep -> searchOutbox (safety net of the
+  // delayed expire-boost jobs). 04:20 UTC: Firestore vs search index, after the backup's reads.
+  "expire-boosts-nightly": { pattern: "5 4 * * *", job: "expire-boosts" },
+  "reconcile-search-nightly": { pattern: "20 4 * * *", job: "reconcile-search" },
+  // 07:00 UTC (08:00 in Morocco): one digest e-mail per user for the saved searches with alerts.
+  "saved-search-alerts-daily": { pattern: "0 7 * * *", job: "saved-search-alerts" },
 } as const;

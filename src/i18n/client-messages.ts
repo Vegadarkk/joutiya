@@ -21,6 +21,30 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   "Auth.common",
   "Auth.errors",
   "Listing.errors",
+  // Search islands shared by the home, category and listing pages (phase 4): favorite heart,
+  // À la Une badge, search bar and place field, home search panel.
+  "Favorites.button",
+  "ListingCard",
+  "Search.bar",
+  "Search.location",
+  "Home",
+] as const;
+
+/**
+ * Added on the search page only (its own NextIntlClientProvider, on top of the public list): the
+ * filters sheet reads the criteria and category labels (~30 KB), which no other public page needs.
+ */
+export const SEARCH_PAGE_CLIENT_NAMESPACES = [
+  "SearchFilters",
+  "SearchPage",
+  "Criteria",
+  "Categories",
+  "Listing.units",
+  "Listing.wizard",
+  "Listing.fields",
+  "SavedSearches.button",
+  "SavedSearches.summary",
+  "SavedSearches.dialog",
 ] as const;
 
 /** The subtrees of `messages` named by `paths` ("Auth.menu" keeps `{ Auth: { menu } }`); unknown paths are skipped. */

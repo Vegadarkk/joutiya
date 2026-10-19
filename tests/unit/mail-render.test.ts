@@ -25,6 +25,18 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
   listingChangesApproved: { displayName: "Nadia", title: "Vélo de ville", status: "paused", url: `${SITE}/fr/mes-annonces?onglet=active`, until: "2026-12-15T09:30:00.000Z" },
   listingExpiringSoon: { displayName: "Nadia", title: "Vélo de ville", url: `${SITE}/fr/annonce/velo-de-ville-casablanca-abcd2345`, expiresAt: "2026-12-15T09:30:00.000Z" },
   listingExpired: { displayName: "Nadia", title: "Vélo de ville", purgeAt: "2027-12-15T09:30:00.000Z" },
+  savedSearchAlert: {
+    displayName: "Nadia",
+    searches: [
+      {
+        name: "Vélos à Casablanca",
+        url: `${SITE}/fr/recherche?sous-categorie=velos&ville=casablanca`,
+        total: 7,
+        listings: [{ title: "Vélo de ville", url: `${SITE}/fr/annonce/velo-de-ville-casablanca-abcd2345`, price: 1500, isDonation: false, citySlug: "casablanca" }],
+      },
+    ],
+    unsubscribeToken: "djEudWlkLio.c2lnbmF0dXJlLW9mLWZvcnR5LXRocmVlLWNoYXJhY3RlcnMtYWE", // gitleaks:allow (fake fixture)
+  },
 };
 
 /** Every URL a template receives must appear in both bodies. */

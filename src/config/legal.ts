@@ -69,16 +69,25 @@ export const DEFAULT_LEGAL: LegalConfig = {
   phone: "+33 7 62 66 71 49",
   email: "contact@joutiya.ma",
   publicationDirector: "Adil DARKAOUI DAHMANI",
-  // Oracle entity from the contract accepted at signup (Oracle France SAS or Oracle America, Inc.).
-  host: { name: "", address: "", phone: "" },
+  // Oracle signup maps a French account to the "Oracle Cloud Services Agreement" of Oracle France
+  // SAS (cloud_csa_online_v062223_fr_eng.pdf); head office per SIRENE 335 092 318 since 2026-04-13;
+  // phone of Oracle's Paris office (oracle.com/fr/corporate/contact/field-offices). Checked 2026-10-16.
+  host: { name: "Oracle France SAS", address: "6 avenue de Messine, 75008 Paris", phone: "+33 1 57 60 20 20" },
   dataHosts: [
-    // Google entity named in the contract (Ireland): address and phone checked before launch.
-    { name: "Google (Firestore)", region: "europe-west9, Paris", address: "", phone: "" },
+    // Firestore and Firebase Authentication fall under the Google Cloud terms (firebase.google.com/terms),
+    // whose entity for a French customer is Google Cloud France SARL (cloud.google.com/terms/google-entity;
+    // Spark has no billing address). Google publishes no phone for it: Google Paris switchboard.
     {
-      name: "Google LLC (Firebase Authentication)",
+      name: "Google Cloud France SARL (Firestore)",
+      region: "europe-west9, Paris",
+      address: "8 rue de Londres, 75009 Paris",
+      phone: "+33 1 42 68 53 00",
+    },
+    {
+      name: "Google Cloud France SARL (Firebase Authentication)",
       region: "États-Unis",
-      address: "1600 Amphitheatre Parkway, Mountain View, CA 94043, États-Unis",
-      phone: "+1 650 253 0000",
+      address: "8 rue de Londres, 75009 Paris",
+      phone: "+33 1 42 68 53 00",
     },
     {
       name: "Cloudflare, Inc. (R2, CDN)",

@@ -40,6 +40,9 @@ const deployed: Record<string, string> = {
   R2_BUCKET_PRIVATE: "joutiya-staging-private",
   MEDIA_BASE_URL: "https://media-staging.joutiya.ma",
   BACKUP_AGE_RECIPIENT: "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",
+  MEILI_URL: "http://meilisearch:7700",
+  MEILI_SEARCH_KEY: "search-key-placeholder",
+  MEILI_INDEX_KEY: "index-key-placeholder",
 };
 
 describe("parseEnv", () => {

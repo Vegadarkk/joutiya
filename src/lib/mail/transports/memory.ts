@@ -15,6 +15,8 @@ export interface MemoryMailRecord {
   subject: string;
   text: string;
   html: string;
+  /** Extra headers of the mail (List-Unsubscribe of the alerts). */
+  headers?: Record<string, string>;
   data: TemplateData[TemplateId] | Record<string, never>;
 }
 
@@ -52,6 +54,7 @@ export class MemoryTransport implements MailTransport {
       subject: mail.subject,
       text: mail.text,
       html: mail.html,
+      ...(mail.headers ? { headers: mail.headers } : {}),
       data: mail.meta?.data ?? {},
     };
     records.unshift(record);

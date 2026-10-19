@@ -16,8 +16,8 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | 6 | Applications Access et jetons de service | Claude (API), Nav | Après les étapes 5 et 7 (Access exige une zone active) |
 | 7 | Serveurs DNS chez Cloudflare | Nav (Hostinger) | Après la validation du .MA, avant le 12 novembre |
 | 8 | Déploiement automatique du staging | Claude (API), vous pour un jeton | Après les étapes 6 et 7 |
-| 9 | Accès sans clé de la VM à Firestore | Claude (outil), Cody pour la partie Google | Outil prêt : prompt P ; certificats de la VM dès qu'elle existe |
-| 10 | Mentions légales de la production | Claude | Après Firebase |
+| 9 | Accès sans clé de la VM à Firestore | Claude (outil), Nav sur le PC2 pour la partie Google | Partie Google faite le 16 octobre (staging et production testés) ; certificats de la VM dès qu'elle existe |
+| 10 | Mentions légales de la production | Claude | Hébergeurs relevés le 16 octobre, dans le code |
 | 11 | Alertes | Claude (API), Nav pour un filtre Gmail | Code en phase 2 ; après l'étape 7 (domaine Resend) |
 | 12 | Mise en production et contrôles | Claude | Après l'étape 8 |
 | 13 | Test de reconstruction de la VM | Claude | Avant le lancement |
@@ -25,11 +25,14 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | 15 | Domaines des médias | Nav | À l'activation de la zone (étape 7) |
 | 16 | Variables de la VM | Claude (Run Command), Cody pour vos clés | Outil prêt ; dès que la VM existe |
 
+Point d'arrêt du 16 octobre au soir, avant l'audit de lundi : tout le travail de la phase 1 est dans `main`. La suite attend la VM, dont la création gratuite est relancée chaque minute (étapes 3, 4, 9 pour les certificats, 16, puis 12), ou la bascule DNS après le .MA (étapes 6, 7, 8, 11 et 15). Les échéances à renouveler sont plus bas (Renouvellements).
+
+Relance de la VM : 856 essais du 16 octobre, de 01:44 à 17:00 UTC, un par minute hors trois pauses du matin, tous refusés par Oracle faute de place (« Out of host capacity ») : aucune machine A1 gratuite libre à Paris, région à un seul domaine de disponibilité, domaine de pannes laissé au choix d'Oracle. La relance tourne dans le conteneur de Claude, qui s'arrête avec le quota de la semaine : pause du 16 octobre vers 19 h UTC au lundi 19 octobre 10:05 UTC, où la routine du coordinateur la relance. Pas de relance depuis la CI ni depuis un autre serveur : les clés `JOUTIYA_OCI_*` ne quittent pas l'environnement cloud de Claude.
+
 ## Ce qui reste à vous
 
 - **Étape 8** : sur la page de jeton GitHub préparée par Nav, cliquer sur **Generate token**, puis l'enregistrer dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
-- **Étape 9** : lancer le prompt P dans Cody, puis choisir dans votre navigateur le compte Google de vos projets Firebase.
-- **Étape 16**, quand la VM existera : lancer le prompt O dans Cody, qui envoie les clés de votre `.env.local` sur la VM, puis ses certificats Google.
+- **Étape 16**, quand la VM existera : lancer le prompt O dans Cody, qui envoie les clés de votre `.env.local` sur la VM.
 
 Rien d'autre : ni clé SSH, ni commande, ni console.
 
@@ -75,7 +78,7 @@ Limites : script de 4 Ko et sortie de 1 Ko par commande. Oracle garde le contenu
 
 Commandes de Claude (`scripts/oracle-vm.ts`) :
 - `agent` : les dernières commandes et l'état des modules de l'agent sur la VM ;
-- `run <script> --apply` : un script en root, sa sortie revient ;
+- `run <script> --apply` : un script en root, sa sortie revient ; `run infra/vm/check.sh --apply` contrôle le démarrage (agent, tunnels, droits des jetons, chaîne `JOUTIYA-IMDS`, sans afficher de secret) ;
 - `sync --apply` : installe `infra/vm` et `docker/` sur la VM (`infra/vm/install.sh`), en plusieurs commandes vérifiées par empreinte SHA-256.
 
 ## 5. Connexion Google d'Access (fiche Nav N15)
@@ -122,17 +125,17 @@ Les variables `FIREBASE_STAGING_WIF_PROVIDER` et `FIREBASE_STAGING_DEPLOYER` (ri
 
 ## 9. Accès sans clé de la VM à Firestore
 
-Fédération d'identité X.509 (§9) : web et worker prouvent qui ils sont par un certificat, sans clé JSON. `scripts/google-wif.ts` tourne sur votre PC, par Cody : l'autorité qui signe les certificats y reste (`~/.joutiya/wif-ca`), et gcloud s'y connecte dans une configuration à part (`~/.joutiya/gcloud`), sans toucher à celle de vos autres projets.
+Fédération d'identité X.509 (§9) : web et worker prouvent qui ils sont par un certificat, sans clé JSON. `scripts/google-wif.ts` tourne sur la machine de l'autorité : votre PC2, par Nav (16 octobre). L'autorité qui signe les certificats y reste (`~/.joutiya/wif-ca`), et gcloud s'y connecte dans une configuration à part (`~/.joutiya/gcloud`), sans toucher à celle de vos autres projets. Ce dossier `~/.joutiya` ne doit pas se perdre : sans lui, il faut une nouvelle autorité et refaire `setup`. Points 1 à 4 faits par Nav le 16 octobre : les tests du staging et de la production passent.
 
 1. `ca` crée l'autorité (EC P-256, 10 ans), une seule fois.
 2. `login` ouvre la connexion Google. **Vous :** choisir le compte de vos projets Firebase et accepter.
 3. `setup staging` puis `setup prod`, en simulation puis avec `--apply`, dans le projet Firebase consigné pour l'environnement : API IAM, IAM Credentials, STS et Resource Manager ; comptes `joutiya-web` (Cloud Datastore User, Firebase Authentication Admin, signature de ses propres custom tokens) et `joutiya-worker` (Cloud Datastore User, Firebase Authentication Admin) ; pool `joutiya-vm` et son fournisseur `x509`, qui ne croit que l'autorité et n'accepte que `joutiya-<env>-web` et `joutiya-<env>-worker`. En staging, aussi `joutiya-deployer` (Firebase Rules Admin, Cloud Datastore Index Admin, et Service Usage Consumer, qu'exige `firebase deploy`) et le pool `github`, réservé à `deploy-staging.yml` sur `main` de ce dépôt (identifiant numérique dans `infra/targets.json`). L'outil ajoute ce qui manque et ne retire jamais rien.
 4. `test staging` puis `test prod` : des certificats d'un jour signés sur votre PC prouvent toute la chaîne (lecture Firestore et custom token pour web, lecture Firestore et Firebase Auth pour worker), puis leurs clés sont effacées. IAM met quelques minutes à appliquer les droits : l'outil réessaie seul.
-5. Quand la VM existe, après ses variables et avant le premier déploiement (prompt O, étape 16) : `node --env-file=.env.local scripts/oracle-vm.ts wif <env> --apply`. Chaque conteneur reçoit une clé créée sur la VM, qui n'en sort jamais ; seule sa demande de certificat passe par votre PC pour être signée. Sans ces fichiers, web et worker refusent de démarrer.
+5. Quand la VM existe, après ses variables et avant le premier déploiement : Claude lance `node scripts/oracle-vm.ts wif <env> --apply`, qui crée sur la VM une clé par conteneur (elle n'en sort jamais) et affiche leurs demandes de certificat, publiques. Nav les signe sur le PC2 (`node scripts/google-wif.ts sign <fichier>`) et renvoie les lignes `certificate` ; Claude les pose (`wif <env> --certificates=<fichier> --apply`) et relance web et worker. Ni clé Oracle ni `.env.local` sur le PC2. Sans ces fichiers, web et worker refusent de démarrer.
 
-Le certificat d'un conteneur vaut un an : la même commande le renouvelle, et Claude programme un rappel. Si Google exige la facturation pour ces API, `setup` s'arrête avant toute création : la solution de repli (une clé JSON par conteneur, renouvelée tous les 90 jours) demande votre accord. Nouvelle autorité (fin de projet, fuite) : `ca --new`, puis `setup` et `wif` pour les deux environnements.
+Le certificat d'un conteneur vaut un an : les mêmes étapes le renouvellent, et Claude programme un rappel (Renouvellements, plus bas). Si Google exige la facturation pour ces API, `setup` s'arrête avant toute création : la solution de repli (une clé JSON par conteneur, renouvelée tous les 90 jours) demande votre accord. Nouvelle autorité (fin de projet, fuite) : `ca --new`, puis `setup` et `wif` pour les deux environnements.
 
-**P. Accès Google sans clé** (prompt Cody)
+**P. Accès Google sans clé** (prompt pour l'agent de la machine de l'autorité : Nav, sur le PC2)
 
 ```text
 Prépare l'accès sans clé de Joutiya à Google (docs/phase-1.md, étape 9), depuis Git Bash, à la racine du dépôt à jour (git pull). Ces commandes n'ont pas besoin de .env.local : ne le lis pas. 1) Si node_modules manque : npm ci --ignore-scripts. 2) node scripts/google-wif.ts ca. 3) node scripts/google-wif.ts login ; si gcloud manque, dis-moi d'installer Google Cloud CLI et arrête-toi ; sinon je choisis dans le navigateur le compte de mes projets Firebase. 4) Pour staging puis prod : node scripts/google-wif.ts setup <env>, simulation qui liste ce qui sera créé ; sans erreur, relance-la avec --apply ; si Google demande la facturation, arrête-toi et montre-moi le message. 5) node scripts/google-wif.ts test staging, puis test prod. Résume-moi seulement ce qui a été créé et si les deux tests passent. N'affiche jamais une clé ni un jeton.
@@ -140,7 +143,13 @@ Prépare l'accès sans clé de Joutiya à Google (docs/phase-1.md, étape 9), de
 
 ## 10. Mentions légales de la production
 
-La production refuse de démarrer tant qu'une mention obligatoire manque : hébergeur, adresse et téléphone des hébergeurs de données. Claude relève les entités Oracle et Google dans leurs contrats publics, puis écrit `config/legal` dans Firestore avec `scripts/legal-config.ts`, en production puis en staging.
+La production refuse de démarrer tant qu'une mention obligatoire manque : hébergeur, adresse et téléphone des hébergeurs de données. Fait le 16 octobre : les valeurs par défaut de `src/config/legal.ts` portent les hébergeurs, relevés dans les contrats publics et le registre SIRENE.
+
+- Hébergeur du site : Oracle France SAS (contrat Oracle Cloud d'un compte français), 6 avenue de Messine, 75008 Paris, +33 1 57 60 20 20.
+- Données : Google Cloud France SARL pour Firestore (Paris) et Firebase Authentication (États-Unis), entité des conditions Google Cloud pour un client français, 8 rue de Londres, 75009 Paris ; Google ne publie pas de téléphone pour elle, d'où le standard de Google Paris, +33 1 42 68 53 00. Le forfait Spark n'ayant pas d'adresse de facturation, Google LLC (États-Unis) reste possible : à revoir si Google l'indique.
+- Photos et CDN : Cloudflare, Inc., inchangé.
+
+Aucune écriture dans Firestore n'est nécessaire. `scripts/legal-config.ts` sert plus tard à modifier ces mentions sans redéployer (médiateur de la consommation, changement d'hébergeur), depuis le PC2 par Nav.
 
 ## 11. Alertes
 
@@ -152,7 +161,7 @@ Prérequis : le domaine `notif.joutiya.ma` vérifié chez Resend, après la basc
 2. Claude déploie le Worker et pose ses secrets par l'API Cloudflare : `RESEND_API_KEY`, `ALERT_EMAIL_TO` (votre Gmail), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ALERT_RELAY_SECRET`, `ACCESS_CLIENT_ID` et `ACCESS_CLIENT_SECRET` (jeton `joutiya-probe`). L'expéditeur, `Joutiya alertes <alertes@notif.joutiya.ma>`, est dans `workers/uptime-probe/wrangler.jsonc`.
 3. Test : une alerte signée arrive dans votre Gmail depuis `alertes@notif.joutiya.ma`, avec SPF, DKIM et DMARC à PASS (« Afficher l'original ») ; Nav ajoute un filtre Gmail « Ne jamais envoyer dans le spam » pour cet expéditeur.
 
-Garde-fous : au plus 20 e-mails relayés par jour UTC (au-delà, l'application reçoit une erreur 429 et la note dans ses journaux), et un seul avis Telegram par jour quand le quota Resend du jour est épuisé. Sans `ALERT_EMAIL_TO` ni `RESEND_API_KEY`, le Worker n'envoie aucun e-mail et l'écrit dans ses journaux ; avec un seul des deux, il signale une erreur.
+Garde-fous : au plus 20 e-mails relayés par jour UTC, dont les 5 derniers gardés pour les alertes P0 (au-delà, l'application reçoit une erreur 429 et la note dans ses journaux), et un seul avis Telegram par jour quand le quota Resend du jour est épuisé. Sans `ALERT_EMAIL_TO` ni `RESEND_API_KEY`, le Worker n'envoie aucun e-mail et l'écrit dans ses journaux ; avec un seul des deux, il signale une erreur.
 
 ## 12. Mise en production et contrôles
 
@@ -207,7 +216,7 @@ Chaque environnement lit `/etc/joutiya/<env>/app.env` (root, 0600) et deux mots 
 - **Registre** `infra/targets.json` : adresses du site et du back-office, projet et application web Firebase, compte de service `joutiya-web`, client Google de connexion, clé de site Turnstile, DSN Sentry, compte et buckets R2, Access.
 - **VM** : `CSRF_SECRET`, les mots de passe Valkey et la clé maîtresse de Meilisearch (`meilisearch.env`, phase 4), générés une fois sur place ; ils n'en sortent jamais et une VM reconstruite en reçoit de nouveaux. Les deux clés de recherche de l'application en dérivent : `node scripts/oracle-vm.ts search-setup <env> --apply` crée l'index et les écrit dans `app.env`, puis recrée web et worker, une fois qu'une version avec Meilisearch tourne.
 - **Votre `.env.local`**, lu sur votre PC par Cody (prompt O) : les clés secrètes. Le fichier sert aussi à un autre produit : l'outil ne fait que le lire, ne prend que des noms de `.env.example` et seulement sous deux formes : `NOM_STAGING=…` ou `NOM_PROD=…`, ou la paire rangée par Nav le 16 octobre (ligne de production active, ligne du staging en commentaire juste dessous) pour `FIREBASE_SERVER_API_KEY`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` et `MAIL_FALLBACK_API_KEY`. Toute autre ligne est ignorée : valeur de développement ou de l'autre produit. Une clé de site Turnstile différente du registre arrête tout : la paire aurait été mal lue.
-- **Google** : `GOOGLE_CLOUD_PROJECT`, égal au projet Firebase, évite à la bibliothèque de Google de chercher le projet avant chaque premier jeton. Les certificats de web et worker ne sont pas dans `app.env` : `oracle-vm.ts wif <env> --apply` les pose ensuite dans `/etc/joutiya/<env>/gcp` (étape 9).
+- **Google** : `GOOGLE_CLOUD_PROJECT`, égal au projet Firebase, évite à la bibliothèque de Google de chercher le projet avant chaque premier jeton. Les certificats de web et worker ne sont pas dans `app.env` : ils sont posés ensuite dans `/etc/joutiya/<env>/gcp` (étape 9, point 5).
 - **Claude, au fil des étapes** : `CF_ACCESS_AUD` (étape 6), `ALERT_RELAY_URL` et `ALERT_RELAY_SECRET` (Worker, étape 11), `MAIL_API_KEY` et `MAIL_WEBHOOK_SECRET` (Resend, après la bascule DNS), `MAP_PMTILES_URL` (phase 3). Puis il relance web et worker.
 
 `HASH_PEPPER` sert aux empreintes des e-mails, des téléphones et des désabonnements dans Firestore : il ne doit jamais changer. Cody le génère dans votre `.env.local` (`HASH_PEPPER_STAGING`, `HASH_PEPPER_PROD`), qui en garde la copie ; **Vous :** rangez-la aussi dans votre gestionnaire de mots de passe. Les réglages R2 ne s'écrivent qu'avec les deux clés `R2_ACCESS_KEY_ID` et `R2_SECRET_ACCESS_KEY` de l'environnement : un jeu partiel empêche l'application de démarrer.
@@ -217,8 +226,22 @@ Pour l'envoi, Cody a besoin dans votre `.env.local` des six lignes `JOUTIYA_OCI_
 **O. Variables de la VM** (prompt Cody)
 
 ```text
-Envoie les clés de mon .env.local sur la VM de Joutiya (docs/phase-1.md, étape 16). Ce fichier sert aussi à un autre produit : ne le lis pas toi-même (ni cat, head, tail, sed, ni grep sans -q), ne l'affiche pas, ne le réécris pas et ne change ni l'ordre ni le texte de ses lignes ; seuls les deux scripts ci-dessous le lisent. 1) `node scripts/vm-env.ts pepper .env.local` : ajoute HASH_PEPPER_STAGING et HASH_PEPPER_PROD à la fin du fichier s'ils manquent, sans montrer de valeur ; dis-moi alors de les copier dans mon gestionnaire de mots de passe. 2) Pour staging puis prod : `node --env-file=.env.local scripts/oracle-vm.ts env <env> --from=.env.local`, simulation qui liste les noms, leurs lignes et ce qui manque. Sans erreur, relance la même commande avec --apply ; sinon montre-moi les erreurs et arrête. 3) Pour staging puis prod : `node --env-file=.env.local scripts/oracle-vm.ts wif <env>` (simulation), puis la même avec --apply : certificats Google de la VM, signés par l'autorité de l'étape 9. S'il manque des variables JOUTIYA_OCI_*, dis-moi lesquelles ajouter, sans valeur. Ne me donne aucune valeur, seulement des noms.
+Envoie les clés de mon .env.local sur la VM de Joutiya (docs/phase-1.md, étape 16). Ce fichier sert aussi à un autre produit : ne le lis pas toi-même (ni cat, head, tail, sed, ni grep sans -q), ne l'affiche pas, ne le réécris pas et ne change ni l'ordre ni le texte de ses lignes ; seuls les deux scripts ci-dessous le lisent. 1) `node scripts/vm-env.ts pepper .env.local` : ajoute HASH_PEPPER_STAGING et HASH_PEPPER_PROD à la fin du fichier s'ils manquent, sans montrer de valeur ; dis-moi alors de les copier dans mon gestionnaire de mots de passe. 2) Pour staging puis prod : `node --env-file=.env.local scripts/oracle-vm.ts env <env> --from=.env.local`, simulation qui liste les noms, leurs lignes et ce qui manque. Sans erreur, relance la même commande avec --apply ; sinon montre-moi les erreurs et arrête. S'il manque des variables JOUTIYA_OCI_*, dis-moi lesquelles ajouter, sans valeur. Ne me donne aucune valeur, seulement des noms.
 ```
+
+## Renouvellements
+
+Toutes les échéances du projet sont dans `joutiya/echeances.md`, dans les fichiers du projet. Celles de cette phase :
+
+- **Certificats Google de la VM** (web et worker, staging et production) : 365 jours à partir de leur pose. Oubliés, web et worker n'obtiennent plus d'accès Google : Firestore et Firebase Auth échouent, et le site ne fonctionne plus. Le renouvellement prend une dizaine de minutes ; web et worker redémarrent en quelques secondes :
+  1. Claude : `node scripts/oracle-vm.ts wif staging --apply`, puis `wif prod --apply` : nouvelles clés sur la VM, demandes de certificat affichées ;
+  2. Nav, sur le PC2 : `node scripts/google-wif.ts sign <fichier des demandes>`, qui rend les lignes `certificate` ;
+  3. Claude : `node scripts/oracle-vm.ts wif <env> --certificates=<fichier> --apply` pour chacun, puis contrôle des journaux.
+
+  Un rappel part 30 jours avant l'échéance : Claude le pose avec les certificats.
+- **Autorité des certificats** (PC2, `~/.joutiya/wif-ca`) : 10 ans, jusqu'au 13 octobre 2036. Gardez le dossier `~/.joutiya` du PC2 (autorité et connexion gcloud). S'il est perdu ou si l'autorité expire, Nav en crée une nouvelle (`ca --new`) et refait `setup staging --apply` et `setup prod --apply`, puis Claude refait les certificats de la VM comme ci-dessus.
+- **Jeton Cloudflare `joutiya-edge`** : jusqu'au 15 novembre 2026. Oublié, Claude ne peut plus régler Cloudflare par API (DNS, tunnels, cache) ; le site continue de tourner. Nav prépare un jeton aux mêmes droits, vous le rangez sous `JOUTIYA_CLOUDFLARE_API_TOKEN`.
+- **Jeton GitHub `joutiya-claude-actions`** (étape 8) : 90 jours à partir de sa création. Oublié, Claude ne peut plus changer les secrets et variables de la CI ; les déploiements continuent.
 
 ## Fin de la phase 1
 

@@ -62,6 +62,18 @@ export interface BuiltMail {
   text: string;
   /** Where a reply goes (statement mails: the DSA contact address). */
   replyTo?: string;
+  /** Extra headers (alerts: List-Unsubscribe, List-Unsubscribe-Post). */
+  headers?: Record<string, string>;
+}
+
+/** A titled block of linked items (alert digest: one block per saved search). */
+export interface MailSection {
+  heading: string;
+  /** Short line under the heading ("3 nouvelles annonces"). */
+  note?: string;
+  items: { title: string; detail?: string; url: string }[];
+  /** Link closing the block ("Voir les 12 annonces"). */
+  more?: { label: string; url: string };
 }
 
 export interface LayoutInput {
@@ -76,6 +88,8 @@ export interface LayoutInput {
   action?: { label: string; url: string };
   /** Secondary links, as labelled raw URLs (signupExisting: reset link). */
   links?: { label: string; url: string }[];
+  /** Blocks after the paragraphs, before the button. */
+  sections?: MailSection[];
   /** Paragraphs after the button (security sentence last). */
   closing?: string[];
   /** Footer identity; the current publisher (setMailPublisher) when omitted. */
@@ -169,6 +183,34 @@ function rawLink(url: string): string {
   return `<p style="margin:0 0 16px;font-size:13px;line-height:1.5;color:${COLORS.muted};word-break:break-all;"><a href="${safe}" style="color:${COLORS.link};text-decoration:underline;">${safe}</a></p>`;
 }
 
+function sectionHtml(section: MailSection, align: string): string {
+  const parts: string[] = [];
+  parts.push(`<h2 style="margin:0 0 4px;font-size:18px;line-height:1.35;font-weight:700;color:${COLORS.heading};">${escapeHtml(section.heading)}</h2>`);
+  if (section.note) parts.push(`<p style="margin:0 0 10px;font-size:14px;line-height:1.5;color:${COLORS.muted};">${escapeHtml(section.note)}</p>`);
+  const rows = section.items.map(
+    (item) =>
+      `<tr><td style="padding:10px 0;border-top:1px solid ${COLORS.cardBorder};text-align:${align};">` +
+      `<a href="${escapeHtml(item.url)}" style="font-size:15px;line-height:1.45;font-weight:600;color:${COLORS.link};text-decoration:none;">${escapeHtml(item.title)}</a>` +
+      (item.detail ? `<div style="margin-top:2px;font-size:13px;line-height:1.5;color:${COLORS.muted};">${escapeHtml(item.detail)}</div>` : "") +
+      `</td></tr>`,
+  );
+  if (rows.length > 0) parts.push(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px;">${rows.join("")}</table>`);
+  if (section.more) {
+    parts.push(
+      `<p style="margin:0;font-size:15px;line-height:1.5;"><a href="${escapeHtml(section.more.url)}" style="font-weight:700;color:${COLORS.primary};text-decoration:underline;">${escapeHtml(section.more.label)}</a></p>`,
+    );
+  }
+  return `<div style="margin:8px 0 24px;padding:16px 0 0;border-top:3px solid ${COLORS.rule};">${parts.join("")}</div>`;
+}
+
+function sectionText(section: MailSection): string[] {
+  const lines = [section.heading, ...(section.note ? [section.note] : []), ""];
+  for (const item of section.items) lines.push(`- ${item.title}${item.detail ? ` (${item.detail})` : ""}`, `  ${item.url}`);
+  if (section.more) lines.push("", `${section.more.label} : ${section.more.url}`);
+  lines.push("");
+  return lines;
+}
+
 export function renderLayout(input: LayoutInput): BuiltMail {
   const rtl = input.lang === "ar";
   const dir = rtl ? "rtl" : "ltr";
@@ -181,6 +223,7 @@ export function renderLayout(input: LayoutInput): BuiltMail {
   body.push(`<h1 style="margin:0 0 20px;font-size:22px;line-height:1.3;font-weight:700;color:${COLORS.heading};">${escapeHtml(input.title)}</h1>`);
   body.push(paragraph(input.greeting));
   for (const text of input.paragraphs) body.push(paragraph(text));
+  for (const section of input.sections ?? []) body.push(sectionHtml(section, align));
   if (input.action) {
     const url = escapeHtml(input.action.url);
     body.push(
@@ -219,7 +262,7 @@ export function renderLayout(input: LayoutInput): BuiltMail {
     `</td></tr>` +
     `</table></td></tr></table></body></html>`;
 
-  const lines: string[] = [input.title, "", input.greeting, "", ...input.paragraphs.flatMap((text) => [text, ""])];
+  const lines: string[] = [input.title, "", input.greeting, "", ...input.paragraphs.flatMap((text) => [text, ""]), ...(input.sections ?? []).flatMap(sectionText)];
   if (input.action) lines.push(`${input.action.label} : ${input.action.url}`, "");
   for (const link of input.links ?? []) lines.push(`${link.label} ${link.url}`, "");
   for (const text of input.closing ?? []) lines.push(text, "");

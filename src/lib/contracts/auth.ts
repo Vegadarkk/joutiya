@@ -1,5 +1,6 @@
 import { z } from "@/lib/zod";
 import { LOCALES } from "@/config/site";
+import { PASSWORD_MAX, PASSWORD_MIN } from "./endpoints";
 
 // Shared client/server contracts of the authentication API (phase 2). Imported by the forms
 // (react-hook-form + zodResolver) and by the route handlers: one validation, same messages.
@@ -9,10 +10,7 @@ import { LOCALES } from "@/config/site";
 export const CGU_VERSION = "2026-10";
 export const TRANSFERS_CONSENT_VERSION = "2026-10";
 
-export const PASSWORD_MIN = 8;
-export const PASSWORD_MAX = 128;
-
-export { AUTH_API } from "./endpoints";
+export { AUTH_API, PASSWORD_MAX, PASSWORD_MIN } from "./endpoints";
 
 export const emailSchema = z.string().trim().toLowerCase().email().max(254);
 
@@ -35,7 +33,7 @@ export const turnstileTokenSchema = z.string().min(1).max(2048);
  * Turnstile `action` names: the widget declares one, siteverify echoes it and the server refuses a
  * token solved for another action. One list for both sides (a mismatch is a hard 403 in prod).
  */
-export const TURNSTILE_ACTIONS = ["signup", "login", "reset", "google", "verify-resend", "staff-login", "phone", "listing"] as const;
+export const TURNSTILE_ACTIONS = ["signup", "login", "reset", "google", "verify-resend", "staff-login", "phone", "listing", "search", "pages"] as const;
 export type TurnstileAction = (typeof TURNSTILE_ACTIONS)[number];
 
 export const consentsSchema = z

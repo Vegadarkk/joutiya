@@ -78,6 +78,14 @@ describe("SiteHeader", () => {
     const html = render(<SiteHeader locale="fr" />);
     expect(html).toContain(`role="search" aria-label="${fr.Nav.searchLabel}"`);
     expect(html).toMatch(/<a class="flex h-11 [^"]*" aria-label="Accueil Joutiya" href="\/fr"/);
+    expect(html).toContain('<div class="ms-auto flex items-center gap-1 *:min-w-11">');
+  });
+
+  it("hides its search field when the main content has its own search form (home, /recherche)", () => {
+    const html = render(<SiteHeader locale="ar" />, "ar");
+    const form = /<form [^>]*>/.exec(html)?.[0] ?? "";
+    expect(form).toContain('action="/ar/recherche"');
+    expect(form).toContain("[:root:has(#main_[role=search])_&amp;]:hidden");
   });
 });
 

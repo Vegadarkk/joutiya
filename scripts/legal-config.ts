@@ -1,7 +1,9 @@
-// Writes Firestore `config/legal` of one environment (§7) from a local JSON file, from the
-// owner's machine with his own Google credentials (`gcloud auth application-default login`).
-// The file holds only the fields that differ from DEFAULT_LEGAL (src/config/legal.ts), e.g. the
-// host entity; the app merges the document over the defaults. Production refuses to start while
+// Writes Firestore `config/legal` of one environment (§7) from a JSON file (infra/legal.json), on
+// the machine that holds the CA of scripts/google-wif.ts, with the gcloud sign-in of its `login`
+// (own configuration, ~/.joutiya/gcloud): never `gcloud auth application-default login`, which
+// would replace the machine-wide credentials of the owner's other projects.
+// The file holds only the fields that differ from DEFAULT_LEGAL (src/config/legal.ts), which
+// already holds the hosts, e.g. the consumer mediator; the app merges the document over the defaults. Production refuses to start while
 // a mention required by art. 1-1 LCEN is missing.
 //
 //   node scripts/legal-config.ts <staging|prod> <file.json> [--apply]     dry run without --apply
@@ -10,6 +12,7 @@ import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { missingLegalMentions, resolveLegalConfig, type LegalConfig } from "../src/config/legal.ts";
 import { validateTargets, type Targets } from "./assert-target.ts";
+import { gcloudAccessToken } from "./google-wif.ts";
 
 export interface LegalPlan {
   config: LegalConfig;
@@ -23,6 +26,21 @@ export function planLegal(stored: unknown): LegalPlan {
   }
   const { config, errors } = resolveLegalConfig(stored);
   return { config, errors, missing: errors.length > 0 ? [] : missingLegalMentions(config) };
+}
+
+/** A JSON value as a Firestore REST value (config/legal holds strings, numbers, booleans, lists, maps). */
+export function firestoreValue(value: unknown): Record<string, unknown> {
+  if (value === null) return { nullValue: null };
+  if (typeof value === "string") return { stringValue: value };
+  if (typeof value === "boolean") return { booleanValue: value };
+  if (typeof value === "number") return Number.isSafeInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  if (Array.isArray(value)) return { arrayValue: value.length === 0 ? {} : { values: value.map(firestoreValue) } };
+  if (typeof value === "object") return { mapValue: { fields: firestoreFields(value as Record<string, unknown>) } };
+  throw new Error(`cannot store ${typeof value} in Firestore`);
+}
+
+export function firestoreFields(object: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(object).map(([key, value]) => [key, firestoreValue(value)]));
 }
 
 async function main(): Promise<void> {
@@ -45,10 +63,14 @@ async function main(): Promise<void> {
     console.log(`\nDry run: nothing written. Add --apply to write config/legal in ${projectId}.`);
     return;
   }
-  const { applicationDefault, initializeApp } = await import("firebase-admin/app");
-  const { getFirestore } = await import("firebase-admin/firestore");
-  const app = initializeApp({ projectId, credential: applicationDefault() });
-  await getFirestore(app).collection("config").doc("legal").set(stored);
+  // The whole document, as set() would write it: a PATCH without updateMask replaces every field.
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/config/legal`;
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: { authorization: `Bearer ${gcloudAccessToken()}`, "content-type": "application/json" },
+    body: JSON.stringify({ fields: firestoreFields(stored) }),
+  });
+  if (!response.ok) throw new Error(`Firestore answered HTTP ${response.status}: ${(await response.text()).slice(0, 300)}`);
   console.log(`\nconfig/legal written in ${projectId}. The app picks it up within 5 minutes.`);
 }
 

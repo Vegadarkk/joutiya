@@ -21,6 +21,11 @@ describe("buildCsp", () => {
     expect(policy.get("script-src")).toEqual(["'nonce-abc'", "'strict-dynamic'", "'wasm-unsafe-eval'", "https:", "'unsafe-inline'"]);
   });
 
+  it("adds pinned script hashes next to the nonce on private pages", () => {
+    const policy = directives(buildCsp({ variant: "private", nonce: "abc", scriptHashes: ["h1=", "h2="] }));
+    expect(policy.get("script-src")?.slice(0, 4)).toEqual(["'nonce-abc'", "'sha256-h1='", "'sha256-h2='", "'strict-dynamic'"]);
+  });
+
   it("uses the 'self' fallback on public pages, without nonce nor WebAssembly", () => {
     const text = buildCsp({ variant: "public" });
     expect(directives(text).get("script-src")).toEqual(["'self'", "'unsafe-inline'", "https://challenges.cloudflare.com", "https://accounts.google.com/gsi/client"]);
