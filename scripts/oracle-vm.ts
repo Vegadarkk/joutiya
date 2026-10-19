@@ -616,7 +616,7 @@ export function rebuildDetails(input: { imageId: string; userData: string; metad
 /**
  * `rebuild`: the compartment's VM gets a new boot volume (newest image) and a new first boot with the
  * tunnel tokens, keeping the instance and its A1 capacity (guide step 13, infra/redeploy.md). Also
- * repairs a VM created in the console without the cloud-init script, whatever its name. --keep-disk
+ * repairs a VM created in the console without the cloud-init script or public IP, whatever its name. --keep-disk
  * keeps the old boot volume, detached, as evidence after an incident.
  */
 async function rebuild(oci: Oci, targets: Targets, compartmentId: string, keepDisk: boolean): Promise<void> {
@@ -628,6 +628,15 @@ async function rebuild(oci: Oci, targets: Targets, compartmentId: string, keepDi
   console.log(`instance ${instance.displayName} ${instance.lifecycleState} (${instance.id})`);
   const { userData, imageId } = await launchPlan(oci, targets, compartmentId, await existingSubnet(oci, compartmentId), true);
   await oci.write("PUT", `/20160918/instances/${instance.id}`, { displayName: NAMES.instance, ...INSTANCE_SETTINGS });
+  // Without a public IP the VM cannot reach the internet (no NAT gateway): an ephemeral one, free.
+  const attachments = await oci.call<{ vnicId: string; lifecycleState: string }[]>("GET", "iaas", `/20160918/vnicAttachments${query({ compartmentId, instanceId: instance.id })}`);
+  for (const attachment of attachments.filter((item) => item.lifecycleState === "ATTACHED")) {
+    const vnic = await oci.call<{ id: string; isPrimary?: boolean; publicIp?: string }>("GET", "iaas", `/20160918/vnics/${attachment.vnicId}`);
+    if (!vnic.isPrimary || vnic.publicIp) continue;
+    const primary = (await oci.call<{ id: string; isPrimary: boolean }[]>("GET", "iaas", `/20160918/privateIps${query({ vnicId: vnic.id })}`)).find((ip) => ip.isPrimary);
+    if (!primary) throw new Error(`vnic ${vnic.id} has no primary private IP`);
+    await oci.write("POST", "/20160918/publicIps", { compartmentId, lifetime: "EPHEMERAL", privateIpId: primary.id, displayName: NAMES.instance });
+  }
   const details = rebuildDetails({ imageId, userData, metadata: instance.metadata, keepDisk });
   const shown = { ...details, metadata: { keys: Object.keys(details.metadata as object), user_data: `<bootstrap.sh with tokens, ${userData.length} bytes>` } };
   await oci.write("PUT", `/20160918/instances/${instance.id}`, details, shown);
