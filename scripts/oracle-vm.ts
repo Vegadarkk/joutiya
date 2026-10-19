@@ -464,27 +464,36 @@ async function create(oci: Oci, targets: Targets, compartmentId: string, retryMi
     return;
   }
   const deadline = Date.now() + retryMinutes * 60_000;
-  for (let attempt = 1; ; attempt += 1) {
+  let attempt = 0;
+  let launched: Instance | undefined;
+  while (!launched) {
+    // Look before every launch but the first (checked above): a request cut off earlier may have
+    // launched the VM, and in --small-fallback mode two 1 OCPU VMs fit the quota. Never launch
+    // while the lookup fails: wait and look again.
+    if (attempt > 0) {
+      try {
+        launched = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance);
+      } catch (error) {
+        if ((!isTransientError(error) && !isCapacityError(error)) || Date.now() > deadline) throw error;
+        console.log(`instance lookup failed (${(error as Error).message}): looking again in 60 s`);
+        await sleep(60_000);
+        continue;
+      }
+      if (launched) break;
+    }
+    attempt += 1;
     const shapeConfig = shapeForAttempt(attempt, smallFallback);
-    let launched: Instance | undefined;
     try {
       launched = await oci.write<Instance>("POST", "/20160918/instances", details(shapeConfig), attempt === 1 ? shown : { attempt, ...shapeConfig });
     } catch (error) {
       const capacity = isCapacityError(error);
       if ((!capacity && !isTransientError(error)) || Date.now() > deadline) throw error;
-      // A request cut off may still have launched the VM (the quota allows one): look before retrying.
-      if (!capacity) launched = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance).catch(() => undefined);
-      if (!launched) {
-        console.log(`${capacity ? `no A1 capacity for ${size(shapeConfig)}` : `transient error (${(error as Error).message})`} (attempt ${attempt}): retrying in 60 s`);
-        await sleep(60_000);
-        continue;
-      }
+      console.log(`${capacity ? `no A1 capacity for ${size(shapeConfig)}` : `transient error (${(error as Error).message})`} (attempt ${attempt}): retrying in 60 s`);
+      await sleep(60_000);
     }
-    if (!launched) return;
-    const running = await waitFor<Instance>(oci, `/20160918/instances/${launched.id}`, "RUNNING", 15);
-    console.log(`instance ${NAMES.instance} ${running.lifecycleState} (${running.id}), ${size(running.shapeConfig ?? shapeConfig)}`);
-    return;
   }
+  const running = await waitFor<Instance>(oci, `/20160918/instances/${launched.id}`, "RUNNING", 15);
+  console.log(`instance ${NAMES.instance} ${running.lifecycleState} (${running.id})${running.shapeConfig ? `, ${size(running.shapeConfig)}` : ""}`);
 }
 
 /** Bootstrap lines (joutiya-bootstrap: ...) and cloud-init's verdict, from the serial console. */
@@ -707,15 +716,20 @@ async function envFiles(oci: Oci, targets: Targets, compartmentId: string, env: 
 // ---------------------------------------------------------------------------------------------
 // Production releases (§2), run by root through Run Command with the forced command of the deploy
 // users (infra/vm/deploy-forced-command.sh, environment prod). Production only runs images already
-// running in staging, pinned by image ID; no production key exists anywhere.
+// running in staging, pinned by image ID, from the tarball the CI recorded; no production key exists
+// anywhere.
 
 const RELEASE = /^[0-9a-f]{12,40}$/;
 const IMAGE_ID = /^sha256:[0-9a-f]{64}$/;
+/** Check run of deploy-staging.yml that records, on each release's commit, the tarball sent to the VM. */
+export const RELEASE_CHECK = "Release images";
 
 export interface EnvStatus {
   release: string;
   web: string;
   worker: string;
+  /** sha256 of the tarball the release's images were loaded from (empty before the first load). */
+  tarball?: string;
 }
 export type VmStatus = Record<"staging" | "prod", EnvStatus>;
 
@@ -736,6 +750,30 @@ export function promoteCommand(staging: EnvStatus): string {
   if (!RELEASE.test(staging.release)) throw new Error("staging runs no valid release");
   if (!IMAGE_ID.test(staging.web) || !IMAGE_ID.test(staging.worker)) throw new Error("staging image IDs are missing");
   return `promote ${staging.release} ${staging.web} ${staging.worker}`;
+}
+
+/**
+ * Tarball digests that the GitHub Actions app recorded for a release, from a GitHub "list check runs
+ * for a Git reference" answer. Nobody else can write these: the staging deploy key and its Access
+ * token cannot.
+ */
+export function recordedTarballs(answer: unknown, release: string): string[] {
+  const runs = (answer as { check_runs?: unknown } | null)?.check_runs;
+  if (!Array.isArray(runs)) throw new Error("unexpected answer from GitHub");
+  return (runs as { name?: unknown; head_sha?: unknown; conclusion?: unknown; app?: { slug?: unknown }; output?: { summary?: unknown } }[]).flatMap((run) => {
+    if (run.name !== RELEASE_CHECK || run.app?.slug !== "github-actions" || run.conclusion !== "success") return [];
+    if (typeof run.head_sha !== "string" || !run.head_sha.startsWith(release)) return [];
+    const digest = /^tarball (sha256:[0-9a-f]{64})$/m.exec(typeof run.output?.summary === "string" ? run.output.summary : "")?.[1];
+    return digest ? [digest] : [];
+  });
+}
+
+/** The CI's records of a release, read through curl: in the Claude environment its proxy signs requests to the private repository. */
+function ciTarballs(repository: string, release: string): string[] {
+  const url = `https://api.github.com/repos/${repository}/commits/${release}/check-runs?check_name=${encodeURIComponent(RELEASE_CHECK)}&filter=all&per_page=100`;
+  const answer = spawnSync("curl", ["-fsS", "--max-time", "30", "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28", url], { encoding: "utf8" });
+  if (answer.status !== 0) throw new Error(`the CI's record of ${release} could not be read from GitHub (${answer.stderr.trim() || `curl exit ${answer.status}`}): not promoted`);
+  return recordedTarballs(JSON.parse(answer.stdout), release);
 }
 
 /** Root script sending one request to the forced command of production (it splits the request on spaces, no shell parses it). */
@@ -783,6 +821,12 @@ async function release(oci: Oci, targets: Targets, compartmentId: string, action
     request = promoteCommand(current.staging);
     if (current.staging.release === current.prod.release) throw new Error("production already runs this release");
     if (!isOnMain(current.staging.release)) throw new Error(`release ${current.staging.release} is not a commit of origin/main: not promoted`);
+    const { tarball } = current.staging;
+    const repository = targets.shared.github.repository;
+    if (!repository) throw new Error("shared.github.repository is not recorded in infra/targets.json");
+    if (!tarball || !ciTarballs(repository, current.staging.release).includes(tarball)) {
+      throw new Error(`staging's images of ${current.staging.release} do not come from the tarball the CI recorded (check run "${RELEASE_CHECK}"): not promoted`);
+    }
   }
   const output = await runCommand(oci, compartmentId, instance.id, `joutiya-deploy ${request.split(" ").slice(0, 2).join(" ")}`, rootCommand(deployScript(request)));
   if (!oci.apply) return;

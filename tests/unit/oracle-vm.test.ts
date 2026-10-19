@@ -22,6 +22,7 @@ import {
   parseStatus,
   pickImage,
   promoteCommand,
+  recordedTarballs,
   rootCommand,
   securityList,
   shapeForAttempt,
@@ -196,6 +197,23 @@ describe("production releases", () => {
     const text = JSON.stringify({ staging: { release: "0123456789ab", web: id("a"), worker: id("b") }, prod: { release: "", web: "", worker: "" } });
     expect(parseStatus(text).staging.release).toBe("0123456789ab");
     expect(() => parseStatus('{"staging":{}}')).toThrow(/staging is missing/);
+  });
+
+  it("trusts only the tarballs GitHub Actions recorded on the release's commit", () => {
+    const sha = "0123456789ab".padEnd(40, "c");
+    const run = { name: "Release images", head_sha: sha, conclusion: "success", app: { slug: "github-actions" }, output: { summary: `tarball ${id("d")}` } };
+    const answer = {
+      check_runs: [
+        run,
+        { ...run, app: { slug: "some-app" }, output: { summary: `tarball ${id("e")}` } },
+        { ...run, conclusion: "failure", output: { summary: `tarball ${id("f")}` } },
+        { ...run, head_sha: "f".repeat(40), output: { summary: `tarball ${id("1")}` } },
+        { ...run, name: "Dependabot", output: { summary: null } },
+      ],
+    };
+    expect(recordedTarballs(answer, "0123456789ab")).toEqual([id("d")]);
+    expect(recordedTarballs({ check_runs: [] }, "0123456789ab")).toEqual([]);
+    expect(() => recordedTarballs({ message: "Not Found" }, "0123456789ab")).toThrow("unexpected answer");
   });
 
   it("promotes only a valid release with both image IDs", () => {
