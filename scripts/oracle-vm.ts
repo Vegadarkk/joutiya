@@ -433,13 +433,19 @@ export function launchDetails(input: {
   };
 }
 
-async function create(oci: Oci, targets: Targets, compartmentId: string, retryMinutes: number, smallFallback: boolean): Promise<void> {
-  const existing = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance);
-  if (existing) {
-    console.log(`instance ${NAMES.instance} already exists (${existing.lifecycleState}): nothing to create`);
-    return;
-  }
-  const subnetId = await ensureNetwork(oci, compartmentId);
+/** Tunnel token value of a user data built for the launcher Worker: bootstrap.sh then skips the tunnels. */
+export const NO_TOKEN = "none";
+
+/** The subnet `create` made, found without writing anything (for `launcher`). */
+async function existingSubnet(oci: Oci, compartmentId: string): Promise<string> {
+  const vcn = await findOne<Vcn>(oci, "/20160918/vcns", { compartmentId }, NAMES.vcn);
+  const subnet = vcn && (await findOne<Resource>(oci, "/20160918/subnets", { compartmentId, vcnId: vcn.id }, NAMES.subnet));
+  if (!subnet) throw new Error(`subnet ${NAMES.subnet} not found: run create --apply once first`);
+  return subnet.id;
+}
+
+/** The create request (availability domain, newest image, user data), with or without tunnel tokens. */
+async function launchPlan(oci: Oci, targets: Targets, compartmentId: string, subnetId: string, withTokens: boolean): Promise<{ userData: string; details: (shapeConfig: ShapeConfig) => Record<string, unknown> }> {
   const tenancy = targets.shared.oracle.tenancyId as string;
   const [ad] = await oci.call<{ name: string }[]>("GET", "identity", `/20160918/availabilityDomains${query({ compartmentId: tenancy })}`);
   if (!ad) throw new Error("no availability domain");
@@ -448,14 +454,24 @@ async function create(oci: Oci, targets: Targets, compartmentId: string, retryMi
   );
   console.log(`image    ${image.displayName}`);
 
+  const token = (name: TunnelName): Promise<string> => (withTokens ? tunnelToken(targets, name) : Promise.resolve(NO_TOKEN));
   const userData = buildUserData({
     template: readFileSync(new URL("../infra/vm/bootstrap.sh", import.meta.url), "utf8"),
-    sshTunnelToken: await tunnelToken(targets, "ssh"),
-    stagingTunnelToken: await tunnelToken(targets, "staging"),
-    prodTunnelToken: await tunnelToken(targets, "prod"),
+    sshTunnelToken: await token("ssh"),
+    stagingTunnelToken: await token("staging"),
+    prodTunnelToken: await token("prod"),
     vmFiles: vmFilesTarball(),
   });
-  const details = (shapeConfig: ShapeConfig) => launchDetails({ availabilityDomain: ad.name, compartmentId, subnetId, imageId: image.id, userData, shapeConfig });
+  return { userData, details: (shapeConfig) => launchDetails({ availabilityDomain: ad.name, compartmentId, subnetId, imageId: image.id, userData, shapeConfig }) };
+}
+
+async function create(oci: Oci, targets: Targets, compartmentId: string, retryMinutes: number, smallFallback: boolean): Promise<void> {
+  const existing = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance);
+  if (existing) {
+    console.log(`instance ${NAMES.instance} already exists (${existing.lifecycleState}): nothing to create`);
+    return;
+  }
+  const { userData, details } = await launchPlan(oci, targets, compartmentId, await ensureNetwork(oci, compartmentId), true);
   const shown = { ...details(shapeForAttempt(1, false)), metadata: { user_data: `<bootstrap.sh with tokens, ${userData.length} bytes>` } };
   const size = ({ ocpus, memoryInGBs }: ShapeConfig) => `${ocpus} OCPU, ${memoryInGBs} GB`;
   if (smallFallback) console.log(`every other attempt asks for ${size(SMALL_SHAPE_CONFIG)}`);
@@ -494,6 +510,54 @@ async function create(oci: Oci, targets: Targets, compartmentId: string, retryMi
   }
   const running = await waitFor<Instance>(oci, `/20160918/instances/${launched.id}`, "RUNNING", 15);
   console.log(`instance ${NAMES.instance} ${running.lifecycleState} (${running.id})${running.shapeConfig ? `, ${size(running.shapeConfig)}` : ""}`);
+}
+
+/** Request file of the free launcher Worker, written by `launcher` (no secret: commit it). */
+export const LAUNCHER_FILE = "workers/vm-launcher/src/launch.json";
+
+/**
+ * `launcher`: the create request the Worker sends every minute (workers/vm-launcher), with "none"
+ * for each tunnel token and both shapes. Read-only on OCI; the file may lag infra/vm, since `sync`
+ * brings a new VM up to date anyway.
+ */
+async function launcher(oci: Oci, targets: Targets, compartmentId: string): Promise<void> {
+  const { details } = await launchPlan(oci, targets, compartmentId, await existingSubnet(oci, compartmentId), false);
+  const { shapeConfig: _shape, ...request } = details(shapeForAttempt(1, false));
+  const config = {
+    tenancy: targets.shared.oracle.tenancyId,
+    region: targets.shared.oracle.homeRegion,
+    compartmentId,
+    displayName: NAMES.instance,
+    request,
+    shapes: [shapeForAttempt(1, false), SMALL_SHAPE_CONFIG],
+  };
+  const text = `${JSON.stringify(config, null, 2)}\n`;
+  writeFileSync(join(root, LAUNCHER_FILE), text);
+  console.log(`${LAUNCHER_FILE}: ${text.length} bytes, no tunnel token; commit it, then redeploy the Worker`);
+}
+
+/** Root script of `tunnels`: the three tunnel tokens a VM launched by the Worker lacks, then the SSH tunnel. */
+export function tunnelsScript(tokens: Record<TunnelName, string>): string {
+  for (const [name, token] of Object.entries(tokens)) {
+    if (!/^[A-Za-z0-9+/=_-]+$/.test(token) || token === NO_TOKEN) throw new Error(`token of joutiya-${name}-tunnel is not a base64 value`);
+  }
+  return [
+    "[[ -d /etc/joutiya/staging && -d /etc/joutiya/prod ]] || { echo 'the bootstrap has not finished' >&2; exit 1; }",
+    "umask 077",
+    `printf 'TUNNEL_TOKEN=%s\\n' '${tokens.ssh}' > /etc/joutiya/ssh-tunnel.env`,
+    `printf 'TUNNEL_TOKEN=%s\\n' '${tokens.staging}' > /etc/joutiya/staging/tunnel.env`,
+    `printf 'TUNNEL_TOKEN=%s\\n' '${tokens.prod}' > /etc/joutiya/prod/tunnel.env`,
+    "systemctl enable cloudflared.service",
+    "systemctl restart cloudflared.service",
+    'echo "ssh tunnel: $(systemctl is-active cloudflared.service)"',
+  ].join("\n");
+}
+
+async function tunnels(oci: Oci, targets: Targets, compartmentId: string): Promise<void> {
+  const instance = await runningInstance(oci, compartmentId);
+  const script = tunnelsScript({ ssh: await tunnelToken(targets, "ssh"), staging: await tunnelToken(targets, "staging"), prod: await tunnelToken(targets, "prod") });
+  const output = await runCommand(oci, compartmentId, instance.id, "joutiya tunnels", rootCommand(script));
+  if (oci.apply) console.log(output.trimEnd());
 }
 
 /** Bootstrap lines (joutiya-bootstrap: ...) and cloud-init's verdict, from the serial console. */
@@ -995,12 +1059,12 @@ async function main(): Promise<void> {
   const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);
   const smallFallback = args.includes("--small-fallback");
-  const actions = ["create", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback"];
+  const actions = ["create", "launcher", "tunnels", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback"];
   const perEnv = action === "env" || action === "search-setup" || action === "wif";
   const argument = action === "run" || perEnv;
   if (!action || !actions.includes(action) || argument !== (file !== undefined) || (perEnv && !(DEPLOYED_ENVS as readonly string[]).includes(file ?? ""))) {
     throw new Error(
-      "usage: scripts/oracle-vm.ts <create|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
+      "usage: scripts/oracle-vm.ts <create|launcher|tunnels|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
     );
   }
 
@@ -1017,6 +1081,8 @@ async function main(): Promise<void> {
   const oci = new Oci(credentials, args.includes("--apply"));
   const compartment = compartmentId as string;
   if (action === "create") await create(oci, targets, compartment, retry, smallFallback);
+  else if (action === "launcher") await launcher(oci, targets, compartment);
+  else if (action === "tunnels") await tunnels(oci, targets, compartment);
   else if (action === "reboot") await reboot(oci, compartment);
   else if (action === "agent") await agent(oci, compartment);
   else if (action === "run") await run(oci, compartment, file as string);
@@ -1027,7 +1093,7 @@ async function main(): Promise<void> {
   else if (action === "deploy-status") await release(oci, targets, compartment, "status");
   else if (action === "promote" || action === "rollback") await release(oci, targets, compartment, action);
   else await status(oci, targets, compartment);
-  if (!["status", "agent", "deploy-status"].includes(action)) console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
+  if (!["status", "agent", "deploy-status", "launcher"].includes(action)) console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
 }
 
 const self = fileURLToPath(import.meta.url);

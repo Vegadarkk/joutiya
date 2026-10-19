@@ -29,6 +29,7 @@ import {
   signedHeaders,
   signingString,
   syncCommands,
+  tunnelsScript,
 } from "../../scripts/oracle-vm";
 
 const template = readFileSync(new URL("../../infra/vm/bootstrap.sh", import.meta.url), "utf8");
@@ -187,6 +188,16 @@ describe("OCI Run Command", () => {
     expect(install.status).not.toBe(0);
     expect(install.stdout).not.toContain("installed");
     expect(() => syncCommands("not base64!")).toThrow("not base64");
+  });
+  it("writes the tunnel tokens of a launcher VM root-only, then starts the SSH tunnel", () => {
+    const script = tunnelsScript({ ssh: token("ssh"), staging: token("staging"), prod: token("prod") });
+    const lines = script.split("\n");
+    expect(lines.indexOf("umask 077")).toBeLessThan(lines.findIndex((line) => line.startsWith("printf")));
+    expect(lines).toContain(`printf 'TUNNEL_TOKEN=%s\\n' '${token("prod")}' > /etc/joutiya/prod/tunnel.env`);
+    expect(lines.slice(-3, -1)).toEqual(["systemctl enable cloudflared.service", "systemctl restart cloudflared.service"]);
+    expect(() => rootCommand(script)).not.toThrow();
+    expect(() => tunnelsScript({ ssh: "none", staging: token("staging"), prod: token("prod") })).toThrow("joutiya-ssh-tunnel");
+    expect(() => tunnelsScript({ ssh: token("ssh"), staging: "x' y", prod: token("prod") })).toThrow("joutiya-staging-tunnel");
   });
 });
 

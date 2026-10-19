@@ -2,7 +2,8 @@
 # First boot of the Joutiya VM (Oracle Always Free Ampere A1, Ubuntu 24.04 aarch64), sent as the
 # cloud-init user data by `node scripts/oracle-vm.ts create`, which fills the placeholders in memory
 # (tunnel tokens read from the Cloudflare API, a tarball of infra/vm and docker/). Never fill or
-# commit a copy by hand.
+# commit a copy by hand. The launcher Worker's copy (workers/vm-launcher) carries "none" for each
+# token: the tunnels then wait for `node scripts/oracle-vm.ts tunnels --apply`.
 #
 # Keeps the metadata service (which serves this script, tokens included) away from non-root users,
 # sets up the admin channel first (OCI Run Command), then the SSH tunnel of the CI's staging deploys,
@@ -48,6 +49,7 @@ retry() {
 APT=(apt-get -o DPkg::Lock::Timeout=600)
 export DEBIAN_FRONTEND=noninteractive
 progress "start $(date -u +%FT%TZ)"
+has_token() { [[ "$1" != none ]]; }
 for value in "$SSH_TUNNEL_TOKEN" "$STAGING_TUNNEL_TOKEN" "$PROD_TUNNEL_TOKEN" "$VM_FILES"; do
   if [[ "$value" == __* ]]; then
     progress "a placeholder was not filled in"
@@ -102,11 +104,15 @@ echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudf
 retry "${APT[@]}" update
 retry "${APT[@]}" install -y cloudflared
 install -d -m 0711 /etc/joutiya
-write_secret /etc/joutiya/ssh-tunnel.env "TUNNEL_TOKEN=$SSH_TUNNEL_TOKEN"
 install -m 0644 "$files/infra/vm/cloudflared-ssh.service" /etc/systemd/system/cloudflared.service
 systemctl daemon-reload
-systemctl enable --now cloudflared
-progress "ssh tunnel started"
+if has_token "$SSH_TUNNEL_TOKEN"; then
+  write_secret /etc/joutiya/ssh-tunnel.env "TUNNEL_TOKEN=$SSH_TUNNEL_TOKEN"
+  systemctl enable --now cloudflared
+  progress "ssh tunnel started"
+else
+  progress "no tunnel token: waiting for oracle-vm.ts tunnels"
+fi
 
 # Swap: 4 GB on the boot volume, used only under memory pressure.
 if ! swapon --show | grep -q /swapfile; then
@@ -174,13 +180,14 @@ rm -rf "$files"
 progress "vm files installed"
 
 # Tokens of the Compose tunnels, root only (docker/compose.yml reads /etc/joutiya/<env>/tunnel.env).
-write_secret /etc/joutiya/staging/tunnel.env "TUNNEL_TOKEN=$STAGING_TUNNEL_TOKEN"
-write_secret /etc/joutiya/prod/tunnel.env "TUNNEL_TOKEN=$PROD_TUNNEL_TOKEN"
+if has_token "$STAGING_TUNNEL_TOKEN"; then write_secret /etc/joutiya/staging/tunnel.env "TUNNEL_TOKEN=$STAGING_TUNNEL_TOKEN"; fi
+if has_token "$PROD_TUNNEL_TOKEN"; then write_secret /etc/joutiya/prod/tunnel.env "TUNNEL_TOKEN=$PROD_TUNNEL_TOKEN"; fi
 
 # Self-check: the tokens stay root only. cloud-init redacts the user data from its world-readable
 # instance data, and no world-readable file may hold a token.
 if grep -qsE '"user_data": "[A-Za-z0-9+/=]{100,}' /run/cloud-init/instance-data.json; then progress "WARNING: the user data is in /run/cloud-init/instance-data.json"; fi
 for token in "$SSH_TUNNEL_TOKEN" "$STAGING_TUNNEL_TOKEN" "$PROD_TUNNEL_TOKEN"; do
+  has_token "$token" || continue
   while IFS= read -r file; do
     if [[ -n "$(find "$file" -perm -0004)" ]]; then progress "WARNING: a tunnel token is in world-readable $file"; fi
   done < <(grep -rlsF -D skip -- "$token" /etc /run/cloud-init /var/lib/cloud /var/log)
