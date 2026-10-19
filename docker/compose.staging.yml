@@ -24,6 +24,10 @@ services:
     deploy:
       resources:
         limits: { cpus: "0.25", memory: 96M }
+  meilisearch-init:
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 32M }
   meilisearch:
     environment:
       MEILI_MAX_INDEXING_MEMORY: 512MiB

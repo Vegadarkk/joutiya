@@ -13,7 +13,7 @@ import { readJson } from "@/lib/http/json";
 import { logConnection } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
 import { assertQuotas, SIGNUP_QUOTAS } from "@/lib/quota/gate";
-import { enforceLimit } from "@/lib/rate-limit/limiter";
+import { enforceIpLimit, enforceLimit } from "@/lib/rate-limit/limiter";
 import { safeEqual } from "@/lib/security/hash";
 import { errorCode, localPart, userByEmail } from "./accounts";
 import { activateMember } from "./activation";
@@ -204,7 +204,7 @@ async function existingRecord(identity: GoogleIdentity): Promise<UserRecord | nu
 async function googleSignIn(request: Request): Promise<Response> {
   const flow = beginAnonymous(request);
   const input = await readJson(request, googleSchema);
-  await enforceLimit("google.ip", flow.identity.ipBucket);
+  await enforceIpLimit("google.ip", flow.identity);
   await enforceLimit("google.device", flow.identity.deviceKey);
   const identity = await verifyGoogleCredential(input.credential);
   assertNonce(identity, input.nonce);
@@ -219,7 +219,7 @@ async function googleSignIn(request: Request): Promise<Response> {
     // Otherwise an orphan of a failed sign-up: the sign-up path reuses it.
   }
   // New account: the sign-up limits apply, a `needs_consent` pass included (§6).
-  await enforceLimit("signup.ip", flow.identity.ipBucket);
+  await enforceIpLimit("signup.ip", flow.identity);
   // Firestore writes degraded (§2): refused before the consent step; members still sign in above.
   // Before the device limit, which a refusal must not use up (as for a password sign-up).
   await assertQuotas(SIGNUP_QUOTAS);

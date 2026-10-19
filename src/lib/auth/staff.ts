@@ -29,7 +29,7 @@ import { logConnection } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
 import { sendMail } from "@/lib/mail";
 import { requestIdentity, type RequestIdentity } from "@/lib/rate-limit/keys";
-import { blockLimit, consumeLimit, enforceLimit, limitState, resetLimit } from "@/lib/rate-limit/limiter";
+import { blockLimit, consumeLimit, enforceIpLimit, limitState, resetLimit } from "@/lib/rate-limit/limiter";
 import { clearSessionCookies, CSRF_HEADER, SESSION_COOKIE, setSessionCookies } from "@/lib/security/cookies";
 import { csrfToken } from "@/lib/security/csrf";
 import { expectedOrigin, hostKind } from "@/lib/security/origin";
@@ -157,7 +157,7 @@ export async function login(request: Request): Promise<Response> {
   if (body.email !== access.email) throw forbidden("Access identity does not match");
 
   const identity = requestIdentity(request.headers);
-  await enforceLimit("login.ip", identity.ipBucket);
+  await enforceIpLimit("login.ip", identity);
   const account = emailNormHash(body.email);
   const accountIp = `${account}:${identity.ipBucket}`;
   const [pair, perAccount] = await Promise.all([limitState(LOGIN_LIMIT, accountIp), limitState(ACCOUNT_LIMIT, account)]);
@@ -244,7 +244,7 @@ export async function setPassword(request: Request): Promise<Response> {
   const access = await requireAccess(request);
   const body = await readJson(request, staffPasswordSchema);
   const identity = requestIdentity(request.headers);
-  await enforceLimit("action.ip", identity.ipBucket);
+  await enforceIpLimit("action.ip", identity);
 
   let email: string;
   try {

@@ -26,7 +26,7 @@ import { getSearchOutbox } from "@/lib/db/repositories/search-outbox";
 import { resetServerEnv } from "@/lib/env";
 import { SLUG_ID_PATTERN } from "@/lib/listings/ids";
 import { sendMail } from "@/lib/mail";
-import { consumeLimit, resetRateLimiters } from "@/lib/rate-limit/limiter";
+import { consumeIpLimit, resetRateLimiters } from "@/lib/rate-limit/limiter";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 import { capturedMails, lastMail } from "../auth/helpers";
@@ -186,19 +186,19 @@ describe("POST /api/listings/{id}/publish", () => {
   it("escalates to Turnstile past the IP allowance; a solved challenge sets the pass cookie", async () => {
     const owner = await member();
     const id = await readyDraft(owner);
-    vi.mocked(consumeLimit).mockResolvedValueOnce(LIMITED);
+    vi.mocked(consumeIpLimit).mockResolvedValueOnce(LIMITED);
     const challenged = await api<ErrorBody>(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: ACCEPT });
     expect(challenged.status).toBe(403);
     expect(challenged.body.error.code).toBe("turnstile_required");
     expect((await getListing(id))?.status).toBe("draft");
 
-    vi.mocked(consumeLimit).mockResolvedValueOnce(LIMITED);
+    vi.mocked(consumeIpLimit).mockResolvedValueOnce(LIMITED);
     vi.mocked(verifyTurnstile).mockResolvedValueOnce({ ok: false, codes: ["invalid-input-response"] });
     const failed = await api<ErrorBody>(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: { ...ACCEPT, turnstileToken: "bad" } });
     expect(failed.status).toBe(403);
     expect(failed.body.error.code).toBe("turnstile_failed");
 
-    vi.mocked(consumeLimit).mockResolvedValueOnce(LIMITED);
+    vi.mocked(consumeIpLimit).mockResolvedValueOnce(LIMITED);
     const solved = await api<PublishBody>(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: { ...ACCEPT, turnstileToken: "solved" } });
     expect(solved.status).toBe(200);
     expect(solved.body.status).toBe("published");
@@ -208,7 +208,7 @@ describe("POST /api/listings/{id}/publish", () => {
 
     // The pass lifts the challenge for this device on the next publication.
     const next = await readyDraft(owner, { title: "Deuxième vélo de ville en bon état" });
-    vi.mocked(consumeLimit).mockResolvedValueOnce(LIMITED);
+    vi.mocked(consumeIpLimit).mockResolvedValueOnce(LIMITED);
     const passed = await api<PublishBody>(publish, "POST", `/api/listings/${next}/publish`, { member: owner, body: ACCEPT });
     expect(passed.status).toBe(200);
     expect(vi.mocked(verifyTurnstile)).toHaveBeenCalledTimes(2);

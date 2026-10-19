@@ -8,7 +8,7 @@ import { readJson } from "@/lib/http/json";
 import { logConnection } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
 import { assertQuotas, SIGNUP_QUOTAS } from "@/lib/quota/gate";
-import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
+import { consumeLimit, enforceIpLimit, enforceLimit } from "@/lib/rate-limit/limiter";
 import { HttpError } from "@/lib/http/errors";
 import { displayNameFor, errorCode, userByEmail } from "./accounts";
 import { anonymous, beginAnonymous, checkTurnstile, respond, uniformDuration, type AnonymousFlow } from "./anonymous";
@@ -55,7 +55,7 @@ async function createAuthUser(input: SignupInput): Promise<{ uid: string; create
 async function signup(request: Request): Promise<Response> {
   const flow = beginAnonymous(request);
   const input = await readJson(request, signupSchema);
-  await enforceLimit("signup.ip", flow.identity.ipBucket);
+  await enforceIpLimit("signup.ip", flow.identity);
   // Firestore writes degraded (§2): the documents would fail after the Auth record; refused first.
   // Before the device limit (3 a day): a refusal must not use up the retry its Retry-After invites.
   await assertQuotas(SIGNUP_QUOTAS);
@@ -95,7 +95,7 @@ async function verifyResend(request: Request): Promise<Response> {
   const flow = beginAnonymous(request);
   const input = await readJson(request, verifyResendSchema);
   await enforceLimit("verify.resend.uid", emailNormHash(input.email));
-  await enforceLimit("reset.ip", flow.identity.ipBucket);
+  await enforceIpLimit("reset.ip", flow.identity);
   await checkTurnstile(flow, input.turnstileToken, "verify-resend");
   const record = await userByEmail(input.email);
   if (record?.email && !record.emailVerified && !record.disabled) {

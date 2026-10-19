@@ -17,7 +17,7 @@ vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(),
 let rows: Map<string, FavoriteRecord>;
 vi.mock("@/lib/favorites/repository", () => ({
   getFavorite: vi.fn(async (_uid: string, id: string) => rows.get(id) ?? null),
-  createFavorite: vi.fn(async (_uid: string, id: string, doc: FavoriteDoc) => {
+  createFavorite: vi.fn(async (_uid: string, id: string, doc: Omit<FavoriteDoc, "listingId">) => {
     if (rows.has(id)) return false;
     rows.set(id, { listingId: id, ...doc });
     return true;

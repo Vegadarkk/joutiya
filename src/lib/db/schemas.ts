@@ -386,8 +386,15 @@ export const favoriteSnapshotSchema = z
   .strict();
 export type FavoriteSnapshot = z.infer<typeof favoriteSnapshotSchema>;
 
-/** users/{uid}/favorites/{listingId}. */
-export const favoriteSchema = z.object({ createdAt: ts, listingSnapshot: favoriteSnapshotSchema }).strict();
+/**
+ * users/{uid}/favorites/{listingId}. `listingId` repeats the document id so that retention-purge
+ * finds every favorite of a purged listing with one collection-group equality query (a collection
+ * group cannot be filtered on a bare document id, and the snapshot's slugId is the one at save
+ * time: a rejected listing reopened and republished gets a new one). Written since audit A3-06
+ * (2026-10-19), when no environment held favorites yet; a document without it still reads (the
+ * repository fills it from the id) but escapes that query.
+ */
+export const favoriteSchema = z.object({ listingId: listingIdSchema, createdAt: ts, listingSnapshot: favoriteSnapshotSchema }).strict();
 export type FavoriteDoc = z.infer<typeof favoriteSchema>;
 
 /** users/{uid}/savedSearches/{id}: 10 at most; alerts are daily e-mails, never instant (no reverse search). */

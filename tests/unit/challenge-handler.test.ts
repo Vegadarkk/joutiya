@@ -129,6 +129,19 @@ describe("POST /api/challenge/pass", () => {
     expect(verify).not.toHaveBeenCalled();
   });
 
+  it("holds the hard ceiling on an IPv6 /48 for a client rotating its /64s", async () => {
+    verify.mockResolvedValue({ ok: false, codes: ["invalid-input-response"] });
+    await consumeLimit("challenge.ip.hard48", "2001:0db8:0040::/48", RATE_LIMITS["challenge.ip.hard48"].points - 1);
+    const fromSubscriber = (n: number) => post({ token: "bad" }, { ip: `2001:db8:40:${n}::1`, cookie: `__Host-did=${newDeviceCookie().value}` });
+    expect((await POST(fromSubscriber(1), context)).status).toBe(403);
+    verify.mockClear();
+    expect((await POST(fromSubscriber(2), context)).status).toBe(429);
+    expect(verify).not.toHaveBeenCalled();
+    // Another /48 is not affected.
+    verify.mockResolvedValue({ ok: true, codes: [] });
+    expect((await POST(post({ token: "solved" }, { ip: "2001:db8:41:1::1" }), context)).status).toBe(204);
+  });
+
   it("does not count siteverify outages against the client", async () => {
     const cookie = `__Host-did=${newDeviceCookie().value}`;
     verify.mockResolvedValue({ ok: false, codes: ["unreachable"] });

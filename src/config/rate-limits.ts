@@ -1,7 +1,7 @@
 // Rate limits (architecture §6, "Limitation de débit"). Keys are HMACs of the IP bucket (IPv4 or
-// IPv6 /64), the device cookie, the uid or the normalized e-mail: nothing in clear in Valkey.
-// `policy` says what happens when valkey-ratelimit is down: "closed" refuses (what costs money or
-// exposes data), "open" lets the request through.
+// IPv6 /64, plus the IPv6 /48 of the "ip48" siblings below), the device cookie, the uid or the
+// normalized e-mail: nothing in clear in Valkey. `policy` says what happens when valkey-ratelimit
+// is down: "closed" refuses (what costs money or exposes data), "open" lets the request through.
 
 export type FailPolicy = "open" | "closed";
 
@@ -22,7 +22,7 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const MIB = 1024 * 1024;
 
-export const RATE_LIMITS = {
+const LIMITS = {
   // /api/auth/signup: 3 per day per device; one account per normalized e-mail (users repository);
   // IP: 30 per hour, Turnstile always required.
   "signup.device": { points: 3, duration: DAY, policy: "closed", key: "device" },
@@ -145,4 +145,36 @@ export const RATE_LIMITS = {
   "alerts.unsubscribe.ip": { points: 60, duration: HOUR, policy: "open", key: "ip" },
 } as const satisfies Record<string, RateLimitDefinition>;
 
+// IPv6 /48 siblings (§6 "un second compteur plus large sur le /48 pour les sources agressives"):
+// every "ip" limiter above gets "<id>48", same window, block and policy, keyed on the client's /48
+// and consumed with the base one by consumeIpLimit (rate-limit/limiter.ts) for IPv6 clients only.
+// A /48 holds 65 536 /64s: one site (a business, a VPS allocation) that could otherwise rotate
+// across fresh /64 buckets. Mobile carriers may pool many subscribers in one /48, hence a wide
+// factor rather than a tight one; revisit with real traffic.
+export const IP48_FACTOR = 10;
+
+type Limits = typeof LIMITS;
+
+/** Limiters keyed on the client's IP bucket (IPv4 address or IPv6 /64): use the ip helpers of limiter.ts. */
+export type IpRateLimitId = { [K in keyof Limits]: Limits[K]["key"] extends "ip" ? K : never }[keyof Limits];
+
+type Ip48Limits = {
+  readonly [K in IpRateLimitId as `${K}48`]: Omit<Limits[K], "points" | "key"> & { readonly points: number; readonly key: "ip48" };
+};
+
+function ip48Siblings(limits: Record<string, RateLimitDefinition>): Ip48Limits {
+  const siblings: Record<string, RateLimitDefinition> = {};
+  for (const [id, definition] of Object.entries(limits)) {
+    if (definition.key === "ip") siblings[`${id}48`] = { ...definition, points: definition.points * IP48_FACTOR, key: "ip48" };
+  }
+  return siblings as Ip48Limits;
+}
+
+export const RATE_LIMITS = { ...LIMITS, ...ip48Siblings(LIMITS) } satisfies Record<string, RateLimitDefinition>;
+
 export type RateLimitId = keyof typeof RATE_LIMITS;
+
+/** The /48 sibling of an "ip" limiter. */
+export function ip48Id<K extends IpRateLimitId>(id: K): `${K}48` {
+  return `${id}48`;
+}

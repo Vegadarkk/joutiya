@@ -10,7 +10,7 @@ import { HttpError, forbidden } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { logConnection } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
-import { enforceLimit, resetLimit } from "@/lib/rate-limit/limiter";
+import { enforceIpLimit, enforceLimit, resetLimit } from "@/lib/rate-limit/limiter";
 import { accountByEmail, displayNameFor, userByEmail, withCodeErrors } from "./accounts";
 import { activateMember } from "./activation";
 import { checkResetCode } from "./action";
@@ -27,7 +27,7 @@ import { sessionSummary } from "./summary";
 async function resetRequest(request: Request): Promise<Response> {
   const flow = beginAnonymous(request);
   const input = await readJson(request, resetRequestSchema);
-  await enforceLimit("reset.ip", flow.identity.ipBucket);
+  await enforceIpLimit("reset.ip", flow.identity);
   await enforceLimit("reset.email", emailNormHash(input.email));
   await checkTurnstile(flow, input.turnstileToken, "reset");
   const record = await accountByEmail(input.email);
@@ -49,7 +49,7 @@ async function resetRequest(request: Request): Promise<Response> {
 async function resetConfirm(request: Request): Promise<Response> {
   const flow = beginAnonymous(request);
   const input = await readJson(request, resetConfirmSchema);
-  await enforceLimit("action.ip", flow.identity.ipBucket);
+  await enforceIpLimit("action.ip", flow.identity);
   const email = await checkResetCode(input.oobCode);
   const record = await userByEmail(email);
   // A staff password is never set from the public host (the back office, behind Access, has its own flow).

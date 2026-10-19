@@ -234,7 +234,7 @@ describe("POST /api/admin/auth/login", () => {
   });
 
   it("fails closed when the rate-limit store is unavailable", async () => {
-    vi.mocked(limiter.enforceLimit).mockRejectedValueOnce(new HttpError(503, "unavailable", "rate limiter unavailable"));
+    vi.mocked(limiter.enforceIpLimit).mockRejectedValueOnce(new HttpError(503, "unavailable", "rate limiter unavailable"));
     const perIp = await loginCall(EMAIL.moderator, PASSWORD);
     expect(perIp.status).toBe(503);
     expect(await errorCode(perIp)).toBe("unavailable");

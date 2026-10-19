@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { subcategoryById } from "@/config/categories";
 import { cityBySlug } from "@/config/regions";
+import { INDEXED_LOCALES } from "@/config/site";
 import { parseEnv, resetServerEnv, type ServerEnv } from "@/lib/env";
 import { resetSearchEngine, setSearchEngineForTests } from "@/lib/search/engine";
 import { MemoryEngine } from "@/lib/search/memory";
@@ -8,7 +9,7 @@ import { buildSitemapFile, escapeXml, parseSitemapFile, SITEMAP_LISTINGS_MAX, ur
 import { SITEMAP_SHARDS, sitemapShardOf, type SearchDocument } from "@/lib/search/types";
 import { GET } from "@/app/sitemaps/[file]/route";
 
-// XML sitemaps (design D16): files, escaping, shards, hreflang alternates, production only.
+// XML sitemaps (design D16): files, escaping, shards, indexed locales, hreflang alternates, production only.
 
 const PROD = { ...parseEnv({ APP_ENV: "dev" }).env, APP_ENV: "prod" } as ServerEnv;
 const STAGING = { ...PROD, APP_ENV: "staging" } as ServerEnv;
@@ -102,6 +103,15 @@ describe("sitemap files", () => {
       '<url><loc>https://joutiya.ma/fr</loc><xhtml:link rel="alternate" hreflang="fr-MA" href="https://joutiya.ma/fr"/><xhtml:link rel="alternate" hreflang="ar-MA" href="https://joutiya.ma/ar"/><xhtml:link rel="alternate" hreflang="x-default" href="https://joutiya.ma/fr"/></url>',
     );
   });
+
+  it("writes the Tarifit URL too (indexed), with its lastmod and outside the hreflang cluster", () => {
+    expect(INDEXED_LOCALES).toEqual(["fr", "ar", "rif"]);
+    const entries = urlEntries("/annonce/velo-a&b-abcd2345", UPDATED);
+    expect(entries).toHaveLength(3);
+    expect(entries[2]).toBe("<url><loc>https://joutiya.ma/rif/annonce/velo-a&amp;b-abcd2345</loc><lastmod>2026-10-01T08:30:00.000Z</lastmod></url>");
+    expect(urlEntries("")).toEqual([expect.stringContaining("<loc>https://joutiya.ma/fr</loc>"), expect.stringContaining("<loc>https://joutiya.ma/ar</loc>"), "<url><loc>https://joutiya.ma/rif</loc></url>"]);
+    expect(urlEntries("").join("")).not.toContain('hreflang="rif');
+  });
 });
 
 describe("buildSitemapFile", () => {
@@ -132,12 +142,12 @@ describe("buildSitemapFile", () => {
     const xml = (await buildSitemapFile(`listings-${shard}.xml`, PROD)) ?? "";
     expect(xml).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">');
     const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
-    expect(locs.sort()).toEqual(mine.flatMap((id) => [`https://joutiya.ma/fr/annonce/annonce-${id}`, `https://joutiya.ma/ar/annonce/annonce-${id}`]).sort());
-    expect(xml.match(/<lastmod>2026-10-01T08:30:00.000Z<\/lastmod>/g)).toHaveLength(mine.length * 2);
+    expect(locs.sort()).toEqual(mine.flatMap((id) => ["fr", "ar", "rif"].map((locale) => `https://joutiya.ma/${locale}/annonce/annonce-${id}`)).sort());
+    expect(xml.match(/<lastmod>2026-10-01T08:30:00.000Z<\/lastmod>/g)).toHaveLength(mine.length * 3);
     const empty = Array.from({ length: SITEMAP_SHARDS }, (_, k) => k).find((k) => !all.some((id) => sitemapShardOf(id) === k));
     if (empty !== undefined) await expect(buildSitemapFile(`listings-${empty}.xml`, PROD)).resolves.toBeNull();
-    // Each listing is one URL per locale: a file stays under Google's 50 000 URLs.
-    expect(SITEMAP_LISTINGS_MAX * 2).toBeLessThanOrEqual(50_000);
+    // Each listing is one URL per indexed locale: a file stays under Google's 50 000 URLs.
+    expect(SITEMAP_LISTINGS_MAX * INDEXED_LOCALES.length).toBeLessThanOrEqual(50_000);
   });
 
   it("lists home and the landing pages with at least 3 listings", async () => {
@@ -156,7 +166,8 @@ describe("buildSitemapFile", () => {
     const xml = (await buildSitemapFile("pages.xml", PROD)) ?? "";
     const paths = [...xml.matchAll(/<loc>https:\/\/joutiya\.ma\/fr([^<]*)<\/loc>/g)].map((match) => match[1]);
     expect(paths.sort()).toEqual(["", "/c/vehicules", "/c/vehicules/casablanca", "/c/vehicules/voitures", "/c/vehicules/voitures/casablanca"].sort());
-    expect(xml.match(/<url>/g)).toHaveLength(paths.length * 2);
+    expect([...xml.matchAll(/<loc>https:\/\/joutiya\.ma\/rif([^<]*)<\/loc>/g)].map((match) => match[1]).sort()).toEqual(paths);
+    expect(xml.match(/<url>/g)).toHaveLength(paths.length * 3);
   });
 });
 

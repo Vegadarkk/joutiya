@@ -1,19 +1,19 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { LOCALES, type Locale } from "@/config/site";
-import type { RateLimitId } from "@/config/rate-limits";
 import { readCookie } from "@/lib/http/cookies";
 import { hasChallengePass } from "@/lib/security/challenge-pass";
 import { SESSION_COOKIE } from "@/lib/security/cookies";
-import { consumeLimit, type LimitOutcome } from "./limiter";
+import { consumeIpLimit, consumeLimit, type LimitOutcome } from "./limiter";
 import { requestIdentity } from "./keys";
 
 // Page-view limits of the server-rendered pages (§6 table, design D14), checked in proxy.ts. The
 // proxy bundle has its own module instances, so these limiters use their own valkey-ratelimit
 // client (limiter.ts connects it). Visitor: 120/h per device; signed in: 600/h keyed by the session
 // cookie (never verified here: a forged cookie only buys a bucket the IP limit still caps); always
-// 1 200/h per IP /64. Over a limit: a valid challenge pass gets its own allowance, else the visitor
-// is sent to the Turnstile page. Store down: open. Verified bots (Cloudflare header) are exempt.
+// 1 200/h per IP /64 (12 000/h per IPv6 /48). Over a limit: a valid challenge pass gets its own
+// allowance, else the visitor is sent to the Turnstile page. Store down: open. Verified bots
+// (Cloudflare header) are exempt.
 
 /** Second path segment of the metered pages: /{locale}/annonce/..., /c/..., /profil/..., /boutique/... */
 export const METERED_SEGMENTS: readonly string[] = ["annonce", "c", "profil", "boutique"];
@@ -55,12 +55,12 @@ export async function checkPageLimits(request: Request): Promise<PageLimitDecisi
   const identity = requestIdentity(request.headers);
   const session = readCookie(request.headers, SESSION_COOKIE);
   // A signed-in member counts on the session bucket instead of the visitor's device bucket.
-  const checks: [RateLimitId, string][] = [];
-  if (session) checks.push(["pages.session", session]);
-  else if (identity.deviceId) checks.push(["pages.device", identity.deviceKey]);
-  checks.push(["pages.ip", identity.ipBucket]);
   // limitKey() stores a peppered HMAC of each raw key: no cookie or IP in clear in Valkey.
-  const over = retryAfter(await Promise.all(checks.map(([id, key]) => consumeLimit(id, key))));
+  const checks: Promise<LimitOutcome>[] = [];
+  if (session) checks.push(consumeLimit("pages.session", session));
+  else if (identity.deviceId) checks.push(consumeLimit("pages.device", identity.deviceKey));
+  checks.push(consumeIpLimit("pages.ip", identity));
+  const over = retryAfter(await Promise.all(checks));
   if (over === null) return { kind: "allow" };
   if (!(await hasChallengePass(request))) return { kind: "challenge", retryAfterSeconds: over };
   const passed = await consumeLimit("pages.passed.device", identity.deviceKey);

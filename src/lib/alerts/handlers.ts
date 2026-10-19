@@ -4,7 +4,7 @@ import { HttpError } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { noContent } from "@/lib/http/route";
 import { requestIdentity } from "@/lib/rate-limit/keys";
-import { enforceLimit } from "@/lib/rate-limit/limiter";
+import { enforceIpLimit } from "@/lib/rate-limit/limiter";
 import { disableAlerts, getSavedSearch } from "@/lib/saved-searches/repository";
 import { UNSUBSCRIBE_ALL, verifyUnsubscribeToken, type UnsubscribeTarget } from "./unsubscribe-token";
 
@@ -27,7 +27,7 @@ async function tokenOf(request: Request): Promise<string> {
 }
 
 export async function handleUnsubscribe(request: Request): Promise<Response> {
-  await enforceLimit("alerts.unsubscribe.ip", requestIdentity(request.headers).ipBucket);
+  await enforceIpLimit("alerts.unsubscribe.ip", requestIdentity(request.headers));
   const target = verifyUnsubscribeToken(await tokenOf(request));
   if (!target) throw invalidToken();
   // A deleted search or an alert already off: nothing to do, same answer (idempotent).

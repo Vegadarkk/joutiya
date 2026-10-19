@@ -5,7 +5,7 @@ import { challengePassSchema } from "@/lib/contracts/search";
 import { serverEnv } from "@/lib/env";
 import { HttpError, rateLimited } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
-import { consumeLimit, limitState } from "@/lib/rate-limit/limiter";
+import { consumeIpLimit, consumeLimit, ipLimitSpent, limitState } from "@/lib/rate-limit/limiter";
 import { requestIdentity, type RequestIdentity } from "@/lib/rate-limit/keys";
 import { challengePassCookie } from "./challenge-pass";
 import { setDeviceCookie } from "./cookies";
@@ -22,19 +22,20 @@ import { verifyTurnstile } from "./turnstile";
 // without a siteverify call. The IP ceiling only holds against a device that already failed: an
 // IPv4 behind a carrier-grade NAT is shared by strangers, and one of them sending junk tokens must
 // not cheaply refuse the others a valid solve. A client minting a fresh device cookie for every
-// junk token never meets it; the hard IP ceiling (5x) bounds that one, for every device.
+// junk token never meets it; the hard IP ceiling (5x) bounds that one, for every device. Both IP
+// limiters are read and counted on the /64 and, for IPv6, on the /48 (limiter.ts ip helpers).
 
 /** Throws 429 when this client spent its failed checks (none spent: always checked). */
 export async function assertChallengeBudget(identity: RequestIdentity): Promise<void> {
-  const [device, ip, hard] = await Promise.all([
+  const [device, ipSpent, hardSpent] = await Promise.all([
     limitState("challenge.device", identity.deviceKey),
-    limitState("challenge.ip", identity.ipBucket),
-    limitState("challenge.ip.hard", identity.ipBucket),
+    ipLimitSpent("challenge.ip", identity),
+    ipLimitSpent("challenge.ip.hard", identity),
   ]);
-  if (hard && hard.consumedPoints >= RATE_LIMITS["challenge.ip.hard"].points) throw rateLimited(hard.msBeforeNext / 1000);
+  if (hardSpent !== null) throw rateLimited(hardSpent);
   if (!device) return;
   if (device.consumedPoints >= RATE_LIMITS["challenge.device"].points) throw rateLimited(device.msBeforeNext / 1000);
-  if (device.consumedPoints > 0 && ip && ip.consumedPoints >= RATE_LIMITS["challenge.ip"].points) throw rateLimited(ip.msBeforeNext / 1000);
+  if (device.consumedPoints > 0 && ipSpent !== null) throw rateLimited(ipSpent);
 }
 
 /** Counts a refused token. siteverify unreachable or failing is not the client's failure. */
@@ -42,8 +43,8 @@ export async function recordChallengeFailure(identity: RequestIdentity, codes: r
   if (codes.some((code) => code === "unreachable" || code.startsWith("http-"))) return;
   await Promise.all([
     consumeLimit("challenge.device", identity.deviceKey),
-    consumeLimit("challenge.ip", identity.ipBucket),
-    consumeLimit("challenge.ip.hard", identity.ipBucket),
+    consumeIpLimit("challenge.ip", identity),
+    consumeIpLimit("challenge.ip.hard", identity),
   ]);
 }
 

@@ -10,8 +10,9 @@ import { enqueueSearchOutboxTx } from "./search-outbox";
 // Time-driven listing jobs (design D16, architecture §5 "Purges sans TTL"): the expiry and
 // reminder queries (index listings status asc, expiresAt asc), the scan of removed listings
 // (index listings status asc, updatedAt asc), the reminder cursor
-// (system/listingReminders), the purge of listings past purgeAt (tombstone) and the batch
-// deletion of journals past purgeAt (contentOps, revealLogs: single-field purgeAt index).
+// (system/listingReminders), the purge of listings past purgeAt (tombstone, with the favorites
+// pointing at it: collection-group index favorites.listingId) and the batch deletion of journals
+// past purgeAt (contentOps, revealLogs: single-field purgeAt index).
 // Pages carry a cursor taken from the raw snapshot, so a document that fails to parse never
 // stalls a job.
 
@@ -139,18 +140,47 @@ export const listingTombstoneSchema = z
 export type ListingTombstone = z.infer<typeof listingTombstoneSchema>;
 
 /**
- * Replaces the listing with its tombstone and queues the index deletion, in one transaction that
- * re-checks `purgeable` on the current document (a renewal or a legal hold since the query wins).
+ * Favorites deleted by one purge transaction: with the tombstone and the outbox entry, well under
+ * the 500 writes of a commit.
  */
-export async function purgeListing(id: string, purgeable: (current: ListingRecord) => boolean, now: Date): Promise<ListingTombstone | null> {
+export const PURGE_FAVORITES_PER_TX = 400;
+
+export interface ListingPurge {
+  /** The tombstone written, or null while favorites of the listing remain (call again). */
+  tombstone: ListingTombstone | null;
+  /** Accounts whose favorite of the listing this call deleted (their hearts cache must follow). */
+  favoriteUids: string[];
+}
+
+/** users/{uid}/favorites/{listingId} of every account, by the stored `listingId` (schemas.ts). */
+const favoritesOf = (listingId: string) => db().collectionGroup(COLLECTIONS.favorites).where("listingId", "==", listingId);
+
+/**
+ * Purges a listing in one transaction that re-checks `purgeable` on the current document (a renewal
+ * or a legal hold since the query wins): deletes up to `favoritesLimit` favorites pointing at it
+ * (their snapshot keeps its title, price and cover: architecture §5 "supprime le texte"), and once
+ * none is left replaces the listing with its tombstone and queues the index deletion. A listing
+ * with more favorites takes several calls; each commits on its own and re-checks the listing, so
+ * a stopped run leaves a listing still past purgeAt that the next run takes up. Null when missing
+ * or not purgeable.
+ */
+export async function purgeListing(id: string, purgeable: (current: ListingRecord) => boolean, now: Date, favoritesLimit = PURGE_FAVORITES_PER_TX): Promise<ListingPurge | null> {
+  const limit = Math.max(1, Math.min(favoritesLimit, PURGE_FAVORITES_PER_TX));
   return db().runTransaction(async (tx: Transaction) => {
     const current = await getListingTx(tx, id);
     if (!current || !purgeable(current)) return null;
+    const favorites = await tx.get(favoritesOf(id).select().limit(limit + 1));
+    void consume("firestore.reads", Math.max(1, favorites.size));
+    const doomed = favorites.docs.slice(0, limit);
+    for (const favorite of doomed) tx.delete(favorite.ref);
+    if (doomed.length > 0) void consume("firestore.deletes", doomed.length);
+    const favoriteUids = doomed.map((favorite) => favorite.ref.parent.parent?.id).filter((uid): uid is string => uid !== undefined);
+    if (favorites.size > limit) return { tombstone: null, favoriteUids };
     const tombstone = listingTombstoneSchema.parse({ status: "purged", ...(current.categoryId ? { categoryId: current.categoryId } : {}), purgedAt: now, version: current.version + 1, updatedAt: now });
     tx.set(listingRef(id), { ...tombstone, purgedAt: Timestamp.fromDate(now), updatedAt: Timestamp.fromDate(now) });
     void consume("firestore.writes", 1);
     enqueueSearchOutboxTx(tx, id, "delete", tombstone.version, now);
-    return tombstone;
+    return { tombstone, favoriteUids };
   });
 }
 

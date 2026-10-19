@@ -20,7 +20,7 @@ vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
 }));
 vi.mock("@/lib/rate-limit/limiter", { spy: true });
 
-import { consumeLimit, resetRateLimiters } from "@/lib/rate-limit/limiter";
+import { consumeIpLimit, consumeLimit, resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { challengePassCookie } from "@/lib/security/challenge-pass";
 import { newDeviceCookie } from "@/lib/security/device";
 import { enforceSearchLimit } from "@/lib/search/limits";
@@ -103,6 +103,13 @@ describe("enforceSearchLimit", () => {
     expect((await rejection(enforceSearchLimit(request({ ...who, device: newDeviceCookie() })))).code).toBe("turnstile_required");
   });
 
+  it("escalates a fresh IPv6 /64 once its /48 spent the wider IP budget", async () => {
+    await spend("search.ip48", "2001:0db8:0077::/48");
+    const who = { ...client(), ip: "2001:db8:77:1::5" };
+    expect((await rejection(enforceSearchLimit(request(who)))).code).toBe("turnstile_required");
+    await expect(enforceSearchLimit(request({ ...client(), ip: "2001:db8:78:1::5" }))).resolves.toEqual({ passGranted: false });
+  });
+
   it("ignores a pass bound to another device", async () => {
     const who = client();
     who.pass = (await challengePassCookie(newDeviceCookie().id)).split(";")[0];
@@ -151,9 +158,11 @@ describe("enforceSearchLimit", () => {
 
   it("stays open when the limiter store is down", async () => {
     const down = { ok: false, reason: "unavailable" } as const;
-    vi.mocked(consumeLimit).mockResolvedValueOnce(down).mockResolvedValueOnce(down).mockResolvedValueOnce(down);
+    vi.mocked(consumeLimit).mockResolvedValueOnce(down).mockResolvedValueOnce(down);
+    vi.mocked(consumeIpLimit).mockResolvedValueOnce(down);
     await expect(enforceSearchLimit(request(client()))).resolves.toEqual({ passGranted: false });
-    expect(consumeLimit).toHaveBeenCalledTimes(3);
+    expect(consumeLimit).toHaveBeenCalledTimes(2);
+    expect(consumeIpLimit).toHaveBeenCalledTimes(1);
   });
 
   it("keys a client without device cookie on its IP bucket", async () => {

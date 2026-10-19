@@ -11,7 +11,7 @@ import { readCookie } from "@/lib/http/cookies";
 import { readJson } from "@/lib/http/json";
 import { logConnection } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
-import { enforceLimit } from "@/lib/rate-limit/limiter";
+import { enforceIpLimit, enforceLimit } from "@/lib/rate-limit/limiter";
 import { CSRF_HEADER, SESSION_COOKIE, clearSessionCookies } from "@/lib/security/cookies";
 import { csrfToken } from "@/lib/security/csrf";
 import { anonymous, beginAnonymous, finish, userAgentOf } from "./anonymous";
@@ -55,7 +55,7 @@ export async function handleClientToken(request: Request): Promise<Response> {
 async function session(request: Request): Promise<Response> {
   const flow = beginAnonymous(request);
   const input = await readJson(request, sessionSchema);
-  await enforceLimit("google.ip", flow.identity.ipBucket);
+  await enforceIpLimit("google.ip", flow.identity);
   await enforceLimit("google.device", flow.identity.deviceKey);
   const minted = await createSessionFromIdToken(input.idToken, { providers: ["google.com"] });
   if (isStaff(minted.user.claims)) throw forbidden("staff accounts sign in on the back office");

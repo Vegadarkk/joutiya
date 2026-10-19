@@ -17,6 +17,9 @@ x-service: &service
     driver: json-file
     options: { max-size: "10m", max-file: "3" }
 
+# Meilisearch's uid:gid, of no other container nor host account (the upstream image has no USER).
+x-meilisearch-user: &meilisearch-user "10002:10002"
+
 x-valkey-health: &valkey-health
   test: ["CMD-SHELL", "valkey-cli -a \"$$VALKEY_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
   interval: 10s
@@ -115,11 +118,31 @@ services:
     networks: [data]
     healthcheck: *valkey-health
 
+  # One-shot, run by every `up` before meilisearch: hands the volume to Meilisearch's uid, whether
+  # fresh (root-owned when created) or written by the former root container, then does nothing once
+  # the volume root is its. Deepest entries first, that root last: a run cut short starts over.
+  meilisearch-init:
+    <<: *service
+    restart: "no"
+    init: false
+    image: getmeili/meilisearch:v1.55.0@sha256:ff546679970126f8822e15d1b6a06bfbff1f2ce2e43f810cfb5258012f92de5c
+    user: "0:0"
+    cap_add: [CHOWN]
+    network_mode: none
+    environment:
+      OWNER: *meilisearch-user
+    entrypoint: ["sh", "-c"]
+    command: ['[ "$$(stat -c %u:%g /meili_data)" = "$$OWNER" ] || find /meili_data -depth -exec chown -h "$$OWNER" {} +']
+    read_only: true
+    volumes:
+      - meilisearch-data:/meili_data
+
   meilisearch:
     <<: *service
     # The image starts through its own tini.
     init: false
     image: getmeili/meilisearch:v1.55.0@sha256:ff546679970126f8822e15d1b6a06bfbff1f2ce2e43f810cfb5258012f92de5c
+    user: *meilisearch-user
     # MEILI_MASTER_KEY only (16 bytes at least: production mode refuses to start without it). The app
     # holds two scoped keys created from it by scripts/search-setup.ts (app.env), never the master key.
     env_file:
@@ -135,6 +158,10 @@ services:
     volumes:
       - meilisearch-data:/meili_data
     networks: [data]
+    depends_on:
+      # Not required: a failed hand-over leaves search down (503, D2), never a failed `up` that
+      # would roll the release back.
+      meilisearch-init: { condition: service_completed_successfully, required: false }
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7700/health"]
       interval: 10s

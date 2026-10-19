@@ -6,13 +6,13 @@ import { COLLECTIONS, favoriteSchema, type FavoriteDoc } from "@/lib/db/schemas"
 import { datesToTimestamps, timestampsToDates } from "@/lib/db/repositories/timestamps";
 import type { FavoriteCursor } from "./cards";
 
-// users/{uid}/favorites/{listingId} (design D17): {createdAt, listingSnapshot}. The document id is
-// the listing id, so adding twice is one `create` refused by Firestore and removing twice one
-// `delete` refused by its precondition: no read before either write.
+// users/{uid}/favorites/{listingId} (design D17): {listingId, createdAt, listingSnapshot}. The
+// document id is the listing id, so adding twice is one `create` refused by Firestore and removing
+// twice one `delete` refused by its precondition: no read before either write. `listingId` repeats
+// the id for retention-purge's collection-group query (src/lib/db/repositories/retention.ts).
 
-export interface FavoriteRecord extends FavoriteDoc {
-  listingId: string;
-}
+/** A stored favorite; its `listingId` is the document id. */
+export type FavoriteRecord = FavoriteDoc;
 
 export interface FavoritePage {
   favorites: FavoriteRecord[];
@@ -33,8 +33,9 @@ const favorites = (uid: string) => db().collection(COLLECTIONS.users).doc(uid).c
 function fromSnapshot(snapshot: DocumentSnapshot): FavoriteRecord | null {
   const data = snapshot.data();
   if (!data) return null;
-  const parsed = favoriteSchema.safeParse(timestampsToDates(data));
-  return parsed.success ? { listingId: snapshot.id, ...parsed.data } : null;
+  // The id stands in for a document written before `listingId` was (schemas.ts).
+  const parsed = favoriteSchema.safeParse({ listingId: snapshot.id, ...timestampsToDates(data) });
+  return parsed.success ? { ...parsed.data, listingId: snapshot.id } : null;
 }
 
 export async function getFavorite(uid: string, listingId: string): Promise<FavoriteRecord | null> {
@@ -44,8 +45,8 @@ export async function getFavorite(uid: string, listingId: string): Promise<Favor
 }
 
 /** True when created, false when the listing already was a favorite. */
-export async function createFavorite(uid: string, listingId: string, doc: FavoriteDoc): Promise<boolean> {
-  const data = datesToTimestamps(favoriteSchema.parse(doc));
+export async function createFavorite(uid: string, listingId: string, doc: Omit<FavoriteDoc, "listingId">): Promise<boolean> {
+  const data = datesToTimestamps(favoriteSchema.parse({ ...doc, listingId }));
   try {
     await favorites(uid).doc(listingId).create(data);
     return true;

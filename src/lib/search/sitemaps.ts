@@ -1,6 +1,6 @@
 import "server-only";
 import { CATEGORIES } from "@/config/categories";
-import { CANONICAL_ORIGIN, HREFLANG_LOCALES } from "@/config/site";
+import { CANONICAL_ORIGIN, INDEXED_LOCALES } from "@/config/site";
 import { serverEnv, type ServerEnv } from "@/lib/env";
 import { alternates } from "@/lib/i18n/metadata";
 import { searchEngine } from "@/lib/search/engine";
@@ -14,13 +14,14 @@ import { SITEMAP_SHARDS, SearchUnavailableError, type EngineQuery, type SearchDo
 // - pages.xml: home and the indexable landing pages (>= SEO_MIN_LISTINGS listings, facet counts);
 // - listings-{k}.xml: listings with `sitemapShard === k` (documents API, not capped by maxTotalHits),
 //   lastmod = listing updatedAt.
-// Every URL comes in fr and ar, each <url> carrying the whole hreflang cluster (+ x-default), from
-// the same helper as the pages' <head> (alternates()); Tarifit stays out of the cluster.
+// Every URL comes in each indexed locale (INDEXED_LOCALES), with the alternates of the pages' <head>
+// (alternates()): fr and ar carry the whole hreflang cluster (+ x-default); Tarifit, indexed but
+// outside the cluster, carries none.
 
 /** Google: 50 000 URLs per sitemap file. */
 export const SITEMAP_URL_MAX = 50_000;
-/** Listings per shard file: each listing is one URL per hreflang locale. */
-export const SITEMAP_LISTINGS_MAX = Math.floor(SITEMAP_URL_MAX / HREFLANG_LOCALES.length);
+/** Listings per shard file: each listing is one URL per indexed locale. */
+export const SITEMAP_LISTINGS_MAX = Math.floor(SITEMAP_URL_MAX / INDEXED_LOCALES.length);
 const DOCUMENTS_PAGE = 1_000;
 
 export type SitemapFile = { kind: "index" } | { kind: "pages" } | { kind: "listings"; shard: number };
@@ -40,12 +41,14 @@ export function escapeXml(value: string): string {
 
 const absolute = (path: string) => `${CANONICAL_ORIGIN}${path}`;
 
-/** One <url> per hreflang locale of `path` (locale-free), each with the full cluster. */
+/** One <url> per indexed locale of `path` (locale-free), each with that page's hreflang alternates. */
 export function urlEntries(path: string, lastmod?: number): string[] {
-  const languages = Object.entries(alternates("fr", path)?.languages ?? {}).map(([tag, href]) => [tag, absolute(String(href))] as const);
-  const links = languages.map(([tag, href]) => `<xhtml:link rel="alternate" hreflang="${escapeXml(tag)}" href="${escapeXml(href)}"/>`).join("");
   const modified = lastmod !== undefined && Number.isFinite(lastmod) ? `<lastmod>${new Date(lastmod).toISOString()}</lastmod>` : "";
-  return HREFLANG_LOCALES.map((locale) => `<url><loc>${escapeXml(absolute(`/${locale}${path}`))}</loc>${modified}${links}</url>`);
+  return INDEXED_LOCALES.map((locale) => {
+    const languages = Object.entries(alternates(locale, path)?.languages ?? {});
+    const links = languages.map(([tag, href]) => `<xhtml:link rel="alternate" hreflang="${escapeXml(tag)}" href="${escapeXml(absolute(String(href)))}"/>`).join("");
+    return `<url><loc>${escapeXml(absolute(`/${locale}${path}`))}</loc>${modified}${links}</url>`;
+  });
 }
 
 export function urlset(entries: readonly string[]): string {

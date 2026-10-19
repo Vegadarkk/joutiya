@@ -24,6 +24,10 @@ services:
     deploy:
       resources:
         limits: { cpus: "0.25", memory: 128M }
+  meilisearch-init:
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 32M }
   meilisearch:
     environment:
       # Indexing memory stays under the limit; the rest is the memory-mapped index (page cache).

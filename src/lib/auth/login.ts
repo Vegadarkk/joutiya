@@ -9,7 +9,7 @@ import { createSessionForUid, createSessionFromServerSignIn, type MintedSession 
 import { HttpError, forbidden, unavailable } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { logConnection } from "@/lib/logging/connection-logs";
-import { assertLimit, blockLimit, consumeLimit, consumedPoints, limitState, resetLimit } from "@/lib/rate-limit/limiter";
+import { assertIpLimit, blockLimit, consumeIpLimit, consumeLimit, consumedPoints, limitState, resetLimit } from "@/lib/rate-limit/limiter";
 import { classifySignInError } from "./accounts";
 import { activateMember } from "./activation";
 import { anonymous, beginAnonymous, checkTurnstile, finish, hasPass, respond } from "./anonymous";
@@ -29,6 +29,10 @@ export interface LoginKeys {
   accountIp: string;
 }
 
+/**
+ * The pair stays on the IP /64, without a /48 sibling: a source rotating /64s inside one /48 gets
+ * fresh pairs but still meets login.fail.account (Turnstile on every attempt) and login.ip's /48.
+ */
 export function loginKeys(email: string, ipBucket: string): LoginKeys {
   const account = emailNormHash(email);
   return { account, accountIp: `${account}:${ipBucket}` };
@@ -79,9 +83,10 @@ async function login(request: Request): Promise<Response> {
   const input = await readJson(request, loginSchema);
   // §6 "une IP n'est jamais bloquée net": past 300 attempts per hour an IP (CGNAT: hundreds of
   // subscribers behind it) escalates to Turnstile instead of a 429. The store being down still
-  // refuses (policy "closed"). Device and account keys keep their hard answers.
-  const ipOutcome = await consumeLimit("login.ip", flow.identity.ipBucket);
-  if (!ipOutcome.ok && ipOutcome.reason === "unavailable") assertLimit("login.ip", ipOutcome);
+  // refuses (policy "closed"). Device and account keys keep their hard answers. An IPv6 /48 past
+  // 3 000 escalates the same way (limiter.ts consumeIpLimit).
+  const ipOutcome = await consumeIpLimit("login.ip", flow.identity);
+  if (!ipOutcome.ok && ipOutcome.reason === "unavailable") assertIpLimit("login.ip", ipOutcome);
   const ipEscalated = !ipOutcome.ok;
   const keys = loginKeys(input.email, flow.identity.ipBucket);
   const { failures, accountFailures } = await assertNotLocked(keys);

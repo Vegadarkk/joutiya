@@ -10,6 +10,13 @@ export const RTL_LOCALES: readonly Locale[] = ["ar"];
 /** Locales in the hreflang cluster: Tarifit stays out (AdSense and search engines do not support it). */
 export const HREFLANG_LOCALES: readonly Locale[] = ["fr", "ar"];
 
+/**
+ * Indexed locales, listed in the sitemaps (src/lib/search/sitemaps.ts). Tarifit is indexed (native-
+ * reviewed translation before launch, owner decision of 19 October) but stays out of the hreflang
+ * cluster: Google's hreflang takes ISO 639-1 codes, and Tarifit has none (rif is ISO 639-3).
+ */
+export const INDEXED_LOCALES: readonly Locale[] = ["fr", "ar", "rif"];
+
 /** BCP 47 tags for Intl formatting and the `lang` attribute. */
 export const LOCALE_TAGS: Record<Locale, string> = {
   fr: "fr-MA",

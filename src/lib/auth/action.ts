@@ -7,7 +7,7 @@ import { createSessionForUid } from "@/lib/firebase/session";
 import { HttpError } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { logConnection } from "@/lib/logging/connection-logs";
-import { enforceLimit } from "@/lib/rate-limit/limiter";
+import { enforceIpLimit } from "@/lib/rate-limit/limiter";
 import { userByEmail, withCodeErrors } from "./accounts";
 import { activateMember } from "./activation";
 import { anonymous, beginAnonymous, finish, respond } from "./anonymous";
@@ -47,7 +47,7 @@ export async function checkResetCode(oobCode: string): Promise<string> {
 async function action(request: Request): Promise<Response> {
   const flow = beginAnonymous(request);
   const input = await readJson(request, actionSchema);
-  await enforceLimit("action.ip", flow.identity.ipBucket);
+  await enforceIpLimit("action.ip", flow.identity);
 
   if (input.mode === "resetPassword") {
     const email = await checkResetCode(input.oobCode);

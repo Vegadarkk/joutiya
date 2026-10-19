@@ -2,21 +2,28 @@ import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RateLimitId } from "@/config/rate-limits";
 import { resetServerEnv } from "@/lib/env";
-import type { LimitOutcome } from "@/lib/rate-limit/limiter";
+import type { IpIdentity, LimitOutcome } from "@/lib/rate-limit/limiter";
 import { checkPageLimits, isMeteredPath, pathLocale, TOO_MANY_CSP, tooManyPagesHtml } from "@/lib/rate-limit/proxy-limits";
 import { challengePassCookie } from "@/lib/security/challenge-pass";
 import { newDeviceCookie } from "@/lib/security/device";
 
-// Page-view limits of the proxy (§6, design D14), with the store stubbed per limiter id.
+// Page-view limits of the proxy (§6, design D14), with the store stubbed per limiter id. The IP
+// limiter goes through consumeIpLimit (its /48 sibling is covered in rate-limit-ip.test.ts).
 
 const store = vi.hoisted(() => ({
   outcomes: new Map<string, LimitOutcome>(),
   calls: [] as { id: string; key: string }[],
+  ipIdentities: [] as IpIdentity[],
 }));
 
 vi.mock("@/lib/rate-limit/limiter", () => ({
   consumeLimit: vi.fn(async (id: string, key: string): Promise<LimitOutcome> => {
     store.calls.push({ id, key });
+    return store.outcomes.get(id) ?? { ok: true, remaining: 10 };
+  }),
+  consumeIpLimit: vi.fn(async (id: string, identity: IpIdentity): Promise<LimitOutcome> => {
+    store.calls.push({ id, key: identity.ipBucket });
+    store.ipIdentities.push(identity);
     return store.outcomes.get(id) ?? { ok: true, remaining: 10 };
   }),
 }));
@@ -40,6 +47,7 @@ beforeEach(() => {
   resetServerEnv();
   store.outcomes.clear();
   store.calls.length = 0;
+  store.ipIdentities.length = 0;
 });
 afterEach(() => resetServerEnv());
 
@@ -61,6 +69,12 @@ describe("checkPageLimits", () => {
     await expect(checkPageLimits(request())).resolves.toEqual({ kind: "allow" });
     expect(ids()).toEqual(["pages.ip"]);
     expect(store.calls[0]?.key).toBe("203.0.113.7");
+  });
+
+  it("counts an IPv6 visitor on its /64 and its /48", async () => {
+    await checkPageLimits(request({}, { "x-forwarded-for": "2001:db8:1:2::7" }));
+    expect(ids()).toEqual(["pages.ip"]);
+    expect(store.ipIdentities[0]).toMatchObject({ ipBucket: "2001:0db8:0001:0002::/64", ipNetwork: "2001:0db8:0001::/48", ipv6: true });
   });
 
   it("counts a visitor with a device cookie on the device and the IP", async () => {

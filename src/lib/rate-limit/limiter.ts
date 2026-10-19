@@ -1,10 +1,11 @@
 import "server-only";
 import { RateLimiterMemory, RateLimiterRedis, RateLimiterRes, type RateLimiterAbstract } from "rate-limiter-flexible";
-import { RATE_LIMITS, type RateLimitId } from "@/config/rate-limits";
+import { ip48Id, RATE_LIMITS, type IpRateLimitId, type RateLimitId } from "@/config/rate-limits";
 import { HttpError, rateLimited, unavailable } from "@/lib/http/errors";
 import { logger } from "@/lib/logging/logger";
 import { pepperedHash } from "@/lib/security/hash";
 import { isValkeyConfigured, valkey } from "@/lib/valkey/clients";
+import type { RequestIdentity } from "./keys";
 
 // Limiters on valkey-ratelimit (§6). Redis down: `rejectIfRedisNotReady` and a short command
 // timeout make the call fail fast, then the limiter's policy decides (open or closed). Without
@@ -155,6 +156,53 @@ export function assertLimit(id: RateLimitId, outcome: LimitOutcome): void {
 /** consumeLimit + assertLimit in one call. */
 export async function enforceLimit(id: RateLimitId, rawKey: string, points = 1): Promise<void> {
   assertLimit(id, await consumeLimit(id, rawKey, points));
+}
+
+// "ip" limiters (§6 "Les clés"): the IPv4 address or IPv6 /64 bucket and, for an IPv6 client, the
+// "<id>48" sibling on its /48 (rate-limits.ts), so a source rotating /64s inside one allocation
+// still meets a ceiling. Every "ip" limiter goes through these helpers, never the plain ones above
+// (tests/unit/rate-limit-ip.test.ts scans src). IPv4 costs one store call, IPv6 two in parallel.
+
+export type IpIdentity = Pick<RequestIdentity, "ipBucket" | "ipNetwork" | "ipv6">;
+
+function ipKeys(id: IpRateLimitId, identity: IpIdentity): [RateLimitId, string][] {
+  return identity.ipv6 ? [[id, identity.ipBucket], [ip48Id(id), identity.ipNetwork]] : [[id, identity.ipBucket]];
+}
+
+/** Worst of the outcomes: limited (longest wait), else unavailable, else ok (fewest points left). */
+function worst(outcomes: LimitOutcome[]): LimitOutcome {
+  const waits = outcomes.flatMap((outcome) => (!outcome.ok && outcome.reason === "limited" ? [outcome.retryAfterSeconds] : []));
+  if (waits.length > 0) return { ok: false, reason: "limited", retryAfterSeconds: Math.max(...waits) };
+  if (outcomes.some((outcome) => !outcome.ok)) return { ok: false, reason: "unavailable" };
+  return { ok: true, remaining: Math.min(...outcomes.map((outcome) => (outcome.ok ? outcome.remaining : Infinity))) };
+}
+
+/** consumeLimit for an "ip" limiter: the client's bucket and, for IPv6, its /48; the worse outcome. */
+export async function consumeIpLimit(id: IpRateLimitId, identity: IpIdentity, points = 1): Promise<LimitOutcome> {
+  return worst(await Promise.all(ipKeys(id, identity).map(([limit, key]) => consumeLimit(limit, key, points))));
+}
+
+/** assertLimit for an outcome of consumeIpLimit (the /48 sibling shares the policy). */
+export function assertIpLimit(id: IpRateLimitId, outcome: LimitOutcome): void {
+  assertLimit(id, outcome);
+}
+
+/** consumeIpLimit + assertIpLimit in one call. */
+export async function enforceIpLimit(id: IpRateLimitId, identity: IpIdentity, points = 1): Promise<void> {
+  assertIpLimit(id, await consumeIpLimit(id, identity, points));
+}
+
+/**
+ * Reads an "ip" limiter without consuming it: seconds until the client's spent bucket frees (the
+ * later one when its /48 is spent too), or null when none is spent or the store cannot answer.
+ */
+export async function ipLimitSpent(id: IpRateLimitId, identity: IpIdentity): Promise<number | null> {
+  const states = await Promise.all(ipKeys(id, identity).map(async ([limit, key]) => ({ limit, state: await limitState(limit, key) })));
+  let seconds: number | null = null;
+  for (const { limit, state } of states) {
+    if (state && state.consumedPoints >= RATE_LIMITS[limit].points) seconds = Math.max(seconds ?? 0, state.msBeforeNext / 1000);
+  }
+  return seconds;
 }
 
 export function isRateLimitError(error: unknown): boolean {

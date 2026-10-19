@@ -288,6 +288,28 @@
       ]
     },
     {
+      "collectionGroup": "favorites",
+      "fieldPath": "listingId",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "arrayConfig": "CONTAINS",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
       "collectionGroup": "savedSearches",
       "fieldPath": "updatedAt",
       "indexes": [

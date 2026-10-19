@@ -20,6 +20,15 @@ export function alternates(locale: Locale, path = ""): Metadata["alternates"] {
   return { canonical, languages };
 }
 
+/**
+ * og:locale, spread into an `openGraph` object: language_TERRITORY (ogp.me), so fr_MA and ar_MA.
+ * Tarifit's tag (rif-Latn) has a script, not a territory, and no valid value: no og:locale there.
+ */
+export function openGraphLocale(locale: Locale): { locale?: string } {
+  const match = /^([a-z]{2})-([A-Z]{2})$/.exec(LOCALE_TAGS[locale]);
+  return match ? { locale: `${match[1]}_${match[2]}` } : {};
+}
+
 export async function rootMetadata(locale: Locale): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: "Metadata" });
   return {
@@ -30,7 +39,7 @@ export async function rootMetadata(locale: Locale): Promise<Metadata> {
     alternates: alternates(locale),
     icons: { icon: "/brand/joutiya-icon.svg" },
     formatDetection: { telephone: false, email: false, address: false },
-    openGraph: { siteName: "Joutiya", locale: LOCALE_TAGS[locale].replace("-", "_"), type: "website" },
+    openGraph: { siteName: "Joutiya", ...openGraphLocale(locale), type: "website" },
   };
 }
 

@@ -2,9 +2,10 @@ import { alert } from "@/lib/alert";
 import { audit } from "@/lib/audit";
 import { PHOTO_VARIANTS } from "@/lib/contracts/media";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
-import { deleteJournalPastPurge, listListingsPastPurge, oldestPastPurge, purgeListing, type JournalCollection, type ListingCursor } from "@/lib/db/repositories/retention";
+import { deleteJournalPastPurge, listListingsPastPurge, oldestPastPurge, purgeListing, PURGE_FAVORITES_PER_TX, type JournalCollection, type ListingCursor } from "@/lib/db/repositories/retention";
 import { deleteUploadDocument, listUploadsByTarget, updateUpload, UPLOADS_BY_TARGET_LIMIT, type UploadRecord } from "@/lib/db/repositories/uploads";
 import { COLLECTIONS, type ListingStatus } from "@/lib/db/schemas";
+import { recordFavoriteChange } from "@/lib/favorites/ids-cache";
 import { isFirestoreConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
 import { photoObjectKey, quarantineObjectKey, type PhotoBucket } from "@/lib/media/urls";
@@ -16,22 +17,27 @@ import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 
 // Nightly at 03:00 UTC (architecture §5 "Purges sans TTL", table of §7 retention, design D16):
 // 1. listings past purgeAt (expired, sold, removed or rejected + listingPurgeMonths) without a
-//    legal hold: replaced by a tombstone (transaction re-checking status, hold and date, with the
-//    searchOutbox delete), then their photo variants, quarantine objects and upload documents go.
+//    legal hold: the favorites pointing at them go first (their snapshot holds the title, price
+//    and cover; the hearts cache `fav:{uid}` follows), then the listing becomes a tombstone
+//    (transactions re-checking status, hold and date, the last one with the searchOutbox delete),
+//    then its photo variants, quarantine objects and upload documents go.
 //    A removed listing keeps its text and its photos until then (architecture §5: removal + 12
 //    months): purge-quarantine (hourly) moves its photos to the private bucket
 //    (`removed/listings/...`) and the purgeAt of its uploads to the listing's, and never deletes
 //    them; a removed listing's variants are deleted from both buckets (a move cut short can leave
 //    them in either). Unattached and orphan uploads of other listings are purge-quarantine's;
 // 2. contentOps (1 year) and revealLogs (90 days) past purgeAt.
-// At most PURGE_DELETE_BUDGET document deletions a night (Spark: 20 000 a day); the rest waits a
-// night, and a backlog older than 3 days raises an alert. Idempotent: every step re-reads.
+// At most PURGE_DELETE_BUDGET document deletions a night (Spark: 20 000 a day), favorites
+// included; the rest waits a night, and a backlog older than 3 days raises an alert. Idempotent:
+// every step re-reads, and a listing whose favorites outlast the budget stays past purgeAt.
 
 export const PURGE_DELETE_BUDGET = 15_000;
 export const LISTING_PURGE_BATCH = 100;
 export const LISTING_PURGE_PAGES = 20;
 /** Pages of upload documents read for one purged listing (each page is deleted before the next query). */
 export const LISTING_MEDIA_PAGES = 5;
+/** Purge transactions for one listing a run (PURGE_FAVORITES_PER_TX favorites each, the last with the tombstone). */
+export const LISTING_FAVORITES_PASSES = 5;
 export const JOURNAL_BATCH = 400;
 export const BACKLOG_ALERT_MS = 3 * 24 * 3_600_000;
 
@@ -47,6 +53,8 @@ export interface RetentionResult {
   skipped: number;
   /** Upload documents deleted (with their objects). */
   uploads: number;
+  /** Favorites of purged listings deleted (users/{uid}/favorites/{listingId}). */
+  favorites: number;
   /** Storage objects deleted (idempotent: a missing object counts too). */
   objects: number;
   contentOps: number;
@@ -125,6 +133,26 @@ async function purgeListingMedia(store: ObjectStore, listing: ListingRecord, sta
   }
 }
 
+/**
+ * Favorites first, then the tombstone (purgeListing): one transaction per PURGE_FAVORITES_PER_TX
+ * favorites, each charged to the delete budget. "deferred" when the budget or the passes ran out
+ * with favorites left: the listing stays past purgeAt for the next run. The listing's own counter
+ * (`stats:favorites:{id}`) is left alone: a decrement would only make stats-flush write the stats
+ * of a listing that no longer exists.
+ */
+async function purgeWithFavorites(listing: ListingRecord, state: RunState): Promise<"purged" | "skipped" | "deferred"> {
+  for (let passes = 0; passes < LISTING_FAVORITES_PASSES && state.budget > 0; passes += 1) {
+    const purge = await purgeListing(listing.id, (current) => isPurgeable(current, state.now), state.now, Math.min(PURGE_FAVORITES_PER_TX, state.budget));
+    if (!purge) return "skipped";
+    state.result.favorites += purge.favoriteUids.length;
+    state.budget -= purge.favoriteUids.length;
+    // Committed: the hearts cache drops the id (and a racing rebuild is voided). Best effort.
+    await Promise.all(purge.favoriteUids.map((uid) => recordFavoriteChange(uid, listing.id, "remove")));
+    if (purge.tombstone) return "purged";
+  }
+  return "deferred";
+}
+
 async function purgeListings(state: RunState): Promise<void> {
   const { now, result } = state;
   let cursor: ListingCursor | undefined;
@@ -145,9 +173,13 @@ async function purgeListings(state: RunState): Promise<void> {
         return;
       }
       try {
-        const tombstone = await purgeListing(listing.id, (current) => isPurgeable(current, now), now);
-        if (!tombstone) {
+        const purged = await purgeWithFavorites(listing, state);
+        if (purged === "skipped") {
           result.skipped += 1;
+          continue;
+        }
+        if (purged === "deferred") {
+          result.deferred = true;
           continue;
         }
         result.listings += 1;
@@ -184,7 +216,7 @@ async function purgeJournal(collection: JournalCollection, key: "contentOps" | "
 }
 
 export async function retentionPurge(now = new Date(), deps: { store?: ObjectStore } = {}): Promise<RetentionResult> {
-  const result: RetentionResult = { listings: 0, held: 0, skipped: 0, uploads: 0, objects: 0, contentOps: 0, revealLogs: 0, failed: 0, deferred: false };
+  const result: RetentionResult = { listings: 0, held: 0, skipped: 0, uploads: 0, favorites: 0, objects: 0, contentOps: 0, revealLogs: 0, failed: 0, deferred: false };
   if (!isFirestoreConfigured()) {
     logger.warn("retention-purge skipped: Firebase not configured");
     return result;

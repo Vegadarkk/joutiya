@@ -24,7 +24,7 @@ import { updateListing } from "@/lib/db/repositories/listings";
 import { listRevealLogs } from "@/lib/db/repositories/reveal-logs";
 import { resetServerEnv } from "@/lib/env";
 import { displayPhone } from "@/lib/phone/normalize";
-import { consumeLimit, limitState, resetRateLimiters } from "@/lib/rate-limit/limiter";
+import { consumeIpLimit, consumeLimit, limitState, resetRateLimiters } from "@/lib/rate-limit/limiter";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { DAY_MS, api, freshPhone, member, readyPatch, seedReadyUpload, type ErrorBody, type ListingBody, type Member } from "./helpers";
 
@@ -158,13 +158,13 @@ describe("POST /api/listings/{id}/phone", () => {
     const owner = await member({ phone: freshPhone() });
     const viewer = await member();
     const id = await listingOf(owner);
-    vi.mocked(consumeLimit).mockResolvedValueOnce({ ok: false, reason: "limited", retryAfterSeconds: 60 });
+    vi.mocked(consumeIpLimit).mockResolvedValueOnce({ ok: false, reason: "limited", retryAfterSeconds: 60 });
     const challenged = await ask(viewer, id);
     expect(challenged.status).toBe(403);
     expect(challenged.body.error.code).toBe("turnstile_required");
     expect(await listRevealLogs(id)).toEqual([]);
 
-    vi.mocked(consumeLimit).mockResolvedValueOnce({ ok: false, reason: "limited", retryAfterSeconds: 60 });
+    vi.mocked(consumeIpLimit).mockResolvedValueOnce({ ok: false, reason: "limited", retryAfterSeconds: 60 });
     const solved = await ask(viewer, id, { turnstileToken: "solved" });
     expect(solved.status).toBe(200);
     expect(viewer.jar.get("__Host-tsv")).toBeDefined();

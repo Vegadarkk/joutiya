@@ -1,12 +1,13 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UploadRecord } from "@/lib/db/repositories/uploads";
 
 // retention-purge (03:00 UTC): listings past purgeAt (expired, sold, removed, rejected, no legal
-// hold) become tombstones and lose their media and upload documents (a removed listing keeps its
-// photos until then, in the private bucket: no upload is deleted on its own purgeAt); contentOps and revealLogs past
-// purgeAt are deleted in batches under a nightly budget. Repositories are mocked; a
-// MemoryObjectStore records storage.
+// hold) lose the favorites pointing at them, become tombstones and lose their media and upload
+// documents (a removed listing keeps its photos until then, in the private bucket: no upload is
+// deleted on its own purgeAt); contentOps and revealLogs past purgeAt are deleted in batches under
+// a nightly budget. Repositories are mocked; a MemoryObjectStore records storage.
 
 const stored = vi.hoisted(() => new Map<string, UploadRecord>());
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
@@ -25,7 +26,9 @@ vi.mock("@/lib/db/repositories/uploads", () => ({
   deleteUploadDocument: vi.fn(async (id: string): Promise<UploadRecord | null> => stored.get(id) ?? null),
   updateUpload: vi.fn(async () => undefined),
 }));
+vi.mock("@/lib/favorites/ids-cache", () => ({ recordFavoriteChange: vi.fn(async () => undefined) }));
 vi.mock("@/lib/db/repositories/retention", () => ({
+  PURGE_FAVORITES_PER_TX: 400,
   listListingsPastPurge: vi.fn(async () => ({ listings: [], read: 0 })),
   purgeListing: vi.fn(),
   deleteJournalPastPurge: vi.fn(async () => 0),
@@ -50,8 +53,9 @@ const { audit } = await import("@/lib/audit");
 const { alert } = await import("@/lib/alert");
 const { isDegraded } = await import("@/lib/quota");
 const { recordMediaBytes } = await import("@/lib/uploads/storage-gauge");
+const { recordFavoriteChange } = await import("@/lib/favorites/ids-cache");
 const { MemoryObjectStore } = await import("@/lib/storage/memory");
-const { JOURNAL_BATCH, LISTING_PURGE_BATCH, PURGE_DELETE_BUDGET, isPurgeable, retentionPurge } = await import("@/worker/jobs/retention-purge");
+const { JOURNAL_BATCH, LISTING_FAVORITES_PASSES, LISTING_PURGE_BATCH, PURGE_DELETE_BUDGET, isPurgeable, retentionPurge } = await import("@/worker/jobs/retention-purge");
 
 const NOW = new Date("2026-10-16T03:00:00Z");
 const DAY = 86_400_000;
@@ -93,6 +97,11 @@ function seedPrivate(listingId: string, photoId: string): void {
   for (const variant of ["l", "s"]) store.seed("private", `removed/listings/${listingId}/${photoId}-${variant}.webp`, Buffer.from("v"), { contentType: "image/webp" });
 }
 
+const TOMBSTONE = { status: "purged", categoryId: "vehicules", purgedAt: NOW, version: 8, updatedAt: NOW } as const;
+
+/** Accounts whose favorite a purge transaction deleted. */
+const uids = (count: number, prefix = "saver") => Array.from({ length: count }, (_, index) => `${prefix}-${index}`);
+
 function page(listings: ListingRecord[], read = listings.length) {
   const last = listings[listings.length - 1];
   return { listings, read, ...(last ? { next: { at: last.purgeAt!, id: last.id } } : {}) };
@@ -104,7 +113,7 @@ beforeEach(() => {
   store = new MemoryObjectStore();
   for (const mocked of [retention, uploadsRepo]) for (const fn of Object.values(mocked)) if (vi.isMockFunction(fn)) fn.mockReset();
   vi.mocked(retention.listListingsPastPurge).mockResolvedValue({ listings: [], read: 0 });
-  vi.mocked(retention.purgeListing).mockImplementation(async (id, purgeable) => (purgeable(listing(id)) ? { status: "purged", categoryId: "vehicules", purgedAt: NOW, version: 8, updatedAt: NOW } : null));
+  vi.mocked(retention.purgeListing).mockImplementation(async (id, purgeable) => (purgeable(listing(id)) ? { tombstone: TOMBSTONE, favoriteUids: [] } : null));
   vi.mocked(retention.deleteJournalPastPurge).mockResolvedValue(0);
   vi.mocked(retention.oldestPastPurge).mockResolvedValue(null);
   vi.mocked(uploadsRepo.listPastPurge).mockResolvedValue([]);
@@ -114,6 +123,7 @@ beforeEach(() => {
   vi.mocked(audit).mockClear();
   vi.mocked(alert).mockClear();
   vi.mocked(recordMediaBytes).mockClear();
+  vi.mocked(recordFavoriteChange).mockClear();
 });
 
 describe("isPurgeable", () => {
@@ -140,7 +150,7 @@ describe("retention-purge: listings", () => {
     const result = await retentionPurge(NOW, { store });
     expect(result).toMatchObject({ listings: 1, uploads: 2, held: 0, skipped: 0, failed: 0, deferred: false });
     expect(retention.listListingsPastPurge).toHaveBeenCalledWith(NOW, LISTING_PURGE_BATCH, undefined);
-    expect(retention.purgeListing).toHaveBeenCalledWith("abcd2345", expect.any(Function), NOW);
+    expect(retention.purgeListing).toHaveBeenCalledWith("abcd2345", expect.any(Function), NOW, 400);
     expect(store.keys("media")).toEqual([]);
     expect(store.keys("quarantine")).toEqual([]);
     expect(uploadsRepo.deleteUploadDocument).toHaveBeenCalledWith("photo00000000001");
@@ -230,6 +240,74 @@ describe("retention-purge: listings", () => {
     await retentionPurge(NOW, { store });
     const last = full[full.length - 1]!;
     expect(vi.mocked(retention.listListingsPastPurge).mock.calls[1]).toEqual([NOW, LISTING_PURGE_BATCH, { at: last.purgeAt, id: last.id }]);
+  });
+});
+
+describe("retention-purge: favorites of purged listings", () => {
+  it("deletes them before the tombstone, one transaction per page, and drops the id from each saver's hearts cache", async () => {
+    const record = listing("abcd2345");
+    vi.mocked(retention.listListingsPastPurge).mockResolvedValueOnce(page([record]));
+    vi.mocked(retention.purgeListing)
+      .mockResolvedValueOnce({ tombstone: null, favoriteUids: uids(400) })
+      .mockResolvedValueOnce({ tombstone: TOMBSTONE, favoriteUids: ["late-saver"] });
+
+    const result = await retentionPurge(NOW, { store });
+    expect(result).toMatchObject({ listings: 1, favorites: 401, failed: 0, deferred: false });
+    expect(vi.mocked(retention.purgeListing).mock.calls.map((call) => call[3])).toEqual([400, 400]);
+    expect(recordFavoriteChange).toHaveBeenCalledTimes(401);
+    expect(recordFavoriteChange).toHaveBeenCalledWith("saver-0", "abcd2345", "remove");
+    expect(recordFavoriteChange).toHaveBeenCalledWith("late-saver", "abcd2345", "remove");
+    expect(audit).toHaveBeenCalledTimes(1);
+  });
+
+  it("a listing whose favorites outlast the passes stays past purgeAt (no tombstone, media kept), the next one is purged", async () => {
+    const crowded = listing("crowd234", { photos: [{ id: "photo00000000001", w: 1600, h: 1200, blurhash: "LEHV6nWB2yk8" }] });
+    seed(crowded.id, "photo00000000001");
+    vi.mocked(retention.listListingsPastPurge).mockResolvedValueOnce(page([crowded, listing("abcd2345")]));
+    vi.mocked(retention.purgeListing).mockImplementation(async (id, _purgeable, _now, limit) => (id === crowded.id ? { tombstone: null, favoriteUids: uids(limit!) } : { tombstone: TOMBSTONE, favoriteUids: [] }));
+
+    const result = await retentionPurge(NOW, { store });
+    expect(result).toMatchObject({ listings: 1, favorites: LISTING_FAVORITES_PASSES * 400, deferred: true, failed: 0 });
+    expect(vi.mocked(retention.purgeListing).mock.calls.filter(([id]) => id === crowded.id)).toHaveLength(LISTING_FAVORITES_PASSES);
+    expect(audit).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ target: { type: "listing", id: "abcd2345" } }));
+    expect(store.keys("media")).toHaveLength(2);
+  });
+
+  it("charges them to the nightly delete budget: the last transaction is cut to what is left, then the run stops", async () => {
+    const listings = Array.from({ length: 10 }, (_, index) => listing(`crowd${String(index).padStart(3, "0")}`));
+    vi.mocked(retention.listListingsPastPurge).mockResolvedValueOnce(page(listings));
+    vi.mocked(retention.purgeListing).mockImplementation(async (_id, _purgeable, _now, limit) => ({ tombstone: null, favoriteUids: uids(limit!) }));
+    vi.mocked(retention.deleteJournalPastPurge).mockImplementation(async (_collection, _now, limit) => limit);
+
+    const result = await retentionPurge(NOW, { store });
+    expect(result).toMatchObject({ listings: 0, favorites: PURGE_DELETE_BUDGET, contentOps: 0, revealLogs: 0, deferred: true });
+    const limits = vi.mocked(retention.purgeListing).mock.calls.map((call) => call[3]!);
+    expect(limits.reduce((sum, limit) => sum + limit, 0)).toBe(PURGE_DELETE_BUDGET);
+    expect(limits[limits.length - 1]).toBe(PURGE_DELETE_BUDGET % 400);
+    // 7 listings of 5 passes (14 000), then 400 + 400 + 200 on the eighth: the last two are not touched.
+    expect(new Set(vi.mocked(retention.purgeListing).mock.calls.map(([id]) => id)).size).toBe(8);
+  });
+
+  it("a refused or failing transaction: nothing counted for it, the passes committed before it keep their cache updates", async () => {
+    vi.mocked(retention.listListingsPastPurge).mockResolvedValueOnce(page([listing("abcd2345"), listing("renew234")]));
+    vi.mocked(retention.purgeListing)
+      .mockResolvedValueOnce({ tombstone: null, favoriteUids: ["saver-a"] })
+      .mockRejectedValueOnce(new Error("ABORTED"))
+      .mockResolvedValueOnce(null);
+
+    const result = await retentionPurge(NOW, { store });
+    expect(result).toMatchObject({ listings: 0, favorites: 1, failed: 1, skipped: 1 });
+    expect(recordFavoriteChange).toHaveBeenCalledExactlyOnceWith("saver-a", "abcd2345", "remove");
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it("the purge query has its collection-group index (the emulator never asks)", () => {
+    type Override = { collectionGroup: string; fieldPath: string; indexes: { queryScope: string; order?: string }[] };
+    const file = JSON.parse(readFileSync(new URL("../../firestore.indexes.json", import.meta.url), "utf8")) as { fieldOverrides: Override[] };
+    const override = file.fieldOverrides.find((o) => o.collectionGroup === "favorites" && o.fieldPath === "listingId");
+    expect(override?.indexes).toContainEqual({ order: "ASCENDING", queryScope: "COLLECTION_GROUP" });
+    // An override replaces the defaults: the collection-scope ones stay declared.
+    expect(override?.indexes).toContainEqual({ order: "ASCENDING", queryScope: "COLLECTION" });
   });
 });
 
