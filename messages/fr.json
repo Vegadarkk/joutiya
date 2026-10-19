@@ -280,7 +280,8 @@
         "phoneVerified": "Vérifié",
         "phoneMissing": "Non vérifié",
         "verifyPhone": "Vérifier mon numéro",
-        "managePhone": "Voir la vérification"
+        "managePhone": "Voir la vérification",
+        "phoneSoon": "Vérification pas encore ouverte"
       },
       "methods": {
         "title": "Méthodes de connexion",
@@ -318,7 +319,7 @@
       "changeNumber": "Changer de numéro",
       "badge": "Téléphone vérifié",
       "backSettings": "Retour aux paramètres",
-      "unavailable": "La vérification WhatsApp n'est pas encore ouverte. Revenez dans quelques jours.",
+      "unavailable": "La vérification du numéro par WhatsApp n'est pas encore ouverte. En attendant, les acheteurs vous écrivent par la messagerie Joutiya.",
       "loadFailedTitle": "L'état de la vérification n'a pas pu être chargé",
       "retry": "Réessayer",
       "alreadyVerified": "Votre compte a déjà un numéro vérifié."
@@ -526,6 +527,7 @@
       "phoneNotVerified": "Numéro non vérifié",
       "verifyLink": "Vérifier mon numéro",
       "verifyBody": "Vérifiez votre numéro pour l'afficher sur l'annonce ou proposer WhatsApp. Votre brouillon est conservé.",
+      "verifySoon": "Afficher votre numéro ou proposer WhatsApp demande un numéro vérifié. Cette vérification n'est pas encore ouverte : en attendant, les acheteurs vous écrivent par la messagerie Joutiya.",
       "revealNote": "Votre numéro n'apparaît jamais en clair sur la page : il faut être connecté et cliquer pour le voir."
     },
     "photos": {

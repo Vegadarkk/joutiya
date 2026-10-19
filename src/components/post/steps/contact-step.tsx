@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { useSession } from "@/lib/auth/client";
+import { usePublicConfig } from "@/lib/config/client";
 import { useWizard } from "@/lib/listings/client/store";
 import { SwitchField } from "../controls/switch";
 import { STEP_FORM_ID } from "../wizard-shell";
@@ -18,6 +19,8 @@ export function ContactStep({ onNext }: { onNext: () => void }) {
   const { status, session } = useSession();
   const known = status === "ready";
   const verified = Boolean(session?.phoneVerified);
+  // While the WhatsApp check is closed, explain why the switches stay off instead of linking to a 503.
+  const phoneOpen = usePublicConfig()?.phoneVerification !== false;
   // Without the badge the switches can be turned off, never on (the API refuses: phone_required).
   const blocked = known && !verified && (listing.contact.showPhone || listing.contact.whatsapp);
   const blocker = blockers.find((issue) => issue.path.startsWith("contact"));
@@ -44,11 +47,13 @@ export function ContactStep({ onNext }: { onNext: () => void }) {
               <BadgeCheck className="size-3.5" aria-hidden="true" />
               {t("contact.phoneVerified")}
             </Badge>
-          ) : (
+          ) : phoneOpen ? (
             <Badge variant="warning">{t("contact.phoneNotVerified")}</Badge>
-          )}
+          ) : null}
         </div>
-        {known && !verified ? (
+        {known && !verified && !phoneOpen ? (
+          <p className="text-sm text-foreground-muted text-pretty">{t("contact.verifySoon")}</p>
+        ) : known && !verified ? (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-foreground-muted text-pretty">{t("contact.verifyBody")}</p>
             <Button asChild variant="outline" size="sm" className="shrink-0 max-sm:h-11">
