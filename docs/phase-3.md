@@ -65,7 +65,7 @@ Sans clés R2, le site démarre et refuse les envois de photos (503). Sans `MAP_
 
 - Dépôt : `npm run check`, `npm run test:api`, `npm run test:rules`, `npm run build` puis `npm run test:e2e`.
 - Staging : déposer une annonce avec 3 photos depuis un téléphone (dont une photo HEIC d'iPhone), vérifier la page annonce, la suppression de l'EXIF (`exiftool` sur la photo publiée : aucune position GPS), « Mes annonces » (pause, reprise, vendue, suppression), la file **Modération** du back-office avec une annonce signalée, la carte interactive.
-- Critères de sortie qui exigent le staging en ligne, notés en attente tant qu'il n'existe pas : Lighthouse mobile ≥ 90 sur la page annonce, dépôt complet en moins de 3 minutes sur un Android bridé, test de restauration sur de vraies données (répétition A de `docs/backups.md` : sauvegardes du staging vers `joutiya-dev` ; le test contre l'émulateur est fait et passe). La répétition B (production vers staging) est à refaire avant le lancement.
+- Critères de sortie qui exigent le staging en ligne, notés en attente tant qu'il n'existe pas : Lighthouse mobile ≥ 90 sur la page annonce, dépôt complet en moins de 3 minutes sur un Android bridé, test de restauration sur de vraies données (répétition A de `docs/backups.md` : sauvegardes du staging vers l'émulateur Firestore du PC ; le test automatique contre l'émulateur est fait et passe). La répétition B (production vers staging) est à refaire avant le lancement.
 
 ## Écarts par rapport à l'architecture
 

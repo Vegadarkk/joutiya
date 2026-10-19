@@ -12,6 +12,7 @@ import { criterionById, subcategoryById } from "@/config/categories";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
+import { useNumbersTranslations } from "@/i18n/numbers";
 import { isApiError } from "@/lib/auth/client";
 import { SENSITIVE_DECLARATION_KINDS, type FieldIssue, type PublishListingResponse, type SensitiveDeclarationKind, type WizardStep } from "@/lib/contracts/listings";
 import { publishListing } from "@/lib/listings/client/api";
@@ -43,7 +44,7 @@ interface ReviewStepProps {
 
 export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: ReviewStepProps) {
   const { listing, photos, photosBusy, blockers, setBlockers, save, saveState, saveError, saveMode, listingId, update } = useWizard();
-  const t = useTranslations("Listing");
+  const t = useNumbersTranslations("Listing");
   const names = useCategoryLabels();
   const criteria = useCriteriaLabels();
   const locale = useLocale() as Locale;

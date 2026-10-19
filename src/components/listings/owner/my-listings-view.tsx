@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { useSearchParams } from "next/navigation";
-import { useLocale, useTranslations } from "next-intl";
+import { useLocale } from "next-intl";
 import { toast } from "sonner";
 import { FormMessage, useApiErrorMessage } from "@/components/auth/form-message";
 import { EmptyState } from "@/components/feedback/empty-state";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isRtl, type Locale } from "@/config/site";
 import { Link, useRouter } from "@/i18n/navigation";
+import { useNumbersTranslations } from "@/i18n/numbers";
 import { isApiError } from "@/lib/auth/client";
 import { usePublicConfig } from "@/lib/config/client";
 import { MAX_DRAFTS, OWNER_LIST_BUCKETS, type OwnerListBucket, type OwnerListing, type OwnerListingSummary } from "@/lib/contracts/listings";
@@ -79,7 +80,7 @@ function summaryAfter(summary: OwnerListingSummary, listing: OwnerListing): Owne
 }
 
 export function MyListingsView() {
-  const t = useTranslations("MyListings");
+  const t = useNumbersTranslations("MyListings");
   const locale = useLocale() as Locale;
   const rtl = isRtl(locale);
   const apiMessage = useApiErrorMessage();

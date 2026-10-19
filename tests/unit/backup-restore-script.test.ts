@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { encryptAge, generateIdentity, identityToRecipient } from "@/lib/backup/crypto";
 import { manifestKey, partKey, sealPart } from "@/lib/backup/parts";
-import { bucketProblems, parseCli, projectProblem, SPARK_DAILY_WRITES, writesProblem } from "../../scripts/restore-firestore.ts";
+import { bucketConfig, parseCli, projectProblem, SPARK_DAILY_WRITES, writesProblem } from "../../scripts/restore-firestore.ts";
 import type { Targets } from "../../scripts/assert-target.ts";
 
 // scripts/restore-firestore.ts: arguments, the target guard (never production by accident), and a
@@ -32,7 +32,7 @@ describe("parseCli", () => {
     expect(parseCli(["--identity", "k.txt", "--from", "dl", "--project", "joutiya-staging"])).toEqual({
       identity: "k.txt",
       from: "dl",
-      fromBucket: false,
+      fromBucket: null,
       project: "joutiya-staging",
       collections: null,
       until: null,
@@ -42,11 +42,11 @@ describe("parseCli", () => {
       allowOverQuota: false,
     });
     expect(
-      parseCli(["--identity", "k", "--from-bucket", "--project", "p-123x", "--collections", "users, listings,", "--until", "2026-10-16", "--apply", "--allow-production", "--allow-unverified", "--allow-over-quota"]),
+      parseCli(["--identity", "k", "--from-bucket", "prod", "--project", "p-123x", "--collections", "users, listings,", "--until", "2026-10-16", "--apply", "--allow-production", "--allow-unverified", "--allow-over-quota"]),
     ).toEqual({
       identity: "k",
       from: null,
-      fromBucket: true,
+      fromBucket: "prod",
       project: "p-123x",
       collections: ["users", "listings"],
       until: "2026-10-16",
@@ -61,13 +61,16 @@ describe("parseCli", () => {
     for (const argv of [[], ["--from", "dl", "--project", "p"], ["--identity", "k", "--project", "p"], ["--identity", "k", "--from", "dl", "--from-bucket", "--project", "p"], ["--identity", "k", "--from", "dl"], ["--identity", "k", "--from", "dl", "--project", "p", "--force"]]) {
       expect(() => parseCli(argv), argv.join(" ")).toThrow();
     }
+    // The bucket of an environment whose backups exist.
+    expect(() => parseCli(["--identity", "k", "--from-bucket", "dev", "--project", "p"])).toThrow(/--from-bucket: staging or prod/);
+    expect(() => parseCli(["--identity", "k", "--from-bucket", "--project", "p"])).toThrow();
     expect(() => parseCli(["--identity", "k", "--from", "dl", "--project", "p", "--until", "demain"])).toThrow(/--until/);
     expect(() => parseCli(["--identity", "k", "--from", "dl", "--project", "p", "--collections", "users/u1"])).toThrow(/--collections/);
   });
 });
 
 describe("projectProblem", () => {
-  const recorded = targets({ staging: "joutiya-staging", prod: "joutiya-prod" });
+  const recorded = targets({ dev: "joutiya-dev", staging: "joutiya-staging", prod: "joutiya-prod" });
 
   it("lets the emulator take any project id", () => {
     expect(projectProblem(recorded, "demo-joutiya", { emulated: true, allowProduction: false })).toBeNull();
@@ -79,6 +82,9 @@ describe("projectProblem", () => {
     expect(projectProblem(recorded, "other-project", { emulated: false, allowProduction: true })).toMatch(/not recorded in infra\/targets\.json/);
     expect(projectProblem(recorded, "joutiya-prod", { emulated: false, allowProduction: false })).toMatch(/production project: .*--allow-production/);
     expect(projectProblem(recorded, "joutiya-prod", { emulated: false, allowProduction: true })).toBeNull();
+    // Development has no worker identity to write with: its data goes to the emulator.
+    expect(projectProblem(recorded, "joutiya-dev", { emulated: false, allowProduction: true })).toMatch(/no worker identity: restore into the emulator/);
+    expect(projectProblem(recorded, "joutiya-dev", { emulated: true, allowProduction: false })).toBeNull();
     expect(projectProblem(targets({}), "joutiya-prod", { emulated: false, allowProduction: true })).toMatch(/not recorded/);
     expect(projectProblem(recorded, "Bad_Id", { emulated: true, allowProduction: false })).toMatch(/not a Firebase project id/);
   });
@@ -100,16 +106,25 @@ describe("writesProblem", () => {
   });
 });
 
-describe("bucketProblems", () => {
-  const recorded = targets({});
-  const env = { R2_S3_ENDPOINT: "https://a.eu.r2.cloudflarestorage.com", R2_ACCESS_KEY_ID: "id", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET_PRIVATE: "joutiya-prod-private" };
+describe("bucketConfig", () => {
+  const accountId = "0123456789abcdef0123456789abcdef";
+  const recorded = { ...targets({}), shared: { cloudflare: { accountId } } as unknown as Targets["shared"] };
+  // The owner's .env.local: unsuffixed names belong to development or another product.
+  const vars = { R2_ACCESS_KEY_ID: "other-id", R2_SECRET_ACCESS_KEY: "other-secret", R2_ACCESS_KEY_ID_PROD: " prod-id ", R2_SECRET_ACCESS_KEY_PROD: "prod-secret" };
 
-  it("needs the four R2 variables and a recorded private bucket, naming variables only", () => {
-    expect(bucketProblems(recorded, env)).toEqual([]);
-    expect(bucketProblems(recorded, { ...env, R2_SECRET_ACCESS_KEY: undefined, R2_S3_ENDPOINT: "" })).toEqual(["--from-bucket needs R2_S3_ENDPOINT, R2_SECRET_ACCESS_KEY"]);
-    const wrong = bucketProblems(recorded, { ...env, R2_BUCKET_PRIVATE: "joutiya-prod-media" });
-    expect(wrong).toEqual(["R2_BUCKET_PRIVATE is not a private bucket recorded in infra/targets.json"]);
-    expect(wrong.join(" ")).not.toContain("secret");
+  it("reads the environment's own keys, bucket and endpoint from the registry", () => {
+    expect(bucketConfig(recorded, "prod", vars)).toEqual({
+      config: { endpoint: `https://${accountId}.eu.r2.cloudflarestorage.com`, accessKeyId: "prod-id", secretAccessKey: "prod-secret", bucket: "joutiya-prod-private" },
+      problems: [],
+    });
+  });
+
+  it("never falls back to the unsuffixed keys, and names variables only", () => {
+    const missing = bucketConfig(recorded, "staging", { ...vars, R2_SECRET_ACCESS_KEY_STAGING: "" });
+    expect(missing).toEqual({ config: null, problems: ["--from-bucket staging needs R2_ACCESS_KEY_ID_STAGING and R2_SECRET_ACCESS_KEY_STAGING (the R2 keys of staging, as in .env.local)"] });
+    for (const value of ["other-id", "other-secret", "prod-id", "prod-secret"]) expect(missing.problems.join(" ")).not.toContain(value);
+    const unrecorded = bucketConfig({ ...recorded, shared: { cloudflare: { accountId: null } } as unknown as Targets["shared"] }, "prod", vars);
+    expect(unrecorded).toEqual({ config: null, problems: ["shared.cloudflare.accountId is not recorded in infra/targets.json"] });
   });
 });
 

@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import { BadgeCheck, MailCheck, MapPin, ShieldCheck } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { quietLinkClassName, textLinkClassName } from "@/components/ui/text-link";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
+import { useNumbersTranslations } from "@/i18n/numbers";
 import { intlLocale } from "@/lib/listings/client/format";
 import type { PublicSeller } from "@/lib/listings/public";
 import { cn } from "@/lib/utils";
@@ -44,7 +44,7 @@ export function SellerAvatar({ name, size = "md", className }: { name: string; s
 }
 
 export function SellerBadges({ badges, sellerType, className }: Pick<PublicSeller, "badges" | "sellerType"> & { className?: string }) {
-  const t = useTranslations("ListingPage.seller");
+  const t = useNumbersTranslations("ListingPage.seller");
   const items: { key: string; icon: typeof ShieldCheck; label: string }[] = [];
   if (sellerType === "pro" && badges.proCertified) items.push({ key: "pro", icon: BadgeCheck, label: t("proCertified") });
   if (badges.phoneVerified) items.push({ key: "phone", icon: ShieldCheck, label: t("phoneVerified") });
@@ -75,7 +75,7 @@ export interface SellerCardProps {
 }
 
 export function SellerCard({ seller, fallbackName, fallbackType, locale, children, className }: SellerCardProps) {
-  const t = useTranslations("ListingPage.seller");
+  const t = useNumbersTranslations("ListingPage.seller");
   const name = seller?.displayName ?? fallbackName;
   const type = seller?.sellerType ?? fallbackType;
   const city = seller?.citySlug ? cityBySlug(seller.citySlug) : undefined;

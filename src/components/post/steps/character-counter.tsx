@@ -1,11 +1,11 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useNumbersTranslations } from "@/i18n/numbers";
 import { cn } from "@/lib/utils";
 
 /** "12 / 70 caractères" with a live hint while the minimum is not reached. */
 export function CharacterCounter({ count, min, max }: { count: number; min: number; max: number }) {
-  const t = useTranslations("Listing.fields");
+  const t = useNumbersTranslations("Listing.fields");
   const over = count > max;
   const under = count < min;
   return (

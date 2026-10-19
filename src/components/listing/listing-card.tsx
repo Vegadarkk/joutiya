@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Camera, ImageOff } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { BoostBadge } from "@/components/search/boost-badge";
 import type { CardBadge } from "@/components/search/filter-model";
 import { quietLinkClassName } from "@/components/ui/text-link";
@@ -8,6 +7,7 @@ import { subcategoryById } from "@/config/categories";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
+import { useNumbersTranslations } from "@/i18n/numbers";
 import { intlLocale } from "@/lib/listings/client/format";
 import type { PublicListingCard } from "@/lib/listings/public";
 import { cn } from "@/lib/utils";
@@ -47,7 +47,7 @@ export function formatCardDate(iso: string, locale: Locale): string {
 }
 
 export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3", badge, action, priority = false, wide = false, className }: ListingCardProps) {
-  const t = useTranslations("ListingCard");
+  const t = useNumbersTranslations("ListingCard");
   const Heading = headingLevel;
   const city = listing.citySlug ? cityBySlug(listing.citySlug) : undefined;
   const unit = listing.subcategoryId ? subcategoryById(listing.subcategoryId)?.priceUnit : undefined;

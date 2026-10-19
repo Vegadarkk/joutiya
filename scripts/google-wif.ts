@@ -19,6 +19,7 @@
 //   node scripts/google-wif.ts test <staging|prod>
 //       one-day certificates signed here prove the chain end to end: a Firestore read and a custom
 //       token (web), a Firestore read and a Firebase Auth admin call (worker). Their keys are deleted.
+//       scripts/restore-firestore.ts writes the same way, as the worker (mintCredentials).
 //   node scripts/google-wif.ts sign <file>
 //       signs the VM's requests, the `request joutiya-<env>-<service> <base64>` lines printed by
 //       `oracle-vm.ts wif <env> --apply` (keys made on the VM), for 365 days; prints one
@@ -706,59 +707,94 @@ function login(): void {
 }
 
 // ---------------------------------------------------------------------------------------------
-// test: the chain end to end with one-day certificates, from a child process per container.
+// One-day credentials of a container's identity, signed here: `test`, and the writes of
+// scripts/restore-firestore.ts (as the worker).
 
-function recorded(targets: Targets, env: DeployedEnv): { project: string; projectNumber: string } {
+export function recorded(targets: Targets, env: DeployedEnv): { project: string; projectNumber: string } {
   const { projectId, projectNumber } = targets.environments[env].firebase;
   if (projectId === null || projectNumber === null) throw new Error(`environments.${env}.firebase is not recorded in infra/targets.json`);
   return { project: projectId, projectNumber };
 }
 
+export interface MintedCredentials {
+  /** The file for GOOGLE_APPLICATION_CREDENTIALS. */
+  path: string;
+  /** Deletes the key, its certificate and their configurations. */
+  remove(): void;
+}
+
+/**
+ * Credentials of `service` in `env` for one day: a key made here, its certificate signed by this
+ * machine's CA, in a private temporary folder that `remove` deletes. google-auth-library reads the
+ * certificate again at each token refresh: remove only once done.
+ */
+export function mintCredentials(targets: Targets, env: DeployedEnv, service: WifService, ca = caFiles()): MintedCredentials {
+  const { project, projectNumber } = recorded(targets, env);
+  readCa(ca);
+  const dir = mkdtempSync(join(tmpdir(), `joutiya-wif-${service}-`));
+  const remove = () => rmSync(dir, { recursive: true, force: true });
+  try {
+    const subject = subjectName(env, service);
+    const key = join(dir, "key.pem");
+    const cert = join(dir, "cert.pem");
+    const certificateConfigPath = join(dir, "certificate_config.json");
+    const path = join(dir, "credentials.json");
+    openssl(["genpkey", "-algorithm", "EC", "-pkeyopt", "ec_paramgen_curve:P-256", "-out", key]);
+    const csr = withConfig([`CN = ${subject}`], (config) => openssl(["req", "-new", "-key", key, "-config", config]));
+    writeFileSync(cert, signCsr({ csr, subject, days: 1, ca }));
+    writeFileSync(certificateConfigPath, JSON.stringify(certificateConfig(cert, key)));
+    writeFileSync(path, JSON.stringify(credentialConfig({ projectNumber, project, service, certificateConfigPath })));
+    return { path, remove };
+  } catch (error) {
+    remove();
+    throw error;
+  }
+}
+
+/** Variables that would send the Google libraries elsewhere: an emulator, a client certificate of their own, another gcloud setup. */
+const FOREIGN_GOOGLE_ENV = [
+  "FIRESTORE_EMULATOR_HOST",
+  "FIREBASE_AUTH_EMULATOR_HOST",
+  "GOOGLE_API_CERTIFICATE_CONFIG",
+  "GOOGLE_API_USE_CLIENT_CERTIFICATE",
+  "GOOGLE_API_USE_MTLS_ENDPOINT",
+  "CLOUDSDK_CONFIG",
+  "CLOUDSDK_CORE_PROJECT",
+] as const;
+
+/** `base` signed in with these credentials only, in `project`: never an emulator or another project's settings. */
+export function keylessEnv(project: string, credentials: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...base, GOOGLE_APPLICATION_CREDENTIALS: credentials, GOOGLE_CLOUD_PROJECT: project, GCLOUD_PROJECT: project };
+  for (const name of FOREIGN_GOOGLE_ENV) Reflect.deleteProperty(env, name);
+  return env;
+}
+
+// ---------------------------------------------------------------------------------------------
+// test: the chain end to end, from a child process per container.
+
 const self = fileURLToPath(import.meta.url);
 const PROBE_TRIES = 6;
 const PROBE_PAUSE_MS = 60_000;
 
-/** The child's environment: these credentials only, never an emulator or another project's settings. */
-function probeEnv(project: string, credentials: string): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...process.env, GOOGLE_APPLICATION_CREDENTIALS: credentials, GOOGLE_CLOUD_PROJECT: project, GCLOUD_PROJECT: project };
-  for (const name of ["FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST", "GOOGLE_API_CERTIFICATE_CONFIG", "GOOGLE_API_USE_CLIENT_CERTIFICATE", "GOOGLE_API_USE_MTLS_ENDPOINT", "CLOUDSDK_CONFIG", "CLOUDSDK_CORE_PROJECT"]) {
-    Reflect.deleteProperty(env, name);
-  }
-  return env;
-}
-
 async function test(env: DeployedEnv, targets: Targets): Promise<void> {
-  const { project, projectNumber } = recorded(targets, env);
+  const { project } = recorded(targets, env);
   const ca = caFiles();
-  readCa(ca);
-  const temp = mkdtempSync(join(tmpdir(), "joutiya-wif-test-"));
   let failed = 0;
-  try {
-    for (const service of WIF_SERVICES) {
-      const subject = subjectName(env, service);
-      const dir = join(temp, service);
-      mkdirSync(dir, { mode: 0o700 });
-      const key = join(dir, "key.pem");
-      const cert = join(dir, "cert.pem");
-      const certificateConfigPath = join(dir, "certificate_config.json");
-      const credentials = join(dir, "credentials.json");
-      openssl(["genpkey", "-algorithm", "EC", "-pkeyopt", "ec_paramgen_curve:P-256", "-out", key]);
-      const csr = withConfig([`CN = ${subject}`], (config) => openssl(["req", "-new", "-key", key, "-config", config]));
-      writeFileSync(cert, signCsr({ csr, subject, days: 1, ca }));
-      writeFileSync(certificateConfigPath, JSON.stringify(certificateConfig(cert, key)));
-      writeFileSync(credentials, JSON.stringify(credentialConfig({ projectNumber, project, service, certificateConfigPath })));
+  for (const service of WIF_SERVICES) {
+    const credentials = mintCredentials(targets, env, service, ca);
+    try {
       let ok = false;
       for (let attempt = 1; attempt <= PROBE_TRIES && !ok; attempt += 1) {
         if (attempt > 1) {
           console.log(`${service}: trying again in ${PROBE_PAUSE_MS / 1000} s (IAM changes take a few minutes to apply)`);
           await new Promise((done) => setTimeout(done, PROBE_PAUSE_MS));
         }
-        ok = spawnSync(process.execPath, [self, "probe", service, project], { env: probeEnv(project, credentials), stdio: "inherit" }).status === 0;
+        ok = spawnSync(process.execPath, [self, "probe", service, project], { env: keylessEnv(project, credentials.path), stdio: "inherit" }).status === 0;
       }
       if (!ok) failed += 1;
+    } finally {
+      credentials.remove();
     }
-  } finally {
-    rmSync(temp, { recursive: true, force: true });
   }
   if (failed > 0) throw new Error(`${env}: ${failed} of ${WIF_SERVICES.length} containers cannot reach Google without a key`);
   console.log(`${env}: web and worker reach Firestore and Firebase Auth without a key`);
