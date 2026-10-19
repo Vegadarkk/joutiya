@@ -93,7 +93,10 @@ describe("suspension", () => {
 
     // Not ended yet: the job leaves it; 8 days later it is lifted.
     expect(await liftSuspensions(new Date())).toMatchObject({ lifted: 0 });
-    expect(await liftSuspensions(new Date(Date.now() + 8 * DAY_MS))).toMatchObject({ lifted: 1, failed: 0 });
+    // Other files' suspensions share the emulator (stream-revoke suspends for 7 days too): count this one at least.
+    const lifted = await liftSuspensions(new Date(Date.now() + 8 * DAY_MS));
+    expect(lifted.failed).toBe(0);
+    expect(lifted.lifted).toBeGreaterThanOrEqual(1);
     expect((await getClaims(seller.uid)).st).toBeUndefined();
     expect(await userStatus(seller.uid)).toBe("active");
     expect(await suspensionDoc(seller.uid)).toBeUndefined();
