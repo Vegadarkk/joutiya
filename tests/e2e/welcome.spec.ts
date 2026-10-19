@@ -84,7 +84,10 @@ test.describe("welcome threshold", () => {
     await expect(dialog.getByText("باب مفتوح على العالم.")).toBeVisible();
     // The leaf's hinge is on the start side: mirrored from French.
     const origin = await page.locator(".welcome-leaf").evaluate((leaf) => getComputedStyle(leaf).transformOrigin);
+    // The Arabic visit used up this device's first visit: start the French one from an empty device.
+    await page.evaluate(() => localStorage.clear());
     await page.goto("/fr");
+    await expect(welcome(page)).toBeVisible();
     const french = await page.locator(".welcome-leaf").evaluate((leaf) => getComputedStyle(leaf).transformOrigin);
     expect(origin).not.toEqual(french);
   });
