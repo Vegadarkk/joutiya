@@ -123,6 +123,10 @@
     "retry": "Réessayer",
     "back": "Revenir à l'accueil"
   },
+  "Toaster": {
+    "region": "Notifications",
+    "close": "Fermer la notification"
+  },
   "Auth": {
     "common": {
       "email": "Adresse e-mail",
@@ -202,10 +206,41 @@
     },
     "consents": {
       "cgu": "J'ai lu et j'accepte les <link>conditions générales d'utilisation</link> de Joutiya.",
-      "transfers": "J'autorise expressément Joutiya à transférer mes données personnelles hors du Maroc, vers ses prestataires d'hébergement et d'envoi d'e-mails situés dans l'Union européenne et aux États-Unis (article 44 de la loi 09-08). Sans cet accord, le compte ne peut pas être créé.",
+      "transfers": "J'autorise expressément Joutiya à transférer mes données personnelles hors du Maroc, vers l'Union européenne et les États-Unis, aux prestataires listés ci-dessous et pour le rôle indiqué (article 44 de la loi 09-08).",
+      "transfersRequired": "Sans cet accord, le compte ne peut pas être créé.",
+      "transfersDetails": "Voir les prestataires et leur rôle",
+      "transfersEu": "Dans l'Union européenne",
+      "transfersUs": "Aux États-Unis",
+      "transfersNote": "Avant tout envoi à une intelligence artificielle, les numéros, les e-mails et les noms sont masqués. Les garanties de chaque transfert sont décrites dans la <link>politique de confidentialité</link>.",
+      "roles": {
+        "oracle": "Le serveur qui fait fonctionner le site, la recherche et les tâches automatiques, à Paris.",
+        "firestore": "La base de données, à Paris.",
+        "r2": "Le stockage des photos et des sauvegardes.",
+        "sentry": "Le suivi des erreurs techniques.",
+        "brevo": "L'envoi de secours des e-mails de sécurité, en France.",
+        "googleAuth": "La connexion et la gestion des comptes.",
+        "adsense": "La publicité, quand elle sera activée, et seulement avec votre accord donné à part.",
+        "cloudflare": "La diffusion et la protection du site, la vérification anti-robot (Turnstile) et l'IA de secours du contrôle des annonces (Workers AI), sur son réseau mondial.",
+        "anthropic": "L'aide au contrôle des annonces, au tri des signalements et à l'examen des recours, et l'Assistant Joutiya.",
+        "openai": "Le contrôle de secours des contenus.",
+        "meta": "La vérification de votre numéro de téléphone par WhatsApp.",
+        "resend": "L'envoi des e-mails.",
+        "stripe": "Les paiements, à l'ouverture des ventes.",
+        "revenuecat": "Les abonnements Pro, à l'ouverture des ventes."
+      },
       "marketing": "Je souhaite recevoir par e-mail les nouveautés et les offres de Joutiya. Facultatif, et révocable à tout moment.",
       "privacy": "Le traitement de vos données est décrit dans la <link>politique de confidentialité</link>.",
       "legend": "Consentements"
+    },
+    "reconsent": {
+      "title": "Confirmez votre accord pour continuer",
+      "lead": "Nous avons précisé la liste des prestataires qui reçoivent vos données hors du Maroc, avec le rôle et le lieu de chacun. Votre accord précédent portait sur un texte moins précis : pour continuer à utiliser votre compte, donnez-le à nouveau.",
+      "submit": "Accepter et continuer",
+      "accepted": "Votre accord est enregistré.",
+      "refuseTitle": "Vous ne souhaitez pas donner cet accord ?",
+      "refuseBody": "Sans cet accord, votre compte ne peut pas être utilisé : il fonctionne avec ces prestataires. Vous pouvez vous déconnecter, et demander la suppression de votre compte en écrivant à <mail>{dpo}</mail>.",
+      "signOut": "Se déconnecter",
+      "signedOut": "Vous êtes déconnecté."
     },
     "forgot": {
       "title": "Mot de passe oublié",

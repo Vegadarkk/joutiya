@@ -140,6 +140,12 @@ export async function updateLocale(uid: string, locale: Locale, now = new Date()
   void consume("firestore.writes", 1);
 }
 
+/** Renewed transfers consent (art. 44 loi 09-08): only consents.transfers changes (a dotted path in update()). */
+export async function updateTransfersConsent(uid: string, version: string, now = new Date()): Promise<void> {
+  await privateRef(uid).update({ "consents.transfers": { version, at: now } });
+  void consume("firestore.writes", 1);
+}
+
 /** Accounts still pending after `before` (purge-unactivated): uids, oldest first. */
 export async function listPendingAccounts(before: Date, limit = 200): Promise<string[]> {
   const snapshot = await db()

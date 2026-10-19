@@ -23,6 +23,7 @@ function render(text: string, values: LegalValues): string {
 
 function BlockView({ block, values }: { block: Block; values: LegalValues }) {
   if (typeof block === "string") return <p>{render(block, values)}</p>;
+  if ("ifSet" in block) return values[block.ifSet] ? <p>{render(block.text, values)}</p> : null;
   return (
     <ul className="flex list-disc flex-col gap-1.5 ps-5 marker:text-featured">
       {block.list.map((item) => (

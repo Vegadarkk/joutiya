@@ -2,9 +2,10 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { ThemeSync } from "@/components/layout/theme";
 import { ThemeScript } from "@/components/layout/theme-script";
-import { Toaster } from "@/components/ui/toaster";
+import { LabelledToaster } from "@/components/ui/toaster";
 import { ACCESS_JWT_HEADER, verifyAccessJwt } from "@/lib/auth/access-jwt";
 import { serverEnv } from "@/lib/env";
 import { readex } from "@/lib/fonts";
@@ -32,13 +33,14 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     if (!identity) notFound();
   }
   const nonce = requestHeaders.get("x-nonce") ?? undefined;
+  const toaster = await getTranslations({ locale: "fr", namespace: "Toaster" });
   return (
     <html lang="fr-MA" dir="ltr" className={readex.variable} suppressHydrationWarning>
       <body className="min-h-dvh bg-surface-muted antialiased">
         <ThemeScript nonce={nonce} />
         <ThemeSync />
         {children}
-        <Toaster dir="ltr" />
+        <LabelledToaster dir="ltr" labels={{ region: toaster("region"), close: toaster("close") }} />
       </body>
     </html>
   );

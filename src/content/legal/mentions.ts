@@ -25,7 +25,8 @@ export function legalValues(config: LegalConfig): LegalValues {
     languages: config.dsaContactLanguages.map((code) => LANGUAGE_NAMES[code]).join(", "),
     ttlDays: String(config.listingTtlDays),
     purgeMonths: String(config.listingPurgeMonths),
-    cndp: config.cndpReceiptNo ? `récépissé n° ${config.cndpReceiptNo}` : "en cours",
+    // Empty until a receipt exists: the CNDP sentence (an `ifSet` block) is then left out.
+    cndp: config.cndpReceiptNo ? `récépissé n° ${config.cndpReceiptNo}` : "",
   };
 }
 
