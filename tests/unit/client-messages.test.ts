@@ -53,11 +53,15 @@ function clientModules(entries: string[]): Set<string> {
   return modules;
 }
 
-/** Namespaces read by useTranslations in client modules reachable from `entries`, with their readers. */
+/** The wrapper of useTranslations (src/i18n/numbers.ts): its callers name the namespaces. */
+const WRAPPER = path.join(SRC, "i18n/numbers.ts");
+
+/** Namespaces read by useTranslations (or useNumbersTranslations) in client modules reachable from `entries`, with their readers. */
 function clientNamespaces(entries: string[]): Map<string, Set<string>> {
   const found = new Map<string, Set<string>>();
   for (const file of clientModules(entries)) {
-    for (const match of readFileSync(file, "utf8").matchAll(/useTranslations\(([^)]*)\)/g)) {
+    if (file === WRAPPER) continue;
+    for (const match of readFileSync(file, "utf8").matchAll(/use(?:Numbers)?Translations\(([^)]*)\)/g)) {
       const literal = /^\s*"([^"]+)"\s*$/.exec(match[1] ?? "");
       const namespace = literal?.[1] ?? `<not a literal: ${match[1]}>`;
       if (!found.has(namespace)) found.set(namespace, new Set());

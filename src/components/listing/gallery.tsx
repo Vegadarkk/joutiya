@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { ChevronLeft, ChevronRight, Expand, ImageOff, RotateCw } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { InlineError } from "@/components/feedback/inline-error";
 import { loadWithRetry } from "@/components/layout/chunk-retry";
 import { Button } from "@/components/ui/button";
+import { useNumbersTranslations } from "@/i18n/numbers";
 import { isolate } from "@/lib/i18n/bidi";
 import { cn } from "@/lib/utils";
 import { scrollToIndex, useTrackNavigation, useTrackIndex } from "./gallery-track";
@@ -38,7 +38,7 @@ const PHOTO_FOCUS = cn(
 
 /** Stands in for the lightbox while its chunk cannot be downloaded: closes at once, under a reload prompt. */
 export function LightboxUnavailable({ open, start, onClose }: LightboxProps) {
-  const t = useTranslations("ListingPage.gallery");
+  const t = useNumbersTranslations("ListingPage.gallery");
   useEffect(() => {
     if (open) onClose(start);
   }, [open, start, onClose]);
@@ -74,7 +74,7 @@ export interface GalleryProps {
 }
 
 export function Gallery({ listingId, title, photos, mediaBaseUrl, className }: GalleryProps) {
-  const t = useTranslations("ListingPage.gallery");
+  const t = useNumbersTranslations("ListingPage.gallery");
   const [track, setTrack] = useState<HTMLUListElement | null>(null);
   const count = photos.length;
   const [index] = useTrackIndex(track, count);

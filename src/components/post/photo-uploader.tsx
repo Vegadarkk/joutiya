@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
+import { useNumbersTranslations } from "@/i18n/numbers";
 import { blurhashDataUrl } from "@/lib/listings/client/blurhash";
 import { ACCEPTED_INPUT_TYPES } from "@/lib/listings/client/prepare-image";
 import { isPhotoBusy, type PhotoItem } from "@/lib/listings/client/store";
@@ -35,7 +36,7 @@ function hasFiles(event: DragEvent): boolean {
 }
 
 export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onRefresh, onMove, keepOne = false }: PhotoUploaderProps) {
-  const t = useTranslations("Listing.photos");
+  const t = useNumbersTranslations("Listing.photos");
   const errors = useTranslations("Listing.errors");
   const picker = useRef<HTMLInputElement>(null);
   const camera = useRef<HTMLInputElement>(null);
@@ -197,7 +198,7 @@ interface PhotoTileProps {
 }
 
 function PhotoTile({ item, index, total, canRemove, onRemove, onRetry, onRefresh, onMove }: PhotoTileProps) {
-  const t = useTranslations("Listing.photos");
+  const t = useNumbersTranslations("Listing.photos");
   const errors = useTranslations("Listing.errors");
   const n = index + 1;
   const busy = isPhotoBusy(item);

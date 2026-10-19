@@ -255,6 +255,17 @@ test.describe("listing page", () => {
     await expect(dialog).toContainText("الصورة 1 من 2");
   });
 
+  test("Tarifit: the French fallback, numbers and plurals formatted in French on the server and in the browser", async ({ page }) => {
+    await page.goto(`/rif/annonce/${fixture.published.slugId}`);
+    await expect(page.getByRole("heading", { level: 1, name: fixture.published.title })).toBeVisible();
+    // Server component (seller card) and client island (gallery), both through useNumbersTranslations.
+    await expect(page.getByTestId("seller-card")).toContainText(/\d+ annonces? en ligne/);
+    await expect(page.getByTestId("gallery")).toHaveAttribute("aria-label", "Photos de l'annonce, 2 photos");
+    await page.getByRole("button", { name: "Agrandir la photo" }).first().click();
+    await expect(page.getByRole("dialog", { name: fixture.published.title })).toContainText("Photo 1 sur 2");
+    await expect(page.getByRole("heading", { name: ERROR_TITLE })).toHaveCount(0);
+  });
+
   test("sends an anonymous visitor to sign-in before showing the number, then back here", async ({ page }) => {
     const { slugId } = fixture.published;
     await page.goto(`/fr/annonce/${slugId}`);
