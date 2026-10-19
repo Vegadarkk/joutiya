@@ -18,6 +18,9 @@ export default defineConfig({
     baseURL,
     trace: "retain-on-failure",
     launchOptions: executablePath ? { executablePath } : {},
+    // A device that already went through the welcome threshold (design C7): the other specs test
+    // the page itself; tests/e2e/welcome.spec.ts starts from an empty device.
+    storageState: { cookies: [], origins: [{ origin: baseURL, localStorage: [{ name: "welcome", value: "seen" }, { name: "door", value: "opened" }] }] },
   },
   webServer: {
     command: "node scripts/start-standalone.ts",

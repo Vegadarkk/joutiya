@@ -3,11 +3,14 @@ import { Slot } from "radix-ui";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { Spinner } from "./spinner";
+import { textLinkClassName } from "./text-link";
 
+// Press feedback: scale .98 in 150 ms on the door curve. Tailwind v4 scales with the `scale`
+// property, not `transform`, so the transition names it. Focus: the global :focus-visible outline.
 const buttonVariants = cva(
   [
     "inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium",
-    "transition-[background-color,border-color,color,transform] duration-150 ease-door",
+    "transition-[background-color,border-color,color,opacity,scale] duration-150 ease-door",
     "active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 aria-busy:cursor-progress",
     "[&_svg]:size-[1.1em] [&_svg]:shrink-0",
   ],
@@ -18,7 +21,7 @@ const buttonVariants = cva(
         structure: "bg-structure text-structure-foreground hover:bg-bab-600",
         outline: "border border-border-strong bg-surface text-foreground hover:border-foreground/40 hover:bg-surface-muted",
         ghost: "text-foreground hover:bg-surface-muted",
-        link: "h-auto px-0 text-link underline underline-offset-4 hover:no-underline active:scale-100",
+        link: cn("h-auto px-0 text-link active:scale-100", textLinkClassName),
         danger: "bg-danger text-danger-foreground hover:opacity-90",
       },
       size: {

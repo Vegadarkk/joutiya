@@ -40,7 +40,7 @@ export function StepProgress({ current, states, onSelect, reachable }: StepProgr
         aria-expanded={open}
         aria-controls={listId}
         onClick={() => setOpenOn(open ? null : current)}
-        className="group -mx-2 flex min-h-11 flex-col justify-center gap-3 rounded-md px-2 py-1.5 text-start focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25 lg:hidden"
+        className="group -mx-2 flex min-h-11 flex-col justify-center gap-3 rounded-md px-2 py-1.5 text-start lg:hidden"
       >
         <span className="flex w-full items-center justify-between gap-3 text-sm font-medium text-foreground-muted">
           {t("stepOf", { current: currentIndex + 1, total: WIZARD_STEPS.length })}
@@ -54,7 +54,7 @@ export function StepProgress({ current, states, onSelect, reachable }: StepProgr
               <span
                 key={step}
                 className={cn(
-                  "block h-1.5 min-w-0 flex-1 rounded-full transition-[background-color,transform] duration-150 ease-door",
+                  "block h-1.5 min-w-0 flex-1 rounded-full transition-[background-color,scale] duration-150 ease-door",
                   isCurrent && "scale-y-[1.35]",
                   isCurrent ? "bg-featured" : state === "complete" ? "bg-structure" : state === "incomplete" && index < currentIndex ? "bg-danger/70" : "bg-border",
                 )}
@@ -81,7 +81,6 @@ export function StepProgress({ current, states, onSelect, reachable }: StepProgr
                 aria-current={isCurrent ? "step" : undefined}
                 className={cn(
                   "flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-start text-sm transition-colors duration-150 ease-door",
-                  "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25",
                   isCurrent ? "bg-surface-brand font-semibold text-foreground" : can ? "text-foreground hover:bg-surface-muted" : "text-foreground-muted",
                   !can && !isCurrent && "cursor-default",
                 )}

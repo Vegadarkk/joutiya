@@ -157,7 +157,7 @@ export function SearchCityCombobox({ value, onChange, label, hideLabel, names, i
               setQuery(null);
               input.current?.focus();
             }}
-            className="absolute inset-y-0 end-0 flex w-11 items-center justify-center rounded-e-md text-foreground-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25"
+            className="absolute inset-y-0 end-0 flex w-11 items-center justify-center rounded-e-md text-foreground-muted transition-colors duration-150 ease-door hover:text-foreground focus-visible:-outline-offset-2"
           >
             <X className="size-4" aria-hidden="true" />
           </button>

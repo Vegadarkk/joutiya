@@ -8,9 +8,11 @@ import type { z } from "@/lib/zod";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { quietLinkClassName } from "@/components/ui/text-link";
 import { Link } from "@/i18n/navigation";
 import { apiPost, isApiError, setSession } from "@/lib/auth/client";
 import { AUTH_API, loginSchema, type LoginInput, type LoginResponse } from "@/lib/contracts/auth";
+import { cn } from "@/lib/utils";
 import { FormMessage, useFieldMessage } from "./form-message";
 import { GoogleButton, type GoogleNeedsConsent } from "./google-button";
 import { GoogleConsentStep } from "./google-consent-step";
@@ -112,7 +114,7 @@ export function LoginForm({ nonce }: { nonce?: string }) {
         <PasswordField
           label={c("password")}
           labelAside={
-            <Link href="/mot-de-passe-oublie" className="text-link underline-offset-2 hover:underline">
+            <Link href="/mot-de-passe-oublie" className={cn("text-link", quietLinkClassName)}>
               {t("forgot")}
             </Link>
           }

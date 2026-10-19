@@ -61,7 +61,7 @@ export function Lightbox({ open, start, onClose, onCloseAutoFocus, listingId, ti
               {t("position", { index: index + 1, count })}
             </span>
             <Dialog.Close asChild>
-              <button type="button" aria-label={t("close")} className="flex size-11 items-center justify-center rounded-full bg-cream-100/10 hover:bg-cream-100/20 focus-visible:outline-2 focus-visible:outline-gold-300">
+              <button type="button" aria-label={t("close")} className="flex size-11 items-center justify-center rounded-full bg-cream-100/10 transition-[background-color,scale] duration-150 ease-door hover:bg-cream-100/20 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-gold-300">
                 <X className="size-5" aria-hidden="true" />
               </button>
             </Dialog.Close>
@@ -114,7 +114,7 @@ function LightboxArrow({ direction, label, disabled, onClick, className }: { dir
       disabled={disabled}
       aria-label={label}
       className={cn(
-        "absolute top-1/2 hidden size-12 -translate-y-1/2 items-center justify-center rounded-full bg-cream-100/10 hover:bg-cream-100/20 focus-visible:outline-2 focus-visible:outline-gold-300 disabled:pointer-events-none disabled:opacity-0 sm:flex",
+        "absolute top-1/2 hidden size-12 -translate-y-1/2 items-center justify-center rounded-full bg-cream-100/10 transition-[background-color,opacity,scale] duration-150 ease-door hover:bg-cream-100/20 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-gold-300 disabled:pointer-events-none disabled:opacity-0 sm:flex",
         className,
       )}
     >

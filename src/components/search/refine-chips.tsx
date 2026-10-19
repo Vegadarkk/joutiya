@@ -27,8 +27,9 @@ export function RefineChips({ params, facets, className }: { params: SearchParam
               scroll={false}
               className={cn(
                 "inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm whitespace-nowrap sm:min-h-9",
-                "transition-[border-color,background-color] duration-150 ease-door hover:border-structure/50 hover:bg-surface-muted",
-                "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25",
+                "transition-[border-color,background-color,scale] duration-150 ease-door hover:border-structure/50 hover:bg-surface-muted active:scale-[0.98]",
+                // The phone row scrolls and clips outside its chips: the focus ring goes inside.
+                "max-sm:focus-visible:-outline-offset-2",
               )}
             >
               <span className="font-medium">{item.kind === "subcategory" ? names.subcategory(item.categoryId, item.id) : names.category(item.id)}</span>

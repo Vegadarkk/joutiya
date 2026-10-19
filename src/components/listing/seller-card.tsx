@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { BadgeCheck, MailCheck, MapPin, ShieldCheck } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { quietLinkClassName, textLinkClassName } from "@/components/ui/text-link";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
@@ -87,7 +88,7 @@ export function SellerCard({ seller, fallbackName, fallbackType, locale, childre
           <p className="text-xs text-foreground-muted">{type === "pro" ? t("roleBusiness") : t("roleIndividual")}</p>
           <h2 id="seller-name" className="flex flex-wrap items-center gap-2 text-lg font-semibold leading-tight">
             {seller ? (
-              <Link href={`/profil/${seller.publicId}`} prefetch={false} dir="auto" className="break-words rounded-sm hover:underline hover:underline-offset-2">
+              <Link href={`/profil/${seller.publicId}`} prefetch={false} dir="auto" className={cn("break-words rounded-sm", quietLinkClassName)}>
                 {name}
               </Link>
             ) : (
@@ -108,7 +109,7 @@ export function SellerCard({ seller, fallbackName, fallbackType, locale, childre
       </div>
       {seller ? <SellerBadges badges={seller.badges} sellerType={seller.sellerType} /> : null}
       {seller ? (
-        <Link href={`/profil/${seller.publicId}`} prefetch={false} className="-my-3 inline-flex min-h-11 items-center self-start rounded-sm text-sm font-medium text-link underline underline-offset-4 hover:no-underline">
+        <Link href={`/profil/${seller.publicId}`} prefetch={false} className={cn("-my-3 inline-flex min-h-11 items-center self-start rounded-sm text-sm font-medium text-link", textLinkClassName)}>
           {t("listingsOnline", { count: seller.publishedCount })}
         </Link>
       ) : null}
