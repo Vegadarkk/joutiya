@@ -181,8 +181,9 @@ export function uploadToPresignedUrl(url: string, headers: Record<string, string
 }
 
 /**
- * POST /api/auth/google: the Google Identity Services credential with the nonce the page gave GIS
- * (the server matches it against the token's `nonce` claim: a captured token cannot be replayed).
+ * POST /api/auth/google: the Google Identity Services credential. The page gave GIS a nonce derived
+ * from the device cookie; the server recomputes it from that cookie and matches the token's `nonce`
+ * claim, so a token cannot be used from another device (nothing in this body attests it).
  */
 export function googleSignIn(input: GoogleInput): Promise<GoogleResponse> {
   return apiPost<GoogleResponse>(AUTH_API.google, input);

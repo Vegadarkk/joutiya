@@ -10,6 +10,9 @@ vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/security/turnstile", () => ({ verifyTurnstile: vi.fn(async () => ({ ok: true, codes: [] })) }));
 // Spies around the real limiter: single tests make the store "unavailable".
 vi.mock("@/lib/rate-limit/limiter", { spy: true });
+// Spies around the real roster: single tests shrink the active admins to the target (the emulator
+// roster is shared with other runs, so "the last admin" cannot be arranged in Firestore itself).
+vi.mock("@/lib/db/repositories/staff", { spy: true });
 
 import { DELETE as deleteStaff } from "@/app/api/admin/staff/[uid]/route";
 import { GET as getStaff, POST as postStaff } from "@/app/api/admin/staff/route";
@@ -17,7 +20,7 @@ import { POST as postLogin } from "@/app/api/admin/auth/login/route";
 import { POST as postLogout } from "@/app/api/admin/auth/logout/route";
 import { POST as postPassword } from "@/app/api/admin/auth/password/route";
 import type { StaffListResponse, StaffLoginResponse } from "@/lib/auth/staff";
-import { getStaff as readRoster, upsertStaff } from "@/lib/db/repositories/staff";
+import { getStaff as readRoster, listActiveAdmins, upsertStaff } from "@/lib/db/repositories/staff";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { resetServerEnv } from "@/lib/env";
 import { auth, db } from "@/lib/firebase/admin";
@@ -422,6 +425,11 @@ describe("invitation, password and revocation", () => {
 
     const unknown = await deleteStaff(call("DELETE", "/api/admin/staff/nobody", { access: EMAIL.admin, cookies: admin.cookies, csrf: admin.csrf }), ctx({ uid: "nobody" }));
     expect(unknown.status).toBe(404);
+    // A path is not a document id: "a/b/c" would address a subcollection document (and "a/b" would throw in the SDK).
+    for (const uid of ["a/b/c", "a/b", "x".repeat(129), "nobody?"]) {
+      const path = await deleteStaff(call("DELETE", `/api/admin/staff/${encodeURIComponent(uid)}`, { access: EMAIL.admin, cookies: admin.cookies, csrf: admin.csrf }), ctx({ uid }));
+      expect(path.status).toBe(404);
+    }
     // A member account is not a staff member either (and stays untouched).
     const member = await deleteStaff(call("DELETE", `/api/admin/staff/${uids.member}`, { access: EMAIL.admin, cookies: admin.cookies, csrf: admin.csrf }), ctx({ uid: uids.member }));
     expect(member.status).toBe(404);
@@ -478,6 +486,47 @@ describe("invitation, password and revocation", () => {
     expect(record.disabled).toBe(false);
     expect(record.customClaims).toEqual({ role: "admin", v: 2 });
     expect((await readRoster(invitedUid))?.revokedAt).toBeUndefined();
+    // A revoked entry given a role again is a re-invitation, not a role change.
+    expect((await db().collection(COLLECTIONS.auditLogs).where("action", "==", "staff.role_change").where("target.id", "==", invitedUid).get()).size).toBe(0);
+  });
+
+  it("audits a new role on an active colleague as staff.role_change, and keeps at least one active admin", async () => {
+    const roleChanges = () => db().collection(COLLECTIONS.auditLogs).where("action", "==", "staff.role_change").where("target.id", "==", invitedUid).get();
+    // Demoting an active admin while another one (the caller) remains: allowed, audited as a role change.
+    const demoted = await invite({ email: EMAIL.invited, displayName: "Invitée Test", role: "moderator" });
+    expect(demoted.status).toBe(201);
+    expect((await auth().getUser(invitedUid)).customClaims).toEqual({ role: "moderator", v: 2 });
+    expect((await readRoster(invitedUid))?.role).toBe("moderator");
+    let entries = await roleChanges();
+    expect(entries.size).toBe(1);
+    expect(entries.docs[0]!.data()).toMatchObject({ actorUid: uids.admin, actorRole: "admin", automated: false, reason: "admin->moderator" });
+    // Back to admin: a second entry; the same role again: an invitation only.
+    expect((await invite({ email: EMAIL.invited, displayName: "Invitée Test", role: "admin" })).status).toBe(201);
+    expect((await invite({ email: EMAIL.invited, displayName: "Invitée Test", role: "admin" })).status).toBe(201);
+    entries = await roleChanges();
+    expect(entries.docs.map((entry) => entry.get("reason")).sort()).toEqual(["admin->moderator", "moderator->admin"]);
+
+    // The roster as the guard would see it once `invited` is the only active admin left (the
+    // caller's own entry already demoted by a concurrent change, or a bootstrap without entry).
+    const only = (await listActiveAdmins()).filter((member) => member.uid === invitedUid);
+    expect(only).toHaveLength(1);
+    vi.mocked(listActiveAdmins).mockResolvedValueOnce(only);
+    const lastDemotion = await invite({ email: EMAIL.invited, displayName: "Invitée Test", role: "moderator" });
+    expect(lastDemotion.status).toBe(409);
+    expect(await errorCode(lastDemotion)).toBe("conflict");
+    expect((await auth().getUser(invitedUid)).customClaims).toEqual({ role: "admin", v: 2 });
+    expect((await readRoster(invitedUid))?.role).toBe("admin");
+    vi.mocked(listActiveAdmins).mockResolvedValueOnce(only);
+    const lastRevocation = await deleteStaff(call("DELETE", `/api/admin/staff/${invitedUid}`, { access: EMAIL.admin, cookies: admin.cookies, csrf: admin.csrf }), ctx({ uid: invitedUid }));
+    expect(lastRevocation.status).toBe(409);
+    expect(await errorCode(lastRevocation)).toBe("conflict");
+    expect((await auth().getUser(invitedUid)).disabled).toBe(false);
+    expect((await auth().getUser(invitedUid)).customClaims).toEqual({ role: "admin", v: 2 });
+    expect((await readRoster(invitedUid))?.revokedAt).toBeUndefined();
+    // With the caller still an active admin in the roster, the revocation goes through.
+    const revoked = await deleteStaff(call("DELETE", `/api/admin/staff/${invitedUid}`, { access: EMAIL.admin, cookies: admin.cookies, csrf: admin.csrf }), ctx({ uid: invitedUid }));
+    expect(revoked.status).toBe(204);
+    expect((await readRoster(invitedUid))?.revokedAt).toBeInstanceOf(Date);
   });
 });
 

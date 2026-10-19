@@ -43,6 +43,10 @@ export default defineConfig({
       // Turnstile test keys: always pass (Cloudflare's documented dummy pair).
       TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
       TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
+      // A client id makes the Google button render; the pages load a stub in place of the Google
+      // script (tests/e2e/gsi-stub.ts) and the server rejects its credentials (no Google keys). The
+      // prefix is the dev project number: the startup check compares it with infra/targets.json.
+      GOOGLE_OAUTH_CLIENT_ID: "89741285084-e2estub.apps.googleusercontent.com",
       // WhatsApp verification: dummy credentials, the tests sign the webhook payloads themselves
       // (tests/e2e/phone.spec.ts keeps the same values); the display number is the dev placeholder.
       WHATSAPP_APP_SECRET: "e2e-whatsapp-app-secret",

@@ -128,6 +128,7 @@ function ProfileSection({ session }: { session: SessionSummary }) {
   } = useForm<ProfileForm, unknown, ProfileInput>({
     resolver: zodResolver(profileSchema),
     defaultValues: { displayName: session.displayName ?? "", locale: session.locale ?? "fr" },
+    mode: "onTouched",
   });
 
   const submit = handleSubmit(async (values) => {
@@ -209,6 +210,7 @@ function PasswordChangeForm({ email, displayName }: { email: string | null; disp
   } = useForm<PasswordForm, unknown, PasswordInput>({
     resolver: zodResolver(passwordChangeSchema),
     defaultValues: { currentPassword: "", password: "" },
+    mode: "onTouched",
   });
   const password = useWatch({ control, name: "password" });
 

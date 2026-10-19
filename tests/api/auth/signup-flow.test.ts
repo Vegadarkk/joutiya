@@ -6,10 +6,12 @@ import { COLLECTIONS } from "@/lib/db/schemas";
 import { auth, db } from "@/lib/firebase/admin";
 import { setClaims } from "@/lib/firebase/claims";
 import { sendMail } from "@/lib/mail";
+import { addSuppression, isSuppressed } from "@/lib/mail/suppressions";
 import type { TemplateMail } from "@/lib/mail/types";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { POST as action } from "@/app/api/auth/action/route";
+import { POST as login } from "@/app/api/auth/login/route";
 import { GET as inbox } from "@/app/api/conversations/route";
 import { POST as logout } from "@/app/api/auth/logout/route";
 import { GET as me } from "@/app/api/auth/me/route";
@@ -142,12 +144,17 @@ describe("sign-up, verification, session, profile, logout", () => {
     expect(await loggedEvents(session.uid)).toEqual(["signup", "login", "logout"]);
   });
 
-  it("answers an existing e-mail exactly like a new one and warns the owner by mail", async () => {
+  it("answers an existing e-mail exactly like a new one (body and duration) and warns the owner by mail", async () => {
     const email = uniqueEmail();
+    const firstAt = Date.now();
     const first = await signUp(new Jar(), email);
     expect(first.template).toBe("verifyEmail");
+    // A new address and an existing one take at least the same time (timing enumeration, A1-05).
+    expect(Date.now() - firstAt).toBeGreaterThanOrEqual(UNIFORM_RESPONSE_MS - 5);
     const before = capturedMails(sendMail).length;
+    const secondAt = Date.now();
     const second = await call<{ status: string }>(signup, SIGNUP, { jar: new Jar(), body: signupBody(email, "Someone Else") });
+    expect(Date.now() - secondAt).toBeGreaterThanOrEqual(UNIFORM_RESPONSE_MS - 5);
     expect(second.status).toBe(202);
     expect(second.body).toEqual({ status: "verification_sent" });
     const mails = capturedMails(sendMail).slice(before);
@@ -227,14 +234,19 @@ describe("sign-up, verification, session, profile, logout", () => {
     expect(capturedMails(sendMail).filter((mail) => mail.template === "verifyEmail")).toHaveLength(2);
   });
 
-  it("adopts an orphan Auth record without documents, never a staff account", async () => {
-    // Left by a failed sign-up or by a purge whose Auth deletion failed.
+  it("replaces an orphan Auth record without documents by a fresh uid (never adopted), never a staff account", async () => {
+    // Left by a failed sign-up or by a purge whose Auth deletion failed. Its uid may still key data
+    // (favourites, listings in retention...) once account closure exists: deleted, never reused.
     const email = uniqueEmail("orphan");
     const orphan = await auth().createUser({ email, password: `left-over-${PASSWORD}`, emailVerified: false });
     const mail = await signUp(new Jar(), email);
     expect(mail.to).toBe(email);
-    expect(await findUidByEmail(email)).toBe(orphan.uid);
-    expect(await getUser(orphan.uid)).toMatchObject({ activation: "pending" });
+    const uid = await findUidByEmail(email);
+    expect(uid).not.toBeNull();
+    expect(uid).not.toBe(orphan.uid);
+    expect(await getUser(uid!)).toMatchObject({ activation: "pending" });
+    expect((await auth().getUser(uid!)).email).toBe(email);
+    await expect(auth().getUser(orphan.uid)).rejects.toMatchObject({ code: "auth/user-not-found" });
 
     const staffEmail = uniqueEmail("staff");
     const staff = await auth().createUser({ email: staffEmail, emailVerified: true });
@@ -244,6 +256,50 @@ describe("sign-up, verification, session, profile, logout", () => {
     expect(await getUser(staff.uid)).toBeNull();
     expect(await findUidByEmail(staffEmail)).toBeNull();
     expect((await auth().getUser(staff.uid)).customClaims).toMatchObject({ role: "moderator" });
+  });
+
+  it("opens a session from the verification link on the device that signed up only; elsewhere the account is activated without a session", async () => {
+    // Same device (the cookie the sign-up answer set, kept by the jar): activated and signed in.
+    const jar = new Jar();
+    const email = uniqueEmail("dev");
+    const verified = await verify(jar, (await signUp(jar, email)).data.actionUrl);
+    expect(verified.body.session.uid).toBe(await findUidByEmail(email));
+    expect(jar.get("__Host-session")).toBeDefined();
+    const account = await getUserPrivate(verified.body.session.uid);
+    // The private document holds a peppered hash of the device id, never the id itself.
+    expect(account?.signupDeviceHash).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(account?.signupDeviceHash).not.toContain(jar.get("__Host-did")!.split(".")[0]);
+
+    // Another browser (a victim whose address someone else registered, or simply another device):
+    // the link activates the account but opens no session; the password still signs in.
+    const signupJar = new Jar();
+    const otherEmail = uniqueEmail("elsewhere");
+    const mail = await signUp(signupJar, otherEmail);
+    const elsewhere = new Jar();
+    const activated = await call<{ status: string; session: null }>(action, ACTION, { jar: elsewhere, body: { mode: "verifyEmail", oobCode: oobCodeOf(mail.data.actionUrl) } });
+    expect(activated.status).toBe(200);
+    expect(activated.body).toEqual({ status: "verified", session: null });
+    expect(elsewhere.get("__Host-session")).toBeUndefined();
+    expect(activated.header("x-csrf-token")).toBeNull();
+    const uid = (await findUidByEmail(otherEmail))!;
+    expect(await getUserRecord(uid)).toMatchObject({ activation: "done", badges: { emailVerified: true } });
+    expect((await auth().getUser(uid)).customClaims).toMatchObject({ role: "individual" });
+    expect((await auth().getUser(uid)).emailVerified).toBe(true);
+    // No "login" entry: nobody signed in.
+    expect(await loggedEvents(uid)).toEqual(["signup"]);
+    const signedIn = await call<SignedInBody>(login, "/api/auth/login", { jar: elsewhere, body: { email: otherEmail, password: PASSWORD } });
+    expect(signedIn.status).toBe(200);
+    expect(signedIn.body.session.uid).toBe(uid);
+  });
+
+  it("lifts a mail suppression once the address proves it receives mail (verification link)", async () => {
+    const jar = new Jar();
+    const email = uniqueEmail("bounce");
+    const mail = await signUp(jar, email);
+    await addSuppression(email, "bounce", "resend");
+    expect(await isSuppressed(email)).toBe(true);
+    await verify(jar, mail.data.actionUrl);
+    expect(await isSuppressed(email)).toBe(false);
   });
 
   it("purges the documents of a pending account only (deleteAccountDocumentsIfPending)", async () => {

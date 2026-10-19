@@ -5,7 +5,8 @@ import { notFound } from "@/lib/http/errors";
 import { apiRoute, noContent } from "@/lib/http/route";
 import { requestIdentity } from "@/lib/rate-limit/keys";
 
-const uidSchema = z.string().min(1).max(128);
+/** One Firestore document id, never a path: a slash would address a document of a subcollection. */
+const uidSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 
 // Revocation of a member (admins only, never oneself).
 export const DELETE = apiRoute(async (request, context) => {

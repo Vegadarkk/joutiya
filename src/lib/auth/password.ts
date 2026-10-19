@@ -14,8 +14,8 @@ import { enforceLimit, resetLimit } from "@/lib/rate-limit/limiter";
 import { accountByEmail, displayNameFor, userByEmail, withCodeErrors } from "./accounts";
 import { activateMember } from "./activation";
 import { checkResetCode } from "./action";
-import { anonymous, beginAnonymous, checkTurnstile, respond, uniformDuration, userAgentOf } from "./anonymous";
-import { assertNotLocked, checkPassword, loginKeys } from "./login";
+import { anonymous, beginAnonymous, checkTurnstile, respond, uniformDuration } from "./anonymous";
+import { assertNotLocked, checkPassword, countAttempt, loginKeys } from "./login";
 import { sendPasswordChangedMail, sendResetMail } from "./mails";
 import { assertPasswordPolicy } from "./password-policy";
 import { applyDevice, deviceOf, signedIn } from "./respond";
@@ -64,7 +64,7 @@ async function resetConfirm(request: Request): Promise<Response> {
     // The account has a usable password again (a Google sign-in may have dropped it, src/lib/auth/google.ts).
     await linkProvider(record.uid, "password").catch((error: unknown) => logger.warn({ err: (error as Error).message }, "providers update skipped"));
     await sendPasswordChangedMail({ email: record.email ?? email, displayName: displayNameFor(profile, record, email), locale: profile?.locale ?? "fr" });
-    await logConnection({ uid: record.uid, event: "password_reset", ip: flow.identity.ip, userAgent: flow.userAgent });
+    await logConnection({ uid: record.uid, event: "password_reset", ip: flow.identity.ip });
   }
   const body: ResetConfirmResponse = { status: "password_reset" };
   return respond(flow, body);
@@ -80,15 +80,17 @@ export async function handlePasswordChange(request: Request): Promise<Response> 
   if (!email) throw forbidden("this account has no password");
   const keys = loginKeys(email, device.identity.ipBucket);
   await assertNotLocked(keys);
-  await checkPassword(email, input.currentPassword, keys);
+  // The attempt is counted before the check (atomic), and forgotten as soon as the password is right.
+  const attempt = await countAttempt(keys);
+  await checkPassword(email, input.currentPassword, keys, attempt);
+  await resetLimit("login.fail.accountIp", keys.accountIp);
   const profile = await getUser(uid);
   assertPasswordPolicy(input.password, { email, displayName: profile?.displayName });
   await auth().updateUser(uid, { password: input.password });
   await revokeSessions(uid);
   const minted = await createSessionForUid(uid);
-  await resetLimit("login.fail.accountIp", keys.accountIp);
   await sendPasswordChangedMail({ email, displayName: displayNameFor(profile, null, email), locale: profile?.locale ?? "fr" });
-  await logConnection({ uid, event: "password_change", ip: device.identity.ip, userAgent: userAgentOf(request) });
+  await logConnection({ uid, event: "password_change", ip: device.identity.ip });
   const body: PasswordChangeResponse = { status: "changed", session: await sessionSummary(minted.user) };
   return applyDevice(signedIn(minted, body), device);
 }

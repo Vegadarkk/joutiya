@@ -24,7 +24,7 @@ import { useAfterSignIn } from "./use-after-sign-in";
 
 type LoginForm = z.input<typeof loginSchema>;
 
-export function LoginForm({ nonce }: { nonce?: string }) {
+export function LoginForm({ nonce, gisNonce }: { nonce?: string; gisNonce?: string }) {
   const t = useTranslations("Auth.signIn");
   const c = useTranslations("Auth.common");
   const fieldMessage = useFieldMessage();
@@ -43,7 +43,7 @@ export function LoginForm({ nonce }: { nonce?: string }) {
     handleSubmit,
     setValue,
     formState: { errors, isSubmitting },
-  } = useForm<LoginForm, unknown, LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
+  } = useForm<LoginForm, unknown, LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" }, mode: "onTouched" });
 
   // The "confirm your address" notice replaces nothing visible: focus tells the person it appeared.
   useEffect(() => {
@@ -93,7 +93,7 @@ export function LoginForm({ nonce }: { nonce?: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <GoogleButton nonce={nonce} onSignedIn={afterSignIn} onNeedsConsent={setConsent} onError={setServerError} divider={<OrDivider label={c("or")} />} />
+      <GoogleButton nonce={nonce} gisNonce={gisNonce} onSignedIn={afterSignIn} onNeedsConsent={setConsent} onError={setServerError} divider={<OrDivider label={c("or")} />} />
       {unverifiedEmail ? (
         // Its own form (resend): a sibling of the sign-in form, never nested in it.
         <section aria-labelledby="login-unverified" className="flex flex-col gap-4 rounded-lg border border-warning/30 bg-warning-surface p-5">

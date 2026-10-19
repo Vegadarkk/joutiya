@@ -9,16 +9,18 @@ import { logConnection } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
 import { assertQuotas, SIGNUP_QUOTAS } from "@/lib/quota/gate";
 import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
-import { HttpError } from "@/lib/http/errors";
+import { HttpError, unavailable } from "@/lib/http/errors";
+import { pepperedHash } from "@/lib/security/hash";
 import { displayNameFor, errorCode, userByEmail } from "./accounts";
-import { anonymous, beginAnonymous, checkTurnstile, respond, uniformDuration, type AnonymousFlow } from "./anonymous";
+import { anonymous, beginAnonymous, checkTurnstile, deviceIdOf, respond, uniformDuration, type AnonymousFlow } from "./anonymous";
 import { sendSignupExistingMail, sendVerificationMail } from "./mails";
-import { recordState } from "./orphan";
+import { deleteOrphanRecord, recordState } from "./orphan";
 import { assertPasswordPolicy } from "./password-policy";
 
 // Sign-up by e-mail (§6): Turnstile, limits, disposable domains, password policy, then an Auth
 // record without role and the Firestore documents; the verification link activates the account.
-// An e-mail that already has an account gets the same 202 and a "signupExisting" mail.
+// An e-mail that already has an account gets the same 202 and a "signupExisting" mail, after the
+// same minimum duration (uniformDuration): neither the body nor a clock tells the two apart.
 
 const VERIFICATION_SENT: SignupResponse = { status: "verification_sent" };
 
@@ -33,10 +35,16 @@ async function existingAccountAnswer(flow: AnonymousFlow, uid: string, email: st
     const [profile, record] = await Promise.all([getUser(uid), auth().getUser(uid).catch(() => null)]);
     await sendSignupExistingMail({ uid, email: record?.email ?? email, displayName: displayNameFor(profile, record, email), locale });
   }
+  await uniformDuration(flow);
   return respond(flow, VERIFICATION_SENT, { status: 202 });
 }
 
-async function createAuthUser(input: SignupInput): Promise<{ uid: string; created: boolean }> {
+/**
+ * Auth record for the new account. An orphan record with this e-mail (a failed sign-up, a purge
+ * whose Auth deletion failed) is never adopted: its uid may still key data, so it is deleted and
+ * the creation retried once with a fresh uid. A member or staff record answers `created: false`.
+ */
+async function createAuthUser(input: SignupInput, retry = true): Promise<{ uid: string; created: boolean }> {
   try {
     const record = await auth().createUser({ email: input.email, password: input.password, displayName: input.displayName, emailVerified: false });
     return { uid: record.uid, created: true };
@@ -45,10 +53,9 @@ async function createAuthUser(input: SignupInput): Promise<{ uid: string; create
     const record = await userByEmail(input.email);
     if (!record) throw error;
     if ((await recordState(record)) !== "orphan") return { uid: record.uid, created: false };
-    // Orphan of a failed sign-up or of a purge whose Auth deletion failed: adopted by this sign-up,
-    // which otherwise could never use this e-mail again. The verification link still decides.
-    await auth().updateUser(record.uid, { password: input.password, displayName: input.displayName, emailVerified: false, disabled: false });
-    return { uid: record.uid, created: true };
+    if (!retry) throw unavailable("auth record could not be created");
+    await deleteOrphanRecord(record.uid);
+    return createAuthUser(input, false);
   }
 }
 
@@ -69,6 +76,9 @@ async function signup(request: Request): Promise<Response> {
 
   const { uid, created } = await createAuthUser(input);
   if (!created) return existingAccountAnswer(flow, uid, input.email, input.locale);
+  // The device this sign-up binds to the browser (its cookie, sent or set by this answer): the
+  // verification link opens a session on that device only (src/lib/auth/action.ts).
+  const deviceId = deviceIdOf(flow);
   try {
     await createAccountDocuments({
       uid,
@@ -77,6 +87,7 @@ async function signup(request: Request): Promise<Response> {
       locale: input.locale,
       consents: { cguVersion: CGU_VERSION, transfersVersion: TRANSFERS_CONSENT_VERSION, marketing: input.consents.marketing },
       provider: "password",
+      ...(deviceId ? { signupDeviceHash: pepperedHash("did", deviceId) } : {}),
     });
   } catch (error) {
     await auth()
@@ -86,7 +97,8 @@ async function signup(request: Request): Promise<Response> {
     throw error;
   }
   await sendVerificationMail({ uid, email: input.email, displayName: input.displayName, locale: input.locale });
-  await logConnection({ uid, event: "signup", ip: flow.identity.ip, userAgent: flow.userAgent });
+  await logConnection({ uid, event: "signup", ip: flow.identity.ip });
+  await uniformDuration(flow);
   return respond(flow, VERIFICATION_SENT, { status: 202 });
 }
 

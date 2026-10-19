@@ -25,7 +25,7 @@ import { useAfterSignIn } from "./use-after-sign-in";
 
 type SignupForm = z.input<typeof signupSchema>;
 
-export function SignupForm({ nonce }: { nonce?: string }) {
+export function SignupForm({ nonce, gisNonce }: { nonce?: string; gisNonce?: string }) {
   const t = useTranslations("Auth.signUp");
   const c = useTranslations("Auth.common");
   const locale = useLocale() as Locale;
@@ -46,6 +46,7 @@ export function SignupForm({ nonce }: { nonce?: string }) {
   } = useForm<SignupForm, unknown, SignupInput>({
     resolver: zodResolver(signupSchema),
     defaultValues: { email: "", password: "", displayName: "", locale, consents: { marketing: false }, turnstileToken: "" },
+    mode: "onTouched",
   });
   const password = useWatch({ control, name: "password" });
   const email = useWatch({ control, name: "email" });
@@ -85,7 +86,7 @@ export function SignupForm({ nonce }: { nonce?: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <GoogleButton nonce={nonce} onSignedIn={afterSignIn} onNeedsConsent={setConsent} onError={setServerError} divider={<OrDivider label={c("or")} />} />
+      <GoogleButton nonce={nonce} gisNonce={gisNonce} onSignedIn={afterSignIn} onNeedsConsent={setConsent} onError={setServerError} divider={<OrDivider label={c("or")} />} />
       <form onSubmit={(event) => void handleSubmit(onValid)(event)} noValidate className="flex flex-col gap-5">
         <FormMessage error={serverError} />
         <Field label={t("displayName")} hint={t("displayNameHint")} error={fieldMessage("displayName", errors.displayName)} required>
