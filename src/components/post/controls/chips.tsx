@@ -27,7 +27,7 @@ interface SingleProps extends ChipGroupProps {
 }
 
 const chip = cn(
-  "inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border-strong bg-surface px-3.5 py-2 text-base",
+  "inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border-control bg-surface px-3.5 py-2 text-base",
   "transition-[background-color,border-color,color] duration-150 ease-door hover:bg-surface-muted",
   "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25",
   "aria-checked:border-structure aria-checked:bg-structure aria-checked:text-structure-foreground",

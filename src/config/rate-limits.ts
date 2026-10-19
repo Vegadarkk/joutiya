@@ -57,6 +57,8 @@ export const RATE_LIMITS = {
   "staff.login.accountIp": { points: 5, duration: 15 * MINUTE, blockDuration: 15 * MINUTE, policy: "closed", key: "account+ip" },
   // Account settings mutations (display name, password change, account closure).
   "account.mutation.uid": { points: 60, duration: HOUR, policy: "closed", key: "uid" },
+  // POST /api/auth/consents (re-consent panel, one write and one audit entry): 10 per hour per account.
+  "consents.uid": { points: 10, duration: HOUR, policy: "closed", key: "uid" },
   // --- Listings and media (phase 3, design §4) ---------------------------------------------
   // Draft autosave (PATCH /api/listings/{id}): coalesced client-side, never per keystroke.
   "listing.draft.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },

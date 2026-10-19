@@ -26,6 +26,8 @@ export const AUTH_API = {
   phoneStart: "/api/auth/phone/start",
   phoneStatus: "/api/auth/phone/status",
   profile: "/api/auth/profile",
+  /** Renewed transfers consent (art. 44 loi 09-08) of the re-consent panel. */
+  consents: "/api/auth/consents",
   staffLogin: "/api/admin/auth/login",
   staffLogout: "/api/admin/auth/logout",
 } as const;

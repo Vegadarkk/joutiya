@@ -8,7 +8,8 @@ import { PASSWORD_MAX, PASSWORD_MIN } from "./endpoints";
 
 /** Version strings recorded with the consents (users/{uid}/private.consents). */
 export const CGU_VERSION = "2026-10";
-export const TRANSFERS_CONSENT_VERSION = "2026-10";
+/** 2026-10-19: the text names each provider, its role and region (audit C2-04); older consents are asked again. */
+export const TRANSFERS_CONSENT_VERSION = "2026-10-19";
 
 export { AUTH_API, PASSWORD_MAX, PASSWORD_MIN } from "./endpoints";
 
@@ -106,6 +107,9 @@ export type VerifyResendInput = z.infer<typeof verifyResendSchema>;
 
 export const profileSchema = z.object({ displayName: displayNameSchema.optional(), locale: localeSchema.optional() }).strict();
 
+/** POST /api/auth/consents: the renewed transfers consent of the re-consent panel (design D12). */
+export const transfersConsentSchema = z.object({ transfers: z.literal(true) }).strict();
+
 /** Moroccan mobile only (06, 07): national or international format, as typed by the user. */
 export const phoneStartSchema = z.object({ phone: z.string().trim().min(9).max(20) }).strict();
 
@@ -134,6 +138,7 @@ export type VerifyResendResponse = { status: "verification_sent" };
 export type ResetConfirmResponse = { status: "password_reset" };
 export type PasswordChangeResponse = { status: "changed"; session: SessionSummary };
 export type ProfileResponse = { session: SessionSummary };
+export type ConsentsResponse = { status: "recorded"; version: string };
 export type SessionResponse = { status: "signed_in"; session: SessionSummary };
 export type MeResponse = { session: SessionSummary | null };
 export type ClientTokenResponse = { token: string };

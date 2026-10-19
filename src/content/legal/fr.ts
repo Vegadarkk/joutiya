@@ -5,7 +5,8 @@
 
 import type { LegalSlug } from "@/config/legal-pages";
 
-export type Block = string | { list: string[] };
+/** A paragraph, a list, or a paragraph rendered only when the value `ifSet` names is not empty (an optional mention). */
+export type Block = string | { list: string[] } | { text: string; ifSet: keyof LegalValues };
 
 export interface LegalSection {
   id: string;
@@ -201,7 +202,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
   },
 
   confidentialite: {
-    updated: "2026-10-13",
+    updated: "2026-10-19",
     intro:
       "{publisher} ({address}) est responsable du traitement de vos données personnelles, y compris de celles publiées dans les annonces. Contact : {dpo}.",
     sections: [
@@ -249,8 +250,19 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
         id: "destinataires",
         heading: "Prestataires et transferts hors de l'Union européenne et du Maroc",
         blocks: [
-          "Hébergés en France : la base de données (Google Firestore, Paris) et le serveur (Oracle Cloud, Paris). Photos : Cloudflare R2, Union européenne.",
-          "Traités aux États-Unis : Google (authentification), Anthropic et OpenAI (contrôle des annonces), Meta (vérification du téléphone par WhatsApp), Resend (e-mails), RevenueCat et Stripe (paiements, à l'ouverture des ventes). Ces transferts reposent sur le cadre de protection des données UE–États-Unis ou sur les clauses contractuelles types de la Commission européenne, et sur votre consentement exprès recueilli à l'inscription (loi marocaine 09-08, art. 44).",
+          "Hébergés dans l'Union européenne : le serveur (Oracle Cloud, Paris), la base de données (Google Firestore, Paris), les photos et les sauvegardes (Cloudflare R2), le suivi des erreurs techniques (Sentry) et l'envoi de secours des e-mails de sécurité (Brevo, France).",
+          "Traités aux États-Unis :",
+          {
+            list: [
+              "Google : connexion et gestion des comptes ; publicité AdSense quand elle sera activée, avec un accord séparé ;",
+              "Cloudflare : diffusion et protection du site, vérification anti-robot et IA de secours, sur son réseau mondial ;",
+              "Anthropic : aide au contrôle des annonces, au tri des signalements et à l'examen des recours, Assistant Joutiya ; OpenAI : contrôle de secours. Les numéros, e-mails et noms sont masqués avant tout envoi à une IA ;",
+              "Meta : vérification du téléphone par WhatsApp ;",
+              "Resend : envoi des e-mails ;",
+              "Stripe et RevenueCat : paiements et abonnements Pro, à l'ouverture des ventes.",
+            ],
+          },
+          "Ces transferts reposent sur le cadre de protection des données UE–États-Unis ou sur les clauses contractuelles types de la Commission européenne, et sur votre consentement exprès, recueilli à l'inscription et redemandé quand cette liste change (loi marocaine 09-08, art. 44).",
         ],
       },
       {
@@ -258,14 +270,15 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
         heading: "Vos droits",
         blocks: [
           "Vous disposez des droits d'accès, de rectification, d'effacement, d'opposition, de limitation et de portabilité, et pouvez retirer votre consentement à tout moment. Écrivez à {dpo}. Vous pouvez aussi saisir la CNIL (cnil.fr) ou, au Maroc, la CNDP (cndp.ma).",
-          "Déclaration auprès de la CNDP : {cndp}.",
+          // Shown once a receipt number is in config/legal: no declaration before launch and budget (Z10).
+          { text: "Déclaration auprès de la CNDP : {cndp}.", ifSet: "cndp" },
         ],
       },
     ],
   },
 
   cookies: {
-    updated: "2026-10-13",
+    updated: "2026-10-19",
     intro: "Cette page liste les cookies et traceurs utilisés par Joutiya, par finalité.",
     sections: [
       {
@@ -274,27 +287,31 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
         blocks: [
           {
             list: [
-              "__Host-session : votre session une fois connecté (14 jours au plus) ;",
-              "__Host-csrf : protection contre les requêtes frauduleuses ;",
-              "__Host-did : identifiant aléatoire de l'appareil, pour limiter les abus (13 mois) ;",
+              "__Host-session : vous garder connecté à votre compte (14 jours au plus, 8 heures pour le personnel) ;",
+              "__Host-csrf : protéger vos actions contre les requêtes frauduleuses venues d'autres sites (même durée que la session) ;",
+              "__Host-did : identifiant aléatoire et signé de l'appareil, pour limiter les abus (400 jours, environ 13 mois) ;",
+              "__Host-tsv : mémoriser que vous avez réussi la vérification anti-robot, pour ne pas vous la redemander aussitôt (30 minutes) ;",
               "NEXT_LOCALE : la langue choisie (1 an) ;",
-              "la préférence d'apparence (clair ou sombre), gardée dans votre navigateur.",
+              "theme, dans le stockage local du navigateur : l'apparence choisie, claire ou sombre, jusqu'à ce que vous changiez de réglage ;",
+              "pendant le dépôt d'une annonce, le stockage de session du navigateur garde la liste des points à corriger, jusqu'à la fermeture de l'onglet.",
             ],
           },
+          "Cloudflare, qui protège le site, peut déposer ses propres cookies de sécurité quand il vérifie qu'un visiteur n'est pas un robot. Google dépose les siens, sur ses domaines, seulement si vous choisissez « Continuer avec Google ».",
         ],
       },
       {
         id: "publicite",
         heading: "Publicité (avec votre consentement)",
         blocks: [
-          "Aucun cookie publicitaire n'est déposé aujourd'hui. Quand la publicité Google AdSense sera activée, elle ne fonctionnera qu'après votre accord, donné ou refusé dans la bannière, aussi simplement l'un que l'autre. Les pages en tarifit n'affichent pas de publicité.",
+          "Aucun cookie publicitaire n'est déposé aujourd'hui. Quand la publicité Google AdSense sera activée, une bannière vous demandera votre accord avant tout dépôt, et vous pourrez refuser aussi simplement qu'accepter. Les pages en tarifit n'afficheront pas de publicité.",
         ],
       },
       {
         id: "choix",
         heading: "Vos choix",
         blocks: [
-          "Votre choix est conservé 6 mois, puis redemandé. Vous pouvez le modifier à tout moment par le lien « Modifier mes choix » en bas de chaque page. Les traceurs soumis à consentement ne durent pas plus de 13 mois.",
+          "Quand la publicité sera activée, votre choix sera conservé 6 mois, puis redemandé, et un lien « Gérer mes cookies » en bas de chaque page permettra de le modifier à tout moment. Les traceurs soumis à consentement ne dureront pas plus de 13 mois.",
+          "Vous pouvez dès aujourd'hui bloquer ou effacer les cookies dans les réglages de votre navigateur ; la connexion et certaines fonctions risquent alors de ne plus marcher.",
         ],
       },
     ],
