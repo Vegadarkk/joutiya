@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
+import { useNumbersTranslations } from "@/i18n/numbers";
 import { blurhashDataUrl } from "@/lib/listings/client/blurhash";
 import { ACCEPTED_INPUT_TYPES } from "@/lib/listings/client/prepare-image";
 import { isPhotoBusy, type PhotoItem } from "@/lib/listings/client/store";
@@ -35,7 +36,7 @@ function hasFiles(event: DragEvent): boolean {
 }
 
 export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onRefresh, onMove, keepOne = false }: PhotoUploaderProps) {
-  const t = useTranslations("Listing.photos");
+  const t = useNumbersTranslations("Listing.photos");
   const errors = useTranslations("Listing.errors");
   const picker = useRef<HTMLInputElement>(null);
   const camera = useRef<HTMLInputElement>(null);
@@ -121,7 +122,7 @@ export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onR
             onDragLeave={() => setOver((current) => (current === item.key ? null : current))}
             onDrop={(event) => onDrop(event, item.key)}
             className={cn(
-              "relative rounded-lg transition-[opacity,transform,box-shadow] duration-150 ease-door",
+              "relative rounded-lg transition-[opacity,scale,box-shadow] duration-150 ease-door",
               dragging === item.key && "scale-[0.97] opacity-50",
               over === item.key && dragging !== item.key && "ring-3 ring-featured ring-offset-2 ring-offset-background",
               item.status === "ready" && !item.removing && "cursor-grab active:cursor-grabbing",
@@ -159,7 +160,7 @@ export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onR
               }}
               className={cn(
                 "group flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border-strong bg-surface-muted/60 px-3 text-center text-foreground-muted",
-                "transition-[border-color,background-color,color] duration-150 ease-door hover:border-structure hover:text-structure focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25",
+                "transition-[border-color,background-color,color] duration-150 ease-door hover:border-structure hover:text-structure",
                 fileOver && "border-structure bg-surface-brand text-structure",
               )}
             >
@@ -197,7 +198,7 @@ interface PhotoTileProps {
 }
 
 function PhotoTile({ item, index, total, canRemove, onRemove, onRetry, onRefresh, onMove }: PhotoTileProps) {
-  const t = useTranslations("Listing.photos");
+  const t = useNumbersTranslations("Listing.photos");
   const errors = useTranslations("Listing.errors");
   const n = index + 1;
   const busy = isPhotoBusy(item);
@@ -272,9 +273,9 @@ function PhotoTile({ item, index, total, canRemove, onRemove, onRetry, onRefresh
             disabled={!canRemove}
             title={canRemove ? undefined : t("keepOne")}
             aria-label={busy ? t("cancel", { index: n }) : t("remove", { index: n })}
-            className="absolute end-1 top-1 flex size-11 items-center justify-center rounded-full focus-visible:outline-none disabled:cursor-not-allowed [&:focus-visible>span]:ring-3 [&:focus-visible>span]:ring-ring/40"
+            className="absolute end-1 top-1 flex size-11 items-center justify-center rounded-full focus-visible:outline-none disabled:cursor-not-allowed [&:focus-visible>span]:outline-2 [&:focus-visible>span]:outline-offset-0 [&:focus-visible>span]:outline-ring"
           >
-            <span className="flex size-8 items-center justify-center rounded-full bg-surface/90 text-foreground shadow-sm transition-colors duration-150 hover:bg-surface [button:disabled>&]:opacity-40">
+            <span className="flex size-8 items-center justify-center rounded-full bg-surface/90 text-foreground shadow-sm transition-colors duration-150 ease-door hover:bg-surface [button:disabled>&]:opacity-40">
               <X className="size-4" aria-hidden="true" />
             </span>
           </button>
@@ -322,7 +323,7 @@ function TileButton({ label, disabled, onClick, children, action }: { label: str
       data-action={action}
       disabled={disabled}
       onClick={onClick}
-      className="flex size-11 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors duration-150 hover:bg-surface hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25 disabled:opacity-30"
+      className="flex size-11 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-[background-color,color,scale] duration-150 ease-door hover:bg-surface hover:text-foreground active:scale-[0.98] disabled:opacity-30"
     >
       {children}
     </button>

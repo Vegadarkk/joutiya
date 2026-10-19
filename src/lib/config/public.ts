@@ -1,6 +1,7 @@
 import "server-only";
 import { MAX_PHOTOS_INDIVIDUAL, MAX_UPLOAD_BYTES } from "@/lib/contracts/media";
 import { serverEnv, type ServerEnv } from "@/lib/env";
+import { isPhoneVerificationConfigured } from "@/lib/phone-verify/config";
 import { mediaBaseUrl } from "@/lib/storage/keys";
 import type { PublicConfig } from "./public-types";
 
@@ -37,5 +38,6 @@ export function publicConfig(env: ServerEnv = serverEnv()): PublicConfig {
     mediaBaseUrl: mediaBaseUrl(env),
     upload: { ...UPLOAD_LIMITS },
     map: env.MAP_PMTILES_URL ? { pmtilesUrl: env.MAP_PMTILES_URL, attribution: MAP_ATTRIBUTION } : null,
+    phoneVerification: isPhoneVerificationConfigured(env),
   };
 }

@@ -34,6 +34,17 @@ vi.mock("@/lib/db/repositories/retention", () => ({
   purgeListing: vi.fn(),
   deleteJournalPastPurge: vi.fn(async () => 0),
   oldestPastPurge: vi.fn(async () => null),
+  // Phase 5 steps (D22): nothing past purgeAt here (tests/unit/jobs-phase5-retention.test.ts).
+  listPastPurge: vi.fn(),
+  deleteIfPurgeable: vi.fn(),
+  readDecisionPurgeAts: vi.fn(),
+  setAiDecisionPurgeAt: vi.fn(),
+  deleteConversationMessages: vi.fn(),
+  deleteOrphanEvidence: vi.fn(),
+  deleteConversationIfEmpty: vi.fn(),
+  readUserBlocksCursor: vi.fn(),
+  writeUserBlocksCursor: vi.fn(),
+  purgeOrphanUserBlocks: vi.fn(),
 }));
 vi.mock("@/lib/storage", async () => {
   const memory = await import("@/lib/storage/memory");
@@ -114,6 +125,9 @@ beforeEach(() => {
   vi.mocked(retention.purgeListing).mockImplementation(async (id, purgeable) => (purgeable(listing(id)) ? { status: "purged", categoryId: "vehicules", purgedAt: NOW, version: 8, updatedAt: NOW } : null));
   vi.mocked(retention.deleteJournalPastPurge).mockResolvedValue(0);
   vi.mocked(retention.oldestPastPurge).mockResolvedValue(null);
+  vi.mocked(retention.listPastPurge).mockResolvedValue({ docs: [], read: 0 });
+  vi.mocked(retention.readUserBlocksCursor).mockResolvedValue(null);
+  vi.mocked(retention.purgeOrphanUserBlocks).mockResolvedValue({ deleted: 0, read: 0, last: null });
   vi.mocked(uploadsRepo.listPastPurge).mockResolvedValue([]);
   vi.mocked(uploadsRepo.listUploadsByTarget).mockResolvedValue([]);
   vi.mocked(getListings).mockReset().mockResolvedValue([]);
@@ -124,9 +138,9 @@ beforeEach(() => {
 });
 
 describe("isPurgeable", () => {
-  it("only ended listings, past purgeAt, without a legal hold", () => {
-    for (const status of ["expired", "sold", "removed", "rejected"] as const) expect(isPurgeable(listing("x", { status }), NOW)).toBe(true);
-    for (const status of ["published", "paused", "pending_review", "draft", "purged"] as const) expect(isPurgeable(listing("x", { status }), NOW)).toBe(false);
+  it("only ended listings and stale drafts, past purgeAt, without a legal hold", () => {
+    for (const status of ["expired", "sold", "removed", "rejected", "draft"] as const) expect(isPurgeable(listing("x", { status }), NOW)).toBe(true);
+    for (const status of ["published", "paused", "pending_review", "purged"] as const) expect(isPurgeable(listing("x", { status }), NOW)).toBe(false);
     expect(isPurgeable(listing("x", { legalHold: ["report:r1"] }), NOW)).toBe(false);
     expect(isPurgeable(listing("x", { purgeAt: new Date(NOW.getTime() + 1) }), NOW)).toBe(false);
     expect(isPurgeable(listing("x", { purgeAt: undefined }), NOW)).toBe(false);
@@ -352,10 +366,24 @@ describe("retention-purge: journals and budget", () => {
     vi.mocked(retention.listListingsPastPurge).mockRejectedValueOnce(new Error("FAILED_PRECONDITION"));
     vi.mocked(retention.deleteJournalPastPurge).mockResolvedValue(1);
     expect(await retentionPurge(NOW, { store })).toMatchObject({ failed: 1, contentOps: 1, revealLogs: 1 });
+    // The job completes: the step alerts, since the worker's failed handler never sees it.
+    expect(alert).toHaveBeenCalledExactlyOnceWith({ severity: "P2", title: "Tâche système en échec : retention-purge", body: expect.stringContaining("listings (FAILED_PRECONDITION)") });
     configured.value = false;
     vi.mocked(retention.deleteJournalPastPurge).mockClear();
     expect(await retentionPurge(NOW, { store })).toMatchObject({ contentOps: 0, failed: 0 });
     expect(retention.deleteJournalPastPurge).not.toHaveBeenCalled();
+  });
+
+  it("alerts once per run however many steps fail, never for a clean run", async () => {
+    vi.mocked(retention.deleteJournalPastPurge).mockResolvedValue(1);
+    expect(await retentionPurge(NOW, { store })).toMatchObject({ failed: 0 });
+    expect(alert).not.toHaveBeenCalled();
+
+    vi.mocked(retention.listListingsPastPurge).mockRejectedValueOnce(new Error("FAILED_PRECONDITION"));
+    vi.mocked(retention.deleteJournalPastPurge).mockRejectedValueOnce(new Error("PERMISSION_DENIED")).mockResolvedValue(1);
+    expect(await retentionPurge(NOW, { store })).toMatchObject({ failed: 2, contentOps: 0, revealLogs: 1 });
+    expect(alert).toHaveBeenCalledOnce();
+    expect(vi.mocked(alert).mock.calls[0]?.[0].body).toContain("listings (FAILED_PRECONDITION) ; contentOps (PERMISSION_DENIED)");
   });
 });
 

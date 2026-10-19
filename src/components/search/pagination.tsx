@@ -10,9 +10,10 @@ import { SearchLink } from "./search-navigation";
 
 const item = cn(
   "inline-flex size-11 items-center justify-center rounded-md text-sm font-medium tabular-nums",
-  "transition-[background-color,color] duration-150 ease-door hover:bg-surface-muted",
-  "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25",
+  "transition-[background-color,color,scale] duration-150 ease-door hover:bg-surface-muted",
 );
+// Press feedback on the links only: the current page and a disabled arrow are plain spans.
+const link = cn(item, "active:scale-[0.98]");
 
 interface PaginationProps {
   params: SearchParams;
@@ -37,7 +38,7 @@ export function Pagination({ params, page, totalPages, total, pageSize = SEARCH_
       <ul className="flex items-center gap-1">
         <li>
           {current > 1 ? (
-            <SearchLink params={withPage(params, current - 1)} rel="prev" aria-label={t("previous")} className={item}>
+            <SearchLink params={withPage(params, current - 1)} rel="prev" aria-label={t("previous")} className={link}>
               <ChevronLeft className="size-5 rtl:-scale-x-100" aria-hidden="true" />
             </SearchLink>
           ) : (
@@ -59,7 +60,7 @@ export function Pagination({ params, page, totalPages, total, pageSize = SEARCH_
                   {entry}
                 </span>
               ) : (
-                <SearchLink params={withPage(params, entry)} aria-label={t("page", { page: entry })} className={item}>
+                <SearchLink params={withPage(params, entry)} aria-label={t("page", { page: entry })} className={link}>
                   {entry}
                 </SearchLink>
               )}
@@ -68,7 +69,7 @@ export function Pagination({ params, page, totalPages, total, pageSize = SEARCH_
         )}
         <li>
           {current < last ? (
-            <SearchLink params={withPage(params, current + 1)} rel="next" aria-label={t("next")} className={item}>
+            <SearchLink params={withPage(params, current + 1)} rel="next" aria-label={t("next")} className={link}>
               <ChevronRight className="size-5 rtl:-scale-x-100" aria-hidden="true" />
             </SearchLink>
           ) : (

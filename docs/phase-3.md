@@ -1,6 +1,6 @@
 # Phase 3 : annonces et médias
 
-Le code de la phase 3 est sur la branche `claude/mvp-phase-3-fable-8j3rv0` (PR #40) : dépôt d'annonce en 9 étapes avec sauvegarde automatique, photos envoyées directement vers R2 puis traitées par le worker (WebP, EXIF et GPS supprimés, contrôle nudité et visages par modèles locaux), modération automatique avant publication, page annonce, page profil public, « Mes annonces », carte (SVG statique puis carte interactive MapLibre sur fond Protomaps sans frontières), expiration à 60 jours avec rappel, file de modération du back-office, sauvegardes Firestore chiffrées chaque nuit. Ce guide dit quoi brancher, dans l'ordre, et qui le fait. Coût : 0 €.
+Le code de la phase 3 est fusionné dans `main` (PR #40), avec des correctifs ultérieurs (PR #49, #51, #54, #57) : dépôt d'annonce en 9 étapes avec sauvegarde automatique, photos envoyées directement vers R2 puis traitées par le worker (WebP, EXIF et GPS supprimés, contrôle nudité et visages par modèles locaux), modération automatique avant publication, page annonce, page profil public, « Mes annonces », carte (SVG statique puis carte interactive MapLibre sur fond Protomaps sans frontières), expiration à 60 jours avec rappel, file de modération du back-office, sauvegardes Firestore chiffrées chaque nuit. Ce guide dit quoi brancher, dans l'ordre, et qui le fait. Coût : 0 €.
 
 ## Avant de commencer
 
@@ -46,7 +46,7 @@ Chaque nuit à 03:30 UTC, le worker exporte Firestore (incrémental + rotation c
 
 1. **Vous :** prompt N dans Cody : il génère la paire de clés sur votre PC, vous montre la clé publique et vous dit où ranger la clé privée (gestionnaire de mots de passe + copie hors ligne).
 2. Collez la clé publique (`age1…`) dans le fil : elle est publique par conception. Claude la pose en `BACKUP_AGE_RECIPIENT` sur la VM.
-3. Restauration (en cas de besoin) : `node scripts/restore-firestore.ts --identity <fichier de clé privée> --from <dossier> --project <projet>` (simulation par défaut, `--apply` pour écrire ; voir `docs/backups.md`).
+3. Restauration (en cas de besoin) : `node scripts/restore-firestore.ts --identity <fichier de clé privée> --from <dossier> --project <projet>` (simulation par défaut, `--apply` pour écrire ; voir `docs/backups.md`, qui décrit aussi la répétition de la restauration et son tableau de résultats).
 
 Sans `BACKUP_AGE_RECIPIENT`, le travail de nuit ne sauvegarde rien et envoie une alerte : rien n'est jamais écrit en clair.
 
@@ -65,7 +65,13 @@ Sans clés R2, le site démarre et refuse les envois de photos (503). Sans `MAP_
 
 - Dépôt : `npm run check`, `npm run test:api`, `npm run test:rules`, `npm run build` puis `npm run test:e2e`.
 - Staging : déposer une annonce avec 3 photos depuis un téléphone (dont une photo HEIC d'iPhone), vérifier la page annonce, la suppression de l'EXIF (`exiftool` sur la photo publiée : aucune position GPS), « Mes annonces » (pause, reprise, vendue, suppression), la file **Modération** du back-office avec une annonce signalée, la carte interactive.
-- Critères de sortie qui exigent le staging en ligne, notés en attente tant qu'il n'existe pas : Lighthouse mobile ≥ 90 sur la page annonce, dépôt complet en moins de 3 minutes sur un Android bridé, test de restauration sur de vraies données (le test de restauration contre l'émulateur est fait et passe).
+- Critères de sortie qui exigent le staging en ligne, notés en attente tant qu'il n'existe pas : Lighthouse mobile ≥ 90 sur la page annonce, dépôt complet en moins de 3 minutes sur un Android bridé, test de restauration sur de vraies données (répétition A de `docs/backups.md` : sauvegardes du staging vers l'émulateur Firestore du PC ; le test automatique contre l'émulateur est fait et passe). La répétition B (production vers staging) est à refaire avant le lancement.
+
+## Écarts par rapport à l'architecture
+
+À valider par vous (toute déviation demande votre accord) :
+
+- Statistiques des annonces : la tâche de nuit `stats-flush` (§4) et le compteur de vues (`listingStats.views`, §5) sont reportés à une phase ultérieure. En attendant, `phoneReveals` est incrémenté directement dans Firestore à chaque première révélation du numéro (une écriture, bornée par les limites de révélation), et les vues ne sont pas comptées. Deux suites possibles : inscrire ce report dans l'architecture, ou ajouter en phase 6 la tâche de nuit (compteurs Valkey reversés dans Firestore) avec le compteur de vues.
 
 ## Prompts Cody
 

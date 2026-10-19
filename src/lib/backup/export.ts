@@ -29,7 +29,9 @@ import { PART_MAX_BYTES, PART_MAX_DOCS, PartBuilder, manifestKey, partKey, sealP
 // (docs/backups.md); a purged listing is not deleted but replaced by a tombstone with `updatedAt`,
 // so the next incremental carries it and the restore writes it over the older captures.
 // The cursor document also keeps the encrypted bytes written per night (98 days, the private
-// bucket's lifecycle): the R2 storage gauge counts them.
+// bucket's lifecycle): the R2 storage gauge counts them. It also sums the NDJSON bytes of the
+// rolling full per cycle: a complete cycle holds every document once, which estimates the
+// Firestore storage (`firestoreStorageEstimate`) without any read of its own.
 
 export type TimeField = "updatedAt" | "createdAt";
 
@@ -70,6 +72,15 @@ const TABLE: Record<BackedUpId, Omit<BackupCollection, "id">> = {
   favorites: { scope: "group", timeField: "createdAt" },
   savedSearches: { scope: "group", timeField: "updatedAt" },
   proProfiles: { scope: "root", timeField: "updatedAt" },
+  // Phase 5: messages and their evidence are subcollections of conversations/{cid}.
+  conversations: { scope: "root", timeField: "updatedAt" },
+  messages: { scope: "group", timeField: "createdAt" },
+  evidence: { scope: "group", timeField: "createdAt" },
+  userBlocks: { scope: "root", timeField: "updatedAt" },
+  reports: { scope: "root", timeField: "updatedAt" },
+  aiDecisions: { scope: "root", timeField: "createdAt" },
+  authorityRequests: { scope: "root", timeField: "updatedAt" },
+  suspensions: { scope: "root", timeField: "createdAt" },
 };
 
 export const BACKUP_COLLECTIONS: readonly BackupCollection[] = (Object.keys(TABLE) as BackedUpId[]).map((id) => ({ id, ...TABLE[id] }));
@@ -100,6 +111,23 @@ export const BACKUP_RUN_READS_SHARE = 0.4;
 /** Days a backup object lives in the private bucket (R2 lifecycle rule `backups-98d`, docs/backups.md). */
 export const BACKUP_RETENTION_DAYS = 98;
 
+/**
+ * Firestore storage per NDJSON byte of a complete rolling full (firestore.storage gauge, 1 GB on
+ * Spark). Firestore bills documents and index entries (firebase.google.com/docs/firestore/storage-size):
+ * an indexed field has an ascending and a descending entry, each holding the document's name, its
+ * parent's name, the field name and value and 32 bytes (~100 bytes for a short field), so a fully
+ * indexed document weighs about three times its own size. The NDJSON overstates timestamps (~40
+ * bytes against 8) and a listing's bulk (description, attributes, photos) is exempt from indexing
+ * (firestore.indexes.json): 2, not 3. A floor for the whole store, where small fully indexed
+ * documents (journals, users, uploads) dominate; the console (Firestore > Usage) has the real figure.
+ */
+export const FIRESTORE_STORAGE_FACTOR = 2;
+
+/** The firestore.storage estimate for the NDJSON bytes of a complete rolling full cycle. */
+export function firestoreStorageEstimate(cyclePlainBytes: number): number {
+  return Math.round(cyclePlainBytes * FIRESTORE_STORAGE_FACTOR);
+}
+
 export const DEFAULT_BACKUP_CONFIG: BackupConfig = {
   collections: BACKUP_COLLECTIONS,
   fullBudget: 10_000,
@@ -128,6 +156,10 @@ export interface FullCursor {
   after: Record<string, string>;
   cycleStartedAt: Date | null;
   cycleCompletedAt: Date | null;
+  /** NDJSON bytes the cycle in progress exported so far; null when it began before this sum existed. */
+  cycleBytes: number | null;
+  /** NDJSON bytes of the last complete cycle (every document once): the Firestore storage estimate. */
+  lastCycleBytes: number | null;
 }
 
 export interface BackupCursors {
@@ -174,7 +206,7 @@ export interface BackupManifest {
 export interface CursorsJson {
   incremental: Record<string, { since: string; after: string | null }>;
   incrementalNext: string | null;
-  full: { next: string | null; after: Record<string, string>; cycleStartedAt: string | null; cycleCompletedAt: string | null };
+  full: { next: string | null; after: Record<string, string>; cycleStartedAt: string | null; cycleCompletedAt: string | null; cycleBytes: number | null; lastCycleBytes: number | null };
 }
 
 export type BackupSkipReason = "no_recipient" | "no_storage" | "reads_degraded" | "already_done";
@@ -196,6 +228,8 @@ export interface BackupResult {
   cursors: BackupCursors | null;
   /** Encrypted bytes of every backup still within the retention, this run included (null when skipped). */
   retainedBytes: number | null;
+  /** Firestore storage estimated from the last complete rolling full (null when skipped or before the first one). */
+  firestoreStorageBytes: number | null;
 }
 
 export interface RunBackupInput {
@@ -229,6 +263,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function toByteCount(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
 /** Paths only: a hand-edited value that is not a document path would make every run throw. */
 function toPathMap(value: unknown): Record<string, string> {
   if (!isRecord(value)) return {};
@@ -251,7 +289,7 @@ function toIncremental(value: unknown): Record<string, IncrementalCursor> {
 export const EMPTY_CURSORS: BackupCursors = {
   incremental: {},
   incrementalNext: null,
-  full: { next: null, after: {}, cycleStartedAt: null, cycleCompletedAt: null },
+  full: { next: null, after: {}, cycleStartedAt: null, cycleCompletedAt: null, cycleBytes: null, lastCycleBytes: null },
   lastRunAt: null,
   lastDate: null,
   storedBytes: {},
@@ -299,6 +337,8 @@ export function parseCursors(data: unknown): BackupCursors {
       after: toPathMap(full["after"]),
       cycleStartedAt: toDate(full["cycleStartedAt"]),
       cycleCompletedAt: toDate(full["cycleCompletedAt"]),
+      cycleBytes: toByteCount(full["cycleBytes"]),
+      lastCycleBytes: toByteCount(full["lastCycleBytes"]),
     },
     lastRunAt: toDate(data["lastRunAt"]),
     lastDate: typeof data["lastDate"] === "string" && DATE_KEY.test(data["lastDate"]) ? data["lastDate"] : null,
@@ -312,7 +352,14 @@ export function serializeCursors(cursors: BackupCursors, now: Date): Record<stri
   return {
     incremental: Object.fromEntries(Object.entries(cursors.incremental).map(([id, cursor]) => [id, { since: cursor.since, after: cursor.after }])),
     incrementalNext: cursors.incrementalNext,
-    full: { next: cursors.full.next, after: cursors.full.after, cycleStartedAt: ts(cursors.full.cycleStartedAt), cycleCompletedAt: ts(cursors.full.cycleCompletedAt) },
+    full: {
+      next: cursors.full.next,
+      after: cursors.full.after,
+      cycleStartedAt: ts(cursors.full.cycleStartedAt),
+      cycleCompletedAt: ts(cursors.full.cycleCompletedAt),
+      cycleBytes: cursors.full.cycleBytes,
+      lastCycleBytes: cursors.full.lastCycleBytes,
+    },
     lastRunAt: ts(cursors.lastRunAt),
     lastDate: cursors.lastDate,
     storedBytes: cursors.storedBytes,
@@ -325,7 +372,14 @@ function cursorsJson(cursors: BackupCursors): CursorsJson {
   return {
     incremental: Object.fromEntries(Object.entries(cursors.incremental).map(([id, cursor]) => [id, { since: cursor.since.toDate().toISOString(), after: cursor.after }])),
     incrementalNext: cursors.incrementalNext,
-    full: { next: cursors.full.next, after: cursors.full.after, cycleStartedAt: iso(cursors.full.cycleStartedAt), cycleCompletedAt: iso(cursors.full.cycleCompletedAt) },
+    full: {
+      next: cursors.full.next,
+      after: cursors.full.after,
+      cycleStartedAt: iso(cursors.full.cycleStartedAt),
+      cycleCompletedAt: iso(cursors.full.cycleCompletedAt),
+      cycleBytes: cursors.full.cycleBytes,
+      lastCycleBytes: cursors.full.lastCycleBytes,
+    },
   };
 }
 
@@ -496,7 +550,7 @@ function resumable(collection: BackupCollection, path: string | null | undefined
 
 /** A run that wrote nothing (also used by the worker job when the storage is missing). */
 export function skippedBackup(reason: BackupSkipReason, date: string, durationMs = 0): BackupResult {
-  return { status: "skipped", reason, date, manifestKey: null, counts: { incremental: {}, full: {} }, parts: 0, bytes: 0, reads: 0, truncated: false, quotaStopped: false, durationMs, cursors: null, retainedBytes: null };
+  return { status: "skipped", reason, date, manifestKey: null, counts: { incremental: {}, full: {} }, parts: 0, bytes: 0, reads: 0, truncated: false, quotaStopped: false, durationMs, cursors: null, retainedBytes: null, firestoreStorageBytes: null };
 }
 
 export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
@@ -575,6 +629,8 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
   const after = continuing ? Object.fromEntries(Object.entries(previous.full.after).filter(([id]) => known.has(id))) : {};
   const startIndex = continuing ? order.findIndex((collection) => collection.id === previous.full.next) : 0;
   const cycleStartedAt = continuing ? (previous.full.cycleStartedAt ?? now) : now;
+  // Unknown (null) for a cycle continued from before this sum existed: it never yields an estimate.
+  let cycleBytes = continuing ? previous.full.cycleBytes : 0;
   // Bounded by what the incremental left of the run's reads: a busy day shortens the rotation, never the app's share.
   let remaining = Math.min(config.fullBudget, config.maxRunReads - state.reads);
   let fullNext: string | null = null;
@@ -589,6 +645,7 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
     const result = await scan(baseQuery(db, collection).orderBy(FieldPath.documentId()), remaining, config.pageSize, resumable(collection, resume) ? [db.doc(resume)] : null, state, (doc) => writer.add(doc));
     await writer.finish();
     remaining -= result.docs;
+    if (cycleBytes !== null) cycleBytes += writer.parts.reduce((sum, part) => sum + part.plainBytes, 0);
     counts.full[collection.id] = result.docs;
     parts.push(...writer.parts);
     if (result.exhausted) {
@@ -606,7 +663,14 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
   const cursors: BackupCursors = {
     incremental,
     incrementalNext,
-    full: { next: fullNext, after, cycleStartedAt, cycleCompletedAt: cycleComplete ? now : previous.full.cycleCompletedAt },
+    full: {
+      next: fullNext,
+      after,
+      cycleStartedAt,
+      cycleCompletedAt: cycleComplete ? now : previous.full.cycleCompletedAt,
+      cycleBytes,
+      lastCycleBytes: cycleComplete && cycleBytes !== null ? cycleBytes : previous.full.lastCycleBytes,
+    },
     lastRunAt: now,
     lastDate: date,
     storedBytes: retainedStoredBytes(previous.storedBytes, now),
@@ -647,7 +711,9 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
   }
 
   const durationMs = Date.now() - started;
-  const result: BackupResult = { status: "done", date, manifestKey: key, counts, parts: parts.length, bytes, reads: state.reads, truncated, quotaStopped: state.quotaStopped, durationMs, cursors, retainedBytes };
+  const lastCycleBytes = cursors.full.lastCycleBytes;
+  const firestoreStorageBytes = lastCycleBytes === null ? null : firestoreStorageEstimate(lastCycleBytes);
+  const result: BackupResult = { status: "done", date, manifestKey: key, counts, parts: parts.length, bytes, reads: state.reads, truncated, quotaStopped: state.quotaStopped, durationMs, cursors, retainedBytes, firestoreStorageBytes };
   logger.info({ date, counts, parts: parts.length, bytes, reads: state.reads, truncated, quotaStopped: state.quotaStopped, fullNext, cycleComplete, durationMs }, "backup-firestore");
   return result;
 }

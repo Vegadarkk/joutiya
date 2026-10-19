@@ -1,3 +1,4 @@
+import { alert } from "@/lib/alert";
 import { LEGACY_PHOTO_VARIANTS, PHOTO_VARIANTS, type PhotoVariant } from "@/lib/contracts/media";
 import { getListings, type ListingRecord } from "@/lib/db/repositories/listings";
 import { getProProfile } from "@/lib/db/repositories/pro-profiles";
@@ -362,12 +363,22 @@ export async function purgeQuarantine(now = new Date(), deps: { store?: ObjectSt
   return result;
 }
 
-/** A failing query stops that step only: the document purge still runs. */
+/**
+ * A failing query stops that step only: the document purge still runs. The job completes anyway, so
+ * the step alerts itself (one step per run: one alert).
+ */
 async function step(name: string, result: PurgeQuarantineResult, run: () => Promise<void>): Promise<void> {
   try {
     await run();
   } catch (error) {
     result.failed += 1;
-    logger.error({ step: name, err: (error as Error).message }, "purge-quarantine step failed");
+    const message = (error as Error).message;
+    logger.error({ step: name, err: message }, "purge-quarantine step failed");
+    await alert({
+      severity: "P2",
+      title: "Tâche système en échec : purge-quarantine",
+      // The document purge runs after this step and may still fail on its own: claim nothing about it.
+      body: `Étape en échec : ${name} (${message.slice(0, 200)}). L'exécution de l'heure suivante réessaie ; détails dans les journaux du worker.`,
+    });
   }
 }

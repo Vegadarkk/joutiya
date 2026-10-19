@@ -87,13 +87,18 @@ export async function setGauge(id: QuotaId, value: number, at = new Date()): Pro
   }
 }
 
-/** Current level of every quota, for degraded-mode decisions and the nightly report. */
+/**
+ * Current level of every quota, for degraded-mode decisions and the nightly report. An unset
+ * counter is 0 (nothing used yet); an unset gauge was not measured in the period: "unknown", not a
+ * false 0 at "ok".
+ */
 export async function readQuotas(at = new Date()): Promise<QuotaStatus[]> {
   const periods = QUOTA_IDS.map((id) => periodKey(QUOTAS[id], at));
   if (!isValkeyConfigured("queue")) return QUOTA_IDS.map((id, index) => status(id, periods[index] ?? "", null));
   try {
     const values = await valkey("queue").mget(QUOTA_IDS.map((id, index) => counterKey(id, periods[index] ?? "")));
-    return QUOTA_IDS.map((id, index) => status(id, periods[index] ?? "", values[index] ? Number(values[index]) : 0));
+    const unset = (id: QuotaId) => (QUOTAS[id].kind === "gauge" ? null : 0);
+    return QUOTA_IDS.map((id, index) => status(id, periods[index] ?? "", values[index] ? Number(values[index]) : unset(id)));
   } catch {
     return QUOTA_IDS.map((id, index) => status(id, periods[index] ?? "", null));
   }

@@ -61,6 +61,8 @@ describe("publicConfig", () => {
       mediaBaseUrl: "https://media-staging.joutiya.ma",
       upload: { maxBytes: 10 * 1024 * 1024, maxPhotos: 10 },
       map: { pmtilesUrl: "https://media-staging.joutiya.ma/maps/morocco.pmtiles", attribution: "© OpenStreetMap contributors · Protomaps" },
+      // The app secret is set but not the display number or the phone number id: no challenge can start.
+      phoneVerification: false,
     });
     const json = JSON.stringify(config);
     for (const [name, value] of Object.entries(secrets)) {
@@ -82,6 +84,7 @@ describe("publicConfig", () => {
       mediaBaseUrl: "http://localhost:3000/api/dev/storage/joutiya-dev-media",
       upload: { maxBytes: 10 * 1024 * 1024, maxPhotos: 10 },
       map: null,
+      phoneVerification: false,
     });
     // Outside dev the media host is null until MEDIA_BASE_URL exists: no bucket name leaks.
     const staging = publicConfig(parseEnv({ APP_ENV: "staging", SITE_URL: "https://staging.joutiya.ma", R2_BUCKET_MEDIA: "joutiya-staging-media" }).env);
@@ -104,6 +107,16 @@ describe("publicConfig", () => {
     expect(publicConfig(parseEnv(emulated).env).firebase?.authEmulatorUrl).toBe("http://127.0.0.1:9099");
     // Refused at startup outside dev (env.ts); never advertised to the browser either.
     expect(publicConfig(parseEnv({ ...configured, ...emulated }).env).firebase).not.toHaveProperty("authEmulatorUrl");
+  });
+
+  it("offers the phone check only when a WhatsApp challenge can complete", () => {
+    const whatsapp = { WHATSAPP_DISPLAY_NUMBER: "+212 600 000 000", WHATSAPP_APP_SECRET: "wa-secret", WHATSAPP_PHONE_NUMBER_ID: "123" };
+    expect(publicConfig(parseEnv({ ...configured, ...whatsapp }).env).phoneVerification).toBe(true);
+    // Meta parked: no phone number id, so /api/auth/phone/start answers 503 and the browser hides the calls to action.
+    expect(publicConfig(parseEnv({ ...configured, ...whatsapp, WHATSAPP_PHONE_NUMBER_ID: "" }).env).phoneVerification).toBe(false);
+    // Development falls back to the placeholder number but still needs the webhook credentials.
+    expect(publicConfig(parseEnv({ WHATSAPP_APP_SECRET: "wa-secret", WHATSAPP_PHONE_NUMBER_ID: "123" }).env).phoneVerification).toBe(true);
+    expect(JSON.stringify(publicConfig(parseEnv({ ...configured, ...whatsapp }).env))).not.toContain("wa-secret");
   });
 });
 

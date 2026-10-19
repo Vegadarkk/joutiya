@@ -18,7 +18,7 @@
     "test:rules": "firebase emulators:exec --only firestore --project demo-joutiya \"vitest run --config vitest.rules.config.ts\"",
     "test:e2e": "firebase emulators:exec --only auth,firestore --project demo-joutiya \"playwright test\"",
     "assert-target": "node scripts/assert-target.ts",
-    "check": "npm run lint && npm run typecheck && tsc -p workers/uptime-probe --noEmit && npm run test && node --test scripts/assert-target.test.ts",
+    "check": "npm run lint && npm run typecheck && tsc -p workers/uptime-probe --noEmit && tsc -p workers/vm-launcher --noEmit && npm run test && node --test scripts/assert-target.test.ts",
     "test:api": "firebase emulators:exec --only auth,firestore --project demo-joutiya \"vitest run --config vitest.api.config.ts\"",
     "test:search": "vitest run --config vitest.search.config.ts",
     "test:e2e:only": "playwright test",
@@ -27,6 +27,7 @@
     "dev:verify-phone": "node scripts/dev-verify-phone.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.131.0",
     "@hookform/resolvers": "5.9.1",
     "@protomaps/basemaps": "5.7.2",
     "@sentry/browser": "11.8.0",

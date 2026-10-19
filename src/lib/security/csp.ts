@@ -30,7 +30,7 @@ export interface CspOptions {
   tilesOrigin?: string;
   /** Error-reporting ingest origin (Sentry EU), if configured. */
   errorIngestOrigin?: string;
-  /** Development only: Firebase Auth emulator origin the browser SDK talks to. */
+  /** Development only: Firebase Auth emulator origin (no browser code calls it since phase 5 D2). */
   authEmulatorOrigin?: string;
   /** Same-origin endpoint receiving violation reports. */
   reportPath?: string;
@@ -38,12 +38,6 @@ export interface CspOptions {
   upgradeInsecure?: boolean;
 }
 
-/** Hosts the browser talks to directly (§3 trust zone 1): Firebase Auth and Firestore realtime. */
-const FIREBASE_ORIGINS = [
-  "https://identitytoolkit.googleapis.com",
-  "https://securetoken.googleapis.com",
-  "https://firestore.googleapis.com",
-];
 export const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 /** Google Identity Services (Google sign-in, phase 2): script, button iframe, style sheet. */
 const GIS_SCRIPT = "https://accounts.google.com/gsi/client";
@@ -111,7 +105,6 @@ export function buildCsp(options: CspOptions): string {
     "font-src": ["'self'"],
     "connect-src": compact([
       "'self'",
-      ...FIREBASE_ORIGINS,
       GIS_FRAME,
       origin(options.r2Origin),
       tiles,

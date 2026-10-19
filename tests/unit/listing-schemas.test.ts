@@ -240,7 +240,8 @@ describe("firestore.indexes.json", () => {
     expect(keys).toContain("listings:ownerUid ASCENDING,status ASCENDING,updatedAt DESCENDING");
     expect(keys).toContain("listings:ownerUid ASCENDING,status ASCENDING,sortAt DESCENDING");
     expect(keys).toContain("listings:status ASCENDING,expiresAt ASCENDING");
-    expect(keys).toContain("listings:moderation.state ASCENDING,createdAt ASCENDING");
+    // No query filters on moderation.state: the moderation queue reads status + updatedAt (below).
+    expect(keys).not.toContain("listings:moderation.state ASCENDING,createdAt ASCENDING");
     // Queries of the phase 3 lots (the emulator never asks for composite indexes; production does).
     expect(keys).toContain("listings:status ASCENDING,updatedAt ASCENDING");
     expect(keys).toContain("listings:ownerUid ASCENDING,publishedAt ASCENDING");

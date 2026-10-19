@@ -1,9 +1,9 @@
 rules_version = '2';
 
 // Every read and write goes through the Next.js API with the Admin SDK, which bypasses these
-// rules (§3, §6). Browsers get nothing: no client query can be abused for injection or to burn
-// the free quota. Phase 5 opens read access to a participant's own conversations (realtime
-// messaging), and nothing else.
+// rules (§3, §6). No client reads or writes anything: not the listings (that would bypass the rate
+// limits), not the conversations either. Messaging reads come from the API and live updates from
+// its event stream (phase 5 design D2, revised 19 Oct: the browser never reads Firestore).
 service cloud.firestore {
   match /databases/{database}/documents {
     match /{document=**} {

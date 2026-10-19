@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { textLinkClassName } from "@/components/ui/text-link";
 import type { Locale } from "@/config/site";
 import type { SearchParams } from "@/lib/search/params";
 import { cn } from "@/lib/utils";
@@ -12,8 +13,7 @@ import { SearchLink } from "./search-navigation";
 
 export const chipClassName = cn(
   "inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-structure/30 bg-surface-brand ps-3.5 pe-2.5 text-sm font-medium text-foreground sm:min-h-9",
-  "transition-[background-color,border-color] duration-150 ease-door hover:border-structure/60 hover:bg-cream-300/60 dark:hover:bg-bab-700",
-  "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25",
+  "transition-[background-color,border-color,scale] duration-150 ease-door hover:border-structure/60 hover:bg-cream-300/60 dark:hover:bg-bab-700 active:scale-[0.98]",
 );
 
 export function ActiveFilterChips({ params, locale, className }: { params: SearchParams; locale: Locale; className?: string }) {
@@ -33,7 +33,7 @@ export function ActiveFilterChips({ params, locale, className }: { params: Searc
       ))}
       {filters.length > 1 ? (
         <li>
-          <SearchLink params={clearFilters(params)} scroll={false} className="inline-flex min-h-11 items-center rounded-sm px-2 text-sm font-medium text-link underline underline-offset-4 hover:no-underline sm:min-h-9">
+          <SearchLink params={clearFilters(params)} scroll={false} className={cn("inline-flex min-h-11 items-center rounded-sm px-2 text-sm font-medium text-link sm:min-h-9", textLinkClassName)}>
             {t("clearAll")}
           </SearchLink>
         </li>

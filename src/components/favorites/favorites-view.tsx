@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useLocale } from "next-intl";
 import { toast } from "sonner";
 import { FormMessage, useApiErrorMessage } from "@/components/auth/form-message";
 import { EmptyState } from "@/components/feedback/empty-state";
@@ -10,6 +10,7 @@ import { RESULTS_GRID_CLASS } from "@/components/search/grid";
 import { Button } from "@/components/ui/button";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
+import { useNumbersTranslations } from "@/i18n/numbers";
 import { usePublicConfig } from "@/lib/config/client";
 import { FAVORITES_MAX, type FavoritesPage, type FavoriteView } from "@/lib/contracts/search";
 import { listFavorites, setFavorite } from "@/lib/favorites/client";
@@ -50,7 +51,7 @@ export function FavoritesGrid({
   onRemove: (favorite: FavoriteView) => void;
   onMore: () => void;
 }) {
-  const t = useTranslations("Favorites.page");
+  const t = useNumbersTranslations("Favorites.page");
   const locale = useLocale() as Locale;
   const config = usePublicConfig();
 
@@ -96,7 +97,7 @@ export function FavoritesGrid({
 }
 
 export function FavoritesView() {
-  const t = useTranslations("Favorites.page");
+  const t = useNumbersTranslations("Favorites.page");
   const apiMessage = useApiErrorMessage();
   const [view, setView] = useState<View>({ kind: "loading" });
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());

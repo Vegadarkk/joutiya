@@ -1,10 +1,10 @@
 import "server-only";
 import sharp, { type Sharp, type SharpOptions } from "sharp";
 
-// One hardened sharp for the whole process (research/libs-media.md §1, §8): no cache (bounded
-// memory, one image at a time), a loader allowlist so libvips never parses SVG, TIFF, GIF, PDF or
-// HEIF from our buffers, and a pixel cap on every call so a 109 KB "PNG" announcing 900 MP is
-// refused from its header. Buffer inputs only: the file loaders stay blocked.
+// One hardened sharp for the whole process (phase-3/research/libs-media.md §1, §8): no cache
+// (bounded memory, one image at a time), a loader allowlist so libvips never parses SVG, TIFF, GIF,
+// PDF or HEIF from our buffers, and a pixel cap on every call so a 109 KB "PNG" announcing 900 MP
+// is refused from its header. Buffer inputs only: the file loaders stay blocked.
 
 export const MAX_INPUT_PIXELS = 64_000_000;
 /** Seconds a single pipeline may run before libvips aborts it. */

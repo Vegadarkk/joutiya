@@ -14,7 +14,7 @@ export interface RateLimitDefinition {
   blockDuration?: number;
   policy: FailPolicy;
   /** What the key is made of, for the audit of this table. */
-  key: "device" | "ip" | "ip48" | "uid" | "email" | "account+ip" | "account" | "phone";
+  key: "device" | "ip" | "ip48" | "uid" | "email" | "account+ip" | "account" | "phone" | "uid+cid";
 }
 
 const MINUTE = 60;
@@ -46,8 +46,6 @@ export const RATE_LIMITS = {
   "verify.resend.uid": { points: 3, duration: HOUR, policy: "closed", key: "uid" },
   // Action codes (verification and reset links): per IP, brute force on oobCode.
   "action.ip": { points: 60, duration: HOUR, policy: "closed", key: "ip" },
-  // /api/auth/client-token: 120 per hour per uid.
-  "clientToken.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
   // WhatsApp verification: 3 per day per account, 5 per day per IP /64, 1 per minute per number and account.
   "phone.uid": { points: 3, duration: DAY, policy: "closed", key: "uid" },
   "phone.ip": { points: 5, duration: DAY, policy: "closed", key: "ip" },
@@ -159,6 +157,54 @@ export const RATE_LIMITS = {
   "savedSearch.docs.uid": { points: 1000, duration: DAY, policy: "open", key: "uid" },
   // One-click unsubscribe links of the alert e-mails (signed token, no session).
   "alerts.unsubscribe.ip": { points: 60, duration: HOUR, policy: "open", key: "ip" },
+
+  // Phase 5 (architecture §6, design phase-5 §2).
+  // Messaging: 20 messages per minute; new conversations 50 per day, 10 for accounts under 7 days;
+  // Turnstile on the first message of every conversation. Open: a Valkey outage never blocks a reply.
+  "message.send.uid": { points: 20, duration: MINUTE, policy: "open", key: "uid" },
+  // Every send costs 2-3 writes of the shared 20 000/day Firestore quota (audit D1a-01): besides the
+  // burst above, 120 per hour and 400 per day per account, and 60 per hour per account and thread
+  // (key `${uid}:${cid}`), checked together in handlers.ts before the quota gate.
+  "message.send.hour.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
+  "message.send.day.uid": { points: 400, duration: DAY, policy: "open", key: "uid" },
+  "message.send.thread": { points: 60, duration: HOUR, policy: "open", key: "uid+cid" },
+  "conversation.new.uid": { points: 50, duration: DAY, policy: "open", key: "uid" },
+  "conversation.new.young.uid": { points: 10, duration: DAY, policy: "open", key: "uid" },
+  // Read, archive, hide, block calls of the inbox, and the unread badge.
+  "conversation.state.uid": { points: 600, duration: HOUR, policy: "open", key: "uid" },
+  "messages.unread.uid": { points: 600, duration: HOUR, policy: "open", key: "uid" },
+  // The browser reads conversations through the API only (D2, 19 Oct): inbox pages, inbox rows and
+  // thread pages, 1 200 calls per hour (a live thread refetches its newer messages on each event),
+  // and the documents they read (an inbox page up to 31, a thread page up to 52, a refetch 2 or 3):
+  // 5 000 per day per account, a tenth of the Spark day, like listing.owner.read.uid.
+  "conversation.read.uid": { points: 1200, duration: HOUR, policy: "open", key: "uid" },
+  "conversation.docs.uid": { points: 5000, duration: DAY, policy: "open", key: "uid" },
+  // GET /api/messages/stream opens (one per tab; the stream ends after 30 min and reconnects).
+  "messages.stream.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
+  // Reports: signed in 20 per day; anonymous 5 per hour per device and 20 per hour per IP (Turnstile
+  // always); P0 reasons 3 per day per account, 2 per device, 5 per IP /64. Open: a report is always
+  // accepted, and without Valkey a P0 hides nothing (no "multi" strong signal).
+  "report.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
+  "report.device": { points: 5, duration: HOUR, policy: "open", key: "device" },
+  "report.ip": { points: 20, duration: HOUR, policy: "open", key: "ip" },
+  "report.p0.uid": { points: 3, duration: DAY, policy: "open", key: "uid" },
+  "report.p0.device": { points: 2, duration: DAY, policy: "open", key: "device" },
+  "report.p0.ip": { points: 5, duration: DAY, policy: "open", key: "ip" },
+  // Acknowledgement mail of a notice (art. 16(4)): 2 per day per normalized e-mail, whoever typed it
+  // (an anonymous reporter may type a stranger's address, audit D1a-04); the report id is on screen,
+  // the mail is a courtesy (bulk priority). Closed: without the store no acknowledgement leaves.
+  "report.ack.email": { points: 2, duration: DAY, policy: "closed", key: "email" },
+  // Appeals (art. 20): signed-in and signed-link routes.
+  "appeal.uid": { points: 10, duration: DAY, policy: "closed", key: "uid" },
+  "appeal.link.ip": { points: 30, duration: HOUR, policy: "closed", key: "ip" },
+  // Assistant Joutiya: 20 messages per hour and 50 per day per device or account; 200 per day per IP
+  // /64, then Turnstile. Closed: it spends the AI budget.
+  "assistant.device.hour": { points: 20, duration: HOUR, policy: "closed", key: "device" },
+  "assistant.device.day": { points: 50, duration: DAY, policy: "closed", key: "device" },
+  "assistant.ip": { points: 200, duration: DAY, policy: "closed", key: "ip" },
+  // Back-office reads (queues, target views, stats) and the staff conversation view (D18).
+  "admin.read.uid": { points: 3000, duration: HOUR, policy: "open", key: "uid" },
+  "admin.conversation.uid": { points: 60, duration: HOUR, policy: "closed", key: "uid" },
 } as const satisfies Record<string, RateLimitDefinition>;
 
 export type RateLimitId = keyof typeof RATE_LIMITS;

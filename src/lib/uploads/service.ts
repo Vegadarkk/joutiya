@@ -128,7 +128,15 @@ export async function signUpload(uploader: Uploader, input: SignUploadInput, now
     createdAt: now,
     updatedAt: now,
   });
-  const signed = await objects.presignPut({ bucket: "quarantine", key: quarantineKey, contentType: input.declaredType, contentLength: input.declaredSize, expiresInSeconds: UPLOAD_URL_TTL_SECONDS });
+  // The document comes first, so it counts against the limits checked above while the URL is
+  // signed; a failed presign removes it, or it would hold a photo slot with no URL to use.
+  const signed = await objects
+    .presignPut({ bucket: "quarantine", key: quarantineKey, contentType: input.declaredType, contentLength: input.declaredSize, expiresInSeconds: UPLOAD_URL_TTL_SECONDS })
+    .catch(async (error: unknown) => {
+      // Left behind if this fails too: purge-quarantine expires it.
+      await deleteUploadDocument(id).catch(() => undefined);
+      throw error;
+    });
   if (uploader.ip) await recordContentOp({ uid, op: "upload.create", contentRef: uploadContentRef(id), ip: uploader.ip, now });
   return { uploadId: id, url: signed.url, method: "PUT", headers: { "Content-Type": input.declaredType }, expiresAt: signed.expiresAt.toISOString() };
 }

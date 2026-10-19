@@ -3,13 +3,13 @@ import { AwsClient } from "aws4fetch";
 import { assertObjectKey, bucketName } from "./keys";
 import type { BucketRole, GetOptions, ObjectHead, ObjectStore, PresignedPut, PresignPutInput, PutOptions } from "./types";
 
-// Cloudflare R2 through its S3 API (research/libs-map-backup.md §C3): aws4fetch SigV4, region
-// "auto", path-style URLs on the EU endpoint (`https://<account>.eu.r2.cloudflarestorage.com/
-// <bucket>/<key>`, one origin for CSP and CORS). presignPut signs the query (X-Amz-Expires = the
-// requested validity, 300 s by default) with Content-Type and Content-Length as signed headers;
-// the worker's HEAD remains the size authority. Server calls sign headers and carry
-// `X-Amz-Content-Sha256: UNSIGNED-PAYLOAD` (accepted by R2 over HTTPS). Class A/B accounting is
-// MeteredObjectStore's job; this adapter only talks to R2.
+// Cloudflare R2 through its S3 API (phase-3/research/libs-map-backup.md §C3): aws4fetch SigV4,
+// region "auto", path-style URLs on the EU endpoint (one origin for CSP and CORS:
+// `https://<account>.eu.r2.cloudflarestorage.com/<bucket>/<key>`). presignPut signs the query
+// (X-Amz-Expires = the requested validity, 300 s by default) with Content-Type and Content-Length
+// as signed headers; the worker's HEAD remains the size authority. Server calls sign headers and
+// carry `X-Amz-Content-Sha256: UNSIGNED-PAYLOAD` (accepted by R2 over HTTPS). Class A/B accounting
+// is MeteredObjectStore's job; this adapter only talks to R2.
 
 export interface S3ObjectStoreConfig {
   /** https://<account>.eu.r2.cloudflarestorage.com */

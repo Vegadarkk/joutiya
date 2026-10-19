@@ -7,6 +7,7 @@ const ARABIC_MARKS = /[ؐ-ًؚ-ٰٟۖ-ۭـ]/g;
 const LATIN_MARKS = /[̀-ͯ]/g;
 const ARABIC_DIGITS = /[٠-٩۰-۹]/g;
 const APOSTROPHES = /['’`´]/g;
+const FORMAT_CHARS = /\p{Cf}/gu;
 const SEPARATORS = /[\s\-_.,;:!?()[\]{}"«»/\\|+*&#@~^<>=]+/g;
 
 const ARABIC_FOLD: Record<string, string> = {
@@ -31,7 +32,8 @@ function foldArabic(text: string): string {
 
 /** Lower-cased, accent-insensitive form with single spaces, for comparisons and searches. */
 export function normalizeText(input: string): string {
-  const folded = foldArabic(input)
+  // Format characters (zero-width joiners included) never split a word for matching (audit D1a-11).
+  const folded = foldArabic(input.replace(FORMAT_CHARS, ""))
     .replace(APOSTROPHES, "")
     .normalize("NFKD")
     .replace(LATIN_MARKS, "")

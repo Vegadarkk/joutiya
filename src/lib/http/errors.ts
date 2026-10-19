@@ -80,6 +80,29 @@ export type ErrorCode =
   | "invalid_pieces"
   /** Firestore daily quota degraded (src/lib/quota/gate.ts): deposit or sign-up suspended until the reset. */
   | "quota_exhausted"
+  // Messaging, reports, appeals, assistant (phase 5). Messages: Messaging.errors / Report.errors.
+  /** One side blocked the other (403). */
+  | "conversation_blocked"
+  /** Conversation frozen (dispute or authority request) or the other account is gone (409). */
+  | "conversation_unavailable"
+  /** A seller cannot message himself about his own listing (409). */
+  | "self_conversation"
+  /** Reporter abusive (art. 23) or target not reportable by this account (403). */
+  | "report_not_allowed"
+  /** The reported target does not exist or is not visible to the reporter (404 semantics, 422). */
+  | "report_target_invalid"
+  /** Appeal window (6 months) closed, or the decision cannot be appealed (409). */
+  | "appeal_closed"
+  /** An appeal is already open or decided for this decision (409). */
+  | "appeal_exists"
+  /** Not the affected user nor a reporter of this decision (403). */
+  | "appeal_not_allowed"
+  /** An appeal is reviewed by another moderator than the one who decided (403). */
+  | "same_reviewer"
+  /** Ban by a moderator outside a P0 he confirmed, or a sanction above his role (403). */
+  | "sanction_not_allowed"
+  /** AI budget or provider unavailable: the assistant answers with help-center search results. */
+  | "assistant_unavailable"
   | "unavailable"
   | "internal";
 

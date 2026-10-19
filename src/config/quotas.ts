@@ -23,6 +23,16 @@ export interface QuotaDefinition {
 }
 
 const GB = 1_000_000_000;
+const MIB = 1024 * 1024;
+
+/**
+ * Internal Claude budget per month, in micro-USD (§7, §9 "budget interne réduit en staging"): the
+ * 5 USD Console cap is shared by the organisation, so only production gets it; staging and dev
+ * stop at 1 USD. One image serves staging and production: APP_ENV is read at runtime.
+ */
+export function claudeBudgetMicroUsd(appEnv: string | undefined): number {
+  return appEnv === "prod" ? 5_000_000 : 1_000_000;
+}
 
 export const QUOTAS = {
   "firestore.reads": {
@@ -62,7 +72,10 @@ export const QUOTAS = {
     service: "Firestore (Spark)",
     limit: 1 * GB,
     unit: "bytes",
-    period: "day",
+    // A floor estimated by the nightly backup from its last complete rolling full
+    // (src/lib/backup/export.ts). A gauge never resets: the period only scopes the stored value and
+    // the alert markers, so the warning comes once a month, not every night.
+    period: "month",
     resetTimeZone: "UTC",
     kind: "gauge",
     alertAt: 0.7,
@@ -139,8 +152,8 @@ export const QUOTAS = {
   },
   "claude.budget": {
     service: "Claude API",
-    // 5 USD hard cap in the Console; internal switch at 4 USD (Z4).
-    limit: 5_000_000,
+    // 5 USD hard cap in the Console; internal switch at 80 % (4 USD in prod, 0.80 USD elsewhere, Z4).
+    limit: claudeBudgetMicroUsd(process.env.APP_ENV),
     unit: "usd_micros",
     period: "month",
     resetTimeZone: "UTC",
@@ -148,6 +161,19 @@ export const QUOTAS = {
     alertAt: 0.7,
     degradeAt: 0.8,
     degradedMode: "Bascule sur le secours gratuit (Workers AI, modération OpenAI), puis votre seule file.",
+  },
+  "valkey.queueMemory": {
+    service: "Valkey (file de travaux)",
+    // maxmemory of docker/valkey/queue.conf, measured by the worker heartbeat. noeviction: at 100 %
+    // every write fails, quota counters included, so the alert comes early.
+    limit: 192 * MIB,
+    unit: "bytes",
+    period: "day",
+    resetTimeZone: "UTC",
+    kind: "gauge",
+    alertAt: 0.7,
+    degradeAt: 0.9,
+    degradedMode: "À 100 %, la file refuse toute écriture (travaux, compteurs de quotas) : purger les travaux terminés ou relever maxmemory.",
   },
   "workersAi.neurons": {
     service: "Cloudflare Workers AI",

@@ -127,7 +127,7 @@ export async function deliverMail(mail: TemplateMail): Promise<DeliverOutcome> {
   const rendered = renderMail(mail);
 
   if (!security && (await isSuppressed(mail.to))) {
-    logger.info({ template: mail.template, priority }, "mail skipped: recipient suppressed");
+    logger.info({ template: mail.template, priority, key: mail.idempotencyKey }, "mail skipped: recipient suppressed");
     return { skipped: "suppressed" };
   }
 
@@ -144,7 +144,7 @@ export async function deliverMail(mail: TemplateMail): Promise<DeliverOutcome> {
   // Quotas: from 90 % only security mails still use Resend (the reserved last 10 %); at 100 %
   // they move to Brevo, and once nothing is left the job waits for the earliest reset.
   if (!security && (await resendDegraded())) {
-    logger.info({ template: mail.template, priority }, "mail skipped: Resend quota degraded");
+    logger.info({ template: mail.template, priority, key: mail.idempotencyKey }, "mail skipped: Resend quota degraded");
     return { skipped: "quota" };
   }
   const resendBackAt = security ? await resendAvailableAt() : undefined;

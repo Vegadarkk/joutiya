@@ -29,7 +29,7 @@ function OptionChecklist({ criterionId, options, values, label, onChange }: { cr
       {options.map((option) => {
         const checked = values.includes(option.value);
         return (
-          <label key={option.value} className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-border px-3 last:border-b-0 hover:bg-surface-muted">
+          <label key={option.value} className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-border px-3 transition-colors duration-150 ease-door last:border-b-0 hover:bg-surface-muted">
             <input
               type="checkbox"
               name={`${criterionId}-${option.value}`}

@@ -2,6 +2,12 @@ import "server-only";
 import { LOCALES } from "@/config/site";
 import { serverEnv } from "@/lib/env";
 import { mailLocale, type BuiltMail, type TemplateContext } from "./templates/layout";
+import { appealOutcome } from "./templates/appealOutcome";
+import { appealReceived } from "./templates/appealReceived";
+import { contentRestored } from "./templates/contentRestored";
+import { decisionNotice } from "./templates/decisionNotice";
+import { reportOutcome } from "./templates/reportOutcome";
+import { reporterWarning } from "./templates/reporterWarning";
 import { listingApproved } from "./templates/listingApproved";
 import { listingChangesApproved } from "./templates/listingChangesApproved";
 import { listingExpired } from "./templates/listingExpired";
@@ -14,8 +20,10 @@ import { phoneRemoved } from "./templates/phoneRemoved";
 import { phoneVerified } from "./templates/phoneVerified";
 import { proApproved } from "./templates/proApproved";
 import { proRejected } from "./templates/proRejected";
+import { reportReceived } from "./templates/reportReceived";
 import { resetPassword } from "./templates/resetPassword";
 import { savedSearchAlert } from "./templates/savedSearchAlert";
+import { newMessages } from "./templates/newMessages";
 import { signupExisting } from "./templates/signupExisting";
 import { staffInvite } from "./templates/staffInvite";
 import { verifyEmail } from "./templates/verifyEmail";
@@ -38,9 +46,17 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   listingChangesApproved,
   listingExpiringSoon,
   listingExpired,
+  reportReceived,
+  decisionNotice,
+  reportOutcome,
+  contentRestored,
+  appealReceived,
+  appealOutcome,
+  reporterWarning,
   savedSearchAlert,
   proApproved,
   proRejected,
+  newMessages,
 };
 
 export const TEMPLATE_IDS = Object.keys(TEMPLATES) as TemplateId[];

@@ -22,11 +22,23 @@ export type TemplateId =
   | "listingChangesApproved"
   | "listingExpiringSoon"
   | "listingExpired"
+  // Reports (phase 5, L2): acknowledgement of a notice (art. 16(4) DSA).
+  | "reportReceived"
+  // Decisions (phase 5, L3): statement of reasons (art. 17), outcome to the reporter (art. 16(5)),
+  // restoration, appeal received and decided (art. 20), reporter warning (art. 23).
+  | "decisionNotice"
+  | "reportOutcome"
+  | "contentRestored"
+  | "appealReceived"
+  | "appealOutcome"
+  | "reporterWarning"
   // Search (phase 4): the daily digest of the saved searches with an alert (design D19).
   | "savedSearchAlert"
   // Pro accounts (phase 7): the moderator's decision on the application.
   | "proApproved"
-  | "proRejected";
+  | "proRejected"
+  // Messaging (phase 5, L5): the grouped new-messages mail (design D21).
+  | "newMessages";
 
 /**
  * Statement of reasons (art. 17 DSA, design D8) carried by the hold and rejection mails. The
@@ -45,6 +57,14 @@ export interface ModerationStatement {
   automated: boolean;
   /** Where to object: the DSA contact address of the legal configuration. */
   redress: string;
+}
+
+/** Why a phase 5 decision was taken (art. 17(3)(b)): a notice, our own check, or an authority order. */
+export type DecisionSource = "notice" | "own_initiative" | "authority_order";
+/** Automated means used (art. 17(3)(c)): detection and/or decision. */
+export interface DecisionAutomation {
+  detection: boolean;
+  decision: boolean;
 }
 
 export interface TemplateData {
@@ -74,6 +94,55 @@ export interface TemplateData {
   /** Expired: renewable from "Mes annonces" until `purgeAt` (ISO), then deleted. */
   listingExpired: { displayName: string; title: string; purgeAt: string };
   /**
+   * Notice received (art. 16(4) DSA): reference, target type, reason id (labels in
+   * src/config/report-reasons.ts), target delay in hours, reception date (ISO). `displayName` is
+   * null for a visitor who gave no name (P0); `urgent` adds the emergency numbers.
+   */
+  reportReceived: { displayName: string | null; reportId: string; targetType: "listing" | "user" | "message" | "pro"; reasonId: string; slaHours: number; receivedAt: string; urgent: boolean };
+  /** Statement of reasons of a restrictive decision (art. 17 DSA), with the signed appeal link (null: authority order). */
+  decisionNotice: {
+    displayName: string;
+    decisionId: string;
+    /** src/config/decision-templates.ts: facts and ground in the recipient's language. */
+    templateId: string;
+    action: "remove" | "restrict_visibility" | "warn" | "suspend_account" | "ban";
+    targetType: "listing" | "user" | "message";
+    /** Listing title (listing target), else null. */
+    title: string | null;
+    /** The moderator's own words, quoted as written. */
+    details: string | null;
+    durationDays: number | null;
+    /** End of a suspension (ISO). */
+    until: string | null;
+    source: DecisionSource;
+    automated: DecisionAutomation;
+    appealToken: string | null;
+    /** ISO. */
+    appealDeadline: string;
+  };
+  /** What became of a notice (art. 16(5) DSA); no detail on the measures beyond what is needed. */
+  reportOutcome: {
+    displayName: string | null;
+    reportId: string;
+    /** ISO date of the notice. */
+    reportedAt: string;
+    targetType: "listing" | "user" | "message" | "pro";
+    outcome: "actioned" | "dismissed";
+    action: "remove" | "restrict_visibility" | "restore" | "no_action" | "warn" | "suspend_account" | "ban";
+    automated: DecisionAutomation;
+    decisionId: string;
+    appealToken: string | null;
+    appealDeadline: string;
+  };
+  /** Hidden content shown again, or an account restriction lifted (report dismissed or appeal granted). */
+  contentRestored: { displayName: string; targetType: "listing" | "user" | "message"; title: string | null; via: "report" | "appeal"; decisionId: string };
+  /** Appeal received (art. 20 DSA): reference, date (ISO), answer delay. */
+  appealReceived: { displayName: string | null; decisionId: string; receivedAt: string; slaDays: number };
+  /** Appeal decided by another moderator: upheld or reversed, with the reasons. */
+  appealOutcome: { displayName: string | null; decisionId: string; outcome: "upheld" | "reversed"; by: "affected" | "reporter"; note: string; reviewedAt: string };
+  /** Art. 23(2) DSA: prior warning after manifestly unfounded notices, then the suspension of the notices until `until`. */
+  reporterWarning: { displayName: string; kind: "warning" | "suspended"; count: number; windowDays: number; until: string | null };
+  /**
    * Daily digest (bulk): the saved searches with new listings since the last digest.
    * `unsubscribeToken` (src/lib/alerts/unsubscribe-token.ts, every alert of the account) builds the
    * List-Unsubscribe header and the "Se désabonner" link.
@@ -83,6 +152,11 @@ export interface TemplateData {
   proApproved: { displayName: string; shopName: string; launchOffer: boolean; noticeDays: number };
   /** The moderator's reason; `contact` is where to object (legal configuration). */
   proRejected: { displayName: string; shopName: string; reason: string; contact: string };
+  /**
+   * Grouped new-messages mail (bulk, D21): the unread total and up to 3 conversations (listing
+   * title, the other member's display name). Never the text of a message.
+   */
+  newMessages: { displayName: string; count: number; conversations: { listingTitle: string; counterpartName: string }[] };
 }
 
 /** One saved search of the digest: its results page, the count of new listings and the newest few. */

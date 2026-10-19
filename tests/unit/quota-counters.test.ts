@@ -116,6 +116,18 @@ describe("isDegraded and isExhausted", () => {
     const quotas = await readQuotas();
     expect(quotas.find((quota) => quota.id === "r2.storage")).toMatchObject({ level: "degraded", used: 9_600_000_000 });
     expect(quotas.find((quota) => quota.id === "claude.budget")).toMatchObject({ used: 0, level: "ok" });
+    // A gauge nobody measured this period is unknown, not a false 0 at "ok".
+    expect(quotas.find((quota) => quota.id === "firestore.storage")).toMatchObject({ used: 0, level: "unknown" });
+  });
+
+  it("alert the Firestore storage estimate once a month, though the backup sets it every night", async () => {
+    expect(await setGauge("firestore.storage", 700_000_000, AT)).toMatchObject({ period: "2026-10", level: "warning" });
+    expect(await setGauge("firestore.storage", 710_000_000, TOMORROW)).toMatchObject({ period: "2026-10", level: "warning" });
+    expect(alert).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(alert).mock.calls[0]?.[0].title).toContain("firestore.storage");
+    expect((await readQuotas(TOMORROW)).find((quota) => quota.id === "firestore.storage")).toMatchObject({ used: 710_000_000, level: "warning" });
+    expect(await setGauge("firestore.storage", 720_000_000, new Date("2026-11-01T03:30:00Z"))).toMatchObject({ period: "2026-11", level: "warning" });
+    expect(alert).toHaveBeenCalledTimes(2);
   });
 });
 

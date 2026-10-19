@@ -1,5 +1,6 @@
 import { Flag } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { textLinkClassName } from "@/components/ui/text-link";
 import { cn } from "@/lib/utils";
 
 // "Signaler" (listing or profile) until the notice-and-action form of phase 5 (DSA art. 16): an
@@ -28,7 +29,7 @@ export function ReportLink({ email, target, id, url, className }: ReportLinkProp
   const href = reportMailto(email, t(`${target}.subject`, { id }), t("body", { url }));
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      <a href={href} className="inline-flex min-h-11 items-center gap-2 self-start rounded-sm text-sm font-medium text-foreground-muted underline underline-offset-4 hover:text-foreground hover:no-underline">
+      <a href={href} className={cn("inline-flex min-h-11 items-center gap-2 self-start rounded-sm text-sm font-medium text-foreground-muted hover:text-foreground", textLinkClassName)}>
         <Flag className="size-4" aria-hidden="true" />
         {t(`${target}.link`)}
       </a>

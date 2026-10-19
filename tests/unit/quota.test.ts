@@ -1,6 +1,18 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { QUOTA_IDS, QUOTAS } from "@/config/quotas";
+import { claudeBudgetMicroUsd, QUOTA_IDS, QUOTAS } from "@/config/quotas";
 import { classify, periodKey, retentionSeconds } from "@/lib/quota/period";
+import { usedMemoryBytes } from "@/lib/quota/valkey-memory";
+
+describe("claude.budget", () => {
+  it("gives the full 5 USD to production only; staging and dev stop at 1 USD (§9, audit D1b-06)", () => {
+    expect(claudeBudgetMicroUsd("prod")).toBe(5_000_000);
+    expect(claudeBudgetMicroUsd("staging")).toBe(1_000_000);
+    expect(claudeBudgetMicroUsd("dev")).toBe(1_000_000);
+    expect(claudeBudgetMicroUsd(undefined)).toBe(1_000_000);
+    expect(QUOTAS["claude.budget"].limit).toBe(claudeBudgetMicroUsd(process.env.APP_ENV));
+  });
+});
 
 describe("quota periods", () => {
   it("buckets Firestore by the Pacific day and others by UTC", () => {
@@ -45,5 +57,19 @@ describe("nextPeriodStart", () => {
     // Pacific day on the DST switch (2026-11-01, 02:00 PDT → 01:00 PST): next midnight is 08:00 UTC.
     near(nextPeriodStart({ period: "day", resetTimeZone: "America/Los_Angeles" }, new Date("2026-11-01T12:00:00Z")), "2026-11-02T08:00:00Z");
     near(nextPeriodStart({ period: "month", resetTimeZone: "UTC" }, new Date("2026-02-10T00:00:00Z")), "2026-03-01T00:00:00Z");
+  });
+});
+
+describe("valkey-queue memory gauge", () => {
+  it("reads used_memory from INFO memory", () => {
+    expect(usedMemoryBytes("# Memory\r\nused_memory:1048576\r\nused_memory_human:1.00M\r\nmaxmemory:201326592\r\n")).toBe(1_048_576);
+    expect(usedMemoryBytes("# Memory\nused_memory_rss:5\n")).toBeNull();
+  });
+
+  it("uses the maxmemory of docker/valkey/queue.conf as its limit", () => {
+    const conf = readFileSync(new URL("../../docker/valkey/queue.conf", import.meta.url), "utf8");
+    const mb = Number(/^maxmemory (\d+)mb$/m.exec(conf)?.[1]);
+    expect(QUOTAS["valkey.queueMemory"].limit).toBe(mb * 1024 * 1024);
+    expect(/^maxmemory-policy noeviction$/m.test(conf)).toBe(true);
   });
 });

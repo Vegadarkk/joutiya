@@ -192,7 +192,7 @@ export interface OwnerListing {
   id: string;
   slugId: string | null;
   status: ListingStatus;
-  pausedReason: "owner" | "quota" | null;
+  pausedReason: "owner" | "quota" | "moderation" | null;
   categoryId: string | null;
   subcategoryId: string | null;
   title: string;

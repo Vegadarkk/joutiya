@@ -31,7 +31,7 @@ export interface MailPublisher {
 }
 
 /** The only postal address ever displayed (domiciliation): the fallback when the config has none. */
-export const PUBLISHER_ADDRESS = "6 rue d'Armaillé, 75017 Paris";
+export const PUBLISHER_ADDRESS = DEFAULT_LEGAL.hqAddress;
 
 export function mailPublisher(legal?: Partial<Pick<LegalConfig, "companyName" | "hqAddress" | "email">>): MailPublisher {
   return {

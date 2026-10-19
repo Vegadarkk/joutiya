@@ -8,10 +8,13 @@ import { COLLECTIONS, auditLogSchema, type AuditLogDoc } from "@/lib/db/schemas"
 import { pepperedHash } from "@/lib/security/hash";
 
 // auditLogs (§5): append-only. Staff actions (roles, sanctions, config) and automated system
-// actions (purges). Nobody updates or deletes an entry; a daily export to the private bucket
-// comes with phase 5.
+// actions (purges). Nobody updates or deletes an entry; the daily export to the private bucket
+// (phase 5, D23) is the durable copy, and the nightly retention-purge deletes entries past
+// `purgeAt` (§7 table: 5 years, D22). Entries written before phase 5 carry no purgeAt and stay.
 
-export interface AuditInput extends Omit<AuditLogDoc, "at" | "ipHash"> {
+export const AUDIT_RETENTION_YEARS = 5;
+
+export interface AuditInput extends Omit<AuditLogDoc, "at" | "ipHash" | "purgeAt"> {
   /** Clear IP of the actor; stored as an HMAC. */
   ip?: string;
   at?: Date;
@@ -25,15 +28,23 @@ export interface AuditOptions {
   required?: boolean;
 }
 
+/** `at` + 5 calendar years (UTC). */
+export function auditPurgeAt(at: Date): Date {
+  const purgeAt = new Date(at.getTime());
+  purgeAt.setUTCFullYear(purgeAt.getUTCFullYear() + AUDIT_RETENTION_YEARS);
+  return purgeAt;
+}
+
 export async function audit(input: AuditInput, options: AuditOptions = {}): Promise<void> {
   const { ip, at = new Date(), ...rest } = input;
-  const document = auditLogSchema.parse({ ...rest, ...(ip ? { ipHash: pepperedHash("ip", ip) } : {}), at });
+  const purgeAt = auditPurgeAt(at);
+  const document = auditLogSchema.parse({ ...rest, ...(ip ? { ipHash: pepperedHash("ip", ip) } : {}), at, purgeAt });
   logger.info({ audit: { action: document.action, target: document.target, actorRole: document.actorRole } }, "audit");
   if (!isFirebaseConfigured()) return;
   try {
     await db()
       .collection(COLLECTIONS.auditLogs)
-      .add({ ...document, at: Timestamp.fromDate(at) });
+      .add({ ...document, at: Timestamp.fromDate(at), purgeAt: Timestamp.fromDate(purgeAt) });
     void consume("firestore.writes", 1);
   } catch (error) {
     logger.error({ err: (error as Error).message, action: input.action }, "audit log failed");

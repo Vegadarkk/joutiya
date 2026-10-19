@@ -52,7 +52,6 @@ export const SwitchField = forwardRef<HTMLButtonElement, SwitchFieldProps>(funct
         className={cn(
           "relative mt-0.5 inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border border-transparent bg-border-strong",
           "transition-colors duration-150 ease-door data-[state=checked]:bg-structure disabled:cursor-not-allowed",
-          "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25",
           // 44 px touch target without growing the visual control.
           "before:absolute before:-inset-y-2.5 before:-inset-x-1 before:content-['']",
         )}

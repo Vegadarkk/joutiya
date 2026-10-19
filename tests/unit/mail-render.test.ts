@@ -25,6 +25,38 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
   listingChangesApproved: { displayName: "Nadia", title: "Vélo de ville", status: "paused", url: `${SITE}/fr/mes-annonces?onglet=active`, until: "2026-12-15T09:30:00.000Z" },
   listingExpiringSoon: { displayName: "Nadia", title: "Vélo de ville", url: `${SITE}/fr/annonce/velo-de-ville-casablanca-abcd2345`, expiresAt: "2026-12-15T09:30:00.000Z" },
   listingExpired: { displayName: "Nadia", title: "Vélo de ville", purgeAt: "2027-12-15T09:30:00.000Z" },
+  reportReceived: { displayName: "Nadia", reportId: "AbCdEf0123456789wxyz", targetType: "listing", reasonId: "scam", slaHours: 24, receivedAt: "2026-10-16T09:30:00.000Z", urgent: false },
+  decisionNotice: {
+    displayName: "Nadia",
+    decisionId: "DeCiSiOn0123456789ab",
+    templateId: "listing.remove.scam",
+    action: "remove",
+    targetType: "listing",
+    title: "Vélo de ville",
+    details: "Demande d'acompte par Wafacash.",
+    durationDays: null,
+    until: null,
+    source: "notice",
+    automated: { detection: false, decision: false },
+    appealToken: "djEuRGVDaVNpT24wMTIzNDU2Nzg5YWIuYWZmZWN0ZWQuLS4xODAwMDAwMDAw.c2lnbmF0dXJlLW9mLWZvcnR5LXRocmVlLWNoYXJhY3RlcnMtYWE", // gitleaks:allow (fake fixture)
+    appealDeadline: "2027-04-16T09:30:00.000Z",
+  },
+  reportOutcome: {
+    displayName: "Nadia",
+    reportId: "AbCdEf0123456789wxyz",
+    reportedAt: "2026-10-16T09:30:00.000Z",
+    targetType: "listing",
+    outcome: "actioned",
+    action: "remove",
+    automated: { detection: false, decision: false },
+    decisionId: "DeCiSiOn0123456789ab",
+    appealToken: "djEuRGVDaVNpT24wMTIzNDU2Nzg5YWIucmVwb3J0ZXIuQWJDZEVmMDEyMzQ1Njc4OXd4eXouMTgwMDAwMDAwMA.c2lnbmF0dXJlLW9mLWZvcnR5LXRocmVlLWNoYXJhY3RlcnMtYWE", // gitleaks:allow (fake fixture)
+    appealDeadline: "2027-04-16T09:30:00.000Z",
+  },
+  contentRestored: { displayName: "Nadia", targetType: "listing", title: "Vélo de ville", via: "report", decisionId: "DeCiSiOn0123456789ab" },
+  appealReceived: { displayName: "Nadia", decisionId: "DeCiSiOn0123456789ab", receivedAt: "2026-10-16T09:30:00.000Z", slaDays: 14 },
+  appealOutcome: { displayName: "Nadia", decisionId: "DeCiSiOn0123456789ab", outcome: "reversed", by: "affected", note: "Les photos montrent un objet conforme.", reviewedAt: "2026-10-20T09:30:00.000Z" },
+  reporterWarning: { displayName: "Nadia", kind: "warning", count: 3, windowDays: 30, until: null },
   savedSearchAlert: {
     displayName: "Nadia",
     searches: [
@@ -39,6 +71,7 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
   },
   proApproved: { displayName: "Nadia", shopName: "Atlas Vélos", launchOffer: true, noticeDays: 30 },
   proRejected: { displayName: "Nadia", shopName: "Atlas Vélos", reason: "L'ICE ne correspond pas au registre du commerce.", contact: "dsa@joutiya.ma" },
+  newMessages: { displayName: "Nadia", count: 4, conversations: [{ listingTitle: "Vélo de ville", counterpartName: "Karim" }] },
 };
 
 /** Every URL a template receives must appear in both bodies. */

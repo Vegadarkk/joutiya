@@ -28,6 +28,18 @@ passwd --lock deploy-staging > /dev/null
 # deploy-prod (the owner's SSH key) was retired for Run Command in October 2026.
 if id deploy-prod > /dev/null 2>&1; then userdel --remove deploy-prod 2> /dev/null; fi
 
+# uid 1000 runs web and worker (docker/compose.yml); on the host it is the image's default user,
+# ubuntu, whom cloud-init gives passwordless sudo. Nobody logs in as ubuntu (no SSH key, Run Command
+# runs as ocarun), so it loses sudo and its admin groups: a container escape as uid 1000 stays
+# unprivileged.
+if id ubuntu > /dev/null 2>&1; then
+  rm -f /etc/sudoers.d/90-cloud-init-users
+  for group in sudo adm lxd docker; do
+    if [[ " $(id -nG ubuntu) " == *" $group "* ]]; then gpasswd --delete ubuntu "$group" > /dev/null; fi
+  done
+  usermod --shell /usr/sbin/nologin ubuntu
+fi
+
 # authorized_keys owned by root: the deploy user cannot change its own key.
 install_keys() {
   local user="$1" file="$2" home
@@ -86,8 +98,21 @@ if ! sshd -t; then
   exit 1
 fi
 rm -f "$SSHD_DROPIN.previous"
+# Same loopback addresses for ssh.socket, which ignores ListenAddress.
+install -D -m 0644 -o root -g root "$SRC/infra/vm/ssh.socket.d/joutiya.conf" /etc/systemd/system/ssh.socket.d/10-joutiya.conf
+systemctl daemon-reload
 # Reloads a running sshd only; a socket-activated one reads the new file on the next connection.
 systemctl try-reload-or-restart ssh
+# A listener still bound beyond loopback (first run) is replaced; open sessions stay (KillMode=process).
+listeners=$(ss -Hltn 'sport = :22' | awk '{ print $4 }')
+if grep -qvE '^(127\.0\.0\.1|\[::1\]):22$' <<< "$listeners"; then
+  if systemctl is-enabled --quiet ssh.socket; then
+    systemctl stop ssh.service
+    systemctl restart ssh.socket
+  else
+    systemctl restart ssh.service
+  fi
+fi
 
 # Containers never reach the instance metadata service (169.254.169.254): it serves the cloud-init
 # user data, which holds the SSH tunnel token.

@@ -166,17 +166,43 @@ describe("manifest verification", () => {
     await expect(checkRestore(count, await planRestore(count, identity), identity)).rejects.toThrow(/documents 1\/2/);
   });
 
-  it("ignores parts the manifest does not list, and restores a date without manifest with a warning", async () => {
+  it("ignores parts the manifest does not list", async () => {
     const source = new MemorySource();
     await addDate(source, "2026-10-15", [{ mode: "full", collection: "users", docs: [{ p: "users/u1", u: null }] }]);
     const stale = await sealPart([line({ p: "users/stale", u: null })], recipient);
     source.objects.set(partKey("2026-10-15", "full", "users", 3), stale.body);
-    await addDate(source, "2026-10-16", [{ mode: "full", collection: "users", docs: [{ p: "users/u2", u: null }] }], { manifest: false });
     const { plan, written } = await restoreAll(source);
     expect(plan.verifiedDates).toEqual(["2026-10-15"]);
+    expect(plan.warnings).toEqual([expect.stringContaining("2026-10-15: 1 part(s) not in the manifest ignored")]);
+    expect([...written.keys()]).toEqual(["users/u1"]);
+  });
+
+  it("refuses the parts of a date without manifest unless allowUnverified, which lists them", async () => {
+    const source = new MemorySource();
+    await addDate(source, "2026-10-15", [{ mode: "full", collection: "users", docs: [{ p: "users/u1", u: null }] }]);
+    await addDate(
+      source,
+      "2026-10-16",
+      [
+        { mode: "incremental", collection: "staff", docs: [{ p: "staff/admin", d: { role: "admin" }, u: null }] },
+        { mode: "full", collection: "users", docs: [{ p: "users/u2", u: null }] },
+      ],
+      { manifest: false },
+    );
+    const refusal = planRestore(source, identity);
+    await expect(refusal).rejects.toBeInstanceOf(RestoreError);
+    await expect(refusal).rejects.toThrow(
+      "2 part(s) from date(s) without manifest (a run that did not finish), nothing to check them against: 2026-10-16/full/users.ndjson.gz.age, 2026-10-16/incremental/staff.ndjson.gz.age. Stop before them with --until 2026-10-15, or add --allow-unverified to restore them unchecked.",
+    );
+    // Narrowed to collections the unverified date does not hold, or stopped before it: no refusal.
+    expect((await restoreAll(source, { collections: ["listings", "users"], until: "2026-10-15" })).plan.warnings).toEqual(['collection "listings" is in no backup part']);
+    await expect(planRestore(source, identity, { collections: ["staff"] })).rejects.toThrow(/1 part\(s\) from date\(s\) without manifest .*: 2026-10-16\/incremental\/staff\.ndjson\.gz\.age\./);
+
+    const { plan, written } = await restoreAll(source, { allowUnverified: true });
+    expect(plan.verifiedDates).toEqual(["2026-10-15"]);
     expect(plan.dates).toEqual(["2026-10-15", "2026-10-16"]);
-    expect(plan.warnings).toEqual([expect.stringContaining("2026-10-15: 1 part(s) not in the manifest ignored"), expect.stringContaining("2026-10-16: no manifest")]);
-    expect([...written.keys()].sort()).toEqual(["users/u1", "users/u2"]);
+    expect(plan.warnings).toEqual(["2 part(s) without manifest restored unchecked (--allow-unverified): 2026-10-16/full/users.ndjson.gz.age, 2026-10-16/incremental/staff.ndjson.gz.age"]);
+    expect([...written.keys()].sort()).toEqual(["staff/admin", "users/u1", "users/u2"]);
   });
 
   it("refuses a malformed manifest", () => {
@@ -223,7 +249,7 @@ describe("restore options and errors", () => {
     const source = new MemorySource();
     await addDate(source, "2026-10-16", [{ mode: "full", collection: "users", docs: [{ p: "users/u1", u: null }] }], { manifest: false });
     const other = await generateIdentity();
-    const plan = await planRestore(source, other);
+    const plan = await planRestore(source, other, { allowUnverified: true });
     await expect(checkRestore(source, plan, other)).rejects.toThrow(/users\.ndjson\.gz\.age: cannot be decrypted or decompressed, wrong identity\?/);
     await addDate(source, "2026-10-17", [], {});
     await expect(planRestore(source, other)).rejects.toThrow(/manifest\.json\.age: cannot be decrypted, wrong identity\?/);
@@ -232,16 +258,17 @@ describe("restore options and errors", () => {
   it("refuses malformed lines and documents filed under another collection", async () => {
     const bad = new MemorySource();
     bad.objects.set(partKey("2026-10-16", "full", "users", null), (await sealPart([line({ p: "users/u1", u: null }), '{"p":"users/u2","d":{"x":{"__t":"geo"}},"u":null}'], recipient)).body);
-    await expect(checkRestore(bad, await planRestore(bad, identity), identity)).rejects.toThrow(/users\.ndjson\.gz\.age line 2: geo\.lat/);
+    // No manifest: only the decoding stands between a part and the database.
+    await expect(checkRestore(bad, await planRestore(bad, identity, { allowUnverified: true }), identity)).rejects.toThrow(/users\.ndjson\.gz\.age line 2: geo\.lat/);
     const misfiled = new MemorySource();
     misfiled.objects.set(partKey("2026-10-16", "full", "users", null), (await sealPart([line({ p: "listings/l1", u: null })], recipient)).body);
-    await expect(checkRestore(misfiled, await planRestore(misfiled, identity), identity)).rejects.toThrow(/document of another collection/);
+    await expect(checkRestore(misfiled, await planRestore(misfiled, identity, { allowUnverified: true }), identity)).rejects.toThrow(/document of another collection/);
   });
 
   it("refuses to write a part that changed after the check", async () => {
     const source = new MemorySource();
     await addDate(source, "2026-10-16", [{ mode: "full", collection: "users", docs: [{ p: "users/u1", u: null }] }], { manifest: false });
-    const plan = await planRestore(source, identity);
+    const plan = await planRestore(source, identity, { allowUnverified: true });
     const check = await checkRestore(source, plan, identity);
     source.objects.set(partKey("2026-10-16", "full", "users", null), (await sealPart([line({ p: "users/u9", u: null })], recipient)).body);
     await expect(applyRestore(source, plan, check, identity, fakeTarget().target)).rejects.toThrow(/changed since it was checked/);

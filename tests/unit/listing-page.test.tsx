@@ -191,6 +191,12 @@ describe("D1 canonical URL and D14 404", () => {
     }
   });
 
+  it("answers 404 for a published listing hidden by a report's strong signal (phase 5, D11)", async () => {
+    repo.getListing.mockResolvedValue(record("published", { moderation: { state: "auto_ok", score: 12, flags: [], openReports: 1, hiddenBy: { reportId: "r1", signal: "multi", at: NOW } } }));
+    await expect(ListingPage(params(SLUG_ID))).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(await generateMetadata(params(SLUG_ID))).toEqual({});
+  });
+
   it("answers 404 for an unknown locale", async () => {
     repo.getListing.mockResolvedValue(record());
     await expect(ListingPage(params(SLUG_ID, "en"))).rejects.toThrow("NEXT_NOT_FOUND");
@@ -291,10 +297,7 @@ describe("page content", () => {
   });
 
   it("links only /c/{category} for a listing its deeper landing pages do not count (they may 404, D15)", async () => {
-    const outOfIndex = [
-      ...(["sold", "paused", "expired"] as const).map((status) => record(status)),
-      record("published", { moderation: { state: "auto_ok", score: 12, flags: [], openReports: 1, hiddenBy: { reportId: "r1", signal: "multi", at: NOW } } }),
-    ];
+    const outOfIndex = (["sold", "paused", "expired"] as const).map((status) => record(status));
     for (const listing of outOfIndex) {
       repo.getListing.mockResolvedValue(listing);
       const html = await renderPage();

@@ -6,6 +6,7 @@ import { cityBySlug, cityName } from "@/config/regions";
 import type { AuthContext } from "@/lib/auth/guards";
 import { requireOwner } from "@/lib/auth/guards";
 import type { Device } from "@/lib/auth/respond";
+import { enqueueAiTask } from "@/lib/ai/queue";
 import { audit } from "@/lib/audit";
 import { MAX_DRAFTS, type CreateListingInput, type FieldIssue, type ListingPatch, type ListingStatus, type ModerationFlag, type PublishListingResponse } from "@/lib/contracts/listings";
 import { listingPhotoSchema, type ListingPhoto } from "@/lib/contracts/media";
@@ -48,7 +49,7 @@ import { publishesAsPro } from "@/lib/pro/lifecycle";
 import { notifySearchIndex } from "@/lib/search/queue";
 import { escalateOnIp } from "./escalation";
 import { buildSlugId, newListingId } from "./ids";
-import { IllegalTransitionError, canRenew, canTransition, renew, renewForReview, transition, type Lifetime, type TransitionContext, type TransitionEffects, type TransitionResult } from "./lifecycle";
+import { IllegalTransitionError, canRenew, canTransition, draftPurgeAt, renew, renewForReview, transition, type Lifetime, type TransitionContext, type TransitionEffects, type TransitionResult } from "./lifecycle";
 import { ownerListingView } from "./owner-view";
 import { PUBLIC_STATES } from "./public";
 import { assessReadiness } from "./readiness";
@@ -163,6 +164,8 @@ export async function createDraft(actor: Actor, input: CreateListingInput, now =
     legalHold: [],
     createdAt: now,
     updatedAt: now,
+    // A draft nobody edits for 30 days goes with its photos (retention-purge, audit A4-04).
+    purgeAt: draftPurgeAt(now),
     version: 0,
   });
   try {
@@ -319,6 +322,8 @@ export async function patchListing(actor: Actor, id: string, patch: ListingPatch
   const fields = changedFields(listing, await fieldsOf(listing, patch, { uid, quotas: seller.quotas, now }));
   // Nothing changes: nothing is written. A rejected listing's save reopens it, even an empty one.
   if (Object.keys(fields).length === 0 && listing.status !== "rejected") return ownerListingView(listing);
+  // Every draft edit restarts its 30-day clock (written with the edit: no extra write).
+  if (listing.status === "draft") fields.purgeAt = draftPurgeAt(now);
   let effects: TransitionEffects = { search: null, contentOp: null, audit: null, revalidate: false, mail: null };
   let mail: MailJob | null = null;
   let hold: ModerationDecisionInput | undefined;
@@ -417,6 +422,7 @@ export async function publish(actor: Actor, request: Request, id: string, option
   const hold = to === "pending_review" ? holdRecord(listing, screening, now, rejectedBefore) : undefined;
 
   const updated = await commit(listing, patch, effects, { actor, user: seller.user, now, hold, maxActive: seller.quotas.activeListings });
+  await requestScreening(updated);
   const path = `/${seller.user.locale}/annonce/${slugId}`;
   if (to === "published") await notifySeller(updated, seller.user, { template: "listingPublished", path });
   else await notifySeller(updated, seller.user, { template: "listingPendingReview", statement: statementOf("hold", screening.flags, await redressAddress()) });
@@ -438,6 +444,20 @@ async function enforceDailyLimit(uid: string, seller: Seller, quotas: ListingQuo
   if (outcome.ok && seller.type !== "pro") return;
   if (quotas.listingsPerDay !== null && (await countPublishedSince(uid, new Date(now.getTime() - DAY_MS))) >= quotas.listingsPerDay) {
     throw new HttpError(429, "listing_daily_limit", undefined, { headers: { "Retry-After": "3600" } });
+  }
+}
+
+/**
+ * After a publication or a screened renewal commits (design D19, D20): the agent screens the
+ * listing (a held one may be approved alone, a published one may get a system report). The job
+ * id carries the committed version, so a republish is screened even while an older job runs.
+ * Never throws: a publication never fails because the agent queue is down.
+ */
+async function requestScreening(listing: ListingRecord): Promise<void> {
+  try {
+    await enqueueAiTask("listing_screen", { type: "listing", id: listing.id }, { version: listing.version });
+  } catch (error) {
+    logger.warn({ listingId: listing.id, err: (error as Error).message }, "listings: screening request failed");
   }
 }
 
@@ -534,6 +554,8 @@ async function renewExpired(actor: Actor, listing: ListingRecord, seller: Seller
   patch.adsEligible = !held && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy;
   const hold = held ? holdRecord(listing, screening, now, rejectedBefore) : undefined;
   const updated = await commit(listing, patch, effects, { actor, user: seller.user, now, hold, maxActive: seller.quotas.activeListings });
+  // Content a moderator approved and unchanged since was not screened: nothing for the agent either.
+  if (!approved) await requestScreening(updated);
   if (held) await notifySeller(updated, seller.user, { template: "listingPendingReview", statement: statementOf("hold", screening.flags, await redressAddress()) });
   return updated;
 }
