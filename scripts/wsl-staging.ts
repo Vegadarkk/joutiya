@@ -1,0 +1,284 @@
+// Staging on the owner's PC2 until the Oracle VM exists (his go of 19 October 2026): the VM's
+// staging host rebuilt in a dedicated WSL2 distro, joutiya-staging (Ubuntu 24.04), with the same
+// Compose files, paths, deploy command and secret files (/opt/joutiya, /etc/joutiya/staging,
+// /var/lib/joutiya), so that moving to the VM is a redeploy there. Run on PC2 from Git Bash at the
+// root of an up-to-date checkout of main. Each root script reaches the distro on stdin (wsl.exe),
+// never on a command line or in a Windows file. Dry run unless --apply. Production never runs here.
+//
+//   node scripts/wsl-staging.ts setup [--apply]
+//       Docker Engine from Docker's repository (as bootstrap.sh does on the VM), git and zstd; the
+//       group and directories of infra/vm/install.sh; the public clone of Joutiya in
+//       /opt/joutiya/src; a key pair that receives the sealed staging variables (its public
+//       certificate is printed as a `transfer-certificate ...` line).
+//   node scripts/wsl-staging.ts wif [--apply]
+//       keyless Google access (§9): a key per container made in the distro, its request signed here
+//       by the CA of step 9 (~/.joutiya/wif-ca) for 90 days, then the certificate and Workload
+//       Identity Federation files installed and running web and worker recreated. Same command to renew.
+//   node scripts/wsl-staging.ts deploy [--commit=<sha>] [--apply]
+//       a commit of origin/main (default: its head) built in the distro (web and worker, amd64),
+//       then started by infra/vm/deploy-forced-command.sh `load` as on the VM (health checks,
+//       rollback). While a required variable or secret file is missing, the images are built and
+//       the start waits: the output names what is missing.
+//   node scripts/wsl-staging.ts status
+//       release, containers and images (read only).
+//   node scripts/wsl-staging.ts stop [--apply]
+//       staging stopped, volumes kept: before the VM's staging starts, since both would connect to
+//       the same tunnel and share its traffic.
+
+import { spawn } from "node:child_process";
+import { readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { validateTargets, type Targets } from "./assert-target.ts";
+import { WIF_SERVICES, caFiles, certificateConfig, credentialConfig, csrFromOutput, readCa, signCsr, subjectName } from "./google-wif.ts";
+import { wifDir, wifInstallScript, wifKeyScript, wifRecreateScript } from "./oracle-vm.ts";
+import { REQUIRED } from "./vm-env.ts";
+
+export const DISTRO = "joutiya-staging";
+const ENV = "staging";
+export const REPOSITORY = "https://github.com/Vegadarkk/joutiya.git";
+export const SOURCE_DIR = "/opt/joutiya/src";
+const ETC = `/etc/joutiya/${ENV}`;
+const COMPOSE = `APP_ENV=${ENV} RELEASE="$release" docker compose --project-directory /opt/joutiya/docker -f /opt/joutiya/docker/compose.yml -f /opt/joutiya/docker/compose.${ENV}.yml`;
+/** Certificates of this temporary host live shorter than the VM's 365 days; `wif` renews them. */
+export const PC_LEAF_DAYS = 90;
+/** Secret files the start needs besides app.env (Compose's env_file entries and §9's credentials). */
+export const SECRET_FILES = ["tunnel.env", "valkey-queue.env", "valkey-ratelimit.env", "meilisearch.env", "gcp/web/credentials.json", "gcp/worker/credentials.json"] as const;
+
+// ---------------------------------------------------------------------------------------------
+// Running root scripts in the distro.
+
+/**
+ * What the distro runs: the script read from stdin into a root-only temporary file, then run with
+ * its standard input closed, so that no command inside can read the rest of the script. No double
+ * quote: wsl.exe receives it through a Windows command line.
+ */
+export const RUNNER = "umask 077; f=$(mktemp); trap 'rm -f $f' EXIT; cat > $f; /bin/bash -euo pipefail $f < /dev/null";
+
+export function wslArgs(distro = DISTRO): string[] {
+  return ["-d", distro, "-u", "root", "--exec", "/bin/bash", "-c", RUNNER];
+}
+
+export interface Command {
+  file: string;
+  args: string[];
+}
+
+/** Runs a script in the distro, its output shown as it comes; resolves with the output, rejects unless it exits 0. */
+export function runScript(script: string, command: Command = { file: "wsl.exe", args: wslArgs() }, echo = true): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // WSL_UTF8: wsl.exe's own messages in UTF-8 instead of UTF-16.
+    const child = spawn(command.file, command.args, { env: { ...process.env, WSL_UTF8: "1" }, stdio: ["pipe", "pipe", "inherit"], windowsHide: true });
+    let output = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      output += chunk;
+      if (echo) process.stdout.write(chunk);
+    });
+    child.on("error", (error: NodeJS.ErrnoException) => reject(error.code === "ENOENT" ? new Error(`${command.file} not found: run this on PC2, from Git Bash`) : error));
+    child.on("close", (code) => (code === 0 ? resolve(output) : reject(new Error(`exit ${code ?? "on a signal"}`))));
+    child.stdin.end(script);
+  });
+}
+
+// No parameter properties: Node runs this file by stripping types only.
+class Host {
+  readonly apply: boolean;
+  private readonly run: (script: string) => Promise<string>;
+
+  constructor(apply: boolean, run: (script: string) => Promise<string> = (script) => runScript(script)) {
+    this.apply = apply;
+    this.run = run;
+  }
+
+  /** A script that changes the distro runs only with --apply; a read-only one runs in dry runs too. */
+  async exec(label: string, script: string, readOnly = false): Promise<string> {
+    if (!this.apply && !readOnly) {
+      console.log(`would run  ${label} (${Buffer.byteLength(script)} bytes)`);
+      return "";
+    }
+    console.log(`run        ${label}`);
+    try {
+      return await this.run(script);
+    } catch (error) {
+      throw new Error(`${label}: ${(error as Error).message}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Root scripts.
+
+/** Refuses Docker Desktop's engine, which its WSL integration may put behind `docker`. */
+const OWN_ENGINE = [
+  'engine="$(docker info --format "{{.OperatingSystem}}" 2> /dev/null || true)"',
+  '[[ -n "$engine" && "$engine" != *"Docker Desktop"* ]] || { echo "docker does not reach the Docker Engine of this distro (found: ${engine:-nothing}): turn off Docker Desktop\'s WSL integration for joutiya-staging" >&2; exit 1; }',
+];
+
+/** Docker's daemon settings, as on the VM (infra/vm/bootstrap.sh). */
+export const DAEMON_JSON = `{
+  "log-driver": "json-file",
+  "log-opts": { "max-size": "10m", "max-file": "3" },
+  "live-restore": true,
+  "no-new-privileges": true
+}`;
+
+export function setupScript(): string {
+  return [
+    // The runner's umask is 077: here only secrets are written with it.
+    "umask 022",
+    ". /etc/os-release",
+    '[[ "$ID" == ubuntu && "$VERSION_ID" == 24.04 ]] || { echo "joutiya-staging runs $PRETTY_NAME, not Ubuntu 24.04" >&2; exit 1; }',
+    '[[ "$(ps -p 1 -o comm=)" == systemd ]] || { echo "systemd is not running: set [boot] systemd=true in /etc/wsl.conf, then wsl.exe --terminate joutiya-staging" >&2; exit 1; }',
+    "export DEBIAN_FRONTEND=noninteractive",
+    "APT=(apt-get -o DPkg::Lock::Timeout=600 -o Acquire::Retries=5)",
+    '"${APT[@]}" update -q',
+    '"${APT[@]}" install -y -q ca-certificates curl git zstd openssl python3',
+    // Docker Engine from Docker's repository (docs.docker.com/engine/install/ubuntu), as on the VM.
+    "if ! command -v dockerd > /dev/null; then",
+    "  install -m 0755 -d /etc/apt/keyrings",
+    "  curl -fsSL --retry 5 https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc",
+    "  chmod a+r /etc/apt/keyrings/docker.asc",
+    "  cat > /etc/apt/sources.list.d/docker.sources << EOF",
+    "Types: deb",
+    "URIs: https://download.docker.com/linux/ubuntu",
+    "Suites: ${UBUNTU_CODENAME:-$VERSION_CODENAME}",
+    "Components: stable",
+    "Architectures: $(dpkg --print-architecture)",
+    "Signed-By: /etc/apt/keyrings/docker.asc",
+    "EOF",
+    '  "${APT[@]}" update -q',
+    '  "${APT[@]}" install -y -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin',
+    "fi",
+    "install -d -m 0755 /etc/docker",
+    "cat > /etc/docker/daemon.json.new << 'EOF'",
+    DAEMON_JSON,
+    "EOF",
+    "if cmp -s /etc/docker/daemon.json.new /etc/docker/daemon.json; then rm /etc/docker/daemon.json.new; else mv /etc/docker/daemon.json.new /etc/docker/daemon.json; systemctl restart docker; fi",
+    "systemctl enable --now docker",
+    ...OWN_ENGINE,
+    // The layout of infra/vm/install.sh, staging only: secrets root only, gcp/ for the group of
+    // web and worker (compose.staging.yml), state of the deploy command.
+    "getent group joutiya-staging > /dev/null || groupadd --gid 2002 joutiya-staging",
+    "install -d -m 0711 /etc/joutiya",
+    `install -d -m 0700 ${ETC}`,
+    `install -d -m 0750 -g joutiya-staging ${ETC}/gcp ${ETC}/gcp/web ${ETC}/gcp/worker`,
+    "install -d -m 0700 /var/lib/joutiya",
+    "install -d -m 0755 /opt/joutiya /opt/joutiya/docker /opt/joutiya/docker/valkey",
+    `[[ -d ${SOURCE_DIR}/.git ]] || git clone --quiet ${REPOSITORY} ${SOURCE_DIR}`,
+    // Receives the staging variables sealed on the owner's other PC: the key never leaves the distro.
+    `if [[ ! -s ${ETC}/transfer.key ]]; then`,
+    `  (umask 077 && openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out ${ETC}/transfer.key 2> /dev/null)`,
+    `  openssl req -x509 -new -key ${ETC}/transfer.key -subj /CN=joutiya-staging-transfer -days 30 -out ${ETC}/transfer.pem`,
+    "fi",
+    `echo "transfer-certificate $(openssl x509 -in ${ETC}/transfer.pem -outform DER | base64 -w0)"`,
+    `echo "docker $(docker version --format '{{.Server.Version}}'), compose $(docker compose version --short), engine $engine"`,
+    'echo "setup done"',
+  ].join("\n");
+}
+
+/**
+ * A commit of origin/main built in the distro and, once every secret is in place, loaded and
+ * started by the VM's deploy command, which waits for health and rolls back on failure.
+ */
+export function deployScript(commit?: string): string {
+  if (commit !== undefined && !/^[0-9a-f]{7,40}$/.test(commit)) throw new Error("--commit takes a commit SHA of origin/main");
+  const src = SOURCE_DIR;
+  return [
+    // The image keeps the modes of the build context: files checked out as the CI's are (0644).
+    "umask 022",
+    ...OWN_ENGINE,
+    `[[ -d ${src}/.git ]] || { echo "no clone in ${src}: run setup first" >&2; exit 1; }`,
+    `git -C ${src} fetch --quiet origin main`,
+    `commit="$(git -C ${src} rev-parse --verify --quiet '${commit ?? "origin/main"}^{commit}')" || { echo "unknown commit" >&2; exit 1; }`,
+    `git -C ${src} merge-base --is-ancestor "$commit" origin/main || { echo "$commit is not on origin/main" >&2; exit 1; }`,
+    `git -C ${src} checkout --quiet --force --detach "$commit"`,
+    `release="$(git -C ${src} rev-parse --short=12 "$commit")"`,
+    // The files infra/vm/install.sh installs on the VM, from the same commit.
+    `install -m 0644 ${src}/docker/compose.yml ${src}/docker/compose.staging.yml /opt/joutiya/docker/`,
+    `install -m 0644 ${src}/docker/valkey/*.conf /opt/joutiya/docker/valkey/`,
+    `install -m 0755 ${src}/infra/vm/deploy-forced-command.sh /usr/local/sbin/joutiya-deploy`,
+    `install -m 0755 ${src}/infra/vm/search-setup.sh /usr/local/sbin/joutiya-search-setup`,
+    "for target in web worker; do",
+    '  echo "building joutiya-$target:$release"',
+    `  docker build --progress=plain -f ${src}/docker/Dockerfile --target "$target" --build-arg RELEASE="$release" -t "joutiya-$target:$release" ${src} 2>&1 | tail -n 20`,
+    "done",
+    'missing=""',
+    `for name in ${REQUIRED.join(" ")}; do grep -q "^$name=" ${ETC}/app.env 2> /dev/null || missing="$missing $name"; done`,
+    `for file in ${SECRET_FILES.join(" ")}; do [[ -s ${ETC}/$file ]] || missing="$missing $file"; done`,
+    'if [[ -n "$missing" ]]; then echo "built $release; the start waits for:$missing"; exit 0; fi',
+    'docker save "joutiya-web:$release" "joutiya-worker:$release" | zstd -T0 -3 -q | SSH_ORIGINAL_COMMAND="load $release" /usr/local/sbin/joutiya-deploy staging',
+    'echo "running $release"',
+  ].join("\n");
+}
+
+export function statusScript(): string {
+  return [
+    'release="$(cat /var/lib/joutiya/staging.release 2> /dev/null || true)"',
+    'echo "release ${release:-none}"',
+    `if [[ -n "$release" ]]; then ${COMPOSE} ps --all; fi`,
+    "docker image ls --format '{{.Repository}}:{{.Tag}} {{.CreatedSince}}' | grep '^joutiya-' || true",
+  ].join("\n");
+}
+
+export function stopScript(): string {
+  return [
+    'release="$(cat /var/lib/joutiya/staging.release 2> /dev/null || true)"',
+    '[[ -n "$release" ]] || { echo "staging runs no release"; exit 0; }',
+    `${COMPOSE} down`,
+    'echo "staging stopped, volumes kept"',
+  ].join("\n");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Actions.
+
+async function wif(host: Host, targets: Targets): Promise<void> {
+  const { projectId: project, projectNumber } = targets.environments[ENV].firebase;
+  if (project === null || projectNumber === null) throw new Error(`environments.${ENV}.firebase is not recorded in infra/targets.json`);
+  const ca = caFiles();
+  readCa(ca);
+  for (const service of WIF_SERVICES) {
+    const subject = subjectName(ENV, service);
+    const output = await host.exec(`wif ${service}: new key and request in the distro`, wifKeyScript(ENV, service));
+    if (!host.apply) {
+      console.log(`would sign  ${subject} here for ${PC_LEAF_DAYS} days, then install it in ${wifDir(ENV, service)}`);
+      continue;
+    }
+    const certificate = signCsr({ csr: csrFromOutput(output), subject, days: PC_LEAF_DAYS, ca });
+    const dir = wifDir(ENV, service);
+    const files = {
+      credentials: JSON.stringify(credentialConfig({ projectNumber, project, service, certificateConfigPath: `${dir}/certificate_config.json` })),
+      certificateConfig: JSON.stringify(certificateConfig(`${dir}/cert.pem`, `${dir}/key.pem`)),
+    };
+    await host.exec(`wif ${service}: certificate and federation files`, wifInstallScript(ENV, service, certificate, files));
+  }
+  await host.exec("wif: running web and worker recreated", wifRecreateScript(ENV));
+  if (host.apply) console.log(`certificates valid ${PC_LEAF_DAYS} days: renew them with this command before they expire`);
+}
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const [action, extra] = args.filter((arg) => !arg.startsWith("--"));
+  const actions = ["setup", "wif", "deploy", "status", "stop"];
+  if (!action || !actions.includes(action) || extra !== undefined) {
+    throw new Error("usage: scripts/wsl-staging.ts <setup|wif|deploy [--commit=<sha>]|status|stop> [--apply]");
+  }
+  const raw: unknown = JSON.parse(readFileSync(new URL("../infra/targets.json", import.meta.url), "utf8"));
+  const errors = validateTargets(raw);
+  if (errors.length > 0) throw new Error(errors.join("\n"));
+  const host = new Host(args.includes("--apply"));
+  if (action === "setup") await host.exec("setup", setupScript());
+  else if (action === "wif") await wif(host, raw as Targets);
+  else if (action === "deploy") await host.exec("deploy", deployScript(args.find((arg) => arg.startsWith("--commit="))?.slice("--commit=".length)));
+  else if (action === "stop") await host.exec("stop", stopScript());
+  else await host.exec("status", statusScript(), true);
+  if (action !== "status") console.log(host.apply ? "\nDone." : "\nDry run: nothing changed in the distro. Add --apply to run these scripts.");
+}
+
+const self = fileURLToPath(import.meta.url);
+if (/[\\/]wsl-staging\.(?:ts|mjs)$/.test(self) && process.argv[1] !== undefined && realpathSync(process.argv[1]) === self) {
+  main().catch((error: unknown) => {
+    console.error(`wsl-staging: ${(error as Error).message}`);
+    process.exit(1);
+  });
+}
