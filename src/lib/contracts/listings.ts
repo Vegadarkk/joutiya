@@ -216,7 +216,8 @@ export interface OwnerListing {
 }
 
 export type CreateListingResponse = { id: string };
-export type OwnerListingsResponse = { listings: OwnerListingSummary[] };
+/** `salesOpen`: paid options can be bought (config/flags.salesEnabled, phase 7). */
+export type OwnerListingsResponse = { listings: OwnerListingSummary[]; salesOpen: boolean };
 export type ListingResponse = { listing: OwnerListing };
 export type PublishListingResponse = {
   status: Extract<ListingStatus, "published" | "pending_review" | "rejected">;

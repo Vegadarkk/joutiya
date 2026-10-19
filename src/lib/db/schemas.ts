@@ -21,6 +21,7 @@ import { SAVED_SEARCH_ALERTS, SAVED_SEARCH_NAME_MAX } from "@/lib/contracts/sear
 import { storedSearchParamsSchema } from "@/lib/search/params";
 import { MESSAGE_RISK_FLAGS, MESSAGE_TEXT_MAX } from "@/lib/contracts/messaging";
 import { REPORT_PRIORITIES, REPORT_REASON_IDS, REPORT_TARGET_TYPES } from "@/config/report-reasons";
+import type { LedgerReason } from "@/lib/payments/wallet";
 
 // The enums shared with the browser are defined in the client-safe contracts (this module is
 // server-only through claims.ts) and re-exported here so the repositories have one import.
@@ -659,6 +660,65 @@ export type AuthorityRequestDoc = z.infer<typeof authorityRequestSchema>;
 export const suspensionSchema = z.object({ until: ts, decisionId: z.string().min(1).max(128), createdAt: ts }).strict();
 export type SuspensionDoc = z.infer<typeof suspensionSchema>;
 
+// ---- Phase 7: credits wallet (design §3, §5) --------------------------------------------------
+
+const creditAmount = z.number().int().min(-1_000_000).max(1_000_000);
+
+/**
+ * wallets/{accountId} (`uid`, or `pro_{proId}` for a shop): purchased balance (may go negative
+ * after a refund, then `frozen`), the plan's monthly credits and À la Une allowance, each valid
+ * until its `resetsAt` (not cumulative: the next grant replaces them, an ended period voids them).
+ */
+export const walletSchema = z
+  .object({
+    balance: creditAmount,
+    frozen: z.boolean(),
+    planCredits: z.number().int().min(0).max(100_000),
+    planCreditsResetsAt: ts.optional(),
+    allowances: z.object({ featured: z.number().int().min(0).max(1_000), resetsAt: ts.optional() }).strict(),
+    createdAt: ts,
+    updatedAt: ts,
+  })
+  .strict();
+export type WalletDoc = z.infer<typeof walletSchema>;
+
+export const LEDGER_REASONS = ["purchase", "option", "plan_grant", "refund", "refund_reversed", "admin_adjust"] as const satisfies readonly LedgerReason[];
+
+/**
+ * wallets/{accountId}/ledger/{entryId}: append-only. Ids are deterministic (idempotency):
+ * `option_{listingId}_{requestId}`, `purchase_{storeTransactionId}`, `refund_{...}`, `grant_{...}`.
+ */
+export const ledgerEntrySchema = z
+  .object({
+    reason: z.enum(LEDGER_REASONS),
+    delta: creditAmount,
+    paidPart: creditAmount,
+    bonusPart: creditAmount,
+    planCreditsDelta: creditAmount,
+    featuredAllowanceDelta: creditAmount,
+    balanceAfter: creditAmount,
+    /** Price of the option or pack in credits (what the buyer agreed to). */
+    price: z.number().int().min(0).max(1_000_000).optional(),
+    refs: z
+      .object({
+        listingId: listingIdSchema.optional(),
+        optionId: z.string().min(1).max(32).optional(),
+        requestId: z.string().min(1).max(64).optional(),
+        orderId: z.string().min(1).max(128).optional(),
+        subscriptionId: z.string().min(1).max(128).optional(),
+      })
+      .strict(),
+    /** Country of taxation of a purchase (lot 3). */
+    taxJurisdiction: z.enum(["MA", "EU"]).optional(),
+    /** Both purchase boxes ticked (CGV + withdrawal, immediate execution), with the text version. */
+    consent: z.object({ version: z.string().min(1).max(20), at: ts }).strict().optional(),
+    /** Who acted: the buyer, or "system" for a grant or a webhook. */
+    actorUid: uid,
+    at: ts,
+  })
+  .strict();
+export type LedgerEntryDoc = z.infer<typeof ledgerEntrySchema>;
+
 export const COLLECTIONS = {
   users: "users",
   userPrivate: "private",
@@ -684,6 +744,9 @@ export const COLLECTIONS = {
   savedSearches: "savedSearches",
   // Phase 7
   proProfiles: "proProfiles",
+  wallets: "wallets",
+  /** wallets/{accountId}/ledger/{entryId} */
+  ledger: "ledger",
   // Phase 5
   conversations: "conversations",
   /** conversations/{cid}/messages/{mid} */

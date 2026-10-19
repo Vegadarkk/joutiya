@@ -26,6 +26,7 @@ interface OwnerListingCardProps {
   onDelete: () => Promise<void>;
   /** An action of this row is running. */
   busy?: boolean;
+  salesOpen?: boolean;
   now?: Date;
 }
 
@@ -33,7 +34,7 @@ interface OwnerListingCardProps {
  * One row of "Mes annonces": cover, title, price, city, status, expiry, actions. On phones the
  * primary action takes the full row under the cover (its label is longer than the text column).
  */
-export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, busy = false, now = new Date() }: OwnerListingCardProps) {
+export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, busy = false, salesOpen = false, now = new Date() }: OwnerListingCardProps) {
   const t = useTranslations("MyListings");
   const locale = useLocale() as Locale;
   const city = listing.citySlug ? cityBySlug(listing.citySlug) : undefined;
@@ -80,7 +81,7 @@ export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, bu
               </a>
             )}
           </h2>
-          <ListingActions listing={listing} onAction={onAction} onDelete={onDelete} busy={busy} publicHref={publicHref} now={now} />
+          <ListingActions listing={listing} onAction={onAction} onDelete={onDelete} busy={busy} publicHref={publicHref} salesOpen={salesOpen} now={now} />
         </div>
         <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
           <span className="font-semibold tabular-nums">{price}</span>

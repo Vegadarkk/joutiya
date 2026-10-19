@@ -78,6 +78,19 @@ export type ErrorCode =
   | "pro_application_exists"
   /** KYBC pieces that are not the applicant's `kyb` uploads. */
   | "invalid_pieces"
+  // Credits and paid options (phase 7, design §5). Messages: Options.errors.<code>.
+  /** config/flags.salesEnabled is off: nothing can be bought (403). */
+  | "sales_closed"
+  /** A shop's credits are spent by its owner only (403). */
+  | "billing_owner_only"
+  /** The listing is not published or is hidden by moderation (409). */
+  | "listing_not_promotable"
+  /** The listing sorted from a publication, renewal or bump within the last hour (409). */
+  | "bump_too_soon"
+  /** Negative balance after a refund: no purchase until it is covered (409). */
+  | "wallet_frozen"
+  /** Plan credits + balance below the price (402). */
+  | "insufficient_credits"
   /** Firestore daily quota degraded (src/lib/quota/gate.ts): deposit or sign-up suspended until the reset. */
   | "quota_exhausted"
   // Messaging, reports, appeals, assistant (phase 5). Messages: Messaging.errors / Report.errors.
