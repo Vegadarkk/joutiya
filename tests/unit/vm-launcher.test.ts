@@ -6,10 +6,10 @@ import { describe, expect, it } from "vitest";
 import registry from "../../infra/targets.json";
 import { SHAPE, SMALL_SHAPE_CONFIG, consoleCloudInit } from "../../scripts/oracle-vm";
 import plan from "../../workers/vm-launcher/src/launch.json";
-import { launchOnce, signedHeaders, signingString, type Env, type Launch } from "../../workers/vm-launcher/src/lib";
+import { launchOnce, pkcs8, signedHeaders, signingString, type Env, type Launch } from "../../workers/vm-launcher/src/lib";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-const env = (type: "pkcs8" | "pkcs1"): Env => ({ OCI_USER: "usr", OCI_FINGERPRINT: "aa:bb", OCI_PRIVATE_KEY: privateKey.export({ type, format: "pem" }).toString() });
+const env = (type: "pkcs8" | "pkcs1"): Required<Env> => ({ OCI_USER: "usr", OCI_FINGERPRINT: "aa:bb", OCI_PRIVATE_KEY: privateKey.export({ type, format: "pem" }).toString() });
 const launch: Launch = { tenancy: "ten", region: "eu-paris-1", compartmentId: "ocid1.compartment.oc1..c", displayName: "joutiya-vm", request: { displayName: "joutiya-vm" }, shapes: [{ ocpus: 2, memoryInGBs: 12 }, SMALL_SHAPE_CONFIG] };
 
 describe("vm-launcher signing", () => {
@@ -25,6 +25,38 @@ describe("vm-launcher signing", () => {
       const signature = /signature="([^"]+)"/.exec(headers.authorization ?? "")?.[1] ?? "";
       expect(createVerify("RSA-SHA256").update(text).verify(publicKey, signature, "base64")).toBe(true);
     }
+  });
+});
+
+describe("vm-launcher key parsing", () => {
+  const der = new Uint8Array(privateKey.export({ type: "pkcs8", format: "der" }));
+  const pem = env("pkcs8").OCI_PRIVATE_KEY;
+
+  it("reads only the PEM block, whatever the console file or a Windows copy adds around it", () => {
+    const crlf = pem.replaceAll("\n", "\r\n");
+    for (const variant of [
+      `${pem}OCI_API_KEY\n`,
+      `\uFEFF${crlf}OCI_API_KEY\r\n`,
+      [...`\uFEFF${crlf}`].join("\0"),
+      pem.replaceAll("\n", "\\n"),
+      `"${pem.trim()}"`,
+    ]) {
+      expect(pkcs8(variant)).toEqual(der);
+    }
+  });
+
+  it("names the secret without quoting it when the key is missing or broken", async () => {
+    expect(() => pkcs8(pem.split("\n").slice(1, -2).join(""))).toThrow(/^OCI_PRIVATE_KEY holds no PEM private key block$/);
+    expect(() => pkcs8(pem.replace(/\n[\s\S]+\n(?=-----END)/, "\nabcde\n"))).toThrow(/^OCI_PRIVATE_KEY: the PEM block is not base64$/);
+    const broken = { ...env("pkcs8"), OCI_PRIVATE_KEY: pem.replace(/\n[A-Za-z0-9+/]{8}/, "\n") };
+    await expect(signedHeaders(broken, "ten", "GET", new URL("https://iaas.eu-paris-1.oraclecloud.com/"), undefined, new Date())).rejects.toThrow(/^OCI_PRIVATE_KEY is not an RSA private key$/);
+  });
+
+  it("logs which secrets are missing instead of calling Oracle", async () => {
+    const fetcher = async (): Promise<Response> => {
+      throw new Error("no request expected");
+    };
+    expect(await launchOnce(launch, { OCI_USER: "usr" }, 0, fetcher)).toBe("secrets missing: OCI_FINGERPRINT, OCI_PRIVATE_KEY");
   });
 });
 
