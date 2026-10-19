@@ -2,7 +2,7 @@
 
 ## Signaler une vulnérabilité
 
-Merci de ne pas ouvrir d'issue publique. Écrivez à `security@joutiya.ma` en décrivant la faille, les étapes pour la reproduire et son impact. Nous accusons réception sous 72 heures.
+Merci de ne pas ouvrir d'issue publique. Écrivez à `abuse@joutiya.ma`, objet « Sécurité », en décrivant la faille, les étapes pour la reproduire et son impact. Nous accusons réception sous 72 heures.
 
 ## Secrets exposés
 
