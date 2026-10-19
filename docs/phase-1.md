@@ -66,7 +66,7 @@ Claude lance `node scripts/oracle-vm.ts create --apply --retry-minutes=4800 --sm
 
 **Lanceur gratuit** (`workers/vm-launcher`, votre choix du 19 octobre) : un Worker Cloudflare envoie la même demande de création chaque minute, hors Claude, donc sans quota consommé ni pause. Il agit sous un utilisateur Oracle dédié, `joutiya-launcher`, qui peut seulement lister et créer des instances dans `joutiya` ; sa clé est générée sur votre PC2 et posée dans Cloudflare par Nav, Claude ne la voit jamais. Il ne lance rien tant qu'une instance existe dans le compartiment. Sa demande (`src/launch.json`, écrite par `node scripts/oracle-vm.ts launcher`) ne contient aucun jeton de tunnel : la VM démarre avec ses tunnels en attente, puis Claude les écrit par Run Command (`node scripts/oracle-vm.ts tunnels --apply`). Une fois la VM configurée, Nav supprime le Worker et l'utilisateur `joutiya-launcher`.
 
-Création à la main dans la console Oracle : même nom `joutiya-vm`, même forme, même sous-réseau, aucune clé SSH, et surtout le script cloud-init `workers/vm-launcher/console-cloud-init.sh` collé en entier (le même démarrage, sans jeton de tunnel). Sans lui, la VM n'a ni agent de Claude ni tunnel.
+Création à la main dans la console Oracle : même nom `joutiya-vm`, même forme, même sous-réseau, aucune clé SSH, et surtout le script cloud-init `workers/vm-launcher/console-cloud-init.sh` collé en entier (le même démarrage, sans jeton de tunnel). Sans lui, la VM n'a ni agent de Claude ni tunnel : Claude la répare sur place avec `node scripts/oracle-vm.ts rebuild --apply` (disque de démarrage neuf et bon démarrage ; l'instance et sa place chez Oracle restent).
 
 Oracle peut reprendre une VM gratuite inactive 7 jours de suite (processeur, réseau et mémoire sous 20 %). Le staging et la sonde réduisent ce risque. Ne passez pas en *Pay As You Go* sans en parler dans le projet.
 
@@ -179,7 +179,7 @@ Garde-fous : au plus 20 e-mails relayés par jour UTC, dont les 5 derniers gard�
 
 ## 13. Tester la reconstruction de la VM
 
-La VM ne doit garder aucune donnée unique. On le vérifie une fois, avant le lancement, tant que personne n'utilise le site : Claude reconstruit `joutiya-vm` sur place : il remplace son disque de démarrage par une image neuve (l'instance et sa place chez Oracle restent), suit `infra/redeploy.md`, refait les contrôles de l'étape 12 et note la durée totale. Jamais de suppression puis recréation : la place A1 gratuite pourrait ne pas revenir.
+La VM ne doit garder aucune donnée unique. On le vérifie une fois, avant le lancement, tant que personne n'utilise le site : Claude reconstruit `joutiya-vm` sur place (`node scripts/oracle-vm.ts rebuild --apply`) : il remplace son disque de démarrage par une image neuve et rejoue le démarrage (l'instance et sa place chez Oracle restent), suit `infra/redeploy.md`, refait les contrôles de l'étape 12 et note la durée totale. Jamais de suppression puis recréation : la place A1 gratuite pourrait ne pas revenir.
 
 ## 14. Réglages des buckets R2 (fiche Nav N16)
 

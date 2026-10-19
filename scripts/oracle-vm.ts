@@ -422,16 +422,21 @@ export function launchDetails(input: {
     createVnicDetails: { subnetId: input.subnetId, assignPublicIp: true, displayName: NAMES.instance, hostnameLabel: NAMES.instance },
     // No SSH key: administration goes through OCI Run Command; ssh.joutiya.ma serves the CI only.
     metadata: { user_data: input.userData },
-    agentConfig: {
-      isMonitoringDisabled: false,
-      isManagementDisabled: false,
-      pluginsConfig: [{ name: "Compute Instance Run Command", desiredState: "ENABLED" }],
-    },
-    // Metadata service v2 only (header-authenticated); v1 endpoints are disabled.
-    instanceOptions: { areLegacyImdsEndpointsDisabled: true },
-    freeformTags: { project: "joutiya" },
+    ...INSTANCE_SETTINGS,
   };
 }
+
+/** Settings of launchDetails that `rebuild` also applies to an existing VM. */
+const INSTANCE_SETTINGS = {
+  agentConfig: {
+    isMonitoringDisabled: false,
+    isManagementDisabled: false,
+    pluginsConfig: [{ name: "Compute Instance Run Command", desiredState: "ENABLED" }],
+  },
+  // Metadata service v2 only (header-authenticated); v1 endpoints are disabled.
+  instanceOptions: { areLegacyImdsEndpointsDisabled: true },
+  freeformTags: { project: "joutiya" },
+};
 
 /** Tunnel token value of a user data built for the launcher Worker: bootstrap.sh then skips the tunnels. */
 export const NO_TOKEN = "none";
@@ -445,7 +450,13 @@ async function existingSubnet(oci: Oci, compartmentId: string): Promise<string> 
 }
 
 /** The create request (availability domain, newest image, user data), with or without tunnel tokens. */
-async function launchPlan(oci: Oci, targets: Targets, compartmentId: string, subnetId: string, withTokens: boolean): Promise<{ userData: string; details: (shapeConfig: ShapeConfig) => Record<string, unknown> }> {
+async function launchPlan(
+  oci: Oci,
+  targets: Targets,
+  compartmentId: string,
+  subnetId: string,
+  withTokens: boolean,
+): Promise<{ userData: string; imageId: string; details: (shapeConfig: ShapeConfig) => Record<string, unknown> }> {
   const tenancy = targets.shared.oracle.tenancyId as string;
   const [ad] = await oci.call<{ name: string }[]>("GET", "identity", `/20160918/availabilityDomains${query({ compartmentId: tenancy })}`);
   if (!ad) throw new Error("no availability domain");
@@ -462,7 +473,7 @@ async function launchPlan(oci: Oci, targets: Targets, compartmentId: string, sub
     prodTunnelToken: await token("prod"),
     vmFiles: vmFilesTarball(),
   });
-  return { userData, details: (shapeConfig) => launchDetails({ availabilityDomain: ad.name, compartmentId, subnetId, imageId: image.id, userData, shapeConfig }) };
+  return { userData, imageId: image.id, details: (shapeConfig) => launchDetails({ availabilityDomain: ad.name, compartmentId, subnetId, imageId: image.id, userData, shapeConfig }) };
 }
 
 async function create(oci: Oci, targets: Targets, compartmentId: string, retryMinutes: number, smallFallback: boolean): Promise<void> {
@@ -589,6 +600,38 @@ async function tunnels(oci: Oci, targets: Targets, compartmentId: string): Promi
   const script = tunnelsScript({ ssh: await tunnelToken(targets, "ssh"), staging: await tunnelToken(targets, "staging"), prod: await tunnelToken(targets, "prod") });
   const output = await runCommand(oci, compartmentId, instance.id, "joutiya tunnels", rootCommand(script));
   if (oci.apply) console.log(output.trimEnd());
+}
+
+/**
+ * Boot volume replacement of `rebuild`: a new boot volume from the image and a new first boot. Oracle
+ * accepts new user data only together with a new boot volume; any SSH key stays as it is.
+ */
+export function rebuildDetails(input: { imageId: string; userData: string; metadata?: Record<string, string>; keepDisk: boolean }): Record<string, unknown> {
+  return {
+    metadata: { ...input.metadata, user_data: input.userData },
+    sourceDetails: { sourceType: "image", imageId: input.imageId, bootVolumeSizeInGBs: BOOT_VOLUME_GB, isPreserveBootVolumeEnabled: input.keepDisk },
+  };
+}
+
+/**
+ * `rebuild`: the compartment's VM gets a new boot volume (newest image) and a new first boot with the
+ * tunnel tokens, keeping the instance and its A1 capacity (guide step 13, infra/redeploy.md). Also
+ * repairs a VM created in the console without the cloud-init script, whatever its name. --keep-disk
+ * keeps the old boot volume, detached, as evidence after an incident.
+ */
+async function rebuild(oci: Oci, targets: Targets, compartmentId: string, keepDisk: boolean): Promise<void> {
+  const instances = await oci.call<Instance[]>("GET", "iaas", `/20160918/instances${query({ compartmentId })}`);
+  const live = instances.filter((instance) => !["TERMINATING", "TERMINATED"].includes(instance.lifecycleState));
+  if (live.length !== 1 || !live[0]) throw new Error(`expected one instance in the compartment, found ${live.length}: nothing done`);
+  const instance = await oci.call<Instance & { metadata?: Record<string, string> }>("GET", "iaas", `/20160918/instances/${live[0].id}`);
+  if (!["RUNNING", "STOPPED"].includes(instance.lifecycleState)) throw new Error(`instance ${instance.displayName} is ${instance.lifecycleState}: nothing done`);
+  console.log(`instance ${instance.displayName} ${instance.lifecycleState} (${instance.id})`);
+  const { userData, imageId } = await launchPlan(oci, targets, compartmentId, await existingSubnet(oci, compartmentId), true);
+  await oci.write("PUT", `/20160918/instances/${instance.id}`, { displayName: NAMES.instance, ...INSTANCE_SETTINGS });
+  const details = rebuildDetails({ imageId, userData, metadata: instance.metadata, keepDisk });
+  const shown = { ...details, metadata: { keys: Object.keys(details.metadata as object), user_data: `<bootstrap.sh with tokens, ${userData.length} bytes>` } };
+  await oci.write("PUT", `/20160918/instances/${instance.id}`, details, shown);
+  if (oci.apply) console.log("boot volume replacement requested: follow it with `node scripts/oracle-vm.ts status`");
 }
 
 /** Bootstrap lines (joutiya-bootstrap: ...) and cloud-init's verdict, from the serial console. */
@@ -1090,12 +1133,12 @@ async function main(): Promise<void> {
   const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);
   const smallFallback = args.includes("--small-fallback");
-  const actions = ["create", "launcher", "tunnels", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback"];
+  const actions = ["create", "launcher", "tunnels", "rebuild", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback"];
   const perEnv = action === "env" || action === "search-setup" || action === "wif";
   const argument = action === "run" || perEnv;
   if (!action || !actions.includes(action) || argument !== (file !== undefined) || (perEnv && !(DEPLOYED_ENVS as readonly string[]).includes(file ?? ""))) {
     throw new Error(
-      "usage: scripts/oracle-vm.ts <create|launcher|tunnels|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
+      "usage: scripts/oracle-vm.ts <create|launcher|tunnels|rebuild [--keep-disk]|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
     );
   }
 
@@ -1114,6 +1157,7 @@ async function main(): Promise<void> {
   if (action === "create") await create(oci, targets, compartment, retry, smallFallback);
   else if (action === "launcher") await launcher(oci, targets, compartment);
   else if (action === "tunnels") await tunnels(oci, targets, compartment);
+  else if (action === "rebuild") await rebuild(oci, targets, compartment, args.includes("--keep-disk"));
   else if (action === "reboot") await reboot(oci, compartment);
   else if (action === "agent") await agent(oci, compartment);
   else if (action === "run") await run(oci, compartment, file as string);

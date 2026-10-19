@@ -22,6 +22,7 @@ import {
   parseStatus,
   pickImage,
   promoteCommand,
+  rebuildDetails,
   recordedTarballs,
   rootCommand,
   securityList,
@@ -134,6 +135,17 @@ describe("instance", () => {
   it("reads the bootstrap progress from the serial console", () => {
     const console = "[  12.1] cloud-init[812]: noise\r\n[  30.2] joutiya-bootstrap: ssh tunnel installed\r\nCloud-init v. 25.1 finished at Fri, 16 Oct 2026. Up 300 seconds\r\n";
     expect(bootstrapLines(console)).toEqual(["joutiya-bootstrap: ssh tunnel installed", "Cloud-init v. 25.1 finished at Fri, 16 Oct 2026. Up 300 seconds"]);
+  });
+});
+
+describe("rebuild", () => {
+  it("replaces the boot volume and the user data together, keeping any SSH key", () => {
+    const details = rebuildDetails({ imageId: "ocid1.image.oc1.x", userData: "bmV3", metadata: { user_data: "b2xk", ssh_authorized_keys: "ssh-ed25519 AAAA" }, keepDisk: false });
+    expect(details).toEqual({
+      metadata: { user_data: "bmV3", ssh_authorized_keys: "ssh-ed25519 AAAA" },
+      sourceDetails: { sourceType: "image", imageId: "ocid1.image.oc1.x", bootVolumeSizeInGBs: 100, isPreserveBootVolumeEnabled: false },
+    });
+    expect(rebuildDetails({ imageId: "i", userData: "bmV3", keepDisk: true })).toMatchObject({ metadata: { user_data: "bmV3" }, sourceDetails: { isPreserveBootVolumeEnabled: true } });
   });
 });
 
