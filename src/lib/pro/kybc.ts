@@ -78,3 +78,24 @@ export function sniffKybcType(bytes: Uint8Array): "image/jpeg" | "image/png" | "
 export function kybcObjectKey(uid: string, uploadId: string): string {
   return `kyb/${uid}/${uploadId}`;
 }
+
+/**
+ * Version of the collection notice shown with the pieces (`Pro.form.piecesNotice`: purpose, who
+ * sees them, retention, hosting outside Morocco, rights). Stored with the application
+ * (`kybc.noticeVersion`, loi 09-08 art. 5); bump it when the text changes in substance.
+ */
+export const KYBC_NOTICE_VERSION = "2026-10-19";
+
+/**
+ * PDF name tokens that run code, open files or embed payloads (`/OpenAction` + `/JavaScript`,
+ * `/Launch`, `/EmbeddedFile`, XFA forms...). A piece carrying one is refused at `complete`: staff
+ * download the PDFs to a desktop reader. Defence in depth, not a sanitiser: compressed object
+ * streams hide names from this scan, so PDFs still open in the sandboxed browser viewer first.
+ */
+const PDF_ACTIVE_TOKENS = /\/(?:JavaScript|JS|Launch|OpenAction|AA|EmbeddedFiles?|RichMedia|XFA|GoToR|SubmitForm|ImportData)(?![A-Za-z0-9_])/;
+
+export function pdfHasActiveContent(bytes: Uint8Array): boolean {
+  // `#xx` escapes in names (`/J#61vaScript`) are decoded before the match.
+  const text = new TextDecoder("latin1").decode(bytes).replace(/#([0-9A-Fa-f]{2})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+  return PDF_ACTIVE_TOKENS.test(text);
+}

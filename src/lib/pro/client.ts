@@ -1,4 +1,4 @@
-import { ApiError, apiGet, apiPost, uploadToPresignedUrl, type UploadProgress } from "@/lib/auth/client";
+import { ApiError, apiDelete, apiGet, apiPost, uploadToPresignedUrl, type UploadProgress } from "@/lib/auth/client";
 import { KYBC_DECLARED_TYPES, MAX_UPLOAD_BYTES, type KybcDeclaredType } from "@/lib/contracts/media";
 import { PRO_API, type KybcCompleteResponse, type KybcSignResponse, type ProApplyInput, type ProApplyResponse, type ProMeResponse } from "@/lib/contracts/pro";
 
@@ -23,3 +23,6 @@ export async function uploadKybcPiece(file: File, onProgress?: UploadProgress, s
   if (signal?.aborted) throw new ApiError(0, "aborted");
   return apiPost<KybcCompleteResponse>(PRO_API.kybcComplete(signed.uploadId), {});
 }
+
+/** Removes a piece the wizard no longer lists (a piece of an application under review is refused: 409). */
+export const removeKybcPiece = (uploadId: string) => apiDelete(PRO_API.kybcDelete(uploadId));

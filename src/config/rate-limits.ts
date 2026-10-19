@@ -120,6 +120,9 @@ export const RATE_LIMITS = {
   // Pro applications (phase 7): a moderator's verify or reject; each verification retags the
   // owner's listings (up to RETAG_PAGE x RETAG_MAX_PAGES writes), so far fewer than listings.
   "pro.decision.uid": { points: 60, duration: HOUR, policy: "closed", key: "uid" },
+  // Staff reads of KYBC pieces (identity documents, admin host): a review opens a few; closed, a
+  // bulk download by a careless or stolen staff session stops at the ceiling.
+  "pro.kybc.view.uid": { points: 300, duration: HOUR, policy: "closed", key: "uid" },
   // --- Search and discovery (phase 4, design §6) ---------------------------------------------
   // /api/search and /recherche pages: 30 per minute and 600 per hour per device (or uid), 120 per
   // minute per IP; over: Turnstile, then 429. Open: reading and searching stay up without Valkey.

@@ -2,6 +2,7 @@ import type { Job } from "bullmq";
 import { backupFirestore } from "./backup-firestore";
 import { expireListings } from "./expire-listings";
 import { sendExpiryReminders } from "./listing-expiry-reminders";
+import { proEffectsSync } from "./pro-effects-sync";
 import { purgeConnectionLogs } from "./purge-connection-logs";
 import { purgeQuarantine } from "./purge-quarantine";
 import { purgeUnactivated } from "./purge-unactivated";
@@ -27,6 +28,7 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "expire-boosts": () => sweepExpiredBoosts(),
   "saved-search-alerts": () => sendSavedSearchAlerts(),
   "purge-connection-logs": () => purgeConnectionLogs(),
+  "pro-effects-sync": () => proEffectsSync(),
 };
 
 /** Repeatable jobs (UTC cron patterns), upserted at every start. */
@@ -49,6 +51,8 @@ export const SCHEDULES = {
   "purge-connection-logs-nightly": { pattern: "15 3 * * *", job: "purge-connection-logs" },
   // 03:30 UTC (D17): encrypted Firestore backup, after retention-purge (03:00) and the R2 gauge (03:10).
   "backup-firestore-nightly": { pattern: "30 3 * * *", job: "backup-firestore" },
+  // Phase 7. 03:50 UTC: Pro claims and listings retag a verification left pending (effects.ts).
+  "pro-effects-sync-nightly": { pattern: "50 3 * * *", job: "pro-effects-sync" },
   // Phase 4. 04:05 UTC: À la Une ended since the last sweep -> searchOutbox (safety net of the
   // delayed expire-boost jobs). 04:20 UTC: Firestore vs search index, after the backup's reads.
   "expire-boosts-nightly": { pattern: "5 4 * * *", job: "expire-boosts" },

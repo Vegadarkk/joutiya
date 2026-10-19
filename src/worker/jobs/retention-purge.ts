@@ -2,6 +2,7 @@ import { alert } from "@/lib/alert";
 import { audit } from "@/lib/audit";
 import { PHOTO_VARIANTS } from "@/lib/contracts/media";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
+import { listProProfilesPastPurge, purgeProProfile } from "@/lib/db/repositories/pro-profiles";
 import { deleteJournalPastPurge, listListingsPastPurge, oldestPastPurge, purgeListing, type JournalCollection, type ListingCursor } from "@/lib/db/repositories/retention";
 import { deleteUploadDocument, listUploadsByTarget, updateUpload, UPLOADS_BY_TARGET_LIMIT, type UploadRecord } from "@/lib/db/repositories/uploads";
 import { COLLECTIONS, type ListingStatus } from "@/lib/db/schemas";
@@ -23,7 +24,10 @@ import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 //    (`removed/listings/...`) and the purgeAt of its uploads to the listing's, and never deletes
 //    them; a removed listing's variants are deleted from both buckets (a move cut short can leave
 //    them in either). Unattached and orphan uploads of other listings are purge-quarantine's;
-// 2. contentOps (1 year) and revealLogs (90 days) past purgeAt.
+// 2. contentOps (1 year) and revealLogs (90 days) past purgeAt;
+// 3. rejected Pro applications past purgeAt (6 months, phase 7): the profile (identifiers) goes
+//    and the owner is unlinked; its KYBC pieces get purgeAt = now and purge-quarantine deletes
+//    them within the hour (src/lib/pro/kybc-retention.ts).
 // At most PURGE_DELETE_BUDGET document deletions a night (Spark: 20 000 a day); the rest waits a
 // night, and a backlog older than 3 days raises an alert. Idempotent: every step re-reads.
 
@@ -33,6 +37,8 @@ export const LISTING_PURGE_PAGES = 20;
 /** Pages of upload documents read for one purged listing (each page is deleted before the next query). */
 export const LISTING_MEDIA_PAGES = 5;
 export const JOURNAL_BATCH = 400;
+export const PRO_PURGE_BATCH = 50;
+export const PRO_PURGE_PAGES = 4;
 export const BACKLOG_ALERT_MS = 3 * 24 * 3_600_000;
 
 /** Statuses whose purgeAt ends the listing; published, paused and pending listings are never purged. */
@@ -51,6 +57,8 @@ export interface RetentionResult {
   objects: number;
   contentOps: number;
   revealLogs: number;
+  /** Rejected Pro applications deleted (phase 7). */
+  proProfiles: number;
   failed: number;
   /** The delete budget or the Firestore quota stopped the run before the end. */
   deferred: boolean;
@@ -164,6 +172,36 @@ async function purgeListings(state: RunState): Promise<void> {
   }
 }
 
+/** Rejected Pro applications past purgeAt: profile deleted, owner unlinked, pieces handed to purge-quarantine. */
+async function purgeProProfiles(state: RunState): Promise<void> {
+  const { now, result } = state;
+  for (let pages = 0; pages < PRO_PURGE_PAGES; pages += 1) {
+    const profiles = await listProProfilesPastPurge(now, PRO_PURGE_BATCH);
+    for (const profile of profiles) {
+      if (state.budget <= 0) {
+        result.deferred = true;
+        return;
+      }
+      try {
+        const purged = await purgeProProfile(profile.proId, now);
+        if (!purged) {
+          result.skipped += 1;
+          continue;
+        }
+        result.proProfiles += 1;
+        state.budget -= 1;
+        await Promise.all(purged.kybc.uploadIds.map((uploadId) => updateUpload(uploadId, { purgeAt: now }, now).catch(() => undefined)));
+        await audit({ actorUid: "system", actorRole: "system", action: "pro.purge", target: { type: "pro", id: profile.proId }, automated: true, at: now });
+      } catch (error) {
+        result.failed += 1;
+        logger.warn({ proId: profile.proId, err: (error as Error).message }, "rejected Pro application not purged");
+      }
+    }
+    if (profiles.length < PRO_PURGE_BATCH) return;
+  }
+  result.deferred = true;
+}
+
 async function purgeJournal(collection: JournalCollection, key: "contentOps" | "revealLogs", state: RunState): Promise<void> {
   while (state.budget > 0) {
     const wanted = Math.min(JOURNAL_BATCH, state.budget);
@@ -184,7 +222,7 @@ async function purgeJournal(collection: JournalCollection, key: "contentOps" | "
 }
 
 export async function retentionPurge(now = new Date(), deps: { store?: ObjectStore } = {}): Promise<RetentionResult> {
-  const result: RetentionResult = { listings: 0, held: 0, skipped: 0, uploads: 0, objects: 0, contentOps: 0, revealLogs: 0, failed: 0, deferred: false };
+  const result: RetentionResult = { listings: 0, held: 0, skipped: 0, uploads: 0, objects: 0, contentOps: 0, revealLogs: 0, proProfiles: 0, failed: 0, deferred: false };
   if (!isFirestoreConfigured()) {
     logger.warn("retention-purge skipped: Firebase not configured");
     return result;
@@ -206,6 +244,7 @@ export async function retentionPurge(now = new Date(), deps: { store?: ObjectSto
   }
   await step("contentOps", state, () => purgeJournal(COLLECTIONS.contentOps, "contentOps", state));
   await step("revealLogs", state, () => purgeJournal(COLLECTIONS.revealLogs, "revealLogs", state));
+  await step("proProfiles", state, () => purgeProProfiles(state));
 
   if (state.freedBytes > 0) await recordMediaBytes(-state.freedBytes, now);
   logger.info({ ...result }, "retention-purge");

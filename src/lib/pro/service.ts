@@ -6,14 +6,16 @@ import type { ProApplyInput, ProMeResponse } from "@/lib/contracts/pro";
 import { db } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
 import { countActive } from "@/lib/db/repositories/listings";
-import { getProProfile, proProfileFromSnapshot, proProfileRef, proProfileToFirestore } from "@/lib/db/repositories/pro-profiles";
-import { COLLECTIONS } from "@/lib/db/schemas";
+import { getProProfile, proProfileFromSnapshot, proProfileRef, proProfileToFirestore, type ProProfileRecord } from "@/lib/db/repositories/pro-profiles";
+import { COLLECTIONS, type UserDoc } from "@/lib/db/schemas";
 import { getUploads } from "@/lib/db/repositories/uploads";
 import { getUser } from "@/lib/db/repositories/users";
 import { HttpError } from "@/lib/http/errors";
 import { newListingId, slugify } from "@/lib/listings/ids";
+import { isPhoneVerificationConfigured } from "@/lib/phone-verify/config";
+import { normalizeMoroccanMobile } from "@/lib/phone/normalize";
 import { consume } from "@/lib/quota";
-import { iceFormatOk } from "./kybc";
+import { iceFormatOk, KYBC_NOTICE_VERSION } from "./kybc";
 import { storefrontShown, transition } from "./lifecycle";
 import type { ProProfileDoc } from "./profile-schema";
 
@@ -32,27 +34,46 @@ export interface ProActor {
 export const newProId = newListingId;
 
 /**
- * Submits (or, after a rejection, resubmits) the application. Refuses: applications closed
- * (`config/flags.proSignupEnabled`), an account already Pro, an application in progress, an
- * unverified e-mail or phone, pieces that are not the applicant's `kyb` uploads.
+ * Eligibility of an application (and of sending its pieces): applications open
+ * (`config/flags.proSignupEnabled`), an account not Pro yet, active, with a verified e-mail and
+ * phone, and no application in progress for it (a rejected one may be resubmitted). While the
+ * WhatsApp check is unavailable (Meta app pending), the phone is verified by a moderator's call
+ * during the review instead: the application then carries the number to call.
  */
-export async function submitApplication(actor: ProActor, input: ProApplyInput, now = new Date()): Promise<{ proId: string }> {
-  const uid = actor.auth.user.uid;
+export async function assertCanApply(auth: AuthContext): Promise<{ user: UserDoc; existing: ProProfileRecord | null }> {
+  const uid = auth.user.uid;
   const flags = await getFlags();
   if (!flags.proSignupEnabled) throw new HttpError(403, "pro_signup_closed");
-  if (actor.auth.user.claims.role === "pro") throw new HttpError(409, "already_pro");
+  if (auth.user.claims.role === "pro") throw new HttpError(409, "already_pro");
 
   const user = await getUser(uid);
   if (!user || user.status !== "active") throw new HttpError(403, "account_suspended");
   if (!user.badges.emailVerified) throw new HttpError(403, "email_not_verified");
-  if (!user.badges.phoneVerified) throw new HttpError(403, "phone_required");
+  if (!user.badges.phoneVerified && isPhoneVerificationConfigured()) throw new HttpError(403, "phone_required");
+
+  const existing = user.proId ? await getProProfile(user.proId) : null;
+  if (existing && existing.lifecycle !== "rejected") throw new HttpError(409, "pro_application_exists");
+  return { user, existing };
+}
+
+/**
+ * Submits (or, after a rejection, resubmits) the application. Refuses what `assertCanApply`
+ * refuses, and pieces that are not the applicant's `kyb` uploads.
+ */
+export async function submitApplication(actor: ProActor, input: ProApplyInput, now = new Date()): Promise<{ proId: string }> {
+  const uid = actor.auth.user.uid;
+  const { user, existing } = await assertCanApply(actor.auth);
+  // The badge may be false only while the WhatsApp check is unavailable: the number to call is then part of the application.
+  let phoneToCheck: string | undefined;
+  if (!user.badges.phoneVerified) {
+    if (!input.phone) throw new HttpError(400, "phone_required");
+    phoneToCheck = normalizeMoroccanMobile(input.phone).e164;
+  }
 
   const pieces = await getUploads(input.uploadIds);
   const valid = pieces.filter((upload) => upload.ownerUid === uid && upload.purpose === "kyb" && upload.status === "ready");
   if (valid.length !== new Set(input.uploadIds).size) throw new HttpError(400, "invalid_pieces");
 
-  const existing = user.proId ? await getProProfile(user.proId) : null;
-  if (existing && existing.lifecycle !== "rejected") throw new HttpError(409, "pro_application_exists");
   const proId = existing?.proId ?? newProId();
   const pricing = await getPricing();
 
@@ -72,6 +93,8 @@ export async function submitApplication(actor: ProActor, input: ProApplyInput, n
       iceFormatOk: iceFormatOk(input.legal.ice),
       uploadIds: [...new Set(input.uploadIds)],
       complianceCommitmentAt: now,
+      noticeVersion: KYBC_NOTICE_VERSION,
+      ...(phoneToCheck ? { phoneToCheck } : {}),
       submittedAt: now,
     },
     lifecycle: "pending_verification",
@@ -106,7 +129,7 @@ export async function proSelf(auth: AuthContext): Promise<ProMeResponse> {
   const uid = auth.user.uid;
   const [flags, user] = await Promise.all([getFlags(), getUser(uid)]);
   const eligibility = { emailVerified: user?.badges.emailVerified ?? false, phoneVerified: user?.badges.phoneVerified ?? false, accountActive: user?.status === "active" };
-  const base = { signupOpen: flags.proSignupEnabled, salesOpen: flags.salesEnabled, eligibility };
+  const base = { signupOpen: flags.proSignupEnabled, salesOpen: flags.salesEnabled, phoneVerification: isPhoneVerificationConfigured() ? ("whatsapp" as const) : ("call" as const), eligibility };
   const profile = user?.proId ? await getProProfile(user.proId) : null;
   if (!profile || profile.ownerUid !== uid) return { ...base, shop: null };
   const pricing = await getPricing();

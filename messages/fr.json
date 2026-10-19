@@ -555,7 +555,8 @@
         "decode_failed": "Cette image est illisible ou abîmée.",
         "nsfw": "Cette photo ne respecte pas les règles de Joutiya.",
         "expired": "L'envoi a expiré. Réessayez.",
-        "quota": "Le nombre maximal de photos est atteint."
+        "quota": "Le nombre maximal de photos est atteint.",
+        "active_content": "Ce fichier contient des éléments actifs et ne peut pas être accepté."
       },
       "tooMany": "Vous pouvez encore ajouter {count, plural, one {# photo} other {# photos}}.",
       "full": "Vous avez atteint le nombre maximal de photos.",
@@ -2531,7 +2532,8 @@
       "aeNumber": "Numéro d'auto-entrepreneur",
       "tp": "Numéro de taxe professionnelle (TP)",
       "rcOrTp": "Indiquez le RC ou la taxe professionnelle.",
-      "piecesLead": "Ajoutez de 1 à {max} documents : extrait du registre de commerce, attestation d'auto-entrepreneur ou de taxe professionnelle. Formats acceptés : PDF, JPEG ou PNG, 10 Mo au plus chacun.",
+      "piecesLead": "Ajoutez de 1 à {max} documents : extrait du registre de commerce (modèle J), attestation d'auto-entrepreneur ou de taxe professionnelle. Pas de copie de carte d'identité : si un document porte votre numéro de CNIE, masquez-le avant l'envoi. Formats acceptés : PDF, JPEG ou PNG, 10 Mo au plus chacun.",
+      "piecesNotice": "Ces documents servent uniquement à vérifier votre activité professionnelle. Seuls nos modérateurs les consultent et chaque consultation est journalisée. Ils sont hébergés hors du Maroc, conservés le temps de la vérification, puis supprimés 6 mois après la fermeture de votre boutique ou le refus de la demande. Vous pouvez demander à y accéder ou à les faire supprimer à tout moment : <link>politique de confidentialité</link>.",
       "addPiece": "Ajouter un document",
       "removePiece": "Retirer {name}",
       "pieceUploading": "Envoi en cours…",
@@ -2539,7 +2541,8 @@
       "pieceRejected": {
         "bad_type": "Ce fichier n'est ni un PDF, ni une image JPEG ou PNG.",
         "too_large": "Ce fichier dépasse 10 Mo.",
-        "expired": "L'envoi n'a pas abouti. Réessayez."
+        "expired": "L'envoi n'a pas abouti. Réessayez.",
+        "active_content": "Ce PDF contient des éléments actifs (script, pièce jointe). Enregistrez-le à plat ou envoyez une image."
       },
       "pieceFailed": "Le document n'a pas pu être envoyé. Réessayez.",
       "piecesRequired": "Ajoutez au moins un justificatif.",

@@ -17,6 +17,9 @@ vi.mock("@/lib/uploads/storage-gauge", () => ({ recordMediaBytes: vi.fn(async ()
 const configured = { value: true };
 vi.mock("@/lib/firebase/admin", () => ({ isFirestoreConfigured: () => configured.value, isFirebaseConfigured: () => configured.value, db: vi.fn() }));
 vi.mock("@/lib/db/repositories/listings", () => ({ getListings: vi.fn(async () => []) }));
+vi.mock("@/lib/db/repositories/profiles", () => ({ getUserRecord: vi.fn(async () => null) }));
+vi.mock("@/lib/db/repositories/pro-profiles", () => ({ getProProfile: vi.fn(async () => null) }));
+vi.mock("@/lib/db/repositories/users", () => ({ getUserPrivate: vi.fn(async () => null) }));
 vi.mock("@/lib/db/repositories/retention", () => ({ listListingsChangedBefore: vi.fn(async () => ({ listings: [], read: 0 })) }));
 vi.mock("@/lib/db/repositories/uploads", () => ({
   UPLOADS_BY_TARGET_LIMIT: 100,
@@ -36,6 +39,9 @@ vi.mock("@/lib/db/repositories/uploads", () => ({
 
 const repo = await import("@/lib/db/repositories/uploads");
 const { getListings } = await import("@/lib/db/repositories/listings");
+const { getUserRecord } = await import("@/lib/db/repositories/profiles");
+const { getProProfile } = await import("@/lib/db/repositories/pro-profiles");
+const { getUserPrivate } = await import("@/lib/db/repositories/users");
 const { listListingsChangedBefore } = await import("@/lib/db/repositories/retention");
 const { logger } = await import("@/lib/logging/logger");
 const { isDegraded } = await import("@/lib/quota");
@@ -102,6 +108,9 @@ beforeEach(() => {
   vi.mocked(repo.readRejectedSweepCursor).mockResolvedValue(null);
   vi.mocked(repo.listPastPurge).mockResolvedValue([]);
   vi.mocked(getListings).mockResolvedValue([]);
+  vi.mocked(getUserRecord).mockReset().mockResolvedValue(null);
+  vi.mocked(getProProfile).mockReset().mockResolvedValue(null);
+  vi.mocked(getUserPrivate).mockReset().mockResolvedValue(null);
   vi.mocked(repo.listUploadsByTarget).mockResolvedValue([]);
   vi.mocked(repo.readRetainedScanCursor).mockResolvedValue(null);
   vi.mocked(repo.transitionUpload).mockImplementation(async (id: string) => ({ ok: true, upload: { id } as UploadRecord }));
@@ -619,5 +628,92 @@ describe("purge-quarantine: document purge and removed listings' photos", () => 
     vi.mocked(getListings).mockResolvedValue([listing({ status: "published" })]);
     await purgeQuarantine(NOW, { store });
     expect(store.calls.filter((call) => call.bucket === "private")).toEqual([]);
+  });
+});
+
+describe("purge-quarantine: KYBC pieces follow their owner's application", () => {
+  const DAY = 86_400_000;
+  const past = { purgeAt: new Date(NOW.getTime() - 3_600_000) };
+  const piece = (id: string, overrides: Partial<UploadRecord> = {}) =>
+    upload(id, { ...past, purpose: "kyb", targetId: "owner-1", bucket: "private", status: "ready", finalKey: `kyb/owner-1/${id}`, size: 1_000, ...overrides });
+  const seedPiece = (record: UploadRecord) => {
+    store.seed("quarantine", record.quarantineKey, Buffer.from("q"), { contentType: "application/pdf" });
+    store.seed("private", `kyb/owner-1/${record.id}`, Buffer.from("p"), { contentType: "application/pdf" });
+  };
+  const user = (overrides: Record<string, unknown> = {}) => ({ uid: "owner-1", proId: "shop0001", status: "active", updatedAt: NOW, ...overrides }) as unknown as Awaited<ReturnType<typeof getUserRecord>>;
+  const profile = (uploadIds: string[], overrides: Record<string, unknown> = {}) =>
+    ({ proId: "shop0001", ownerUid: "owner-1", lifecycle: "pending_verification", updatedAt: NOW, kybc: { status: "submitted", iceFormatOk: true, uploadIds }, ...overrides }) as unknown as Awaited<ReturnType<typeof getProProfile>>;
+
+  it("keeps a listed piece with the application, rechecked in 30 days, without touching the objects", async () => {
+    const listed = piece("kybpiece0001");
+    seedPiece(listed);
+    vi.mocked(repo.listPastPurge).mockResolvedValue([listed]);
+    vi.mocked(getUserRecord).mockResolvedValue(user());
+    vi.mocked(getProProfile).mockResolvedValue(profile([listed.id]));
+
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ extended: 1, purged: 0, failed: 0 });
+    expect(repo.updateUpload).toHaveBeenCalledWith(listed.id, { purgeAt: new Date(NOW.getTime() + 30 * DAY) }, NOW);
+    expect(getProProfile).toHaveBeenCalledWith("shop0001");
+    expect(store.keys("private")).toEqual([`kyb/owner-1/${listed.id}`]);
+    expect(repo.deleteUploadDocument).not.toHaveBeenCalled();
+    expect(getListings).toHaveBeenCalledWith([]);
+  });
+
+  it("deletes a piece no application lists, or whose owner has no shop, from both buckets", async () => {
+    const unlisted = piece("kybpiece0002");
+    const orphan = piece("kybpiece0003", { ownerUid: "owner-1" });
+    seedPiece(unlisted);
+    seedPiece(orphan);
+    vi.mocked(repo.listPastPurge).mockResolvedValue([unlisted, orphan]);
+    vi.mocked(getUserRecord).mockResolvedValueOnce(user()).mockResolvedValueOnce(user({ proId: undefined }));
+    vi.mocked(getProProfile).mockResolvedValue(profile(["another-piece"]));
+
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ extended: 0, purged: 2, failed: 0 });
+    expect(store.keys("private")).toEqual([]);
+    expect(store.keys("quarantine")).toEqual([]);
+    expect(repo.deleteUploadDocument).toHaveBeenCalledWith(unlisted.id);
+    expect(repo.deleteUploadDocument).toHaveBeenCalledWith(orphan.id);
+    // A KYBC piece never entered the media gauge: nothing to give back.
+    expect(recordMediaBytes).not.toHaveBeenCalled();
+  });
+
+  it("deletes the pieces of a verified shop 6 months after its owner closed the account, reading the closure date", async () => {
+    const listed = piece("kybpiece0004");
+    seedPiece(listed);
+    vi.mocked(repo.listPastPurge).mockResolvedValue([listed]);
+    vi.mocked(getUserRecord).mockResolvedValue(user({ status: "closed" }));
+    vi.mocked(getUserPrivate).mockResolvedValue({ closedAt: new Date(NOW.getTime() - 200 * DAY) } as unknown as Awaited<ReturnType<typeof getUserPrivate>>);
+    vi.mocked(getProProfile).mockResolvedValue(profile([listed.id], { lifecycle: "verified", kybc: { status: "verified", iceFormatOk: true, uploadIds: [listed.id] } }));
+
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: 1, extended: 0 });
+    expect(getUserPrivate).toHaveBeenCalledWith("owner-1");
+    expect(store.keys("private")).toEqual([]);
+  });
+
+  it("keeps a rejected application's pieces until 6 months after the rejection, then lets them go", async () => {
+    const listed = piece("kybpiece0005");
+    seedPiece(listed);
+    vi.mocked(repo.listPastPurge).mockResolvedValue([listed]);
+    vi.mocked(getUserRecord).mockResolvedValue(user());
+    const rejected = (daysAgo: number) => profile([listed.id], { lifecycle: "rejected", updatedAt: new Date(NOW.getTime() - daysAgo * DAY), kybc: { status: "rejected", iceFormatOk: true, uploadIds: [listed.id] } });
+    vi.mocked(getProProfile).mockResolvedValueOnce(rejected(170));
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ extended: 1, purged: 0 });
+    expect(repo.updateUpload).toHaveBeenCalledWith(listed.id, { purgeAt: new Date(NOW.getTime() + 13 * DAY) }, NOW);
+    expect(getUserPrivate).not.toHaveBeenCalled();
+
+    vi.mocked(getProProfile).mockResolvedValueOnce(rejected(184));
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: 1 });
+    expect(store.keys("private")).toEqual([]);
+  });
+
+  it("counts a piece whose owner cannot be read as failed and leaves its objects", async () => {
+    const listed = piece("kybpiece0006");
+    seedPiece(listed);
+    vi.mocked(repo.listPastPurge).mockResolvedValue([listed]);
+    vi.mocked(getUserRecord).mockRejectedValue(new Error("firestore down"));
+
+    expect(await purgeQuarantine(NOW, { store })).toMatchObject({ failed: 1, purged: 0, extended: 0 });
+    expect(store.keys("private")).toHaveLength(1);
+    expect(logger.warn).toHaveBeenCalledWith(expect.objectContaining({ uploadId: listed.id }), "expired KYBC piece not purged");
   });
 });

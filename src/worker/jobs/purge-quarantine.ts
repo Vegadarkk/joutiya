@@ -2,6 +2,7 @@ import { LEGACY_PHOTO_VARIANTS, PHOTO_VARIANTS, type PhotoVariant } from "@/lib/
 import { getListings, type ListingRecord } from "@/lib/db/repositories/listings";
 import { getProProfile } from "@/lib/db/repositories/pro-profiles";
 import { getUserRecord } from "@/lib/db/repositories/profiles";
+import { getUserPrivate } from "@/lib/db/repositories/users";
 import { listListingsChangedBefore, type ListingCursor } from "@/lib/db/repositories/retention";
 import {
   deleteUploadDocument,
@@ -256,12 +257,18 @@ export function retainedUntil(listing: Pick<ListingRecord, "purgeAt">, now: Date
   return new Date(Math.max(listing.purgeAt.getTime(), floor));
 }
 
-/** A KYBC piece past purgeAt (phase 7): kept with its owner's application, else deleted from both buckets. */
+/**
+ * A KYBC piece past purgeAt (phase 7): kept with its owner's application while the relationship
+ * lasts and 6 months after its end (src/lib/pro/kybc-retention.ts), else deleted from both buckets.
+ */
 async function purgeKybcPiece(store: ObjectStore, upload: UploadRecord, now: Date, result: PurgeQuarantineResult): Promise<void> {
   try {
     const user = await getUserRecord(upload.ownerUid);
     const profile = user?.proId ? await getProProfile(user.proId) : null;
-    const retention = kybcRetention(upload.id, profile && profile.ownerUid === upload.ownerUid ? profile : null, now);
+    // The closure date is private; read only for a closed account.
+    const closedAt = user?.status === "closed" ? (await getUserPrivate(upload.ownerUid))?.closedAt : undefined;
+    const owner = user ? { status: user.status, updatedAt: user.updatedAt, ...(closedAt ? { closedAt } : {}) } : null;
+    const retention = kybcRetention(upload.id, profile && profile.ownerUid === upload.ownerUid ? profile : null, owner, now);
     if (retention.keep) {
       await updateUpload(upload.id, { purgeAt: retention.until }, now);
       result.extended += 1;

@@ -6,17 +6,22 @@ import { useTranslations } from "next-intl";
 import { InlineError } from "@/components/feedback/inline-error";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { Link } from "@/i18n/navigation";
+import type { KybcRejectReason } from "@/lib/contracts/pro";
 import { KYBC_MAX_PIECES } from "@/lib/pro/kybc";
-import { uploadKybcPiece } from "@/lib/pro/client";
+import { removeKybcPiece, uploadKybcPiece } from "@/lib/pro/client";
 import { cn } from "@/lib/utils";
 
 // KYBC pieces of the application (design §4): each file is sent as soon as it is chosen (sign,
-// PUT, complete) and shows its own state; only `ready` pieces go in the application.
+// PUT, complete) and shows its own state; only `ready` pieces go in the application. A piece
+// removed from the list is deleted on the server too (its private copy would otherwise stay 7
+// days). The collection notice (purpose, who reads them, retention, rights: loi 09-08 art. 5)
+// and the CNIE masking instruction sit above the list, before the first file is chosen.
 
 export type PieceState =
   | { key: string; name: string; phase: "uploading"; progress: number }
   | { key: string; name: string; phase: "ready"; uploadId: string }
-  | { key: string; name: string; phase: "rejected"; reason: "bad_type" | "too_large" | "expired" | "failed" };
+  | { key: string; name: string; phase: "rejected"; reason: KybcRejectReason | "failed" };
 
 interface KybcPiecesProps {
   pieces: PieceState[];
@@ -49,6 +54,12 @@ export function KybcPieces({ pieces, onChange, error }: KybcPiecesProps) {
     }
   }
 
+  function remove(piece: PieceState) {
+    onChange((list) => list.filter((item) => item.key !== piece.key));
+    // Best effort: a copy left behind is purged by the server after 7 days anyway.
+    if (piece.phase === "ready") void removeKybcPiece(piece.uploadId).catch(() => undefined);
+  }
+
   function choose(files: FileList | null) {
     if (!files) return;
     const room = KYBC_MAX_PIECES - kept;
@@ -59,6 +70,15 @@ export function KybcPieces({ pieces, onChange, error }: KybcPiecesProps) {
   return (
     <div className="flex flex-col gap-4" aria-describedby={error ? errorId : undefined}>
       <p className="text-sm text-pretty text-foreground-muted">{t("piecesLead", { max: KYBC_MAX_PIECES })}</p>
+      <p className="text-xs text-pretty text-foreground-muted">
+        {t.rich("piecesNotice", {
+          link: (chunks) => (
+            <Link href="/legal/confidentialite" target="_blank" rel="noopener" className="font-medium text-link underline underline-offset-2">
+              {chunks}
+            </Link>
+          ),
+        })}
+      </p>
       {pieces.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {pieces.map((piece) => (
@@ -90,7 +110,7 @@ export function KybcPieces({ pieces, onChange, error }: KybcPiecesProps) {
                 ) : null}
               </div>
               {piece.phase !== "uploading" ? (
-                <Button type="button" variant="ghost" size="icon" className="size-9" onClick={() => onChange((list) => list.filter((item) => item.key !== piece.key))} aria-label={t("removePiece", { name: piece.name })}>
+                <Button type="button" variant="ghost" size="icon" className="size-9" onClick={() => remove(piece)} aria-label={t("removePiece", { name: piece.name })}>
                   <X aria-hidden="true" />
                 </Button>
               ) : null}

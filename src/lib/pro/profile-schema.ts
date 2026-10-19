@@ -17,6 +17,12 @@ export const PRO_SLUG_MAX = 60;
 
 const uid = z.string().min(1).max(128);
 const ts = z.date();
+/** Moroccan mobile in E.164, as users/{uid}/private/account.phoneE164 (src/lib/db/schemas.ts). */
+const mobileE164 = z.string().regex(/^\+212[67]\d{8}$/);
+
+/** Outcome of a moderator's call to the applicant's number (phase 7: the WhatsApp check is parked until Meta validates the app). */
+export const PHONE_CHECK_OUTCOMES = ["verified", "unreachable", "mismatch"] as const;
+export type PhoneCheckOutcome = (typeof PHONE_CHECK_OUTCOMES)[number];
 
 export const proProfileSchema = z
   .object({
@@ -43,6 +49,12 @@ export const proProfileSchema = z
         /** Pieces in the private bucket (uploads purpose `kyb`), purged 6 months after the relationship ends. */
         uploadIds: z.array(z.string().min(1).max(64)).max(KYBC_MAX_PIECES),
         complianceCommitmentAt: ts.optional(),
+        /** Collection notice shown with the pieces when they were sent (`KYBC_NOTICE_VERSION`). */
+        noticeVersion: z.string().max(20).optional(),
+        /** Number to call, declared with the application while the account has no verified number; deleted once verified. */
+        phoneToCheck: mobileE164.optional(),
+        /** The moderator's last call (who, when, outcome, number); `verified` also set the account's badge. */
+        phoneCheck: z.object({ at: ts, by: uid, outcome: z.enum(PHONE_CHECK_OUTCOMES), phone: mobileE164, note: z.string().max(200).optional() }).strict().optional(),
         submittedAt: ts.optional(),
         rejectReason: z.string().max(1000).optional(),
         decisionId: z.string().max(64).optional(),
@@ -60,6 +72,13 @@ export const proProfileSchema = z
     launchOfferNoticeSentAt: ts.optional(),
     /** Derived from config/pricing for `plan`. */
     quotas: listingQuotasSchema,
+    /**
+     * The claims grant or the listings retag of a verification failed at this date: the nightly
+     * pro-effects-sync (or the moderator's verify again) reruns them; absent once they are done.
+     */
+    effectsPendingSince: ts.optional(),
+    /** Rejected application: the profile (identifiers) and its pieces go at this date (6 months, retention-purge). */
+    purgeAt: ts.optional(),
     createdAt: ts,
     updatedAt: ts,
   })

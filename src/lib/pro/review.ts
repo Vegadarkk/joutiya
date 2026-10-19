@@ -1,34 +1,41 @@
 import "server-only";
-import { Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { launchOfferOpen, listingQuotas } from "@/config/pricing";
 import type { StaffContext } from "@/lib/auth/guards";
 import { audit } from "@/lib/audit";
 import { getFlags, getPricing } from "@/lib/config/runtime";
-import type { ProDecisionInput, ProDecisionResponse, ProQueueItem, ProQueueResponse, ProReview } from "@/lib/contracts/pro";
+import type { ProDecisionInput, ProDecisionResponse, ProPhoneCheckInput, ProPhoneCheckResponse, ProQueueItem, ProQueueResponse, ProReview } from "@/lib/contracts/pro";
 import { getProProfile, listProApplications, proProfileFromSnapshot, proProfileRef, proProfileToFirestore, type ProProfileRecord } from "@/lib/db/repositories/pro-profiles";
 import { getUserRecord } from "@/lib/db/repositories/profiles";
 import { getUploads } from "@/lib/db/repositories/uploads";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { db } from "@/lib/firebase/admin";
-import { updateClaims } from "@/lib/firebase/claims";
 import { HttpError, notFound } from "@/lib/http/errors";
 import { getLegalConfig } from "@/lib/legal/config";
 import { logger } from "@/lib/logging/logger";
 import { sendMail } from "@/lib/mail";
 import { listingRecipient } from "@/lib/mail/recipients";
+import { claimVerifiedPhoneIn } from "@/lib/phone-verify/accounts";
+import { notifyPhoneChange } from "@/lib/phone-verify/notify";
+import { normalizeMoroccanMobile } from "@/lib/phone/normalize";
 import { consume } from "@/lib/quota";
 import type { RequestIdentity } from "@/lib/rate-limit/keys";
-import { IllegalProTransitionError, transition } from "./lifecycle";
+import { applyVerificationEffects, hasProClaims } from "./effects";
+import { KYBC_END_RETENTION_MS } from "./kybc-retention";
+import { IllegalProTransitionError, publishesAsPro, transition } from "./lifecycle";
 import type { ProProfileDoc } from "./profile-schema";
-import { retagOwnerListings } from "./retag";
 
 // KYBC review of the back office (phase 7 design §4): the queue of submitted applications, one
 // application's review, and the moderator's decision. The decision is one transaction that
 // re-reads the profile and the owner's account (a resubmission or another moderator meanwhile
-// answers 409) and writes both; the claims, the listings retag, the audit entry and the mail
-// follow the commit. Verify: claims role pro + proId + proRole owner (sessions revoked),
-// users.type "pro", lifecycle verified with the launch offer's Essentiel quotas when it is open.
-// Reject: lifecycle rejected with the moderator's reason; the account stays individual.
+// answers 409) and writes both; the audit entry and the mail follow the commit whatever happens
+// to the effects. Verify: claims role pro + proId + proRole owner (sessions revoked), users.type
+// "pro", lifecycle verified with the launch offer's Essentiel quotas when it is open; the claims
+// and the listings retag are the effects of src/lib/pro/effects.ts, rerun by the nightly sync or
+// by the same verify request again when they failed. Reject: lifecycle rejected with the
+// moderator's reason, the account stays individual, the profile and its pieces purge 6 months on.
+// Verify needs the owner's number verified: by WhatsApp before the application, or, while that
+// check is unavailable, by the moderator's call recorded with checkPhoneByCall.
 
 export const PRO_QUEUE_PAGE = 50;
 
@@ -74,10 +81,14 @@ export async function proReview(proId: string): Promise<ProReview | null> {
       submittedAt: iso(record.kybc.submittedAt),
       rejectReason: record.kybc.rejectReason ?? null,
       registrySource: record.kybc.registryCheck?.source ?? null,
+      phoneCheck: record.kybc.phoneCheck
+        ? { at: record.kybc.phoneCheck.at.toISOString(), by: record.kybc.phoneCheck.by, outcome: record.kybc.phoneCheck.outcome, phone: record.kybc.phoneCheck.phone, note: record.kybc.phoneCheck.note ?? null }
+        : null,
     },
     lifecycle: record.lifecycle,
     plan: record.plan,
     planSource: record.planSource,
+    effectsPending: record.effectsPendingSince !== undefined,
     owner: owner
       ? {
           uid: owner.uid,
@@ -86,6 +97,7 @@ export async function proReview(proId: string): Promise<ProReview | null> {
           status: owner.status,
           emailVerified: owner.badges.emailVerified,
           phoneVerified: owner.badges.phoneVerified,
+          phoneToCheck: record.kybc.phoneToCheck ?? null,
           createdAt: owner.createdAt.toISOString(),
         }
       : null,
@@ -96,7 +108,7 @@ export async function proReview(proId: string): Promise<ProReview | null> {
 /** The profile after the decision: pure, so the unit tests cover every branch without Firestore. */
 export function decidedProfile(current: ProProfileRecord, input: ProDecisionInput, ctx: { staffUid: string; now: Date; launchOfferActive: boolean; pricing: Awaited<ReturnType<typeof getPricing>> }): ProProfileDoc {
   if (current.kybc.status !== "submitted" || current.lifecycle !== "pending_verification") throw new HttpError(409, "conflict", "application already decided");
-  if (!current.kybc.submittedAt || current.kybc.submittedAt.getTime() !== Date.parse(input.submittedAt)) throw new HttpError(409, "conflict", "application resubmitted since the review");
+  if (!reviewedSubmission(current, input)) throw new HttpError(409, "conflict", "application resubmitted since the review");
   const { proId: _proId, ...doc } = current;
   let result;
   try {
@@ -108,7 +120,7 @@ export function decidedProfile(current: ProProfileRecord, input: ProDecisionInpu
   const { patch } = result;
   const kybc: ProProfileDoc["kybc"] =
     input.action === "verify"
-      ? { ...doc.kybc, status: "verified", registryCheck: { source: input.registrySource, at: ctx.now, by: ctx.staffUid }, rejectReason: undefined }
+      ? { ...doc.kybc, status: "verified", registryCheck: { source: input.registrySource, at: ctx.now, by: ctx.staffUid }, rejectReason: undefined, phoneToCheck: undefined }
       : { ...doc.kybc, status: "rejected", rejectReason: input.reason };
   return {
     ...doc,
@@ -117,8 +129,21 @@ export function decidedProfile(current: ProProfileRecord, input: ProDecisionInpu
     plan: patch.plan,
     planSource: patch.planSource,
     quotas: listingQuotas({ type: "pro", plan: patch.plan }, ctx.pricing),
+    // A rejected application keeps its identifiers and pieces 6 months (spec §7), then retention-purge deletes it.
+    purgeAt: input.action === "reject" ? new Date(ctx.now.getTime() + KYBC_END_RETENTION_MS) : undefined,
+    effectsPendingSince: undefined,
     updatedAt: ctx.now,
   };
+}
+
+/** The moderator reviewed this very submission (a resubmission meanwhile changes `submittedAt`). */
+function reviewedSubmission(current: Pick<ProProfileRecord, "kybc">, input: Pick<ProDecisionInput, "submittedAt">): boolean {
+  return current.kybc.submittedAt !== undefined && current.kybc.submittedAt.getTime() === Date.parse(input.submittedAt);
+}
+
+/** A verify of a submission already verified: its effects are rerun instead of answering 409. */
+export function isEffectsRerun(current: Pick<ProProfileRecord, "kybc" | "lifecycle">, input: ProDecisionInput): boolean {
+  return input.action === "verify" && current.kybc.status === "verified" && publishesAsPro(current.lifecycle) && reviewedSubmission(current, input);
 }
 
 export async function decideApplication(staff: StaffContext, proId: string, input: ProDecisionInput, identity: RequestIdentity, now = new Date()): Promise<ProDecisionResponse> {
@@ -130,32 +155,37 @@ export async function decideApplication(staff: StaffContext, proId: string, inpu
   const decided = await db().runTransaction(async (tx) => {
     const current = proProfileFromSnapshot(await tx.get(ref));
     if (!current) throw notFound();
+    if (isEffectsRerun(current, input)) return { next: current, rerun: true };
     const userRef = db().collection(COLLECTIONS.users).doc(current.ownerUid);
     const userSnapshot = await tx.get(userRef);
     if (!userSnapshot.exists) throw new HttpError(409, "conflict", "owner account missing");
     if (userSnapshot.get("proId") !== proId) throw new HttpError(409, "conflict", "owner account linked to another shop");
     if (input.action === "verify" && userSnapshot.get("status") !== "active") throw new HttpError(409, "account_suspended", "owner account not active");
+    if (input.action === "verify" && userSnapshot.get("badges.phoneVerified") !== true) throw new HttpError(409, "phone_unverified", "owner phone not verified");
     const next = decidedProfile(current, input, { staffUid: staff.user.uid, now, launchOfferActive, pricing });
     tx.set(ref, proProfileToFirestore(next));
     if (input.action === "verify") tx.update(userRef, { type: "pro", updatedAt: Timestamp.fromDate(now) });
-    return { previous: current, next };
+    return { next, rerun: false };
   });
-  void consume("firestore.reads", 2);
-  void consume("firestore.writes", input.action === "verify" ? 2 : 1);
+  void consume("firestore.reads", decided.rerun ? 1 : 2);
+  if (!decided.rerun) void consume("firestore.writes", input.action === "verify" ? 2 : 1);
 
   const uid = decided.next.ownerUid;
-  let retagged = 0;
-  if (input.action === "verify") {
-    // Sessions are revoked: the owner signs in again and gets the Pro claims.
-    await updateClaims(uid, { role: "pro", proId, proRole: "owner" });
-    try {
-      retagged = (await retagOwnerListings(uid, proId, now)).retagged;
-    } catch (error) {
-      // The profile and claims are right; a later run of the retag (idempotent) finishes the listings.
-      logger.error({ err: (error as Error).message, proId }, "pro listings retag failed");
-    }
+  if (decided.rerun) {
+    // Nothing left to do: the same answer as a second decision on a decided application.
+    if (decided.next.effectsPendingSince === undefined && (await hasProClaims(uid, proId))) throw new HttpError(409, "conflict", "application already decided");
+    const outcome = await applyVerificationEffects(uid, proId, now);
+    await audit({ actorUid: staff.user.uid, actorRole: staff.role, action: "pro.verify.rerun", target: { type: "pro", id: proId }, automated: false, reason: outcome.ok ? "effects applied" : "effects still pending", ip: identity.ip, at: now });
+    return { proId, lifecycle: decided.next.lifecycle, retagged: outcome.retagged, effectsPending: !outcome.ok };
   }
 
+  let effectsPending = false;
+  let retagged = 0;
+  if (input.action === "verify") {
+    const outcome = await applyVerificationEffects(uid, proId, now);
+    retagged = outcome.retagged;
+    effectsPending = !outcome.ok;
+  }
   await audit({
     actorUid: staff.user.uid,
     actorRole: staff.role,
@@ -167,7 +197,52 @@ export async function decideApplication(staff: StaffContext, proId: string, inpu
     at: now,
   });
   await notifyApplicant(decided.next, input, launchOfferActive ? pricing.launchOffer.noticeDays : null);
-  return { proId, lifecycle: decided.next.lifecycle, retagged };
+  return { proId, lifecycle: decided.next.lifecycle, retagged, effectsPending };
+}
+
+/**
+ * The moderator called the applicant's number (while the WhatsApp check is unavailable): the
+ * outcome is recorded on the application (who, when, which number) and journaled; `verified`
+ * also marks the number verified on the account in the same transaction, taking it from any
+ * other account that held it like the WhatsApp path (both told by e-mail).
+ */
+export async function checkPhoneByCall(staff: StaffContext, proId: string, input: ProPhoneCheckInput, identity: RequestIdentity, now = new Date()): Promise<ProPhoneCheckResponse> {
+  const ref = proProfileRef(proId);
+  const corrected = input.phone === undefined ? null : normalizeMoroccanMobile(input.phone).e164;
+  const checked = await db().runTransaction(async (tx) => {
+    const current = proProfileFromSnapshot(await tx.get(ref));
+    if (!current) throw notFound();
+    if (current.kybc.status !== "submitted" || current.lifecycle !== "pending_verification") throw new HttpError(409, "conflict", "application not under review");
+    const userRef = db().collection(COLLECTIONS.users).doc(current.ownerUid);
+    const userSnapshot = await tx.get(userRef);
+    if (!userSnapshot.exists || userSnapshot.get("proId") !== proId) throw new HttpError(409, "conflict", "owner account missing or linked to another shop");
+    if (userSnapshot.get("status") !== "active") throw new HttpError(409, "account_suspended", "owner account not active");
+    const badge = userSnapshot.get("badges.phoneVerified") === true;
+    const verified = input.outcome === "verified";
+    if (verified && badge) throw new HttpError(409, "conflict", "phone already verified");
+    const phone = corrected ?? current.kybc.phoneToCheck;
+    if (!phone) throw new HttpError(400, "phone_required", "no number to check");
+    // Reads first (the claim queries the holders), then the writes.
+    const claimed = verified ? await claimVerifiedPhoneIn(tx, current.ownerUid, phone, now) : { previousUid: null, moved: 0 };
+    const phoneCheck = { at: Timestamp.fromDate(now), by: staff.user.uid, outcome: input.outcome, phone, ...(input.note ? { note: input.note } : {}) };
+    tx.update(ref, { "kybc.phoneCheck": phoneCheck, ...(verified ? { "kybc.phoneToCheck": FieldValue.delete() } : {}), updatedAt: Timestamp.fromDate(now) });
+    return { ownerUid: current.ownerUid, phone, verified, phoneVerified: badge || verified, previousUid: claimed.previousUid, moved: claimed.moved };
+  });
+  void consume("firestore.reads", 2);
+  void consume("firestore.writes", 1 + (checked.verified ? 2 + 2 * checked.moved : 0));
+
+  const entry = { actorUid: staff.user.uid, actorRole: staff.role, automated: false, ip: identity.ip, at: now };
+  await audit({ ...entry, action: "pro.phone.check", target: { type: "pro", id: proId }, reason: input.outcome });
+  if (checked.verified) {
+    await audit({ ...entry, action: "phone.verified", target: { type: "user", id: checked.ownerUid }, reason: "call during the KYBC review" });
+    const key = `${proId}-${now.getTime()}`;
+    if (checked.previousUid) {
+      await audit({ ...entry, action: "phone.transferred", target: { type: "user", id: checked.previousUid }, reason: `number verified by ${checked.ownerUid}` });
+      await notifyPhoneChange("phoneRemoved", checked.previousUid, checked.phone, key);
+    }
+    await notifyPhoneChange("phoneVerified", checked.ownerUid, checked.phone, key);
+  }
+  return { proId, outcome: input.outcome, phoneVerified: checked.phoneVerified, transferred: checked.previousUid !== null };
 }
 
 /** proApproved / proRejected; a failure is logged, never thrown (the decision is committed). */

@@ -52,6 +52,8 @@ export type ErrorCode =
   | "upload_not_ready"
   /** A verified phone is needed (showPhone, WhatsApp). */
   | "phone_required"
+  /** Pro verification: the owner's number is not verified yet (WhatsApp, or the moderator's call). */
+  | "phone_unverified"
   /** Listing not published any more (paused, sold, expired, removed). */
   | "listing_unavailable"
   /** Phone reveal refused: account too young, e-mail unverified or quota reached. */

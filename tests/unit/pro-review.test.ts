@@ -5,7 +5,8 @@ import type { ProProfileRecord } from "@/lib/db/repositories/pro-profiles";
 import { HttpError } from "@/lib/http/errors";
 import { proProfileSchema } from "@/lib/pro/profile-schema";
 import { retagWrite } from "@/lib/pro/retag";
-import { decidedProfile } from "@/lib/pro/review";
+import { KYBC_END_RETENTION_MS } from "@/lib/pro/kybc-retention";
+import { decidedProfile, isEffectsRerun } from "@/lib/pro/review";
 
 // KYBC decision (phase 7 design §4): the profile after a moderator's verify or reject, and the
 // listing patch of the retag effect.
@@ -72,10 +73,33 @@ describe("decidedProfile", () => {
     expect(proProfileSchema.safeParse(next).success).toBe(true);
   });
 
+  it("gives a rejected application 6 months before its purge; a verification has no purge date", () => {
+    expect(decidedProfile(record(), reject, CTX).purgeAt).toEqual(new Date(NOW.getTime() + KYBC_END_RETENTION_MS));
+    expect(decidedProfile(record(), verify, CTX).purgeAt).toBeUndefined();
+    expect(decidedProfile(record({ effectsPendingSince: SUBMITTED }), verify, CTX).effectsPendingSince).toBeUndefined();
+  });
+
   it("refuses a decided application or a resubmitted one (409)", () => {
     conflict(() => decidedProfile(record({ lifecycle: "verified", kybc: { ...record().kybc, status: "verified" } }), verify, CTX));
     conflict(() => decidedProfile(record({ lifecycle: "rejected", kybc: { ...record().kybc, status: "rejected" } }), reject, CTX));
     conflict(() => decidedProfile(record(), { ...verify, submittedAt: NOW.toISOString() }, CTX));
+  });
+});
+
+describe("isEffectsRerun", () => {
+  const verified = () => record({ lifecycle: "verified", kybc: { ...record().kybc, status: "verified" } });
+
+  it("is a verify of the very submission already verified", () => {
+    expect(isEffectsRerun(verified(), verify)).toBe(true);
+    expect(isEffectsRerun(record({ lifecycle: "active", kybc: { ...record().kybc, status: "verified" } }), verify)).toBe(true);
+  });
+
+  it("is not a reject, a pending or rejected application, a suspended shop or another submission", () => {
+    expect(isEffectsRerun(verified(), reject)).toBe(false);
+    expect(isEffectsRerun(record(), verify)).toBe(false);
+    expect(isEffectsRerun(record({ lifecycle: "rejected", kybc: { ...record().kybc, status: "rejected" } }), verify)).toBe(false);
+    expect(isEffectsRerun(record({ lifecycle: "suspended", kybc: { ...record().kybc, status: "verified" } }), verify)).toBe(false);
+    expect(isEffectsRerun(verified(), { ...verify, submittedAt: NOW.toISOString() })).toBe(false);
   });
 });
 

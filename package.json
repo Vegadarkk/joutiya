@@ -23,7 +23,8 @@
     "test:search": "vitest run --config vitest.search.config.ts",
     "test:e2e:only": "playwright test",
     "emulators": "firebase emulators:start --only auth,firestore --project demo-joutiya",
-    "create-admin": "node scripts/create-admin.ts"
+    "create-admin": "node scripts/create-admin.ts",
+    "dev:verify-phone": "node scripts/dev-verify-phone.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "5.9.1",

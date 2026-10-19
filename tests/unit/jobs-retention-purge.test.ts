@@ -25,6 +25,10 @@ vi.mock("@/lib/db/repositories/uploads", () => ({
   deleteUploadDocument: vi.fn(async (id: string): Promise<UploadRecord | null> => stored.get(id) ?? null),
   updateUpload: vi.fn(async () => undefined),
 }));
+vi.mock("@/lib/db/repositories/pro-profiles", () => ({
+  listProProfilesPastPurge: vi.fn(async () => []),
+  purgeProProfile: vi.fn(async () => null),
+}));
 vi.mock("@/lib/db/repositories/retention", () => ({
   listListingsPastPurge: vi.fn(async () => ({ listings: [], read: 0 })),
   purgeListing: vi.fn(),
@@ -44,6 +48,7 @@ vi.mock("@/lib/storage", async () => {
 });
 
 const retention = await import("@/lib/db/repositories/retention");
+const proProfiles = await import("@/lib/db/repositories/pro-profiles");
 const uploadsRepo = await import("@/lib/db/repositories/uploads");
 const { getListings } = await import("@/lib/db/repositories/listings");
 const { audit } = await import("@/lib/audit");
@@ -102,7 +107,9 @@ beforeEach(() => {
   stored.clear();
   configured.value = true;
   store = new MemoryObjectStore();
-  for (const mocked of [retention, uploadsRepo]) for (const fn of Object.values(mocked)) if (vi.isMockFunction(fn)) fn.mockReset();
+  for (const mocked of [retention, uploadsRepo, proProfiles]) for (const fn of Object.values(mocked)) if (vi.isMockFunction(fn)) fn.mockReset();
+  vi.mocked(proProfiles.listProProfilesPastPurge).mockResolvedValue([]);
+  vi.mocked(proProfiles.purgeProProfile).mockResolvedValue(null);
   vi.mocked(retention.listListingsPastPurge).mockResolvedValue({ listings: [], read: 0 });
   vi.mocked(retention.purgeListing).mockImplementation(async (id, purgeable) => (purgeable(listing(id)) ? { status: "purged", categoryId: "vehicules", purgedAt: NOW, version: 8, updatedAt: NOW } : null));
   vi.mocked(retention.deleteJournalPastPurge).mockResolvedValue(0);
@@ -349,5 +356,38 @@ describe("retention-purge: journals and budget", () => {
     vi.mocked(retention.deleteJournalPastPurge).mockClear();
     expect(await retentionPurge(NOW, { store })).toMatchObject({ contentOps: 0, failed: 0 });
     expect(retention.deleteJournalPastPurge).not.toHaveBeenCalled();
+  });
+});
+
+describe("retention-purge: rejected Pro applications (phase 7)", () => {
+  const profile = (proId: string, uploadIds: string[]) =>
+    ({ proId, ownerUid: "owner-9", lifecycle: "rejected", purgeAt: new Date(NOW.getTime() - DAY), kybc: { status: "rejected", iceFormatOk: true, uploadIds } }) as unknown as Awaited<ReturnType<typeof proProfiles.purgeProProfile>>;
+
+  it("deletes a rejected application past its purge date, hands its pieces to purge-quarantine and journals it", async () => {
+    const rejected = profile("shoprej1", ["kybpiece0001", "kybpiece0002"]);
+    vi.mocked(proProfiles.listProProfilesPastPurge).mockResolvedValueOnce([rejected!]);
+    vi.mocked(proProfiles.purgeProProfile).mockResolvedValueOnce(rejected);
+
+    const result = await retentionPurge(NOW, { store });
+    expect(result).toMatchObject({ proProfiles: 1, failed: 0, skipped: 0, deferred: false });
+    expect(proProfiles.purgeProProfile).toHaveBeenCalledWith("shoprej1", NOW);
+    expect(uploadsRepo.updateUpload).toHaveBeenCalledWith("kybpiece0001", { purgeAt: NOW }, NOW);
+    expect(uploadsRepo.updateUpload).toHaveBeenCalledWith("kybpiece0002", { purgeAt: NOW }, NOW);
+    expect(audit).toHaveBeenCalledWith({ actorUid: "system", actorRole: "system", action: "pro.purge", target: { type: "pro", id: "shoprej1" }, automated: true, at: NOW });
+  });
+
+  it("skips an application resubmitted since the query (the transaction purged nothing) and counts a failed one", async () => {
+    vi.mocked(proProfiles.listProProfilesPastPurge).mockResolvedValueOnce([profile("shoprej2", [])!, profile("shoprej3", [])!]);
+    vi.mocked(proProfiles.purgeProProfile).mockResolvedValueOnce(null).mockRejectedValueOnce(new Error("contention"));
+
+    expect(await retentionPurge(NOW, { store })).toMatchObject({ proProfiles: 0, skipped: 1, failed: 1 });
+    expect(audit).not.toHaveBeenCalledWith(expect.objectContaining({ action: "pro.purge" }));
+  });
+
+  it("runs without object storage too (the pieces are purge-quarantine's)", async () => {
+    const rejected = profile("shoprej4", ["kybpiece0009"]);
+    vi.mocked(proProfiles.listProProfilesPastPurge).mockResolvedValueOnce([rejected!]);
+    vi.mocked(proProfiles.purgeProProfile).mockResolvedValueOnce(rejected);
+    expect(await retentionPurge(NOW)).toMatchObject({ proProfiles: 1, failed: 0 });
   });
 });

@@ -35,7 +35,8 @@ export const UPLOAD_DOC_DECLARED_TYPES = ["image/jpeg", "image/webp", "image/png
 export const UPLOAD_STATUSES = ["signed", "processing", "ready", "rejected"] as const;
 export type UploadStatus = (typeof UPLOAD_STATUSES)[number];
 
-export const UPLOAD_REJECT_REASONS = ["too_large", "bad_type", "decode_failed", "nsfw", "expired", "quota"] as const;
+/** `active_content`: a KYBC PDF carrying scripts, launch actions or embedded files (phase 7). */
+export const UPLOAD_REJECT_REASONS = ["too_large", "bad_type", "decode_failed", "nsfw", "expired", "quota", "active_content"] as const;
 export type UploadRejectReason = (typeof UPLOAD_REJECT_REASONS)[number];
 
 /** Phase 3 signs listing photos only; the document schema knows the other purposes (§5). */

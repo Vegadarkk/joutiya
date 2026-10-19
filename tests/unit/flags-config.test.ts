@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_FLAGS, flagsConfigSchema, resolveFlagsConfig } from "@/config/flags";
 
-// config/flags (architecture §5, §10): production-safe defaults, Firestore overrides, invalid
-// documents fall back to the defaults.
+// config/flags (architecture §5, §10): production-safe defaults, Firestore overrides flag by flag,
+// invalid or unknown flags reported while the valid ones still apply (an admin closing the Pro
+// sign-up is not undone by a typo elsewhere in the document).
 
 describe("config/flags", () => {
   it("keeps sales off and Pro applications open by default", () => {
@@ -13,12 +14,21 @@ describe("config/flags", () => {
   it("applies a stored override over the defaults", () => {
     expect(resolveFlagsConfig({ salesEnabled: true }).config).toEqual({ ...DEFAULT_FLAGS, salesEnabled: true });
     expect(resolveFlagsConfig(undefined).config).toBe(DEFAULT_FLAGS);
+    expect(resolveFlagsConfig(null).config).toBe(DEFAULT_FLAGS);
   });
 
-  it("rejects unknown or mistyped flags and keeps the defaults", () => {
-    const typo = resolveFlagsConfig({ salesEnabled: "yes" });
-    expect(typo.config).toBe(DEFAULT_FLAGS);
+  it("reports a mistyped or unknown flag and keeps the valid ones", () => {
+    const typo = resolveFlagsConfig({ salesEnabled: "yes", proSignupEnabled: false });
+    expect(typo.config).toEqual({ ...DEFAULT_FLAGS, proSignupEnabled: false });
+    expect(typo.errors).toHaveLength(1);
     expect(typo.errors[0]).toMatch(/^salesEnabled/);
-    expect(resolveFlagsConfig({ unknownFlag: true }).errors.length).toBeGreaterThan(0);
+    const unknown = resolveFlagsConfig({ unknownFlag: true, proSignupEnabled: false });
+    expect(unknown.config.proSignupEnabled).toBe(false);
+    expect(unknown.errors).toEqual(["unknownFlag: unknown flag"]);
+    expect(resolveFlagsConfig("off")).toEqual({ config: DEFAULT_FLAGS, errors: ["config/flags: not an object"] });
+  });
+
+  it("ignores the editing metadata an admin writes next to the flags", () => {
+    expect(resolveFlagsConfig({ proSignupEnabled: false, updatedAt: new Date(), updatedBy: "uid-admin" })).toEqual({ config: { ...DEFAULT_FLAGS, proSignupEnabled: false }, errors: [] });
   });
 });

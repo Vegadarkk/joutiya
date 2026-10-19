@@ -24,13 +24,29 @@ export const DEFAULT_FLAGS: FlagsConfig = {
   paymentInstallmentsEnabled: false,
 };
 
-/** Firestore value over the defaults; an invalid document is reported and the defaults apply. */
+/** Editing metadata an admin's write may carry next to the flags: ignored, never an error. */
+const METADATA_KEYS: ReadonlySet<string> = new Set(["updatedAt", "updatedBy"]);
+
+/**
+ * Firestore value over the defaults, flag by flag: a valid flag applies even when another one is
+ * mistyped or unknown (reported, so an admin closing the Pro sign-up with a typo elsewhere in the
+ * document does close it). The runtime raises an alert on any error.
+ */
 export function resolveFlagsConfig(stored: unknown): { config: FlagsConfig; errors: string[] } {
   if (stored === undefined || stored === null) return { config: DEFAULT_FLAGS, errors: [] };
-  const parsed = flagsConfigSchema.safeParse({ ...DEFAULT_FLAGS, ...(typeof stored === "object" ? stored : {}) });
-  if (parsed.success) return { config: parsed.data, errors: [] };
-  return {
-    config: DEFAULT_FLAGS,
-    errors: parsed.error.issues.map((issue) => `${issue.path.join(".") || "config/flags"}: ${issue.message}`),
-  };
+  if (typeof stored !== "object" || Array.isArray(stored)) return { config: DEFAULT_FLAGS, errors: ["config/flags: not an object"] };
+  const config: FlagsConfig = { ...DEFAULT_FLAGS };
+  const errors: string[] = [];
+  for (const [key, value] of Object.entries(stored)) {
+    if (METADATA_KEYS.has(key)) continue;
+    const field = flagsConfigSchema.shape[key as keyof FlagsConfig] as z.ZodType | undefined;
+    if (!field) {
+      errors.push(`${key}: unknown flag`);
+      continue;
+    }
+    const parsed = field.safeParse(value);
+    if (parsed.success) config[key as keyof FlagsConfig] = parsed.data as boolean;
+    else errors.push(`${key}: ${parsed.error.issues[0]?.message ?? "invalid"}`);
+  }
+  return { config, errors };
 }
