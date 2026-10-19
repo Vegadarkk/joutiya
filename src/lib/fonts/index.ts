@@ -2,14 +2,16 @@ import { Montserrat, Readex_Pro } from "next/font/google";
 
 /**
  * Readex Pro covers Arabic and Latin; self-hosted by next/font at build time (font-src 'self').
- * `subsets` only picks the files preloaded on every page: the CSS declares all of them, and the
- * browser fetches latin-ext (Ā to ʺ, rare in French and absent from Arabic) only for a page that
- * uses it, instead of a 28 KB preload competing with the listing photo.
+ * The CSS declares every subset and the browser fetches only those a page renders (unicode-range):
+ * no preload, which would compete with the listing photo (the LCP element) for a phone's first
+ * bytes, and would fetch the Arabic file on French pages that render no Arabic glyph (preloads
+ * follow the module graph, not the locale). Text paints in the size-adjusted fallback until then.
  */
 export const readex = Readex_Pro({
   subsets: ["arabic", "latin"],
   variable: "--font-readex",
   display: "swap",
+  preload: false,
 });
 
 /**

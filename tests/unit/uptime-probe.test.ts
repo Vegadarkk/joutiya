@@ -5,6 +5,7 @@ import {
   PROBE_DAILY_CAP,
   RECOVERY_CONFIRMATIONS,
   RELAY_DAILY_CAP,
+  RELAY_P0_RESERVE,
   RESEND_URL,
   emailPayload,
   emailSettings,
@@ -14,6 +15,7 @@ import {
   parseTargets,
   readCapped,
   relay,
+  relayCap,
   relayIdempotencyKey,
   sendViaResend,
   sign,
@@ -277,6 +279,16 @@ describe("daily KV markers", () => {
     expect(kv.store.get("probe-count:2026-10-16")).toBe(String(PROBE_DAILY_CAP));
     // Both caps together stay well inside Resend's 100 e-mails a day shared with the site.
     expect(PROBE_DAILY_CAP + RELAY_DAILY_CAP).toBeLessThanOrEqual(30);
+  });
+
+  it("keeps the last relay e-mails of the day for P0 alerts", async () => {
+    const kv = memoryKv();
+    for (let i = 0; i < RELAY_DAILY_CAP - RELAY_P0_RESERVE; i += 1) expect(await takeDailySlot(kv, "relay", day, relayCap("P1"))).toBe(true);
+    expect(await takeDailySlot(kv, "relay", day, relayCap("P2"))).toBe(false);
+    expect(await takeDailySlot(kv, "relay", day, relayCap("info"))).toBe(false);
+    for (let i = 0; i < RELAY_P0_RESERVE; i += 1) expect(await takeDailySlot(kv, "relay", day, relayCap("P0"))).toBe(true);
+    expect(await takeDailySlot(kv, "relay", day, relayCap("P0"))).toBe(false);
+    expect(kv.store.get("relay-count:2026-10-16")).toBe(String(RELAY_DAILY_CAP));
   });
 });
 

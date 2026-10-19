@@ -29,30 +29,29 @@ function slides(html: string): string[] {
 }
 
 describe("Gallery", () => {
-  it("makes the first photo the LCP image and lazy-loads the others", () => {
-    const [first, second, third] = slides(render());
+  it("makes the first photo the LCP image; the others are not in the server HTML (they mount when idle)", () => {
+    const html = render();
+    const images = slides(html);
+    expect(images).toHaveLength(1);
+    const [first] = images as [string];
     expect(first).toContain('fetchPriority="high"');
     expect(first).toContain('loading="eager"');
     expect(first).not.toContain("lazy");
     // React hoists a matching preload for the high-priority image.
-    expect(render()).toMatch(/<link rel="preload" as="image" imageSrcSet="[^"]*photo0001-s\.webp 480w[^"]*" imageSizes="[^"]*" fetchPriority="high"\/>/);
-    for (const img of [second, third]) {
-      expect(img).toContain('loading="lazy"');
-      expect(img).toContain('decoding="async"');
-      expect(img).not.toContain("fetchPriority");
-    }
+    expect(html).toMatch(/<link rel="preload" as="image" imageSrcSet="[^"]*photo0001-s\.webp 480w[^"]*" imageSizes="[^"]*" fetchPriority="high"\/>/);
+    // Every slide is there (blurhash, button that opens the lightbox); the lazy images of the others
+    // mount after hydration (e2e listing.spec.ts checks loading="lazy" on them).
+    expect(html.match(/cursor-zoom-in/g)).toHaveLength(3);
+    expect(html).not.toContain("photo0002-l.webp");
   });
 
   it("serves both WebP variants through srcset and sizes with the intrinsic size", () => {
-    const [first, second, third] = slides(render());
+    const [first] = slides(render()) as [string];
     expect(first).toContain(`src="${MEDIA}/listings/abcd2345/photo0001-l.webp"`);
     expect(first).toContain(`srcSet="${MEDIA}/listings/abcd2345/photo0001-s.webp 480w, ${MEDIA}/listings/abcd2345/photo0001-l.webp 1600w"`);
     expect(first).toContain(`sizes="${GALLERY_SIZES}"`);
     expect(first).toContain('width="1600" height="1200"');
-    // Portrait: the small variant is 480 px high, 360 px wide.
-    expect(second).toContain("photo0002-s.webp 360w");
-    // Smaller than the small variant: one candidate only.
-    expect(third).toContain(`srcSet="${MEDIA}/listings/abcd2345/photo0003-l.webp 400w"`);
+    // Portrait and smaller-than-small candidates: listing-photo.test.ts (srcSetOf).
     // The seller's title is bidi-isolated inside the translated alt text.
     expect(first).toContain(`alt="${isolate("Vélo de ville")}, photo 1 sur 3"`);
   });

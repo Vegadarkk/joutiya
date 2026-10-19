@@ -76,6 +76,18 @@ export function Gallery({ listingId, title, photos, mediaBaseUrl, className }: G
   const [lightboxMounted, setLightboxMounted] = useState(false);
   // Where the lightbox was closed: the track resumes there once the dialog has given focus back.
   const closedAt = useRef<number | null>(null);
+  // The other photos mount once the page is idle after hydration: on a phone they no longer share
+  // the first bytes with the first photo (the LCP element) and the page's JavaScript. Until then
+  // their slide shows the blurhash and still opens the lightbox.
+  const [restMounted, setRestMounted] = useState(false);
+  useEffect(() => {
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(() => setRestMounted(true), { timeout: 2_000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = window.setTimeout(() => setRestMounted(true), 200);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   if (count === 0 || !mediaBaseUrl) {
     return (
@@ -118,17 +130,19 @@ export function Gallery({ listingId, title, photos, mediaBaseUrl, className }: G
                   }}
                   className="group absolute inset-0 flex cursor-zoom-in items-center justify-center bg-bab-950/10 outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={sources.src}
-                    srcSet={sources.srcSet}
-                    sizes={GALLERY_SIZES}
-                    width={sources.width}
-                    height={sources.height}
-                    alt={t("photoAlt", { title: isolate(title), index: position + 1, count })}
-                    {...(first ? { fetchPriority: "high" as const, loading: "eager" as const } : { loading: "lazy" as const, decoding: "async" as const })}
-                    className="size-full object-contain"
-                  />
+                  {first || restMounted ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={sources.src}
+                      srcSet={sources.srcSet}
+                      sizes={GALLERY_SIZES}
+                      width={sources.width}
+                      height={sources.height}
+                      alt={t("photoAlt", { title: isolate(title), index: position + 1, count })}
+                      {...(first ? { fetchPriority: "high" as const, loading: "eager" as const } : { loading: "lazy" as const, decoding: "async" as const })}
+                      className="size-full object-contain"
+                    />
+                  ) : null}
                   <span className="sr-only">{t("open")}</span>
                 </button>
               </li>

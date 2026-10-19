@@ -1,8 +1,12 @@
 import type { OwnerListBucket } from "./listings";
 
 // API paths shared by the browser and the route handlers. No zod here: a public client island that
-// only needs a path (the phone reveal, the session) must not pull the validation schemas into the
-// page's JavaScript. auth.ts and listings.ts re-export them.
+// only needs a path (the phone reveal, the session, a favorite's heart) must not pull the validation
+// schemas into the page's JavaScript. auth.ts, listings.ts and search.ts re-export them.
+
+/** Password length bounds, shown by the forms' error messages (auth.ts re-exports them). */
+export const PASSWORD_MIN = 8;
+export const PASSWORD_MAX = 128;
 
 export const AUTH_API = {
   signup: "/api/auth/signup",
@@ -39,4 +43,23 @@ export const LISTING_API = {
   renew: (id: string) => `/api/listings/${id}/renew`,
   /** POST, answer `Cache-Control: no-store`. */
   phone: (id: string) => `/api/listings/${id}/phone`,
+} as const;
+
+export const SEARCH_API = {
+  /** GET ?<search params> -> SearchApiResponse. Over the limits: 403 turnstile_required, then 429. */
+  search: "/api/search",
+  /** GET -> { ids: string[] } (hearts state; Valkey cache over the subcollection). */
+  favoriteIds: "/api/favorites/ids",
+  /** GET ?cursor= -> FavoritesPage. */
+  favorites: "/api/favorites",
+  /** PUT -> 201/200 { favorite } ; DELETE -> 204. */
+  favorite: (listingId: string) => `/api/favorites/${listingId}`,
+  /** GET -> { searches: SavedSearchView[] } ; POST SavedSearchCreate -> 201 { search }. */
+  savedSearches: "/api/saved-searches",
+  /** PATCH SavedSearchPatch -> { search } ; DELETE -> 204. */
+  savedSearch: (id: string) => `/api/saved-searches/${id}`,
+  /** POST { token } (and RFC 8058 one-click POST with ?t=) -> 204. No session, no CSRF: the token authenticates. */
+  unsubscribe: "/api/alerts/unsubscribe",
+  /** POST { token } -> 204 + __Host-tsv pass (page challenge of /anti-robot). */
+  challengePass: "/api/challenge/pass",
 } as const;

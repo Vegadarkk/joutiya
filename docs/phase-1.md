@@ -27,6 +27,8 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 
 Point d'arrêt du 16 octobre au soir, avant l'audit de lundi : tout le travail de la phase 1 est dans `main`. La suite attend la VM, dont la création gratuite est relancée chaque minute (étapes 3, 4, 9 pour les certificats, 16, puis 12), ou la bascule DNS après le .MA (étapes 6, 7, 8, 11 et 15). Les échéances à renouveler sont plus bas (Renouvellements).
 
+Relance de la VM : 856 essais du 16 octobre, de 01:44 à 17:00 UTC, un par minute hors trois pauses du matin, tous refusés par Oracle faute de place (« Out of host capacity ») : aucune machine A1 gratuite libre à Paris, région à un seul domaine de disponibilité, domaine de pannes laissé au choix d'Oracle. La relance tourne dans le conteneur de Claude, qui s'arrête avec le quota de la semaine : pause du 16 octobre vers 19 h UTC au lundi 19 octobre 10:05 UTC, où la routine du coordinateur la relance. Pas de relance depuis la CI ni depuis un autre serveur : les clés `JOUTIYA_OCI_*` ne quittent pas l'environnement cloud de Claude.
+
 ## Ce qui reste à vous
 
 - **Étape 8** : sur la page de jeton GitHub préparée par Nav, cliquer sur **Generate token**, puis l'enregistrer dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
@@ -159,7 +161,7 @@ Prérequis : le domaine `notif.joutiya.ma` vérifié chez Resend, après la basc
 2. Claude déploie le Worker et pose ses secrets par l'API Cloudflare : `RESEND_API_KEY`, `ALERT_EMAIL_TO` (votre Gmail), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ALERT_RELAY_SECRET`, `ACCESS_CLIENT_ID` et `ACCESS_CLIENT_SECRET` (jeton `joutiya-probe`). L'expéditeur, `Joutiya alertes <alertes@notif.joutiya.ma>`, est dans `workers/uptime-probe/wrangler.jsonc`.
 3. Test : une alerte signée arrive dans votre Gmail depuis `alertes@notif.joutiya.ma`, avec SPF, DKIM et DMARC à PASS (« Afficher l'original ») ; Nav ajoute un filtre Gmail « Ne jamais envoyer dans le spam » pour cet expéditeur.
 
-Garde-fous : au plus 20 e-mails relayés par jour UTC (au-delà, l'application reçoit une erreur 429 et la note dans ses journaux), et un seul avis Telegram par jour quand le quota Resend du jour est épuisé. Sans `ALERT_EMAIL_TO` ni `RESEND_API_KEY`, le Worker n'envoie aucun e-mail et l'écrit dans ses journaux ; avec un seul des deux, il signale une erreur.
+Garde-fous : au plus 20 e-mails relayés par jour UTC, dont les 5 derniers gardés pour les alertes P0 (au-delà, l'application reçoit une erreur 429 et la note dans ses journaux), et un seul avis Telegram par jour quand le quota Resend du jour est épuisé. Sans `ALERT_EMAIL_TO` ni `RESEND_API_KEY`, le Worker n'envoie aucun e-mail et l'écrit dans ses journaux ; avec un seul des deux, il signale une erreur.
 
 ## 12. Mise en production et contrôles
 
