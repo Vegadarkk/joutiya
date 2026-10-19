@@ -1,7 +1,8 @@
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Container } from "@/components/layout/container";
 import { fill, type Block, type LegalText, type LegalValues } from "@/content/legal/fr";
 import type { Locale } from "@/config/site";
+import { numbersLocale } from "@/i18n/params";
 
 interface LegalPageProps {
   locale: Locale;
@@ -38,9 +39,9 @@ function BlockView({ block, values }: { block: Block; values: LegalValues }) {
  */
 export function LegalPage({ locale, title, text, values, provisional = true }: LegalPageProps) {
   const t = useTranslations("Legal");
-  const format = useFormatter();
   const foreign = locale !== "fr";
-  const updated = format.dateTime(new Date(`${text.updated}T12:00:00Z`), { dateStyle: "long" });
+  // Not useFormatter(): it formats under the request locale, and Intl has no "rif" data (en-US).
+  const updated = new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeZone: "Africa/Casablanca" }).format(new Date(`${text.updated}T12:00:00Z`));
   const toc = text.sections.length > 2;
 
   return (

@@ -218,7 +218,7 @@ export const listingSchema = z
     publishedAt: ts.optional(),
     /** publishedAt + listingTtlDays. */
     expiresAt: ts.optional(),
-    /** Expiry or removal + listingPurgeMonths; blocked while `legalHold` is not empty. */
+    /** Expiry, sale or removal + listingPurgeMonths, or a draft's last edit + 30 days; blocked while `legalHold` is not empty. */
     purgeAt: ts.optional(),
     legalHold: z.array(z.string().min(1).max(64)).max(50),
     createdAt: ts,

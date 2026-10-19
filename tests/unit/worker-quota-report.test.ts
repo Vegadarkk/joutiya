@@ -65,6 +65,13 @@ describe("quota-report", () => {
     expect(alert).toHaveBeenCalledWith({ severity: "P1", title: "Compteurs de quotas illisibles", body: expect.stringContaining("1 compteurs inconnus pour le 2026-10-15") });
   });
 
+  it("snapshots an unmeasured gauge as unknown without the Valkey alert", async () => {
+    vi.mocked(readQuotas).mockResolvedValue([...STATUS, { id: "firestore.storage", period: "2026-10", used: 0, limit: 1_000_000_000, ratio: 0, level: "unknown" }]);
+    await quotaReport();
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ quotas: expect.objectContaining({ "firestore.storage": expect.objectContaining({ level: "unknown" }) }) }), { merge: true });
+    expect(alert).not.toHaveBeenCalled();
+  });
+
   it("is the nightly job of the system queue", () => {
     expect(JOBS["quota-report"]).toBe(quotaReport);
   });

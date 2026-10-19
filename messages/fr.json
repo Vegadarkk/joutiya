@@ -85,7 +85,7 @@
     "postBody": "Vous pourrez publier une annonce avec ses photos en quelques minutes."
   },
   "Footer": {
-    "about": "Joutiya, la place de marché des petites annonces au Maroc. Ouvrez la porte à une nouvelle façon d'acheter et de vendre.",
+    "about": "Joutiya, la place de marché des petites annonces au Maroc. Une porte ouverte sur le monde.",
     "legalTitle": "Informations légales",
     "trustTitle": "Mentions et autorités",
     "disclaimer": "Joutiya héberge les annonces de ses utilisateurs : elle n'est ni vendeur, ni acheteur, ni partie aux ventes conclues entre eux.",
@@ -133,7 +133,7 @@
       "googleLoading": "Chargement du bouton Google…",
       "backHome": "Revenir à l'accueil",
       "waitLater": "dans quelques minutes",
-      "brandPromise": "Ouvrez la porte à une nouvelle façon d'acheter et de vendre.",
+      "brandPromise": "Une porte ouverte sur le monde.",
       "trust": {
         "messages": "Vos échanges restent dans la messagerie Joutiya.",
         "phone": "Votre numéro n'est jamais affiché en clair.",
@@ -280,7 +280,8 @@
         "phoneVerified": "Vérifié",
         "phoneMissing": "Non vérifié",
         "verifyPhone": "Vérifier mon numéro",
-        "managePhone": "Voir la vérification"
+        "managePhone": "Voir la vérification",
+        "phoneSoon": "Vérification pas encore ouverte"
       },
       "methods": {
         "title": "Méthodes de connexion",
@@ -318,7 +319,7 @@
       "changeNumber": "Changer de numéro",
       "badge": "Téléphone vérifié",
       "backSettings": "Retour aux paramètres",
-      "unavailable": "La vérification WhatsApp n'est pas encore ouverte. Revenez dans quelques jours.",
+      "unavailable": "La vérification du numéro par WhatsApp n'est pas encore ouverte. En attendant, les acheteurs vous écrivent par la messagerie Joutiya.",
       "loadFailedTitle": "L'état de la vérification n'a pas pu être chargé",
       "retry": "Réessayer",
       "alreadyVerified": "Votre compte a déjà un numéro vérifié."
@@ -526,6 +527,7 @@
       "phoneNotVerified": "Numéro non vérifié",
       "verifyLink": "Vérifier mon numéro",
       "verifyBody": "Vérifiez votre numéro pour l'afficher sur l'annonce ou proposer WhatsApp. Votre brouillon est conservé.",
+      "verifySoon": "Afficher votre numéro ou proposer WhatsApp demande un numéro vérifié. Cette vérification n'est pas encore ouverte : en attendant, les acheteurs vous écrivent par la messagerie Joutiya.",
       "revealNote": "Votre numéro n'apparaît jamais en clair sur la page : il faut être connecté et cliquer pour le voir."
     },
     "photos": {
@@ -2019,6 +2021,7 @@
     "pausedQuota": "En pause : le nombre d'annonces actives de votre compte est atteint.",
     "loading": "Chargement de vos annonces…",
     "draftsLimit": "{count, plural, one {# brouillon} other {# brouillons}} sur {max} possibles",
+    "draftsRetention": "Un brouillon non modifié pendant 30 jours est supprimé avec ses photos.",
     "errors": {
       "renewBlocked": "Votre annonce doit être corrigée avant d'être renouvelée : corrigez les points signalés et enregistrez, puis renouvelez-la depuis « Mes annonces ».",
       "listingLimit": "Vous avez atteint le nombre maximal d'annonces actives. Mettez en pause ou supprimez une autre annonce pour remettre celle-ci en ligne."

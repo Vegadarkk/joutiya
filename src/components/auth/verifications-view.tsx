@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Link } from "@/i18n/navigation";
 import { apiGet, apiPost, isApiError, refreshSession } from "@/lib/auth/client";
+import { usePublicConfig } from "@/lib/config/client";
 import { AUTH_API, phoneStartSchema, type PhoneStartResponse, type PhoneStatusResponse } from "@/lib/contracts/auth";
 import { isolateLtr } from "@/lib/i18n/bidi";
 import { FormMessage, useApiErrorMessage, useFieldMessage } from "./form-message";
@@ -51,8 +52,12 @@ function fromStatus(status: PhoneStatusResponse): State {
 export function VerificationsView() {
   const t = useTranslations("Auth.verifications");
   const apiMessage = useApiErrorMessage();
-  const [state, setState] = useState<State>({ kind: "loading" });
+  const [loaded, setState] = useState<State>({ kind: "loading" });
   const started = useRef(false);
+  // Closed check (WhatsApp parked): say so up front instead of a form whose submit answers 503.
+  // A badge earned earlier still shows.
+  const closed = usePublicConfig()?.phoneVerification === false;
+  const state: State = closed && (loaded.kind === "idle" || loaded.kind === "expired" || loaded.kind === "pendingUnknown") ? { kind: "unavailable" } : loaded;
 
   const load = useCallback(async () => {
     setState({ kind: "loading" });

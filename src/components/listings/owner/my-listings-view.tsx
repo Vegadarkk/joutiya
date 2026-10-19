@@ -327,7 +327,11 @@ export function MyListingsView() {
           </EmptyState>
         ) : (
           <>
-            {tab === "drafts" ? <p className="mb-1 text-sm text-foreground-muted">{t("draftsLimit", { count: current.listings.length, max: MAX_DRAFTS })}</p> : null}
+            {tab === "drafts" ? (
+              <p className="mb-1 text-sm text-foreground-muted text-pretty">
+                {t("draftsLimit", { count: current.listings.length, max: MAX_DRAFTS })}. {t("draftsRetention")}
+              </p>
+            ) : null}
             <ul className={cn("flex flex-col divide-y divide-border transition-opacity duration-200", current.refreshing && "opacity-80")} aria-busy={busyId !== null || current.refreshing || undefined}>
               {current.listings.map((listing) => (
                 <OwnerListingCard key={listing.id} listing={listing} mediaBaseUrl={mediaBaseUrl} busy={busyId === listing.id} onAction={(action) => onAction(listing.id, action)} onDelete={() => onDelete(listing.id)} />

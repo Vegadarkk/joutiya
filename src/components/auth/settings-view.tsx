@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LOCALES, type Locale } from "@/config/site";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { ApiError, apiPost, isApiError, setSession, signOut, useSession } from "@/lib/auth/client";
+import { usePublicConfig } from "@/lib/config/client";
 import { AUTH_API, passwordChangeSchema, profileSchema, type SessionSummary } from "@/lib/contracts/auth";
 import { toast } from "sonner";
 import { FormMessage, useApiErrorMessage, useFieldMessage } from "./form-message";
@@ -250,8 +251,10 @@ function PasswordChangeForm({ email, displayName }: { email: string | null; disp
   );
 }
 
-function VerificationSection({ session }: { session: SessionSummary }) {
+export function VerificationSection({ session }: { session: SessionSummary }) {
   const t = useTranslations("Auth.settings.verification");
+  // WhatsApp parked (no phone number id): the check cannot start, so no call to action leads to a 503.
+  const phoneOpen = usePublicConfig()?.phoneVerification !== false;
   return (
     <Section id="verification" title={t("title")} body={t("body")}>
       <ul className="flex flex-col divide-y divide-border">
@@ -277,9 +280,13 @@ function VerificationSection({ session }: { session: SessionSummary }) {
               {session.phoneVerified ? t("phoneVerified") : t("phoneMissing")}
             </Badge>
           </div>
-          <Button asChild variant={session.phoneVerified ? "ghost" : "structure"} size="sm">
-            <Link href="/verifications">{session.phoneVerified ? t("managePhone") : t("verifyPhone")}</Link>
-          </Button>
+          {session.phoneVerified || phoneOpen ? (
+            <Button asChild variant={session.phoneVerified ? "ghost" : "structure"} size="sm">
+              <Link href="/verifications">{session.phoneVerified ? t("managePhone") : t("verifyPhone")}</Link>
+            </Button>
+          ) : (
+            <span className="text-sm text-foreground-muted">{t("phoneSoon")}</span>
+          )}
         </li>
       </ul>
     </Section>

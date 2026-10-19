@@ -38,4 +38,6 @@ export interface PublicConfig {
   mediaBaseUrl: string | null;
   upload: PublicUploadLimits;
   map: PublicMapConfig | null;
+  /** True when a WhatsApp phone check can be started (§9); false hides the verification calls to action. */
+  phoneVerification: boolean;
 }

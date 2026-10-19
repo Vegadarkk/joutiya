@@ -62,7 +62,7 @@ FROM runtime AS worker
 COPY --from=build /src/dist/worker-standalone ./
 COPY --from=build /src/infra/targets.json ./infra/targets.json
 COPY --from=models /app/models ./models
-# MALLOC_ARENA_MAX: glibc fragmentation with sharp/libvips (research/libs-media.md §1.1).
+# MALLOC_ARENA_MAX: glibc fragmentation with sharp/libvips (phase-3/research/libs-media.md §1.1).
 ENV MEDIA_MODELS_DIR=/app/models \
     MALLOC_ARENA_MAX=2
 USER node

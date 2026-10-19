@@ -4,14 +4,17 @@ import { alertBackupSkipped, runBackup, skippedBackup, type BackupResult } from 
 import { serverEnv } from "@/lib/env";
 import { db, isFirestoreConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
+import { setGauge } from "@/lib/quota";
 import { isStorageNotConfigured, objectStore, type ObjectStore } from "@/lib/storage";
 import { setBackupBytes } from "@/lib/uploads/storage-gauge";
 
 // Nightly at 03:30 UTC (D17): encrypted export of Firestore to the private bucket
 // (src/lib/backup/export.ts). A missing or invalid BACKUP_AGE_RECIPIENT, or no R2, alerts once a
-// day and writes nothing. A failure alerts and fails the job without retries (system jobs have
+// day and writes nothing. A failure alerts and fails the job without retries (the backup has
 // one attempt): the cursors did not move, so the next night redoes the work. A completed run
-// hands the bytes of the backups still in the private bucket to the R2 storage gauge.
+// hands the bytes of the backups still in the private bucket to the R2 storage gauge, and the
+// Firestore storage estimated from the last complete rolling full to its gauge (every night, so the
+// monthly key always holds it; nothing until a first cycle completed).
 
 export interface BackupJobDeps {
   db?: Firestore;
@@ -44,5 +47,6 @@ export async function backupFirestore(now = new Date(), deps: BackupJobDeps = {}
     throw error;
   }
   if (result.retainedBytes !== null) await setBackupBytes(result.retainedBytes, now);
+  if (result.firestoreStorageBytes !== null) await setGauge("firestore.storage", result.firestoreStorageBytes, now);
   return result;
 }

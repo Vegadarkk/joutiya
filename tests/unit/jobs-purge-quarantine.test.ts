@@ -14,6 +14,7 @@ const stored = vi.hoisted(() => new Map<string, UploadRecord>());
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/quota", () => ({ isDegraded: vi.fn(async () => false), consume: vi.fn(async () => ({ level: "ok" })) }));
 vi.mock("@/lib/uploads/storage-gauge", () => ({ recordMediaBytes: vi.fn(async () => null) }));
+vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => true) }));
 const configured = { value: true };
 vi.mock("@/lib/firebase/admin", () => ({ isFirestoreConfigured: () => configured.value, isFirebaseConfigured: () => configured.value, db: vi.fn() }));
 vi.mock("@/lib/db/repositories/listings", () => ({ getListings: vi.fn(async () => []) }));
@@ -38,6 +39,7 @@ const repo = await import("@/lib/db/repositories/uploads");
 const { getListings } = await import("@/lib/db/repositories/listings");
 const { listListingsChangedBefore } = await import("@/lib/db/repositories/retention");
 const { logger } = await import("@/lib/logging/logger");
+const { alert } = await import("@/lib/alert");
 const { isDegraded } = await import("@/lib/quota");
 const { recordMediaBytes } = await import("@/lib/uploads/storage-gauge");
 const { MemoryObjectStore } = await import("@/lib/storage/memory");
@@ -110,6 +112,7 @@ beforeEach(() => {
   vi.mocked(isDegraded).mockResolvedValue(false);
   vi.mocked(recordMediaBytes).mockClear();
   vi.mocked(logger.warn).mockClear();
+  vi.mocked(alert).mockClear();
 });
 
 describe("purge-quarantine: stale uploads", () => {
@@ -548,9 +551,13 @@ describe("purge-quarantine: photos of removed listings leave the public bucket",
     expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: 1 });
     expect(listListingsChangedBefore).not.toHaveBeenCalled();
 
+    expect(alert).not.toHaveBeenCalled();
+
     vi.mocked(isDegraded).mockResolvedValue(false);
     vi.mocked(listListingsChangedBefore).mockRejectedValueOnce(new Error("FAILED_PRECONDITION"));
     expect(await purgeQuarantine(NOW, { store })).toMatchObject({ purged: 1, failed: 1 });
+    // The job completes: the step alerts, since the worker's failed handler never sees it.
+    expect(alert).toHaveBeenCalledExactlyOnceWith({ severity: "P2", title: "Tâche système en échec : purge-quarantine", body: expect.stringContaining("retained photos (FAILED_PRECONDITION)") });
   });
 });
 

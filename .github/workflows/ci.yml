@@ -64,6 +64,16 @@ jobs:
         run: |
           npm run typecheck
           npx tsc -p workers/uptime-probe --noEmit
+      # The real-model block of tests/unit/media-classify.test.ts runs only with the ONNX files (22 MB,
+      # never committed): weights only in the cache, so the checkout's MANIFEST and README stay.
+      - name: Cache the ONNX models
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: models/*.onnx
+          key: onnx-models-${{ hashFiles('models/MANIFEST.json') }}
+      # Verifies each sha256, skips valid files (cache hit), fails the job on a bad download.
+      - name: ONNX models (docs/models.md)
+        run: node scripts/fetch-models.ts
       - run: npm test
       - name: Firestore rules (emulator)
         run: npm run test:rules
