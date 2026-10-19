@@ -3,8 +3,8 @@ import "server-only";
 // Repeat rule of the message risk (design D5): a sender with >= 3 flagged messages in 24 h across
 // >= 2 conversations gets ONE system report per 24 h: target user, reason `scam` (P1), source
 // `system`, never a strong signal. The report itself belongs to the reports lot (L2): imported on
-// first use, so "@/lib/reports" (which wires hideMessage/unhideMessage from here) and this module
-// never depend on each other at load time.
+// first use, because "@/lib/reports" imports hideMessage/unhideMessage from "@/lib/messaging"
+// statically; this direction stays lazy so the module graph has no cycle.
 
 export interface RepeatRiskReport {
   /** The sender. */

@@ -23,6 +23,7 @@ export function rulesOutput(input: AiTaskInput): AiOutput {
         };
       }
       if (facts.flags.length > 0) return escalation(`Règles locales : signaux de la pré-modération (${facts.flags.join(", ")}) ; un modérateur décide.`);
+      if (facts.previouslyRejected) return escalation("Règles locales : annonce déjà retirée par une décision de modération ; un modérateur décide.");
       return escalation("Règles locales : aucun signal ; analyse automatique indisponible, un modérateur décide.");
     }
     case "report":

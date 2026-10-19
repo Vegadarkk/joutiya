@@ -16,6 +16,8 @@ vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
 }));
 vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => true) }));
 vi.mock("@/lib/rate-limit/limiter", { spy: true });
+// Every export calls the messaging lot's own code; one test stubs a single hide.
+vi.mock("@/lib/messaging", { spy: true });
 
 import { alert } from "@/lib/alert";
 import { getListing } from "@/lib/db/repositories/listings";
@@ -28,9 +30,8 @@ import { getPublicProfile, getPublishedBySlugId } from "@/lib/listings/public";
 import { hideMessage, unhideMessage } from "@/lib/messaging";
 import * as limiter from "@/lib/rate-limit/limiter";
 import { closeReportsTx, createSystemReport, getReport, isTrustedReporter, openReportsForTarget, recordReporterOutcomes, targetKey, unhideTarget } from "@/lib/reports";
-import { resetReportsAiConfig } from "@/lib/reports/ai-config";
+import { setAiConfigForTests } from "@/lib/ai/config";
 import { setTriageRequester } from "@/lib/reports/hooks";
-import { setMessageVisibility } from "@/lib/reports/messaging-adapter";
 import { notifySearchIndex } from "@/lib/search/queue";
 import { EXPLANATION, listingNotice, makeTrusted, member, publicIdOf, publishedListing, report, seedConversation, visitor, type Member } from "./helpers";
 
@@ -60,7 +61,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   await db().collection("config").doc("ai").delete();
-  resetReportsAiConfig();
+  setAiConfigForTests(undefined);
+  setTriageRequester(undefined);
 });
 
 describe("a lone P0 hides nothing (exit criterion)", () => {
@@ -99,10 +101,10 @@ describe("a lone P0 hides nothing (exit criterion)", () => {
 });
 
 describe("strong signals hide a listing", () => {
-  it("multi: two distinct reporters (account, device, network) hide it from the page and the index", async () => {
+  it("multi: two distinct accounts (uid, device, network) hide it from the page and the index", async () => {
     const { id, seller } = await publishedListing();
     const first = await report(listingNotice(id, "terrorism"), { as: await member(), headers: ownNetwork() });
-    const second = await report(listingNotice(id, "terrorism"), { as: visitor(), headers: ownNetwork() });
+    const second = await report(listingNotice(id, "terrorism"), { as: await member(), headers: ownNetwork() });
     expect([first.status, second.status]).toEqual([201, 201]);
     expect((await getReport(first.body.reportId))!.hidden).toBe(false);
     const stored = (await getReport(second.body.reportId))!;
@@ -133,6 +135,46 @@ describe("strong signals hide a listing", () => {
     expect(await auditActions(id)).toContain("listing.unhide");
   });
 
+  it("two visitors do not hide: a pair of anonymous P0 notices stays P0 and online (audit D1a-03)", async () => {
+    const { id } = await publishedListing();
+    const first = await report(listingNotice(id, "terrorism"), { as: visitor(), headers: ownNetwork() });
+    const second = await report(listingNotice(id, "terrorism"), { as: visitor(), headers: ownNetwork() });
+    expect([first.status, second.status]).toEqual([201, 201]);
+    const stored = (await getReport(second.body.reportId))!;
+    expect(stored).toMatchObject({ priority: "P0", hidden: false });
+    expect(stored.strongSignal).toBeUndefined();
+    const listing = (await getListing(id))!;
+    expect(listing.moderation.hiddenBy).toBeUndefined();
+    expect(listing.moderation.openReports).toBe(2);
+    expect(await getPublishedBySlugId(listing.slugId!)).not.toBeNull();
+    expect(alertMock.mock.calls.at(-1)![0].body).toContain("Signal fort : non");
+  });
+
+  it("a visitor never completes a multi signal, but corroborates: one rank more urgent, never P0", async () => {
+    const { id } = await publishedListing();
+    const anonymous = (reasonId: string) => listingNotice(id, reasonId, { name: "Visiteur Corrobore", email: `corrobore-${reasonId}@example.com` });
+    const guest = await report(listingNotice(id, "threat"), { as: visitor(), headers: ownNetwork() });
+    expect(guest.body.priority).toBe("P0");
+    const account = await report(listingNotice(id, "threat"), { as: await member(), headers: ownNetwork() });
+    expect((await getReport(account.body.reportId))!).toMatchObject({ priority: "P0", hidden: false });
+    expect((await getListing(id))!.moderation.hiddenBy).toBeUndefined();
+
+    const misleading = await report(anonymous("misleading"), { as: visitor(), headers: ownNetwork() });
+    expect(misleading.body).toMatchObject({ priority: "P1", slaHours: 24 });
+    expect((await getReport(misleading.body.reportId))!).toMatchObject({ reasonId: "misleading", priority: "P1", hidden: false });
+    const spam = await report(anonymous("spam"), { as: visitor(), headers: ownNetwork() });
+    expect(spam.body.priority).toBe("P2");
+    const scam = await report(listingNotice(id, "scam"), { as: await member(), headers: ownNetwork() });
+    expect(scam.body.priority).toBe("P1");
+    // Same device and network as an open notice: nothing to corroborate.
+    const { id: other } = await publishedListing();
+    const network = ownNetwork();
+    await report(listingNotice(other, "spam", { name: "Même Appareil", email: "meme-appareil@example.com" }), { as: visitor(), headers: network });
+    const alone = await report(listingNotice(other, "misleading"), { as: await member(), headers: network });
+    expect(alone.body.priority).toBe("P2");
+    expect((await getListing(id))!.moderation.hiddenBy).toBeUndefined();
+  });
+
   it("multi is off when the P0 limiters could not count (rate-limit store down)", async () => {
     const actual = await vi.importActual<typeof limiter>("@/lib/rate-limit/limiter");
     vi.mocked(limiter.consumeLimit).mockImplementation(async (id, key, points) => (id.startsWith("report.p0.") ? { ok: false, reason: "unavailable" } : actual.consumeLimit(id, key, points)));
@@ -158,7 +200,7 @@ describe("strong signals hide a listing", () => {
     const { id } = await publishedListing();
     const flagger = await member();
     await db().collection("config").doc("ai").set({ trustedFlaggers: [flagger.uid] });
-    resetReportsAiConfig();
+    setAiConfigForTests(undefined);
     expect(await isTrustedReporter(flagger.uid)).toBe(true);
     const result = await report(listingNotice(id, "terrorism"), { as: flagger, headers: ownNetwork() });
     expect((await getReport(result.body.reportId))!.strongSignal).toBe("trusted");
@@ -196,20 +238,21 @@ describe("strong signals on accounts and messages", () => {
   });
 
   it("hands a message to the messaging lot's hide", async () => {
-    const hide = vi.fn(async () => true);
-    setMessageVisibility({ hide });
+    const hide = vi.mocked(hideMessage);
+    hide.mockClear();
+    hide.mockResolvedValueOnce(true);
     const { id, seller } = await publishedListing();
     const buyer = await member();
     await makeTrusted(buyer);
     const { cid, mid } = await seedConversation(id, buyer, seller, seller, "Je sais où tu habites.");
     const result = await report({ target: { type: "message", id: `${cid}/${mid}` }, reasonId: "threat", explanation: EXPLANATION, goodFaith: true }, { as: buyer, headers: ownNetwork() });
     expect(result.status).toBe(201);
+    expect(hide).toHaveBeenCalledTimes(1);
     expect(hide).toHaveBeenCalledWith(cid, mid, `report:${result.body.reportId}`);
     expect((await getReport(result.body.reportId))!.hidden).toBe(true);
   });
 
   it("with the messaging lot's own hide: text masked, original kept as evidence, restored by unhideTarget", async () => {
-    setMessageVisibility({ hide: hideMessage, unhide: unhideMessage });
     const { id, seller } = await publishedListing();
     const buyer = await member();
     await makeTrusted(buyer);
@@ -224,6 +267,7 @@ describe("strong signals on accounts and messages", () => {
     expect((await conversation.collection(COLLECTIONS.evidence).doc(mid).get()).get("text")).toBe(text);
     expect((await conversation.get()).get("legalHold")).toContain(`report:${result.body.reportId}`);
     expect(await unhideTarget({ type: "message", id: `${cid}/${mid}` })).toBe(true);
+    expect(vi.mocked(unhideMessage)).toHaveBeenCalledWith(cid, mid);
     expect((await message.get()).get("hidden")).toBeUndefined();
     expect((await message.get()).get("text")).toBe(text);
   });

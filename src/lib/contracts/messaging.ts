@@ -23,14 +23,27 @@ export const cidSchema = z.string().regex(/^[A-Za-z0-9_-]{22}$/);
 /** Firestore auto id of a message. */
 export const messageIdSchema = z.string().regex(/^[A-Za-z0-9]{20}$/);
 
-const messageTextSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(MESSAGE_TEXT_MAX)
-  // No control characters except tab and newlines; the markers are reserved for the server.
-  .refine((text) => !/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(text), { message: "control_characters" })
-  .refine((text) => !text.includes("⟦") && !text.includes("⟧"), { message: "reserved_marker" });
+/**
+ * Format characters (Unicode Cf: zero-width spaces, bidi marks and overrides, soft hyphen, BOM...)
+ * except ZWNJ and ZWJ (U+200C, U+200D: Arabic and emoji sequences need them). Invisible, they split
+ * a keyword, a bank account or a domain past the risk rules and spoof the display direction.
+ */
+const FORMAT_CHARACTERS = /(?![‌‍])\p{Cf}/gu;
+
+/** `text` without its format characters: applied before validation and risk analysis (D5). */
+export const stripFormatCharacters = (text: string): string => text.replace(FORMAT_CHARACTERS, "");
+
+const messageTextSchema = z.preprocess(
+  (value) => (typeof value === "string" ? stripFormatCharacters(value) : value),
+  z
+    .string()
+    .trim()
+    .min(1)
+    .max(MESSAGE_TEXT_MAX)
+    // No control characters except tab and newlines; the markers are reserved for the server.
+    .refine((text) => !/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(text), { message: "control_characters" })
+    .refine((text) => !text.includes("⟦") && !text.includes("⟧"), { message: "reserved_marker" }),
+);
 
 export const startConversationSchema = z
   .object({ listingId: listingIdSchema, text: messageTextSchema, turnstileToken: turnstileTokenSchema })

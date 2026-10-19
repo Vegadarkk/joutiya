@@ -42,8 +42,12 @@ async function quietly(label: string, context: Record<string, unknown>, send: ()
   }
 }
 
-/** Statement of reasons (art. 17) to the affected account; nothing for restore and no_action. */
-export async function sendDecisionNotice(input: NoticeInput): Promise<boolean> {
+/**
+ * Statement of reasons (art. 17) to the affected account; nothing for restore and no_action. A
+ * re-send (`resentAt`, staff action) gets its own idempotency key per minute: the first job may
+ * still sit in the queue's failed set.
+ */
+export async function sendDecisionNotice(input: NoticeInput, options: { resentAt?: Date } = {}): Promise<boolean> {
   if (!RESTRICTIVE.includes(input.action)) return false;
   const to = await accountRecipient(input.affectedUid);
   if (!to) return false;
@@ -63,8 +67,9 @@ export async function sendDecisionNotice(input: NoticeInput): Promise<boolean> {
     appealToken: token,
     appealDeadline: input.appealDeadline.toISOString(),
   };
+  const key = options.resentAt ? `decisionNotice-${input.decisionId}-resend-${Math.floor(options.resentAt.getTime() / 60_000)}` : `decisionNotice-${input.decisionId}`;
   return quietly("decisionNotice", { decisionId: input.decisionId }, () =>
-    sendMail({ template: "decisionNotice", locale: to.locale, to: to.email, priority: "transactional", idempotencyKey: `decisionNotice-${input.decisionId}`, data }),
+    sendMail({ template: "decisionNotice", locale: to.locale, to: to.email, priority: "transactional", idempotencyKey: key, data }),
   );
 }
 

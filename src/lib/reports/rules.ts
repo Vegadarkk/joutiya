@@ -73,20 +73,39 @@ export interface SignalReport {
   createdAt: Date;
 }
 
-function distinctReporters(a: SignalReport, b: SignalReport): boolean {
-  // A visitor has no uid: the device stands for the account, so two visitors on one device never pass.
-  const accountA = a.uid ?? `device:${a.deviceHash}`;
-  const accountB = b.uid ?? `device:${b.deviceHash}`;
-  return accountA !== accountB && a.deviceHash !== b.deviceHash && a.ipPrefixHash !== b.ipPrefixHash;
+/** Distinct devices and IP prefixes, and distinct accounts when both are signed in. */
+function distinctOrigins(a: SignalReport, b: SignalReport): boolean {
+  if (a.uid !== undefined && a.uid === b.uid) return false;
+  return a.deviceHash !== b.deviceHash && a.ipPrefixHash !== b.ipPrefixHash;
+}
+
+const inWindow = (other: SignalReport, now: Date): boolean => now.getTime() - other.createdAt.getTime() <= MULTI_WINDOW_MS;
+
+/**
+ * "multi" (strong signal): the new P0 report and at least one other open P0 user report on the same
+ * target, created within 7 days, come from two distinct ACCOUNTS (both signed in) on distinct
+ * devices AND IP prefixes (AF §7). A visitor has no account to answer for a false notice (art. 23),
+ * so two visitors never hide anything (audit D1a-03): they only corroborate each other. `others` are
+ * the open P0 reports of the target with `source: "user"` (the caller filters).
+ */
+export function hasMultiSignal(candidate: SignalReport, others: readonly SignalReport[], now: Date): boolean {
+  if (candidate.uid === undefined) return false;
+  return others.some((other) => other.uid !== undefined && inWindow(other, now) && distinctOrigins(candidate, other));
 }
 
 /**
- * "multi": the new P0 report and at least one other open P0 user report on the same target, created
- * within 7 days, come from distinct accounts AND devices AND IP prefixes. `others` are the open P0
- * reports of the target with `source: "user"` (the caller filters).
+ * Corroborated: another open user report on the same target within 7 days from a distinct device
+ * and IP prefix, visitors included. Not a strong signal: it raises the priority one rank
+ * (raisePriority), never hides.
  */
-export function hasMultiSignal(candidate: SignalReport, others: readonly SignalReport[], now: Date): boolean {
-  return others.some((other) => now.getTime() - other.createdAt.getTime() <= MULTI_WINDOW_MS && distinctReporters(candidate, other));
+export function isCorroborated(candidate: SignalReport, others: readonly SignalReport[], now: Date): boolean {
+  return others.some((other) => inWindow(other, now) && distinctOrigins(candidate, other));
+}
+
+/** One rank more urgent: P3 -> P2, P2 -> P1; P1 and P0 stay (a corroboration never makes a P0). */
+export function raisePriority(priority: ReportPriority): ReportPriority {
+  const rank = priorityRank(priority);
+  return rank >= 2 ? (REPORT_PRIORITIES[rank - 1] ?? priority) : priority;
 }
 
 export interface TrustedFacts {

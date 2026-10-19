@@ -3,6 +3,7 @@ import { logger } from "@/lib/logging/logger";
 import { applyAutoDecision, noteOnListing, noteOnReport, planApplication, raiseSystemReport, type Application } from "./apply";
 import { aiConfig } from "./config";
 import { appealReviewInput, listingScreenInput, reportTriageInput, type InputDeps } from "./inputs";
+import { withVerdict } from "./output";
 import { PROMPT_VERSIONS } from "./prompts";
 import type { AgentJobData } from "./queue";
 import { createAiDecision, listAiDecisions } from "./repository";
@@ -62,7 +63,7 @@ export async function runAgentTask(job: AgentJobData, options: AgentRunOptions =
     provider: route.provider,
     model: route.model,
     promptVersion: route.provider === "anthropic" ? PROMPT_VERSIONS[input.task] : "none",
-    output: route.output,
+    output: withVerdict(input.task, route.output),
     applied: "pending",
     costMicroUsd: route.costMicroUsd,
     inputHash: input.inputHash,

@@ -11,6 +11,10 @@ const DAY = 24 * HOUR;
 
 const expected: Record<string, RateLimitDefinition> = {
   "message.send.uid": { points: 20, duration: MINUTE, policy: "open", key: "uid" },
+  // Audit D1a-01: hourly, daily and per-thread caps on top of the burst.
+  "message.send.hour.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
+  "message.send.day.uid": { points: 400, duration: DAY, policy: "open", key: "uid" },
+  "message.send.thread": { points: 60, duration: HOUR, policy: "open", key: "uid+cid" },
   "conversation.new.uid": { points: 50, duration: DAY, policy: "open", key: "uid" },
   "conversation.new.young.uid": { points: 10, duration: DAY, policy: "open", key: "uid" },
   "conversation.state.uid": { points: 600, duration: HOUR, policy: "open", key: "uid" },

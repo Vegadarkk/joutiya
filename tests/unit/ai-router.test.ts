@@ -44,7 +44,7 @@ function listingInput(overrides: Partial<AiTaskInput> = {}): AiTaskInput {
     target: { type: "listing", id: "abcdefgh" },
     text: "Titre : Vélo de route\nDescription : très bon état, contactez [téléphone].",
     images: [{ mediaType: "image/jpeg", data: "AAAA" }],
-    facts: { kind: "listing", status: "pending_review", version: 3, flags: [], score: 10, hidden: false, openReports: 0, prohibitedHard: [] },
+    facts: { kind: "listing", status: "pending_review", version: 3, flags: [], score: 10, hidden: false, openReports: 0, prohibitedHard: [], previouslyRejected: false },
     inputHash: "h".repeat(64),
     ...overrides,
   };

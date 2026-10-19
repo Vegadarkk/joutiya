@@ -23,12 +23,15 @@ service cloud.firestore {
     }
 
     match /conversations/{cid} {
-      // Query: where('participants', 'array-contains', uid) or where('sellerProId', '==', proId), orderBy('updatedAt', 'desc').
-      allow get, list: if canRead(resource.data);
+      // Query: where('participants', 'array-contains', uid) or where('sellerProId', '==', proId), orderBy('updatedAt', 'desc'), limit(30).
+      // A list without a limit, or past the page size, is denied: every document read is Spark quota.
+      allow get: if canRead(resource.data);
+      allow list: if canRead(resource.data) && request.query.limit <= 30;
       allow write: if false;
       match /messages/{mid} {
-        // Query: the same filter (duplicated on each message), orderBy('createdAt', 'desc').
-        allow get, list: if canRead(resource.data);
+        // Query: the same filter (duplicated on each message), orderBy('createdAt', 'desc'), limit(50).
+        allow get: if canRead(resource.data);
+        allow list: if canRead(resource.data) && request.query.limit <= 50;
         allow write: if false;
       }
       // Originals of masked or hidden messages: server only.

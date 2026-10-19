@@ -1,5 +1,5 @@
 import "server-only";
-import { FieldValue, Timestamp, type DocumentSnapshot, type Transaction } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, type DocumentSnapshot, type Query, type QueryDocumentSnapshot, type Transaction } from "firebase-admin/firestore";
 import { HIDDEN_MARKER, type MessageRiskFlag } from "@/lib/contracts/messaging";
 import {
   COLLECTIONS,
@@ -18,9 +18,9 @@ import { maskLinks, messagePreview } from "./risk";
 
 // conversations/{cid}, their messages and evidence, userBlocks/{uid} (design D4-D7, D18). The
 // server is the only writer (rules deny every client write); every read and write is counted
-// against the Spark quotas. A message costs one transaction: the conversation read, then the
-// message, the conversation update and, for a masked text, its evidence. Dates: Timestamp in
-// Firestore, Date in memory.
+// against the Spark quotas. A message costs one transaction: the conversation read and the block
+// lists of both participants, then the message, the conversation update and, for a masked text,
+// its evidence. Dates: Timestamp in Firestore, Date in memory.
 
 export interface ConversationRecord extends ConversationDoc {
   cid: string;
@@ -113,10 +113,8 @@ export async function getConversation(cid: string): Promise<ConversationRecord |
   return conversationFromSnapshot(snapshot);
 }
 
-/** Blocked uids of each account (missing document: nobody). */
-export async function getUserBlocks(uids: readonly string[]): Promise<Map<string, string[]>> {
-  const snapshots = await db().getAll(...uids.map((uid) => userBlocksRef(uid)));
-  void consume("firestore.reads", snapshots.length);
+/** uid -> blocked uids, from userBlocks snapshots (missing document: nobody). */
+function blocksOf(snapshots: readonly DocumentSnapshot[]): Map<string, string[]> {
   const out = new Map<string, string[]>();
   for (const snapshot of snapshots) {
     const parsed = userBlocksSchema.safeParse(timestampsToDates(snapshot.data() ?? {}));
@@ -124,6 +122,16 @@ export async function getUserBlocks(uids: readonly string[]): Promise<Map<string
   }
   return out;
 }
+
+/** Blocked uids of each account (missing document: nobody). */
+export async function getUserBlocks(uids: readonly string[]): Promise<Map<string, string[]>> {
+  const snapshots = await db().getAll(...uids.map((uid) => userBlocksRef(uid)));
+  void consume("firestore.reads", snapshots.length);
+  return blocksOf(snapshots);
+}
+
+/** True when either account blocked the other (D6). */
+export const isPairBlocked = (blocks: Map<string, string[]>, a: string, b: string): boolean => (blocks.get(a)?.includes(b) ?? false) || (blocks.get(b)?.includes(a) ?? false);
 
 export interface NewMessageInput {
   senderUid: string;
@@ -188,7 +196,8 @@ export interface AppendResult {
 
 /**
  * Appends a message (D4, D7) in one transaction: the sender must be a participant (else
- * "missing"), nobody blocked the other ("blocked"), the conversation is not frozen ("frozen").
+ * "missing"), nobody blocked the other ("blocked": the `blockedBy` mirror, then the userBlocks
+ * lists of both accounts, which decide, audit D1a-10), the conversation is not frozen ("frozen").
  * The recipient's unread count + 1; archive and delete-for-me are lifted for both participants.
  */
 export async function appendMessage(cid: string, input: NewMessageInput): Promise<AppendResult> {
@@ -197,8 +206,10 @@ export async function appendMessage(cid: string, input: NewMessageInput): Promis
     const conversation = conversationFromSnapshot(await tx.get(conversationRef(cid)));
     if (!conversation || !isParticipant(conversation, input.senderUid)) throw new ConversationAccessError("missing");
     if (conversation.blockedBy.length > 0) throw new ConversationAccessError("blocked");
-    if (conversation.status === "frozen") throw new ConversationAccessError("frozen");
     const recipientUid = counterpartOf(conversation, input.senderUid);
+    const blocks = blocksOf(await tx.getAll(userBlocksRef(input.senderUid), userBlocksRef(recipientUid)));
+    if (isPairBlocked(blocks, input.senderUid, recipientUid)) throw new ConversationAccessError("blocked");
+    if (conversation.status === "frozen") throw new ConversationAccessError("frozen");
     const message = messageDoc(conversation, input);
     const evidence = evidenceDoc(input);
     const { cid: _cid, ...current } = conversation;
@@ -228,7 +239,7 @@ export async function appendMessage(cid: string, input: NewMessageInput): Promis
     );
     return { conversation, recipientUid, writes: evidence ? 3 : 2 };
   });
-  void consume("firestore.reads", 1);
+  void consume("firestore.reads", 3);
   void consume("firestore.writes", result.writes);
   return { messageId: messageRef.id, conversation: result.conversation, recipientUid: result.recipientUid };
 }
@@ -310,24 +321,43 @@ export async function setUserBlock(uid: string, other: string, blocked: boolean,
   return changed;
 }
 
+/** Conversations of a pair mirrored per page (one batch each), and the most pages per direction. */
+export const MIRROR_PAGE = 100;
+export const MIRROR_MAX_PAGES = 50;
+
+/** Updates `blockedBy` on every document of `base`, page after page (implicit `__name__` cursor). */
+async function mirrorBlockedBy(base: Query, blocker: string, blocked: boolean): Promise<number> {
+  const change = blocked ? FieldValue.arrayUnion(blocker) : FieldValue.arrayRemove(blocker);
+  let updated = 0;
+  let after: QueryDocumentSnapshot | undefined;
+  for (let page = 0; page < MIRROR_MAX_PAGES; page += 1) {
+    const snapshot = await (after ? base.startAfter(after) : base).limit(MIRROR_PAGE).get();
+    void consume("firestore.reads", Math.max(1, snapshot.size));
+    if (snapshot.empty) break;
+    const batch = db().batch();
+    for (const doc of snapshot.docs) batch.update(doc.ref, { blockedBy: change });
+    await batch.commit();
+    void consume("firestore.writes", snapshot.size);
+    updated += snapshot.size;
+    if (snapshot.size < MIRROR_PAGE) break;
+    after = snapshot.docs[snapshot.size - 1];
+  }
+  return updated;
+}
+
 /**
- * Mirrors an account-level block on every conversation between the two accounts (`blockedBy`), so
- * a send checks the conversation alone. Equality filters only: Firestore merges the single-field
- * indexes of buyerUid and sellerUid. Returns the number of conversations updated.
+ * Mirrors an account-level block on every conversation between the two accounts (`blockedBy`): the
+ * inbox shows it without reading userBlocks, and a send refuses on it before reading them (the
+ * lists decide either way, audit D1a-10). Paged until exhausted (MIRROR_MAX_PAGES x MIRROR_PAGE
+ * per direction). Equality filters only: Firestore merges the single-field indexes of buyerUid and
+ * sellerUid. Returns the number of conversations updated.
  */
 export async function setPairBlockedBy(blocker: string, other: string, blocked: boolean): Promise<number> {
   const [asBuyer, asSeller] = await Promise.all([
-    conversations().where("buyerUid", "==", blocker).where("sellerUid", "==", other).limit(100).get(),
-    conversations().where("buyerUid", "==", other).where("sellerUid", "==", blocker).limit(100).get(),
+    mirrorBlockedBy(conversations().where("buyerUid", "==", blocker).where("sellerUid", "==", other), blocker, blocked),
+    mirrorBlockedBy(conversations().where("buyerUid", "==", other).where("sellerUid", "==", blocker), blocker, blocked),
   ]);
-  const docs = [...asBuyer.docs, ...asSeller.docs];
-  void consume("firestore.reads", Math.max(1, asBuyer.size) + Math.max(1, asSeller.size));
-  if (docs.length === 0) return 0;
-  const batch = db().batch();
-  for (const doc of docs) batch.update(doc.ref, { blockedBy: blocked ? FieldValue.arrayUnion(blocker) : FieldValue.arrayRemove(blocker) });
-  await batch.commit();
-  void consume("firestore.writes", docs.length);
-  return docs.length;
+  return asBuyer + asSeller;
 }
 
 /** cid -> unread count of `uid` over its newest conversations (the badge rebuild, D3). */

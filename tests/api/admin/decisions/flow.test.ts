@@ -39,7 +39,7 @@ let otherModerator: Staff;
 
 beforeAll(async () => {
   resetServerEnv();
-  setDecisionAiHooks({ requestAppealReview, markAiDecision, appealProposalId: async () => null });
+  setDecisionAiHooks({ requestAppealReview, markAiDecision, appealProposal: async () => null });
   moderator = await staff("moderator");
   otherModerator = await staff("moderator");
 });
@@ -136,6 +136,56 @@ describe("report -> decision -> notification -> appeal -> reversal", () => {
     // A superseded decision cannot be appealed again.
     const closed = await publicCall(appealRoute, "POST", "/api/appeals", { as: seller, body: { decisionId, text: "Une nouvelle contestation." } });
     expect(closed.status).toBe(409);
+  });
+
+  it("lets an admin review an appeal against his own decision, recorded and audited as a self-review; a moderator still cannot", async () => {
+    const admin = await staff("admin");
+    const { id, seller } = await publishedListing();
+    const notice = await report(listingNotice(id, "scam"), { as: await member() });
+    expect(notice.status).toBe(201);
+    const decided = await adminCall<DecideResponse>(decideRoute, "POST", "/api/admin/decisions", {
+      as: admin,
+      body: { target: `listing:${id}`, templateId: "listing.remove.scam", details: "Avance par Wafacash exigée avant la visite." },
+    });
+    expect(decided.status).toBe(201);
+    const decisionId = decided.body.decisionId;
+    const appeal = await publicCall<OpenAppealResponse>(appealRoute, "POST", "/api/appeals", { as: seller, body: { decisionId, text: "Je n'ai demandé aucune avance." } });
+    expect(appeal.status).toBe(201);
+
+    const queue = await adminCall<AppealQueueResponse>(queueRoute, "GET", "/api/admin/appeals", { as: admin });
+    expect(queue.body.items.find((item) => item.decisionId === decisionId)).toMatchObject({ reviewable: true, decidedBy: admin.uid });
+    const reviewed = await adminCall<ReviewAppealResponse>(reviewRoute, "POST", `/api/admin/appeals/${decisionId}`, {
+      as: admin,
+      params: { decisionId },
+      body: { outcome: "reversed", note: "Après relecture des messages, aucune demande d'avance." },
+    });
+    expect(reviewed.status).toBe(200);
+    const outcomeDecisionId = reviewed.body.outcomeDecisionId as string;
+    expect((await listing(id)).status).toBe("published");
+    expect((await decision(decisionId)).appeal).toMatchObject({ status: "reversed", reviewer: admin.uid, selfReview: true, outcomeDecisionId });
+    const view = await adminCall<{ decision: DecisionView }>(decisionRoute, "GET", `/api/admin/decisions/${decisionId}`, { as: admin, params: { id: decisionId } });
+    expect(view.body.decision.appeal).toMatchObject({ status: "reversed", selfReview: true });
+    // The audit log says who, when, which decision and the outcome.
+    const entries = await audits("appeal.self_review", decisionId);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ actorUid: admin.uid, actorRole: "admin", automated: false, reason: `outcome reversed; decided and reviewed by the same admin; decision ${outcomeDecisionId}` });
+    expect(entries[0]!["at"]).toBeDefined();
+    expect(await audits("appeal.reversed", decisionId)).toHaveLength(1);
+    expect(mailTo(sendMail, "appealOutcome", seller.email)?.data).toMatchObject({ decisionId, outcome: "reversed" });
+
+    // A moderator's own decision: still another moderator, or an admin.
+    const { id: second, seller: seller2 } = await publishedListing();
+    const noticed = await adminCall<DecideResponse>(decideRoute, "POST", "/api/admin/decisions", { as: moderator, body: { target: `listing:${second}`, templateId: "listing.restrict", details: "Photos sans rapport avec l'objet." } });
+    const appealed = await publicCall(appealRoute, "POST", "/api/appeals", { as: seller2, body: { decisionId: noticed.body.decisionId, text: "Les photos montrent bien l'objet vendu." } });
+    expect(appealed.status).toBe(201);
+    const refused = await adminCall(reviewRoute, "POST", `/api/admin/appeals/${noticed.body.decisionId}`, { as: moderator, params: { decisionId: noticed.body.decisionId }, body: { outcome: "upheld", note: "Je maintiens ma décision." } });
+    expect(refused.status).toBe(403);
+    expect(refused.body.error.code).toBe("same_reviewer");
+    const upheld = await adminCall<ReviewAppealResponse>(reviewRoute, "POST", `/api/admin/appeals/${noticed.body.decisionId}`, { as: admin, params: { decisionId: noticed.body.decisionId }, body: { outcome: "upheld", note: "Les photos ne montrent pas l'objet vendu." } });
+    expect(upheld.status).toBe(200);
+    expect((await decision(noticed.body.decisionId)).appeal).toMatchObject({ status: "upheld", reviewer: admin.uid });
+    expect((await decision(noticed.body.decisionId)).appeal?.selfReview).toBeUndefined();
+    expect(await audits("appeal.self_review", noticed.body.decisionId)).toHaveLength(0);
   });
 
   it("refuses visitors, members and the public host on the back-office routes", async () => {

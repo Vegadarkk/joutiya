@@ -2,6 +2,7 @@ import "server-only";
 import type { AiConfig } from "@/config/ai";
 import { reportReason, slaDueAt, type ReportPriority, type ReportReasonId, type ReportTargetType } from "@/config/report-reasons";
 import type { Locale } from "@/config/site";
+import { aiConfig } from "@/lib/ai/config";
 import { alert } from "@/lib/alert";
 import type { CreateReportRequest, CreateReportResponse } from "@/lib/contracts/reports";
 import { getListingTx, updateListingTx, type ListingFieldPatch, type ListingRecord } from "@/lib/db/repositories/listings";
@@ -15,11 +16,12 @@ import { HttpError } from "@/lib/http/errors";
 import { logger } from "@/lib/logging/logger";
 import { sendMail } from "@/lib/mail";
 import { consume } from "@/lib/quota";
-import { reportsAiConfig } from "./ai-config";
+import { consumeLimit } from "@/lib/rate-limit/limiter";
+import { normalizeEmail } from "@/lib/security/email-normalize";
 import { requestTriage } from "./hooks";
 import { createReportTx, listTargetReports, newReportId, OPEN_STATUSES, reportHold, reportPurgeAt, updateReport, withHold, type ReportRecord } from "./repository";
 import { privateAccountRef, readPrivateAccount } from "./reporter";
-import { findDuplicate, hasAutoSignal, hasMultiSignal, isAbusive, p0Alert, slaHours, strongSignalOf, trustedFromFacts, type StrongSignal } from "./rules";
+import { findDuplicate, hasAutoSignal, hasMultiSignal, isAbusive, isCorroborated, p0Alert, raisePriority, slaHours, strongSignalOf, trustedFromFacts, type StrongSignal } from "./rules";
 import { conversationRef, resolveReportTarget, resolveSystemTarget, type ResolvedTarget, type SystemTargetInput } from "./targets";
 import { afterVisibilityChange, hideTarget, type VisibilityChange } from "./visibility";
 
@@ -186,13 +188,14 @@ async function afterCommit({ id, doc, signal, change, now, ack, triage }: AfterC
   if (doc.priority === "P0") {
     await alert(p0Alert({ reportId: id, targetType: doc.target.type, reasonId: doc.reasonId, signal, hidden, slaDueAt: doc.slaDueAt, source: doc.source }));
   }
-  if (ack) {
+  if (ack && (await ackAllowed(ack.to, id))) {
     try {
+      // A courtesy (the response carries the report id): bulk priority, dropped first under the mail quota.
       await sendMail({
         template: "reportReceived",
         locale: ack.locale,
         to: ack.to,
-        priority: "transactional",
+        priority: "bulk",
         idempotencyKey: `reportReceived-${id}`,
         data: { displayName: ack.displayName, reportId: id, targetType: doc.target.type, reasonId: doc.reasonId, slaHours: slaHours(doc.priority), receivedAt: now.toISOString(), urgent: doc.priority === "P0" },
       });
@@ -202,6 +205,18 @@ async function afterCommit({ id, doc, signal, change, now, ack, triage }: AfterC
   }
   if (triage) await requestTriage(id);
   return hidden;
+}
+
+/**
+ * The per-address cap of the acknowledgements (audit D1a-04): 2 per day per normalized e-mail,
+ * counted by the rate-limit store (HMAC key, nothing in clear). A visitor types any address; a
+ * flood of notices must not become a flood of mails to a stranger, nor eat the mail quota. Store
+ * down (closed policy): no acknowledgement, the report stands.
+ */
+async function ackAllowed(email: string, reportId: string): Promise<boolean> {
+  const outcome = await consumeLimit("report.ack.email", normalizeEmail(email));
+  if (!outcome.ok) logger.info({ reportId, reason: outcome.reason }, "reports: acknowledgement mail skipped (per-address cap)");
+  return outcome.ok;
 }
 
 interface ReporterFacts {
@@ -238,8 +253,8 @@ async function reporterFacts(input: CreateReportRequest, requester: ReportReques
  */
 export async function createReport(input: CreateReportRequest, requester: ReportRequester, options: CreateReportOptions = {}): Promise<CreateReportResult> {
   const now = options.now ?? new Date();
-  const priority = assertReportInput(input, requester.uid !== null);
-  const ai = options.ai ?? (await reportsAiConfig());
+  const reasonPriority = assertReportInput(input, requester.uid !== null);
+  const ai = options.ai ?? (await aiConfig());
   const reporter = await reporterFacts(input, requester, ai, now);
   const resolved = await resolveReportTarget(input.target, requester.uid);
   const { target } = resolved;
@@ -247,13 +262,20 @@ export async function createReport(input: CreateReportRequest, requester: Report
   const device = deviceHash(requester.deviceKey);
   const ipPrefix = ipPrefixHash(requester.ip);
   const open = await listTargetReports(target, OPEN_STATUSES);
-  const duplicate = findDuplicate(open, { ...(reporter.uid ? { uid: reporter.uid } : {}), deviceHash: device }, priority);
+  const duplicate = findDuplicate(open, { ...(reporter.uid ? { uid: reporter.uid } : {}), deviceHash: device }, reasonPriority);
   if (duplicate) return { response: responseOf(duplicate.id, duplicate.priority, true), created: false, hidden: false };
+
+  // D11: another reporter on a distinct device and network corroborates the notice: one rank more
+  // urgent (never P0). The strong "multi" signal needs two accounts and a P0 reason (audit D1a-03).
+  const candidate = { ...(reporter.uid ? { uid: reporter.uid } : {}), deviceHash: device, ipPrefixHash: ipPrefix, createdAt: now };
+  const signalReport = (report: ReportRecord) => ({ ...report.reporter, createdAt: report.createdAt });
+  const userReports = open.filter((report) => report.source === "user");
+  const corroborated = isCorroborated(candidate, userReports.map(signalReport), now);
+  const priority = corroborated ? raisePriority(reasonPriority) : reasonPriority;
 
   let signal: StrongSignal | undefined;
   if (priority === "P0") {
-    const candidate = { ...(reporter.uid ? { uid: reporter.uid } : {}), deviceHash: device, ipPrefixHash: ipPrefix, createdAt: now };
-    const others = open.filter((report) => report.priority === "P0" && report.source === "user").map((report) => ({ ...report.reporter, createdAt: report.createdAt }));
+    const others = userReports.filter((report) => report.priority === "P0").map(signalReport);
     const multi = options.multiSignal !== false && hasMultiSignal(candidate, others, now);
     const auto = !reporter.trusted && resolved.listing ? hasAutoSignal(await nsfwScores(resolved.listing), ai.reports.autoHideNsfwAt) : false;
     signal = strongSignalOf(priority, { trusted: reporter.trusted, auto, multi });
@@ -283,7 +305,7 @@ export async function createReport(input: CreateReportRequest, requester: Report
     purgeAt: reportPurgeAt(now),
   };
   const { change } = await commitReport({ id, doc, resolved, ...(signal ? { signal } : {}), now });
-  logger.info({ reportId: id, target: target.type, priority, signal: signal ?? null }, "report created");
+  logger.info({ reportId: id, target: target.type, priority, corroborated, signal: signal ?? null }, "report created");
   const hidden = await afterCommit({
     id,
     doc,
@@ -304,6 +326,8 @@ export interface SystemReportInput {
   /** system: messaging repeat rule (D5) or the agent (D20), never a strong signal; authority: removal order (D17), hidden at once. */
   source: "system" | "authority";
   authorityRequestId?: string;
+  /** false: no agent triage (the agent's own reports already carry a proposal, D20); authority orders are never triaged. */
+  triage?: boolean;
   now?: Date;
 }
 
@@ -349,8 +373,8 @@ export async function createSystemReport(input: SystemReportInput): Promise<Syst
   };
   const { change } = await commitReport({ id, doc, resolved, ...(signal ? { signal } : {}), now });
   logger.info({ reportId: id, target: target.type, priority: reason.priority, source: input.source }, "system report created");
-  // Authority orders are decided by a human only: no agent triage.
-  const hidden = await afterCommit({ id, doc, ...(signal ? { signal } : {}), change, now, triage: input.source === "system" });
+  // Authority orders are decided by a human only: no agent triage. The agent's own reports skip it too (triage: false).
+  const hidden = await afterCommit({ id, doc, ...(signal ? { signal } : {}), change, now, triage: input.source === "system" && input.triage !== false });
   return { reportId: id, duplicate: false, priority: reason.priority, hidden };
 }
 

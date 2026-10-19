@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { QUOTA_IDS, QUOTAS } from "@/config/quotas";
+import { claudeBudgetMicroUsd, QUOTA_IDS, QUOTAS } from "@/config/quotas";
 import { classify, periodKey, retentionSeconds } from "@/lib/quota/period";
+
+describe("claude.budget", () => {
+  it("gives the full 5 USD to production only; staging and dev stop at 1 USD (§9, audit D1b-06)", () => {
+    expect(claudeBudgetMicroUsd("prod")).toBe(5_000_000);
+    expect(claudeBudgetMicroUsd("staging")).toBe(1_000_000);
+    expect(claudeBudgetMicroUsd("dev")).toBe(1_000_000);
+    expect(claudeBudgetMicroUsd(undefined)).toBe(1_000_000);
+    expect(QUOTAS["claude.budget"].limit).toBe(claudeBudgetMicroUsd(process.env.APP_ENV));
+  });
+});
 
 describe("quota periods", () => {
   it("buckets Firestore by the Pacific day and others by UTC", () => {

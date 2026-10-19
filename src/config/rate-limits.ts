@@ -14,7 +14,7 @@ export interface RateLimitDefinition {
   blockDuration?: number;
   policy: FailPolicy;
   /** What the key is made of, for the audit of this table. */
-  key: "device" | "ip" | "ip48" | "uid" | "email" | "account+ip" | "account" | "phone";
+  key: "device" | "ip" | "ip48" | "uid" | "email" | "account+ip" | "account" | "phone" | "uid+cid";
 }
 
 const MINUTE = 60;
@@ -148,6 +148,12 @@ export const RATE_LIMITS = {
   // Messaging: 20 messages per minute; new conversations 50 per day, 10 for accounts under 7 days;
   // Turnstile on the first message of every conversation. Open: a Valkey outage never blocks a reply.
   "message.send.uid": { points: 20, duration: MINUTE, policy: "open", key: "uid" },
+  // Every send costs 2-3 writes of the shared 20 000/day Firestore quota (audit D1a-01): besides the
+  // burst above, 120 per hour and 400 per day per account, and 60 per hour per account and thread
+  // (key `${uid}:${cid}`), checked together in handlers.ts before the quota gate.
+  "message.send.hour.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
+  "message.send.day.uid": { points: 400, duration: DAY, policy: "open", key: "uid" },
+  "message.send.thread": { points: 60, duration: HOUR, policy: "open", key: "uid+cid" },
   "conversation.new.uid": { points: 50, duration: DAY, policy: "open", key: "uid" },
   "conversation.new.young.uid": { points: 10, duration: DAY, policy: "open", key: "uid" },
   // Read, archive, hide, block calls of the inbox, and the unread badge.
@@ -162,6 +168,10 @@ export const RATE_LIMITS = {
   "report.p0.uid": { points: 3, duration: DAY, policy: "open", key: "uid" },
   "report.p0.device": { points: 2, duration: DAY, policy: "open", key: "device" },
   "report.p0.ip": { points: 5, duration: DAY, policy: "open", key: "ip" },
+  // Acknowledgement mail of a notice (art. 16(4)): 2 per day per normalized e-mail, whoever typed it
+  // (an anonymous reporter may type a stranger's address, audit D1a-04); the report id is on screen,
+  // the mail is a courtesy (bulk priority). Closed: without the store no acknowledgement leaves.
+  "report.ack.email": { points: 2, duration: DAY, policy: "closed", key: "email" },
   // Appeals (art. 20): signed-in and signed-link routes.
   "appeal.uid": { points: 10, duration: DAY, policy: "closed", key: "uid" },
   "appeal.link.ip": { points: 30, duration: HOUR, policy: "closed", key: "ip" },

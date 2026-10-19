@@ -5,8 +5,8 @@ import { logger } from "@/lib/logging/logger";
 import { consume } from "@/lib/quota";
 
 // Firestore `config/ai` over the defaults (src/config/ai.ts), cached 5 minutes in memory: models,
-// prices, D20 thresholds, fallback settings. The shared loader of config/ai (the reports lot keeps
-// its own copy until integration).
+// prices, D20 thresholds, fallback settings. The only loader of config/ai (the agent and the
+// reports lot both read it here).
 
 const TTL_MS = 5 * 60 * 1000;
 let cache: { value: AiConfig; expires: number } | undefined;

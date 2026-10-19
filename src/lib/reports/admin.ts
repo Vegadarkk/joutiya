@@ -6,7 +6,7 @@ import { getListing } from "@/lib/db/repositories/listings";
 import { listDecisionsForUser, type ModerationDecisionRecord } from "@/lib/db/repositories/moderation-decisions";
 import { getUserRecord } from "@/lib/db/repositories/profiles";
 import { timestampsToDates } from "@/lib/db/repositories/timestamps";
-import { aiDecisionSchema, COLLECTIONS, messageEvidenceSchema, moderationDecisionSchema, STRONG_SIGNALS, type AiDecisionDoc } from "@/lib/db/schemas";
+import { aiDecisionSchema, COLLECTIONS, HIDE_SIGNALS, messageEvidenceSchema, moderationDecisionSchema, type AiDecisionDoc, type HideSignal } from "@/lib/db/schemas";
 import { db } from "@/lib/firebase/admin";
 import { HttpError } from "@/lib/http/errors";
 import { consume } from "@/lib/quota";
@@ -196,7 +196,7 @@ export type TargetSnapshot =
       price: number | null;
       isDonation: boolean;
       photos: { id: string; variants: string[] | null }[];
-      moderation: { state: string; score: number; flags: string[]; openReports: number; hiddenBy: { reportId: string; signal: StrongSignal; at: string } | null };
+      moderation: { state: string; score: number; flags: string[]; openReports: number; hiddenBy: { reportId: string; signal: HideSignal; at: string } | null };
       adsEligible: boolean;
       publishedAt: string | null;
     }
@@ -340,7 +340,7 @@ async function ownerSummary(uid: string): Promise<OwnerSummary | null> {
   };
 }
 
-const isSignal = (value: unknown): value is StrongSignal => typeof value === "string" && (STRONG_SIGNALS as readonly string[]).includes(value);
+const isSignal = (value: unknown): value is HideSignal => typeof value === "string" && (HIDE_SIGNALS as readonly string[]).includes(value);
 
 async function messageSnapshot(id: string, staff: StaffContext, identity: RequestIdentity | undefined, now: Date): Promise<TargetSnapshot> {
   const ids = splitMessageId(id);

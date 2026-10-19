@@ -11,7 +11,7 @@ import { parseTargetKey } from "@/lib/reports/target-key";
 import { verifyAppealToken } from "./appeal-token";
 import { APPEAL_SLA_DAYS, type AppealQueueItem, type AppealQueueResponse, type AppealableDecision, type OpenAppealResponse, type ReviewAppealRequest, type ReviewAppealResponse } from "./contracts";
 import { decide, type DecisionActor, type DecisionTarget } from "./decide";
-import { appealProposalId, requestAppealReview } from "./hooks";
+import { appealProposal, markAiDecision, requestAppealReview, type AiReviewOutcome } from "./hooks";
 import { appellantAddress, sendAppealOutcome, sendAppealReceived } from "./notify";
 import { decisionFromSnapshot, decisionRef, decisionsCol, getDecision, getDecisionTx, getReports, type DecisionRecord, type OpenReport } from "./repository";
 import { appealRefusal, appealableView } from "./views";
@@ -19,8 +19,10 @@ import { appealRefusal, appealableView } from "./views";
 // Appeals (art. 20 DSA, design D16): one per decision, within 6 months, stored on the decision.
 // The affected user appeals a restrictive measure (signed in, suspended accounts included, or by
 // the signed link for a banned account); a notifier appeals the dismissal of their notice (signed
-// in, or by the link of the outcome mail). Another moderator than the one who decided reviews it:
-// upheld (mail) or reversed (a new decision superseding it, see decide()).
+// in, or by the link of the outcome mail). Another moderator than the one who decided reviews it,
+// or an admin (his own decisions included, audited as a self-review: owner decision, audit D1a-05):
+// upheld (mail) or reversed (a new decision superseding it, see decide()). The agent's appeal_review
+// proposal is marked by the outcome (D1b-08).
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const APPEAL_QUEUE_LIMIT = 50;
@@ -151,8 +153,18 @@ function decodeCursor(value: string): QueueCursor | null {
   return match?.[1] && match[2] ? { openedAt: Number(match[1]), id: match[2] } : null;
 }
 
+export interface Reviewer {
+  uid: string;
+  role: "moderator" | "admin";
+}
+
+/** A moderator never reviews his own decision; an admin reviews every appeal (D16). */
+export function canReview(record: Pick<DecisionRecord, "decidedBy">, reviewer: Reviewer): boolean {
+  return reviewer.role === "admin" || record.decidedBy !== reviewer.uid;
+}
+
 /** Open appeals, oldest first (index appeal.status asc, appeal.openedAt asc). */
-export async function appealQueue(reviewerUid: string, input: { limit?: number; after?: string } = {}, now = new Date()): Promise<AppealQueueResponse> {
+export async function appealQueue(reviewer: Reviewer, input: { limit?: number; after?: string } = {}, now = new Date()): Promise<AppealQueueResponse> {
   const limit = Math.min(Math.max(input.limit ?? APPEAL_QUEUE_LIMIT, 1), 100);
   let query = decisionsCol().where("appeal.status", "==", "open").orderBy("appeal.openedAt", "asc").orderBy("__name__", "asc");
   if (input.after) {
@@ -164,7 +176,7 @@ export async function appealQueue(reviewerUid: string, input: { limit?: number; 
   void consume("firestore.reads", Math.max(1, snapshot.size));
   const records = snapshot.docs.map(decisionFromSnapshot).filter((record): record is DecisionRecord => record?.appeal !== undefined);
   const page = records.slice(0, limit);
-  const proposals = new Map(await Promise.all(page.map(async (record) => [record.id, await appealProposalId(record.id)] as const)));
+  const proposals = new Map(await Promise.all(page.map(async (record) => [record.id, await appealProposal(record.id)] as const)));
   const items: AppealQueueItem[] = page.map((record) => {
     const appeal = record.appeal as NonNullable<DecisionRecord["appeal"]>;
     return {
@@ -178,8 +190,8 @@ export async function appealQueue(reviewerUid: string, input: { limit?: number; 
       slaDueAt: appeal.slaDueAt?.toISOString() ?? null,
       overdue: appeal.slaDueAt !== undefined && appeal.slaDueAt.getTime() < now.getTime(),
       decidedBy: record.decidedBy,
-      reviewable: record.decidedBy !== reviewerUid,
-      aiDecisionId: proposals.get(record.id) ?? null,
+      reviewable: canReview(record, reviewer),
+      aiDecisionId: proposals.get(record.id)?.id ?? null,
     };
   });
   const last = page[page.length - 1];
@@ -195,7 +207,7 @@ function decisionTarget(record: DecisionRecord): DecisionTarget {
 }
 
 /** Upheld: the appeal closes, the decision stands. */
-async function uphold(record: DecisionRecord, reviewerUid: string, note: string, now: Date): Promise<void> {
+async function uphold(record: DecisionRecord, reviewerUid: string, note: string, now: Date, selfReview: boolean): Promise<void> {
   await db().runTransaction(async (tx) => {
     const current = await getDecisionTx(tx, record.id);
     if (!current?.appeal || current.appeal.status !== "open") throw new HttpError(409, "conflict", "the appeal is not open any more");
@@ -203,6 +215,7 @@ async function uphold(record: DecisionRecord, reviewerUid: string, note: string,
       "appeal.status": "upheld",
       "appeal.closedAt": Timestamp.fromDate(now),
       "appeal.reviewer": reviewerUid,
+      ...(selfReview ? { "appeal.selfReview": true } : {}),
       "appeal.note": note,
     });
     void consume("firestore.writes", 1);
@@ -210,21 +223,40 @@ async function uphold(record: DecisionRecord, reviewerUid: string, note: string,
 }
 
 /**
+ * The agent's verdict on the appeal (approve = reverse, reject = uphold) read against the
+ * reviewer's: confirmed when they agree, rejected when they do not; an "escalate"/"hold" proposal
+ * took no side and stays as it is. The reviewer's own verdict (`input.ai`) wins when given.
+ */
+async function proposalReview(record: DecisionRecord, input: ReviewAppealRequest): Promise<{ decisionId: string; outcome: AiReviewOutcome } | null> {
+  if (input.ai) return input.ai;
+  const proposal = await appealProposal(record.id);
+  if (!proposal) return null;
+  const agent = proposal.action === "approve" ? "reversed" : proposal.action === "reject" ? "upheld" : null;
+  if (!agent) return null;
+  return { decisionId: proposal.id, outcome: agent === input.outcome ? "confirmed" : "rejected" };
+}
+
+/**
  * POST /api/admin/appeals/{decisionId}: the review by another moderator (403 `same_reviewer` for
- * the one who decided). A restrictive decision reversed: `appeal.reversed` restores the content,
- * lifts the sanction and takes a strike off. A dismissal reversed (a notifier's appeal): the
- * measure of `templateId` is taken now, and the original reports are marked founded.
+ * the moderator who decided), or by an admin, his own decisions included: such a self-review is
+ * recorded on the appeal and audited (`appeal.self_review`: who, when, the decision, the outcome).
+ * A restrictive decision reversed: `appeal.reversed` restores the content, lifts the sanction and
+ * takes a strike off. A dismissal reversed (a notifier's appeal): the measure of `templateId` is
+ * taken now, and the original reports are marked founded. The agent's proposal, if any, is marked.
  */
 export async function reviewAppeal(actor: DecisionActor & { role: "moderator" | "admin" }, decisionId: string, input: ReviewAppealRequest, options: { now?: Date; ip?: string } = {}): Promise<ReviewAppealResponse> {
   const now = options.now ?? new Date();
   const record = await getDecision(decisionId);
   if (!record) throw notFound();
   if (!record.appeal || record.appeal.status !== "open") throw new HttpError(409, "conflict", "no open appeal on this decision");
-  if (record.decidedBy === actor.uid) throw new HttpError(403, "same_reviewer");
+  if (!canReview(record, actor)) throw new HttpError(403, "same_reviewer");
+  const selfReview = record.decidedBy === actor.uid;
+  const ai = await proposalReview(record, input);
 
   let outcomeDecisionId: string | null = null;
   if (input.outcome === "upheld") {
-    await uphold(record, actor.uid, input.note, now);
+    await uphold(record, actor.uid, input.note, now, selfReview);
+    if (ai) await markAiDecision(ai.decisionId, ai.outcome, actor.uid, record.id);
   } else {
     const target = decisionTarget(record);
     const restrictive = (RESTRICTIVE_ACTIONS as readonly string[]).includes(record.action) || record.action === "demote";
@@ -233,10 +265,11 @@ export async function reviewAppeal(actor: DecisionActor & { role: "moderator" | 
     const templateId = restrictive ? "appeal.reversed" : (input.templateId as string);
     const template = decisionTemplate(templateId);
     if (!template?.targets.includes(target.type)) throw new HttpError(400, "invalid_body", undefined, { details: [{ path: "templateId", code: "invalid_for_target" }] });
+    // decide() links the new decision to the proposal (aiDecisionId) and marks it with that decision's id.
     const result = await decide(
       actor,
-      { target, templateId, ...(input.details ? { details: input.details } : {}), ...(input.sanction ? { sanction: input.sanction } : {}) },
-      { now, ...(options.ip ? { ip: options.ip } : {}), reversal: { decisionId: record.id, note: input.note }, ...(restrictive ? {} : { referenceReportIds: record.reportIds }) },
+      { target, templateId, ...(input.details ? { details: input.details } : {}), ...(input.sanction ? { sanction: input.sanction } : {}), ...(ai ? { ai } : {}) },
+      { now, ...(options.ip ? { ip: options.ip } : {}), reversal: { decisionId: record.id, note: input.note, selfReview }, ...(restrictive ? {} : { referenceReportIds: record.reportIds }) },
     );
     outcomeDecisionId = result.decisionId;
   }
@@ -256,9 +289,23 @@ export async function reviewAppeal(actor: DecisionActor & { role: "moderator" | 
     action: `appeal.${input.outcome}`,
     target: { type: "decision", id: record.id },
     automated: false,
-    reason: `${record.action} on ${record.target.type}${outcomeDecisionId ? `; decision ${outcomeDecisionId}` : ""}`,
+    reason: `${record.action} on ${record.target.type}${outcomeDecisionId ? `; decision ${outcomeDecisionId}` : ""}${selfReview ? "; self-review" : ""}`,
     ...(options.ip ? { ip: options.ip } : {}),
     at: now,
   });
+  if (selfReview) {
+    // Owner decision (audit D1a-05): an admin may review an appeal against his own decision; each
+    // such review is its own audit entry (who, when, the original decision, the outcome).
+    await audit({
+      actorUid: actor.uid,
+      actorRole: actor.role,
+      action: "appeal.self_review",
+      target: { type: "decision", id: record.id },
+      automated: false,
+      reason: `outcome ${input.outcome}; decided and reviewed by the same admin${outcomeDecisionId ? `; decision ${outcomeDecisionId}` : ""}`,
+      ...(options.ip ? { ip: options.ip } : {}),
+      at: now,
+    });
+  }
   return { decisionId: record.id, outcome: input.outcome, outcomeDecisionId };
 }

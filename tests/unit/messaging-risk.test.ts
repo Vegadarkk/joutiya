@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CONTACT_APP_KEYWORDS, PAYMENT_KEYWORDS } from "@/config/payment-keywords";
-import { URL_MARKER, sendMessageSchema } from "@/lib/contracts/messaging";
+import { URL_MARKER, sendMessageSchema, stripFormatCharacters } from "@/lib/contracts/messaging";
 import { analyzeMessage, findLinks, isOwnLink, linkHost, maskLinks, messagePreview } from "@/lib/messaging/risk";
 import { tokenize } from "@/lib/text/normalize";
 
@@ -125,5 +125,28 @@ describe("message text contract", () => {
     expect(sendMessageSchema.safeParse({ text: `x ${URL_MARKER}` }).success).toBe(false);
     expect(sendMessageSchema.safeParse({ text: "a\u0000b" }).success).toBe(false);
     expect(sendMessageSchema.safeParse({ text: "ligne 1\nligne 2" }).success).toBe(true);
+  });
+
+  // Audit D1a-11: format characters (Cf) are dropped before validation and analysis.
+  describe("format characters", () => {
+    const parse = (text: string) => sendMessageSchema.parse({ text }).text;
+
+    it("strips zero-width, bidi, soft hyphen and BOM characters, keeps ZWNJ and ZWJ", () => {
+      expect(stripFormatCharacters("a​b‎‏c‪‮‬d⁦⁩e﻿­⁠f")).toBe("abcdef");
+      expect(stripFormatCharacters("می‌خواهم")).toBe("می‌خواهم");
+      expect(stripFormatCharacters("👨‍👩‍👧")).toBe("👨‍👩‍👧");
+      expect(parse("‎ Salam ‬")).toBe("Salam");
+      expect(sendMessageSchema.safeParse({ text: "​﻿" }).success).toBe(false);
+      expect(sendMessageSchema.safeParse({ text: `${"x".repeat(2000)}​` }).success).toBe(true);
+    });
+
+    it("keeps a zero-width-split WhatsApp mention, an RTL-override IBAN and a split domain detectable", () => {
+      const whatsapp = parse("virement puis on parle sur w​h​a​t​s​a​p​p");
+      expect(analyzeMessage(whatsapp).flags).toEqual(["payment_kw", "contact_with_payment_kw"]);
+      const iban = parse("Mon IBAN ‮FR76 3000​6000 0112 3456 7890 189‬");
+      expect(analyzeMessage(iban).flags).toEqual(["iban"]);
+      const url = parse("voir https://evil​.example.com/pay merci");
+      expect(analyzeMessage(url)).toMatchObject({ text: `voir ${URL_MARKER} merci`, flags: ["external_url"], masked: true });
+    });
   });
 });

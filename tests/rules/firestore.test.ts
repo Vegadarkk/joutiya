@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
-import { collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, setDoc, updateDoc, where } from "firebase/firestore";
+import { collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, limit, limitToLast, orderBy, query, setDoc, startAfter, updateDoc, where } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Firestore rules (§6, phase 5 design D2): a member reads his own conversations and their messages
@@ -113,6 +113,27 @@ describe("participants", () => {
     await assertFails(getDocs(collection(db, "conversations/c1/messages")));
     await assertFails(getDocs(query(collection(db, "conversations/c1/messages"), orderBy("createdAt", "desc"), limit(50))));
     await assertFails(getDocs(query(collectionGroup(db, "messages"), where("participants", "array-contains", "alice"))));
+  });
+
+  it("list only with a limit of at most 30 conversations or 50 messages (D2, audit D1a-02)", async () => {
+    const db = member("alice");
+    const conversations = collection(db, "conversations");
+    const messages = collection(db, "conversations/c1/messages");
+    // No limit, or past the page size: denied, however well constrained.
+    await assertFails(getDocs(query(conversations, where("participants", "array-contains", "alice"), orderBy("updatedAt", "desc"))));
+    await assertFails(getDocs(query(conversations, where("participants", "array-contains", "alice"), orderBy("updatedAt", "desc"), limit(31))));
+    await assertFails(getDocs(query(messages, where("participants", "array-contains", "alice"), orderBy("createdAt", "desc"))));
+    await assertFails(getDocs(query(messages, where("participants", "array-contains", "alice"), orderBy("createdAt", "desc"), limit(51))));
+    await assertFails(getDocs(query(messages, where("participants", "array-contains", "alice"), orderBy("createdAt", "desc"), limitToLast(51))));
+    // The page sizes of the listeners and of the older pages (startAfter): allowed.
+    await assertSucceeds(getDocs(query(conversations, where("participants", "array-contains", "alice"), orderBy("updatedAt", "desc"), limit(30))));
+    await assertSucceeds(getDocs(query(messages, where("participants", "array-contains", "alice"), orderBy("createdAt", "desc"), limit(50))));
+    await assertSucceeds(getDocs(query(messages, where("participants", "array-contains", "alice"), orderBy("createdAt", "desc"), startAfter(at("2026-10-16T12:00:00Z")), limit(50))));
+    await assertSucceeds(getDocs(query(messages, where("participants", "array-contains", "alice"), orderBy("createdAt", "desc"), limit(1))));
+    // The shop inbox too.
+    const shop = member("erin", { role: "pro", proId: "shop9" });
+    await assertFails(getDocs(query(collection(shop, "conversations"), where("sellerProId", "==", "shop9"), orderBy("updatedAt", "desc"))));
+    await assertSucceeds(getDocs(shopInbox(shop, "shop9")));
   });
 
   it("never read the evidence of masked or hidden messages", async () => {

@@ -32,11 +32,13 @@ import {
   type ModerationStats,
   type MyDecisionsResponse,
   type OpenAppealResponse,
+  type ResendNoticeResponse,
   type ReviewAppealResponse,
   type StaffConversationView,
   type UserModerationView,
 } from "./contracts";
 import { bulkDismiss, decide, type DecisionActor, type DecisionTarget } from "./decide";
+import { resendDecisionNotice } from "./renotify";
 import { getDecision } from "./repository";
 import { staffConversation } from "./staff-conversations";
 import { moderationStats } from "./stats";
@@ -112,6 +114,14 @@ export async function handleDecisionGet(request: Request, context: Params): Prom
   return json<{ decision: DecisionView }>({ decision: decisionView(record) });
 }
 
+/** POST /api/admin/decisions/{id}/notify: the statement of reasons sent again (audit D1a-08). */
+export async function handleResendNotice(request: Request, context: Params): Promise<Response> {
+  const staff = await requireStaff(request, { mutation: true, ...STAFF });
+  const id = await param(context, "id", docIdSchema);
+  await enforceLimit("moderation.decision.uid", staff.user.uid);
+  return json<ResendNoticeResponse>(await resendDecisionNotice(actorOf(staff), id, { ip: ipOf(request) }));
+}
+
 /** POST /api/admin/decisions/bulk: P3 dismissals of up to 20 targets. */
 export async function handleBulkDismiss(request: Request): Promise<Response> {
   const staff = await requireStaff(request, { mutation: true, ...STAFF });
@@ -130,10 +140,10 @@ export async function handleAppealQueue(request: Request): Promise<Response> {
   const staff = await requireStaff(request, STAFF);
   const query = queryOf(request, appealQueueQuerySchema);
   await enforceLimit("admin.read.uid", staff.user.uid);
-  return json<AppealQueueResponse>(await appealQueue(staff.user.uid, query));
+  return json<AppealQueueResponse>(await appealQueue(actorOf(staff), query));
 }
 
-/** POST /api/admin/appeals/{decisionId}: upheld or reversed by another moderator. */
+/** POST /api/admin/appeals/{decisionId}: upheld or reversed by another moderator, or by an admin. */
 export async function handleReviewAppeal(request: Request, context: Params): Promise<Response> {
   const staff = await requireStaff(request, { mutation: true, ...STAFF });
   const decisionId = await param(context, "decisionId", docIdSchema);

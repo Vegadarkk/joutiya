@@ -5,9 +5,11 @@ import {
   findDuplicate,
   hasAutoSignal,
   hasMultiSignal,
+  isCorroborated,
   p0Alert,
   parisTime,
   priorityRank,
+  raisePriority,
   slaHours,
   strongSignalOf,
   trustedFromFacts,
@@ -75,10 +77,30 @@ describe("hasMultiSignal (D11 multi)", () => {
     expect(hasMultiSignal(candidate, [report("u2", "d2", "ip2", ago(7 * DAY))], NOW)).toBe(true);
   });
 
-  it("treats visitors as distinct only on distinct devices and networks", () => {
+  it("never counts a visitor: the strong signal needs two accounts (audit D1a-03)", () => {
     const visitor = report(undefined, "d1", "ip1", NOW);
-    expect(hasMultiSignal(visitor, [report(undefined, "d2", "ip2")], NOW)).toBe(true);
-    expect(hasMultiSignal(visitor, [report(undefined, "d1", "ip2")], NOW)).toBe(false);
+    expect(hasMultiSignal(visitor, [report(undefined, "d2", "ip2")], NOW)).toBe(false);
+    expect(hasMultiSignal(visitor, [report("u2", "d2", "ip2")], NOW)).toBe(false);
+    expect(hasMultiSignal(candidate, [report(undefined, "d2", "ip2")], NOW)).toBe(false);
+  });
+
+  it("isCorroborated: another reporter on a distinct device and network, visitors included, within 7 days", () => {
+    const visitor = report(undefined, "d1", "ip1", NOW);
+    expect(isCorroborated(visitor, [report(undefined, "d2", "ip2")], NOW)).toBe(true);
+    expect(isCorroborated(visitor, [report("u2", "d2", "ip2")], NOW)).toBe(true);
+    expect(isCorroborated(candidate, [report(undefined, "d2", "ip2")], NOW)).toBe(true);
+    expect(isCorroborated(visitor, [report(undefined, "d1", "ip2")], NOW)).toBe(false);
+    expect(isCorroborated(visitor, [report(undefined, "d2", "ip1")], NOW)).toBe(false);
+    expect(isCorroborated(candidate, [report("u1", "d2", "ip2")], NOW)).toBe(false);
+    expect(isCorroborated(visitor, [report(undefined, "d2", "ip2", ago(8 * DAY))], NOW)).toBe(false);
+    expect(isCorroborated(visitor, [], NOW)).toBe(false);
+  });
+
+  it("raisePriority: one rank more urgent, never to P0", () => {
+    expect(raisePriority("P3")).toBe("P2");
+    expect(raisePriority("P2")).toBe("P1");
+    expect(raisePriority("P1")).toBe("P1");
+    expect(raisePriority("P0")).toBe("P0");
   });
 });
 

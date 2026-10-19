@@ -35,7 +35,7 @@ let reviewer: Staff;
 
 beforeAll(async () => {
   resetServerEnv();
-  setDecisionAiHooks({ requestAppealReview: async () => undefined, markAiDecision: async () => undefined, appealProposalId: async () => null });
+  setDecisionAiHooks({ requestAppealReview: async () => undefined, markAiDecision: async () => undefined, appealProposal: async () => null });
   moderator = await staff("moderator");
   reviewer = await staff("moderator");
 });

@@ -234,6 +234,34 @@ describe("POST /api/conversations/{cid}/messages", () => {
     expectError(await send(seller, cid, "Encore"), 429, "rate_limited");
   });
 
+  it("caps sends per hour, per day and per thread besides the burst (audit D1a-01)", async () => {
+    const { buyer, seller, listingId } = await pair();
+    const { cid } = await startOk(buyer, listingId);
+    await spend("message.send.hour.uid", seller.uid);
+    expectError(await send(seller, cid, "Encore"), 429, "rate_limited");
+    resetRateLimiters();
+    await spend("message.send.day.uid", seller.uid);
+    expectError(await send(seller, cid, "Encore"), 429, "rate_limited");
+    resetRateLimiters();
+    await spend("message.send.thread", `${seller.uid}:${cid}`);
+    expectError(await send(seller, cid, "Encore"), 429, "rate_limited");
+    expect(await conversationDoc(cid)).toMatchObject({ messageCount: 1 });
+    // The per-thread cap is per (account, thread): another thread of the account, and the buyer in this one, still write.
+    const other = await seedListing(seller, { title: "Casque vélo" });
+    const second = await startOk(buyer, other.id);
+    expect((await send(seller, second.cid, "Ici oui")).status).toBe(201);
+    expect((await send(buyer, cid, "Vous êtes là ?")).status).toBe(201);
+    // The first message of a conversation counts on the same limiters, before any read.
+    resetRateLimiters();
+    const third = await seedListing(seller, { title: "Antivol" });
+    await spend("message.send.thread", `${buyer.uid}:${conversationId(third.id, buyer.uid)}`);
+    expectError(await start(buyer, { listingId: third.id, text: "Salam", turnstileToken: "ok" }), 429, "rate_limited");
+    expect(await getConversation(conversationId(third.id, buyer.uid))).toBeNull();
+    resetRateLimiters();
+    await spend("message.send.day.uid", buyer.uid);
+    expectError(await start(buyer, { listingId: third.id, text: "Salam", turnstileToken: "ok" }), 429, "rate_limited");
+  });
+
   it("refuses a suspended sender (403) while he may still read and archive", async () => {
     const { buyer, seller, listingId } = await pair();
     const { cid } = await startOk(buyer, listingId);
@@ -265,6 +293,37 @@ describe("blocking", () => {
     expect((await setState(seller, cid, { blocked: false })).status).toBe(204);
     expect((await conversationDoc(second.cid)).blockedBy).toEqual([]);
     expect((await send(buyer, second.cid, "Merci")).status).toBe(201);
+  });
+
+  it("refuses a send when a block list says so, even with a clean mirror on the conversation (audit D1a-10)", async () => {
+    const { buyer, seller, listingId } = await pair();
+    const { cid } = await startOk(buyer, listingId);
+    await db().collection(COLLECTIONS.userBlocks).doc(seller.uid).set({ uids: [buyer.uid], updatedAt: new Date() });
+    expect((await conversationDoc(cid)).blockedBy).toEqual([]);
+    expectError(await send(buyer, cid, "Pourquoi ?"), 403, "conversation_blocked");
+    expectError(await send(seller, cid, "Moi non plus"), 403, "conversation_blocked");
+    expectError(await start(buyer, { listingId, text: "Encore ?", turnstileToken: "ok" }), 403, "conversation_blocked");
+    expect(await conversationDoc(cid)).toMatchObject({ messageCount: 1, blockedBy: [] });
+    await db().collection(COLLECTIONS.userBlocks).doc(seller.uid).delete();
+    expect((await send(buyer, cid, "Merci")).status).toBe(201);
+  });
+
+  it("mirrors a block on every conversation of the pair, beyond one page of 100 (audit D1a-10)", async () => {
+    const { buyer, seller, listingId } = await pair();
+    const { cid } = await startOk(buyer, listingId);
+    const template = await conversationDoc(cid);
+    const batch = db().batch();
+    for (let index = 0; index < 120; index += 1) {
+      const id = `l${index}${listingId}`;
+      batch.set(db().collection(COLLECTIONS.conversations).doc(conversationId(id, buyer.uid)), { ...template, listingId: id });
+    }
+    await batch.commit();
+    const mirrored = () => db().collection(COLLECTIONS.conversations).where("blockedBy", "array-contains", seller.uid).get();
+
+    expect((await setState(seller, cid, { blocked: true })).status).toBe(204);
+    expect((await mirrored()).size).toBe(121);
+    expect((await setState(seller, cid, { blocked: false })).status).toBe(204);
+    expect((await mirrored()).size).toBe(0);
   });
 });
 

@@ -32,10 +32,13 @@ import { listingNotice, member, publishedListing, report, visitor } from "../rep
 let moderator: Staff;
 let reviewer: Staff;
 const requestAppealReview = vi.fn(async () => undefined);
+const markAiDecision = vi.fn(async () => undefined);
+/** The agent's appeal_review proposal on every decision: "reject" = the appeal looks unfounded (uphold). */
+const PROPOSAL_ID = "P".repeat(20);
 
 beforeAll(async () => {
   resetServerEnv();
-  setDecisionAiHooks({ requestAppealReview, markAiDecision: async () => undefined, appealProposalId: async () => "P".repeat(20) });
+  setDecisionAiHooks({ requestAppealReview, markAiDecision, appealProposal: async () => ({ id: PROPOSAL_ID, action: "reject" }) });
   moderator = await staff("moderator");
   reviewer = await staff("moderator");
 });
@@ -43,6 +46,7 @@ beforeAll(async () => {
 beforeEach(() => {
   limiter.resetRateLimiters();
   vi.mocked(sendMail).mockClear();
+  markAiDecision.mockClear();
 });
 
 describe("notifier appeals", () => {
@@ -78,8 +82,10 @@ describe("notifier appeals", () => {
     expect(reviewed.status).toBe(200);
     const removalId = reviewed.body.outcomeDecisionId as string;
     expect(await listing(id)).toMatchObject({ status: "removed" });
-    expect(await decision(removalId)).toMatchObject({ action: "remove", supersedes: decisionId, reportIds: [notice.body.reportId] });
+    expect(await decision(removalId)).toMatchObject({ action: "remove", supersedes: decisionId, reportIds: [notice.body.reportId], aiDecisionId: PROPOSAL_ID });
     expect(await reportStatus(notice.body.reportId)).toMatchObject({ status: "actioned", outcome: "founded", decisionId: removalId });
+    // The agent proposed to uphold: the reversal rejects its proposal, grounded on the new decision (D1b-08).
+    expect(markAiDecision).toHaveBeenCalledWith(PROPOSAL_ID, "rejected", reviewer.uid, removalId);
     expect(mailTo(sendMail, "appealOutcome", reporter.email)?.data).toMatchObject({ outcome: "reversed", by: "reporter" });
     expect(mailTo(sendMail, "decisionNotice", seller.email)?.data).toMatchObject({ decisionId: removalId, action: "remove" });
   });
@@ -106,10 +112,28 @@ describe("notifier appeals", () => {
     expect(upheld.status).toBe(200);
     expect(upheld.body.outcomeDecisionId).toBeNull();
     expect((await decision(decisionId)).appeal).toMatchObject({ status: "upheld", reviewer: reviewer.uid });
+    expect(markAiDecision).toHaveBeenCalledWith(PROPOSAL_ID, "confirmed", reviewer.uid, decisionId);
     expect(await listing(id)).toMatchObject({ status: "published" });
     expect(mailTo(sendMail, "appealOutcome", "visitor.appeal@example.com")?.data).toMatchObject({ outcome: "upheld", by: "reporter", note: "Le modèle existe bien, référence vérifiée." });
     const again = await adminCall(reviewRoute, "POST", `/api/admin/appeals/${decisionId}`, { as: reviewer, params: { decisionId }, body: { outcome: "upheld", note: "Deuxième examen inutile." } });
     expect(again.status).toBe(409);
+  });
+
+  it("marks the proposal with the reviewer's own verdict when the review carries one", async () => {
+    const { id } = await publishedListing();
+    const reporter = await member();
+    expect((await report(listingNotice(id, "duplicate"), { as: reporter })).status).toBe(201);
+    const dismissed = await adminCall<DecideResponse>(decideRoute, "POST", "/api/admin/decisions", { as: moderator, body: { target: `listing:${id}`, templateId: "listing.no_action" } });
+    const decisionId = dismissed.body.decisionId;
+    expect((await publicCall(appealRoute, "POST", "/api/appeals", { as: reporter, body: { decisionId, text: "La même annonce existe déjà trois fois." } })).status).toBe(201);
+    const upheld = await adminCall<ReviewAppealResponse>(reviewRoute, "POST", `/api/admin/appeals/${decisionId}`, {
+      as: reviewer,
+      params: { decisionId },
+      body: { outcome: "upheld", note: "Les annonces visent des objets différents.", ai: { decisionId: "Q".repeat(20), outcome: "edited" } },
+    });
+    expect(upheld.status).toBe(200);
+    expect(markAiDecision).toHaveBeenCalledTimes(1);
+    expect(markAiDecision).toHaveBeenCalledWith("Q".repeat(20), "edited", reviewer.uid, decisionId);
   });
 
   it("refuses expired, forged and foreign tokens", async () => {

@@ -1,15 +1,16 @@
 import "server-only";
-import type { AiTask } from "../types";
+import { createHash } from "node:crypto";
+import { AI_TASKS, type AiTask } from "../types";
 import { PLATFORM_RULES } from "./shared";
 
-// Versioned system prompts (design D19). The version is stored on every aiDecision: bump it with
-// any change of PLATFORM_RULES or of a task text. The user content (masked) goes in the user turn.
+// Versioned system prompts (design D19). The version stored on every aiDecision is
+// `{task}.v{PROMPT_GENERATION}.{8 hex of sha256(systemPrompt)}`: the hash follows every change of
+// PLATFORM_RULES or of a task text (a report-reason label included), so a stored proposal is tied
+// to the exact prompt that produced it (audit D1b-11); the generation is bumped by hand when the
+// meaning of a task changes (v2: user fields in tags + untrusted-content rule, audit D1b-03). The
+// user content (masked) goes in the user turn.
 
-export const PROMPT_VERSIONS: Record<AiTask, string> = {
-  listing_screen: "listing_screen.v1",
-  report_triage: "report_triage.v1",
-  appeal_review: "appeal_review.v1",
-};
+export const PROMPT_GENERATION = 2;
 
 const LISTING_SCREEN = `Task: screen one classified listing (title, description, category, price, city and up to three photos labelled "Image 1:", "Image 2:", ...).
 
@@ -47,3 +48,10 @@ const TASK_TEXT: Record<AiTask, string> = {
 export function systemPrompt(task: AiTask): string {
   return `${PLATFORM_RULES}\n\n${TASK_TEXT[task]}`;
 }
+
+/** `{task}.v{generation}.{sha256 prefix}` of the system prompt text (<= 40 characters, aiDecisions.promptVersion). */
+export function promptVersion(task: AiTask): string {
+  return `${task}.v${PROMPT_GENERATION}.${createHash("sha256").update(systemPrompt(task)).digest("hex").slice(0, 8)}`;
+}
+
+export const PROMPT_VERSIONS: Record<AiTask, string> = Object.fromEntries(AI_TASKS.map((task) => [task, promptVersion(task)])) as Record<AiTask, string>;

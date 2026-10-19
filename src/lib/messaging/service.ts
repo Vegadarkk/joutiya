@@ -21,6 +21,7 @@ import {
   getConversation,
   getParticipantConversation,
   getUserBlocks,
+  isPairBlocked,
   lastMessageOf,
   markConversationRead,
   setPairBlockedBy,
@@ -138,7 +139,7 @@ export async function startConversation(actor: MessagingActor, input: { listingI
 
   const [seller, blocks] = await Promise.all([getUserRecord(listing.ownerUid), getUserBlocks([actor.uid, listing.ownerUid])]);
   if (!seller || SELLER_UNREACHABLE.includes(seller.status)) throw new HttpError(409, "listing_unavailable");
-  if (blocks.get(actor.uid)?.includes(seller.uid) || blocks.get(seller.uid)?.includes(actor.uid)) throw new HttpError(403, "conversation_blocked");
+  if (isPairBlocked(blocks, actor.uid, seller.uid)) throw new HttpError(403, "conversation_blocked");
 
   const message = messageInput(actor.uid, input.text, analysis, now);
   const photo = listing.photos[0];

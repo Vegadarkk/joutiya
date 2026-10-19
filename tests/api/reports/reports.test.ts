@@ -106,7 +106,7 @@ describe("visitor notices", () => {
 
     const mails = capturedMails(sendMailMock).filter((mail) => mail.template === "reportReceived");
     expect(mails).toHaveLength(1);
-    expect(mails[0]).toMatchObject({ to: VISITOR.email, locale: "ar", priority: "transactional", data: { displayName: VISITOR.name, reportId: result.body.reportId, targetType: "listing", reasonId: "scam", slaHours: 24, urgent: false } });
+    expect(mails[0]).toMatchObject({ to: VISITOR.email, locale: "ar", priority: "bulk", data: { displayName: VISITOR.name, reportId: result.body.reportId, targetType: "listing", reasonId: "scam", slaHours: 24, urgent: false } });
     expect(alertMock).not.toHaveBeenCalled();
     // The visitor keeps a device cookie; the Turnstile pass is set for 30 minutes.
     expect(result.response.headers.getSetCookie().some((line) => line.startsWith("__Host-tsv="))).toBe(true);
@@ -157,6 +157,23 @@ describe("visitor notices", () => {
     expect(second.body).toMatchObject({ reportId: first.body.reportId, duplicate: true, priority: "P2" });
     expect(await reportsOn(id)).toHaveLength(1);
     expect((await getListing(id))!.moderation.openReports).toBe(1);
+  });
+
+  it("caps the acknowledgements at 2 per address per day, sent as bulk (audit D1a-04)", async () => {
+    const email = "Cible.Inconnue@example.com";
+    const ids: string[] = [];
+    for (const reasonId of ["scam", "misleading", "spam"]) {
+      const { id } = await publishedListing();
+      const result = await report(listingNotice(id, reasonId, { name: "Anonyme", email: reasonId === "spam" ? email.toLowerCase() : email }), { as: visitor() });
+      expect(result.status).toBe(201);
+      ids.push(result.body.reportId);
+    }
+    const mails = capturedMails(sendMailMock).filter((mail) => mail.template === "reportReceived");
+    expect(mails.map((mail) => (mail.data as { reportId: string }).reportId)).toEqual(ids.slice(0, 2));
+    expect(mails.every((mail) => mail.priority === "bulk")).toBe(true);
+    // The third notice stands and answers with its id: the mail is a courtesy.
+    expect((await getReport(ids[2]!))?.status).toBe("open");
+    expect(limiterCalls().filter((id) => id === "report.ack.email")).toHaveLength(3);
   });
 
   it("counts the visitor limiters: device, IP, and the P0 ones", async () => {

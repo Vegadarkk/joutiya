@@ -183,7 +183,8 @@ export const moderationSchema = z
     /** Russmedia: the advertiser declares being the person concerned, or holding explicit consent. */
     sensitiveDeclaration: z.object({ kind: z.enum(SENSITIVE_DECLARATION_KINDS), at: ts }).strict().optional(),
     openReports: z.number().int().min(0),
-    hiddenBy: z.object({ reportId: z.string().min(1).max(128), signal: z.enum(["trusted", "multi", "auto", "authority"]), at: ts }).strict().optional(),
+    /** Hidden by a report's strong signal (D11) or by a staff `restrict_visibility` decision (D13, `signal: "decision"`, reportId = the decision id when no report). */
+    hiddenBy: z.object({ reportId: z.string().min(1).max(128), signal: z.enum(["trusted", "multi", "auto", "authority", "decision"]), at: ts }).strict().optional(),
     lastDecisionId: z.string().max(128).optional(),
     reviewedBy: z.string().max(128).optional(),
     reviewedAt: ts.optional(),
@@ -382,6 +383,8 @@ export const moderationDecisionSchema = z
         slaDueAt: ts.optional(),
         closedAt: ts.optional(),
         reviewer: z.string().max(128).optional(),
+        /** Reviewed by the admin who took the decision (owner decision, audit D1a-05; audited `appeal.self_review`). Moderators never. */
+        selfReview: z.boolean().optional(),
         note: z.string().max(2000).optional(),
         /** The decision that reversed this one. */
         outcomeDecisionId: z.string().max(128).optional(),
@@ -520,6 +523,9 @@ export type UserBlocksDoc = z.infer<typeof userBlocksSchema>;
 
 export const REPORT_STATUSES = ["open", "in_review", "actioned", "dismissed"] as const;
 export const STRONG_SIGNALS = ["trusted", "multi", "auto", "authority"] as const;
+/** `listing.moderation.hiddenBy.signal`: a strong signal, or "decision" for a staff restriction (D13). */
+export const HIDE_SIGNALS = [...STRONG_SIGNALS, "decision"] as const;
+export type HideSignal = (typeof HIDE_SIGNALS)[number];
 
 /** reports/{id}: notice of art. 16 DSA (D10), kept 5 years. */
 export const reportSchema = z
@@ -578,6 +584,8 @@ export type ReportDoc = z.infer<typeof reportSchema>;
 export const AI_TASKS = ["listing_screen", "report_triage", "appeal_review"] as const;
 export const AI_PROVIDERS = ["anthropic", "workers-ai", "openai", "rules"] as const;
 export const AI_ACTIONS = ["approve", "hold", "reject", "escalate"] as const;
+/** What a triage or appeal proposal says of the report or appeal it is about (src/lib/ai/types.ts). */
+export const AI_VERDICTS = ["founded", "unfounded", "needs_human", "unclear"] as const;
 export const AI_APPLIED = ["auto", "pending", "confirmed", "edited", "rejected"] as const;
 
 /** aiDecisions/{id}: the agent's proposal (Z4); never a sanction by itself. */
@@ -591,6 +599,8 @@ export const aiDecisionSchema = z
     output: z
       .object({
         action: z.enum(AI_ACTIONS),
+        /** report_triage and appeal_review only: the back office reads it instead of `action` (audit D1b-10). */
+        verdict: z.enum(AI_VERDICTS).optional(),
         policy: z.string().max(64),
         severity: z.enum([...REPORT_PRIORITIES, "none"]),
         confidence: z.number().min(0).max(1),

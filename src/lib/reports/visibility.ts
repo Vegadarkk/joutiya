@@ -8,9 +8,9 @@ import { db } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
 import { PUBLIC_STATES } from "@/lib/listings/public";
 import { revalidateListingPaths } from "@/lib/listings/revalidate";
+import { hideMessage, unhideMessage } from "@/lib/messaging";
 import { consume } from "@/lib/quota";
 import { notifySearchIndex } from "@/lib/search/queue";
-import { hideReportedMessage, unhideReportedMessage } from "./messaging-adapter";
 import { listTargetReports } from "./repository";
 import type { StrongSignal } from "./rules";
 import { splitMessageId, type TargetRef } from "./target-key";
@@ -18,7 +18,8 @@ import { splitMessageId, type TargetRef } from "./target-key";
 // Visibility of reported content (design D11, D13). A strong signal hides at once: a listing gets
 // `moderation.hiddenBy` (search outbox + fast lane, ISR revalidation; the public page and the index
 // treat it as unavailable), an account becomes `restricted` and each of its published listings is
-// hidden, a message is replaced by HIDDEN_MARKER (messaging lot). `unhideTarget` undoes it (restore,
+// hidden, a message is replaced by HIDDEN_MARKER (messaging lot's hideMessage; messaging reaches this
+// module only lazily, so the static import makes no cycle). `unhideTarget` undoes it (restore,
 // D13). Every change bumps the listing version: a concurrent owner save then retries instead of
 // writing back a stale `moderation`.
 
@@ -167,7 +168,7 @@ export async function hideTarget(target: TargetRef, signal: StrongSignal, report
       return hideUser(target.id, signal, reportId, now);
     case "message": {
       const ids = splitMessageId(target.id);
-      return ids ? hideReportedMessage(ids.cid, ids.mid, `report:${reportId}`) : false;
+      return ids ? hideMessage(ids.cid, ids.mid, `report:${reportId}`) : false;
     }
     case "pro":
       logger.warn({ target: target.type }, "reports: shop targets cannot be hidden before phase 7");
@@ -187,7 +188,7 @@ export async function unhideTarget(target: TargetRef, now = new Date()): Promise
       return unhideUser(target.id, now);
     case "message": {
       const ids = splitMessageId(target.id);
-      return ids ? unhideReportedMessage(ids.cid, ids.mid) : false;
+      return ids ? unhideMessage(ids.cid, ids.mid) : false;
     }
     case "pro":
       return false;

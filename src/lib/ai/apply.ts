@@ -25,7 +25,9 @@ import type { AiOutput, AiProviderId, AiTask, TaskFacts } from "./types";
 // What the agent may do alone (design D20). Everything else is a proposal shown to a moderator.
 // - A held listing (pending_review) is approved when Claude (never a fallback) proposes "approve"
 //   with confidence >= agent.autoApproveAt (0.9), no moderation flag outside
-//   agent.autoApproveSoftFlags (default none), no open report, nothing prohibited, not hidden.
+//   agent.autoApproveSoftFlags (default none), no open report, nothing prohibited, not hidden, and
+//   no removal decision in its history: a listing a moderator rejected before is held so that a
+//   person reviews it again, whatever the agent thinks of the edited text (audit D1b-02).
 // - A held listing is rejected when Claude proposes "reject" with policy "spam" and confidence >=
 //   agent.autoRejectSpamAt (0.97): automated decision (detection and decision automated, said in
 //   the statement mailed to the seller; the appeal goes to a human).
@@ -50,7 +52,7 @@ export function planApplication(task: AiTask, provider: AiProviderId, output: Ai
   const claude = provider === "anthropic";
   if (facts.status === "pending_review") {
     const softFlags = new Set(config.agent.autoApproveSoftFlags);
-    const clean = facts.flags.every((flag) => softFlags.has(flag)) && facts.openReports === 0 && facts.prohibitedHard.length === 0;
+    const clean = facts.flags.every((flag) => softFlags.has(flag)) && facts.openReports === 0 && facts.prohibitedHard.length === 0 && !facts.previouslyRejected;
     if (claude && output.action === "approve" && output.confidence >= config.agent.autoApproveAt && clean) return { kind: "auto_approve" };
     if (claude && output.action === "reject" && output.policy === "spam" && output.confidence >= config.agent.autoRejectSpamAt) return { kind: "auto_reject_spam" };
     return { kind: "record" };
@@ -96,7 +98,8 @@ function decisionRecord(listing: ListingRecord, kind: "approve" | "reject", inpu
       templateId: approvedAs === "published" ? "listingApproved" : "listingChangesApproved",
     };
   }
-  const reason = REJECT_REASONS.other;
+  // The spam reason of the catalogue (audit D1b-09): the statement and the ground name spam, not "other".
+  const reason = REJECT_REASONS.spam;
   return {
     ...common,
     action: "remove",
@@ -187,7 +190,7 @@ async function notifySeller(listing: ListingRecord, kind: "approve" | "reject", 
       const url = siteUrl(to.locale, listing.slugId ? `annonce/${listing.slugId}` : "mes-annonces");
       await sendMail({ ...base, template: "listingApproved", data: { displayName: to.displayName, title: listing.title, url, expiresAt: (listing.expiresAt ?? listing.updatedAt).toISOString() } });
     } else {
-      const statement = { measure: "reject" as const, facts: rejectStatementFacts("other", SPAM_DETAILS), ground: REJECT_REASONS.other.ground.ref, automated: true, redress };
+      const statement = { measure: "reject" as const, facts: rejectStatementFacts("spam", SPAM_DETAILS), ground: REJECT_REASONS.spam.ground.ref, automated: true, redress };
       await sendMail({ ...base, template: "listingRejected", data: { displayName: to.displayName, title: listing.title, listingId: listing.id, statement } });
     }
   } catch (error) {
@@ -221,7 +224,8 @@ export async function raiseSystemReport(listingId: string, reasonId: ReportReaso
     // Lazy: the reports module reaches back to this one for the triage queue.
     const { createSystemReport } = await import("@/lib/reports");
     const explanation = `Agent de modération (proposition ${aiDecisionId}) : ${output.action}, confiance ${output.confidence.toFixed(2)}. ${output.rationale}`;
-    const result = await createSystemReport({ target: { type: "listing", id: listingId }, reasonId, explanation, source: "system" });
+    // triage: false: the report carries this proposal already; a second Claude call would only repeat it (audit D1b-07).
+    const result = await createSystemReport({ target: { type: "listing", id: listingId }, reasonId, explanation, source: "system", triage: false });
     return { reportId: result.reportId, duplicate: result.duplicate };
   } catch (error) {
     logger.error({ listingId, err: (error as Error).message }, "ai: system report failed");

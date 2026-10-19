@@ -24,6 +24,15 @@ export interface QuotaDefinition {
 
 const GB = 1_000_000_000;
 
+/**
+ * Internal Claude budget per month, in micro-USD (§7, §9 "budget interne réduit en staging"): the
+ * 5 USD Console cap is shared by the organisation, so only production gets it; staging and dev
+ * stop at 1 USD. One image serves staging and production: APP_ENV is read at runtime.
+ */
+export function claudeBudgetMicroUsd(appEnv: string | undefined): number {
+  return appEnv === "prod" ? 5_000_000 : 1_000_000;
+}
+
 export const QUOTAS = {
   "firestore.reads": {
     service: "Firestore (Spark)",
@@ -139,8 +148,8 @@ export const QUOTAS = {
   },
   "claude.budget": {
     service: "Claude API",
-    // 5 USD hard cap in the Console; internal switch at 4 USD (Z4).
-    limit: 5_000_000,
+    // 5 USD hard cap in the Console; internal switch at 80 % (4 USD in prod, 0.80 USD elsewhere, Z4).
+    limit: claudeBudgetMicroUsd(process.env.APP_ENV),
     unit: "usd_micros",
     period: "month",
     resetTimeZone: "UTC",

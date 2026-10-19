@@ -1,7 +1,7 @@
 import "server-only";
 import { REPORT_PRIORITIES, REPORT_REASON_IDS, reportReason } from "@/config/report-reasons";
 import { z } from "@/lib/zod";
-import { AI_ACTIONS, TASK_TARGET, type AiOutput, type AiTask } from "./types";
+import { AI_ACTIONS, TASK_TARGET, type AiAction, type AiOutput, type AiTask, type AiVerdict } from "./types";
 
 // Structured output of the Claude provider (design D19). The JSON schema sent with
 // `output_config.format` may not carry numeric or length bounds, so the model schema has none and
@@ -62,6 +62,25 @@ export function clampOutput(task: AiTask, raw: ModelOutput): AiOutput {
     ...(userMessage ? { userMessage } : {}),
     ...(TEMPLATE_ID.test(templateId) ? { templateId } : {}),
   };
+}
+
+const TRIAGE_VERDICTS: Record<AiAction, AiVerdict> = { reject: "founded", hold: "needs_human", approve: "unfounded", escalate: "unclear" };
+const APPEAL_VERDICTS: Record<AiAction, AiVerdict> = { approve: "founded", hold: "needs_human", reject: "unfounded", escalate: "unclear" };
+
+/**
+ * The task-neutral verdict stored next to `action` (audit D1b-10): what the proposal says of the
+ * report or of the appeal it is about. A screening has none: its action already speaks about the listing.
+ */
+export function verdictOf(task: AiTask, action: AiAction): AiVerdict | undefined {
+  if (task === "report_triage") return TRIAGE_VERDICTS[action];
+  if (task === "appeal_review") return APPEAL_VERDICTS[action];
+  return undefined;
+}
+
+/** `output` with its verdict (every provider's answer, the fallbacks' escalations included). */
+export function withVerdict(task: AiTask, output: AiOutput): AiOutput {
+  const verdict = verdictOf(task, output.action);
+  return verdict ? { ...output, verdict } : output;
 }
 
 /** The neutral "a human decides" proposal of a fallback that found nothing (or of the rules provider). */

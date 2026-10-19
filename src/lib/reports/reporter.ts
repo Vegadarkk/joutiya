@@ -1,5 +1,6 @@
 import "server-only";
 import type { AiConfig } from "@/config/ai";
+import { aiConfig } from "@/lib/ai/config";
 import { audit } from "@/lib/audit";
 import { getUserRecord } from "@/lib/db/repositories/profiles";
 import { datesToTimestamps, timestampsToDates } from "@/lib/db/repositories/timestamps";
@@ -7,7 +8,6 @@ import { COLLECTIONS, userPrivateSchema, type UserPrivateDoc } from "@/lib/db/sc
 import { db } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
 import { consume } from "@/lib/quota";
-import { reportsAiConfig } from "./ai-config";
 import { applyReporterOutcome, trustedFromFacts, type ReporterOutcome, type ReporterStats } from "./rules";
 
 // Reporter accuracy (art. 23 DSA, design D11 "trusted", D15): `users/{uid}/private/account.reporter`
@@ -35,7 +35,7 @@ export async function readPrivateAccount(uid: string): Promise<UserPrivateDoc | 
  * with a verified phone, at least 5 decided reports among its last 10 and at least 80 % founded.
  */
 export async function isTrustedReporter(uid: string, now = new Date(), options: { ai?: AiConfig; account?: UserPrivateDoc | null } = {}): Promise<boolean> {
-  const ai = options.ai ?? (await reportsAiConfig());
+  const ai = options.ai ?? (await aiConfig());
   if (ai.trustedFlaggers.includes(uid)) return true;
   const [user, account] = await Promise.all([getUserRecord(uid), options.account !== undefined ? Promise.resolve(options.account) : readPrivateAccount(uid)]);
   return trustedFromFacts({ user, reporter: account?.reporter ?? null, now });

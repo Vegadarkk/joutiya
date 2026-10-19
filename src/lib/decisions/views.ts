@@ -33,6 +33,7 @@ export function decisionView(record: DecisionRecord): DecisionView {
           slaDueAt: iso(appeal.slaDueAt),
           closedAt: iso(appeal.closedAt),
           reviewer: appeal.reviewer ?? null,
+          selfReview: appeal.selfReview === true,
           note: appeal.note ?? null,
           outcomeDecisionId: appeal.outcomeDecisionId ?? null,
         }

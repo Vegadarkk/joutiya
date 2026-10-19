@@ -13,22 +13,40 @@ import { serverEnv } from "@/lib/env";
 import { HttpError, notFound } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { json, noContent } from "@/lib/http/route";
+import type { RateLimitId } from "@/config/rate-limits";
 import { assertQuotas } from "@/lib/quota/gate";
 import { requestIdentity } from "@/lib/rate-limit/keys";
-import { enforceLimit } from "@/lib/rate-limit/limiter";
+import { assertLimit, consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
 import { verifyTurnstile } from "@/lib/security/turnstile";
+import { conversationId } from "./ids";
 import { MESSAGING_QUOTAS, changeConversationState, readConversation, sendMessage, startConversation, unreadBadge, type MessagingActor } from "./service";
 
 // Route handlers of /api/conversations/** and /api/messages/unread (design D3-D9, §4). Members
 // only (staff accounts never message, D8): Origin + CSRF on every POST. Writing (start, send)
 // refuses a suspended account (403 account_suspended); reading, the read receipt, archive, delete
 // for me and block stay open to it (D9: a suspended user still reads his conversations). Order:
-// guard, body, per-account limiter, quota gate, Turnstile, then the first Firestore read.
+// guard, body, the send limiters, quota gate, Turnstile, then the first Firestore read.
 
 type Params = Promise<Record<string, string | string[] | undefined>>;
 
 /** Large enough for a 2 000-character message in Arabic (UTF-8, JSON escapes) and a Turnstile token. */
 export const MESSAGE_BODY_MAX = 32 * 1024;
+
+/**
+ * The send limiters (D4, audit D1a-01): a burst per minute, an hour and a day per account, and an
+ * hour per account and thread. Consumed together (one round trip), asserted in that order; every
+ * one is open (a Valkey outage never blocks a reply).
+ */
+async function enforceSendLimits(uid: string, cid: string): Promise<void> {
+  const checks: readonly (readonly [RateLimitId, string])[] = [
+    ["message.send.uid", uid],
+    ["message.send.hour.uid", uid],
+    ["message.send.day.uid", uid],
+    ["message.send.thread", `${uid}:${cid}`],
+  ];
+  const outcomes = await Promise.all(checks.map(([id, key]) => consumeLimit(id, key)));
+  checks.forEach(([id], index) => assertLimit(id, outcomes[index]!));
+}
 
 async function cidOf(params: Params): Promise<string> {
   const { cid } = await params;
@@ -43,7 +61,7 @@ const actorOf = (auth: Awaited<ReturnType<typeof requireUser>>): MessagingActor 
 export async function handleStart(request: Request): Promise<Response> {
   const auth = await requireUser(request, { mutation: true });
   const input = await readJson(request, startConversationSchema, MESSAGE_BODY_MAX);
-  await enforceLimit("message.send.uid", auth.user.uid);
+  await enforceSendLimits(auth.user.uid, conversationId(input.listingId, auth.user.uid));
   await assertQuotas(MESSAGING_QUOTAS);
   // Turnstile on every first message (AF §6), before any read: the token is single use.
   const identity = requestIdentity(request.headers);
@@ -58,7 +76,7 @@ export async function handleSend(request: Request, params: Params): Promise<Resp
   const auth = await requireUser(request, { mutation: true });
   const cid = await cidOf(params);
   const input = await readJson(request, sendMessageSchema, MESSAGE_BODY_MAX);
-  await enforceLimit("message.send.uid", auth.user.uid);
+  await enforceSendLimits(auth.user.uid, cid);
   await assertQuotas(MESSAGING_QUOTAS);
   const body: SendMessageResponse = await sendMessage(actorOf(auth), cid, input.text);
   return json(body, { status: 201 });

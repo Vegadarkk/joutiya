@@ -32,7 +32,7 @@ let moderator: Staff;
 
 beforeAll(async () => {
   resetServerEnv();
-  setDecisionAiHooks({ requestAppealReview: async () => undefined, markAiDecision: async () => undefined, appealProposalId: async () => null });
+  setDecisionAiHooks({ requestAppealReview: async () => undefined, markAiDecision: async () => undefined, appealProposal: async () => null });
   moderator = await staff("moderator");
 });
 
@@ -83,7 +83,7 @@ describe("dismissal", () => {
     const restricted = await adminCall<DecideResponse>(decideRoute, "POST", "/api/admin/decisions", { as: moderator, body: { target: `listing:${id}`, templateId: "listing.restrict", details: "Photos sans rapport avec l'objet." } });
     expect(restricted.status).toBe(201);
     const hidden = await listing(id);
-    expect(hidden.moderation.hiddenBy).toMatchObject({ reportId: restricted.body.decisionId, signal: "trusted" });
+    expect(hidden.moderation.hiddenBy).toMatchObject({ reportId: restricted.body.decisionId, signal: "decision" });
     expect(hidden.adsEligible).toBe(false);
     expect((await decision(restricted.body.decisionId)).origin).toBe("own_initiative");
     expect(mailTo(sendMail, "decisionNotice", seller.email)?.data).toMatchObject({ action: "restrict_visibility", source: "own_initiative" });

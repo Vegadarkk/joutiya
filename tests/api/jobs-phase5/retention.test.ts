@@ -11,6 +11,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/search/queue", () => ({ notifySearchIndex: vi.fn(async () => undefined) }));
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 
+import { audit, auditPurgeAt } from "@/lib/audit";
 import { writeUserBlocksCursor } from "@/lib/db/repositories/retention";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { resetServerEnv } from "@/lib/env";
@@ -69,6 +70,10 @@ beforeAll(async () => {
   await col(COLLECTIONS.auditLogs).doc(id("audit-kept")).set({ action: "x", at: OLD });
   await col(COLLECTIONS.userBlocks).doc(id("orphan-uid")).set({ uids: ["someone"], updatedAt: OLD });
   await col(COLLECTIONS.userBlocks).doc(liveUid).set({ uids: ["someone"], updatedAt: OLD });
+  // Entries written through audit() carry purgeAt = at + 5 years (audit D1a-06): a six-year-old one goes, a fresh one stays.
+  for (const [name, at] of [["audit-api-old", new Date(NOW.getTime() - 6 * 365 * DAY)], ["audit-api-fresh", NOW]] as const) {
+    await audit({ actorUid: "system", actorRole: "system", action: "retention.test", target: { type: "test", id: id(name) }, automated: true, at });
+  }
   // Start the rotating scan right before this run's documents (others may exist in a shared emulator).
   await writeUserBlocksCursor(RUN);
 
@@ -121,9 +126,14 @@ describe("retention-purge phase 5 on the emulator", () => {
     expect((grounded.get("purgeAt") as Timestamp).toMillis()).toBe(FUTURE.toMillis());
   });
 
-  it("purges auditLogs past purgeAt (older entries without one stay) and userBlocks of purged accounts", async () => {
+  it("purges auditLogs past purgeAt (entries written before phase 5, without one, stay) and userBlocks of purged accounts", async () => {
     expect(await exists(`auditLogs/${id("audit-old")}`)).toBe(false);
     expect(await exists(`auditLogs/${id("audit-kept")}`)).toBe(true);
+    const written = async (name: string) => (await col(COLLECTIONS.auditLogs).where("target.id", "==", id(name)).get()).docs;
+    expect(await written("audit-api-old")).toHaveLength(0);
+    const [fresh] = await written("audit-api-fresh");
+    expect((fresh?.get("purgeAt") as Timestamp).toMillis()).toBe(auditPurgeAt(NOW).getTime());
+    expect(auditPurgeAt(NOW).getUTCFullYear()).toBe(NOW.getUTCFullYear() + 5);
     expect(await exists(`userBlocks/${id("orphan-uid")}`)).toBe(false);
     expect(await exists(`userBlocks/${liveUid}`)).toBe(true);
     expect(result.failed).toBe(0);

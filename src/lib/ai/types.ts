@@ -1,23 +1,28 @@
 import "server-only";
 import type { ReportPriority } from "@/config/report-reasons";
 import type { ModerationFlag } from "@/lib/contracts/listings";
-import { AI_ACTIONS, AI_PROVIDERS, AI_TASKS, type AiDecisionDoc } from "@/lib/db/schemas";
+import { AI_ACTIONS, AI_PROVIDERS, AI_TASKS, AI_VERDICTS, type AiDecisionDoc } from "@/lib/db/schemas";
 
 // The moderation agent (architecture §7 step 6, Z4; design phase-5 D19, D20). Providers receive the
 // masked input only (src/lib/ai/mask.ts) and answer a proposal; the agent never sanctions by itself.
 //
-// Action semantics per task (the prompts say the same):
+// Action semantics per task (the prompts say the same). `action` always speaks about the content:
 // - listing_screen: approve = compliant; hold = a human must look before (or while) it is online;
 //   reject = clear violation; escalate = cannot tell.
 // - report_triage: reject = the report looks founded (remove or restrict the content); approve = the
 //   content looks compliant (dismiss); hold = founded but needs a human sanction choice; escalate = unclear.
 // - appeal_review: approve = the appeal looks founded (reverse); reject = it looks unfounded (uphold);
 //   escalate = unclear. Never applied (D16).
+// Contract for the back office (audit D1b-10): read `output.verdict`, not `output.action`, for a
+// report or an appeal. It says what the agent thinks of that claim: "founded" (triage: remove or
+// restrict; appeal: reverse), "unfounded" (triage: dismiss; appeal: uphold), "needs_human" (the
+// claim looks founded, the measure is a human choice), "unclear". Screening proposals have none.
 
-export { AI_ACTIONS, AI_PROVIDERS, AI_TASKS };
+export { AI_ACTIONS, AI_PROVIDERS, AI_TASKS, AI_VERDICTS };
 export type AiTask = (typeof AI_TASKS)[number];
 export type AiProviderId = (typeof AI_PROVIDERS)[number];
 export type AiAction = (typeof AI_ACTIONS)[number];
+export type AiVerdict = (typeof AI_VERDICTS)[number];
 export type AiOutput = AiDecisionDoc["output"];
 export type AiSeverity = ReportPriority | "none";
 
@@ -52,6 +57,11 @@ export interface ListingFacts {
   openReports: number;
   /** Hard prohibited groups found in the masked text (src/lib/moderation/prohibited.ts). */
   prohibitedHard: string[];
+  /**
+   * A removal decision exists in the listing's history (a moderator's, or the agent's own): a hold
+   * of a listing rejected before exists for a human re-review, never for the agent (audit D1b-02).
+   */
+  previouslyRejected: boolean;
 }
 export interface ReportFacts {
   kind: "report";

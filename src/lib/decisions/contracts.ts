@@ -113,6 +113,8 @@ export interface DecisionView {
     slaDueAt: string | null;
     closedAt: string | null;
     reviewer: string | null;
+    /** Reviewed by the admin who decided (D16). */
+    selfReview: boolean;
     note: string | null;
     outcomeDecisionId: string | null;
   } | null;
@@ -175,10 +177,15 @@ export interface MyDecisionsResponse {
 export const APPEAL_NOTE_MIN = 10;
 export const APPEAL_NOTE_MAX = 2000;
 
+/** The agent's proposal the staff member followed, edited or refused (decisions and appeal reviews). */
+const aiReviewSchema = z.object({ decisionId: docIdSchema, outcome: z.enum(["confirmed", "edited", "rejected"]) }).strict();
+
 /**
- * POST /api/admin/appeals/{decisionId}: the review by another moderator. `reversed` undoes a
- * restrictive decision; reversing a dismissal (a reporter's appeal) needs the template of the
- * measure to take now (`templateId`, `details`).
+ * POST /api/admin/appeals/{decisionId}: the review by another moderator, or by an admin (his own
+ * decisions included). `reversed` undoes a restrictive decision; reversing a dismissal (a reporter's
+ * appeal) needs the template of the measure to take now (`templateId`, `details`). `ai`: the
+ * reviewer's verdict on the agent's appeal_review proposal; without it the proposal is marked
+ * confirmed or rejected from whether its verdict matches the outcome.
  */
 export const reviewAppealSchema = z
   .object({
@@ -187,6 +194,7 @@ export const reviewAppealSchema = z
     templateId: z.enum(DECISION_TEMPLATE_IDS).optional(),
     details: z.string().trim().max(DETAILS_MAX).optional(),
     sanction: sanctionSchema.optional(),
+    ai: aiReviewSchema.optional(),
   })
   .strict()
   .superRefine((input, ctx) => {
@@ -216,7 +224,7 @@ export interface AppealQueueItem {
   slaDueAt: string | null;
   overdue: boolean;
   decidedBy: string;
-  /** False when the reader decided it: another moderator reviews (403 same_reviewer). */
+  /** False when the reader, a moderator, decided it: another moderator reviews (403 same_reviewer). An admin reviews every appeal. */
   reviewable: boolean;
   aiDecisionId: string | null;
 }
@@ -224,6 +232,14 @@ export interface AppealQueueItem {
 export interface AppealQueueResponse {
   items: AppealQueueItem[];
   next: string | null;
+}
+
+/** POST /api/admin/decisions/{id}/notify: the statement of reasons sent again (audit D1a-08). */
+export interface ResendNoticeResponse {
+  decisionId: string;
+  /** False: no recipient (account closed or purged). */
+  sent: boolean;
+  notifiedAt: string | null;
 }
 
 // ---- Authority requests (D17, admin only) ---------------------------------------------------

@@ -111,6 +111,8 @@ export interface ReversalInput {
   decisionId: string;
   /** The reviewer's reasons (appeal.note). */
   note: string;
+  /** The admin who decided reviews his own decision (D16, audit D1a-05): recorded on the appeal. */
+  selfReview?: boolean;
 }
 
 export interface DecideOptions {
@@ -273,7 +275,8 @@ function listingDecision(
   } else if (template.action === "restrict_visibility") {
     if (!RESTRICTABLE.includes(listing.status)) throw conflict(`listing cannot be restricted in ${listing.status}`);
     if (!moderation.hiddenBy) {
-      moderation = { ...moderation, hiddenBy: { reportId: input.closedIds[0] ?? input.decisionId, signal: "trusted", at: now } };
+      // A staff restriction, not a reporter's strong signal (audit D1a-09): the restore logic clears it like any other.
+      moderation = { ...moderation, hiddenBy: { reportId: input.closedIds[0] ?? input.decisionId, signal: "decision", at: now } };
       if (listing.status === "published") search = "delete";
       effect = "restricted";
     }
@@ -491,6 +494,10 @@ async function applyTx(tx: Transaction, run: TxInput): Promise<Committed> {
     ...(input.ai ? { aiDecisionId: input.ai.decisionId } : {}),
     ...(superseded ? { supersedes: superseded.id } : {}),
     now,
+    // notifiedAt is written here, before the mail leaves: sendMail only enqueues the statement on the
+    // BullMQ mail queue (5 attempts, exponential backoff, deferred while the provider is down), so a
+    // transient failure never loses it. The degraded mail quota skips non-security mails for good:
+    // POST /api/admin/decisions/{id}/notify re-sends the statement (renotify.ts, audit D1a-08).
     notified: notify && isRestrictive(template.action),
   };
   const main = createDecisionTx(tx, run.mainRef, mainInput);
@@ -532,6 +539,7 @@ async function applyTx(tx: Transaction, run: TxInput): Promise<Committed> {
       "appeal.status": "reversed",
       "appeal.closedAt": Timestamp.fromDate(now),
       "appeal.reviewer": actor.uid,
+      ...(run.options.reversal.selfReview ? { "appeal.selfReview": true } : {}),
       "appeal.note": run.options.reversal.note.slice(0, 2000),
       "appeal.outcomeDecisionId": mainId,
       supersededBy: mainId,
@@ -606,7 +614,7 @@ async function afterCommit(run: AfterInput): Promise<void> {
     }
   }
 
-  // Mails.
+  // Mails (queued with retries: see the `notified` note in applyTx; a skipped statement is re-sent by renotify.ts).
   const source = committed.main.origin;
   if (committed.main.notifiedAt && isRestrictive(template.action)) {
     const notice: NoticeInput = {
