@@ -111,7 +111,9 @@ describe("expire-listings", () => {
 describe("listing-expiry-reminders", () => {
   it("reminds listings expiring on the UTC day three days ahead, records the cursor, and never twice", async () => {
     await db().collection(COLLECTIONS.system).doc("listingReminders").delete();
+    // Noon UTC, so the re-run an hour later stays on the same UTC day (after 23:00 it would remind the next day's listings).
     const now = new Date();
+    now.setUTCHours(12, 0, 0, 0);
     const window = reminderWindow(now);
     const soon = await publishedListing("Vélo de ville bientôt expiré");
     const notYet = await publishedListing("Vélo de ville expire plus tard");
