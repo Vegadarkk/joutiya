@@ -1,9 +1,10 @@
+import { spawnSync } from "node:child_process";
 import { createVerify, generateKeyPairSync } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import registry from "../../infra/targets.json";
-import { SHAPE, SMALL_SHAPE_CONFIG } from "../../scripts/oracle-vm";
+import { SHAPE, SMALL_SHAPE_CONFIG, consoleCloudInit } from "../../scripts/oracle-vm";
 import plan from "../../workers/vm-launcher/src/launch.json";
 import { launchOnce, signedHeaders, signingString, type Env, type Launch } from "../../workers/vm-launcher/src/lib";
 
@@ -79,5 +80,12 @@ describe("vm-launcher launch.json", () => {
       .replace(/^(SSH|STAGING|PROD)_TUNNEL_TOKEN='none'$/gm, "$1_TUNNEL_TOKEN='__JOUTIYA_$1_TUNNEL_TOKEN__'")
       .replace(/^VM_FILES='[A-Za-z0-9+/=]+'$/m, "VM_FILES='__JOUTIYA_VM_FILES__'");
     expect(template).toBe(readFileSync(new URL("../../infra/vm/bootstrap.sh", import.meta.url), "utf8"));
+  });
+
+  it("gives a VM created in the console the same first boot, small enough for its metadata", () => {
+    const path = new URL("../../workers/vm-launcher/console-cloud-init.sh", import.meta.url);
+    // consoleCloudInit throws past OCI's 32,000 bytes once base64-encoded.
+    expect(readFileSync(path, "utf8")).toBe(consoleCloudInit((file.request.metadata as { user_data: string }).user_data));
+    expect(spawnSync("bash", ["-n", path.pathname]).status).toBe(0);
   });
 });

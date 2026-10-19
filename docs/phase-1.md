@@ -66,6 +66,8 @@ Claude lance `node scripts/oracle-vm.ts create --apply --retry-minutes=4800 --sm
 
 **Lanceur gratuit** (`workers/vm-launcher`, votre choix du 19 octobre) : un Worker Cloudflare envoie la même demande de création chaque minute, hors Claude, donc sans quota consommé ni pause. Il agit sous un utilisateur Oracle dédié, `joutiya-launcher`, qui peut seulement lister et créer des instances dans `joutiya` ; sa clé est générée sur votre PC2 et posée dans Cloudflare par Nav, Claude ne la voit jamais. Il ne lance rien tant qu'une instance existe dans le compartiment. Sa demande (`src/launch.json`, écrite par `node scripts/oracle-vm.ts launcher`) ne contient aucun jeton de tunnel : la VM démarre avec ses tunnels en attente, puis Claude les écrit par Run Command (`node scripts/oracle-vm.ts tunnels --apply`). Une fois la VM configurée, Nav supprime le Worker et l'utilisateur `joutiya-launcher`.
 
+Création à la main dans la console Oracle : même nom `joutiya-vm`, même forme, même sous-réseau, aucune clé SSH, et surtout le script cloud-init `workers/vm-launcher/console-cloud-init.sh` collé en entier (le même démarrage, sans jeton de tunnel). Sans lui, la VM n'a ni agent de Claude ni tunnel.
+
 Oracle peut reprendre une VM gratuite inactive 7 jours de suite (processeur, réseau et mémoire sous 20 %). Le staging et la sonde réduisent ce risque. Ne passez pas en *Pay As You Go* sans en parler dans le projet.
 
 ## 4. Accès de Claude à la VM

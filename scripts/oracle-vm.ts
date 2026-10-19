@@ -514,14 +514,42 @@ async function create(oci: Oci, targets: Targets, compartmentId: string, retryMi
 
 /** Request file of the free launcher Worker, written by `launcher` (no secret: commit it). */
 export const LAUNCHER_FILE = "workers/vm-launcher/src/launch.json";
+/** The same first boot for a joutiya-vm created by hand in the OCI console, also written by `launcher`. */
+export const CONSOLE_CLOUD_INIT_FILE = "workers/vm-launcher/console-cloud-init.sh";
+
+/**
+ * Cloud-init script to paste in the console's form, which base64-encodes it into the metadata: the
+ * plain bootstrap would not fit, so it carries the gzipped user data and unpacks it as root.
+ */
+export function consoleCloudInit(userData: string): string {
+  const text = [
+    "#!/bin/bash",
+    "# First boot of a joutiya-vm created in the OCI console: paste this whole file as its cloud-init",
+    "# script. It runs infra/vm/bootstrap.sh without tunnel tokens, like the launcher Worker (written by",
+    "# `node scripts/oracle-vm.ts launcher`).",
+    "set -euo pipefail",
+    "umask 077",
+    "base64 -d << 'JOUTIYA_BOOTSTRAP' | gunzip > /root/joutiya-bootstrap.sh",
+    ...(userData.match(/.{1,76}/g) ?? []),
+    "JOUTIYA_BOOTSTRAP",
+    "status=0",
+    "bash /root/joutiya-bootstrap.sh || status=$?",
+    "rm -f /root/joutiya-bootstrap.sh",
+    'exit "$status"',
+    "",
+  ].join("\n");
+  const encoded = Math.ceil(Buffer.byteLength(text) / 3) * 4;
+  if (encoded > MAX_METADATA_BYTES) throw new Error(`console cloud-init is ${encoded} bytes once encoded, OCI allows ${MAX_METADATA_BYTES}`);
+  return text;
+}
 
 /**
  * `launcher`: the create request the Worker sends every minute (workers/vm-launcher), with "none"
- * for each tunnel token and both shapes. Read-only on OCI; the file may lag infra/vm, since `sync`
- * brings a new VM up to date anyway.
+ * for each tunnel token and both shapes, plus the same first boot for the console. Read-only on OCI;
+ * the files may lag infra/vm, since `sync` brings a new VM up to date anyway.
  */
 async function launcher(oci: Oci, targets: Targets, compartmentId: string): Promise<void> {
-  const { details } = await launchPlan(oci, targets, compartmentId, await existingSubnet(oci, compartmentId), false);
+  const { userData, details } = await launchPlan(oci, targets, compartmentId, await existingSubnet(oci, compartmentId), false);
   const { shapeConfig: _shape, ...request } = details(shapeForAttempt(1, false));
   const config = {
     tenancy: targets.shared.oracle.tenancyId,
@@ -534,6 +562,9 @@ async function launcher(oci: Oci, targets: Targets, compartmentId: string): Prom
   const text = `${JSON.stringify(config, null, 2)}\n`;
   writeFileSync(join(root, LAUNCHER_FILE), text);
   console.log(`${LAUNCHER_FILE}: ${text.length} bytes, no tunnel token; commit it, then redeploy the Worker`);
+  const script = consoleCloudInit(userData);
+  writeFileSync(join(root, CONSOLE_CLOUD_INIT_FILE), script);
+  console.log(`${CONSOLE_CLOUD_INIT_FILE}: ${script.length} bytes, for a VM created in the console`);
 }
 
 /** Root script of `tunnels`: the three tunnel tokens a VM launched by the Worker lacks, then the SSH tunnel. */
