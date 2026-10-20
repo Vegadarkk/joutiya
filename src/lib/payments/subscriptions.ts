@@ -242,3 +242,30 @@ export async function startGrace(proId: string, now = new Date()): Promise<boole
   }
   return moved;
 }
+
+/**
+ * End of a grace opened by `startGrace` while RevenueCat still shows the plan paid (the nightly job
+ * has checked Stripe still says past due): the shop is downgraded as at expiry and its listings
+ * over the new quota are paused. False when the shop is not in a grace that ended.
+ */
+export async function endGrace(proId: string, now = new Date()): Promise<boolean> {
+  const pricing = await getPricing();
+  const ended = await db().runTransaction(async (tx) => {
+    const profile = await getProProfile(proId, tx);
+    if (!profile || profile.lifecycle !== "grace" || !profile.graceUntil || profile.graceUntil.getTime() > now.getTime()) return null;
+    const { patch } = transition(profile, { type: "grace_ended" }, { now, graceDays: pricing.graceDays });
+    const updated = profileAfter(profile, patch, pricing, now);
+    tx.set(proProfileRef(proId), proProfileToFirestore(updated));
+    return updated;
+  });
+  if (!ended) return false;
+  await audit({ actorUid: "system", actorRole: "system", action: "pro.subscription.grace_ended", target: { type: "pro", id: proId }, automated: true, at: now }).catch((error: unknown) =>
+    logger.error({ proId, err: (error as Error).message }, "pro subscription audit failed"),
+  );
+  try {
+    await pauseListingsOverQuota(ended.ownerUid, ended.quotas.activeListings, now);
+  } catch (error) {
+    logger.error({ proId, err: (error as Error).message }, "quota pause failed");
+  }
+  return true;
+}

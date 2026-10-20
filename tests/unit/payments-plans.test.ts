@@ -2,6 +2,8 @@ import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PRICING, planOfEntitlement, resolvePricingConfig } from "@/config/pricing";
 import { resetServerEnv } from "@/lib/env";
+import { invoiceViews } from "@/lib/payments/invoices";
+import { noticeDue } from "@/lib/payments/launch-offer";
 import { invoiceFields } from "@/lib/payments/plans";
 import { listCustomerSubscriptions, postStripeReceipt, RevenueCatApiError, type RevenueCatSubscription } from "@/lib/payments/revenuecat-api";
 import { formEncode, stripeRequest, StripeApiError, verifyStripeSignature } from "@/lib/payments/stripe-api";
@@ -10,7 +12,8 @@ import type { ProLifecycleView } from "@/lib/pro/lifecycle";
 
 // Pro subscriptions (phase 7 design §7): the plan grid, Stripe's form encoding and webhook
 // signature, the monthly grant slots of a period, RevenueCat's subscription read and the status and
-// lifecycle event each subscription calls for, and the shop identifiers printed on invoices.
+// lifecycle event each subscription calls for, the shop identifiers printed on invoices, the
+// invoices list and the launch offer's notice steps.
 
 const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const at = (iso: string) => new Date(iso);
@@ -253,5 +256,56 @@ describe("invoice identifiers", () => {
       { name: "ICE", value: "001234567000089" },
       { name: "Taxe professionnelle", value: "55" },
     ]);
+  });
+});
+
+describe("invoices list", () => {
+  const invoice = (extra: Record<string, unknown> = {}) => ({
+    id: "in_1Abc",
+    number: "JOUT-0001",
+    created: 1_790_000_000,
+    total: 70_800,
+    currency: "mad",
+    status: "paid",
+    hosted_invoice_url: "https://invoice.stripe.com/i/acct_1/test",
+    invoice_pdf: "https://pay.stripe.com/invoice/acct_1/test/pdf",
+    ...extra,
+  });
+
+  it("shows the sent invoices with Stripe's links only, drafts and unreadable items left out", () => {
+    const views = invoiceViews({
+      data: [invoice(), invoice({ id: "in_2", status: "draft" }), invoice({ id: "in_3", hosted_invoice_url: "https://evil.example/i", invoice_pdf: "http://pay.stripe.com/x" }), { id: "ch_1" }],
+      has_more: false,
+    });
+    expect(views).toEqual([
+      { id: "in_1Abc", number: "JOUT-0001", issuedAt: new Date(1_790_000_000_000).toISOString(), totalMinor: 70_800, currency: "MAD", status: "paid", hostedUrl: "https://invoice.stripe.com/i/acct_1/test", pdfUrl: "https://pay.stripe.com/invoice/acct_1/test/pdf" },
+      { id: "in_3", number: "JOUT-0001", issuedAt: new Date(1_790_000_000_000).toISOString(), totalMinor: 70_800, currency: "MAD", status: "paid", hostedUrl: null, pdfUrl: null },
+    ]);
+    expect(() => invoiceViews({ object: "error" })).toThrow();
+  });
+});
+
+describe("launch offer notices", () => {
+  const offer = { ...DEFAULT_PRICING.launchOffer, endsAt: "2027-03-01T00:00:00.000Z" };
+  const before = (days: number) => new Date(Date.parse(offer.endsAt) - days * 86_400_000);
+
+  it("sends one notice at J-30, J-7 and J-1, none before, after the end or twice", () => {
+    expect(noticeDue({ ...offer, endsAt: null }, undefined, before(10))).toBeNull();
+    expect(noticeDue(offer, undefined, before(31))).toBeNull();
+    expect(noticeDue(offer, undefined, before(30))).toBe(30);
+    expect(noticeDue(offer, before(30), before(20))).toBeNull();
+    expect(noticeDue(offer, before(30), before(6.5))).toBe(7);
+    expect(noticeDue(offer, before(6.5), before(2))).toBeNull();
+    expect(noticeDue(offer, before(6.5), before(0.5))).toBe(1);
+    expect(noticeDue(offer, before(0.5), before(0.1))).toBeNull();
+    expect(noticeDue(offer, undefined, before(0))).toBeNull();
+  });
+
+  it("starts again when the end date moves and keeps to a shorter notice", () => {
+    expect(noticeDue({ ...offer, endsAt: "2027-04-01T00:00:00.000Z" }, before(0.5), before(0.2))).toBeNull();
+    expect(noticeDue({ ...offer, endsAt: "2027-03-20T00:00:00.000Z" }, before(30), before(0.2))).toBe(30);
+    expect(noticeDue({ ...offer, noticeDays: 5 }, undefined, before(6))).toBeNull();
+    expect(noticeDue({ ...offer, noticeDays: 5 }, undefined, before(4))).toBe(5);
+    expect(noticeDue({ ...offer, noticeDays: 0 }, undefined, before(0.5))).toBeNull();
   });
 });

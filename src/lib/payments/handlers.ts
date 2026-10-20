@@ -16,6 +16,7 @@ import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 import { buyOption, listingOptions, memberBillingAccount, walletSummary } from "./options";
 import { packsView, startPackCheckout } from "./packs";
+import { shopInvoices } from "./invoices";
 import { openBillingPortal, startPlanCheckout, subscriptionPage } from "./plans";
 import { StripeApiError } from "./stripe-api";
 
@@ -131,6 +132,13 @@ export async function handleSubscription(request: Request): Promise<Response> {
   const body = await subscriptionPage(auth);
   await consumeLimit("wallet.read.uid", auth.user.uid, 1);
   return json(body);
+}
+
+/** GET /api/billing/invoices: one Stripe call per view, under the read limit of the wallet. */
+export async function handleInvoices(request: Request): Promise<Response> {
+  const auth = await requireUser(request);
+  await enforceLimit("wallet.read.uid", auth.user.uid);
+  return json(await viaStripe(() => shopInvoices(auth)));
 }
 
 /** POST /api/billing/checkout: the Stripe Checkout of a plan. */

@@ -9,9 +9,11 @@ import type * as StripeApiModule from "@/lib/payments/stripe-api";
 // (owner only, sales gate, one running plan), the Customer Portal, the Stripe webhook (signature,
 // environment, the receipt handed to RevenueCat, the grace of a failed payment) and the sync from
 // RevenueCat: the plan's lifecycle and quotas, the month's grant reset once per period, the
-// downgrade at expiry that pauses the listings over the quota, which a new plan leaves paused.
+// downgrade at expiry that pauses the listings over the quota, which a new plan leaves paused; the
+// invoices list; the nightly job (re-sync, end of a Stripe grace, end of the launch offer).
 
 const flags = vi.hoisted(() => ({ salesEnabled: true, proSignupEnabled: true, paymentInstallmentsEnabled: false }));
+const offer = vi.hoisted(() => ({ endsAt: null as string | null }));
 const store = vi.hoisted(() => ({ subscriptions: [] as RevenueCatSubscription[] }));
 const stripe = vi.hoisted(() => ({ calls: [] as { method: string; path: string; params: Record<string, unknown>; idempotencyKey?: string }[], subscriptionStatus: "active", sessionStatus: "open" }));
 
@@ -22,7 +24,11 @@ vi.mock("@/lib/config/runtime", async (importOriginal) => {
     essentiel: { ...DEFAULT_PRICING.plans.essentiel, stripePrices: { monthly: "price_EssentielMonthly", yearly: "price_EssentielYearly" } },
     business: { ...DEFAULT_PRICING.plans.business, stripePrices: { monthly: "price_BusinessMonthly", yearly: "price_BusinessYearly" } },
   };
-  return { ...(await importOriginal<typeof RuntimeModule>()), getFlags: vi.fn(async () => ({ ...flags })), getPricing: vi.fn(async () => ({ ...DEFAULT_PRICING, plans })) };
+  return {
+    ...(await importOriginal<typeof RuntimeModule>()),
+    getFlags: vi.fn(async () => ({ ...flags })),
+    getPricing: vi.fn(async () => ({ ...DEFAULT_PRICING, plans, launchOffer: { ...DEFAULT_PRICING.launchOffer, endsAt: offer.endsAt } })),
+  };
 });
 vi.mock("@/lib/payments/revenuecat-api", async (importOriginal) => ({
   ...(await importOriginal<typeof RevenueCatApiModule>()),
@@ -41,6 +47,10 @@ vi.mock("@/lib/payments/stripe-api", async (importOriginal) => ({
     if (path.startsWith("/v1/checkout/sessions/")) return { status: stripe.sessionStatus };
     if (path.startsWith("/v1/subscriptions/")) return { status: stripe.subscriptionStatus };
     if (path === "/v1/billing_portal/sessions") return { url: "https://billing.stripe.com/p/session/test_1" };
+    if (path === "/v1/invoices") {
+      const invoice = { id: "in_Test1", number: "JOUT-0001", created: 1_790_000_000, total: 70_800, currency: "mad", hosted_invoice_url: "https://invoice.stripe.com/i/test", invoice_pdf: "https://pay.stripe.com/invoice/test/pdf" };
+      return { data: [{ ...invoice, status: "paid" }, { ...invoice, id: "in_Draft", status: "draft" }], has_more: false };
+    }
     throw new Error(`unexpected Stripe call ${method} ${path}`);
   }),
 }));
@@ -53,19 +63,21 @@ import { PATCH as patch } from "@/app/api/listings/[id]/route";
 import { POST as publish } from "@/app/api/listings/[id]/publish/route";
 import { POST as resume } from "@/app/api/listings/[id]/resume/route";
 import { POST as checkout } from "@/app/api/billing/checkout/route";
+import { GET as invoices } from "@/app/api/billing/invoices/route";
 import { POST as portal } from "@/app/api/billing/portal/route";
 import { GET as subscriptionPage } from "@/app/api/billing/subscription/route";
 import { POST as rcWebhook } from "@/app/api/webhooks/revenuecat/route";
 import { POST as stripeWebhook } from "@/app/api/webhooks/stripe/route";
 import { DEFAULT_PRICING } from "@/config/pricing";
 import type { CreateListingResponse } from "@/lib/contracts/listings";
-import type { BillingRedirectResponse, SubscriptionResponse } from "@/lib/contracts/payments";
+import type { BillingRedirectResponse, InvoicesResponse, SubscriptionResponse } from "@/lib/contracts/payments";
 import { alert } from "@/lib/alert";
 import { getBillingAccount, getSubscription } from "@/lib/db/repositories/billing";
 import { getListing } from "@/lib/db/repositories/listings";
 import { getProProfile, proProfileRef, proProfileToFirestore } from "@/lib/db/repositories/pro-profiles";
 import { getWallet, ledgerRef, setWallet } from "@/lib/db/repositories/wallets";
 import { resetServerEnv } from "@/lib/env";
+import { sendMail } from "@/lib/mail";
 import { setClaims } from "@/lib/firebase/claims";
 import { createSessionForUid } from "@/lib/firebase/session";
 import { postStripeReceipt } from "@/lib/payments/revenuecat-api";
@@ -73,6 +85,7 @@ import { expectedSignature } from "@/lib/payments/revenuecat-webhook";
 import type { ProProfileDoc } from "@/lib/pro/profile-schema";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { csrfToken } from "@/lib/security/csrf";
+import { proPlansNightly } from "@/worker/jobs/pro-plans";
 import { DAY_MS, api, member, readyPatch, seedReadyUpload, type ErrorBody, type Member } from "../listings/helpers";
 
 const RC_AUTH = "Bearer rc-test-authorization";
@@ -99,6 +112,7 @@ afterAll(() => {
 beforeEach(() => {
   resetRateLimiters();
   flags.salesEnabled = true;
+  offer.endsAt = null;
   store.subscriptions = [];
   stripe.calls = [];
   stripe.subscriptionStatus = "active";
@@ -403,5 +417,82 @@ describe("subscription sync", () => {
     const pack = await stripeDeliver("checkout.session.completed", { id: "cs_1", object: "checkout.session", mode: "payment", customer: "cus_Unknown" });
     expect(pack.status).toBe(200);
     expect(alert).not.toHaveBeenCalled();
+  });
+});
+
+describe("invoices", () => {
+  it("lists the shop's sent invoices to its owner only", async () => {
+    const owner = await member();
+    const proId = await shop(owner);
+    expect((await api<InvoicesResponse>(invoices, "GET", "/api/billing/invoices", { member: owner })).body).toEqual({ invoices: [] });
+    await appUserOf(owner, proId);
+    const listed = await api<InvoicesResponse>(invoices, "GET", "/api/billing/invoices", { member: owner });
+    expect(listed.status).toBe(200);
+    expect(listed.body.invoices.map((invoice) => [invoice.id, invoice.status, invoice.currency])).toEqual([["in_Test1", "paid", "MAD"]]);
+    expect(stripe.calls.at(-1)).toMatchObject({ method: "GET", path: "/v1/invoices", params: { customer: `cus_${proId}`, limit: 24 } });
+    const individual = await member();
+    expect((await api<ErrorBody>(invoices, "GET", "/api/billing/invoices", { member: individual })).status).toBe(404);
+  });
+});
+
+describe("nightly plans job", () => {
+  const mailsTo = (owner: Member) => vi.mocked(sendMail).mock.calls.map(([mail]) => mail).filter((mail) => mail.to === owner.email);
+
+  it("keeps a Stripe grace while the payment is due, ends it at its date and re-activates a fixed payment", async () => {
+    const owner = await member();
+    const listingId = await published(owner);
+    const proId = await shop(owner);
+    const appUserId = await appUserOf(owner, proId, "essentiel");
+    store.subscriptions = [rcSubscription({ entitlements: ["essentiel"] })];
+    await rcDeliver("INITIAL_PURCHASE", appUserId);
+    stripe.subscriptionStatus = "past_due";
+    expect((await stripeDeliver("invoice.payment_failed", { id: "in_1", object: "invoice", customer: `cus_${proId}`, subscription: "sub_Stripe1" })).status).toBe(200);
+    expect((await getProProfile(proId))?.lifecycle).toBe("grace");
+
+    // RevenueCat still shows the plan paid: the night does not undo the grace.
+    await proPlansNightly();
+    expect((await getProProfile(proId))?.lifecycle).toBe("grace");
+
+    // Past its date, the grace ends as an expiry would.
+    await proProfileRef(proId).update({ graceUntil: new Date(Date.now() - 60_000) });
+    expect((await proPlansNightly()).graceEnded).toBeGreaterThanOrEqual(1);
+    expect(await getProProfile(proId)).toMatchObject({ lifecycle: "downgraded", plan: "none", planSource: "none" });
+    expect(await getListing(listingId)).toMatchObject({ status: "paused", pausedReason: "quota" });
+    await proPlansNightly();
+    expect((await getProProfile(proId))?.lifecycle).toBe("downgraded");
+
+    // The payment went through: the next sync brings the plan back.
+    stripe.subscriptionStatus = "active";
+    await proPlansNightly();
+    expect(await getProProfile(proId)).toMatchObject({ lifecycle: "active", plan: "essentiel", planSource: "subscription" });
+  });
+
+  it("mails the launch offer's notices once per step, then downgrades the shops still on it", async () => {
+    const owner = await member();
+    const listingId = await published(owner);
+    const proId = await shop(owner);
+    vi.mocked(sendMail).mockClear();
+    const endsAt = Date.now() + 20 * DAY_MS;
+    offer.endsAt = new Date(endsAt).toISOString();
+
+    // Sales still closed: the end date waits.
+    flags.salesEnabled = false;
+    expect((await proPlansNightly()).launchOffer).toEqual({ noticed: 0, ended: 0, failed: 0 });
+    flags.salesEnabled = true;
+
+    await proPlansNightly();
+    expect(mailsTo(owner)).toMatchObject([{ template: "launchOfferNotice", data: { kind: "ending", plan: "essentiel", shopName: "Atlas Auto", endsAt: offer.endsAt, freeListings: 0 } }]);
+    expect((await getProProfile(proId))?.launchOfferNoticeSentAt).toBeInstanceOf(Date);
+    await proPlansNightly();
+    expect(mailsTo(owner)).toHaveLength(1);
+    await proPlansNightly(new Date(endsAt - 6 * DAY_MS));
+    expect(mailsTo(owner)).toHaveLength(2);
+
+    await proPlansNightly(new Date(endsAt + 60_000));
+    expect(await getProProfile(proId)).toMatchObject({ lifecycle: "downgraded", plan: "none", planSource: "none", quotas: DEFAULT_PRICING.pro.none });
+    expect(await getListing(listingId)).toMatchObject({ status: "paused", pausedReason: "quota" });
+    expect(mailsTo(owner).at(-1)).toMatchObject({ template: "launchOfferNotice", data: { kind: "ended", paused: 1 } });
+    await proPlansNightly(new Date(endsAt + 120_000));
+    expect(mailsTo(owner)).toHaveLength(3);
   });
 });

@@ -197,7 +197,8 @@ export async function openBillingPortal(auth: AuthContext, locale: Locale): Prom
   await ownProfile(auth, proId);
   const account = await getBillingAccount(accountId);
   if (!account?.stripeCustomerId) throw new HttpError(409, "no_billing_customer");
-  const session = await stripeRequest<{ url?: string | null }>("POST", "/v1/billing_portal/sessions", { customer: account.stripeCustomerId, return_url: pageUrl(locale), locale: "fr" });
+  const configuration = (await getPricing()).plans.stripePortalConfiguration;
+  const session = await stripeRequest<{ url?: string | null }>("POST", "/v1/billing_portal/sessions", { customer: account.stripeCustomerId, return_url: pageUrl(locale), locale: "fr", ...(configuration ? { configuration } : {}) });
   if (!session.url?.startsWith("https://billing.stripe.com/")) throw new HttpError(502, "unavailable", "Stripe answered an unexpected portal URL");
   return { url: session.url };
 }

@@ -2709,6 +2709,7 @@
       "perDayUnlimited": "Nouvelles annonces sans limite par jour",
       "photos": "Jusqu'à {count} photos par annonce",
       "storefront": "Voir ma vitrine",
+      "subscription": "Mon abonnement",
       "myListings": "Mes annonces",
       "newListing": "Déposer une annonce",
       "signInAgain": "Votre compte vient de passer Pro : reconnectez-vous pour publier en tant que professionnel.",
@@ -3184,6 +3185,130 @@
       "turnstile_failed": "La vérification anti-robot a échoué. Réessayez.",
       "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard."
     }
+  },
+  "Subscription": {
+    "metaTitle": "Mon abonnement",
+    "back": "Espace Pro",
+    "title": "Mon abonnement",
+    "lead": "Choisissez l'offre de votre boutique et gérez son paiement.",
+    "loading": "Chargement de votre abonnement",
+    "failed": "Votre abonnement n'a pas pu être chargé.",
+    "retry": "Réessayer",
+    "current": {
+      "title": "Votre offre",
+      "none": "Aucune offre",
+      "launchOffer": "Essentiel offert",
+      "launchOfferBody": "Offerte jusqu'à l'ouverture des ventes. Vous serez prévenu {days} jours avant la fin.",
+      "launchOfferEnds": "Offerte jusqu'au {date}. Abonnez-vous avant cette date pour garder vos annonces en ligne.",
+      "monthly": "Paiement mensuel",
+      "yearly": "Paiement annuel",
+      "renews": "Prochain paiement le {date}",
+      "ends": "Se termine le {date}, sans renouvellement",
+      "manage": "Gérer l'abonnement",
+      "manageHint": "Changez d'offre ou de carte, ou résiliez, sur la page sécurisée de Stripe.",
+      "invoices": "Mes factures"
+    },
+    "status": {
+      "active": "Active",
+      "cancelled": "Résiliée",
+      "grace": "Paiement à régulariser",
+      "billing_issue": "Paiement à régulariser",
+      "expired": "Terminée"
+    },
+    "grace": {
+      "title": "Le dernier paiement a échoué",
+      "body": "Mettez à jour votre carte avant le {date} pour garder votre offre. Après cette date, les annonces au-delà du quota seront mises en pause."
+    },
+    "downgraded": {
+      "title": "Votre boutique n'a plus d'offre",
+      "body": "Vos annonces au-delà du quota sont en pause. Elles reviennent en ligne dès que vous reprenez une offre."
+    },
+    "success": {
+      "title": "Paiement reçu",
+      "pending": "Votre offre s'active dans quelques instants.",
+      "slow": "L'activation prend plus de temps que prévu. Rechargez la page dans quelques minutes.",
+      "done": "Votre offre est active."
+    },
+    "closed": "Les abonnements ouvriront prochainement. Votre offre Essentiel reste offerte d'ici là.",
+    "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard.",
+    "suspended": "Votre boutique est suspendue : son offre ne peut pas changer pour le moment.",
+    "offers": "Les offres",
+    "interval": {
+      "legend": "Rythme de paiement",
+      "monthly": "Mensuel",
+      "yearly": "Annuel",
+      "yearlyHint": "2 mois offerts"
+    },
+    "price": {
+      "monthly": "<n>{amount, number}</n> MAD HT par mois",
+      "yearly": "<n>{amount, number}</n> MAD HT par an"
+    },
+    "perMonth": "Soit {amount, number, ::.00} MAD HT par mois",
+    "features": {
+      "listings": "{count, plural, one {# annonce en ligne} other {# annonces en ligne}}",
+      "unlimited": "Annonces en ligne sans limite",
+      "perDay": "{count, plural, one {# nouvelle annonce par jour} other {# nouvelles annonces par jour}}",
+      "credits": "{count, plural, one {# crédit offert chaque mois} other {# crédits offerts chaque mois}}",
+      "featured": "{count, plural, one {# « À la Une » de 7 jours chaque mois} other {# « À la Une » de 7 jours chaque mois}}",
+      "noCredits": "Pas de crédits mensuels",
+      "noFeatured": "Pas de « À la Une » inclus",
+      "storefront": "Vitrine de la boutique et badge Pro"
+    },
+    "yours": "Votre offre",
+    "notesTitle": "Avant de vous abonner",
+    "notes": {
+      "stripe": "Le paiement se fait par carte sur la page sécurisée de Stripe, en français. La TVA s'ajoute aux prix HT et figure sur chaque facture.",
+      "renewal": "L'abonnement se renouvelle automatiquement. Vous pouvez le résilier à tout moment : il court jusqu'à la fin de la période payée.",
+      "credits": "Les crédits et les « À la Une » du mois ne se cumulent pas : ils sont remis à niveau chaque mois.",
+      "invoices": "Vos factures portent l'ICE et les identifiants de votre boutique."
+    },
+    "consent": {
+      "terms": "J'accepte les",
+      "termsLink": "conditions générales de vente",
+      "renewal": "et le renouvellement automatique, résiliable à tout moment pour la fin de la période.",
+      "required": "Cochez la case pour continuer."
+    },
+    "choose": "Choisissez une offre.",
+    "submit": {
+      "monthly": "S'abonner : {amount, number} MAD HT par mois",
+      "yearly": "S'abonner : {amount, number} MAD HT par an"
+    },
+    "submitIdle": "S'abonner",
+    "errors": {
+      "sales_closed": "Les abonnements viennent de fermer.",
+      "already_subscribed": "Votre boutique a déjà une offre : changez-la avec « Gérer l'abonnement ».",
+      "pro_not_verified": "Votre boutique doit être vérifiée pour s'abonner.",
+      "no_billing_customer": "Aucun paiement à gérer pour l'instant.",
+      "billing_owner_only": "Seul le propriétaire de la boutique gère son abonnement.",
+      "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard."
+    }
+  },
+  "Invoices": {
+    "metaTitle": "Mes factures",
+    "back": "Mon abonnement",
+    "title": "Mes factures",
+    "lead": "Les factures de l'abonnement de votre boutique, émises par Stripe pour Joutiya.",
+    "loading": "Chargement des factures",
+    "failed": "Les factures n'ont pas pu être chargées.",
+    "retry": "Réessayer",
+    "empty": "Aucune facture pour l'instant. La première arrive avec votre premier paiement.",
+    "caption": "Factures de la boutique, de la plus récente à la plus ancienne",
+    "number": "Numéro",
+    "date": "Date",
+    "amount": "Montant TTC",
+    "state": "État",
+    "documents": "Documents",
+    "noNumber": "Sans numéro",
+    "total": "{amount, number} {currency}",
+    "statuses": {
+      "paid": "Payée",
+      "open": "À payer",
+      "uncollectible": "Impayée",
+      "void": "Annulée"
+    },
+    "view": "Voir la facture",
+    "pdf": "Télécharger le PDF",
+    "older": "Les factures plus anciennes sont dans « Gérer l'abonnement »."
   },
   "Account": {
     "data": {

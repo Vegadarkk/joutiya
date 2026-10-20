@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { BadgeCheck, CircleCheck, CircleDashed, Gift, Hourglass, PhoneCall, ShieldCheck, Store } from "lucide-react";
+import { ArrowRight, BadgeCheck, CircleCheck, CircleDashed, Gift, Hourglass, PhoneCall, ShieldCheck, Store } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { FormMessage, useApiErrorMessage } from "@/components/auth/form-message";
 import { StatusPanel } from "@/components/auth/status-panel";
@@ -9,6 +9,7 @@ import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { textLinkClassName } from "@/components/ui/text-link";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -285,6 +286,10 @@ function Dashboard({ me, shop, lifecycle }: { me: ProMeResponse; shop: ProSelfVi
                 <span>{shop.launchOffer.endsAt ? t("launchOfferEnds", { date: date(shop.launchOffer.endsAt) }) : t("launchOffer", { days: shop.launchOffer.noticeDays })}</span>
               </p>
             ) : null}
+            <Link href="/pro/abonnement" className={cn("mt-auto inline-flex w-fit items-center gap-1.5 rounded-sm text-sm font-medium text-link", textLinkClassName)}>
+              {t("subscription")}
+              <ArrowRight aria-hidden="true" className="size-4 shrink-0 rtl:rotate-180" />
+            </Link>
           </section>
           <Quotas shop={shop} />
         </div>

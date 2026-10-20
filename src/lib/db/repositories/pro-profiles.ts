@@ -1,5 +1,5 @@
 import "server-only";
-import { FieldValue, Timestamp, type DocumentSnapshot, type Transaction } from "firebase-admin/firestore";
+import { FieldPath, FieldValue, Timestamp, type DocumentSnapshot, type Transaction } from "firebase-admin/firestore";
 import { db } from "@/lib/firebase/admin";
 import { consume } from "@/lib/quota";
 import { proProfileSchema, type ProProfileDoc } from "@/lib/pro/profile-schema";
@@ -61,6 +61,27 @@ export async function listProEffectsPending(now: Date, limit: number): Promise<P
   const query = await db().collection(COLLECTIONS.proProfiles).where("effectsPendingSince", "<=", Timestamp.fromDate(now)).orderBy("effectsPendingSince", "asc").limit(limit).get();
   void consume("firestore.reads", Math.max(1, query.size));
   return query.docs.map(proProfileFromSnapshot).filter((record): record is ProProfileRecord => record !== null);
+}
+
+/**
+ * Shops on the launch offer (single-field index planSource), by id after `after`. `next` is the
+ * cursor of the following page, null on the last one.
+ */
+export async function listLaunchOfferProfiles(after: string | null, limit: number): Promise<{ profiles: ProProfileRecord[]; next: string | null }> {
+  let query = db().collection(COLLECTIONS.proProfiles).where("planSource", "==", "launch_offer").orderBy(FieldPath.documentId()).limit(limit);
+  if (after) query = query.startAfter(after);
+  const snapshot = await query.get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  return {
+    profiles: snapshot.docs.map(proProfileFromSnapshot).filter((record): record is ProProfileRecord => record !== null),
+    next: snapshot.size === limit ? (snapshot.docs.at(-1)?.id ?? null) : null,
+  };
+}
+
+/** Date of the last launch-offer notice mailed to the shop (the next one is due from it). */
+export async function markLaunchOfferNotice(proId: string, now: Date): Promise<void> {
+  await proProfileRef(proId).update({ launchOfferNoticeSentAt: Timestamp.fromDate(now) });
+  void consume("firestore.writes", 1);
 }
 
 /**
