@@ -22,6 +22,7 @@ export function conversationView(conversation: ConversationRecord, uid: string):
     blockedByMe: conversation.blockedBy.includes(uid),
     blockedMe: conversation.blockedBy.includes(other),
     frozen: conversation.status === "frozen",
+    counterpartClosed: (conversation.accountClosed ?? []).includes(other),
     updatedAt: conversation.updatedAt.getTime(),
   };
 }

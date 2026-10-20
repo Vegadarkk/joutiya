@@ -18,6 +18,8 @@ vi.mock("@/lib/firebase/admin", () => ({ isFirestoreConfigured: () => true, isFi
 vi.mock("@/lib/db/repositories/uploads", () => ({ UPLOADS_BY_TARGET_LIMIT: 100, listUploadsByTarget: vi.fn(async () => []), deleteUploadDocument: vi.fn(), updateUpload: vi.fn() }));
 // Phase 7 step (rejected Pro applications): nothing to purge here, tests/unit/jobs-retention-purge.test.ts covers it.
 vi.mock("@/lib/db/repositories/pro-profiles", () => ({ listProProfilesPastPurge: vi.fn(async () => []), purgeProProfile: vi.fn() }));
+// Closed accounts (L7, D26): the documents past purgeAt come from closedPages below.
+vi.mock("@/lib/account/purge", () => ({ listClosedPastPurge: vi.fn(), purgeClosedAccount: vi.fn(), purgeClosedIdentity: vi.fn() }));
 vi.mock("@/lib/db/repositories/retention", () => ({
   listListingsPastPurge: vi.fn(),
   purgeListing: vi.fn(),
@@ -36,6 +38,7 @@ vi.mock("@/lib/db/repositories/retention", () => ({
 }));
 
 const retention = await import("@/lib/db/repositories/retention");
+const closed = await import("@/lib/account/purge");
 const { audit } = await import("@/lib/audit");
 const { MemoryObjectStore } = await import("@/lib/storage/memory");
 const job = await import("@/worker/jobs/retention-purge");
@@ -68,7 +71,17 @@ beforeEach(() => {
   vi.mocked(retention.readUserBlocksCursor).mockResolvedValue(null);
   vi.mocked(retention.purgeOrphanUserBlocks).mockResolvedValue({ deleted: 0, read: 0, last: null });
   vi.mocked(audit).mockClear();
+  for (const fn of Object.values(closed)) if (vi.isMockFunction(fn)) fn.mockReset();
+  closedDocs = [];
+  vi.mocked(closed.listClosedPastPurge).mockImplementation(async () => {
+    const docs = closedDocs;
+    closedDocs = [];
+    return { docs, read: Math.max(1, docs.length) };
+  });
 });
+
+/** users/{uid}/private documents past purgeAt served by listClosedPastPurge (one page). */
+let closedDocs: Awaited<ReturnType<typeof closed.listClosedPastPurge>>["docs"] = [];
 
 const run = () => retentionPurge(NOW, { store: new MemoryObjectStore() });
 
@@ -205,5 +218,53 @@ describe("retention-purge phase 5 steps", () => {
     vi.mocked(retention.listPastPurge).mockRejectedValueOnce(new Error("FAILED_PRECONDITION"));
     pages.reports = [{ id: "r1", data: { purgeAt: PAST, status: "actioned" } }];
     expect(await run()).toMatchObject({ failed: 1, reports: 1 });
+  });
+});
+
+describe("retention-purge closed accounts (L7, D26)", () => {
+  it("purges closed accounts and kept identities past purgeAt, counts holds and skips, audits each purge", async () => {
+    closedDocs = [
+      { uid: "u-purged", kind: "account" },
+      { uid: "u-held", kind: "account" },
+      { uid: "u-changed", kind: "account" },
+      { uid: "u-old", kind: "identity" },
+    ];
+    vi.mocked(closed.purgeClosedAccount).mockImplementation(async (uid) => {
+      if (uid === "u-held") return { kind: "held" };
+      if (uid === "u-changed") return { kind: "skip" };
+      return { kind: "purged", deletes: 3, identityKept: true };
+    });
+    vi.mocked(closed.purgeClosedIdentity).mockResolvedValue({ kind: "purged", deletes: 2, identityKept: false });
+    const result = await run();
+    expect(result).toMatchObject({ accounts: 1, identities: 1, held: 1, skipped: 1, failed: 0 });
+    expect(closed.listClosedPastPurge).toHaveBeenCalledWith(NOW, expect.any(Number), undefined);
+    expect(closed.purgeClosedIdentity).toHaveBeenCalledWith("u-old", NOW);
+    expect(audit).toHaveBeenCalledWith(expect.objectContaining({ action: "account.purge", target: { type: "user", id: "u-purged" }, reason: "identity kept until identityPurgeAt" }));
+    expect(audit).toHaveBeenCalledWith(expect.objectContaining({ action: "account.identity_purge", target: { type: "user", id: "u-old" } }));
+    expect(audit).not.toHaveBeenCalledWith(expect.objectContaining({ target: { type: "user", id: "u-held" } }));
+  });
+
+  it("one failing account is counted and the next one still goes", async () => {
+    closedDocs = [
+      { uid: "u-bad", kind: "account" },
+      { uid: "u-good", kind: "account" },
+    ];
+    vi.mocked(closed.purgeClosedAccount).mockRejectedValueOnce(new Error("auth/internal-error")).mockResolvedValueOnce({ kind: "purged", deletes: 2, identityKept: false });
+    expect(await run()).toMatchObject({ accounts: 1, failed: 1 });
+  });
+
+  it("stops at the nightly budget before an account it could not finish", async () => {
+    // contentOps takes all but 2 deletions of the night: fewer than one account may need (3).
+    let left = PURGE_DELETE_BUDGET - 2;
+    vi.mocked(retention.deleteJournalPastPurge).mockImplementation(async (collection, _now, limit) => {
+      if (collection !== "contentOps") return 0;
+      const deleted = Math.min(limit, left);
+      left -= deleted;
+      return deleted;
+    });
+    closedDocs = [{ uid: "u1", kind: "account" }];
+    const result = await run();
+    expect(closed.purgeClosedAccount).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ accounts: 0, deferred: true });
   });
 });

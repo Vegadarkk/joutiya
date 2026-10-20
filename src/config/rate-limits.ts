@@ -55,6 +55,10 @@ export const RATE_LIMITS = {
   "staff.login.accountIp": { points: 5, duration: 15 * MINUTE, blockDuration: 15 * MINUTE, policy: "closed", key: "account+ip" },
   // Account settings mutations (display name, password change, account closure).
   "account.mutation.uid": { points: 60, duration: HOUR, policy: "closed", key: "uid" },
+  // Account closure (phase 5, L7): idempotent but heavy (listings, conversations, Auth), 5 per hour.
+  // Personal data export: up to ~2 000 Firestore reads each (Spark: 50 000 a day), 3 per day.
+  "account.close.uid": { points: 5, duration: HOUR, policy: "closed", key: "uid" },
+  "account.export.uid": { points: 3, duration: DAY, policy: "closed", key: "uid" },
   // --- Listings and media (phase 3, design §4) ---------------------------------------------
   // Draft autosave (PATCH /api/listings/{id}): coalesced client-side, never per keystroke.
   "listing.draft.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },

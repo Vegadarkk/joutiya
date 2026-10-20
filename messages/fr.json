@@ -448,6 +448,9 @@
       "appeal_not_allowed": "Vous ne pouvez pas faire de recours contre cette décision.",
       "same_reviewer": "Un recours doit être examiné par un autre modérateur que celui qui a pris la décision.",
       "sanction_not_allowed": "Cette sanction dépasse vos droits : demandez à un administrateur.",
+      "recent_auth_required": "Par sécurité, reconnectez-vous puis réessayez dans les dix minutes.",
+      "pro_subscription_active": "Résiliez d'abord votre abonnement Pro, puis réessayez.",
+      "wallet_not_empty": "Il reste des crédits achetés sur votre compte : utilisez-les ou demandez leur remboursement, puis réessayez.",
       "unavailable": "Le service est momentanément indisponible. Réessayez dans quelques minutes.",
       "internal": "Une erreur technique est survenue. Réessayez.",
       "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez.",
@@ -2749,6 +2752,7 @@
       "hidden": "Message masqué par la modération",
       "maskedLink": "[lien masqué]",
       "blocked": "Bloqué",
+      "closed": "Compte fermé",
       "frozen": "Suspendue",
       "yesterday": "Hier"
     },
@@ -2791,6 +2795,7 @@
       "cancel": "Annuler",
       "blockedByMe": "Vous avez bloqué {name} : vous ne pouvez plus vous écrire.",
       "blockedMe": "Vous ne pouvez plus écrire dans cette conversation.",
+      "counterpartClosed": "{name} a fermé son compte : vous pouvez relire la conversation, mais plus y écrire.",
       "frozen": "Cette conversation est suspendue : vous pouvez la lire, mais plus y écrire.",
       "suspended": "Votre compte est suspendu : vous pouvez lire vos conversations, mais plus envoyer de message."
     },
@@ -3130,5 +3135,40 @@
     "balanceAfter": "Solde : {count}",
     "more": "Afficher plus",
     "available": "Crédits disponibles"
+  },
+  "Account": {
+    "data": {
+      "title": "Mes données",
+      "body": "Une copie des données de votre compte, dans un fichier que vous pouvez conserver ou réutiliser ailleurs.",
+      "contents": "Profil, paramètres et consentements, annonces (terminées comprises), favoris, recherches enregistrées, conversations, signalements envoyés et décisions de modération vous concernant.",
+      "download": "Télécharger mes données",
+      "downloaded": "Vos données sont téléchargées",
+      "limit": "Fichier JSON, trois téléchargements par jour."
+    },
+    "close": {
+      "title": "Fermer mon compte",
+      "body": "La fermeture est définitive : un compte fermé ne peut pas être rouvert.",
+      "open": "Fermer mon compte",
+      "dialogTitle": "Fermer votre compte Joutiya ?",
+      "dialogLead": "Voici ce qui se passe, et ce que la loi nous oblige à conserver puis à supprimer.",
+      "now": "Aujourd'hui",
+      "nowBody": "Vous êtes déconnecté et ne pouvez plus vous connecter. Vos annonces sont retirées, vos favoris et vos recherches enregistrées supprimés. Les personnes avec qui vous avez échangé peuvent relire vos conversations, sans pouvoir vous écrire.",
+      "purgeBody": "Votre adresse e-mail, votre téléphone et votre nom affiché sont supprimés. Jusque-là, cette adresse e-mail ne peut pas servir à créer un nouveau compte.",
+      "identityBody": "Votre nom légal, s'il nous a été communiqué, est supprimé. Les signalements et décisions de modération vous concernant sont eux aussi conservés cinq ans, puis supprimés.",
+      "exportFirst": "Si vous souhaitez garder une copie de vos données, téléchargez-la avant de fermer le compte (rubrique « Mes données »).",
+      "confirm": "Je comprends que la fermeture de mon compte est définitive.",
+      "submit": "Fermer définitivement",
+      "cancel": "Annuler",
+      "doneTitle": "Votre compte est fermé",
+      "doneBody": "Un e-mail de confirmation vous a été envoyé. Les données de votre compte seront supprimées le {date}.",
+      "home": "Retour à l'accueil",
+      "reauthTitle": "Reconnectez-vous pour confirmer",
+      "reauthBody": "Par sécurité, la fermeture demande une connexion de moins de dix minutes. Reconnectez-vous, puis revenez ici.",
+      "reauth": "Me reconnecter",
+      "proTitle": "Votre abonnement Pro est en cours",
+      "proBody": "Résiliez d'abord votre abonnement Pro. Une fois la résiliation prise en compte, vous pourrez fermer votre compte.",
+      "walletTitle": "Il vous reste des crédits",
+      "walletBody": "Des crédits achetés sont encore sur votre compte. Utilisez-les ou écrivez-nous pour demander leur remboursement, puis fermez votre compte."
+    }
   }
 }

@@ -98,7 +98,10 @@ describe("backup cursors", () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).not.toContain(COLLECTIONS.system);
     expect(ids).not.toContain(COLLECTIONS.userPrivateDoc);
-    const expected = Object.values(COLLECTIONS).filter((id) => id !== COLLECTIONS.system && id !== COLLECTIONS.userPrivateDoc);
+    // A document id, not a collection: users/{uid}/private/identity goes with the `private` group.
+    expect(ids).not.toContain(COLLECTIONS.userIdentityDoc);
+    const excluded: string[] = [COLLECTIONS.system, COLLECTIONS.userPrivateDoc, COLLECTIONS.userIdentityDoc];
+    const expected = Object.values(COLLECTIONS).filter((id) => !excluded.includes(id));
     expect([...ids].sort()).toEqual([...expected].sort());
     expect(BACKUP_COLLECTIONS.find((collection) => collection.id === "private")).toEqual({ id: "private", scope: "group", timeField: null });
   });

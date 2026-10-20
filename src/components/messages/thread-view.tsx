@@ -49,8 +49,8 @@ type ReportSubject = { kind: "user" } | { kind: "message"; message: MessageView 
 
 // One conversation (design phase-5 D2-D9): its newest page, older pages on demand, live updates
 // from the stream (a new message fetches only what follows `latest`), the read receipt while the
-// thread is on screen, the composer, and the menu. Read-only when frozen, blocked either way, or
-// when my account is suspended (D9: it still reads). When the stream is down, the thread polls.
+// thread is on screen, the composer, and the menu. Read-only when frozen, blocked either way, when
+// the other account is closed (L7), or when my account is suspended (D9: it still reads). When the stream is down, the thread polls.
 
 /** Polling period of an open thread while the live stream is not open (Valkey down, refused). */
 export const POLL_MS = 15_000;
@@ -429,6 +429,8 @@ export function ThreadView({ cid }: { cid: string }) {
 
       {suspended ? (
         <ErrorBanner tone="info" title={t("suspended")} className="mx-3 mt-3 lg:mx-5" />
+      ) : conversation.counterpartClosed ? (
+        <ErrorBanner tone="info" title={t("counterpartClosed", { name: isolate(name) })} className="mx-3 mt-3 lg:mx-5" />
       ) : conversation.frozen ? (
         <ErrorBanner tone="warning" title={t("frozen")} className="mx-3 mt-3 lg:mx-5" />
       ) : conversation.blockedByMe ? (
