@@ -16,6 +16,7 @@ import { ModerationDecisionForm } from "../../../_components/moderation-decision
 import { catalogLabels, formatPrice, waitingFor } from "../../../_components/moderation-labels";
 import { FlagBadges, HOLD_LABEL } from "../../../_components/moderation-queue";
 import { RiskMeter } from "../../../_components/moderation-risk";
+import { Facts, Panel } from "../../../_components/panel";
 
 // Review of one listing of the moderation queue (design D9): the listing as the seller wrote it,
 // the signals that held it, the seller's track record, and the decision form while it is pending.
@@ -37,28 +38,6 @@ const ACTION_LABEL: Record<ModerationDecisionDoc["action"], string> = {
 };
 
 const DECLARATION_LABEL = { self: "le vendeur est la personne concernée", explicit_consent: "consentement explicite de la personne concernée" } as const;
-
-function Panel({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function Facts({ rows }: { rows: [string, ReactNode][] }) {
-  return (
-    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
-      {rows.map(([label, value]) => (
-        <div key={label} className="contents">
-          <dt className="text-foreground-muted">{label}</dt>
-          <dd className="text-foreground">{value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
 
 const yesNo = (value: boolean) => (value ? "Oui" : "Non");
 

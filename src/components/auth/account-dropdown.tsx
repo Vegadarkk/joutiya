@@ -1,10 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { BadgeCheck, BellRing, Heart, LogOut, MessageSquare, Scale, Settings, Store } from "lucide-react";
+import { BadgeCheck, BellRing, CircleHelp, Heart, LogOut, MessageSquare, Scale, Settings, Store } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { toast } from "sonner";
+import { ASSISTANT_HASH, openAssistant } from "@/components/help/assistant-event";
 import { canMessage } from "@/components/messages/can-message";
 import { useLiveSnapshot } from "@/components/messages/use-live";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -112,6 +113,13 @@ export default function AccountDropdown({ session, name, triggerClassName, child
             <Link href="/recours" className={item}>
               <Scale aria-hidden="true" />
               {t("decisions")}
+            </Link>
+          </DropdownMenu.Item>
+          {/* Help centre with the Assistant Joutiya open (phase 5 D25); the event opens it when already there. */}
+          <DropdownMenu.Item asChild>
+            <Link href={`/aide${ASSISTANT_HASH}`} className={item} onClick={openAssistant}>
+              <CircleHelp aria-hidden="true" />
+              {t("help")}
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Separator className="my-1 h-px bg-border" />

@@ -104,7 +104,11 @@ export function statementTexts(decision: Pick<AppealableDecision, "templateId" |
   };
 }
 
-/** "19 octobre 2026", Morocco time (a decision's dates are instants). */
+/**
+ * "19 octobre 2026", Morocco time (a decision's dates are instants). Node's and the browser's time
+ * zone data can disagree on Africa/Casablanca's offset (+00 or +01), so between 23:00 and 00:00 UTC
+ * they may print different days: the elements showing it suppress the hydration warning.
+ */
 export function formatDecisionDate(iso: string, locale: Locale): string {
   return new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long", timeZone: "Africa/Casablanca" }).format(new Date(iso));
 }
