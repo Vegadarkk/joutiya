@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ListingStatus } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
+import type { ProProfileRecord } from "@/lib/db/repositories/pro-profiles";
 import type { UserRecord } from "@/lib/db/repositories/profiles";
 import type * as Quota from "@/lib/quota";
 
@@ -11,13 +12,16 @@ const repo = vi.hoisted(() => ({
   getListing: vi.fn<(id: string) => Promise<ListingRecord | null>>(),
   listPublishedByOwner: vi.fn<(uid: string, limit?: number) => Promise<ListingRecord[]>>(),
   findUserByPublicId: vi.fn<(publicId: string) => Promise<UserRecord | null>>(),
+  getUserRecord: vi.fn<(uid: string) => Promise<UserRecord | null>>(),
+  getProProfile: vi.fn<(proId: string) => Promise<ProProfileRecord | null>>(),
   firstDegraded: vi.fn(async (): Promise<string | null> => null),
 }));
 vi.mock("@/lib/db/repositories/listings", () => ({ getListing: repo.getListing, listPublishedByOwner: repo.listPublishedByOwner }));
-vi.mock("@/lib/db/repositories/profiles", () => ({ findUserByPublicId: repo.findUserByPublicId }));
+vi.mock("@/lib/db/repositories/profiles", () => ({ findUserByPublicId: repo.findUserByPublicId, getUserRecord: repo.getUserRecord }));
+vi.mock("@/lib/db/repositories/pro-profiles", () => ({ getProProfile: repo.getProProfile }));
 vi.mock("@/lib/quota", async (importOriginal) => ({ ...(await importOriginal<typeof Quota>()), firstDegraded: repo.firstDegraded }));
 
-const { getPublishedBySlugId, getProfile, memberSince, PUBLIC_STATES } = await import("@/lib/listings/public");
+const { getPublishedBySlugId, getProfile, getPublicStorefront, memberSince, parseStorefrontSegment, PUBLIC_STATES } = await import("@/lib/listings/public");
 
 const NOW = new Date("2026-10-16T10:00:00.000Z");
 const ID = "abcd2345";
@@ -75,6 +79,8 @@ beforeEach(() => {
   repo.getListing.mockReset();
   repo.listPublishedByOwner.mockReset();
   repo.findUserByPublicId.mockReset();
+  repo.getUserRecord.mockReset();
+  repo.getProProfile.mockReset();
   repo.firstDegraded.mockReset();
   repo.firstDegraded.mockResolvedValue(null);
 });
@@ -166,6 +172,46 @@ describe("getProfile", () => {
     expect(await getProfile("abcdefghjk")).toBeNull();
     repo.findUserByPublicId.mockResolvedValue(user({ status: "suspended" }));
     expect((await getProfile("abcdefghjk"))?.listings).toEqual([]);
+    expect(repo.listPublishedByOwner).not.toHaveBeenCalled();
+  });
+});
+
+describe("storefront", () => {
+  const PRO = "shep2345";
+  const shop = (overrides: Partial<ProProfileRecord> = {}) =>
+    ({ proId: PRO, ownerUid: "uid-1", name: "Atelier Salma", slug: "atelier-salma-casablanca", description: "Céramique", citySlug: "casablanca", lifecycle: "verified", plan: "essentiel", ...overrides }) as unknown as ProProfileRecord;
+
+  it("parses {slug}-{proId} and refuses what cannot carry a proId", () => {
+    expect(parseStorefrontSegment(`atelier-salma-casablanca-${PRO}`)).toEqual({ slug: "atelier-salma-casablanca", proId: PRO });
+    expect(parseStorefrontSegment(`-${PRO}`)).toBeNull();
+    expect(parseStorefrontSegment(PRO)).toBeNull();
+    expect(parseStorefrontSegment("atelier-SHEP2345")).toBeNull();
+    expect(parseStorefrontSegment("atelier-shop1234")).toBeNull();
+  });
+
+  it("shows a verified shop with a plan, with the owner's published listings", async () => {
+    repo.getProProfile.mockResolvedValue(shop());
+    repo.getUserRecord.mockResolvedValue(user({ type: "pro" }));
+    repo.listPublishedByOwner.mockResolvedValue([record("published")]);
+    const store = await getPublicStorefront(PRO);
+    expect(store).toMatchObject({ proId: PRO, segment: `atelier-salma-casablanca-${PRO}`, name: "Atelier Salma", citySlug: "casablanca" });
+    expect(store?.seller.publishedCount).toBe(1);
+    expect(store?.seller.listings.map((card) => card.id)).toEqual([ID]);
+  });
+
+  it("is a 404 when the storefront is not shown or the owner has no public face", async () => {
+    for (const overrides of [{ lifecycle: "pending_verification" }, { lifecycle: "rejected" }, { lifecycle: "downgraded" }, { lifecycle: "suspended" }, { plan: "none" }] as const) {
+      repo.getProProfile.mockResolvedValue(shop(overrides as Partial<ProProfileRecord>));
+      repo.getUserRecord.mockResolvedValue(user({ type: "pro" }));
+      expect(await getPublicStorefront(PRO), JSON.stringify(overrides)).toBeNull();
+    }
+    repo.getProProfile.mockResolvedValue(null);
+    expect(await getPublicStorefront(PRO)).toBeNull();
+    repo.getProProfile.mockResolvedValue(shop());
+    for (const status of ["suspended", "banned", "closed"] as const) {
+      repo.getUserRecord.mockResolvedValue(user({ type: "pro", status }));
+      expect(await getPublicStorefront(PRO), status).toBeNull();
+    }
     expect(repo.listPublishedByOwner).not.toHaveBeenCalled();
   });
 });

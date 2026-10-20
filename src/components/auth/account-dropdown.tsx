@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { BadgeCheck, BellRing, CircleHelp, Heart, LogOut, MessageSquare, Scale, Settings } from "lucide-react";
+import { BadgeCheck, BellRing, CircleHelp, Heart, LogOut, MessageSquare, Scale, Settings, Store } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { toast } from "sonner";
@@ -88,6 +88,12 @@ export default function AccountDropdown({ session, name, triggerClassName, child
             <Link href="/recherches" className={item}>
               <BellRing aria-hidden="true" />
               {t("savedSearches")}
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild>
+            <Link href="/pro" className={item}>
+              <Store aria-hidden="true" />
+              {t("pro")}
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Separator className="my-1 h-px bg-border" />

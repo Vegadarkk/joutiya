@@ -1,5 +1,5 @@
 import "server-only";
-import { listingQuotas } from "@/config/pricing";
+import { launchOfferOpen, listingQuotas } from "@/config/pricing";
 import type { AuthContext } from "@/lib/auth/guards";
 import { getFlags, getPricing } from "@/lib/config/runtime";
 import type { ProApplyInput, ProMeResponse } from "@/lib/contracts/pro";
@@ -127,12 +127,13 @@ export async function submitApplication(actor: ProActor, input: ProApplyInput, n
 /** GET /api/pro/me: the account's shop or application, the switches and the eligibility checks. */
 export async function proSelf(auth: AuthContext): Promise<ProMeResponse> {
   const uid = auth.user.uid;
-  const [flags, user] = await Promise.all([getFlags(), getUser(uid)]);
+  const [flags, user, pricing] = await Promise.all([getFlags(), getUser(uid), getPricing()]);
   const eligibility = { emailVerified: user?.badges.emailVerified ?? false, phoneVerified: user?.badges.phoneVerified ?? false, accountActive: user?.status === "active" };
-  const base = { signupOpen: flags.proSignupEnabled, salesOpen: flags.salesEnabled, phoneVerification: isPhoneVerificationConfigured() ? ("whatsapp" as const) : ("call" as const), eligibility };
+  // The offer a shop verified today receives (as decideApplication grants it).
+  const launchOffer = !flags.salesEnabled && launchOfferOpen(pricing.launchOffer, new Date()) ? { noticeDays: pricing.launchOffer.noticeDays } : null;
+  const base = { signupOpen: flags.proSignupEnabled, salesOpen: flags.salesEnabled, phoneVerification: isPhoneVerificationConfigured() ? ("whatsapp" as const) : ("call" as const), launchOffer, eligibility };
   const profile = user?.proId ? await getProProfile(user.proId) : null;
   if (!profile || profile.ownerUid !== uid) return { ...base, shop: null };
-  const pricing = await getPricing();
   const active = profile.lifecycle === "pending_verification" || profile.lifecycle === "rejected" ? 0 : await countActive(uid);
   return {
     ...base,

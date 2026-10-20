@@ -10,6 +10,7 @@ const ITEMS = [
   { href: "/recours", label: "Recours", adminOnly: false },
   { href: "/moderation", label: "Annonces retenues", adminOnly: false },
   { href: "/comptes", label: "Comptes", adminOnly: false },
+  { href: "/pros", label: "Comptes Pro", adminOnly: false },
   { href: "/statistiques", label: "Statistiques", adminOnly: false },
   { href: "/autorites", label: "Autorités", adminOnly: true },
   { href: "/personnel", label: "Personnel", adminOnly: true },
