@@ -44,15 +44,15 @@ describe("infra/vm/search-setup.sh", () => {
     rmSync(calls, { force: true });
     mkdirSync(join(etc, "staging"), { recursive: true });
     mkdirSync(state, { recursive: true });
-    writeFileSync(appEnv, "KEEP_ME='kept'\nMEILI_SEARCH_KEY=old\n", { mode: 0o600 });
+    writeFileSync(appEnv, "KEEP_ME='kept'\nMEILI_URL='http://old'\nMEILI_SEARCH_KEY=old\n", { mode: 0o600 });
     writeFileSync(join(etc, "staging", "meilisearch.env"), `MEILI_MASTER_KEY=${MASTER}\n`, { mode: 0o600 });
     writeFileSync(join(state, "staging.release"), "0123456789abcdef\n");
   });
 
-  it("writes both keys into app.env, recreates web and worker, and never prints a key", () => {
+  it("writes both keys and MEILI_URL into app.env, recreates web and worker, and never prints a key", () => {
     const result = run(["staging"]);
     expect(result.status).toBe(0);
-    expect(readFileSync(appEnv, "utf8")).toBe("KEEP_ME='kept'\nMEILI_SEARCH_KEY=s3arch\nMEILI_INDEX_KEY=ind3x\n");
+    expect(readFileSync(appEnv, "utf8")).toBe("KEEP_ME='kept'\nMEILI_SEARCH_KEY=s3arch\nMEILI_INDEX_KEY=ind3x\nMEILI_URL=http://meilisearch:7700\n");
     expect(statSync(appEnv).mode & 0o777).toBe(0o600);
     const log = readFileSync(calls, "utf8");
     expect(log).toMatch(/compose .* up -d --no-deps --wait --wait-timeout 120 meilisearch master=64/);
@@ -67,7 +67,7 @@ describe("infra/vm/search-setup.sh", () => {
   it("leaves app.env as it was when the keys are unusable", () => {
     const result = run(["staging"], "bad");
     expect(result.status).not.toBe(0);
-    expect(readFileSync(appEnv, "utf8")).toBe("KEEP_ME='kept'\nMEILI_SEARCH_KEY=old\n");
+    expect(readFileSync(appEnv, "utf8")).toBe("KEEP_ME='kept'\nMEILI_URL='http://old'\nMEILI_SEARCH_KEY=old\n");
     expect(readFileSync(calls, "utf8")).not.toContain("force-recreate");
     expect(readdirSync(state)).toEqual(["staging.release"]);
     expect(readdirSync(join(etc, "staging")).sort()).toEqual(["app.env", "meilisearch.env"]);

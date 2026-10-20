@@ -79,8 +79,9 @@ describe("app.env names", () => {
       GOOGLE_CLOUD_PROJECT: "joutiya-staging",
       TURNSTILE_SITE_KEY: "0x4AAAAAAFYY7P8KeaWCGihV",
       MEDIA_BASE_URL: "https://media-staging.joutiya.ma",
-      MEILI_URL: "http://meilisearch:7700",
     });
+    // search-setup writes it with the keys: alone, it would stop the first start.
+    expect(staging.MEILI_URL).toBeUndefined();
     const prod = derivedValues("prod", targets);
     expect(prod).toMatchObject({ SITE_URL: "https://joutiya.ma", ADMIN_HOST: "admin.joutiya.ma", MEDIA_BASE_URL: "https://media.joutiya.ma" });
     expect(prod.CSP_REPORT_ONLY).toBeUndefined();

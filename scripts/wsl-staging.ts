@@ -24,6 +24,10 @@
 //       distro with its key: their app.env lines are merged as on the VM (vm-env.ts mergeLines, which
 //       also generates CSRF_SECRET, the Valkey passwords and Meilisearch's key once), a tunnel.env
 //       replaces the current one. Prints names only; `deploy --apply` then starts staging.
+//   node scripts/wsl-staging.ts search-setup [--reindex=<max Firestore reads>] [--apply]
+//       once a release runs: Meilisearch's index and the app's two keys, written to app.env with
+//       MEILI_URL by infra/vm/search-setup.sh as on the VM, then web and worker recreated; --reindex
+//       also fills the listings index from Firestore (first start).
 //   node scripts/wsl-staging.ts status
 //       release, containers and images (read only).
 //   node scripts/wsl-staging.ts stop [--apply]
@@ -35,7 +39,7 @@ import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { validateTargets, type Targets } from "./assert-target.ts";
 import { WIF_SERVICES, caFiles, certificateConfig, credentialConfig, csrFromOutput, readCa, signCsr, subjectName } from "./google-wif.ts";
-import { wifDir, wifInstallScript, wifKeyScript, wifRecreateScript } from "./oracle-vm.ts";
+import { searchSetupScript, wifDir, wifInstallScript, wifKeyScript, wifRecreateScript } from "./oracle-vm.ts";
 import { type Sealed, parseSealed, sealedHeader } from "./seal-env.ts";
 import { REQUIRED, mergeLines } from "./vm-env.ts";
 
@@ -141,6 +145,7 @@ ExecStart=${NO_INTEROP}
 [Install]
 WantedBy=multi-user.target`;
 const INTEROP_CHECK = `if compgen -G '/proc/sys/fs/binfmt_misc/WSLInterop*' > /dev/null; then echo "WSL interop is still registered" >&2; exit 1; fi`;
+const INTEROP_GUARD = [`[[ -x ${NO_INTEROP} ]] || { echo "${NO_INTEROP} is missing: run setup first" >&2; exit 1; }`, NO_INTEROP, INTEROP_CHECK];
 
 /** Docker's daemon settings, as on the VM (infra/vm/bootstrap.sh). */
 export const DAEMON_JSON = `{
@@ -347,9 +352,9 @@ async function wif(host: Host, targets: Targets): Promise<void> {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const [action, extra] = args.filter((arg) => !arg.startsWith("--"));
-  const actions = ["setup", "wif", "deploy", "env", "status", "stop"];
+  const actions = ["setup", "wif", "deploy", "env", "search-setup", "status", "stop"];
   if (!action || !actions.includes(action) || extra !== undefined) {
-    throw new Error("usage: scripts/wsl-staging.ts <setup|wif|deploy [--commit=<sha>]|env --sealed=<file>[,<file>...]|status|stop> [--apply]");
+    throw new Error("usage: scripts/wsl-staging.ts <setup|wif|deploy [--commit=<sha>]|env --sealed=<file>[,<file>...]|search-setup [--reindex=<reads>]|status|stop> [--apply]");
   }
   const raw: unknown = JSON.parse(readFileSync(new URL("../infra/targets.json", import.meta.url), "utf8"));
   const errors = validateTargets(raw);
@@ -367,9 +372,11 @@ async function main(): Promise<void> {
         throw new Error(`${file}: ${(error as Error).message}`);
       }
     });
-    const interop = [`[[ -x ${NO_INTEROP} ]] || { echo "${NO_INTEROP} is missing: run setup first" >&2; exit 1; }`, NO_INTEROP, INTEROP_CHECK];
-    await host.exec("env", [...interop, envScript(files)].join("\n"));
+    await host.exec("env", [...INTEROP_GUARD, envScript(files)].join("\n"));
     if (host.apply) console.log("app.env and the secret files are in place: `deploy --apply` starts staging once nothing is missing.");
+  } else if (action === "search-setup") {
+    const reindex = args.find((arg) => arg.startsWith("--reindex="))?.slice("--reindex=".length);
+    await host.exec("search-setup", [...INTEROP_GUARD, searchSetupScript(ENV, reindex)].join("\n"));
   } else if (action === "stop") await host.exec("stop", stopScript());
   else await host.exec("status", statusScript(), true);
   if (action !== "status") console.log(host.apply ? "\nDone." : "\nDry run: nothing changed in the distro. Add --apply to run these scripts.");

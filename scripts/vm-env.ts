@@ -131,8 +131,8 @@ export function derivedValues(env: DeployedEnv, targets: Targets): Record<string
     R2_BUCKET_MEDIA: recorded.r2.media,
     R2_BUCKET_PRIVATE: recorded.r2.private,
     MEDIA_BASE_URL: `https://${HOSTS[env].media}`,
-    // Phase 4: Meilisearch on the environment's internal data network.
-    MEILI_URL: "http://meilisearch:7700",
+    // No MEILI_URL (phase 4): infra/vm/search-setup.sh writes it with the two search keys. Alone, it
+    // stops web and worker at startup (src/lib/env.ts), and a first start comes before the keys.
   };
   return Object.fromEntries(Object.entries(values).filter((entry): entry is [string, string] => entry[1] !== null));
 }
