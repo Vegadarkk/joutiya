@@ -13,6 +13,7 @@ import { r2StorageGauge } from "./r2-storage-gauge";
 import { retentionPurge } from "./retention-purge";
 import { reconcileSearch } from "./reconcile-search";
 import { reconcileBilling } from "@/lib/payments/reconcile";
+import { updateBillingThresholds } from "@/lib/payments/thresholds";
 import { sweepExpiredBoosts } from "./expire-boosts";
 import { sendSavedSearchAlerts } from "./saved-search-alerts";
 import { exportAuditLogs } from "./audit-export";
@@ -40,6 +41,7 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "pro-effects-sync": () => proEffectsSync(),
   "pro-plans": () => proPlansNightly(),
   "reconcile-billing": () => reconcileBilling(),
+  "billing-thresholds": () => updateBillingThresholds(),
   "lift-suspensions": () => liftSuspensions(),
   "message-digest": () => sendMessageDigests(),
   "report-sla-sweep": () => sweepReportSla(),
@@ -79,6 +81,8 @@ export const SCHEDULES = {
   // 05:05 UTC (design §8): what the webhooks and the billing queue missed, after pro-plans so a
   // month's grant it gives is not taken for a repair.
   "reconcile-billing-nightly": { pattern: "5 5 * * *", job: "reconcile-billing" },
+  // 05:20 UTC: the year's EU B2C sales and EUR received against the tax thresholds, after the repairs.
+  "billing-thresholds-nightly": { pattern: "20 5 * * *", job: "billing-thresholds" },
   // 07:00 UTC (08:00 in Morocco): one digest e-mail per user for the saved searches with alerts.
   "saved-search-alerts-daily": { pattern: "0 7 * * *", job: "saved-search-alerts" },
   // Phase 5 (D14). Every hour at :35: suspensions past `until` lifted (claim, status, listings).

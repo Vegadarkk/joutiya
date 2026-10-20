@@ -1,5 +1,5 @@
 import "server-only";
-import type { DocumentSnapshot, Transaction } from "firebase-admin/firestore";
+import type { DocumentSnapshot, Query, Transaction } from "firebase-admin/firestore";
 import { db } from "@/lib/firebase/admin";
 import { consume } from "@/lib/quota";
 import {
@@ -145,6 +145,39 @@ export async function getOrder(transactionId: string): Promise<OrderDoc | null> 
   const snapshot = await orderRef(transactionId).get();
   void consume("firestore.reads", 1);
   return parse(snapshot, orderSchema, COLLECTIONS.orders);
+}
+
+export interface OrderRecord extends OrderDoc {
+  /** The document id (`orderId` of the store transaction). */
+  id: string;
+}
+
+const ORDER_PAGE = 500;
+
+async function allOrders(query: Query, max: number): Promise<OrderRecord[]> {
+  const out: OrderRecord[] = [];
+  let last: DocumentSnapshot | undefined;
+  while (out.length < max) {
+    const snapshot = await (last ? query.startAfter(last) : query).limit(Math.min(ORDER_PAGE, max - out.length)).get();
+    void consume("firestore.reads", Math.max(1, snapshot.size));
+    for (const doc of snapshot.docs) {
+      const order = parse(doc, orderSchema, COLLECTIONS.orders);
+      if (order) out.push({ id: doc.id, ...order });
+    }
+    if (snapshot.size < ORDER_PAGE) break;
+    last = snapshot.docs.at(-1);
+  }
+  return out;
+}
+
+/** Orders paid (`purchasedAt`) or refunded (`refundedAt`) in [from, to), oldest first (one range on one field). */
+export function listOrdersBetween(field: "purchasedAt" | "refundedAt", from: Date, to: Date, max = 20_000): Promise<OrderRecord[]> {
+  return allOrders(db().collection(COLLECTIONS.orders).where(field, ">=", from).where(field, "<", to).orderBy(field, "asc"), max);
+}
+
+/** Orders of `jurisdiction` paid in [from, to) (index taxJurisdiction, purchasedAt): the yearly EU B2C counter. */
+export function listOrdersOfJurisdictionBetween(jurisdiction: OrderDoc["taxJurisdiction"], from: Date, to: Date, max = 20_000): Promise<OrderRecord[]> {
+  return allOrders(db().collection(COLLECTIONS.orders).where("taxJurisdiction", "==", jurisdiction).where("purchasedAt", ">=", from).where("purchasedAt", "<", to).orderBy("purchasedAt", "asc"), max);
 }
 
 /** `create`: a concurrent second credit of the same transaction fails and its transaction retries. */
