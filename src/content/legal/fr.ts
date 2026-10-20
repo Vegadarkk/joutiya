@@ -89,7 +89,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
         id: "transactions",
         heading: "Transactions entre utilisateurs",
         blocks: [
-          "Les ventes se concluent directement entre utilisateurs, de gré à gré, et relèvent de la loi marocaine : le Code des obligations et des contrats (DOC), complété par la loi n° 31-08 sur la protection du consommateur quand le vendeur est un professionnel. La qualité, la conformité, la livraison et le paiement relèvent de leur seule relation. Consultez la page « Confiance et sécurité » avant toute transaction.",
+          "Les ventes se concluent directement entre utilisateurs, de gré à gré, et sont régies par la loi marocaine : le Dahir formant Code des obligations et des contrats (DOC), complété par la loi n° 31-08 sur la protection du consommateur quand un vendeur professionnel vend à un consommateur. La qualité, la conformité, la livraison et le paiement relèvent de leur seule relation. Consultez la page « Confiance et sécurité » avant toute transaction.",
         ],
       },
       {
@@ -219,9 +219,9 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
         id: "retractation",
         heading: "Droit de rétractation",
         blocks: [
-          "Le consommateur peut se rétracter sans motif ni pénalité. Joutiya lui accorde 14 jours à compter de l'achat d'un pack, au-delà du minimum de 7 jours prévu par la loi marocaine n° 31-08 (article 36). Les crédits non utilisés du pack lui sont alors remboursés sur simple demande à {email}, au plus tard dans les 15 jours (article 37) ; les crédits bonus du pack sont retirés en proportion.",
+          "Le consommateur peut se rétracter sans motif ni pénalité pendant 14 jours à compter de l'achat d'un pack ; ce délai respecte le minimum légal (14 jours en droit français, 7 jours selon l'article 36 de la loi marocaine n° 31-08). Les crédits non utilisés du pack lui sont alors remboursés sur simple demande à {email}, au plus tard dans les 14 jours suivant cette demande ; les crédits bonus du pack sont retirés en proportion.",
           "Les crédits déjà utilisés ne sont pas remboursables. En demandant l'exécution immédiate d'une option, le consommateur reconnaît perdre son droit de rétractation une fois l'option exécutée.",
-          "Les abonnements Pro sont souscrits par des professionnels pour leur activité. Ces professionnels ne sont pas des consommateurs au sens de la loi n° 31-08 (article 2) : le droit de rétractation ne s'y applique pas.",
+          "Les abonnements Pro sont souscrits par des professionnels pour leur activité. Ces professionnels ne sont pas des consommateurs au sens de la loi n° 31-08 (article 2) : le droit de rétractation ne s'applique donc pas à ces abonnements.",
         ],
       },
       {
@@ -364,14 +364,14 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
         id: "vendeurs",
         heading: "Particulier ou professionnel",
         blocks: [
-          "Vendre de temps en temps vos propres affaires reste une activité de particulier. Acheter pour revendre, ou vendre de façon régulière et organisée, fait de vous un professionnel. Vous devez alors ouvrir un compte Pro et respecter les obligations du commerce au Maroc : immatriculation au registre du commerce si vous êtes commerçant (loi n° 15-95 formant Code de commerce), information de l'acheteur, garantie légale des défauts de la chose vendue et remise d'une facture (loi n° 31-08 sur la protection du consommateur).",
+          "Vendre de temps en temps vos propres affaires reste une activité de particulier ; même entre particuliers, le vendeur répond des défauts cachés de la chose vendue (Dahir formant Code des obligations et des contrats). Acheter pour revendre, ou vendre de façon régulière et organisée, fait de vous un professionnel. Vous devez alors ouvrir un compte Pro et respecter les obligations du commerce au Maroc : immatriculation au registre du commerce si vous êtes commerçant (loi n° 15-95 formant Code de commerce), sauf sous le statut d'auto-entrepreneur (loi n° 114-13), et, envers les consommateurs, information, garantie légale et remise d'une facture (loi n° 31-08 sur la protection du consommateur).",
         ],
       },
       {
         id: "fiscal",
         heading: "Obligations fiscales",
         blocks: [
-          "Les revenus tirés de ventes régulières ou professionnelles sont imposables au Maroc et se déclarent à la Direction générale des impôts (DGI), selon le Code général des impôts. Si vous vendez de façon habituelle, vous relevez d'un régime d'imposition professionnel (par exemple le statut d'auto-entrepreneur, loi n° 114-13) et, selon votre chiffre d'affaires, de la TVA. Renseignez-vous auprès de la DGI (tax.gov.ma).",
+          "Les revenus tirés de ventes régulières ou professionnelles sont imposables au Maroc et se déclarent à la Direction générale des impôts (DGI), selon le Code général des impôts. Si vous vendez de façon habituelle, vous relevez d'un régime d'imposition professionnel, par exemple celui de l'auto-entrepreneur (loi n° 114-13), et pouvez, selon votre chiffre d'affaires, être assujetti à la TVA. Renseignez-vous auprès de la DGI (tax.gov.ma).",
           "Joutiya n'encaisse aucun paiement entre utilisateurs et ne connaît pas le prix final des ventes : elle ne transmet donc pas de déclaration de vos revenus à l'administration fiscale.",
         ],
       },
@@ -443,7 +443,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
         heading: "Vos outils",
         blocks: [
           "Le badge « téléphone vérifié » indique un numéro confirmé par WhatsApp. Le badge « Certifié » signale un professionnel vérifié. Vous pouvez signaler une annonce, un profil ou un message, et bloquer un utilisateur depuis la conversation.",
-          "En cas d'escroquerie, portez plainte auprès de la police (19) ou de la Gendarmerie royale (177). Vous pouvez aussi signaler une escroquerie ou un contenu illicite en ligne sur e-blagh.ma, la plateforme de la Sûreté nationale.",
+          "En cas d'escroquerie, portez plainte dans un commissariat de police, auprès d'une brigade de la Gendarmerie royale ou du procureur du Roi. Vous pouvez aussi signaler une escroquerie ou un contenu illicite en ligne sur e-blagh.ma, la plateforme de la Sûreté nationale. En cas de danger immédiat, appelez le 19 (police) ou le 177 (Gendarmerie royale).",
         ],
       },
     ],
@@ -489,7 +489,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
   "objets-interdits": {
     updated: "2026-10-20",
     intro:
-      "Ces biens, services et contenus ne peuvent pas être proposés sur Joutiya, même par un professionnel : la loi marocaine en interdit la vente ou la réserve à des professionnels agréés, ou ils exposent les acheteurs à un danger. Une annonce qui en contient est refusée ou retirée.",
+      "Ces biens, services et contenus ne peuvent pas être proposés sur Joutiya, même depuis un compte Pro. La plupart sont interdits par la loi marocaine, ou réservés par elle à des professionnels agréés dont Joutiya ne peut pas vérifier l'agrément ; les autres sont exclus par choix de Joutiya, plus stricte que la loi, pour protéger les acheteurs contre un danger ou une fraude. Une annonce qui en contient est refusée ou retirée. Cette liste n'est pas exhaustive : tout bien ou service dont la vente est interdite par la loi marocaine est exclu, ainsi que tout bien ou service que la loi réserve à des professionnels agréés lorsqu'il est proposé par une personne qui ne détient pas l'agrément requis.",
     sections: [
       {
         id: "armes",
@@ -542,7 +542,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
             list: [
               "biens volés, ou dont le vendeur ne peut pas justifier l'origine ;",
               "contrefaçons de marques (vêtements, chaussures, parfums, montres, électronique) ;",
-              "copies illégales de logiciels, de films, de jeux ou de musique, abonnements IPTV pirates et boîtiers préparés pour les recevoir ;",
+              "copies illégales de logiciels, de films, de jeux ou de musique, abonnements IPTV pirates et boîtiers préconfigurés pour ces abonnements ;",
               "documents officiels, papiers d'identité, passeports, permis, diplômes, cartes grises et plaques d'immatriculation ;",
               "uniformes, insignes et décorations officiels des Forces armées royales, de la Sûreté nationale, de la Gendarmerie royale ou des douanes ;",
               "fausse monnaie et faux billets.",
@@ -600,13 +600,12 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
           {
             list: [
               "drones, dont l'importation et l'utilisation sont soumises à autorisation ;",
-              "brouilleurs de signaux, et équipements radio ou de télécommunication non agréés par l'ANRT ;",
-              "sacs en plastique interdits depuis 2016 ;",
+              "brouilleurs de signaux et émetteurs radio sans agrément de l'Agence nationale de réglementation des télécommunications (les téléphones et appareils grand public restent autorisés) ;",
+              "sacs en plastique interdits par la loi depuis 2016 (les sacs isothermes, de congélation, les sacs poubelle et les sacs à usage agricole ou industriel restent autorisés) ;",
               "services dont l'exercice exige un diplôme ou un agrément (soins, conseil juridique), proposés par une personne qui ne le détient pas ;",
               "offres d'emploi (catégorie prévue ultérieurement).",
             ],
           },
-          "Cette liste n'est pas exhaustive : tout bien ou service dont la vente est interdite par la loi marocaine, ou réservée par elle à des professionnels agréés, est exclu.",
         ],
       },
     ],

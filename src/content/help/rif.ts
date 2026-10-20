@@ -64,7 +64,7 @@ export const HELP_RIF: HelpLocaleContent = {
         },
         "Brouillon nnec yettwaḥraz mala tettaruḍ. Tzemmreḍ ad teḥrezeḍ ar {maxDrafts} n brouillons; brouillon war yettwabeddel {draftPurgeDays} n wussan ad yettwakkes.",
         "S umata, annonce ad tban nican. Kra n annonces ad tent-iɣar umsefrez zzat n usuffeɣ, s umata deg 24 n tsaɛtin.",
-        "Annonce ad teqqim {ttlDays} n wussan. Tiɣawsiwin yettwagedlen deg Lmeɣrib ad tent-tafeḍ deg tasna « Objets interdits ».",
+        "Annonce ad teqqim {ttlDays} n wussan. Tiɣawsiwin yettwagedlen deg Joutiya ad tent-tafeḍ deg tasna « Objets interdits ».",
       ],
       keywords: ["annonce", "ssuffeɣ", "zzenz", "brouillon", "publier"],
     },
