@@ -245,7 +245,7 @@ En attendant la VM (votre accord du 19 octobre), le staging tourne sur votre PC2
 **Q. Variables du staging du PC2** (prompt Nav ; Claude donne dans le fil le certificat de transfert, affiché par `setup`, et son empreinte)
 
 ```text
-Dans ton clone de main à jour (`git pull --ff-only`), pose les variables du staging du PC2 (docs/phase-1.md, « Staging provisoire sur le PC2 ») tirées de mon .env.local, désigné ci-dessous par <fichier> (son chemin complet) :
+Dans ton clone de main à jour (`git pull --ff-only`), pose les variables du staging du PC2 (docs/phase-1.md, « Staging provisoire sur le PC2 ») tirées de mon .env.local, désigné ci-dessous par <fichier> (son chemin complet ; s'il n'existe pas, crée-le vide hors de tout clone, puis demande-moi d'y coller les lignes que l'étape 2 dira manquantes, une par une) :
 1. Lance `node scripts/vm-env.ts pepper <fichier>` : il ajoute HASH_PEPPER_STAGING et HASH_PEPPER_PROD s'ils manquent, sans montrer de valeur. S'il en ajoute, dis-moi de copier ces deux lignes dans mon gestionnaire de mots de passe.
 2. Lance `node scripts/seal-env.ts app staging --from=<fichier> --to=<certificat> --fingerprint=<empreinte> --out=joutiya-staging.sealed`, puis `node scripts/wsl-staging.ts env --sealed=joutiya-staging.sealed --apply`, et supprime joutiya-staging.sealed.
 3. Montre-moi les sorties des deux outils (des noms, jamais une valeur).
