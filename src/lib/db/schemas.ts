@@ -761,8 +761,16 @@ export const billingAccountSchema = z
     /** Stripe Customer of the shop (Pro subscriptions), created at its first plan checkout. */
     stripeCustomerId: z.string().regex(/^cus_[A-Za-z0-9]{1,100}$/).optional(),
     /** The last plan checkout opened, with the CGV and auto-renewal consent. */
+    /** The last plan checkout; its session is expired before another one opens (one plan billed). */
     lastPlanCheckout: z
-      .object({ plan: z.enum(["essentiel", "business"]), interval: z.enum(["monthly", "yearly"]), consentVersion: z.string().min(1).max(20), at: ts })
+      .object({
+        plan: z.enum(["essentiel", "business"]),
+        interval: z.enum(["monthly", "yearly"]),
+        consentVersion: z.string().min(1).max(20),
+        at: ts,
+        idempotencyKey: z.string().max(200).optional(),
+        sessionId: z.string().regex(/^cs_[A-Za-z0-9_]{1,200}$/).optional(),
+      })
       .strict()
       .optional(),
     /** A refund left the wallet negative: the account waits on an admin. */

@@ -37,6 +37,12 @@ async function ownProfile(auth: AuthContext, proId: string): Promise<ProProfileR
   return profile;
 }
 
+/** The owner's shop, checked against its profile (404 for anyone else). */
+export async function ownShop(auth: AuthContext): Promise<{ proId: string; accountId: string; profile: ProProfileRecord }> {
+  const shop = shopOf(auth);
+  return { ...shop, profile: await ownProfile(auth, shop.proId) };
+}
+
 function planOffers(pricing: PricingConfig): PlanOffer[] {
   return PAID_PLANS.map((id) => {
     const plan = pricing.plans[id];
@@ -108,6 +114,20 @@ async function stripeCustomer(account: BillingAccountDoc & { id: string }, profi
   return created.id;
 }
 
+/** A Checkout Session stays payable this long (Stripe's default expiry). */
+const SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The previous checkout's session is expired before another opens, so that two plans are never
+ * paid; one already paid but not synced yet answers 409 (the plan arrives with its webhook).
+ */
+async function closeSession(sessionId: string): Promise<void> {
+  const path = `/v1/checkout/sessions/${encodeURIComponent(sessionId)}`;
+  const session = await stripeRequest<{ status?: unknown }>("GET", path);
+  if (session.status === "complete") throw new HttpError(409, "already_subscribed");
+  if (session.status === "open") await stripeRequest("POST", `${path}/expire`);
+}
+
 /** Opens the Stripe Checkout of a plan for the owner's shop. */
 export async function startPlanCheckout(auth: AuthContext, input: CheckoutPlanInput, locale: Locale, now = new Date()): Promise<BillingRedirectResponse> {
   const [flags, pricing] = await Promise.all([getFlags(), getPricing()]);
@@ -118,15 +138,20 @@ export async function startPlanCheckout(auth: AuthContext, input: CheckoutPlanIn
   const { proId, accountId } = shopOf(auth);
   const profile = await ownProfile(auth, proId);
   if (!SUBSCRIBABLE.has(profile.lifecycle)) throw new HttpError(409, "pro_not_verified");
-  const current = await getSubscription(accountId);
+  const [current, existing] = await Promise.all([getSubscription(accountId), getBillingAccount(accountId)]);
   // A plan that still runs is changed or resumed in the portal, never paid twice.
   if (current && current.status !== "expired") throw new HttpError(409, "already_subscribed");
+  // The same plan asked again the same day, from the same page, reopens the same session (Stripe
+  // keeps an idempotent answer 24 hours); any other parameters make another key.
+  const idempotencyKey = `checkout_${accountId}_${input.plan}_${input.interval}_${locale}_${price}_${now.toISOString().slice(0, 10)}`;
+  const previous = existing?.lastPlanCheckout;
+  if (previous?.sessionId && previous.idempotencyKey !== idempotencyKey && now.getTime() - previous.at.getTime() < SESSION_LIFETIME_MS) await closeSession(previous.sessionId);
 
   const account = await db().runTransaction(async (tx) => {
     const before = await getBillingAccountTx(tx, accountId);
     const next: BillingAccountDoc = {
       ...(before ?? { kind: "shop" as const, ownerUid: auth.user.uid, proId, rcAppUserId: randomUUID(), createdAt: now }),
-      lastPlanCheckout: { plan: input.plan, interval: input.interval, consentVersion: PLAN_CONSENT_VERSION, at: now },
+      lastPlanCheckout: { plan: input.plan, interval: input.interval, consentVersion: PLAN_CONSENT_VERSION, at: now, idempotencyKey },
       updatedAt: now,
     };
     setBillingAccountTx(tx, accountId, next);
@@ -134,7 +159,7 @@ export async function startPlanCheckout(auth: AuthContext, input: CheckoutPlanIn
   });
   const customer = await stripeCustomer(account, profile, auth.user.email);
   const metadata = { accountId, app_user_id: account.rcAppUserId };
-  const session = await stripeRequest<{ url?: string | null }>(
+  const session = await stripeRequest<{ id?: string; url?: string | null }>(
     "POST",
     "/v1/checkout/sessions",
     {
@@ -151,10 +176,16 @@ export async function startPlanCheckout(auth: AuthContext, input: CheckoutPlanIn
       metadata,
       subscription_data: { metadata },
     },
-    // The same plan asked again the same day reopens the same session (valid 24 hours).
-    { idempotencyKey: `checkout_${accountId}_${input.plan}_${input.interval}_${now.toISOString().slice(0, 10)}` },
+    { idempotencyKey },
   );
   if (!session.url?.startsWith("https://checkout.stripe.com/")) throw new HttpError(502, "unavailable", "Stripe answered an unexpected checkout URL");
+  const sessionId = session.id;
+  if (sessionId && /^cs_[A-Za-z0-9_]{1,200}$/.test(sessionId)) {
+    await db().runTransaction(async (tx) => {
+      const latest = await getBillingAccountTx(tx, accountId);
+      if (latest?.lastPlanCheckout?.idempotencyKey === idempotencyKey) setBillingAccountTx(tx, accountId, { ...latest, lastPlanCheckout: { ...latest.lastPlanCheckout, sessionId } });
+    });
+  }
   logger.info({ accountId, plan: input.plan, interval: input.interval }, "plan checkout opened");
   return { url: session.url };
 }

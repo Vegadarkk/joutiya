@@ -9,13 +9,14 @@ import { z } from "@/lib/zod";
 import { BillingRetryError, expectedEnvironment } from "./billing-common";
 import { enqueueBillingEvent, isBillingQueueEnabled } from "./billing-queue";
 import { postStripeReceipt, RevenueCatApiError } from "./revenuecat-api";
+import { stripeRequest, StripeApiError } from "./stripe-api";
 import { startGrace, syncShopSubscription, type SyncDeps, type SyncOutcome } from "./subscriptions";
 
 // Stripe webhook events of the Pro subscriptions (phase 7 design §7). The route checks the
 // signature; each event is recorded once (billingEvents/stripe_{id}) and processed by the billing
 // queue (inline without Valkey):
 // - a new or changed subscription is handed to RevenueCat (POST /v1/receipts) so it tracks it now;
-// - a failed invoice puts an active shop in grace at once (and stops there);
+// - a failed payment puts an active shop in grace at once (and stops there);
 // - every other event syncs the shop from RevenueCat (src/lib/payments/subscriptions.ts), the source of truth.
 // Event payloads are not trusted beyond their ids: the sync re-reads everything.
 
@@ -27,6 +28,9 @@ export const STRIPE_EVENT_TYPES: ReadonlySet<string> = new Set([
   "invoice.paid",
   "invoice.payment_failed",
 ]);
+/** Events after which a past-due subscription opens the grace. */
+const GRACE_EVENTS: ReadonlySet<string> = new Set(["invoice.payment_failed", "customer.subscription.updated"]);
+const PAST_DUE: ReadonlySet<string> = new Set(["past_due", "unpaid"]);
 /** Events after which RevenueCat gets the subscription again (tracked now, not at its next refresh). */
 const RECEIPT_EVENTS: ReadonlySet<string> = new Set(["checkout.session.completed", "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"]);
 
@@ -58,6 +62,7 @@ const IGNORED: ReadonlySet<StripeProcessOutcome> = new Set(["unknown_customer", 
 
 export interface StripeProcessDeps extends SyncDeps {
   postReceipt?: typeof postStripeReceipt;
+  stripe?: typeof stripeRequest;
 }
 
 /** A verified delivery: recorded once, then queued (or processed inline without Valkey). */
@@ -101,6 +106,16 @@ export async function receiveStripeEvent(body: unknown, deps: StripeProcessDeps 
   return processStripeEvent(event.id, deps);
 }
 
+async function pastDue(subscriptionId: string, deps: StripeProcessDeps): Promise<boolean> {
+  try {
+    const subscription = await (deps.stripe ?? stripeRequest)<{ status?: unknown }>("GET", `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`);
+    return typeof subscription.status === "string" && PAST_DUE.has(subscription.status);
+  } catch (error) {
+    if (error instanceof StripeApiError && !error.retryable) throw new UnrecoverableError(error.message);
+    throw new BillingRetryError((error as Error).message);
+  }
+}
+
 async function accountOf(event: BillingEventDoc): Promise<BillingAccountRecord | null> {
   if (event.customerId) {
     const account = await findBillingAccountByStripeCustomer(event.customerId);
@@ -133,9 +148,11 @@ async function apply(event: BillingEventDoc, deps: StripeProcessDeps): Promise<S
       logger.warn({ eventId: event.eventId }, "REVENUECAT_STRIPE_PUBLIC_KEY not set: receipt not posted");
     }
   }
-  if (event.type === "invoice.payment_failed") {
-    // No sync here: RevenueCat may still list the plan as active and would end the grace at once.
-    // Its BILLING_ISSUE event (or the next Stripe event) brings the subscription doc in line.
+  // Stripe knows first that a payment failed: while the subscription is past due the grace opens and
+  // nothing is synced (RevenueCat may still list the plan as active and would end the grace at
+  // once; its BILLING_ISSUE event brings the subscription doc in line). Read now, not from the
+  // payload: a failure delivered after the payment that fixed it opens nothing.
+  if (event.subscriptionId && GRACE_EVENTS.has(event.type) && (await pastDue(event.subscriptionId, deps))) {
     if (!account.proId) return "no_shop";
     return (await startGrace(account.proId, deps.now?.() ?? new Date())) ? "updated" : "unchanged";
   }

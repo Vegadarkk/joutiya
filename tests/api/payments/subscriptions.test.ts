@@ -9,11 +9,11 @@ import type * as StripeApiModule from "@/lib/payments/stripe-api";
 // (owner only, sales gate, one running plan), the Customer Portal, the Stripe webhook (signature,
 // environment, the receipt handed to RevenueCat, the grace of a failed payment) and the sync from
 // RevenueCat: the plan's lifecycle and quotas, the month's grant reset once per period, the
-// downgrade at expiry that pauses the listings over the quota, and their return with a new plan.
+// downgrade at expiry that pauses the listings over the quota, which a new plan leaves paused.
 
 const flags = vi.hoisted(() => ({ salesEnabled: true, proSignupEnabled: true, paymentInstallmentsEnabled: false }));
 const store = vi.hoisted(() => ({ subscriptions: [] as RevenueCatSubscription[] }));
-const stripe = vi.hoisted(() => ({ calls: [] as { method: string; path: string; params: Record<string, unknown>; idempotencyKey?: string }[] }));
+const stripe = vi.hoisted(() => ({ calls: [] as { method: string; path: string; params: Record<string, unknown>; idempotencyKey?: string }[], subscriptionStatus: "active", sessionStatus: "open" }));
 
 vi.mock("@/lib/config/runtime", async (importOriginal) => {
   const { DEFAULT_PRICING } = await import("@/config/pricing");
@@ -36,7 +36,10 @@ vi.mock("@/lib/payments/stripe-api", async (importOriginal) => ({
     // One customer per shop: `customer_pro_{proId}` → `cus_{proId}`.
     if (path === "/v1/customers") return { id: `cus_${options.idempotencyKey?.split("_").pop()}` };
     if (path.startsWith("/v1/customers/")) return { id: path.split("/").pop() };
-    if (path === "/v1/checkout/sessions") return { url: "https://checkout.stripe.com/c/pay/cs_test_1" };
+    if (path === "/v1/checkout/sessions") return { id: "cs_test_1", url: "https://checkout.stripe.com/c/pay/cs_test_1" };
+    if (path.endsWith("/expire")) return { status: "expired" };
+    if (path.startsWith("/v1/checkout/sessions/")) return { status: stripe.sessionStatus };
+    if (path.startsWith("/v1/subscriptions/")) return { status: stripe.subscriptionStatus };
     if (path === "/v1/billing_portal/sessions") return { url: "https://billing.stripe.com/p/session/test_1" };
     throw new Error(`unexpected Stripe call ${method} ${path}`);
   }),
@@ -48,6 +51,7 @@ vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 import { POST as create } from "@/app/api/listings/route";
 import { PATCH as patch } from "@/app/api/listings/[id]/route";
 import { POST as publish } from "@/app/api/listings/[id]/publish/route";
+import { POST as resume } from "@/app/api/listings/[id]/resume/route";
 import { POST as checkout } from "@/app/api/billing/checkout/route";
 import { POST as portal } from "@/app/api/billing/portal/route";
 import { GET as subscriptionPage } from "@/app/api/billing/subscription/route";
@@ -97,6 +101,8 @@ beforeEach(() => {
   flags.salesEnabled = true;
   store.subscriptions = [];
   stripe.calls = [];
+  stripe.subscriptionStatus = "active";
+  stripe.sessionStatus = "open";
   vi.mocked(alert).mockClear();
   vi.mocked(postStripeReceipt).mockClear();
 });
@@ -234,13 +240,15 @@ describe("plan checkout", () => {
       subscription_data: { metadata: { app_user_id: account!.rcAppUserId } },
     });
     expect(session!.params.success_url).toMatch(/\/fr\/pro\/abonnement\?abonnement=ok$/);
-    expect(session!.idempotencyKey).toMatch(new RegExp(`^checkout_pro_${proId}_business_yearly_\\d{4}-\\d{2}-\\d{2}$`));
+    expect(session!.idempotencyKey).toMatch(new RegExp(`^checkout_pro_${proId}_business_yearly_fr_price_BusinessYearly_\\d{4}-\\d{2}-\\d{2}$`));
+    expect((await getBillingAccount(`pro_${proId}`))?.lastPlanCheckout?.sessionId).toBe("cs_test_1");
 
-    // A second checkout keeps the customer and the RevenueCat id, and updates the customer.
+    // A second checkout expires the first session (one plan billed), keeps the customer and the
+    // RevenueCat id, and updates the customer.
     stripe.calls = [];
     expect((await startCheckout(owner, plan("essentiel"))).status).toBe(200);
-    expect(stripe.calls[0]).toMatchObject({ path: `/v1/customers/cus_${proId}` });
-    expect(stripe.calls[0]!.idempotencyKey).toBeUndefined();
+    expect(stripe.calls.map((call) => `${call.method} ${call.path}`).slice(0, 3)).toEqual(["GET /v1/checkout/sessions/cs_test_1", "POST /v1/checkout/sessions/cs_test_1/expire", `POST /v1/customers/cus_${proId}`]);
+    expect(stripe.calls[2]!.idempotencyKey).toBeUndefined();
     expect((await getBillingAccount(`pro_${proId}`))?.rcAppUserId).toBe(account!.rcAppUserId);
 
     const managed = await api<BillingRedirectResponse>(portal, "POST", "/api/billing/portal", { member: owner, body: { locale: "ar" } });
@@ -248,6 +256,12 @@ describe("plan checkout", () => {
     expect(managed.body.url).toBe("https://billing.stripe.com/p/session/test_1");
     expect(stripe.calls.at(-1)).toMatchObject({ path: "/v1/billing_portal/sessions", params: { customer: `cus_${proId}` } });
     expect(stripe.calls.at(-1)!.params.return_url).toMatch(/\/ar\/pro\/abonnement$/);
+
+    // The last session was paid but its plan is not synced yet: no second plan.
+    stripe.sessionStatus = "complete";
+    const paidTwice = await startCheckout(owner, plan("business"));
+    expect(paidTwice.status).toBe(409);
+    expect(code(paidTwice.body)).toBe("already_subscribed");
   });
 
   it("is refused while sales are closed, to an editor, an individual, an unverified shop and without consent", async () => {
@@ -298,7 +312,7 @@ describe("subscription sync", () => {
     expect(await getProProfile(proId)).toMatchObject({ lifecycle: "active", plan: "business", planSource: "subscription", quotas: DEFAULT_PRICING.pro.business });
     expect(await getSubscription(accountId)).toMatchObject({ plan: "business", interval: "monthly", status: "active", rcSubscriptionId: "sub_rc_1", storeSubscriptionId: "sub_Stripe1", environment: "SANDBOX", willRenew: true });
     expect(await getWallet(accountId)).toMatchObject({ planCredits: 100, allowances: { featured: 4 } });
-    const grantId = `grant_sub_rc_1_${first.periodStart.getTime()}`;
+    const grantId = `grant_sub_rc_1_business_${first.periodStart.getTime()}`;
     expect((await ledgerRef(accountId, grantId).get()).data()).toMatchObject({ reason: "plan_grant", planCreditsDelta: 100, actorUid: "system" });
 
     // Spent credits stay spent within the period: another event of the same period grants nothing.
@@ -317,7 +331,7 @@ describe("subscription sync", () => {
     store.subscriptions = [renewed];
     await rcDeliver("RENEWAL", appUserId);
     expect((await getWallet(accountId))?.planCredits).toBe(100);
-    expect((await ledgerRef(accountId, `grant_sub_rc_1_${renewed.periodStart.getTime()}`).get()).exists).toBe(true);
+    expect((await ledgerRef(accountId, `grant_sub_rc_1_business_${renewed.periodStart.getTime()}`).get()).exists).toBe(true);
   });
 
   it("puts the shop in grace on a failed payment, downgrades it at expiry and pauses then resumes its listings", async () => {
@@ -342,7 +356,12 @@ describe("subscription sync", () => {
     expect(live.status).toBe(200);
     expect((await getProProfile(proId))?.lifecycle).toBe("active");
 
+    // A failure delivered after the payment that fixed it opens nothing.
+    expect((await stripeDeliver("invoice.payment_failed", { id: "in_0", object: "invoice", customer: `cus_${proId}`, subscription: "sub_Stripe1" })).status).toBe(200);
+    expect((await getProProfile(proId))?.lifecycle).toBe("active");
+
     // A failed payment opens the grace at once, while RevenueCat still lists the plan as active.
+    stripe.subscriptionStatus = "past_due";
     const failed = await stripeDeliver("invoice.payment_failed", { id: "in_1", object: "invoice", customer: `cus_${proId}`, subscription: "sub_Stripe1" });
     expect(failed.status).toBe(200);
     const inGrace = await getProProfile(proId);
@@ -364,12 +383,14 @@ describe("subscription sync", () => {
     expect(await getSubscription(accountId)).toMatchObject({ status: "expired", willRenew: false });
     expect(await getListing(listingId)).toMatchObject({ status: "paused", pausedReason: "quota", adsEligible: false });
 
-    // A new plan brings the listing back.
+    // A new plan does not republish it (spec §5): the owner resumes it, within the new quota.
     store.subscriptions = [rcSubscription({ id: "sub_rc_2", storeSubscriptionId: "sub_Stripe2", entitlements: ["essentiel"] })];
     await rcDeliver("INITIAL_PURCHASE", appUserId);
     expect(await getProProfile(proId)).toMatchObject({ lifecycle: "active", plan: "essentiel", planSource: "subscription" });
+    expect(await getListing(listingId)).toMatchObject({ status: "paused", pausedReason: "quota" });
+    const resumed = await api(resume, "POST", `/api/listings/${listingId}/resume`, { member: owner, body: {} });
+    expect(resumed.status).toBe(200);
     expect(await getListing(listingId)).toMatchObject({ status: "published" });
-    expect((await getListing(listingId))?.pausedReason).toBeUndefined();
   });
 
   it("alerts on a Stripe subscription of an unknown customer and ignores a pack's checkout", async () => {

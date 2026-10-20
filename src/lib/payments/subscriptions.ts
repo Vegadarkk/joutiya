@@ -1,6 +1,7 @@
 import "server-only";
 import { UnrecoverableError } from "bullmq";
 import { listingQuotas, planOfEntitlement, type PaidPlanId, type PlanInterval, type PricingConfig } from "@/config/pricing";
+import { alert } from "@/lib/alert";
 import { audit } from "@/lib/audit";
 import { getBillingAccount, getSubscriptionTx, setSubscriptionTx } from "@/lib/db/repositories/billing";
 import { getProProfile, proProfileRef, proProfileToFirestore, type ProProfileRecord } from "@/lib/db/repositories/pro-profiles";
@@ -11,7 +12,7 @@ import { db } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
 import { transition, type ProEvent, type ProLifecycleView, type ProPatch } from "@/lib/pro/lifecycle";
 import type { ProProfileDoc } from "@/lib/pro/profile-schema";
-import { alignListingsWithQuota } from "@/lib/pro/quota";
+import { pauseListingsOverQuota } from "@/lib/pro/quota";
 import { BillingRetryError, expectedEnvironment } from "./billing-common";
 import { listCustomerSubscriptions, RevenueCatApiError, type RevenueCatSubscription } from "./revenuecat-api";
 import { grantPlanPeriod } from "./wallet";
@@ -23,9 +24,10 @@ import { grantPlanPeriod } from "./wallet";
 // - subscriptions/pro_{proId} (plan from the entitlement lookup key, status, period, renewal);
 // - the Pro lifecycle transition (active, grace on a billing issue, downgraded at expiry), with the
 //   plan's quotas on the profile;
-// - the month's grant (`grant_{subscription}_{monthStartMs}`: plan credits and À la Une allowance
-//   reset, not added; a yearly plan gets one per month of its period).
-// Then the shop's listings are brought within the plan's quota. Idempotent: a replay or a second
+// - the month's grant (`grant_{subscription}_{plan}_{monthStartMs}`: plan credits and À la Une
+//   allowance reset, not added; a yearly plan gets one per month of its period, a plan switched
+//   during the month gets the new plan's once).
+// Then the shop's listings over the plan's quota are paused. Idempotent: a replay or a second
 // event for the same change writes nothing new.
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -165,7 +167,7 @@ export async function syncShopSubscription(accountId: string, deps: SyncDeps = {
 
     // The month's grant, while the plan is paid (reads first: the transaction writes after).
     const slot = PAID.has(next.status) ? grantSlot(next.periodStart, next.periodEnd ?? null, next.interval, now) : null;
-    const entryId = slot ? `grant_${ledgerKey(next.rcSubscriptionId)}_${slot.start.getTime()}` : null;
+    const entryId = slot ? `grant_${ledgerKey(next.rcSubscriptionId)}_${next.plan}_${slot.start.getTime()}` : null;
     const granted = entryId ? await getLedgerEntryTx(tx, accountId, entryId) : null;
     const wallet = entryId && !granted ? await getWalletTx(tx, accountId) : null;
 
@@ -192,6 +194,16 @@ export async function syncShopSubscription(accountId: string, deps: SyncDeps = {
   });
 
   if (result.outcome === "no_shop" || result.outcome === "no_subscription") return result.outcome;
+  // Two plans billing at once (a second checkout paid before the first one was synced): one is kept,
+  // the other must be refunded by hand.
+  const paying = subscriptions.filter((subscription) => subscription.givesAccess && subscription.entitlements.some((key) => planOfEntitlement(key, pricing)));
+  if (paying.length > 1 && result.outcome === "updated") {
+    await alert({
+      severity: "P1",
+      title: `Deux abonnements actifs pour une boutique (${proId})`,
+      body: `La boutique ${proId} a ${paying.length} abonnements qui donnent accès (${paying.map((subscription) => subscription.storeSubscriptionId).join(", ")}). Garder ${chosen?.subscription.storeSubscriptionId ?? "le plus récent"}, annuler et rembourser les autres dans Stripe.`,
+    });
+  }
   if (result.event) {
     logger.info({ proId, event: result.event.type, lifecycle: result.lifecycle }, "pro subscription transition");
     await audit({ actorUid: "system", actorRole: "system", action: `pro.subscription.${result.event.type}`, target: { type: "pro", id: proId }, automated: true, at: now }).catch((error: unknown) =>
@@ -201,10 +213,10 @@ export async function syncShopSubscription(accountId: string, deps: SyncDeps = {
   // A suspended shop keeps its listings paused by moderation; otherwise the plan's quota applies.
   if (result.lifecycle !== "suspended") {
     try {
-      await alignListingsWithQuota(result.ownerUid, result.quotas.activeListings, now);
+      await pauseListingsOverQuota(result.ownerUid, result.quotas.activeListings, now);
     } catch (error) {
       // The next sync (renewal, nightly job) runs it again.
-      logger.error({ proId, err: (error as Error).message }, "quota alignment failed");
+      logger.error({ proId, err: (error as Error).message }, "quota pause failed");
     }
   }
   return result.outcome;
