@@ -37,6 +37,8 @@ export type TemplateId =
   // Pro accounts (phase 7): the moderator's decision on the application.
   | "proApproved"
   | "proRejected"
+  // Pro plans (phase 7, lot 4b): the end of the launch offer, notices then downgrade (design D3).
+  | "launchOfferNotice"
   // Messaging (phase 5, L5): the grouped new-messages mail (design D21).
   | "newMessages"
   // Account closure (phase 5, L7, D26): confirmation with what is kept and until when.
@@ -154,6 +156,11 @@ export interface TemplateData {
   proApproved: { displayName: string; shopName: string; launchOffer: boolean; noticeDays: number };
   /** The moderator's reason; `contact` is where to object (legal configuration). */
   proRejected: { displayName: string; shopName: string; reason: string; contact: string };
+  /**
+   * `ending`: notice before `endsAt` (ISO); `ended`: the shop was downgraded, `paused` listings over
+   * the free quota (`freeListings`, null = unlimited) were paused.
+   */
+  launchOfferNotice: { displayName: string; shopName: string; plan: "essentiel" | "business"; kind: "ending" | "ended"; endsAt: string; freeListings: number | null; paused: number };
   /**
    * Grouped new-messages mail (bulk, D21): the unread total and up to 3 conversations (listing
    * title, the other member's display name). Never the text of a message.

@@ -97,6 +97,29 @@ export async function getSubscriptionTx(tx: Transaction, accountId: string): Pro
   return parse(snapshot, subscriptionSchema, COLLECTIONS.subscriptions);
 }
 
+/** Statuses of a plan RevenueCat may still renew, end or move: the nightly re-sync reads them. */
+export const LIVE_SUBSCRIPTION_STATUSES = ["active", "cancelled", "grace", "billing_issue"] as const;
+
+/**
+ * Subscriptions not expired, the least recently synced first (index status, syncedAt): every sync
+ * rewrites `syncedAt` and the nightly job touches the ones it skips or fails, so successive runs go
+ * round all of them. An unreadable one is left out.
+ */
+export async function listLiveSubscriptions(limit: number): Promise<{ accountId: string; subscription: SubscriptionDoc }[]> {
+  const query = await db().collection(COLLECTIONS.subscriptions).where("status", "in", [...LIVE_SUBSCRIPTION_STATUSES]).orderBy("syncedAt", "asc").limit(limit).get();
+  void consume("firestore.reads", Math.max(1, query.size));
+  return query.docs.flatMap((snapshot) => {
+    const parsed = subscriptionSchema.safeParse(timestampsToDates(snapshot.data()));
+    return parsed.success ? [{ accountId: snapshot.id, subscription: parsed.data }] : [];
+  });
+}
+
+/** Moves a subscription the nightly job did not sync to the back of its queue. */
+export async function touchSubscriptionSynced(accountId: string, at: Date): Promise<void> {
+  await subscriptionRef(accountId).update(datesToTimestamps({ syncedAt: at }));
+  void consume("firestore.writes", 1);
+}
+
 export function setSubscriptionTx(tx: Transaction, accountId: string, subscription: SubscriptionDoc): void {
   tx.set(subscriptionRef(accountId), datesToTimestamps(subscriptionSchema.parse(subscription)));
   void consume("firestore.writes", 1);

@@ -7,6 +7,7 @@ import { requireActiveAccount, requireUser } from "@/lib/auth/guards";
 import { jsonResponse, withDevice } from "@/lib/auth/respond";
 import { closeAccountSchema, type CloseAccountResponse } from "@/lib/contracts/account";
 import { getListingTx, listOwnerListingsByStatus, updateListingTx, type ListingRecord } from "@/lib/db/repositories/listings";
+import { getProProfile } from "@/lib/db/repositories/pro-profiles";
 import { enqueueSearchOutboxTx } from "@/lib/db/repositories/search-outbox";
 import { bumpFavoriteStat } from "@/lib/favorites/ids-cache";
 import { auth, db } from "@/lib/firebase/admin";
@@ -14,6 +15,7 @@ import { HttpError } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { getLegalConfig } from "@/lib/legal/config";
 import { transition, type Lifetime } from "@/lib/listings/lifecycle";
+import { storefrontSegment } from "@/lib/listings/public";
 import { revalidateListingPaths } from "@/lib/listings/revalidate";
 import { logger } from "@/lib/logging/logger";
 import { sendMail } from "@/lib/mail";
@@ -34,7 +36,8 @@ import { CLOSURE_LISTING_STATUSES, closureBlocker, closurePurgeAt, isRecentSignI
 //     credits left, answer 409 before anything changes;
 //  2. users/{uid}/private/account: closedAt, purgeAt (+1 year), identityPurgeAt (+5 years);
 //     users/{uid}.status "closed" (a banned account stays banned);
-//  3. live, paused, held, sold and expired listings removed (search outbox delete, fast lane, ISR);
+//  3. live, paused, held, sold and expired listings removed (search outbox delete, fast lane, ISR),
+//     the shop's storefront page revalidated (hidden: its owner is closed);
 //  4. conversations marked accountClosed (the other participant reads, nobody writes);
 //  5. favorites and saved searches deleted;
 //  6. audit entry, then the Auth user disabled and its refresh tokens revoked, open streams closed,
@@ -112,6 +115,19 @@ async function removeListings(uid: string, publicId: string, now: Date): Promise
   return removed.length;
 }
 
+/**
+ * The shop's storefront leaves the ISR cache at once: its loader already answers 404 for a closed
+ * owner, the cached page would otherwise stay up to its `revalidate`.
+ */
+async function revalidateStorefront(proId: string): Promise<void> {
+  try {
+    const profile = await getProProfile(proId);
+    if (profile) revalidateListingPaths({ shopSegment: storefrontSegment(profile.slug, proId) });
+  } catch (error) {
+    logger.warn({ err: (error as Error).message }, "account closure: storefront not revalidated");
+  }
+}
+
 /** Favorites deleted, their listings' counters lowered (best effort: a counter is only a statistic). */
 async function deleteFavorites(uid: string): Promise<number> {
   const ids = await deleteAllFavorites(uid);
@@ -134,6 +150,7 @@ export async function closeAccount(uid: string, options: { now?: Date; ip?: stri
   }
   const mark = await markAccountClosed(uid, now);
   const listings = await removeListings(uid, account.publicId, now);
+  if (account.proId) await revalidateStorefront(account.proId);
   const conversations = await closeAccountConversations(uid, now);
   const favorites = await deleteFavorites(uid);
   const savedSearches = await deleteAllSavedSearches(uid);

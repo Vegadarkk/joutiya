@@ -118,6 +118,8 @@ export const plansSchema = z
     essentiel: planSchema,
     business: planSchema,
     stripeTaxRate: z.string().regex(/^txr_[A-Za-z0-9]{1,100}$/).optional(),
+    /** Customer Portal configuration of scripts/stripe-setup.ts (plan switch, cancel at period end). */
+    stripePortalConfiguration: z.string().regex(/^bpc_[A-Za-z0-9]{1,100}$/).optional(),
   })
   .strict()
   .refine((plans) => plans.essentiel.entitlement !== plans.business.entitlement, "plan entitlements must differ");

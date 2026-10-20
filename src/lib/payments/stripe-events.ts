@@ -106,7 +106,8 @@ export async function receiveStripeEvent(body: unknown, deps: StripeProcessDeps 
   return processStripeEvent(event.id, deps);
 }
 
-async function pastDue(subscriptionId: string, deps: StripeProcessDeps): Promise<boolean> {
+/** Whether Stripe shows the subscription past due or unpaid (a failed payment not yet fixed). */
+export async function pastDue(subscriptionId: string, deps: Pick<StripeProcessDeps, "stripe"> = {}): Promise<boolean> {
   try {
     const subscription = await (deps.stripe ?? stripeRequest)<{ status?: unknown }>("GET", `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`);
     return typeof subscription.status === "string" && PAST_DUE.has(subscription.status);

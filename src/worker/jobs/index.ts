@@ -4,6 +4,7 @@ import { expireListings } from "./expire-listings";
 import { liftSuspensions } from "./lift-suspensions";
 import { sendExpiryReminders } from "./listing-expiry-reminders";
 import { proEffectsSync } from "./pro-effects-sync";
+import { proPlansNightly } from "./pro-plans";
 import { purgeConnectionLogs } from "./purge-connection-logs";
 import { purgeQuarantine } from "./purge-quarantine";
 import { purgeUnactivated } from "./purge-unactivated";
@@ -36,6 +37,7 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "saved-search-alerts": () => sendSavedSearchAlerts(),
   "purge-connection-logs": () => purgeConnectionLogs(),
   "pro-effects-sync": () => proEffectsSync(),
+  "pro-plans": () => proPlansNightly(),
   "lift-suspensions": () => liftSuspensions(),
   "message-digest": () => sendMessageDigests(),
   "report-sla-sweep": () => sweepReportSla(),
@@ -69,6 +71,9 @@ export const SCHEDULES = {
   // delayed expire-boost jobs). 04:20 UTC: Firestore vs search index, after the backup's reads.
   "expire-boosts-nightly": { pattern: "5 4 * * *", job: "expire-boosts" },
   "reconcile-search-nightly": { pattern: "20 4 * * *", job: "reconcile-search" },
+  // Phase 7 (design §7, D3). 04:35 UTC: shop subscriptions re-synced from RevenueCat (yearly plans'
+  // monthly grant, lost webhooks, grace end), then the launch offer's notices and end.
+  "pro-plans-nightly": { pattern: "35 4 * * *", job: "pro-plans" },
   // 07:00 UTC (08:00 in Morocco): one digest e-mail per user for the saved searches with alerts.
   "saved-search-alerts-daily": { pattern: "0 7 * * *", job: "saved-search-alerts" },
   // Phase 5 (D14). Every hour at :35: suspensions past `until` lifted (claim, status, listings).

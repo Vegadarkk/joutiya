@@ -136,7 +136,8 @@ Node 24; `npm ci --ignore-scripts` once.
 - Scripts, dry run unless `--apply`: `scripts/cloudflare.ts` (edge config),
   `scripts/legal-config.ts` (Firestore `config/legal`), `scripts/oracle-vm.ts` (VM by API; sync,
   promote, rollback and root scripts through OCI Run Command); `scripts/deploy-prod.ts firestore`
-  (production rules). Steps in `docs/phase-1.md`, rebuild in `infra/redeploy.md`.
+  (production rules), `scripts/stripe-setup.ts` (Stripe objects of the Pro plans). Steps in
+  `docs/phase-1.md`, rebuild in `infra/redeploy.md`.
 - Image: `docker build -f docker/Dockerfile --target web` (or `worker`); Compose in `docker/`.
 
 # Compact instructions

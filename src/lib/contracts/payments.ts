@@ -189,6 +189,8 @@ export interface SubscriptionResponse {
   graceUntil: string | null;
   /** End of the launch offer, when set by an admin. */
   launchOfferEndsAt: string | null;
+  /** Days of notice before the launch offer ends (`config/pricing.launchOffer.noticeDays`). */
+  launchOfferNoticeDays: number;
   subscription: SubscriptionView | null;
   plans: PlanOffer[];
   consentVersion: string;
@@ -199,11 +201,31 @@ export interface BillingRedirectResponse {
   url: string;
 }
 
+export interface InvoiceView {
+  id: string;
+  /** Stripe's invoice number, absent until finalized. */
+  number: string | null;
+  issuedAt: string;
+  /** Amount with tax, minor units of `currency`. */
+  totalMinor: number;
+  currency: string;
+  status: "open" | "paid" | "uncollectible" | "void";
+  /** Stripe's hosted invoice page and PDF (Stripe hosts only). */
+  hostedUrl: string | null;
+  pdfUrl: string | null;
+}
+
+/** GET /api/billing/invoices: the shop's latest invoices, newest first (owner only). */
+export interface InvoicesResponse {
+  invoices: InvoiceView[];
+}
+
 export const PAYMENTS_API = {
   wallet: "/api/wallet",
   packs: "/api/wallet/packs",
   subscription: "/api/billing/subscription",
   checkout: "/api/billing/checkout",
   portal: "/api/billing/portal",
+  invoices: "/api/billing/invoices",
   options: (listingId: string) => `/api/listings/${listingId}/options`,
 } as const;
