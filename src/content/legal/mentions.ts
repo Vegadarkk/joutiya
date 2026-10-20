@@ -19,6 +19,7 @@ export function legalValues(config: LegalConfig): LegalValues {
     publisher: config.companyName,
     address: config.hqAddress,
     email: config.email,
+    phone: config.phone,
     dpo: config.dpoContact,
     dsaEmail: config.dsaContactEmail,
     abuseEmail: config.abuseEmail,

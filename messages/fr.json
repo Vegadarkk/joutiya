@@ -2654,7 +2654,7 @@
       "pieceFailed": "Le document n'a pas pu être envoyé. Réessayez.",
       "piecesRequired": "Ajoutez au moins un justificatif.",
       "piecesPending": "Attendez la fin de l'envoi des documents.",
-      "commitment": "Je certifie que ces informations sont exactes et je m'engage à ne proposer que des produits et services conformes à la loi.",
+      "commitment": "Je certifie que ces informations sont exactes et je m'engage à ne proposer que des produits et services conformes à la loi marocaine.",
       "commitmentRequired": "Cochez l'engagement pour envoyer la demande.",
       "submit": "Envoyer ma demande",
       "resubmit": "Envoyer ma demande corrigée",
@@ -2861,7 +2861,7 @@
     "back": "Retour",
     "change": "Changer de motif",
     "reason": "Motif",
-    "emergency": "En cas de danger immédiat, appelez la police : 19 au Maroc, 17 en France.",
+    "emergency": "En cas de danger immédiat, appelez la police (19) ou la Gendarmerie royale (177). Vous pouvez aussi signaler un contenu illicite en ligne sur e-blagh.ma, la plateforme de la Sûreté nationale.",
     "explanation": "Ce que vous avez constaté",
     "explanationHint": "Décrivez les faits : ce qui pose problème, où, et pourquoi. {min} caractères au moins.",
     "explanationPlaceholder": "Ex. : le vendeur demande un acompte par virement avant toute visite.",
@@ -3037,7 +3037,7 @@
   "Storefront": {
     "label": "Boutique professionnelle",
     "verified": "Boutique vérifiée",
-    "verifiedNote": "Joutiya a vérifié les identifiants professionnels de cette boutique (ICE, registre). Les ventes se font directement entre vous et la boutique : Joutiya n'est pas partie à la vente et ne garantit pas les produits.",
+    "verifiedNote": "Joutiya a vérifié les identifiants professionnels de cette boutique (ICE, registre). Les ventes se font directement entre vous et la boutique : Joutiya n'est pas partie à la vente et ne garantit pas les produits. La boutique reste tenue de ses obligations de vendeur professionnel envers les consommateurs (loi n° 31-08 sur la protection du consommateur).",
     "about": "Présentation",
     "meta": {
       "title": "{name}, boutique à {city}",
