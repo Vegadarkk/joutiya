@@ -65,7 +65,7 @@
     }
   },
   "Welcome": {
-    "name": "Joutiya",
+    "title": "Bienvenue sur Joutiya",
     "createAccount": "Créer un compte",
     "signIn": "Se connecter",
     "discover": "Découvrir sans compte"

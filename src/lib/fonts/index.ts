@@ -1,4 +1,4 @@
-import { Montserrat, Readex_Pro } from "next/font/google";
+import { Aref_Ruqaa, Montserrat, Readex_Pro } from "next/font/google";
 
 /**
  * Readex Pro covers Arabic and Latin; self-hosted by next/font at build time (font-src 'self').
@@ -24,4 +24,17 @@ export const tarifitFallback = Montserrat({
   display: "swap",
   preload: false,
   adjustFontFallback: false,
+});
+
+/**
+ * Aref Ruqaa: calligraphic lettering (Ruqʿah in Arabic, a matching pen in Latin) for the inscription
+ * over the welcome door. Only the welcome screen uses it, so only a first visit fetches it; "block"
+ * keeps the inscription from flashing in the fallback during its reveal.
+ */
+export const ruqaa = Aref_Ruqaa({
+  subsets: ["arabic", "latin"],
+  weight: "700",
+  variable: "--font-ruqaa",
+  display: "block",
+  preload: false,
 });
