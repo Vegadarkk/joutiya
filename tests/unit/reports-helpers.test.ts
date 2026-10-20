@@ -132,7 +132,7 @@ describe("reportReceived mail (art. 16(4))", () => {
     expect(mail.text).toContain("AbCdEf0123456789wxyz");
     expect(mail.text).toContain("Mise en danger ou exploitation de mineurs");
     expect(mail.text).toContain("dans l'heure");
-    expect(mail.text).toContain("17 en France");
+    expect(mail.text).toContain("Gendarmerie royale : 177");
   });
 
   it("acknowledges in Arabic, without the emergency line for a non-urgent report", () => {
