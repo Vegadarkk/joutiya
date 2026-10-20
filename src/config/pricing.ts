@@ -87,6 +87,42 @@ export const creditPacksSchema = z
   .refine((packs) => new Set(packs.map((pack) => pack.id)).size === packs.length, "pack ids must be unique")
   .refine((packs) => new Set(packs.map((pack) => pack.productId)).size === packs.length, "pack product ids must be unique");
 
+/**
+ * Pro plans sold by Stripe Checkout (phase 7 design §7): price excluding tax in MAD centimes per
+ * interval (yearly = 10 months), the monthly grant (plan credits, not cumulative, and À la Une
+ * allowance), the RevenueCat entitlement that carries the plan (`lookup_key`, RevenueCat is the
+ * source of truth of the subscription) and the Stripe Price of each interval. Stripe ids differ per
+ * environment: each Firestore project's config/pricing holds its own (none by default: the
+ * checkout answers unavailable until they are set). `stripeTaxRate` is the manual Tax Rate of
+ * Moroccan VAT applied to every line (its inclusive or exclusive mode is set in Stripe).
+ */
+export const PAID_PLANS = ["essentiel", "business"] as const;
+export type PaidPlanId = (typeof PAID_PLANS)[number];
+export const PLAN_INTERVALS = ["monthly", "yearly"] as const;
+export type PlanInterval = (typeof PLAN_INTERVALS)[number];
+
+const stripePriceId = z.string().regex(/^price_[A-Za-z0-9]{1,100}$/);
+export const planSchema = z
+  .object({
+    priceMinor: z.object({ monthly: z.number().int().min(100).max(100_000_000), yearly: z.number().int().min(100).max(1_000_000_000) }).strict(),
+    credits: z.number().int().min(0).max(10_000),
+    featured: z.number().int().min(0).max(100),
+    entitlement: rcIdentifier,
+    stripePrices: z.object({ monthly: stripePriceId.optional(), yearly: stripePriceId.optional() }).strict(),
+  })
+  .strict();
+export type PlanConfig = z.infer<typeof planSchema>;
+
+export const plansSchema = z
+  .object({
+    essentiel: planSchema,
+    business: planSchema,
+    stripeTaxRate: z.string().regex(/^txr_[A-Za-z0-9]{1,100}$/).optional(),
+  })
+  .strict()
+  .refine((plans) => plans.essentiel.entitlement !== plans.business.entitlement, "plan entitlements must differ");
+export type PlansConfig = z.infer<typeof plansSchema>;
+
 export const pricingConfigSchema = z
   .object({
     individual: listingQuotasSchema,
@@ -96,6 +132,7 @@ export const pricingConfigSchema = z
     launchOffer: launchOfferSchema,
     options: optionPricesSchema,
     packs: creditPacksSchema,
+    plans: plansSchema,
   })
   .strict();
 export type PricingConfig = z.infer<typeof pricingConfigSchema>;
@@ -118,7 +155,16 @@ export const DEFAULT_PRICING: PricingConfig = {
     { id: "mad_100", currency: "MAD", priceMinor: 10_000, paid: 100, bonus: 10, productId: "joutiya_credits_100_mad", packageId: "credits_100_mad" },
     { id: "mad_250", currency: "MAD", priceMinor: 25_000, paid: 250, bonus: 40, productId: "joutiya_credits_250_mad", packageId: "credits_250_mad" },
   ],
+  plans: {
+    essentiel: { priceMinor: { monthly: 24_900, yearly: 249_000 }, credits: 30, featured: 0, entitlement: "essentiel", stripePrices: {} },
+    business: { priceMinor: { monthly: 59_000, yearly: 590_000 }, credits: 100, featured: 4, entitlement: "business", stripePrices: {} },
+  },
 };
+
+/** Plan carried by a RevenueCat entitlement `lookup_key`, if any. */
+export function planOfEntitlement(lookupKey: string, config: PricingConfig = DEFAULT_PRICING): PaidPlanId | undefined {
+  return PAID_PLANS.find((plan) => config.plans[plan].entitlement === lookupKey);
+}
 
 export type Seller = { type: "individual" } | { type: "pro"; plan: ProPlan };
 

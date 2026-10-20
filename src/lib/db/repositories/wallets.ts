@@ -74,22 +74,24 @@ export async function getLedgerEntryTx(tx: Transaction, accountId: string, entry
 
 /**
  * Writes the wallet after an operation (`state` from src/lib/payments/wallet.ts) and its ledger
- * entry, in the caller's transaction, and returns the wallet written. Reset dates are kept;
- * `create` fails if the entry exists.
+ * entry, in the caller's transaction, and returns the wallet written. Reset dates are kept, or
+ * set to `resetsAt` (a plan grant: end of the month granted); `create` fails if the entry exists.
  */
 export function recordWalletOperationTx(
   tx: Transaction,
   accountId: string,
   entryId: string,
-  input: { before: WalletDoc | null; state: WalletState; ledger: LedgerDraft; entry: Omit<LedgerEntryDoc, keyof LedgerDraft>; now: Date },
+  input: { before: WalletDoc | null; state: WalletState; ledger: LedgerDraft; entry: Omit<LedgerEntryDoc, keyof LedgerDraft>; now: Date; resetsAt?: Date },
 ): WalletDoc {
   const { before, state, ledger, entry, now } = input;
+  const planCreditsResetsAt = input.resetsAt ?? before?.planCreditsResetsAt;
+  const featuredResetsAt = input.resetsAt ?? before?.allowances.resetsAt;
   const wallet: WalletDoc = walletSchema.parse({
     balance: state.balance,
     frozen: state.frozen,
     planCredits: state.planCredits,
-    ...(before?.planCreditsResetsAt ? { planCreditsResetsAt: before.planCreditsResetsAt } : {}),
-    allowances: { featured: state.featuredAllowance, ...(before?.allowances.resetsAt ? { resetsAt: before.allowances.resetsAt } : {}) },
+    ...(planCreditsResetsAt ? { planCreditsResetsAt } : {}),
+    allowances: { featured: state.featuredAllowance, ...(featuredResetsAt ? { resetsAt: featuredResetsAt } : {}) },
     createdAt: before?.createdAt ?? now,
     updatedAt: now,
   });

@@ -87,6 +87,7 @@ const TABLE: Record<BackedUpId, Omit<BackupCollection, "id">> = {
   billingAccounts: { scope: "root", timeField: "updatedAt" },
   orders: { scope: "root", timeField: "updatedAt" },
   billingEvents: { scope: "root", timeField: null },
+  subscriptions: { scope: "root", timeField: "updatedAt" },
 };
 
 export const BACKUP_COLLECTIONS: readonly BackupCollection[] = (Object.keys(TABLE) as BackedUpId[]).map((id) => ({ id, ...TABLE[id] }));

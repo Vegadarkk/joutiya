@@ -93,7 +93,16 @@ export type ErrorCode =
   | "insufficient_credits"
   /** The option's cost moved since the buyer saw it (price, allowance or plan credits; 409). */
   | "price_changed"
-  /** Firestore daily quota degraded (src/lib/quota/gate.ts): deposit or sign-up suspended until the reset. */
+  // Pro subscriptions (phase 7, design §7). Messages: Subscription.errors.<code>.
+  /** The shop already has a plan: changes go through the Stripe portal (409). */
+  | "already_subscribed"
+  /** The shop's KYBC is not verified, or the shop is suspended (409). */
+  | "pro_not_verified"
+  /** No Stripe customer yet: nothing to manage before a first plan (409). */
+  | "no_billing_customer"
+  /** A webhook whose signature does not match (400, Stripe's expected answer). */
+  | "invalid_signature"
+    /** Firestore daily quota degraded (src/lib/quota/gate.ts): deposit or sign-up suspended until the reset. */
   | "quota_exhausted"
   // Messaging, reports, appeals, assistant (phase 5). Messages: Messaging.errors / Report.errors.
   /** One side blocked the other (403). */
