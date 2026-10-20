@@ -22,11 +22,12 @@ import { POST as webhook } from "@/app/api/webhooks/revenuecat/route";
 import { GET as packs, POST as checkout } from "@/app/api/wallet/packs/route";
 import type { CheckoutPackResponse, PacksResponse } from "@/lib/contracts/payments";
 import { alert } from "@/lib/alert";
-import { billingAccountRef, billingEventRef, getOrder } from "@/lib/db/repositories/billing";
+import { billingAccountRef, billingEventRef, createBillingEvent, getOrder } from "@/lib/db/repositories/billing";
 import { getWallet, ledgerRef, setWallet } from "@/lib/db/repositories/wallets";
 import { resetServerEnv } from "@/lib/env";
 import { setClaims } from "@/lib/firebase/claims";
 import { createSessionForUid } from "@/lib/firebase/session";
+import { reconcileBilling } from "@/lib/payments/reconcile";
 import { expectedSignature } from "@/lib/payments/revenuecat-webhook";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { csrfToken } from "@/lib/security/csrf";
@@ -289,5 +290,61 @@ describe("RevenueCat webhook", () => {
     expect(await getWallet(buyer.uid)).toBeNull();
     expect((await deliver(rcEvent("CANCELLATION", appUserId, transactionId, { cancel_reason: "CUSTOMER_SUPPORT" }))).status).toBe(200);
     expect(await getWallet(buyer.uid)).toBeNull();
+  });
+});
+
+describe("billing reconciliation", () => {
+  const HOUR_MS = 3_600_000;
+  /** RevenueCat lists each customer's own purchases; its product ids are its own (`prod...`). */
+  const deps = (appUserId: string) => ({
+    listPurchases: vi.fn(async (customer: string) => (customer === appUserId ? store.purchases : [])),
+    storeIdentifier: vi.fn(async (productId: string) => (productId === "prod_credits_100" ? "joutiya_credits_100_mad" : "unknown")),
+  });
+  const listed = (transactionId: string, status = "owned"): RevenueCatPurchase => ({ ...owned(transactionId, status), productId: "prod_credits_100", store: "rc_billing", country: "MA", purchasedAt: new Date(Date.now() - HOUR_MS) });
+
+  it("credits a pack whose webhook never came, once, then its refund", async () => {
+    const buyer = await member();
+    const appUserId = await checkoutOf(buyer);
+    const transactionId = `txn_${randomUUID()}`;
+    store.purchases = [listed(transactionId)];
+
+    expect(await reconcileBilling(new Date(), deps(appUserId))).toMatchObject({ packs: 1, failed: 0 });
+    expect(await getWallet(buyer.uid)).toMatchObject({ balance: 110 });
+    expect(await getOrder(transactionId)).toMatchObject({ packId: "mad_100", currency: "MAD", status: "paid", store: "RC_BILLING", taxJurisdiction: "MA", locationEvidence: { countryCode: "MA" }, consent: { version: "2026-10" } });
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({ severity: "P2", title: "Paiements rattrapés cette nuit (1)" }));
+
+    // A second night finds the order; the webhook arriving late credits nothing more.
+    expect(await reconcileBilling(new Date(), deps(appUserId))).toMatchObject({ packs: 0, failed: 0 });
+    expect((await deliver(rcEvent("NON_RENEWING_PURCHASE", appUserId, transactionId))).status).toBe(200);
+    expect((await getWallet(buyer.uid))?.balance).toBe(110);
+
+    store.purchases = [listed(transactionId, "refunded")];
+    expect(await reconcileBilling(new Date(), deps(appUserId))).toMatchObject({ packs: 1, failed: 0 });
+    expect(await getWallet(buyer.uid)).toMatchObject({ balance: 0 });
+    expect(await getOrder(transactionId)).toMatchObject({ status: "refunded" });
+  });
+
+  it("processes again an event the queue left failed, and alerts what it cannot solve", async () => {
+    const buyer = await member();
+    const appUserId = await checkoutOf(buyer);
+    const transactionId = `txn_${randomUUID()}`;
+    const eventId = randomUUID();
+    const receivedAt = new Date(Date.now() - 4 * HOUR_MS);
+    await createBillingEvent({ source: "revenuecat", eventId, type: "NON_RENEWING_PURCHASE", environment: "SANDBOX", appUserId, productId: "joutiya_credits_100_mad", transactionId, store: "RC_BILLING", currency: "MAD", amountMinor: 10_000, countryCode: "MA", kind: "pack", status: "failed", attempts: 8, lastError: "purchase not visible in RevenueCat yet", receivedAt });
+    store.purchases = [listed(transactionId)];
+
+    expect(await reconcileBilling(new Date(), deps(appUserId))).toMatchObject({ swept: 1, packs: 0, failed: 0 });
+    expect((await billingEventRef(eventId).get()).data()).toMatchObject({ status: "processed", outcome: "credited", attempts: 9 });
+    expect(await getOrder(transactionId)).toMatchObject({ eventId, amountMinor: 10_000 });
+
+    // A purchase of a product RevenueCat names otherwise: not credited, alerted.
+    const unknown = `txn_${randomUUID()}`;
+    store.purchases = [{ ...listed(unknown), productId: "prod_other" }];
+    vi.mocked(alert).mockClear();
+    const run = await reconcileBilling(new Date(), deps(appUserId));
+    expect(run).toMatchObject({ packs: 0, failed: 1 });
+    expect(run.problems[0]).toContain(unknown);
+    expect(await getOrder(unknown)).toBeNull();
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({ severity: "P1", title: expect.stringContaining("Rapprochement des paiements") }));
   });
 });

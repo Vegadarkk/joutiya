@@ -79,6 +79,16 @@ export async function findBillingAccountByStripeCustomer(stripeCustomerId: strin
   return account ? { id: doc.id, ...account } : null;
 }
 
+/** Accounts that opened a pack checkout since `since` (one range on one field: no composite index). */
+export async function listRecentPackCheckouts(since: Date, limit: number): Promise<BillingAccountRecord[]> {
+  const snapshot = await db().collection(COLLECTIONS.billingAccounts).where("lastCheckout.at", ">=", since).orderBy("lastCheckout.at", "asc").limit(limit).get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  return snapshot.docs.flatMap((doc) => {
+    const account = parse(doc, billingAccountSchema, COLLECTIONS.billingAccounts);
+    return account ? [{ id: doc.id, ...account }] : [];
+  });
+}
+
 export async function getBillingAccount(accountId: string): Promise<BillingAccountDoc | null> {
   const snapshot = await billingAccountRef(accountId).get();
   void consume("firestore.reads", 1);
@@ -157,6 +167,23 @@ export async function getBillingEvent(eventId: string, source: BillingEventSourc
 /** Events of one store transaction (an equality on one field: no composite index). */
 export async function listBillingEventsByTransactionId(transactionId: string): Promise<BillingEventDoc[]> {
   const snapshot = await db().collection(COLLECTIONS.billingEvents).where("transactionId", "==", transactionId).limit(20).get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  return snapshot.docs.flatMap((doc) => parse(doc, billingEventSchema, COLLECTIONS.billingEvents) ?? []);
+}
+
+/**
+ * Events still `received` or `failed` that arrived between `after` and `before`, the oldest first
+ * (index status, receivedAt): the queue lost or gave up on them.
+ */
+export async function listStuckBillingEvents(after: Date, before: Date, limit: number): Promise<BillingEventDoc[]> {
+  const snapshot = await db()
+    .collection(COLLECTIONS.billingEvents)
+    .where("status", "in", ["received", "failed"])
+    .where("receivedAt", ">=", after)
+    .where("receivedAt", "<", before)
+    .orderBy("receivedAt", "asc")
+    .limit(limit)
+    .get();
   void consume("firestore.reads", Math.max(1, snapshot.size));
   return snapshot.docs.flatMap((doc) => parse(doc, billingEventSchema, COLLECTIONS.billingEvents) ?? []);
 }

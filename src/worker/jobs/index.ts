@@ -12,6 +12,7 @@ import { quotaReport } from "./quota-report";
 import { r2StorageGauge } from "./r2-storage-gauge";
 import { retentionPurge } from "./retention-purge";
 import { reconcileSearch } from "./reconcile-search";
+import { reconcileBilling } from "@/lib/payments/reconcile";
 import { sweepExpiredBoosts } from "./expire-boosts";
 import { sendSavedSearchAlerts } from "./saved-search-alerts";
 import { exportAuditLogs } from "./audit-export";
@@ -38,6 +39,7 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "purge-connection-logs": () => purgeConnectionLogs(),
   "pro-effects-sync": () => proEffectsSync(),
   "pro-plans": () => proPlansNightly(),
+  "reconcile-billing": () => reconcileBilling(),
   "lift-suspensions": () => liftSuspensions(),
   "message-digest": () => sendMessageDigests(),
   "report-sla-sweep": () => sweepReportSla(),
@@ -74,6 +76,9 @@ export const SCHEDULES = {
   // Phase 7 (design §7, D3). 04:35 UTC: shop subscriptions re-synced from RevenueCat (yearly plans'
   // monthly grant, lost webhooks, grace end), then the launch offer's notices and end.
   "pro-plans-nightly": { pattern: "35 4 * * *", job: "pro-plans" },
+  // 05:05 UTC (design §8): what the webhooks and the billing queue missed, after pro-plans so a
+  // month's grant it gives is not taken for a repair.
+  "reconcile-billing-nightly": { pattern: "5 5 * * *", job: "reconcile-billing" },
   // 07:00 UTC (08:00 in Morocco): one digest e-mail per user for the saved searches with alerts.
   "saved-search-alerts-daily": { pattern: "0 7 * * *", job: "saved-search-alerts" },
   // Phase 5 (D14). Every hour at :35: suspensions past `until` lifted (claim, status, listings).

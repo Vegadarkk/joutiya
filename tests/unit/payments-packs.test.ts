@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PRICING, packByProductId, resolvePricingConfig } from "@/config/pricing";
 import { resetServerEnv } from "@/lib/env";
 import { purchaseLink } from "@/lib/payments/packs";
-import { findPurchase, listCustomerPurchases, RevenueCatApiError } from "@/lib/payments/revenuecat-api";
+import { findPurchase, listCustomerPurchases, productStoreIdentifier, RevenueCatApiError } from "@/lib/payments/revenuecat-api";
 import { expectedEnvironment, revenueCatEnvelopeSchema } from "@/lib/payments/revenuecat-events";
 import { onBillingJobFailed } from "@/worker/jobs/billing";
 
@@ -82,18 +82,28 @@ describe("RevenueCat API v2 purchases", () => {
     const fetchImpl = vi.fn(async (url: URL | RequestInfo, init?: RequestInit) => {
       calls.push(String(url));
       expect(new Headers(init?.headers).get("authorization")).toBe("Bearer sk_test");
-      if (calls.length === 1) return reply(200, { items: [item("p1", "txn_1")], next_page: "/v2/projects/proj1/customers/a%20b/purchases?starting_after=p1" });
+      if (calls.length === 1) return reply(200, { items: [{ ...item("p1", "txn_1"), purchased_at: 1_790_000_000_000, store: "rc_billing", country: "MA" }], next_page: "/v2/projects/proj1/customers/a%20b/purchases?starting_after=p1" });
       return reply(200, { items: [item("p2", null, "refunded")], next_page: "https://evil.example/steal" });
     }) as unknown as typeof fetch;
     const purchases = await listCustomerPurchases("a b", "sandbox", fetchImpl);
     expect(calls).toEqual(["https://api.revenuecat.com/v2/projects/proj1/customers/a%20b/purchases?environment=sandbox&limit=100", "https://api.revenuecat.com/v2/projects/proj1/customers/a%20b/purchases?starting_after=p1"]);
     expect(purchases).toEqual([
-      { id: "p1", storePurchaseIdentifier: "txn_1", status: "owned", environment: "sandbox", quantity: 1 },
-      { id: "p2", storePurchaseIdentifier: null, status: "refunded", environment: "sandbox", quantity: 1 },
+      { id: "p1", storePurchaseIdentifier: "txn_1", status: "owned", environment: "sandbox", quantity: 1, productId: "prod1", purchasedAt: new Date(1_790_000_000_000), store: "rc_billing", country: "MA" },
+      { id: "p2", storePurchaseIdentifier: null, status: "refunded", environment: "sandbox", quantity: 1, productId: "prod1" },
     ]);
     expect(findPurchase(purchases, "txn_1")?.id).toBe("p1");
     expect(findPurchase(purchases, "p2")?.status).toBe("refunded");
     expect(findPurchase(purchases, "txn_9")).toBeUndefined();
+  });
+
+  it("reads a product's store identifier, the one the webhooks and config/pricing use", async () => {
+    const fetchImpl = vi.fn(async (url: URL | RequestInfo) => {
+      expect(String(url)).toBe("https://api.revenuecat.com/v2/projects/proj1/products/prod1");
+      return reply(200, { object: "product", id: "prod1", store_identifier: "joutiya_credits_100_mad", type: "one_time" });
+    }) as unknown as typeof fetch;
+    expect(await productStoreIdentifier("prod1", fetchImpl)).toBe("joutiya_credits_100_mad");
+    await expect(productStoreIdentifier("prod1", (async () => reply(403, {})) as unknown as typeof fetch)).rejects.toMatchObject({ retryable: false, status: 403 });
+    await expect(productStoreIdentifier("prod1", (async () => reply(200, { id: "prod1" })) as unknown as typeof fetch)).rejects.toThrow(/unexpected body/);
   });
 
   it("answers no purchase for an unknown customer, a retryable error on 423, 429 or 5xx, a final one otherwise", async () => {
