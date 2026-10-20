@@ -31,8 +31,13 @@ Chaque ligne est une condition de la porte « Ouverture des ventes » (spec §10
 - [ ] **Test réel** avec des cartes de 4 banques marocaines (paiement en MAD).
 - [ ] **Plateforme agréée (PA)** choisie pour la réception des factures électroniques (section 7).
 
-L'ouverture peut se faire en deux temps : d'abord les Pros assujettis à la TVA marocaine, puis les packs aux
-particuliers une fois l'inscription DGI faite.
+Décisions du 20 octobre 2026 :
+
+- Les ventes ouvrent en une seule fois, pour tous, une fois l'inscription DGI faite.
+- Le plus petit pack reste à 50 MAD : environ 10,6 % de frais Stripe, contre 7,9 % sur le pack à 100 MAD.
+- Les crédits achetés n'expirent pas tant que le compte est ouvert (CGV, section « Crédits »).
+- Les points « à confirmer » des sections 2 à 4 sont posés par écrit à la DGI et au SIE avant l'ouverture. En
+  attendant les réponses, les compteurs restent prudents.
 
 ## 2. Maroc : TVA sur les services numériques (art. 115 bis CGI)
 
