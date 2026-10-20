@@ -96,6 +96,13 @@ test.describe("public pages", () => {
     });
   }
 
+  // Own dark theme: Dark Reader-style extensions stay off (src/lib/i18n/metadata.ts).
+  test("public and private pages carry the Dark Reader lock", async ({ request }) => {
+    for (const path of ["/fr", "/fr/connexion"]) {
+      expect(await (await request.get(path)).text()).toContain('<meta name="darkreader-lock"');
+    }
+  });
+
   test("unknown pages answer 404 in the visitor's locale", async ({ page }) => {
     const response = await page.goto("/fr/cette-page-n-existe-pas");
     expect(response?.status()).toBe(404);

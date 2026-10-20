@@ -20,6 +20,13 @@ export function alternates(locale: Locale, path = ""): Metadata["alternates"] {
   return { canonical, languages };
 }
 
+/**
+ * The site has its own dark theme and a light/dark/system switch: a Dark Reader-style extension
+ * would recolour the brand on top of it and override a visitor's light choice. Its lock tag keeps it off
+ * (the extension reads only the name; Next drops a meta with empty content).
+ */
+export const DARK_READER_LOCK: Metadata["other"] = { "darkreader-lock": "true" };
+
 export async function rootMetadata(locale: Locale): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: "Metadata" });
   return {
@@ -31,6 +38,7 @@ export async function rootMetadata(locale: Locale): Promise<Metadata> {
     icons: { icon: "/brand/joutiya-icon.svg" },
     formatDetection: { telephone: false, email: false, address: false },
     openGraph: { siteName: "Joutiya", locale: LOCALE_TAGS[locale].replace("-", "_"), type: "website" },
+    other: DARK_READER_LOCK,
   };
 }
 

@@ -7,6 +7,7 @@ import { ThemeScript } from "@/components/layout/theme-script";
 import { Toaster } from "@/components/ui/toaster";
 import { ACCESS_JWT_HEADER, verifyAccessJwt } from "@/lib/auth/access-jwt";
 import { serverEnv } from "@/lib/env";
+import { DARK_READER_LOCK } from "@/lib/i18n/metadata";
 import { readex } from "@/lib/fonts";
 import "@/styles/globals.css";
 
@@ -19,6 +20,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
   // Same file as the public pages (src/lib/i18n/metadata.ts), served as is on the admin host.
   icons: { icon: "/brand/joutiya-icon.svg" },
+  other: DARK_READER_LOCK,
 };
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
