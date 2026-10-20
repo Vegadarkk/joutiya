@@ -12,6 +12,22 @@ async function watchCsp(page: Page): Promise<string[]> {
   return violations;
 }
 
+const LOGO_FILE = { light: "/brand/joutiya-logo.svg", dark: "/brand/joutiya-logo-dark.svg" } as const;
+
+/** The header and footer each show the logo file of the theme, loaded and decoded. */
+async function expectLogos(page: Page, theme: keyof typeof LOGO_FILE): Promise<void> {
+  await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+  for (const area of [page.getByRole("banner"), page.getByRole("contentinfo")]) {
+    const logo = area.locator('img[src^="/brand/joutiya-logo"]:visible');
+    await expect(logo).toHaveCount(1);
+    await expect(logo).toHaveAttribute("src", LOGO_FILE[theme]);
+    // Lazy (src/components/layout/logo.tsx): the footer one loads near the viewport only.
+    await logo.scrollIntoViewIfNeeded();
+    // A missing or undecodable file leaves naturalWidth at 0 (the broken-image icon).
+    await expect.poll(() => logo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  }
+}
+
 test.describe("public pages", () => {
   for (const [locale, lang, dir] of [
     ["fr", "fr-MA", "ltr"],
@@ -67,6 +83,24 @@ test.describe("public pages", () => {
     await expect(page).toHaveURL(/\/fr\/legal\/mentions-legales$/);
     await expect(page.getByRole("heading", { level: 1 })).toContainText(/mentions légales/i);
     await expect(page.getByText("6 rue d'Armaillé", { exact: false })).toBeVisible();
+  });
+
+  // Each theme has its own logo file; the other one is first fetched on the switch.
+  for (const [first, second] of [["light", "dark"], ["dark", "light"]] as const) {
+    test(`the ${first} logo shows, then the ${second} one after a theme switch`, async ({ page }) => {
+      await page.addInitScript((theme) => localStorage.setItem("theme", theme), first);
+      await page.goto("/fr");
+      await expectLogos(page, first);
+      await page.getByRole("contentinfo").getByRole("radio", { name: second === "light" ? "Clair" : "Sombre" }).click();
+      await expectLogos(page, second);
+    });
+  }
+
+  // Own dark theme: Dark Reader-style extensions stay off (src/lib/i18n/metadata.ts).
+  test("public and private pages carry the Dark Reader lock", async ({ request }) => {
+    for (const path of ["/fr", "/fr/connexion"]) {
+      expect(await (await request.get(path)).text()).toContain('<meta name="darkreader-lock"');
+    }
   });
 
   test("unknown pages answer 404 in the visitor's locale", async ({ page }) => {

@@ -487,7 +487,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
   },
 
   "objets-interdits": {
-    updated: "2026-10-13",
+    updated: "2026-10-20",
     intro: "Ces biens, services et contenus ne peuvent pas être proposés sur Joutiya. Une annonce qui en contient est refusée ou retirée.",
     sections: [
       {
@@ -510,7 +510,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
               "offres d'emploi (catégorie prévue ultérieurement) et services financiers non autorisés.",
             ],
           },
-          "Cette liste n'est pas exhaustive : tout bien ou service dont la vente est interdite par la loi française ou marocaine est exclu.",
+          "Cette liste n'est pas exhaustive : tout bien ou service dont la vente est interdite par la loi marocaine est exclu.",
         ],
       },
     ],
