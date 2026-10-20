@@ -31,8 +31,8 @@ export function ExportForm({ lastMonth, lastQuarter }: { lastMonth: string; last
       <div>
         <h2 className="text-lg font-semibold">Exports</h2>
         <p className="mt-1 max-w-prose text-sm text-foreground-muted">
-          Fichiers CSV pour le tableur (point-virgule, virgule décimale). Les dates de période sont en UTC. Chaque téléchargement est inscrit au
-          journal d&apos;audit.
+          Fichiers CSV pour le tableur (point-virgule, virgule décimale). Les périodes suivent l&apos;heure du Maroc pour les fichiers DGI, celle de
+          Paris pour les autres. Chaque téléchargement est inscrit au journal d&apos;audit.
         </p>
       </div>
       <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">

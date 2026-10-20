@@ -97,10 +97,13 @@ particuliers une fois l'inscription DGI faite.
 - **Compteur** : les packs en euros payés depuis le 1er janvier, recomptés chaque nuit. Les packs remboursés ne
   comptent pas.
 - **Alertes** : à 70 %, puis à 100 %.
-- **À 100 %** : les packs en euros disparaissent de la grille et leur paiement est refusé, jusqu'au 1er janvier.
-  Pour les rouvrir plus tôt, il faut s'inscrire à l'OSS, puis faire un changement de code (TVA par pays).
+- **À 100 %** : les packs en euros disparaissent de la grille et leur paiement est refusé. La règle porte sur
+  l'année en cours et la précédente : ils restent donc fermés jusqu'à la fin de l'année suivante. Pour les rouvrir
+  plus tôt, il faut s'inscrire à l'OSS, puis faire un changement de code (TVA par pays).
+  - Retire aussi les packs en euros de l'offre RevenueCat : un lien de paiement modifié à la main pourrait encore
+    en vendre un. Une telle vente est créditée et signalée par une alerte P1, à rembourser.
 - **Simplification à connaître** : le compteur prend tous les packs en euros, y compris ceux achetés depuis la
-  France, ce qui est prudent. La règle exacte vaut pour l'année en cours et la précédente.
+  France, ce qui est prudent.
 
 ## 6. Factures et reçus
 
@@ -113,9 +116,9 @@ particuliers une fois l'inscription DGI faite.
   - Depuis le 1er septembre 2026, s'y ajoutent pour un client français : son SIREN, la catégorie d'opération
     (services) et l'option pour le paiement de la TVA d'après les débits.
 - **Packs de crédits** : RevenueCat envoie un reçu par e-mail, en anglais.
-- **Avoirs** : un avoir Stripe sur une facture déjà payée n'apparaît pas dans les exports. Il est à reporter à la
-  main, en négatif, sur la période de l'avoir. Un remboursement passé par Stripe, lui, apparaît dans l'export
-  URSSAF.
+- **Avoirs et remboursements d'abonnements** : ils n'apparaissent pas dans les fichiers DGI, qui ne lisent que les
+  factures payées. Ils sont à reporter à la main, en négatif, sur la période où ils ont lieu. Un remboursement passé
+  par Stripe apparaît en revanche dans l'export URSSAF, qui lit les mouvements d'argent.
 
 ## 7. Facturation électronique et e-reporting
 
@@ -139,8 +142,8 @@ particuliers une fois l'inscription DGI faite.
 - **Périodes** :
   - un trimestre (`2027-T1`) pour les deux fichiers DGI ;
   - un mois (`2027-03`) ou un trimestre pour URSSAF et l'e-reporting.
-  - Les bornes sont en heure UTC. Une vente faite juste après minuit, heure de Paris, le 1er du mois, peut donc
-    tomber dans le mois précédent. Les colonnes « Date (Maroc) » et « Date (Paris) » donnent la date locale.
+  - Une période va de minuit à minuit, à l'heure du Maroc pour les fichiers DGI et à l'heure de Paris pour
+    URSSAF et l'e-reporting. Les colonnes « Date (Maroc) » et « Date (Paris) » suivent la même heure.
 - **Ce qu'il faut** :
   - Les abonnements et l'export URSSAF lisent Stripe. Sans clé Stripe, les fichiers DGI ne contiennent que les
     packs, et l'export URSSAF est refusé.
@@ -162,7 +165,7 @@ Les heures sont en UTC. Les alertes arrivent sur Telegram.
     - les événements bloqués depuis plus de 3 heures ;
     - les événements Stripe non livrés ;
     - les abonnements Stripe actifs sans copie à jour ;
-    - les achats de packs RevenueCat des 7 derniers jours.
+    - les achats de packs RevenueCat des 30 derniers jours (les comptes les plus récents d'abord, 500 au plus).
   - Ce que disent les alertes :
     - Une alerte P2 signale une réparation : rien à faire, sauf si elle revient chaque nuit.
     - Une alerte P1 signale un problème que la tâche n'a pas pu régler (un achat introuvable, une clé sans le bon

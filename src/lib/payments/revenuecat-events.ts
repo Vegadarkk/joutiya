@@ -25,6 +25,7 @@ import { BillingRetryError, expectedEnvironment } from "./billing-common";
 import { enqueueBillingEvent, isBillingQueueEnabled } from "./billing-queue";
 import { findPurchase, listCustomerPurchases, RevenueCatApiError, type RevenueCatPurchase } from "./revenuecat-api";
 import { syncShopSubscription, type SyncDeps, type SyncOutcome } from "./subscriptions";
+import { euPacksOpen, getBillingThresholds } from "./thresholds";
 import { creditPurchase, refundPurchase } from "./wallet";
 
 // RevenueCat events of the credit packs (phase 7 design §6). The webhook records each
@@ -247,6 +248,14 @@ async function creditPack(event: BillingEventDoc, deps: ProcessDeps): Promise<Pr
     return refunded ? "already_refunded" : "credited";
   });
 
+  // The grid hides EUR packs past the EU threshold, but a purchase link can be edited.
+  if (outcome === "credited" && pack.currency === "EUR" && !euPacksOpen(await getBillingThresholds(now).catch(() => null), now)) {
+    await alert({
+      severity: "P1",
+      title: "Pack en euros vendu au-delà du seuil UE",
+      body: `Commande ${orderId(transactionId)} (${pack.id}) : les ventes aux particuliers de l'UE ont atteint le seuil. Rembourser l'achat ou s'inscrire au guichet OSS (docs/tax-runbook.md), et retirer les packs en euros de l'offre RevenueCat.`,
+    });
+  }
   if (outcome === "credited" && event.amountMinor !== undefined && event.amountMinor !== pack.priceMinor * quantity) {
     // RevenueCat's product price and config/pricing disagree: the credits follow config/pricing.
     logger.warn({ eventId: event.eventId, packId: pack.id }, "pack price differs from RevenueCat's");

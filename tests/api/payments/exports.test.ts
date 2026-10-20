@@ -2,6 +2,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as RuntimeModule from "@/lib/config/runtime";
+import type { RevenueCatPurchase } from "@/lib/payments/revenuecat-api";
 import type * as StripeApiModule from "@/lib/payments/stripe-api";
 
 // Tax exports and yearly thresholds (phase 7 design §8): the admin-only CSV downloads (staff role,
@@ -45,13 +46,16 @@ vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 import { GET as exportReport } from "@/app/api/admin/exports/[report]/route";
 import { GET as packs, POST as checkout } from "@/app/api/wallet/packs/route";
 import { DEFAULT_PRICING } from "@/config/pricing";
+import { MA_TIME_ZONE } from "@/config/tax";
 import type { PacksResponse } from "@/lib/contracts/payments";
 import { alert } from "@/lib/alert";
-import { billingAccountRef, orderId, orderRef } from "@/lib/db/repositories/billing";
+import { billingAccountRef, createBillingEvent, orderId, orderRef } from "@/lib/db/repositories/billing";
 import { proProfileRef, proProfileToFirestore } from "@/lib/db/repositories/pro-profiles";
 import { COLLECTIONS, orderSchema, type OrderDoc } from "@/lib/db/schemas";
 import { resetServerEnv } from "@/lib/env";
 import { db } from "@/lib/firebase/admin";
+import { processBillingEvent } from "@/lib/payments/revenuecat-events";
+import { parsePeriod } from "@/lib/payments/sales";
 import { stripeRequest } from "@/lib/payments/stripe-api";
 import { euPacksOpen, resetThresholdsCache, updateBillingThresholds } from "@/lib/payments/thresholds";
 import type { ProProfileDoc } from "@/lib/pro/profile-schema";
@@ -92,7 +96,8 @@ async function seedOrder(transactionId: string, extra: Partial<OrderDoc>): Promi
     updatedAt: at,
     ...extra,
   };
-  await orderRef(transactionId).set(orderSchema.parse(order));
+  // Firestore refuses undefined fields (an order without amount drops the key).
+  await orderRef(transactionId).set(Object.fromEntries(Object.entries(orderSchema.parse(order)).filter(([, value]) => value !== undefined)));
   return orderId(transactionId);
 }
 
@@ -222,8 +227,9 @@ describe("tax exports", () => {
       ["2025-03-05", "Vente", "B2B", "JOUT-0007", "590,00"],
     ]);
     expect(rows[3]!.slice(4, 9)).toEqual(["Business (mensuel)", "JOUT-0007", `pro_${proId}`, "Atlas Auto", "001234567000089"]);
-    // Invoices issued up to 45 days before the quarter may be paid in it.
-    expect(stripe.calls).toEqual([{ path: "/v1/invoices", params: expect.objectContaining({ status: "paid", created: { gte: seconds("2024-11-17T00:00:00Z"), lt: seconds("2025-04-01T00:00:00Z") } }) }]);
+    // Invoices issued up to 45 days before the quarter (in Moroccan time) may be paid in it.
+    const quarter = parsePeriod("2025-T1", MA_TIME_ZONE)!;
+    expect(stripe.calls).toEqual([{ path: "/v1/invoices", params: expect.objectContaining({ status: "paid", created: { gte: Math.floor(quarter.from.getTime() / 1_000) - 45 * 86_400, lt: Math.floor(quarter.to.getTime() / 1_000) } }) }]);
     expect(await audits("billing.export", "registre-dgi_2025-T1")).toEqual([expect.objectContaining({ actorUid: admin.uid, actorRole: "admin", automated: false })]);
   });
 
@@ -257,7 +263,8 @@ describe("tax exports", () => {
     // 8,34 MAD of VAT in the quarter, at the 5 428 EUR cents received for 59 000 MAD cents.
     expect(vat!.slice(3, 8)).toEqual(["8,34", "MAD", "", "0,092", "0,77"]);
     expect(net![7]).toBe("63,51");
-    expect(stripe.calls.find((call) => call.path === "/v1/balance_transactions")?.params).toMatchObject({ expand: ["data.source"], created: { gte: seconds("2025-01-01T00:00:00Z"), lt: seconds("2025-04-01T00:00:00Z") } });
+    // The quarter in French time.
+    expect(stripe.calls.find((call) => call.path === "/v1/balance_transactions")?.params).toMatchObject({ expand: ["data.source"], created: { gte: seconds("2024-12-31T23:00:00Z"), lt: seconds("2025-03-31T22:00:00Z") } });
 
     stripe.configured = false;
     expect((await download(admin, "urssaf", "2025-T1")).status).toBe(503);
@@ -265,46 +272,73 @@ describe("tax exports", () => {
 });
 
 describe("yearly thresholds", () => {
-  it("counts the year's paid EU packs and every EUR received, alerting each level once a year", async () => {
+  it("counts the year's paid EU packs and the EUR received by month, alerting each level once a year", async () => {
     await seedOrder("txn_thresholds_1", eurOrder(700_000, "2023-03-01T12:00:00Z"));
+    // Credited by the reconciliation: no amount recorded, the pack's price counts.
+    await seedOrder("txn_thresholds_reconciled", eurOrder(1_000, "2023-03-02T12:00:00Z", { amountMinor: undefined }));
     await seedOrder("txn_thresholds_refunded", eurOrder(500_000, "2023-04-01T12:00:00Z", { status: "refunded", refundedAt: new Date("2023-04-03T12:00:00Z") }));
     await seedOrder("txn_thresholds_next_year", eurOrder(900_000, "2024-01-02T12:00:00Z"));
     await seedOrder("txn_thresholds_morocco", { amountMinor: 9_000_000, purchasedAt: new Date("2023-05-01T12:00:00Z") });
     stripe.balance.push({ id: "txn_b_2023", created: seconds("2023-05-10T12:00:00Z"), amount: 2_700_000, currency: "eur", fee: 0, net: 2_700_000, reporting_category: "charge", source: null });
     const titles = () => vi.mocked(alert).mock.calls.map(([sent]) => [sent.severity, sent.title]);
+    const balanceReads = () => stripe.calls.filter((call) => call.path === "/v1/balance_transactions").length;
 
     const first = await updateBillingThresholds(new Date("2023-06-01T12:00:00Z"), stripeRequest);
-    expect(first).toMatchObject({ year: 2023, euB2cEurMinor: 700_000, turnoverEurMinor: 2_700_000, alerted: { euB2c: 0.7, franchise: 0.7 } });
+    expect(first).toMatchObject({ year: 2023, euB2cEurMinor: 701_000, previousYearEuB2cEurMinor: 0, turnoverEurMinor: 2_700_000, alerted: { euB2c: 0.7, franchise: 0.7 } });
+    expect(first.turnoverMonths).toEqual({ "01": 0, "02": 0, "03": 0, "04": 0, "05": 2_700_000, "06": 0 });
+    expect(balanceReads()).toBe(6);
     expect(titles()).toEqual([
       ["P2", "Ventes B2C dans l'UE : 70 % du seuil annuel"],
       ["P2", "Franchise en base de TVA : 72 % du seuil annuel"],
     ]);
+
+    // The next night reads only the months that may still change, and alerts nothing new.
     vi.mocked(alert).mockClear();
+    stripe.calls = [];
     await updateBillingThresholds(new Date("2023-06-02T12:00:00Z"), stripeRequest);
+    expect(balanceReads()).toBe(2);
     expect(alert).not.toHaveBeenCalled();
 
+    // Stripe down: the EU counter goes on, the months counted stay.
     await seedOrder("txn_thresholds_2", eurOrder(320_000, "2023-06-02T15:00:00Z"));
-    const full = await updateBillingThresholds(new Date("2023-06-03T12:00:00Z"), null);
-    expect(full).toMatchObject({ euB2cEurMinor: 1_020_000, turnoverEurMinor: null, alerted: { euB2c: 1, franchise: 0.7 } });
+    const down = vi.fn(async () => {
+      throw new Error("Stripe unavailable");
+    }) as unknown as typeof stripeRequest;
+    const full = await updateBillingThresholds(new Date("2023-06-03T12:00:00Z"), down);
+    expect(full).toMatchObject({ euB2cEurMinor: 1_021_000, turnoverEurMinor: 2_700_000, alerted: { euB2c: 1, franchise: 0.7 } });
     expect(titles()).toEqual([["P1", "Ventes B2C dans l'UE : 102 % du seuil annuel"]]);
     expect(euPacksOpen(full, new Date("2023-06-03T12:00:00Z"))).toBe(false);
-    expect(euPacksOpen(full, new Date("2024-01-01T00:00:00Z"))).toBe(true);
+    // Reached in 2023: closed through 2024 as well.
+    expect(euPacksOpen(full, new Date("2024-01-01T00:00:00Z"))).toBe(false);
 
-    // A new year starts its counters and alerts again.
+    // A new year starts its counters and alerts again, and keeps last year's figure.
     vi.mocked(alert).mockClear();
-    expect(await updateBillingThresholds(new Date("2024-02-01T12:00:00Z"), null)).toMatchObject({ year: 2024, euB2cEurMinor: 900_000, alerted: { euB2c: 0.7, franchise: 0 } });
+    const next = await updateBillingThresholds(new Date("2024-02-01T12:00:00Z"), null);
+    expect(next).toMatchObject({ year: 2024, euB2cEurMinor: 900_000, previousYearEuB2cEurMinor: 1_021_000, turnoverEurMinor: null, alerted: { euB2c: 0.7, franchise: 0 } });
     expect(titles()).toEqual([["P2", "Ventes B2C dans l'UE : 90 % du seuil annuel"]]);
+    expect(euPacksOpen(next, new Date("2024-02-01T12:00:00Z"))).toBe(false);
   });
 
-  it("takes the EUR packs off the grid and refuses their checkout once this year's EU threshold is reached", async () => {
+  it("takes the EUR packs off the grid, refuses their checkout and alerts one sold anyway once this year's EU threshold is reached", async () => {
     const buyer = await member();
     const grid = async () => (await api<PacksResponse>(packs, "GET", "/api/wallet/packs", { member: buyer })).body.packs.map((pack) => pack.id);
+    const pay = (packId: string, expectedPriceMinor: number) => api<ErrorBody>(checkout, "POST", "/api/wallet/packs", { member: buyer, body: { packId, expectedPriceMinor, acceptTerms: true, turnstileToken: "dev" } });
+    expect((await pay("mad_100", 10_000)).status).toBe(200);
     await thresholdsRef().set({ year: new Date().getUTCFullYear(), euB2cEurMinor: 1_000_000, turnoverEurMinor: null, alerted: { euB2c: 1, franchise: 0 }, computedAt: new Date() });
     resetThresholdsCache();
     expect(await grid()).toEqual(["mad_50", "mad_100", "mad_250"]);
-    const refused = await api<ErrorBody>(checkout, "POST", "/api/wallet/packs", { member: buyer, body: { packId: "eur_10", expectedPriceMinor: 1_000, acceptTerms: true, turnstileToken: "dev" } });
+    const refused = await pay("eur_10", 1_000);
     expect(refused.status).toBe(409);
     expect(refused.body.error.code).toBe("price_changed");
+
+    // An edited purchase link sold one: credited (it was paid), and alerted.
+    const account = (await billingAccountRef(buyer.uid).get()).data()!;
+    const transactionId = `txn_${randomUUID()}`;
+    const eventId = randomUUID();
+    await createBillingEvent({ source: "revenuecat", eventId, type: "NON_RENEWING_PURCHASE", environment: "SANDBOX", appUserId: account.rcAppUserId, productId: "joutiya_credits_100_eur", transactionId, store: "RC_BILLING", currency: "EUR", amountMinor: 1_000, countryCode: "FR", kind: "pack", status: "received", attempts: 0, receivedAt: new Date() });
+    const owned: RevenueCatPurchase = { id: `rcp_${transactionId}`, storePurchaseIdentifier: transactionId, status: "owned", environment: "sandbox", quantity: 1 };
+    expect(await processBillingEvent(eventId, { listPurchases: async () => [owned] })).toBe("credited");
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({ severity: "P1", title: "Pack en euros vendu au-delà du seuil UE" }));
 
     await thresholdsRef().delete();
     resetThresholdsCache();

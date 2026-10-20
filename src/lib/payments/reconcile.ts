@@ -28,20 +28,26 @@ import { syncShopSubscription } from "./subscriptions";
 //    keeps) are recorded and processed as if they had arrived.
 // 3. Stripe subscriptions not canceled whose shop has no running plan here are handed to
 //    RevenueCat again and synced. A paid invoice belongs to such a subscription, and the month's
-//    grant of a known one is the pro-plans job's.
-// 4. RevenueCat purchases of the accounts that opened a pack checkout in the last 7 days: a pack
+//    grant of a known one is the pro-plans job's. The Stripe account serves every environment:
+//    a subscription another one opened (metadata `env`) is skipped, and one without a billing
+//    account here is reported on its first nights only.
+// 4. RevenueCat purchases of the accounts that opened a pack checkout in the last 30 days (the
+//    14-day withdrawal and a late refund), newest first: a pack
 //    owned without its order, or refunded with its order still paid, gets a recorded event of its
 //    own (`reconcile_...`) processed by the pack handlers, which re-read the purchase.
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 export const SWEEP_AFTER_MS = 3 * HOUR_MS;
-export const SWEEP_MAX_ATTEMPTS = 20;
+/** The queue's 8 attempts (billing-queue.ts), then two nights: its last failure has alerted already. */
+export const SWEEP_MAX_ATTEMPTS = 10;
 const SWEEP_LIMIT = 100;
 const STRIPE_EVENTS_DAYS = 30;
 const STRIPE_PAGES = 10;
-const PACK_DAYS = 7;
-const PACK_ACCOUNTS = 200;
+const PACK_DAYS = 30;
+const PACK_ACCOUNTS = 500;
+/** A running subscription without a billing account here is reported this many days after its creation. */
+const ORPHAN_REPORT_DAYS = 3;
 const MAX_PROBLEMS = 15;
 /** Stripe subscription statuses that give the shop its plan (or its grace). */
 const STRIPE_RUNNING: ReadonlySet<string> = new Set(["active", "trialing", "past_due"]);
@@ -115,18 +121,21 @@ async function replayStripeEvents(run: ReconcileRun, now: Date, deps: ReconcileD
   }
 }
 
-async function checkStripeSubscriptions(run: ReconcileRun, deps: ReconcileDeps): Promise<void> {
+async function checkStripeSubscriptions(run: ReconcileRun, now: Date, deps: ReconcileDeps): Promise<void> {
   const stripe = deps.stripe ?? stripeRequest;
   let startingAfter: string | undefined;
   for (let page = 0; page < STRIPE_PAGES; page += 1) {
     // Without a status, Stripe lists every subscription not canceled.
-    const list = await stripe<{ data?: { id: string; status?: string; customer?: unknown }[]; has_more?: boolean }>("GET", "/v1/subscriptions", { limit: 100, starting_after: startingAfter });
+    const list = await stripe<{ data?: { id: string; status?: string; customer?: unknown; created?: number; metadata?: Record<string, unknown> | null }[]; has_more?: boolean }>("GET", "/v1/subscriptions", { limit: 100, starting_after: startingAfter });
     for (const subscription of list.data ?? []) {
       if (!subscription.status || !STRIPE_RUNNING.has(subscription.status) || typeof subscription.customer !== "string") continue;
+      const env = subscription.metadata?.env;
+      if (typeof env === "string" && env !== serverEnv().APP_ENV) continue;
       try {
         const account = await findBillingAccountByStripeCustomer(subscription.customer);
         if (!account) {
-          problem(run, `Abonnement Stripe ${subscription.id} (${subscription.status}) : aucun compte de facturation pour ${subscription.customer}.`);
+          const recent = typeof subscription.created !== "number" || subscription.created * 1_000 >= now.getTime() - ORPHAN_REPORT_DAYS * DAY_MS;
+          if (recent) problem(run, `Abonnement Stripe ${subscription.id} (${subscription.status}) : aucun compte de facturation pour ${subscription.customer}.`);
           continue;
         }
         const local = await getSubscription(account.id);
@@ -171,7 +180,9 @@ async function packEvent(purchase: RevenueCatPurchase & { storePurchaseIdentifie
 
 async function checkRecentPacks(run: ReconcileRun, now: Date, deps: ReconcileDeps): Promise<void> {
   const environment = expectedEnvironment() === "PRODUCTION" ? "production" : "sandbox";
-  for (const account of await listRecentPackCheckouts(new Date(now.getTime() - PACK_DAYS * DAY_MS), PACK_ACCOUNTS)) {
+  const accounts = await listRecentPackCheckouts(new Date(now.getTime() - PACK_DAYS * DAY_MS), PACK_ACCOUNTS);
+  if (accounts.length >= PACK_ACCOUNTS) problem(run, `Plus de ${PACK_ACCOUNTS} comptes avec un achat de pack en ${PACK_DAYS} jours : les plus anciens ne sont pas vérifiés cette nuit.`);
+  for (const account of accounts) {
     let purchases: RevenueCatPurchase[];
     try {
       purchases = await (deps.listPurchases ?? listCustomerPurchases)(account.rcAppUserId, environment);
@@ -204,7 +215,7 @@ export async function reconcileBilling(now = new Date(), deps: ReconcileDeps = {
   const steps: [string, boolean, () => Promise<void>][] = [
     ["sweep", true, () => sweepStuckEvents(run, now)],
     ["stripe events", isStripeConfigured(), () => replayStripeEvents(run, now, deps)],
-    ["stripe subscriptions", isStripeConfigured() && isRevenueCatApiConfigured(), () => checkStripeSubscriptions(run, deps)],
+    ["stripe subscriptions", isStripeConfigured() && isRevenueCatApiConfigured(), () => checkStripeSubscriptions(run, now, deps)],
     ["packs", isRevenueCatApiConfigured(), () => checkRecentPacks(run, now, deps)],
   ];
   for (const [name, enabled, step] of steps) {

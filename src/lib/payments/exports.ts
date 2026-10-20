@@ -1,4 +1,4 @@
-import { MA_TIME_ZONE } from "@/config/tax";
+import { FR_TIME_ZONE, MA_TIME_ZONE } from "@/config/tax";
 import type { Period, ReceiptLine, SaleLine } from "./sales";
 
 // Tax exports of the back office (phase 7 design §8), as CSV files a French spreadsheet opens as is:
@@ -78,7 +78,7 @@ export function dgiTotals(lines: readonly SaleLine[], period: Period): string {
 /** E-reporting feed: turnover by day (Paris), segment, jurisdiction and VAT rate, every sale. */
 export function eReporting(lines: readonly SaleLine[]): string {
   const groups = new Map<string, Totals>();
-  for (const line of lines) add(groups, [dayIn(line.at, "Europe/Paris"), segment(line), line.jurisdiction, percent(line.vatRate), line.currency].join("|"), line);
+  for (const line of lines) add(groups, [dayIn(line.at, FR_TIME_ZONE), segment(line), line.jurisdiction, percent(line.vatRate), line.currency].join("|"), line);
   const rows: Value[][] = [["Date (Paris)", "Segment", "Pays de taxation", "Taux TVA", "Devise", "Opérations", "Montant HT", "TVA", "Montant TTC"]];
   for (const [key, totals] of [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     const [day, seg, jurisdiction, rate, currency] = key.split("|");
@@ -99,7 +99,7 @@ export function urssaf(receipts: readonly ReceiptLine[], lines: readonly SaleLin
   let madMinor = 0;
   let madEurMinor = 0;
   for (const receipt of receipts) {
-    rows.push([dayIn(receipt.at, "Europe/Paris"), receipt.id, receipt.category, receipt.originalMinor === undefined ? null : money(receipt.originalMinor), receipt.originalCurrency, receipt.country, receipt.exchangeRate, money(receipt.amountEurMinor), money(-receipt.feeEurMinor), money(receipt.netEurMinor)]);
+    rows.push([dayIn(receipt.at, FR_TIME_ZONE), receipt.id, receipt.category, receipt.originalMinor === undefined ? null : money(receipt.originalMinor), receipt.originalCurrency, receipt.country, receipt.exchangeRate, money(receipt.amountEurMinor), money(-receipt.feeEurMinor), money(receipt.netEurMinor)]);
     receivedMinor += receipt.amountEurMinor;
     feesMinor += receipt.feeEurMinor;
     if (receipt.originalCurrency === "MAD" && receipt.originalMinor !== undefined) {

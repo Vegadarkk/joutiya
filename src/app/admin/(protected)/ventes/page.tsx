@@ -15,9 +15,9 @@ export const dynamic = "force-dynamic";
 
 const euros = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 
-function Threshold({ label, usedMinor, limitEur, consequence }: { label: string; usedMinor: number | null; limitEur: number; consequence: string }) {
+function Threshold({ label, usedMinor, limitEur, consequence, reached = false }: { label: string; usedMinor: number | null; limitEur: number; consequence: string; reached?: boolean }) {
   const share = usedMinor === null ? null : usedMinor / (limitEur * 100);
-  const level = share === null ? "unknown" : share >= 1 ? "reached" : share >= THRESHOLD_ALERT_AT ? "warning" : "ok";
+  const level = reached || (share !== null && share >= 1) ? "reached" : share === null ? "unknown" : share >= THRESHOLD_ALERT_AT ? "warning" : "ok";
   const badge = { ok: ["Sous le seuil", "success"], warning: ["Alerte", "warning"], reached: ["Seuil atteint", "danger"], unknown: ["Non mesuré", "neutral"] } as const;
   const value = share === null ? 0 : Math.min(100, Math.round(share * 100));
   return (
@@ -54,6 +54,7 @@ export default async function SalesPage() {
   const now = new Date();
   const thresholds = await getBillingThresholds(now, true);
   const current = thresholds?.year === now.getUTCFullYear() ? thresholds : null;
+  const lastYearReached = (current?.previousYearEuB2cEurMinor ?? 0) >= EU_B2C_THRESHOLD_EUR * 100;
   return (
     <>
       <div>
@@ -72,7 +73,12 @@ export default async function SalesPage() {
             label="Ventes B2C dans l'Union européenne"
             usedMinor={current?.euB2cEurMinor ?? null}
             limitEur={EU_B2C_THRESHOLD_EUR}
-            consequence="Au seuil, les packs en euros sont retirés de la vente jusqu'au 1er janvier, sauf inscription au guichet OSS."
+            reached={lastYearReached}
+            consequence={
+              lastYearReached
+                ? `Seuil atteint en ${current!.year - 1} : les packs en euros restent retirés de la vente cette année, sauf inscription au guichet OSS.`
+                : "Au seuil, les packs en euros sont retirés de la vente jusqu'à la fin de l'année suivante, sauf inscription au guichet OSS."
+            }
           />
           <Threshold
             label="Franchise en base de TVA (encaissé)"

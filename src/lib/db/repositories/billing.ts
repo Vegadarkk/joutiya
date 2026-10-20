@@ -79,9 +79,9 @@ export async function findBillingAccountByStripeCustomer(stripeCustomerId: strin
   return account ? { id: doc.id, ...account } : null;
 }
 
-/** Accounts that opened a pack checkout since `since` (one range on one field: no composite index). */
+/** Accounts that opened a pack checkout since `since`, the most recent first (one range on one field: no composite index). */
 export async function listRecentPackCheckouts(since: Date, limit: number): Promise<BillingAccountRecord[]> {
-  const snapshot = await db().collection(COLLECTIONS.billingAccounts).where("lastCheckout.at", ">=", since).orderBy("lastCheckout.at", "asc").limit(limit).get();
+  const snapshot = await db().collection(COLLECTIONS.billingAccounts).where("lastCheckout.at", ">=", since).orderBy("lastCheckout.at", "desc").limit(limit).get();
   void consume("firestore.reads", Math.max(1, snapshot.size));
   return snapshot.docs.flatMap((doc) => {
     const account = parse(doc, billingAccountSchema, COLLECTIONS.billingAccounts);
@@ -154,20 +154,27 @@ export interface OrderRecord extends OrderDoc {
 
 const ORDER_PAGE = 500;
 
+/** More orders than a read may return: a tax total must not come out of a cut list. */
+export class TooManyOrdersError extends Error {}
+
+/** Every order of `query`; past `max` (at most max + 1 reads), TooManyOrdersError. */
 async function allOrders(query: Query, max: number): Promise<OrderRecord[]> {
   const out: OrderRecord[] = [];
   let last: DocumentSnapshot | undefined;
-  while (out.length < max) {
-    const snapshot = await (last ? query.startAfter(last) : query).limit(Math.min(ORDER_PAGE, max - out.length)).get();
+  let seen = 0;
+  for (;;) {
+    const limit = Math.min(ORDER_PAGE, max + 1 - seen);
+    const snapshot = await (last ? query.startAfter(last) : query).limit(limit).get();
     void consume("firestore.reads", Math.max(1, snapshot.size));
+    seen += snapshot.size;
+    if (seen > max) throw new TooManyOrdersError(`more than ${max} orders`);
     for (const doc of snapshot.docs) {
       const order = parse(doc, orderSchema, COLLECTIONS.orders);
       if (order) out.push({ id: doc.id, ...order });
     }
-    if (snapshot.size < ORDER_PAGE) break;
+    if (snapshot.size < limit) return out;
     last = snapshot.docs.at(-1);
   }
-  return out;
 }
 
 /** Orders paid (`purchasedAt`) or refunded (`refundedAt`) in [from, to), oldest first (one range on one field). */

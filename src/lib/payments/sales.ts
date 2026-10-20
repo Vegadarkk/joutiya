@@ -2,15 +2,17 @@ import "server-only";
 import { MA_VAT_RATE } from "@/config/tax";
 import type { PricingConfig } from "@/config/pricing";
 import { getPricing } from "@/lib/config/runtime";
-import { findBillingAccountByStripeCustomer, listOrdersBetween, type OrderRecord } from "@/lib/db/repositories/billing";
+import { findBillingAccountByStripeCustomer, listOrdersBetween, TooManyOrdersError, type OrderRecord } from "@/lib/db/repositories/billing";
 import { getProProfile } from "@/lib/db/repositories/pro-profiles";
+import { unavailable } from "@/lib/http/errors";
+import { headroom } from "@/lib/quota";
 import { stripeRequest, type StripeParam } from "./stripe-api";
 
 // The sales of a period, as the tax exports read them (phase 7 design §8): packs from `orders`
 // (B2C, sold on RevenueCat's page; a refund is a line of its own on its date) and Pro plans from
 // the invoices Stripe marked paid in the period (B2B). Amounts in minor units of the currency
 // charged; a pack's price includes Moroccan VAT for a Moroccan buyer, an EUR pack carries none
-// (French franchise). Periods are UTC calendar months or quarters. Plus Stripe's balance
+// (French franchise). Periods are calendar months or quarters in a report's time zone. Plus Stripe's balance
 // transactions of the period: the EUR actually received, for URSSAF.
 
 export interface Period {
@@ -23,13 +25,35 @@ const DAY_MS = 86_400_000;
 /** An invoice paid in the period may have been issued this long before it. */
 const INVOICE_LOOKBACK_MS = 45 * DAY_MS;
 const STRIPE_PAGES = 100;
+/** Orders one list of an export may read when the quota counter is unreadable. */
+const MAX_ORDERS = 20_000;
 
-/** `2027-03` (month), `2027-Q1` or `2027-T1` (quarter), `2027` (year), in UTC. */
-export function parsePeriod(value: string): Period | null {
+/** Offset of `timeZone` from UTC at `instant`, in ms (local wall clock minus UTC). */
+function zoneOffset(instant: number, timeZone: string): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" })
+      .formatToParts(instant)
+      .map((part) => [part.type, Number(part.value)]),
+  );
+  return Date.UTC(parts.year!, parts.month! - 1, parts.day!, parts.hour!, parts.minute!, parts.second!) - instant;
+}
+
+/** The instant of midnight on the 1st of month `m` (0-based, may overflow) of year `y` in `timeZone`. */
+function monthStart(y: number, m: number, timeZone: string): Date {
+  const wall = Date.UTC(y, m, 1);
+  const first = wall - zoneOffset(wall, timeZone);
+  return new Date(wall - zoneOffset(first, timeZone));
+}
+
+/**
+ * `2027-03` (month), `2027-Q1` or `2027-T1` (quarter), `2027` (year), from midnight to midnight in
+ * `timeZone`: the DGI files follow Moroccan time, URSSAF and the e-reporting French time.
+ */
+export function parsePeriod(value: string, timeZone = "UTC"): Period | null {
   const month = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(value);
   const quarter = /^(\d{4})-[QT]([1-4])$/.exec(value);
   const year = /^(\d{4})$/.exec(value);
-  const at = (y: number, m: number) => new Date(Date.UTC(y, m, 1));
+  const at = (y: number, m: number) => monthStart(y, m, timeZone);
   if (month) return { label: value, from: at(Number(month[1]), Number(month[2]) - 1), to: at(Number(month[1]), Number(month[2])) };
   if (quarter) {
     const start = (Number(quarter[2]) - 1) * 3;
@@ -67,9 +91,14 @@ export function splitIncluded(grossMinor: number, rate: number): { netMinor: num
   return { netMinor: grossMinor - vatMinor, vatMinor };
 }
 
-function packLines(order: OrderRecord, pricing: PricingConfig, period: Period): SaleLine[] {
+/** What the buyer paid: the event's amount, else the pack's price (an order the reconciliation credited has none). */
+export function orderGrossMinor(order: Pick<OrderRecord, "amountMinor" | "packId" | "quantity" | "credits">, pricing: PricingConfig): number {
   const pack = pricing.packs.find((candidate) => candidate.id === order.packId);
-  const grossMinor = order.amountMinor ?? (pack ? pack.priceMinor * order.quantity : order.credits.paid * 100);
+  return order.amountMinor ?? (pack ? pack.priceMinor * order.quantity : order.credits.paid * 100);
+}
+
+function packLines(order: OrderRecord, pricing: PricingConfig, period: Period): SaleLine[] {
+  const grossMinor = orderGrossMinor(order, pricing);
   const rate = order.taxJurisdiction === "MA" ? MA_VAT_RATE : 0;
   const base = {
     kind: "pack" as const,
@@ -159,7 +188,13 @@ async function planLines(period: Period, stripe: typeof stripeRequest): Promise<
 /** The period's sales and refunds, oldest first; plans only when Stripe is configured. */
 export async function salesOf(period: Period, options: { stripe?: typeof stripeRequest | null } = {}): Promise<SaleLine[]> {
   const pricing = await getPricing();
-  const [paid, refunded] = await Promise.all([listOrdersBetween("purchasedAt", period.from, period.to), listOrdersBetween("refundedAt", period.from, period.to)]);
+  // Two lists sharing what the day's Firestore reads leave, a fifth kept for the site.
+  const room = await headroom("firestore.reads", 0.8);
+  const max = room === null ? MAX_ORDERS : Math.min(MAX_ORDERS, Math.floor(room / 2));
+  const [paid, refunded] = await Promise.all([listOrdersBetween("purchasedAt", period.from, period.to, max), listOrdersBetween("refundedAt", period.from, period.to, max)]).catch((error: unknown) => {
+    if (error instanceof TooManyOrdersError) throw unavailable(`more orders in ${period.label} than today's Firestore reads allow (${max} per list): export a shorter period or retry tomorrow`);
+    throw error;
+  });
   const orders = new Map([...paid, ...refunded].map((order) => [order.id, order]));
   const lines = [...orders.values()].flatMap((order) => packLines(order, pricing, period));
   if (options.stripe !== null) lines.push(...(await planLines(period, options.stripe ?? stripeRequest)));

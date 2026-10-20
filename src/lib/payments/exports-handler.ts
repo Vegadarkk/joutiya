@@ -1,4 +1,5 @@
 import "server-only";
+import { FR_TIME_ZONE, MA_TIME_ZONE } from "@/config/tax";
 import { audit } from "@/lib/audit";
 import { requireStaff } from "@/lib/auth/guards";
 import { HttpError, notFound, unavailable } from "@/lib/http/errors";
@@ -10,16 +11,16 @@ import { parsePeriod, receiptsOf, salesOf } from "./sales";
 import { isStripeConfigured, stripeRequest } from "./stripe-api";
 
 // GET /api/admin/exports/{report}?period= (phase 7 design §8): a tax export as a CSV download,
-// admin only, every download audited. The DGI files take a quarter; URSSAF and e-reporting a month
-// or a quarter. Plans come from Stripe and URSSAF's receipts need it.
+// admin only, every download audited. The DGI files take a quarter in Moroccan time; URSSAF and
+// e-reporting a month or a quarter in French time. Plans come from Stripe and URSSAF's receipts need it.
 
 type Params = { params: Promise<Record<string, string | string[] | undefined>> };
 
-const PERIODS: Record<ExportReport, RegExp> = {
-  "registre-dgi": /^\d{4}-[QT][1-4]$/,
-  "totaux-dgi": /^\d{4}-[QT][1-4]$/,
-  urssaf: /^\d{4}-(?:\d{2}|[QT][1-4])$/,
-  "e-reporting": /^\d{4}-(?:\d{2}|[QT][1-4])$/,
+const PERIODS: Record<ExportReport, { shape: RegExp; timeZone: string }> = {
+  "registre-dgi": { shape: /^\d{4}-[QT][1-4]$/, timeZone: MA_TIME_ZONE },
+  "totaux-dgi": { shape: /^\d{4}-[QT][1-4]$/, timeZone: MA_TIME_ZONE },
+  urssaf: { shape: /^\d{4}-(?:\d{2}|[QT][1-4])$/, timeZone: FR_TIME_ZONE },
+  "e-reporting": { shape: /^\d{4}-(?:\d{2}|[QT][1-4])$/, timeZone: FR_TIME_ZONE },
 };
 
 export async function handleBillingExport(request: Request, context: Params): Promise<Response> {
@@ -27,7 +28,8 @@ export async function handleBillingExport(request: Request, context: Params): Pr
   const report = z.enum(EXPORT_REPORTS).safeParse((await context.params).report);
   if (!report.success) throw notFound();
   const raw = new URL(request.url).searchParams.get("period") ?? "";
-  const period = PERIODS[report.data].test(raw) ? parsePeriod(raw) : null;
+  const { shape, timeZone } = PERIODS[report.data];
+  const period = shape.test(raw) ? parsePeriod(raw, timeZone) : null;
   if (!period) throw new HttpError(400, "invalid_body", "period: a quarter (2027-T1) for the DGI files, a month (2027-03) or a quarter otherwise");
   await enforceLimit("admin.read.uid", staff.user.uid);
   const stripe = isStripeConfigured() ? stripeRequest : null;

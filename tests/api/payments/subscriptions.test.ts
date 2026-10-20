@@ -24,7 +24,7 @@ const stripe = vi.hoisted(() => ({
   sessionStatus: "open",
   /** GET /v1/events?delivery_success=false and GET /v1/subscriptions (the reconciliation's lists). */
   undelivered: [] as unknown[],
-  running: [] as { id: string; status: string; customer: string }[],
+  running: [] as { id: string; status: string; customer: string; created?: number; metadata?: Record<string, string> }[],
 }));
 
 vi.mock("@/lib/config/runtime", async (importOriginal) => {
@@ -266,8 +266,8 @@ describe("plan checkout", () => {
       mode: "subscription",
       customer: `cus_${proId}`,
       line_items: [{ price: "price_BusinessYearly", quantity: 1 }],
-      metadata: { accountId: `pro_${proId}`, app_user_id: account!.rcAppUserId },
-      subscription_data: { metadata: { app_user_id: account!.rcAppUserId } },
+      metadata: { accountId: `pro_${proId}`, app_user_id: account!.rcAppUserId, env: "dev" },
+      subscription_data: { metadata: { app_user_id: account!.rcAppUserId, env: "dev" } },
     });
     expect(session!.params.success_url).toMatch(/\/fr\/pro\/abonnement\?abonnement=ok$/);
     expect(session!.idempotencyKey).toMatch(new RegExp(`^checkout_pro_${proId}_business_yearly_fr_price_BusinessYearly_\\d{4}-\\d{2}-\\d{2}$`));
@@ -562,6 +562,9 @@ describe("billing reconciliation", () => {
       { id: "sub_Stripe2", status: "active", customer: `cus_${proId}` },
       { id: "sub_Orphan", status: "past_due", customer: "cus_Unknown" },
       { id: "sub_Old", status: "incomplete_expired", customer: "cus_Unknown" },
+      // Opened by another environment on the shared Stripe account, or reported on earlier nights.
+      { id: "sub_Staging", status: "active", customer: "cus_Unknown", metadata: { env: "staging" } },
+      { id: "sub_OldOrphan", status: "active", customer: "cus_Unknown", created: Math.floor(Date.now() / 1_000) - 10 * 86_400 },
     ];
 
     const run = await reconcileBilling();

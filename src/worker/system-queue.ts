@@ -12,7 +12,7 @@ import { captureServerException } from "@/lib/observability/capture";
  * budget (retention-purge, purge-connection-logs), the backup (heavy, alerts itself, its cursors do
  * not move), reconcile-search (up to 8 000 reads) and saved-search-alerts (per-run mail cap).
  */
-export const RETRIED_SYSTEM_JOBS: ReadonlySet<string> = new Set(["quota-report", "expire-listings", "listing-expiry-reminders", "r2-storage-gauge", "expire-boosts"]);
+export const RETRIED_SYSTEM_JOBS: ReadonlySet<string> = new Set(["quota-report", "expire-listings", "listing-expiry-reminders", "r2-storage-gauge", "expire-boosts", "billing-thresholds"]);
 export const SYSTEM_RETRY_DELAY_MS = 5 * 60_000;
 
 export type Schedules = Readonly<Record<string, { readonly pattern: string; readonly job: string }>>;

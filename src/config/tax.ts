@@ -17,5 +17,8 @@ export const EU_B2C_THRESHOLD_EUR = 10_000;
 /** Share of a threshold that alerts the owner (quota-guard style). */
 export const THRESHOLD_ALERT_AT = 0.7;
 
-/** Time zone of the Moroccan register dates. */
+/** Time zone of the DGI files (dates and period bounds). */
 export const MA_TIME_ZONE = "Africa/Casablanca";
+
+/** Time zone of the URSSAF and e-reporting files (dates and period bounds). */
+export const FR_TIME_ZONE = "Europe/Paris";

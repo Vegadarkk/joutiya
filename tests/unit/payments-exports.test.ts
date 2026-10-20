@@ -39,6 +39,12 @@ describe("periods and VAT", () => {
     for (const bad of ["2027-13", "2027-T5", "27-01", "2027-1", ""]) expect(parsePeriod(bad)).toBeNull();
   });
 
+  it("bounds a period at midnight in the report's time zone, summer time included", () => {
+    expect(parsePeriod("2027-04", "Europe/Paris")).toEqual({ label: "2027-04", from: new Date("2027-03-31T22:00:00Z"), to: new Date("2027-04-30T22:00:00Z") });
+    expect(parsePeriod("2027-T1", "Europe/Paris")).toEqual({ label: "2027-T1", from: new Date("2026-12-31T23:00:00Z"), to: new Date("2027-03-31T22:00:00Z") });
+    expect(parsePeriod("2027-11", "Europe/Paris")?.from).toEqual(new Date("2027-10-31T23:00:00Z"));
+  });
+
   it("splits a VAT-inclusive price, rounding the VAT", () => {
     expect(splitIncluded(10_000, 0.2)).toEqual({ netMinor: 8_333, vatMinor: 1_667 });
     expect(splitIncluded(5_000, 0.2)).toEqual({ netMinor: 4_167, vatMinor: 833 });
@@ -110,12 +116,24 @@ describe("reports", () => {
 
 describe("EU threshold", () => {
   const at = new Date("2027-06-01T00:00:00Z");
-  const counted = (euB2cEurMinor: number, year = 2027): BillingThresholds => ({ year, euB2cEurMinor, turnoverEurMinor: null, alerted: { euB2c: 0, franchise: 0 }, computedAt: at });
+  const counted = (euB2cEurMinor: number, year = 2027, previousYearEuB2cEurMinor = 0): BillingThresholds => ({
+    year,
+    euB2cEurMinor,
+    previousYearEuB2cEurMinor,
+    turnoverEurMinor: null,
+    turnoverMonths: {},
+    alerted: { euB2c: 0, franchise: 0 },
+    computedAt: at,
+  });
 
-  it("closes the EUR packs at 10,000 EUR of EU B2C sales in the year, and opens them again on 1 January", () => {
+  it("closes the EUR packs once this year's or last year's EU B2C sales reach 10,000 EUR", () => {
     expect(euPacksOpen(null, at)).toBe(true);
     expect(euPacksOpen(counted(999_999), at)).toBe(true);
     expect(euPacksOpen(counted(1_000_000), at)).toBe(false);
-    expect(euPacksOpen(counted(1_000_000, 2026), at)).toBe(true);
+    expect(euPacksOpen(counted(0, 2027, 1_000_000), at)).toBe(false);
+    // On 1 January, before the night's count: last year's figure is the previous year's.
+    expect(euPacksOpen(counted(1_000_000, 2026), at)).toBe(false);
+    expect(euPacksOpen(counted(999_999, 2026, 1_000_000), at)).toBe(true);
+    expect(euPacksOpen(counted(1_000_000, 2025), at)).toBe(true);
   });
 });
