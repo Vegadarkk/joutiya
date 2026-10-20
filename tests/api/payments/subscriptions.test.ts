@@ -18,7 +18,14 @@ const offer = vi.hoisted(() => ({ endsAt: null as string | null }));
 const store = vi.hoisted(() => ({ subscriptions: [] as RevenueCatSubscription[] }));
 /** Resend headroom seen by the launch-offer run (null = counter unreadable, the per-run cap applies). */
 const mailRoom = vi.hoisted(() => ({ value: null as number | null }));
-const stripe = vi.hoisted(() => ({ calls: [] as { method: string; path: string; params: Record<string, unknown>; idempotencyKey?: string }[], subscriptionStatus: "active", sessionStatus: "open" }));
+const stripe = vi.hoisted(() => ({
+  calls: [] as { method: string; path: string; params: Record<string, unknown>; idempotencyKey?: string }[],
+  subscriptionStatus: "active",
+  sessionStatus: "open",
+  /** GET /v1/events?delivery_success=false and GET /v1/subscriptions (the reconciliation's lists). */
+  undelivered: [] as unknown[],
+  running: [] as { id: string; status: string; customer: string; created?: number; metadata?: Record<string, string> }[],
+}));
 
 vi.mock("@/lib/config/runtime", async (importOriginal) => {
   const { DEFAULT_PRICING } = await import("@/config/pricing");
@@ -54,6 +61,8 @@ vi.mock("@/lib/payments/stripe-api", async (importOriginal) => ({
       const invoice = { id: "in_Test1", number: "JOUT-0001", created: 1_790_000_000, total: 70_800, currency: "mad", hosted_invoice_url: "https://invoice.stripe.com/i/test", invoice_pdf: "https://pay.stripe.com/invoice/test/pdf" };
       return { data: [{ ...invoice, status: "paid" }, { ...invoice, id: "in_Draft", status: "draft" }], has_more: false };
     }
+    if (path === "/v1/events") return { data: stripe.undelivered, has_more: false };
+    if (path === "/v1/subscriptions") return { data: stripe.running, has_more: false };
     throw new Error(`unexpected Stripe call ${method} ${path}`);
   }),
 }));
@@ -89,6 +98,7 @@ import { expectedSignature } from "@/lib/payments/revenuecat-webhook";
 import type { ProProfileDoc } from "@/lib/pro/profile-schema";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { csrfToken } from "@/lib/security/csrf";
+import { reconcileBilling } from "@/lib/payments/reconcile";
 import { proPlansNightly } from "@/worker/jobs/pro-plans";
 import { DAY_MS, api, member, readyPatch, seedReadyUpload, type ErrorBody, type Member } from "../listings/helpers";
 
@@ -121,6 +131,8 @@ beforeEach(() => {
   stripe.calls = [];
   stripe.subscriptionStatus = "active";
   stripe.sessionStatus = "open";
+  stripe.undelivered = [];
+  stripe.running = [];
   vi.mocked(alert).mockClear();
   vi.mocked(postStripeReceipt).mockClear();
 });
@@ -254,8 +266,8 @@ describe("plan checkout", () => {
       mode: "subscription",
       customer: `cus_${proId}`,
       line_items: [{ price: "price_BusinessYearly", quantity: 1 }],
-      metadata: { accountId: `pro_${proId}`, app_user_id: account!.rcAppUserId },
-      subscription_data: { metadata: { app_user_id: account!.rcAppUserId } },
+      metadata: { accountId: `pro_${proId}`, app_user_id: account!.rcAppUserId, env: "dev" },
+      subscription_data: { metadata: { app_user_id: account!.rcAppUserId, env: "dev" } },
     });
     expect(session!.params.success_url).toMatch(/\/fr\/pro\/abonnement\?abonnement=ok$/);
     expect(session!.idempotencyKey).toMatch(new RegExp(`^checkout_pro_${proId}_business_yearly_fr_price_BusinessYearly_\\d{4}-\\d{2}-\\d{2}$`));
@@ -514,5 +526,56 @@ describe("nightly plans job", () => {
     expect(mailsTo(owner).at(-1)).toMatchObject({ template: "launchOfferNotice", data: { kind: "ended", paused: 1 } });
     await proPlansNightly(new Date(endsAt + 120_000));
     expect(mailsTo(owner)).toHaveLength(3);
+  });
+});
+
+describe("billing reconciliation", () => {
+  it("replays a Stripe event never delivered, once", async () => {
+    const owner = await member();
+    const proId = await shop(owner);
+    await appUserOf(owner, proId, "essentiel");
+    store.subscriptions = [rcSubscription({ entitlements: ["essentiel"] })];
+    stripe.undelivered = [
+      {
+        id: `evt_${randomUUID().replace(/-/g, "")}`,
+        object: "event",
+        type: "checkout.session.completed",
+        livemode: false,
+        created: Math.floor(Date.now() / 1000),
+        data: { object: { id: "cs_test_1", object: "checkout.session", mode: "subscription", customer: `cus_${proId}`, subscription: "sub_Stripe1" } },
+      },
+    ];
+
+    expect(await reconcileBilling()).toMatchObject({ stripeEvents: 1, failed: 0 });
+    expect(stripe.calls.find((call) => call.path === "/v1/events")?.params).toMatchObject({ delivery_success: false, limit: 100 });
+    expect(postStripeReceipt).toHaveBeenCalledWith(expect.any(String), "sub_Stripe1");
+    expect(await getProProfile(proId)).toMatchObject({ lifecycle: "active", plan: "essentiel", planSource: "subscription" });
+    expect(await reconcileBilling()).toMatchObject({ stripeEvents: 0, failed: 0 });
+  });
+
+  it("syncs a running Stripe subscription that has no plan here, and alerts one of an unknown customer", async () => {
+    const owner = await member();
+    const proId = await shop(owner);
+    await appUserOf(owner, proId);
+    store.subscriptions = [rcSubscription({ storeSubscriptionId: "sub_Stripe2" })];
+    stripe.running = [
+      { id: "sub_Stripe2", status: "active", customer: `cus_${proId}` },
+      { id: "sub_Orphan", status: "past_due", customer: "cus_Unknown" },
+      { id: "sub_Old", status: "incomplete_expired", customer: "cus_Unknown" },
+      // Opened by another environment on the shared Stripe account, or reported on earlier nights.
+      { id: "sub_Staging", status: "active", customer: "cus_Unknown", metadata: { env: "staging" } },
+      { id: "sub_OldOrphan", status: "active", customer: "cus_Unknown", created: Math.floor(Date.now() / 1_000) - 10 * 86_400 },
+    ];
+
+    const run = await reconcileBilling();
+    expect(run).toMatchObject({ subscriptions: 1, failed: 1 });
+    expect(run.problems).toEqual([expect.stringContaining("sub_Orphan")]);
+    expect(await getProProfile(proId)).toMatchObject({ lifecycle: "active", plan: "business" });
+    expect(await getSubscription(`pro_${proId}`)).toMatchObject({ status: "active", storeSubscriptionId: "sub_Stripe2" });
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({ severity: "P1" }));
+
+    // Known and running here: nothing more to do.
+    stripe.running = stripe.running.slice(0, 1);
+    expect(await reconcileBilling()).toMatchObject({ subscriptions: 0, failed: 0 });
   });
 });

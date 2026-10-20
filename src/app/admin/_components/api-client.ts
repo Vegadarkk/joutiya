@@ -13,6 +13,7 @@ export const ADMIN_API = {
   appeals: "/api/admin/appeals",
   authorities: "/api/admin/authorities",
   conversations: "/api/admin/conversations",
+  exports: "/api/admin/exports",
 } as const;
 
 const CSRF_COOKIE = "__Host-csrf";

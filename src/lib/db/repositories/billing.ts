@@ -1,5 +1,5 @@
 import "server-only";
-import type { DocumentSnapshot, Transaction } from "firebase-admin/firestore";
+import type { DocumentSnapshot, Query, Transaction } from "firebase-admin/firestore";
 import { db } from "@/lib/firebase/admin";
 import { consume } from "@/lib/quota";
 import {
@@ -79,6 +79,16 @@ export async function findBillingAccountByStripeCustomer(stripeCustomerId: strin
   return account ? { id: doc.id, ...account } : null;
 }
 
+/** Accounts that opened a pack checkout since `since`, the most recent first (one range on one field: no composite index). */
+export async function listRecentPackCheckouts(since: Date, limit: number): Promise<BillingAccountRecord[]> {
+  const snapshot = await db().collection(COLLECTIONS.billingAccounts).where("lastCheckout.at", ">=", since).orderBy("lastCheckout.at", "desc").limit(limit).get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  return snapshot.docs.flatMap((doc) => {
+    const account = parse(doc, billingAccountSchema, COLLECTIONS.billingAccounts);
+    return account ? [{ id: doc.id, ...account }] : [];
+  });
+}
+
 export async function getBillingAccount(accountId: string): Promise<BillingAccountDoc | null> {
   const snapshot = await billingAccountRef(accountId).get();
   void consume("firestore.reads", 1);
@@ -137,6 +147,46 @@ export async function getOrder(transactionId: string): Promise<OrderDoc | null> 
   return parse(snapshot, orderSchema, COLLECTIONS.orders);
 }
 
+export interface OrderRecord extends OrderDoc {
+  /** The document id (`orderId` of the store transaction). */
+  id: string;
+}
+
+const ORDER_PAGE = 500;
+
+/** More orders than a read may return: a tax total must not come out of a cut list. */
+export class TooManyOrdersError extends Error {}
+
+/** Every order of `query`; past `max` (at most max + 1 reads), TooManyOrdersError. */
+async function allOrders(query: Query, max: number): Promise<OrderRecord[]> {
+  const out: OrderRecord[] = [];
+  let last: DocumentSnapshot | undefined;
+  let seen = 0;
+  for (;;) {
+    const limit = Math.min(ORDER_PAGE, max + 1 - seen);
+    const snapshot = await (last ? query.startAfter(last) : query).limit(limit).get();
+    void consume("firestore.reads", Math.max(1, snapshot.size));
+    seen += snapshot.size;
+    if (seen > max) throw new TooManyOrdersError(`more than ${max} orders`);
+    for (const doc of snapshot.docs) {
+      const order = parse(doc, orderSchema, COLLECTIONS.orders);
+      if (order) out.push({ id: doc.id, ...order });
+    }
+    if (snapshot.size < limit) return out;
+    last = snapshot.docs.at(-1);
+  }
+}
+
+/** Orders paid (`purchasedAt`) or refunded (`refundedAt`) in [from, to), oldest first (one range on one field). */
+export function listOrdersBetween(field: "purchasedAt" | "refundedAt", from: Date, to: Date, max = 20_000): Promise<OrderRecord[]> {
+  return allOrders(db().collection(COLLECTIONS.orders).where(field, ">=", from).where(field, "<", to).orderBy(field, "asc"), max);
+}
+
+/** Orders of `jurisdiction` paid in [from, to) (index taxJurisdiction, purchasedAt): the yearly EU B2C counter. */
+export function listOrdersOfJurisdictionBetween(jurisdiction: OrderDoc["taxJurisdiction"], from: Date, to: Date, max = 20_000): Promise<OrderRecord[]> {
+  return allOrders(db().collection(COLLECTIONS.orders).where("taxJurisdiction", "==", jurisdiction).where("purchasedAt", ">=", from).where("purchasedAt", "<", to).orderBy("purchasedAt", "asc"), max);
+}
+
 /** `create`: a concurrent second credit of the same transaction fails and its transaction retries. */
 export function createOrderTx(tx: Transaction, transactionId: string, order: OrderDoc): void {
   tx.create(orderRef(transactionId), datesToTimestamps(orderSchema.parse(order)));
@@ -157,6 +207,23 @@ export async function getBillingEvent(eventId: string, source: BillingEventSourc
 /** Events of one store transaction (an equality on one field: no composite index). */
 export async function listBillingEventsByTransactionId(transactionId: string): Promise<BillingEventDoc[]> {
   const snapshot = await db().collection(COLLECTIONS.billingEvents).where("transactionId", "==", transactionId).limit(20).get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  return snapshot.docs.flatMap((doc) => parse(doc, billingEventSchema, COLLECTIONS.billingEvents) ?? []);
+}
+
+/**
+ * Events still `received` or `failed` that arrived between `after` and `before`, the oldest first
+ * (index status, receivedAt): the queue lost or gave up on them.
+ */
+export async function listStuckBillingEvents(after: Date, before: Date, limit: number): Promise<BillingEventDoc[]> {
+  const snapshot = await db()
+    .collection(COLLECTIONS.billingEvents)
+    .where("status", "in", ["received", "failed"])
+    .where("receivedAt", ">=", after)
+    .where("receivedAt", "<", before)
+    .orderBy("receivedAt", "asc")
+    .limit(limit)
+    .get();
   void consume("firestore.reads", Math.max(1, snapshot.size));
   return snapshot.docs.flatMap((doc) => parse(doc, billingEventSchema, COLLECTIONS.billingEvents) ?? []);
 }

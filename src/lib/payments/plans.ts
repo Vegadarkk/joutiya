@@ -159,7 +159,8 @@ export async function startPlanCheckout(auth: AuthContext, input: CheckoutPlanIn
     return { ...next, id: accountId };
   });
   const customer = await stripeCustomer(account, profile, auth.user.email);
-  const metadata = { accountId, app_user_id: account.rcAppUserId };
+  // `env`: the Stripe account serves every environment, the nightly reconciliation keeps its own.
+  const metadata = { accountId, app_user_id: account.rcAppUserId, env: serverEnv().APP_ENV };
   const session = await stripeRequest<{ id?: string; url?: string | null }>(
     "POST",
     "/v1/checkout/sessions",

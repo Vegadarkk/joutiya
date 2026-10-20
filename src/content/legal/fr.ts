@@ -157,43 +157,99 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
   },
 
   cgv: {
-    updated: "2026-10-13",
+    updated: "2026-10-20",
     intro:
-      "Les présentes conditions s'appliqueront aux options payantes et aux offres Pro vendues par {publisher}. Aucune vente n'est ouverte à ce jour : elles seront complétées avant l'ouverture des ventes.",
+      "Version provisoire, avant relecture juridique. Les présentes conditions encadrent les crédits, les options et les abonnements Pro vendus par {publisher} ({address}) sur Joutiya. Aucune vente n'est ouverte à ce jour : elles s'appliqueront à la première vente, dans leur version en vigueur ce jour-là.",
     sections: [
       {
-        id: "offres",
-        heading: "Options et offres",
+        id: "vendeur",
+        heading: "Vendeur et champ",
         blocks: [
-          "Options pour les annonces (remontée, À la Une) payées en crédits, et abonnements Pro mensuels. Les prix sont affichés toutes taxes comprises pour les particuliers et hors taxes pour les professionnels.",
+          "Le vendeur est {publisher}, {address}, joignable à {email}. Les conditions couvrent les packs de crédits, les options d'annonce payées en crédits et les abonnements Pro. Elles complètent les conditions générales d'utilisation.",
+          "Joutiya est un hébergeur neutre : il n'est pas partie aux ventes conclues entre utilisateurs, et une option ne garantit ni une vente ni un contact.",
         ],
       },
       {
         id: "credits",
         heading: "Crédits",
         blocks: [
-          "Un crédit vaut 1 dirham toutes taxes comprises. Les crédits achetés restent valables 12 mois. Ils ne sont ni remboursables ni convertibles en argent, sauf disposition légale contraire. Les crédits offerts en bonus sont utilisés en dernier et ne sont jamais remboursés.",
+          "Un crédit vaut 1 dirham toutes taxes comprises. Les crédits s'achètent par packs, en dirhams avec une carte marocaine ou en euros avec une carte européenne ; certains packs comprennent des crédits offerts en bonus.",
+          {
+            list: [
+              "Les crédits servent uniquement à payer les options de Joutiya. Ils ne sont ni transférables à un autre compte, ni convertibles en argent, ni utilisables en dehors de Joutiya : ce n'est pas de la monnaie électronique.",
+              "Les crédits achetés n'expirent pas tant que le compte est ouvert.",
+              "Les crédits mensuels d'un abonnement Pro sont utilisés en premier. Ils ne se cumulent pas : ils sont remis à niveau au début de chaque période, et ceux qui restent sont perdus.",
+              "Payer une option avec des crédits vaut exécution complète du service acheté avec ces crédits.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "prix",
+        heading: "Prix, commande et paiement",
+        blocks: [
+          {
+            list: [
+              "Les packs sont affichés toutes taxes comprises. Les packs en dirhams comprennent la TVA marocaine de 20 % (article 115 bis du Code général des impôts marocain).",
+              "Les abonnements Pro sont affichés hors taxes.",
+              "Mention fiscale de l'éditeur : {vat}.",
+              "Le prix dû est celui affiché au moment de la commande.",
+            ],
+          },
+          "Avant de payer, l'acheteur accepte les présentes conditions ; pour une option, il demande aussi son exécution immédiate. Le bouton de paiement vaut commande avec obligation de paiement.",
+          "Les packs se paient par carte sur la page sécurisée de notre prestataire RevenueCat, avec Stripe, et les abonnements Pro par Stripe. Avec une carte marocaine, le paiement en ligne à l'international doit être activé, et l'achat compte dans la dotation annuelle fixée par l'Office des changes. Les crédits sont versés sur le compte dès que le paiement est confirmé.",
         ],
       },
       {
         id: "abonnements",
-        heading: "Durée et renouvellement des abonnements Pro",
+        heading: "Abonnements Pro",
         blocks: [
-          "Les abonnements se renouvellent chaque mois jusqu'à résiliation, possible à tout moment depuis l'espace Pro, avec effet à la fin de la période en cours.",
+          {
+            list: [
+              "Les abonnements sont réservés aux comptes Pro vérifiés. Les offres Essentiel et Business se souscrivent au mois ou à l'année.",
+              "L'abonnement se renouvelle automatiquement à la fin de chaque période. Il se résilie à tout moment depuis l'espace Pro et court jusqu'à la fin de la période payée, qui n'est pas remboursée.",
+              "Passer à une offre supérieure prend effet aussitôt et la différence est facturée. Passer à une offre inférieure prend effet à la fin de la période.",
+              "Après un échec de paiement, l'abonnement reste actif pendant un délai de grâce, puis prend fin. Les annonces au-delà du quota du compte sont alors mises en pause ; elles peuvent être remises en ligne depuis « Mes annonces ».",
+              "Offre de lancement : tant que les ventes sont fermées, les Pros vérifiés bénéficient gratuitement des quotas de l'offre Essentiel, sans crédits mensuels. Ils sont prévenus au moins 30 jours avant la fin de cette offre.",
+            ],
+          },
         ],
       },
       {
         id: "retractation",
         heading: "Droit de rétractation",
         blocks: [
-          "Le consommateur dispose d'un délai de rétractation de 14 jours en France et de 7 jours au Maroc. Lorsqu'il demande l'exécution immédiate d'une option, il renonce expressément à ce droit une fois l'option pleinement exécutée ; à défaut, il est remboursé au prorata de ce qui n'a pas été fourni.",
+          "Le consommateur dispose de 14 jours à compter de l'achat d'un pack pour se rétracter. Les crédits non utilisés du pack lui sont alors remboursés sur simple demande à {email} ; les crédits bonus du pack sont retirés en proportion.",
+          "Les crédits déjà utilisés ne sont pas remboursables. En demandant l'exécution immédiate d'une option, le consommateur reconnaît perdre son droit de rétractation une fois l'option exécutée.",
+          "Les abonnements Pro sont souscrits par des professionnels pour leur activité : le droit de rétractation ne s'y applique pas.",
+        ],
+      },
+      {
+        id: "remboursements",
+        heading: "Remboursements, contestations et solde négatif",
+        blocks: [
+          "Un remboursement, ou une contestation du paiement auprès de la banque, retire du compte les crédits du pack concerné, même déjà utilisés. Si le solde devient négatif, le porte-monnaie est bloqué jusqu'à sa régularisation.",
         ],
       },
       {
         id: "factures",
-        heading: "Factures et médiation",
+        heading: "Factures et reçus",
         blocks: [
-          "Une facture est émise pour chaque achat et reste disponible dans votre compte. En cas de litige non résolu avec notre service client ({email}), le consommateur peut recourir gratuitement à un médiateur de la consommation, désigné avant l'ouverture des ventes.",
+          "Chaque paiement d'abonnement Pro donne lieu à une facture, disponible dans l'espace Pro. Chaque achat de pack donne lieu à un reçu, envoyé par e-mail par notre prestataire de paiement.",
+        ],
+      },
+      {
+        id: "mediation",
+        heading: "Réclamations et médiation",
+        blocks: [
+          "Toute réclamation s'adresse à {email}. En cas de litige non résolu, le consommateur peut recourir gratuitement au médiateur de la consommation : {mediator}.",
+        ],
+      },
+      {
+        id: "droit",
+        heading: "Droit applicable",
+        blocks: [
+          "Les présentes conditions sont soumises au droit français. Le consommateur garde la protection des règles impératives du pays où il réside, notamment la loi marocaine n° 31-08 pour un consommateur résidant au Maroc.",
           SAFEGUARD,
         ],
       },
@@ -472,6 +528,10 @@ export interface LegalValues {
   ttlDays: string;
   purgeMonths: string;
   cndp: string;
+  /** VAT mention of the publisher (franchise or VAT number), from config/legal. */
+  vat: string;
+  /** Consumer mediator, or when it will be named. */
+  mediator: string;
 }
 
 export function fill(text: string, values: LegalValues): string {

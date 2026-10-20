@@ -20,6 +20,11 @@ const purchaseSchema = z.object({
   status: z.string().min(1).max(32),
   environment: z.string().min(1).max(32),
   quantity: z.number().int().nullish(),
+  /** RevenueCat's own product id (`prod...`), not the store identifier of the webhooks. */
+  product_id: z.string().min(1).max(255).nullish().catch(undefined),
+  purchased_at: z.number().int().positive().nullish().catch(undefined),
+  store: z.string().min(1).max(32).nullish().catch(undefined),
+  country: z.string().regex(/^[A-Z]{2}$/).nullish().catch(undefined),
 });
 
 export interface RevenueCatPurchase {
@@ -30,6 +35,11 @@ export interface RevenueCatPurchase {
   status: string;
   environment: "sandbox" | "production";
   quantity: number;
+  /** RevenueCat's product id (see productStoreIdentifier), the store and the buyer's country, when listed. */
+  productId?: string;
+  purchasedAt?: Date;
+  store?: string;
+  country?: string;
 }
 
 /** A failed call; `retryable` when a later attempt may succeed (rate limit, 5xx, network). */
@@ -82,8 +92,42 @@ const isEnvironment = (value: string): value is "sandbox" | "production" => valu
 export async function listCustomerPurchases(appUserId: string, environment: "sandbox" | "production", fetchImpl: typeof fetch = fetch): Promise<RevenueCatPurchase[]> {
   const items = await listCustomerItems(appUserId, "purchases", environment, purchaseSchema, fetchImpl);
   return items.flatMap((item) =>
-    isEnvironment(item.environment) ? [{ id: item.id, storePurchaseIdentifier: item.store_purchase_identifier ?? null, status: item.status, environment: item.environment, quantity: item.quantity ?? 1 }] : [],
+    isEnvironment(item.environment)
+      ? [
+          {
+            id: item.id,
+            storePurchaseIdentifier: item.store_purchase_identifier ?? null,
+            status: item.status,
+            environment: item.environment,
+            quantity: item.quantity ?? 1,
+            ...(item.product_id ? { productId: item.product_id } : {}),
+            ...(item.purchased_at ? { purchasedAt: new Date(item.purchased_at) } : {}),
+            ...(item.store ? { store: item.store } : {}),
+            ...(item.country ? { country: item.country } : {}),
+          },
+        ]
+      : [],
   );
+}
+
+/**
+ * The store identifier of RevenueCat product `productId` (what the webhooks and config/pricing call
+ * the product id). Needs the key's read access to the project's products.
+ */
+export async function productStoreIdentifier(productId: string, fetchImpl: typeof fetch = fetch): Promise<string> {
+  const env = serverEnv();
+  if (!env.REVENUECAT_PROJECT_ID || !env.REVENUECAT_SECRET_API_KEY) throw new RevenueCatApiError(null, false, "RevenueCat API is not configured");
+  const url = new URL(`/v2/projects/${encodeURIComponent(env.REVENUECAT_PROJECT_ID)}/products/${encodeURIComponent(productId)}`, API_ORIGIN);
+  let response: Response;
+  try {
+    response = await fetchImpl(url, { headers: { authorization: `Bearer ${env.REVENUECAT_SECRET_API_KEY}`, accept: "application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  } catch (error) {
+    throw new RevenueCatApiError(null, true, `RevenueCat API unreachable: ${(error as Error).name}`);
+  }
+  if (!response.ok) throw new RevenueCatApiError(response.status, response.status === 429 || response.status >= 500, `RevenueCat API answered ${response.status}`);
+  const parsed = z.object({ store_identifier: z.string().min(1).max(100) }).safeParse(await response.json().catch(() => null));
+  if (!parsed.success) throw new RevenueCatApiError(response.status, false, "RevenueCat API answered an unexpected body");
+  return parsed.data.store_identifier;
 }
 
 const subscriptionSchema = z.object({

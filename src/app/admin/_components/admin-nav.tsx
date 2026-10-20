@@ -12,6 +12,7 @@ const ITEMS = [
   { href: "/comptes", label: "Comptes", adminOnly: false },
   { href: "/pros", label: "Comptes Pro", adminOnly: false },
   { href: "/statistiques", label: "Statistiques", adminOnly: false },
+  { href: "/ventes", label: "Ventes", adminOnly: true },
   { href: "/autorites", label: "Autorités", adminOnly: true },
   { href: "/personnel", label: "Personnel", adminOnly: true },
 ] as const;
