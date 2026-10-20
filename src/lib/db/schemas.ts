@@ -758,6 +758,21 @@ export const billingAccountSchema = z
       .object({ packId: z.string().min(1).max(40), consentVersion: z.string().min(1).max(20), at: ts })
       .strict()
       .optional(),
+    /** Stripe Customer of the shop (Pro subscriptions), created at its first plan checkout. */
+    stripeCustomerId: z.string().regex(/^cus_[A-Za-z0-9]{1,100}$/).optional(),
+    /** The last plan checkout opened, with the CGV and auto-renewal consent. */
+    /** The last plan checkout; its session is expired before another one opens (one plan billed). */
+    lastPlanCheckout: z
+      .object({
+        plan: z.enum(["essentiel", "business"]),
+        interval: z.enum(["monthly", "yearly"]),
+        consentVersion: z.string().min(1).max(20),
+        at: ts,
+        idempotencyKey: z.string().max(200).optional(),
+        sessionId: z.string().regex(/^cs_[A-Za-z0-9_]{1,200}$/).optional(),
+      })
+      .strict()
+      .optional(),
     /** A refund left the wallet negative: the account waits on an admin. */
     flaggedAt: ts.optional(),
     createdAt: ts,
@@ -807,17 +822,27 @@ export type OrderDoc = z.infer<typeof orderSchema>;
 export const BILLING_EVENT_STATUSES = ["received", "processed", "ignored", "failed"] as const;
 
 /**
- * billingEvents/{source}_{eventId}: every authenticated webhook delivery, deduplicated by the
- * event id. Holds only what processing needs; the worker re-reads the purchase from RevenueCat
- * before writing anything.
+ * billingEvents/{source}_{eventId}: every authenticated webhook delivery (RevenueCat or Stripe),
+ * deduplicated by the event id. Holds only what processing needs; the worker re-reads the purchase
+ * or the subscription from RevenueCat before writing anything.
  */
+export const BILLING_EVENT_SOURCES = ["revenuecat", "stripe"] as const;
+export type BillingEventSource = (typeof BILLING_EVENT_SOURCES)[number];
+
 export const billingEventSchema = z
   .object({
-    source: z.literal("revenuecat"),
+    source: z.enum(BILLING_EVENT_SOURCES),
     eventId: z.string().min(1).max(128),
     type: z.string().min(1).max(64),
     environment: rcEnvironment,
-    appUserId: z.string().min(1).max(1_500),
+    /** RevenueCat's customer (always on a RevenueCat event; a Stripe event's metadata when present). */
+    appUserId: z.string().min(1).max(1_500).optional(),
+    /** Stripe: the event's Customer, Subscription and object (session, subscription, invoice). */
+    customerId: z.string().min(1).max(255).optional(),
+    subscriptionId: z.string().min(1).max(255).optional(),
+    objectId: z.string().min(1).max(255).optional(),
+    /** RevenueCat: a pack's purchase or refund, or a Pro plan's change (synced). */
+    kind: z.enum(["pack", "subscription"]).optional(),
     productId: z.string().min(1).max(100).optional(),
     transactionId: z.string().min(1).max(255).optional(),
     cancelReason: z.string().min(1).max(64).optional(),
@@ -837,6 +862,37 @@ export const billingEventSchema = z
   })
   .strict();
 export type BillingEventDoc = z.infer<typeof billingEventSchema>;
+
+export const SUBSCRIPTION_STATUSES = ["active", "grace", "billing_issue", "cancelled", "expired"] as const;
+export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
+
+/**
+ * subscriptions/{accountId} (`pro_{proId}`): the shop's plan as RevenueCat last showed it (source of
+ * truth; Stripe bills). `cancelled` = paid until `periodEnd`, will not renew. Written with the Pro
+ * lifecycle transition and the month's grant in one transaction.
+ */
+export const subscriptionSchema = z
+  .object({
+    plan: z.enum(["essentiel", "business"]),
+    interval: z.enum(["monthly", "yearly"]),
+    status: z.enum(SUBSCRIPTION_STATUSES),
+    /** RevenueCat subscription id and the store's (`sub_...` for Stripe). */
+    rcSubscriptionId: z.string().min(1).max(255),
+    storeSubscriptionId: z.string().min(1).max(255),
+    store: z.string().min(1).max(32),
+    environment: rcEnvironment,
+    periodStart: ts,
+    periodEnd: ts.optional(),
+    willRenew: z.boolean(),
+    /** Start of the last month granted (plan credits and À la Une allowance). */
+    grantedSlotStart: ts.optional(),
+    lastEventId: z.string().min(1).max(128).optional(),
+    syncedAt: ts,
+    createdAt: ts,
+    updatedAt: ts,
+  })
+  .strict();
+export type SubscriptionDoc = z.infer<typeof subscriptionSchema>;
 
 export const COLLECTIONS = {
   users: "users",
@@ -871,6 +927,7 @@ export const COLLECTIONS = {
   billingAccounts: "billingAccounts",
   orders: "orders",
   billingEvents: "billingEvents",
+  subscriptions: "subscriptions",
   // Phase 5
   conversations: "conversations",
   /** conversations/{cid}/messages/{mid} */

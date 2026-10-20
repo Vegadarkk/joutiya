@@ -1,7 +1,8 @@
 import { z } from "@/lib/zod";
-import { OPTION_IDS, type OptionId, type PackCurrency } from "@/config/pricing";
+import { LOCALES } from "@/config/site";
+import { OPTION_IDS, PAID_PLANS, PLAN_INTERVALS, type OptionId, type PackCurrency, type PaidPlanId, type PlanInterval } from "@/config/pricing";
 
-// Credits wallet, paid listing options and credit packs (phase 7 design §5, §6). Client-safe
+// Credits wallet, paid listing options, credit packs and Pro plans (phase 7 design §5-§7). Client-safe
 // contract shared by the promote dialog, the wallet and packs pages and the routes. Prices always
 // come from the server: a body names the option or the pack, and the price it saw only to be
 // refused if it changed.
@@ -141,8 +142,68 @@ export interface CheckoutPackResponse {
   url: string;
 }
 
+/** Version of the Pro subscription consent text (Subscription.consent in messages/*.json, draft for legal review). */
+export const PLAN_CONSENT_VERSION = "2026-10";
+
+export const checkoutPlanSchema = z
+  .object({
+    plan: z.enum(PAID_PLANS),
+    interval: z.enum(PLAN_INTERVALS),
+    /** "J'accepte les CGV et le renouvellement automatique, résiliable à tout moment pour la fin de la période." */
+    acceptTerms: z.literal(true),
+    /** Page language to come back to from Stripe. */
+    locale: z.enum(LOCALES).default("fr"),
+  })
+  .strict();
+export type CheckoutPlanInput = z.infer<typeof checkoutPlanSchema>;
+
+export const billingPortalSchema = z.object({ locale: z.enum(LOCALES).default("fr") }).strict();
+
+export interface PlanOffer {
+  id: PaidPlanId;
+  /** Price excluding tax per interval, MAD centimes. */
+  priceMinor: { monthly: number; yearly: number };
+  credits: number;
+  featured: number;
+  activeListings: number | null;
+  /** Both Stripe Prices exist on this deployment. */
+  available: boolean;
+}
+
+export interface SubscriptionView {
+  plan: PaidPlanId;
+  interval: PlanInterval;
+  status: "active" | "grace" | "billing_issue" | "cancelled" | "expired";
+  periodEnd: string | null;
+  willRenew: boolean;
+}
+
+/** GET /api/billing/subscription: the shop's plan page (owner only). */
+export interface SubscriptionResponse {
+  salesOpen: boolean;
+  /** Stripe is configured on this deployment. */
+  available: boolean;
+  lifecycle: string;
+  plan: string;
+  planSource: "launch_offer" | "subscription" | "none";
+  graceUntil: string | null;
+  /** End of the launch offer, when set by an admin. */
+  launchOfferEndsAt: string | null;
+  subscription: SubscriptionView | null;
+  plans: PlanOffer[];
+  consentVersion: string;
+}
+
+/** POST /api/billing/checkout and /api/billing/portal: the Stripe page to open. */
+export interface BillingRedirectResponse {
+  url: string;
+}
+
 export const PAYMENTS_API = {
   wallet: "/api/wallet",
   packs: "/api/wallet/packs",
+  subscription: "/api/billing/subscription",
+  checkout: "/api/billing/checkout",
+  portal: "/api/billing/portal",
   options: (listingId: string) => `/api/listings/${listingId}/options`,
 } as const;

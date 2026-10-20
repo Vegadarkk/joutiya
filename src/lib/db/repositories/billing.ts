@@ -7,15 +7,20 @@ import {
   billingEventSchema,
   COLLECTIONS,
   orderSchema,
+  subscriptionSchema,
   type BillingAccountDoc,
   type BillingEventDoc,
+  type BillingEventSource,
   type OrderDoc,
+  type SubscriptionDoc,
 } from "../schemas";
 import { datesToTimestamps, timestampsToDates } from "./timestamps";
 
-// billingAccounts, orders and billingEvents (phase 7 design §3, §6). Server-only. The order and
-// its ledger credit are written in one transaction of src/lib/payments/revenuecat-events.ts; an
-// event document is created once per RevenueCat event id (duplicate deliveries find it).
+// billingAccounts, orders, subscriptions and billingEvents (phase 7 design §3, §6, §7).
+// Server-only. The order and its ledger credit are written in one transaction of
+// src/lib/payments/revenuecat-events.ts, the subscription with the Pro lifecycle in
+// src/lib/payments/subscriptions.ts; an event document is created once per webhook event id
+// (duplicate deliveries find it).
 
 /** gRPC status code of a `create` on an existing document. */
 const ALREADY_EXISTS = 6;
@@ -26,7 +31,8 @@ export interface BillingAccountRecord extends BillingAccountDoc {
 
 export const billingAccountRef = (accountId: string) => db().collection(COLLECTIONS.billingAccounts).doc(accountId);
 export const orderRef = (transactionId: string) => db().collection(COLLECTIONS.orders).doc(orderId(transactionId));
-export const billingEventRef = (eventId: string) => db().collection(COLLECTIONS.billingEvents).doc(`revenuecat_${eventId}`);
+export const billingEventRef = (eventId: string, source: BillingEventSource = "revenuecat") => db().collection(COLLECTIONS.billingEvents).doc(`${source}_${eventId}`);
+export const subscriptionRef = (accountId: string) => db().collection(COLLECTIONS.subscriptions).doc(accountId);
 
 /** Firestore ids cannot hold "/": a store transaction id is kept as is otherwise (natural key). */
 export function orderId(transactionId: string): string {
@@ -63,6 +69,39 @@ export async function findBillingAccountByAppUserId(rcAppUserId: string): Promis
   return account ? { id: doc.id, ...account } : null;
 }
 
+/** The account whose Stripe Customer is `stripeCustomerId` (an equality on one field). */
+export async function findBillingAccountByStripeCustomer(stripeCustomerId: string): Promise<BillingAccountRecord | null> {
+  const snapshot = await db().collection(COLLECTIONS.billingAccounts).where("stripeCustomerId", "==", stripeCustomerId).limit(2).get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  if (snapshot.size !== 1) return null;
+  const doc = snapshot.docs[0]!;
+  const account = parse(doc, billingAccountSchema, COLLECTIONS.billingAccounts);
+  return account ? { id: doc.id, ...account } : null;
+}
+
+export async function getBillingAccount(accountId: string): Promise<BillingAccountDoc | null> {
+  const snapshot = await billingAccountRef(accountId).get();
+  void consume("firestore.reads", 1);
+  return parse(snapshot, billingAccountSchema, COLLECTIONS.billingAccounts);
+}
+
+export async function getSubscription(accountId: string): Promise<SubscriptionDoc | null> {
+  const snapshot = await subscriptionRef(accountId).get();
+  void consume("firestore.reads", 1);
+  return parse(snapshot, subscriptionSchema, COLLECTIONS.subscriptions);
+}
+
+export async function getSubscriptionTx(tx: Transaction, accountId: string): Promise<SubscriptionDoc | null> {
+  const snapshot = await tx.get(subscriptionRef(accountId));
+  void consume("firestore.reads", 1);
+  return parse(snapshot, subscriptionSchema, COLLECTIONS.subscriptions);
+}
+
+export function setSubscriptionTx(tx: Transaction, accountId: string, subscription: SubscriptionDoc): void {
+  tx.set(subscriptionRef(accountId), datesToTimestamps(subscriptionSchema.parse(subscription)));
+  void consume("firestore.writes", 1);
+}
+
 export async function getOrderTx(tx: Transaction, transactionId: string): Promise<OrderDoc | null> {
   const snapshot = await tx.get(orderRef(transactionId));
   void consume("firestore.reads", 1);
@@ -86,8 +125,8 @@ export function setOrderTx(tx: Transaction, transactionId: string, order: OrderD
   void consume("firestore.writes", 1);
 }
 
-export async function getBillingEvent(eventId: string): Promise<BillingEventDoc | null> {
-  const snapshot = await billingEventRef(eventId).get();
+export async function getBillingEvent(eventId: string, source: BillingEventSource = "revenuecat"): Promise<BillingEventDoc | null> {
+  const snapshot = await billingEventRef(eventId, source).get();
   void consume("firestore.reads", 1);
   return parse(snapshot, billingEventSchema, COLLECTIONS.billingEvents);
 }
@@ -102,7 +141,7 @@ export async function listBillingEventsByTransactionId(transactionId: string): P
 /** Records a delivery; false when the event id is already known (a duplicate delivery). */
 export async function createBillingEvent(event: BillingEventDoc): Promise<boolean> {
   try {
-    await billingEventRef(event.eventId).create(datesToTimestamps(billingEventSchema.parse(event)));
+    await billingEventRef(event.eventId, event.source).create(datesToTimestamps(billingEventSchema.parse(event)));
     void consume("firestore.writes", 1);
     return true;
   } catch (error) {
@@ -111,7 +150,11 @@ export async function createBillingEvent(event: BillingEventDoc): Promise<boolea
   }
 }
 
-export async function updateBillingEvent(eventId: string, patch: Partial<Pick<BillingEventDoc, "status" | "outcome" | "attempts" | "lastError" | "processedAt">>): Promise<void> {
-  await billingEventRef(eventId).update(datesToTimestamps(patch));
+export async function updateBillingEvent(
+  eventId: string,
+  patch: Partial<Pick<BillingEventDoc, "status" | "outcome" | "attempts" | "lastError" | "processedAt">>,
+  source: BillingEventSource = "revenuecat",
+): Promise<void> {
+  await billingEventRef(eventId, source).update(datesToTimestamps(patch));
   void consume("firestore.writes", 1);
 }

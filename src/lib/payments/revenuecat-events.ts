@@ -17,13 +17,14 @@ import {
   updateBillingEvent,
 } from "@/lib/db/repositories/billing";
 import { getWalletTx, recordWalletOperationTx, walletStateAt } from "@/lib/db/repositories/wallets";
-import type { BillingEventDoc } from "@/lib/db/schemas";
-import { serverEnv } from "@/lib/env";
+import type { BillingEventDoc, BillingEventSource } from "@/lib/db/schemas";
 import { db } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
 import { z } from "@/lib/zod";
+import { BillingRetryError, expectedEnvironment } from "./billing-common";
 import { enqueueBillingEvent, isBillingQueueEnabled } from "./billing-queue";
 import { findPurchase, listCustomerPurchases, RevenueCatApiError, type RevenueCatPurchase } from "./revenuecat-api";
+import { syncShopSubscription, type SyncDeps, type SyncOutcome } from "./subscriptions";
 import { creditPurchase, refundPurchase } from "./wallet";
 
 // RevenueCat events of the credit packs (phase 7 design §6). The webhook records each
@@ -34,11 +35,25 @@ import { creditPurchase, refundPurchase } from "./wallet";
 // - CANCELLATION (for a consumable, always a refund): once RevenueCat shows the purchase as
 //   refunded, the ledger `refund_*` debits the whole pack even if spent; a negative balance
 //   freezes the wallet and flags the account.
+// - a subscription event (a Pro plan billed by Stripe, design §7): the shop's subscription is
+//   synced from RevenueCat (src/lib/payments/subscriptions.ts). A CANCELLATION is a subscription's
+//   when it carries an expiration or comes from Stripe, a pack refund otherwise.
 // Other event types are acknowledged and dropped. A pack paid for an account, a product or in a
 // currency we do not know is not credited and alerts (an admin refunds it from the RevenueCat
 // dashboard); its refund then ends without a debit.
 
-export const HANDLED_EVENT_TYPES: ReadonlySet<string> = new Set(["NON_RENEWING_PURCHASE", "CANCELLATION"]);
+const SUBSCRIPTION_EVENT_TYPES: ReadonlySet<string> = new Set([
+  "INITIAL_PURCHASE",
+  "RENEWAL",
+  "PRODUCT_CHANGE",
+  "UNCANCELLATION",
+  "EXPIRATION",
+  "BILLING_ISSUE",
+  "SUBSCRIPTION_EXTENDED",
+  "SUBSCRIPTION_PAUSED",
+  "REFUND_REVERSED",
+]);
+export const HANDLED_EVENT_TYPES: ReadonlySet<string> = new Set(["NON_RENEWING_PURCHASE", "CANCELLATION", ...SUBSCRIPTION_EVENT_TYPES]);
 
 /** Optional fields RevenueCat documents as sometimes absent or null: a malformed one reads as absent. */
 const loose = <T extends z.ZodType>(schema: T) => schema.nullish().catch(undefined);
@@ -58,16 +73,11 @@ export const revenueCatEnvelopeSchema = z.object({
     country_code: loose(z.string().regex(/^[A-Z]{2}$/)),
     quantity: loose(z.number().int().min(1).max(10)),
     event_timestamp_ms: loose(z.number().int().positive()),
+    expiration_at_ms: loose(z.number().int().positive()),
   }),
 });
 
-/** A step to retry later: the purchase is not visible in RevenueCat yet, or its API is unavailable. */
-export class BillingRetryError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BillingRetryError";
-  }
-}
+export { BillingRetryError, expectedEnvironment };
 
 export type ReceiveOutcome = "unreadable" | "wrong_environment" | "ignored_type" | "duplicate" | "queued" | ProcessOutcome;
 
@@ -81,15 +91,12 @@ export type ProcessOutcome =
   | "missing_transaction"
   | "unknown_customer"
   | "unknown_product"
-  | "wrong_currency";
+  | "wrong_currency"
+  | SyncOutcome;
 
 /** Outcomes that leave the event `ignored` (nothing written to a wallet). */
-const IGNORED: ReadonlySet<ProcessOutcome> = new Set(["never_credited", "missing_transaction", "unknown_customer", "unknown_product", "wrong_currency"]);
+const IGNORED: ReadonlySet<ProcessOutcome> = new Set(["never_credited", "missing_transaction", "unknown_customer", "unknown_product", "wrong_currency", "no_shop", "no_subscription"]);
 
-/** RevenueCat environment this deployment accepts: production events in prod only, sandbox elsewhere. */
-export function expectedEnvironment(appEnv: string = serverEnv().APP_ENV): "SANDBOX" | "PRODUCTION" {
-  return appEnv === "prod" ? "PRODUCTION" : "SANDBOX";
-}
 
 function eventDoc(event: z.infer<typeof revenueCatEnvelopeSchema>["event"], now: Date): BillingEventDoc {
   const price = event.price_in_purchased_currency;
@@ -110,11 +117,18 @@ function eventDoc(event: z.infer<typeof revenueCatEnvelopeSchema>["event"], now:
     status: "received",
     attempts: 0,
     ...(event.event_timestamp_ms ? { occurredAt: new Date(event.event_timestamp_ms) } : {}),
+    kind: subscriptionEvent(event) ? "subscription" : "pack",
     receivedAt: now,
   };
 }
 
-export interface ProcessDeps {
+/** A subscription's event (synced), not a pack's: CANCELLATION of a renewing product or from Stripe. */
+function subscriptionEvent(event: Pick<z.infer<typeof revenueCatEnvelopeSchema>["event"], "type" | "store" | "expiration_at_ms">): boolean {
+  if (SUBSCRIPTION_EVENT_TYPES.has(event.type)) return true;
+  return event.type === "CANCELLATION" && (event.expiration_at_ms !== undefined || event.store === "STRIPE");
+}
+
+export interface ProcessDeps extends SyncDeps {
   listPurchases?: typeof listCustomerPurchases;
   now?: () => Date;
 }
@@ -147,7 +161,7 @@ export async function receiveRevenueCatEvent(body: unknown, deps: ProcessDeps = 
   return processBillingEvent(event.id, deps);
 }
 
-async function purchaseOf(event: BillingEventDoc & { transactionId: string }, deps: ProcessDeps): Promise<RevenueCatPurchase> {
+async function purchaseOf(event: BillingEventDoc & { transactionId: string; appUserId: string }, deps: ProcessDeps): Promise<RevenueCatPurchase> {
   const list = deps.listPurchases ?? listCustomerPurchases;
   let purchases: RevenueCatPurchase[];
   try {
@@ -179,15 +193,15 @@ async function lost(event: BillingEventDoc, outcome: ProcessOutcome): Promise<Pr
 }
 
 async function creditPack(event: BillingEventDoc, deps: ProcessDeps): Promise<ProcessOutcome> {
-  const { transactionId, productId } = event;
-  if (!transactionId || !productId) return lost(event, "missing_transaction");
-  const account = await findBillingAccountByAppUserId(event.appUserId);
+  const { transactionId, productId, appUserId } = event;
+  if (!transactionId || !productId || !appUserId) return lost(event, "missing_transaction");
+  const account = await findBillingAccountByAppUserId(appUserId);
   if (!account) return lost(event, "unknown_customer");
   const pack = packByProductId(productId, await getPricing());
   if (!pack) return lost(event, "unknown_product");
   // Paid in another currency than the pack's (an edited purchase link, a second RevenueCat price).
   if (event.currency !== undefined && event.currency !== pack.currency) return lost(event, "wrong_currency");
-  const purchase = await purchaseOf({ ...event, transactionId }, deps);
+  const purchase = await purchaseOf({ ...event, transactionId, appUserId }, deps);
   const now = deps.now?.() ?? new Date();
   const quantity = Math.min(Math.max(purchase.quantity, 1), 10);
   const credits = { paid: pack.paid * quantity, bonus: pack.bonus * quantity };
@@ -242,9 +256,9 @@ async function creditPack(event: BillingEventDoc, deps: ProcessDeps): Promise<Pr
 }
 
 async function refundPack(event: BillingEventDoc, deps: ProcessDeps): Promise<ProcessOutcome> {
-  const { transactionId } = event;
-  if (!transactionId) return lost(event, "missing_transaction");
-  const purchase = await purchaseOf({ ...event, transactionId }, deps);
+  const { transactionId, appUserId } = event;
+  if (!transactionId || !appUserId) return lost(event, "missing_transaction");
+  const purchase = await purchaseOf({ ...event, transactionId, appUserId }, deps);
   // The refund may not show in RevenueCat yet: the last failed attempt alerts.
   if (purchase.status !== "refunded") throw new BillingRetryError("refund not visible in RevenueCat yet");
   const now = deps.now?.() ?? new Date();
@@ -286,13 +300,21 @@ async function refundPack(event: BillingEventDoc, deps: ProcessDeps): Promise<Pr
   return result.outcome;
 }
 
+/** A Pro plan's event: the shop behind RevenueCat's customer is synced. */
+async function syncSubscriptionEvent(event: BillingEventDoc, deps: ProcessDeps): Promise<ProcessOutcome> {
+  const account = event.appUserId ? await findBillingAccountByAppUserId(event.appUserId) : null;
+  if (!account) return lost(event, "unknown_customer");
+  return syncShopSubscription(account.id, { ...deps, eventId: event.eventId });
+}
+
 /** Applies a recorded event; throws BillingRetryError (or an infrastructure error) for a later attempt. */
 export async function processBillingEvent(eventId: string, deps: ProcessDeps = {}): Promise<ProcessOutcome> {
   const event = await getBillingEvent(eventId);
   if (!event) return "missing";
   if (event.status === "processed" || event.status === "ignored") return (event.outcome as ProcessOutcome | undefined) ?? "duplicate";
   try {
-    const outcome = event.type === "NON_RENEWING_PURCHASE" ? await creditPack(event, deps) : await refundPack(event, deps);
+    const outcome =
+      event.type === "NON_RENEWING_PURCHASE" ? await creditPack(event, deps) : event.kind === "subscription" ? await syncSubscriptionEvent(event, deps) : await refundPack(event, deps);
     await updateBillingEvent(eventId, { status: IGNORED.has(outcome) ? "ignored" : "processed", outcome, attempts: event.attempts + 1, processedAt: deps.now?.() ?? new Date() });
     logger.info({ webhook: "revenuecat", eventId, type: event.type, outcome }, "billing event processed");
     return outcome;
@@ -302,12 +324,13 @@ export async function processBillingEvent(eventId: string, deps: ProcessDeps = {
   }
 }
 
-/** Last failed attempt of a queued event: an admin checks the purchase by hand. */
-export async function onBillingEventAbandoned(eventId: string, error: Error): Promise<void> {
-  logger.error({ webhook: "revenuecat", eventId, err: error.message }, "billing event abandoned");
+/** Last failed attempt of a queued event: an admin checks the purchase or the subscription by hand. */
+export async function onBillingEventAbandoned(eventId: string, error: Error, source: BillingEventSource = "revenuecat"): Promise<void> {
+  const name = source === "stripe" ? "Stripe" : "RevenueCat";
+  logger.error({ webhook: source, eventId, err: error.message }, "billing event abandoned");
   await alert({
     severity: "P1",
-    title: `Paiement RevenueCat non traité (${eventId.slice(0, 8)})`,
-    body: `Événement ${eventId} en échec après toutes les tentatives (${error.message.slice(0, 200)}). Vérifier l'achat dans RevenueCat, puis relancer ou rembourser.`,
+    title: `Paiement ${name} non traité (${eventId.slice(0, 12)})`,
+    body: `Événement ${eventId} en échec après toutes les tentatives (${error.message.slice(0, 200)}). Vérifier l'achat ou l'abonnement dans ${name} et RevenueCat, puis relancer ou rembourser.`,
   });
 }

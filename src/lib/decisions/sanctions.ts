@@ -89,12 +89,12 @@ export async function lifetime(): Promise<Lifetime> {
   return listingLifetime(await getLegalConfig());
 }
 
-interface ListingChange {
+export interface ListingChange {
   patch: ListingFieldPatch & { version: number };
   search: "upsert" | "delete" | null;
 }
 
-interface ChangedListing {
+export interface ChangedListing {
   listing: ListingRecord;
   search: boolean;
 }
@@ -125,7 +125,7 @@ export async function afterListingChanges(changes: readonly ChangedListing[], pu
 }
 
 /** Applies `compute` to each listing, one transaction each; a failure is logged and the next one goes on. */
-async function changeListings(listings: readonly ListingRecord[], compute: (listing: ListingRecord) => ListingChange | null, now: Date, label: string): Promise<ChangedListing[]> {
+export async function changeListings(listings: readonly ListingRecord[], compute: (listing: ListingRecord) => ListingChange | null, now: Date, label: string): Promise<ChangedListing[]> {
   const changes: ChangedListing[] = [];
   for (const listing of listings) {
     try {

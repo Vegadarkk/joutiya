@@ -131,6 +131,12 @@ const schema = z.object({
   REVENUECAT_WEBHOOK_AUTH: optional,
   REVENUECAT_WEBHOOK_HMAC_SECRET: optional,
   REVENUECAT_PURCHASE_LINK: optionalUrl,
+  // Pro subscriptions (design §7): Stripe restricted key (Customers, Checkout Sessions, Customer
+  // Portal, Invoices) and the webhook endpoint's signing secret; RevenueCat tracks each
+  // subscription from POST /v1/receipts with the public API key of its Stripe app.
+  STRIPE_SECRET_KEY: optional,
+  STRIPE_WEBHOOK_SECRET: optional,
+  REVENUECAT_STRIPE_PUBLIC_KEY: optional,
   // AI agent (phase 5, design D19), worker only. Each key is optional: an absent key disables its
   // provider, and the deterministic rules provider always runs (src/lib/ai).
   ANTHROPIC_API_KEY: optional,

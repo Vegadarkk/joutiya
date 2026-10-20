@@ -5,11 +5,11 @@ import { serverEnv } from "@/lib/env";
 import { clientOptions } from "@/lib/valkey/clients";
 import { z } from "@/lib/zod";
 
-// Queue "billing" on valkey-queue (phase 7 design §6): the RevenueCat webhook records the event and
-// answers 200 at once; the worker (src/worker/jobs/billing.ts, concurrency 1: one wallet writer)
-// re-reads the purchase from RevenueCat and writes the order and the ledger. Without
-// QUEUE_REDIS_URL (local dev, API tests) the webhook processes the event inline instead.
-// Payloads hold the event id only.
+// Queue "billing" on valkey-queue (phase 7 design §6, §7): the RevenueCat and Stripe webhooks
+// record the event and answer 200 at once; the worker (src/worker/jobs/billing.ts, concurrency 1:
+// one wallet and subscription writer) re-reads the purchase or the subscription from RevenueCat
+// and writes. Without QUEUE_REDIS_URL (local dev, API tests) the webhook processes the event
+// inline instead. Payloads hold the event's source and id only.
 
 export const BILLING_QUEUE = "billing";
 export const BILLING_JOB = "revenuecat-event";
@@ -25,7 +25,9 @@ export const BILLING_JOB_OPTIONS = {
   removeOnFail: { age: 7 * 24 * 3_600, count: 500 },
 } as const;
 
-export const billingJobSchema = z.object({ eventId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/) }).strict();
+export const billingJobSchema = z
+  .object({ eventId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/), source: z.enum(["revenuecat", "stripe"]).default("revenuecat") })
+  .strict();
 export type BillingJobData = z.infer<typeof billingJobSchema>;
 
 export function isBillingQueueEnabled(env: { QUEUE_REDIS_URL?: string } = serverEnv()): boolean {
@@ -43,16 +45,16 @@ function billingQueue(url: string): Queue {
 }
 
 /** One job per event: BullMQ ignores an add whose id is still known. */
-export async function enqueueBillingEvent(eventId: string): Promise<void> {
+export async function enqueueBillingEvent(eventId: string, source: BillingJobData["source"] = "revenuecat"): Promise<void> {
   const url = serverEnv().QUEUE_REDIS_URL;
   if (!url) throw new Error("QUEUE_REDIS_URL is not set: the billing queue is disabled");
-  const data: BillingJobData = billingJobSchema.parse({ eventId });
+  const data: BillingJobData = billingJobSchema.parse({ eventId, source });
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error("billing job not enqueued in time")), ENQUEUE_TIMEOUT_MS);
   });
   try {
-    await Promise.race([billingQueue(url).add(BILLING_JOB, data, { ...BILLING_JOB_OPTIONS, jobId: `rc-${eventId}` }), timeout]);
+    await Promise.race([billingQueue(url).add(BILLING_JOB, data, { ...BILLING_JOB_OPTIONS, jobId: `${source === "stripe" ? "stripe" : "rc"}-${eventId}` }), timeout]);
   } finally {
     clearTimeout(timer);
   }
