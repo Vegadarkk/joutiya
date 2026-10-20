@@ -26,6 +26,8 @@ export function legalValues(config: LegalConfig): LegalValues {
     ttlDays: String(config.listingTtlDays),
     purgeMonths: String(config.listingPurgeMonths),
     cndp: config.cndpReceiptNo ? `récépissé n° ${config.cndpReceiptNo}` : "en cours",
+    vat: vatMention(config),
+    mediator: config.consumerMediator.name ? `${config.consumerMediator.name} (${config.consumerMediator.url})` : "désigné avant l'ouverture des ventes",
   };
 }
 
