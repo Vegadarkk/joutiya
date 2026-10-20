@@ -68,6 +68,7 @@ export async function subscriptionPage(auth: AuthContext): Promise<SubscriptionR
     planSource: profile.planSource,
     graceUntil: profile.graceUntil?.toISOString() ?? null,
     launchOfferEndsAt: pricing.launchOffer.active ? pricing.launchOffer.endsAt : null,
+    launchOfferNoticeDays: pricing.launchOffer.noticeDays,
     subscription: subscription
       ? { plan: subscription.plan, interval: subscription.interval, status: subscription.status, periodEnd: subscription.periodEnd?.toISOString() ?? null, willRenew: subscription.willRenew }
       : null,

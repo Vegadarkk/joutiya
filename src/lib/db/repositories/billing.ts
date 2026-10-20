@@ -102,7 +102,8 @@ export const LIVE_SUBSCRIPTION_STATUSES = ["active", "cancelled", "grace", "bill
 
 /**
  * Subscriptions not expired, the least recently synced first (index status, syncedAt): every sync
- * rewrites `syncedAt`, so successive runs go round all of them. An unreadable one is left out.
+ * rewrites `syncedAt` and the nightly job touches the ones it skips or fails, so successive runs go
+ * round all of them. An unreadable one is left out.
  */
 export async function listLiveSubscriptions(limit: number): Promise<{ accountId: string; subscription: SubscriptionDoc }[]> {
   const query = await db().collection(COLLECTIONS.subscriptions).where("status", "in", [...LIVE_SUBSCRIPTION_STATUSES]).orderBy("syncedAt", "asc").limit(limit).get();
@@ -111,6 +112,12 @@ export async function listLiveSubscriptions(limit: number): Promise<{ accountId:
     const parsed = subscriptionSchema.safeParse(timestampsToDates(snapshot.data()));
     return parsed.success ? [{ accountId: snapshot.id, subscription: parsed.data }] : [];
   });
+}
+
+/** Moves a subscription the nightly job did not sync to the back of its queue. */
+export async function touchSubscriptionSynced(accountId: string, at: Date): Promise<void> {
+  await subscriptionRef(accountId).update(datesToTimestamps({ syncedAt: at }));
+  void consume("firestore.writes", 1);
 }
 
 export function setSubscriptionTx(tx: Transaction, accountId: string, subscription: SubscriptionDoc): void {

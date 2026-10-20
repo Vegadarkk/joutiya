@@ -3213,7 +3213,8 @@
       "cancelled": "Résiliée",
       "grace": "Paiement à régulariser",
       "billing_issue": "Paiement à régulariser",
-      "expired": "Terminée"
+      "expired": "Terminée",
+      "unpaid": "Offre retirée"
     },
     "grace": {
       "title": "Le dernier paiement a échoué",
@@ -3221,7 +3222,11 @@
     },
     "downgraded": {
       "title": "Votre boutique n'a plus d'offre",
-      "body": "Vos annonces au-delà du quota sont en pause. Elles reviennent en ligne dès que vous reprenez une offre."
+      "body": "Vos annonces au-delà du quota sont en pause. Après avoir repris une offre, remettez-les en ligne depuis Mes annonces."
+    },
+    "unpaid": {
+      "title": "Paiement en échec : offre retirée",
+      "body": "Le paiement n'a pas été réglé avant la fin du délai. Réglez la facture depuis « Gérer l'abonnement » pour retrouver votre offre, puis remettez en ligne vos annonces en pause depuis Mes annonces."
     },
     "success": {
       "title": "Paiement reçu",
@@ -3230,6 +3235,7 @@
       "done": "Votre offre est active."
     },
     "closed": "Les abonnements ouvriront prochainement. Votre offre Essentiel reste offerte d'ici là.",
+    "closedSoon": "Les abonnements ouvriront prochainement.",
     "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard.",
     "suspended": "Votre boutique est suspendue : son offre ne peut pas changer pour le moment.",
     "offers": "Les offres",

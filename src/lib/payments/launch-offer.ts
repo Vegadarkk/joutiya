@@ -9,6 +9,7 @@ import { sendMail } from "@/lib/mail";
 import { listingRecipient } from "@/lib/mail/recipients";
 import { transition } from "@/lib/pro/lifecycle";
 import { pauseListingsOverQuota } from "@/lib/pro/quota";
+import { headroom } from "@/lib/quota";
 import { profileAfter } from "./subscriptions";
 
 // End of the launch offer (phase 7 design D3), run by the nightly pro-plans job once the admin has
@@ -16,13 +17,23 @@ import { profileAfter } from "./subscriptions";
 // offer gets a notice at J-noticeDays, J-7 and J-1 (one mail per step, `launchOfferNoticeSentAt`),
 // then at `endsAt` the transition `launch_offer_ended` (downgraded, plan none), an audit entry,
 // its listings over the free quota paused, and a last mail. A shop that subscribed meanwhile is
-// on planSource "subscription" and is left alone.
+// on planSource "subscription" and is left alone. Each run sends at most what Resend's quotas leave
+// under LAUNCH_OFFER_RESEND_SHARE (non-security mail is dropped at 90 %): the shops past that wait
+// for the next night, their notice still due and their offer kept until their last mail can go.
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Steps after the first notice (`noticeDays`), in days before the end. */
 const LATER_NOTICES = [7, 1];
 const PAGE = 100;
 const MAX_PAGES = 50;
+export const LAUNCH_OFFER_MAX_MAILS = 50;
+export const LAUNCH_OFFER_RESEND_SHARE = 0.6;
+
+/** Mails this run may send: the per-run cap, and what is left under the share of both Resend quotas. */
+async function mailBudget(): Promise<number> {
+  const [daily, monthly] = await Promise.all([headroom("resend.daily", LAUNCH_OFFER_RESEND_SHARE), headroom("resend.monthly", LAUNCH_OFFER_RESEND_SHARE)]);
+  return Math.min(LAUNCH_OFFER_MAX_MAILS, daily ?? LAUNCH_OFFER_MAX_MAILS, monthly ?? LAUNCH_OFFER_MAX_MAILS);
+}
 
 /** The notice step due now (days before the end), or null: none yet, past the end, or already sent. */
 export function noticeDue(offer: LaunchOffer, sentAt: Date | undefined, now: Date): number | null {
@@ -39,6 +50,8 @@ export interface LaunchOfferRun {
   noticed: number;
   ended: number;
   failed: number;
+  /** Shops left for the next night: no mail budget left. */
+  deferred?: true;
 }
 
 export async function runLaunchOfferEnd(now = new Date()): Promise<LaunchOfferRun> {
@@ -54,21 +67,28 @@ export async function runLaunchOfferEnd(now = new Date()): Promise<LaunchOfferRu
   }
   const ended = now.getTime() >= Date.parse(endsAt);
   const freeListings = pricing.pro.none.activeListings;
+  let budget = await mailBudget();
   let after: string | null = null;
-  for (let page = 0; page < MAX_PAGES; page += 1) {
+  pages: for (let page = 0; page < MAX_PAGES; page += 1) {
     const { profiles, next } = await listLaunchOfferProfiles(after, PAGE);
     for (const profile of profiles) {
       if (profile.lifecycle !== "verified") continue;
+      // Null past the end: the shop is downgraded instead.
+      const due = noticeDue(offer, profile.launchOfferNoticeSentAt, now);
+      if (!ended && due === null) continue;
+      if (budget <= 0) {
+        run.deferred = true;
+        break pages;
+      }
+      budget -= 1;
       try {
-        if (ended) {
+        if (due === null) {
           if (await endLaunchOffer(profile.proId, endsAt, pricing, now)) run.ended += 1;
-          continue;
+        } else {
+          await notify(profile, { kind: "ending", endsAt, freeListings, paused: 0 }, `ending-${due}-${Date.parse(endsAt)}`);
+          await markLaunchOfferNotice(profile.proId, now);
+          run.noticed += 1;
         }
-        const due = noticeDue(offer, profile.launchOfferNoticeSentAt, now);
-        if (due === null) continue;
-        await notify(profile, { kind: "ending", endsAt, freeListings, paused: 0 }, `ending-${due}-${Date.parse(endsAt)}`);
-        await markLaunchOfferNotice(profile.proId, now);
-        run.noticed += 1;
       } catch (error) {
         run.failed += 1;
         logger.error({ proId: profile.proId, err: (error as Error).message }, "launch offer end: one shop not handled");
@@ -77,7 +97,8 @@ export async function runLaunchOfferEnd(now = new Date()): Promise<LaunchOfferRu
     if (!next) break;
     after = next;
   }
-  if (run.noticed + run.ended + run.failed > 0) logger.info({ ...run }, "launch offer end done");
+  if (run.deferred) logger.warn({ ...run }, "launch offer end: mail budget used up, the other shops wait for the next night");
+  else if (run.noticed + run.ended + run.failed > 0) logger.info({ ...run }, "launch offer end done");
   return run;
 }
 

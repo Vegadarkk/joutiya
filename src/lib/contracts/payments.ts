@@ -189,6 +189,8 @@ export interface SubscriptionResponse {
   graceUntil: string | null;
   /** End of the launch offer, when set by an admin. */
   launchOfferEndsAt: string | null;
+  /** Days of notice before the launch offer ends (`config/pricing.launchOffer.noticeDays`). */
+  launchOfferNoticeDays: number;
   subscription: SubscriptionView | null;
   plans: PlanOffer[];
   consentVersion: string;

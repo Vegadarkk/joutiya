@@ -102,7 +102,7 @@ describe("stripe-setup run", () => {
     const posts = stubStripe({ account: ACCOUNT, existing: false });
     const lines: string[] = [];
     const secrets: [string, string][] = [];
-    await runSetup({ ...base, apply: true, secretFile: "/tmp/joutiya-webhook.env", write: (line) => lines.push(line), writeSecret: (file, content) => secrets.push([file, content]) });
+    await runSetup({ ...base, apply: true, secretFile: "/tmp/joutiya-webhook.env", write: (line) => lines.push(line), writeSecret: (file, content) => secrets.push([file, content]), fileExists: () => false });
     expect(posts.map((post) => post.path)).toEqual(["/v1/products", "/v1/products", "/v1/prices", "/v1/prices", "/v1/prices", "/v1/prices", "/v1/billing_portal/configurations", "/v1/webhook_endpoints"]);
     expect(posts.filter((post) => post.path === "/v1/prices").every((post) => post.idempotencyKey?.startsWith("stripe-setup-staging-joutiya_"))).toBe(true);
     expect(new URLSearchParams(posts[2]!.body).get("tax_behavior")).toBe("exclusive");
@@ -112,7 +112,7 @@ describe("stripe-setup run", () => {
     expect(lines.join("\n")).toContain('"stripePortalConfiguration": "bpc_new"');
   });
 
-  it("changes nothing already right but the portal, and refuses another account or a new webhook without a secret file", async () => {
+  it("changes nothing already right but the portal, and refuses another account or a new webhook without a new secret file", async () => {
     const posts = stubStripe({ account: ACCOUNT, existing: true });
     await runSetup({ ...base, apply: true, secretFile: null, write: () => undefined });
     expect(posts.map((post) => post.path)).toEqual(["/v1/billing_portal/configurations/bpc_old"]);
@@ -120,7 +120,10 @@ describe("stripe-setup run", () => {
     const dryRun = stubStripe({ account: ACCOUNT, existing: false });
     await runSetup({ ...base, apply: false, secretFile: null, write: () => undefined });
     expect(dryRun).toEqual([]);
+    // A new endpoint without a new secret file: refused before any write.
     await expect(runSetup({ ...base, apply: true, secretFile: null, write: () => undefined })).rejects.toThrow(/--secret-file/);
+    await expect(runSetup({ ...base, apply: true, secretFile: "/tmp/.env.local", write: () => undefined, fileExists: () => true })).rejects.toThrow(/exists/);
+    expect(dryRun).toEqual([]);
 
     const other = stubStripe({ account: "acct_1OtherAccount00", existing: false });
     await expect(runSetup({ ...base, apply: true, secretFile: "/tmp/x", write: () => undefined })).rejects.toThrow(/another Stripe account/);

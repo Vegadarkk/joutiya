@@ -23,7 +23,7 @@
 // Then it prints the ids to set in config/pricing.plans. The VAT tax rate waits for the owner's
 // tax decision (phase 7 tax cards): nothing is created for it here.
 
-import { writeFileSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, writeFileSync, readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { PaidPlanId, PlanInterval, PlansConfig } from "../src/config/pricing.ts";
 import { validateTargets, type Targets } from "./assert-target.ts";
@@ -192,6 +192,7 @@ export interface SetupOptions extends Cli {
   plans: Pick<PlansConfig, PaidPlanId>;
   write?: (line: string) => void;
   writeSecret?: (file: string, content: string) => void;
+  fileExists?: (file: string) => boolean;
 }
 
 export async function runSetup(options: SetupOptions): Promise<void> {
@@ -226,6 +227,16 @@ export async function runSetup(options: SetupOptions): Promise<void> {
   if (account.body.id !== accountId) throw new Error(`${KEY_VARIABLE} belongs to another Stripe account than shared.stripe.accountId: nothing done`);
   write(`Account ${accountId} (${env}, ${apply ? "apply" : "dry run"}).`);
 
+  // Before any write: a new webhook endpoint shows its signing secret once, so its file must be new.
+  const endpoints = await stripe<{ data?: { id: string; url: string; enabled_events: string[]; api_version: string | null }[] }>("GET", "/v1/webhook_endpoints", { limit: 100 });
+  if (endpoints.status !== 200) throw failure("GET webhook endpoints", endpoints);
+  const url = webhookUrl(env);
+  const endpoint = endpoints.body.data?.find((item) => item.url === url);
+  if (apply && !endpoint) {
+    if (!secretFile) throw new Error("the webhook endpoint is new: pass --secret-file <new file> to receive its signing secret (nothing done)");
+    if ((options.fileExists ?? existsSync)(secretFile)) throw new Error(`${secretFile} exists: the signing secret goes to a new file (nothing done)`);
+  }
+
   // 2. Products.
   for (const plan of PLANS) {
     const { id, name, description } = PRODUCTS[plan];
@@ -259,18 +270,13 @@ export async function runSetup(options: SetupOptions): Promise<void> {
   if (ours) await run(`update portal configuration ${ours.id}`, "POST", `/v1/billing_portal/configurations/${ours.id}`, portalParams(env, ids));
   else portalId = (await run<{ id: string }>("create portal configuration", "POST", "/v1/billing_portal/configurations", portalParams(env, ids), `stripe-setup-${env}-portal`))?.id ?? null;
 
-  // 5. Webhook endpoint.
-  const endpoints = await stripe<{ data?: { id: string; url: string; enabled_events: string[]; api_version: string | null }[] }>("GET", "/v1/webhook_endpoints", { limit: 100 });
-  if (endpoints.status !== 200) throw failure("GET webhook endpoints", endpoints);
-  const url = webhookUrl(env);
-  const endpoint = endpoints.body.data?.find((item) => item.url === url);
+  // 5. Webhook endpoint (read before the writes).
   if (endpoint) {
     if (endpoint.api_version !== STRIPE_API_VERSION) console.warn(`! webhook ${endpoint.id} runs API ${endpoint.api_version ?? "account default"}, not ${STRIPE_API_VERSION}: it cannot be changed, recreate it by hand`);
     const same = [...endpoint.enabled_events].sort().join() === [...WEBHOOK_EVENTS].sort().join();
     if (same) write(`= webhook ${endpoint.id}`);
     else await run(`update webhook ${endpoint.id} events`, "POST", `/v1/webhook_endpoints/${endpoint.id}`, { enabled_events: WEBHOOK_EVENTS });
   } else {
-    if (apply && !secretFile) throw new Error("the webhook endpoint is new: pass --secret-file <new file> to receive its signing secret");
     const created = await run<{ id: string; secret?: string }>(
       `create webhook ${url}`,
       "POST",

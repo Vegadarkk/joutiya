@@ -128,12 +128,16 @@ export function SubscriptionView() {
 
   const { data } = state;
   const live = running(data);
+  // A Stripe payment still due after the grace: the plan is withdrawn while Stripe keeps the subscription open.
+  const unpaid = live && data.lifecycle === "downgraded";
   const suspended = data.lifecycle === "suspended";
   const canSubscribe = data.salesOpen && data.available && !live && SUBSCRIBABLE.has(data.lifecycle);
   const selected = canSubscribe ? data.plans.find((plan) => plan.id === choice && plan.available) : undefined;
   const problems = attempted ? { choice: !selected, terms: !terms } : { choice: false, terms: false };
   // The plan the shop has now: a running subscription's, or Essentiel during the launch offer.
-  const current = live ? data.subscription!.plan : data.planSource === "launch_offer" ? data.plan : null;
+  // The shop's state wins over the doc's: a grace opened from Stripe, a plan withdrawn after it.
+  const shownStatus = unpaid ? "unpaid" : data.lifecycle === "grace" && data.subscription?.status === "active" ? "grace" : (data.subscription?.status ?? "expired");
+  const current = live && !unpaid ? data.subscription!.plan : data.planSource === "launch_offer" ? data.plan : null;
 
   async function subscribe() {
     setAttempted(true);
@@ -187,12 +191,16 @@ export function SubscriptionView() {
         <ErrorBanner tone="warning" title={t("grace.title")}>
           {t("grace.body", { date: date(data.graceUntil) })}
         </ErrorBanner>
-      ) : data.lifecycle === "downgraded" && !live ? (
+      ) : unpaid ? (
+        <ErrorBanner tone="warning" title={t("unpaid.title")}>
+          {t("unpaid.body")}
+        </ErrorBanner>
+      ) : data.lifecycle === "downgraded" ? (
         <ErrorBanner tone="info" title={t("downgraded.title")}>
           {t("downgraded.body")}
         </ErrorBanner>
       ) : null}
-      {!data.salesOpen && !live ? <ErrorBanner tone="info" title={t("closed")} /> : null}
+      {!data.salesOpen && !live ? <ErrorBanner tone="info" title={t(data.planSource === "launch_offer" ? "closed" : "closedSoon")} /> : null}
       {data.salesOpen && !data.available ? <ErrorBanner tone="warning" title={t("unavailable")} /> : null}
 
       <section aria-labelledby="plan-current" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -204,11 +212,11 @@ export function SubscriptionView() {
             <>
               <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span className="text-2xl font-semibold">{data.subscription!.plan === "business" ? "Business" : "Essentiel"}</span>
-                <Badge variant={data.subscription!.status === "active" ? "success" : data.subscription!.status === "cancelled" ? "neutral" : "warning"}>{t(`status.${data.subscription!.status}`)}</Badge>
+                <Badge variant={shownStatus === "active" ? "success" : shownStatus === "cancelled" ? "neutral" : "warning"}>{t(`status.${shownStatus}`)}</Badge>
               </p>
               <p className="flex flex-col text-sm text-foreground-muted">
                 <span>{t(`current.${data.subscription!.interval}`)}</span>
-                {data.subscription!.periodEnd ? <span>{data.subscription!.willRenew ? t("current.renews", { date: date(data.subscription!.periodEnd) }) : t("current.ends", { date: date(data.subscription!.periodEnd) })}</span> : null}
+                {data.subscription!.periodEnd && !unpaid ? <span>{data.subscription!.willRenew ? t("current.renews", { date: date(data.subscription!.periodEnd) }) : t("current.ends", { date: date(data.subscription!.periodEnd) })}</span> : null}
               </p>
             </>
           ) : data.planSource === "launch_offer" ? (
@@ -217,7 +225,7 @@ export function SubscriptionView() {
                 <Gift className="size-5 shrink-0 text-gold-500 dark:text-gold-300" aria-hidden="true" />
                 {t("current.launchOffer")}
               </p>
-              <p className="text-sm text-foreground-muted text-pretty">{data.launchOfferEndsAt ? t("current.launchOfferEnds", { date: date(data.launchOfferEndsAt) }) : t("current.launchOfferBody", { days: 30 })}</p>
+              <p className="text-sm text-foreground-muted text-pretty">{data.launchOfferEndsAt ? t("current.launchOfferEnds", { date: date(data.launchOfferEndsAt) }) : t("current.launchOfferBody", { days: data.launchOfferNoticeDays })}</p>
             </>
           ) : (
             <p className="text-2xl font-semibold">{t("current.none")}</p>

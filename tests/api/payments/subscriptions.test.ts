@@ -4,6 +4,7 @@ import type * as RuntimeModule from "@/lib/config/runtime";
 import type * as RevenueCatApiModule from "@/lib/payments/revenuecat-api";
 import type { RevenueCatSubscription } from "@/lib/payments/revenuecat-api";
 import type * as StripeApiModule from "@/lib/payments/stripe-api";
+import type * as QuotaModule from "@/lib/quota";
 
 // Pro subscriptions (phase 7 design §7): the plan page and the Stripe Checkout of a verified shop
 // (owner only, sales gate, one running plan), the Customer Portal, the Stripe webhook (signature,
@@ -15,6 +16,8 @@ import type * as StripeApiModule from "@/lib/payments/stripe-api";
 const flags = vi.hoisted(() => ({ salesEnabled: true, proSignupEnabled: true, paymentInstallmentsEnabled: false }));
 const offer = vi.hoisted(() => ({ endsAt: null as string | null }));
 const store = vi.hoisted(() => ({ subscriptions: [] as RevenueCatSubscription[] }));
+/** Resend headroom seen by the launch-offer run (null = counter unreadable, the per-run cap applies). */
+const mailRoom = vi.hoisted(() => ({ value: null as number | null }));
 const stripe = vi.hoisted(() => ({ calls: [] as { method: string; path: string; params: Record<string, unknown>; idempotencyKey?: string }[], subscriptionStatus: "active", sessionStatus: "open" }));
 
 vi.mock("@/lib/config/runtime", async (importOriginal) => {
@@ -57,6 +60,7 @@ vi.mock("@/lib/payments/stripe-api", async (importOriginal) => ({
 vi.mock("@/lib/search/queue", () => ({ notifySearchIndex: vi.fn(async () => undefined) }));
 vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => true) }));
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
+vi.mock("@/lib/quota", async (importOriginal) => ({ ...(await importOriginal<typeof QuotaModule>()), headroom: vi.fn(async () => mailRoom.value) }));
 
 import { POST as create } from "@/app/api/listings/route";
 import { PATCH as patch } from "@/app/api/listings/[id]/route";
@@ -449,9 +453,12 @@ describe("nightly plans job", () => {
     expect((await stripeDeliver("invoice.payment_failed", { id: "in_1", object: "invoice", customer: `cus_${proId}`, subscription: "sub_Stripe1" })).status).toBe(200);
     expect((await getProProfile(proId))?.lifecycle).toBe("grace");
 
-    // RevenueCat still shows the plan paid: the night does not undo the grace.
-    await proPlansNightly();
+    // RevenueCat still shows the plan paid: the night does not undo the grace, and moves the
+    // subscription to the back of its queue.
+    const queued = (await getSubscription(`pro_${proId}`))!.syncedAt;
+    await proPlansNightly(new Date(Date.now() + 60_000));
     expect((await getProProfile(proId))?.lifecycle).toBe("grace");
+    expect((await getSubscription(`pro_${proId}`))!.syncedAt.getTime()).toBeGreaterThan(queued.getTime());
 
     // Past its date, the grace ends as an expiry would.
     await proProfileRef(proId).update({ graceUntil: new Date(Date.now() - 60_000) });
@@ -480,6 +487,13 @@ describe("nightly plans job", () => {
     expect((await proPlansNightly()).launchOffer).toEqual({ noticed: 0, ended: 0, failed: 0 });
     flags.salesEnabled = true;
 
+    // No Resend headroom left: the notice waits for the next night, still due.
+    mailRoom.value = 0;
+    expect((await proPlansNightly()).launchOffer).toMatchObject({ noticed: 0, deferred: true });
+    expect(mailsTo(owner)).toEqual([]);
+    expect((await getProProfile(proId))?.launchOfferNoticeSentAt).toBeUndefined();
+    mailRoom.value = null;
+
     await proPlansNightly();
     expect(mailsTo(owner)).toMatchObject([{ template: "launchOfferNotice", data: { kind: "ending", plan: "essentiel", shopName: "Atlas Auto", endsAt: offer.endsAt, freeListings: 0 } }]);
     expect((await getProProfile(proId))?.launchOfferNoticeSentAt).toBeInstanceOf(Date);
@@ -487,6 +501,12 @@ describe("nightly plans job", () => {
     expect(mailsTo(owner)).toHaveLength(1);
     await proPlansNightly(new Date(endsAt - 6 * DAY_MS));
     expect(mailsTo(owner)).toHaveLength(2);
+
+    // Past the end without mail budget: the shop keeps the offer until its last mail can go.
+    mailRoom.value = 0;
+    await proPlansNightly(new Date(endsAt + 30_000));
+    expect((await getProProfile(proId))?.lifecycle).toBe("verified");
+    mailRoom.value = null;
 
     await proPlansNightly(new Date(endsAt + 60_000));
     expect(await getProProfile(proId)).toMatchObject({ lifecycle: "downgraded", plan: "none", planSource: "none", quotas: DEFAULT_PRICING.pro.none });
