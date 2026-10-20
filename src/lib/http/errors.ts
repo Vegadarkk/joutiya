@@ -118,6 +118,13 @@ export type ErrorCode =
   | "sanction_not_allowed"
   /** AI budget or provider unavailable: the assistant answers with help-center search results. */
   | "assistant_unavailable"
+  // Account closure (phase 5, L7). Messages: Auth.errors.
+  /** The session's sign-in is older than RECENT_AUTH_SECONDS: sign in again, then retry (403). */
+  | "recent_auth_required"
+  /** A Pro subscription still renews: cancel it before closing the account (409). */
+  | "pro_subscription_active"
+  /** Purchased credits are left in the wallet (409). */
+  | "wallet_not_empty"
   | "unavailable"
   | "internal";
 

@@ -38,7 +38,9 @@ export type TemplateId =
   | "proApproved"
   | "proRejected"
   // Messaging (phase 5, L5): the grouped new-messages mail (design D21).
-  | "newMessages";
+  | "newMessages"
+  // Account closure (phase 5, L7, D26): confirmation with what is kept and until when.
+  | "accountClosed";
 
 /**
  * Statement of reasons (art. 17 DSA, design D8) carried by the hold and rejection mails. The
@@ -157,6 +159,8 @@ export interface TemplateData {
    * title, the other member's display name). Never the text of a message.
    */
   newMessages: { displayName: string; count: number; conversations: { listingTitle: string; counterpartName: string }[] };
+  /** The account is closed: closure date and the purge of the account data (ISO). */
+  accountClosed: { displayName: string; closedAt: string; purgeAt: string };
 }
 
 /** One saved search of the digest: its results page, the count of new listings and the newest few. */

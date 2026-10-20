@@ -2,6 +2,7 @@ import "server-only";
 import { LOCALES } from "@/config/site";
 import { serverEnv } from "@/lib/env";
 import { mailLocale, type BuiltMail, type TemplateContext } from "./templates/layout";
+import { accountClosed } from "./templates/accountClosed";
 import { appealOutcome } from "./templates/appealOutcome";
 import { appealReceived } from "./templates/appealReceived";
 import { contentRestored } from "./templates/contentRestored";
@@ -57,6 +58,7 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   proApproved,
   proRejected,
   newMessages,
+  accountClosed,
 };
 
 export const TEMPLATE_IDS = Object.keys(TEMPLATES) as TemplateId[];

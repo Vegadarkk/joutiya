@@ -121,6 +121,26 @@ export const userPrivateSchema = z
   .strict();
 export type UserPrivateDoc = z.infer<typeof userPrivateSchema>;
 
+/**
+ * users/{uid}/private/identity (L7, D26): what outlives a closed account's purge (its purgeAt, 1 year)
+ * until the account's identityPurgeAt (5 years, AF §7), stored here as `purgeAt` so one query on
+ * `private` serves both documents: the civil identity when collected, and for a banned account the
+ * e-mail HMAC that keeps the address from signing up again (its emailIndex entry stays).
+ */
+export const closedIdentitySchema = z
+  .object({
+    closedAt: ts,
+    /** The account's identityPurgeAt (closure + 5 years). */
+    purgeAt: ts,
+    legalName: z.string().max(120).optional(),
+    /** Banned account only: the emailIndex key kept as the ban's block on a new sign-up. */
+    emailNormHash: z.string().min(16).max(64).optional(),
+    banned: z.boolean(),
+    legalHold: z.array(z.string().min(1).max(64)).max(50),
+  })
+  .strict();
+export type ClosedIdentityDoc = z.infer<typeof closedIdentitySchema>;
+
 /** emailIndex/{emailNormHash}: one account per normalized e-mail, enforced in a transaction. */
 export const emailIndexSchema = z.object({ uid, createdAt: ts }).strict();
 export type EmailIndexDoc = z.infer<typeof emailIndexSchema>;
@@ -486,6 +506,8 @@ export const conversationSchema = z
     hiddenFor: z.array(uid).max(2),
     /** frozen: dispute or authority request, nobody can write (D17). */
     status: z.enum(["open", "frozen"]),
+    /** Participants who closed their account (L7, D26): the other one still reads, nobody writes. */
+    accountClosed: z.array(uid).max(2).optional(),
     messageCount: z.number().int().min(0),
     createdAt: ts,
     updatedAt: ts,
@@ -820,6 +842,8 @@ export const COLLECTIONS = {
   users: "users",
   userPrivate: "private",
   userPrivateDoc: "account",
+  /** users/{uid}/private/identity: what a closed account keeps after its purge (L7). */
+  userIdentityDoc: "identity",
   emailIndex: "emailIndex",
   connectionLogs: "connectionLogs",
   auditLogs: "auditLogs",

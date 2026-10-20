@@ -68,7 +68,8 @@ function messageInput(uid: string, original: string, analysis: MessageAnalysis, 
 function accessError(error: unknown): never {
   if (error instanceof ConversationAccessError) {
     if (error.reason === "blocked") throw new HttpError(403, "conversation_blocked");
-    if (error.reason === "frozen") throw new HttpError(409, "conversation_unavailable");
+    // Frozen, or the other account is closed (L7): read-only.
+    if (error.reason === "frozen" || error.reason === "closed") throw new HttpError(409, "conversation_unavailable");
     throw notFound();
   }
   throw error;

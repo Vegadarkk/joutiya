@@ -1,8 +1,8 @@
 import "server-only";
 import { cidSchema, messageIdSchema } from "@/lib/contracts/messaging";
 import { logger } from "@/lib/logging/logger";
-import { publishConversationChange, publishMessageUpdate } from "./events";
-import { STAFF_MESSAGES_MAX, hideMessageDoc, readTranscript, setConversationHoldDoc, unhideMessageDoc, type ConversationTranscript } from "./repository";
+import { publishConversationChange, publishEvents, publishMessageUpdate } from "./events";
+import { STAFF_MESSAGES_MAX, hideMessageDoc, markAccountClosed, readTranscript, setConversationHoldDoc, unhideMessageDoc, type ConversationTranscript } from "./repository";
 
 // What the other phase 5 lots use from messaging (design §4 L1 exports): moderation hides and
 // restores a message (L2 strong signal, L3 decisions), the staff conversation view (D18), legal
@@ -80,4 +80,16 @@ export async function freezeConversation(cid: string, holdId: string, on: boolea
 export async function setConversationHold(cid: string, holdId: string, on: boolean): Promise<boolean> {
   if (!validRefs(cid) || !HOLD_ID.test(holdId)) return false;
   return (await setConversationHoldDoc(cid, holdId, on)) !== null;
+}
+
+/**
+ * Account closure (L7, D26): every conversation of `uid` becomes read-only for the other
+ * participant (`accountClosed`), whose open tabs refetch the row (one live event each). Returns
+ * how many conversations were marked.
+ */
+export async function closeAccountConversations(uid: string, now = new Date()): Promise<number> {
+  const marked = await markAccountClosed(uid);
+  const at = now.getTime();
+  await publishEvents(marked.filter((item) => item.other !== uid).map((item) => ({ uid: item.other, event: { type: "conversation", cid: item.cid, at } })));
+  return marked.length;
 }

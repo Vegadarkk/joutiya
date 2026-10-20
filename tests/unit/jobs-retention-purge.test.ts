@@ -29,6 +29,8 @@ vi.mock("@/lib/db/repositories/pro-profiles", () => ({
   listProProfilesPastPurge: vi.fn(async () => []),
   purgeProProfile: vi.fn(async () => null),
 }));
+// Closed accounts (L7): none here (tests/unit/jobs-phase5-retention.test.ts covers the step).
+vi.mock("@/lib/account/purge", () => ({ listClosedPastPurge: vi.fn(async () => ({ docs: [], read: 1 })), purgeClosedAccount: vi.fn(), purgeClosedIdentity: vi.fn() }));
 vi.mock("@/lib/db/repositories/retention", () => ({
   listListingsPastPurge: vi.fn(async () => ({ listings: [], read: 0 })),
   purgeListing: vi.fn(),

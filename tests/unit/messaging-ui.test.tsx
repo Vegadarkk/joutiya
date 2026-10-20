@@ -51,6 +51,7 @@ function row(n: number, updatedAt: number, patch: Partial<ConversationView> = {}
     blockedByMe: false,
     blockedMe: false,
     frozen: false,
+    counterpartClosed: false,
     updatedAt,
     ...patch,
   };
@@ -209,7 +210,7 @@ describe("thread pages", () => {
     const open = row(1, 1);
     expect(canWrite(open, false)).toBe(true);
     expect(canWrite(open, true)).toBe(false);
-    for (const patch of [{ frozen: true }, { blockedByMe: true }, { blockedMe: true }]) expect(canWrite({ ...open, ...patch }, false)).toBe(false);
+    for (const patch of [{ frozen: true }, { blockedByMe: true }, { blockedMe: true }, { counterpartClosed: true }]) expect(canWrite({ ...open, ...patch }, false)).toBe(false);
   });
 
   it("drops a sent bubble once the stored message is in the thread", () => {
