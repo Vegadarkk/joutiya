@@ -1,8 +1,8 @@
 import { z } from "@/lib/zod";
 import { DEFAULT_LEGAL, type LegalConfig } from "@/config/legal";
 
-// Quotas per seller type and Pro plan (architecture §8, design D5) and option prices (phase 7
-// design §5). Live values will come from Firestore `config/pricing` (admin-edited, journaled); this
+// Quotas per seller type and Pro plan (architecture §8, design D5), option prices and credit packs
+// (phase 7 design §5, §6). Live values will come from Firestore `config/pricing` (admin-edited, journaled); this
 // file holds the schema and the defaults.
 // Phase 3 publishes individuals only; phase 7 opens Pro accounts before launch (owner, 2026-10-16). Listing lifetime (TTL 60 d, purge 12 months) is legal data and
 // lives in config/legal (`listingTtlDays`, `listingPurgeMonths`): read it through `listingLifetime`.
@@ -56,6 +56,37 @@ const optionPriceSchema = z.object({ standard: credits, premiumCat: credits }).s
 export const optionPricesSchema = z.object({ bump: optionPriceSchema, featured7: optionPriceSchema, featured30: optionPriceSchema }).strict();
 export type OptionPrices = z.infer<typeof optionPricesSchema>;
 
+/**
+ * Credit packs sold through RevenueCat Web Billing (phase 7 design §6): Consumable products, one per
+ * pack and currency. `paid` credits match the price (1 credit = 1 MAD TTC), `bonus` credits come on
+ * top (a discount, out of the taxable base). `productId` is the RevenueCat product identifier (the
+ * webhook's `product_id`, same in sandbox and production), `packageId` the package of the purchase
+ * link's offering. The EUR grid waits on the owner: only MAD packs by default.
+ */
+export const PACK_CURRENCIES = ["MAD", "EUR"] as const;
+export type PackCurrency = (typeof PACK_CURRENCIES)[number];
+
+const rcIdentifier = z.string().regex(/^[A-Za-z0-9._]{1,100}$/);
+export const creditPackSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9_]{1,40}$/),
+    currency: z.enum(PACK_CURRENCIES),
+    /** Price paid, in minor units of `currency` (centimes). RevenueCat's MAD minimum is 8.99. */
+    priceMinor: z.number().int().min(899).max(10_000_000),
+    paid: credits,
+    bonus: z.number().int().min(0).max(10_000),
+    productId: rcIdentifier,
+    packageId: rcIdentifier,
+  })
+  .strict();
+export type CreditPack = z.infer<typeof creditPackSchema>;
+
+export const creditPacksSchema = z
+  .array(creditPackSchema)
+  .max(12)
+  .refine((packs) => new Set(packs.map((pack) => pack.id)).size === packs.length, "pack ids must be unique")
+  .refine((packs) => new Set(packs.map((pack) => pack.productId)).size === packs.length, "pack product ids must be unique");
+
 export const pricingConfigSchema = z
   .object({
     individual: listingQuotasSchema,
@@ -64,6 +95,7 @@ export const pricingConfigSchema = z
     graceDays: z.number().int().min(0).max(60),
     launchOffer: launchOfferSchema,
     options: optionPricesSchema,
+    packs: creditPacksSchema,
   })
   .strict();
 export type PricingConfig = z.infer<typeof pricingConfigSchema>;
@@ -81,6 +113,11 @@ export const DEFAULT_PRICING: PricingConfig = {
   graceDays: 7,
   launchOffer: { active: true, plan: "essentiel", noticeDays: 30, endsAt: null },
   options: { bump: { standard: 10, premiumCat: 20 }, featured7: { standard: 29, premiumCat: 59 }, featured30: { standard: 79, premiumCat: 149 } },
+  packs: [
+    { id: "mad_50", currency: "MAD", priceMinor: 5_000, paid: 50, bonus: 0, productId: "joutiya_credits_50_mad", packageId: "credits_50_mad" },
+    { id: "mad_100", currency: "MAD", priceMinor: 10_000, paid: 100, bonus: 10, productId: "joutiya_credits_100_mad", packageId: "credits_100_mad" },
+    { id: "mad_250", currency: "MAD", priceMinor: 25_000, paid: 250, bonus: 40, productId: "joutiya_credits_250_mad", packageId: "credits_250_mad" },
+  ],
 };
 
 export type Seller = { type: "individual" } | { type: "pro"; plan: ProPlan };
@@ -99,6 +136,11 @@ export function launchOfferOpen(offer: LaunchOffer, now: Date): boolean {
 export function optionPrice(option: OptionId, categoryId: string | undefined, config: PricingConfig = DEFAULT_PRICING): number {
   const tier = categoryId !== undefined && PREMIUM_OPTION_CATEGORIES.includes(categoryId) ? "premiumCat" : "standard";
   return config.options[option][tier];
+}
+
+/** The pack sold as RevenueCat product `productId`, if the config lists it. */
+export function packByProductId(productId: string, config: PricingConfig = DEFAULT_PRICING): CreditPack | undefined {
+  return config.packs.find((pack) => pack.productId === productId);
 }
 
 /** True when `count` more fits under `quota` (`null` = unlimited). */

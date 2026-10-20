@@ -3,7 +3,8 @@ import type * as AgentQueue from "@/lib/ai/queue";
 
 // The worker's bootstrap (src/worker/index.ts) wires the agent queue like the four others (design
 // D19, audit D1b-01): one consumer from createAgentWorker on the shared connection, listed at
-// start-up, closed on SIGTERM with the others together with the producer (closeAgentQueue). And
+// start-up, closed on SIGTERM with the others together with the producer (closeAgentQueue); the
+// billing queue (phase 7) likewise, one consumer at concurrency 1, Sentry on its last attempt. And
 // the consumer itself (src/worker/jobs/agent.ts): queue "agent", concurrency 1, a malformed
 // payload never retries, `final` on the last attempt, Sentry on the final failure only.
 // Everything below BullMQ is mocked: no Valkey, no Firestore, no provider.
@@ -46,6 +47,7 @@ const mocks = vi.hoisted(() => {
     captureServerException: vi.fn(),
     closeAgentQueue: vi.fn(async () => undefined),
     runAgentTask: vi.fn(async () => ({ status: "done" })),
+    onBillingJobFailed: vi.fn(async (job: { attemptsMade: number; opts: { attempts?: number } }) => job.attemptsMade >= (job.opts.attempts ?? 1)),
     outboxWatch: { stop: vi.fn() },
   };
 });
@@ -84,6 +86,7 @@ vi.mock("@/worker/jobs", async () => {
 });
 vi.mock("@/worker/system-queue", () => ({ onSystemJobFailed: vi.fn(async () => undefined), syncSchedulers: vi.fn(async () => []) }));
 vi.mock("@/worker/jobs/media", () => ({ onMediaJobFailed: vi.fn(async () => false), processMediaJob: vi.fn() }));
+vi.mock("@/worker/jobs/billing", () => ({ onBillingJobFailed: mocks.onBillingJobFailed, processBillingJob: vi.fn() }));
 vi.mock("@/worker/jobs/search", () => ({
   ensureEngineReady: vi.fn(async () => undefined),
   holdFailedListing: vi.fn(),
@@ -116,13 +119,13 @@ beforeAll(async () => {
 
 describe("worker bootstrap", () => {
   it("starts the agent consumer on the shared connection, at concurrency 1, and lists its queue", () => {
-    expect(workers().map((worker) => worker.name)).toEqual(["system", "mail", "media", "search", "agent"]);
+    expect(workers().map((worker) => worker.name)).toEqual(["system", "mail", "media", "search", "agent", "billing"]);
     const agent = agentWorker()!;
     const system = workers()[0]!;
     expect(agent.options).toMatchObject({ concurrency: 1 });
     expect(agent.options.connection).toBeInstanceOf(mocks.FakeRedis);
     expect(agent.options.connection).toBe(system.options.connection);
-    expect(started).toEqual({ queues: ["system", "mail", "media", "search", "agent"] });
+    expect(started).toEqual({ queues: ["system", "mail", "media", "search", "agent", "billing"] });
   });
 
   it("logs every failure and reports the final one (or an unrecoverable payload) to Sentry", () => {
@@ -135,6 +138,19 @@ describe("worker bootstrap", () => {
     expect(mocks.captureServerException).toHaveBeenCalledExactlyOnceWith(error, { queue: "agent", job: "ai-task" });
     failed({ name: "ai-task", attemptsMade: 1, opts: { attempts: 3 } }, new mocks.UnrecoverableError("invalid agent job"));
     expect(mocks.captureServerException).toHaveBeenCalledTimes(2);
+  });
+
+  it("consumes the billing queue one event at a time and reports its last failed attempt only", async () => {
+    const billing = workers().find((worker) => worker.name === "billing")!;
+    expect(billing.options).toMatchObject({ concurrency: 1 });
+    expect(billing.options.connection).toBe(workers()[0]!.options.connection);
+    const failed = billing.listeners.get("failed")!;
+    const error = new Error("purchase not visible");
+    failed({ name: "revenuecat-event", data: { eventId: "e1" }, attemptsMade: 2, opts: { attempts: 8 } }, error);
+    await Promise.resolve();
+    expect(mocks.captureServerException).not.toHaveBeenCalledWith(error, expect.anything());
+    failed({ name: "revenuecat-event", data: { eventId: "e1" }, attemptsMade: 8, opts: { attempts: 8 } }, error);
+    await vi.waitFor(() => expect(mocks.captureServerException).toHaveBeenCalledWith(error, { queue: "billing", job: "revenuecat-event" }));
   });
 
   it("runs the task with `final` on the last attempt only and never retries a malformed payload", async () => {

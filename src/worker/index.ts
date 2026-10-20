@@ -2,8 +2,9 @@
 // quota report, hourly purge of unactivated accounts), "mail" (deliveries with retries), "media"
 // (photo pipeline, one upload at a time, D12), "search" (phase 4 D9: the search index's only
 // writer, one job at a time, fed by the web's fast lane, the searchOutbox watch and a 60 s poll)
-// and "agent" (phase 5 D19: the moderation agent, one task at a time, fed by the listings publish
-// and renew paths, the reports service and the appeals service).
+// "agent" (phase 5 D19: the moderation agent, one task at a time, fed by the listings publish
+// and renew paths, the reports service and the appeals service) and "billing" (phase 7: RevenueCat
+// credit pack events, one at a time, fed by the webhook).
 
 import { writeFile } from "node:fs/promises";
 import { DelayedError, Queue, UnrecoverableError, Worker } from "bullmq";
@@ -19,6 +20,7 @@ import { isTemplateMail } from "@/lib/mail/render";
 import { closeMailQueue, MAIL_QUEUE } from "@/lib/mail/send";
 import { checkModelsAtStartup, resetImageClassifier } from "@/lib/media/classify";
 import { closeMediaQueue, MEDIA_CONCURRENCY, MEDIA_QUEUE } from "@/lib/media/queue";
+import { BILLING_CONCURRENCY, BILLING_QUEUE, closeBillingQueue } from "@/lib/payments/billing-queue";
 import { isFirebaseConfigured } from "@/lib/firebase/admin";
 import { SearchUnavailableError } from "@/lib/search/types";
 import { closeSearchQueue, enqueueIndexJobs, indexJobSchema, OUTBOX_POLL_JOB, SEARCH_QUEUE } from "@/lib/search/queue";
@@ -28,6 +30,7 @@ import { syncHelpIndex } from "@/lib/help/search";
 import { runStartupChecks } from "@/lib/startup/checks";
 import { clientOptions } from "@/lib/valkey/clients";
 import { AGENT_QUEUE, createAgentWorker, JOBS, SYSTEM_QUEUE, SCHEDULES } from "./jobs";
+import { onBillingJobFailed, processBillingJob } from "./jobs/billing";
 import { onMediaJobFailed, processMediaJob } from "./jobs/media";
 import { ensureEngineReady, holdFailedListing, OUTBOX_POLL_EVERY_MS, OUTBOX_POLL_SCHEDULER, processSearchJob, watchSearchOutbox } from "./jobs/search";
 import { onSystemJobFailed, syncSchedulers } from "./system-queue";
@@ -123,6 +126,16 @@ async function main(): Promise<void> {
   // final attempt or an unrecoverable payload) lives with the processor in jobs/agent.ts.
   const agentWorker = createAgentWorker(connection);
 
+  // Credit packs (phase 7 design §6): one wallet writer. The final attempt alerts (jobs/billing.ts)
+  // and reaches Sentry; BullMQ retries the earlier ones.
+  const billingWorker = new Worker(BILLING_QUEUE, (job) => processBillingJob(job), { connection, concurrency: BILLING_CONCURRENCY });
+  billingWorker.on("failed", (job, error) => {
+    logger.error({ queue: BILLING_QUEUE, job: job?.name, attempt: job?.attemptsMade, err: error.message }, "billing job failed");
+    void onBillingJobFailed(job, error).then((final) => {
+      if (final) captureServerException(error, { queue: BILLING_QUEUE, job: job?.name });
+    });
+  });
+
   const beat = async () => {
     try {
       await connection.set(WORKER_HEARTBEAT_KEY, new Date().toISOString(), "EX", WORKER_HEARTBEAT_TTL);
@@ -141,15 +154,15 @@ async function main(): Promise<void> {
     logger.info({ signal }, "worker stopping");
     clearInterval(heartbeat);
     outboxWatch?.stop();
-    await Promise.allSettled([systemWorker.close(), mailWorker.close(), mediaWorker.close(), searchWorker.close(), agentWorker.close()]);
-    await Promise.allSettled([queue.close(), searchQueue.close(), closeMailQueue(), closeMediaQueue(), closeSearchQueue(), closeAgentQueue(), resetImageClassifier()]);
+    await Promise.allSettled([systemWorker.close(), mailWorker.close(), mediaWorker.close(), searchWorker.close(), agentWorker.close(), billingWorker.close()]);
+    await Promise.allSettled([queue.close(), searchQueue.close(), closeMailQueue(), closeMediaQueue(), closeSearchQueue(), closeAgentQueue(), closeBillingQueue(), resetImageClassifier()]);
     await connection.quit().catch(() => undefined);
     await flushObservability(2_000);
     process.exit(0);
   };
   process.on("SIGTERM", () => void stop("SIGTERM"));
   process.on("SIGINT", () => void stop("SIGINT"));
-  logger.info({ queues: [SYSTEM_QUEUE, MAIL_QUEUE, MEDIA_QUEUE, SEARCH_QUEUE, AGENT_QUEUE] }, "worker started");
+  logger.info({ queues: [SYSTEM_QUEUE, MAIL_QUEUE, MEDIA_QUEUE, SEARCH_QUEUE, AGENT_QUEUE, BILLING_QUEUE] }, "worker started");
 }
 
 main().catch(async (error: unknown) => {

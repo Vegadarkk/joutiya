@@ -741,6 +741,103 @@ export const ledgerEntrySchema = z
   .strict();
 export type LedgerEntryDoc = z.infer<typeof ledgerEntrySchema>;
 
+// ---- Phase 7: credit packs (design §3, §6) ------------------------------------------------------
+
+/**
+ * billingAccounts/{accountId} (same id as the wallet): who pays, and the RevenueCat app user id
+ * (UUID v4, never the uid: RevenueCat and the payment link only see this value).
+ */
+export const billingAccountSchema = z
+  .object({
+    kind: z.enum(["personal", "shop"]),
+    ownerUid: uid,
+    proId: z.string().min(1).max(64).optional(),
+    rcAppUserId: z.uuid(),
+    /** The last pack checkout opened, with the CGV consent given before the payment page. */
+    lastCheckout: z
+      .object({ packId: z.string().min(1).max(40), consentVersion: z.string().min(1).max(20), at: ts })
+      .strict()
+      .optional(),
+    /** A refund left the wallet negative: the account waits on an admin. */
+    flaggedAt: ts.optional(),
+    createdAt: ts,
+    updatedAt: ts,
+  })
+  .strict();
+export type BillingAccountDoc = z.infer<typeof billingAccountSchema>;
+
+export const ORDER_STATUSES = ["paid", "refunded"] as const;
+const currencyCode = z.string().regex(/^[A-Z]{3}$/);
+const countryCode = z.string().regex(/^[A-Z]{2}$/);
+const rcEnvironment = z.enum(["SANDBOX", "PRODUCTION"]);
+
+/**
+ * orders/{storeTransactionId}: one paid pack, created with its ledger credit in the same
+ * transaction (the natural key makes a replayed event credit once). Kept 10 years (accounting).
+ */
+export const orderSchema = z
+  .object({
+    kind: z.literal("pack"),
+    accountId: uid,
+    packId: z.string().min(1).max(40),
+    productId: z.string().min(1).max(100),
+    quantity: z.number().int().min(1).max(10),
+    /** Credits granted (paid part and bonus, already multiplied by the quantity). */
+    credits: z.object({ paid: z.number().int().min(0).max(1_000_000), bonus: z.number().int().min(0).max(1_000_000) }).strict(),
+    currency: currencyCode,
+    /** Price charged in `currency`, minor units, from the event. */
+    amountMinor: z.number().int().min(0).max(1_000_000_000).optional(),
+    status: z.enum(ORDER_STATUSES),
+    environment: rcEnvironment,
+    store: z.string().min(1).max(32),
+    taxJurisdiction: z.enum(["MA", "EU"]),
+    /** Country of the buyer as RevenueCat saw it (DGI register indicators, design §3). */
+    locationEvidence: z.object({ countryCode: countryCode.optional() }).strict(),
+    consent: z.object({ version: z.string().min(1).max(20), at: ts }).strict().optional(),
+    eventId: z.string().min(1).max(128),
+    refundEventId: z.string().min(1).max(128).optional(),
+    purchasedAt: ts,
+    refundedAt: ts.optional(),
+    createdAt: ts,
+    updatedAt: ts,
+  })
+  .strict();
+export type OrderDoc = z.infer<typeof orderSchema>;
+
+export const BILLING_EVENT_STATUSES = ["received", "processed", "ignored", "failed"] as const;
+
+/**
+ * billingEvents/{source}_{eventId}: every authenticated webhook delivery, deduplicated by the
+ * event id. Holds only what processing needs; the worker re-reads the purchase from RevenueCat
+ * before writing anything.
+ */
+export const billingEventSchema = z
+  .object({
+    source: z.literal("revenuecat"),
+    eventId: z.string().min(1).max(128),
+    type: z.string().min(1).max(64),
+    environment: rcEnvironment,
+    appUserId: z.string().min(1).max(1_500),
+    productId: z.string().min(1).max(100).optional(),
+    transactionId: z.string().min(1).max(255).optional(),
+    cancelReason: z.string().min(1).max(64).optional(),
+    store: z.string().min(1).max(32).optional(),
+    currency: currencyCode.optional(),
+    amountMinor: z.number().int().min(-1_000_000_000).max(1_000_000_000).optional(),
+    countryCode: countryCode.optional(),
+    quantity: z.number().int().min(1).max(10).optional(),
+    status: z.enum(BILLING_EVENT_STATUSES),
+    /** What processing did (`credited`, `refunded`, `duplicate`, `unknown_product`, ...). */
+    outcome: z.string().min(1).max(64).optional(),
+    attempts: z.number().int().min(0).max(1_000),
+    lastError: z.string().max(500).optional(),
+    occurredAt: ts.optional(),
+    receivedAt: ts,
+    processedAt: ts.optional(),
+  })
+  .strict();
+export type BillingEventDoc = z.infer<typeof billingEventSchema>;
+
 export const COLLECTIONS = {
   users: "users",
   userPrivate: "private",
@@ -771,6 +868,9 @@ export const COLLECTIONS = {
   wallets: "wallets",
   /** wallets/{accountId}/ledger/{entryId} */
   ledger: "ledger",
+  billingAccounts: "billingAccounts",
+  orders: "orders",
+  billingEvents: "billingEvents",
   // Phase 5
   conversations: "conversations",
   /** conversations/{cid}/messages/{mid} */

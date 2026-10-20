@@ -122,6 +122,15 @@ const schema = z.object({
   MEILI_URL: optionalUrl,
   MEILI_SEARCH_KEY: optional,
   MEILI_INDEX_KEY: optional,
+  // Payments (phase 7, design §6), behind config/flags `salesEnabled`. RevenueCat project "Joutiya"
+  // (sandbox outside prod): the v2 secret key reads a customer's purchases, every webhook carries
+  // the static Authorization value and the HMAC signature, and the purchase link is the Web
+  // Purchase Link of the credit packs offering (`https://pay.rev.cat/<token>`).
+  REVENUECAT_PROJECT_ID: optional,
+  REVENUECAT_SECRET_API_KEY: optional,
+  REVENUECAT_WEBHOOK_AUTH: optional,
+  REVENUECAT_WEBHOOK_HMAC_SECRET: optional,
+  REVENUECAT_PURCHASE_LINK: optionalUrl,
   // AI agent (phase 5, design D19), worker only. Each key is optional: an absent key disables its
   // provider, and the deterministic rules provider always runs (src/lib/ai).
   ANTHROPIC_API_KEY: optional,

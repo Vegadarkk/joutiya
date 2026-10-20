@@ -87,6 +87,10 @@ export const RATE_LIMITS = {
   // GET /api/wallet and /api/listings/{id}/options, points = documents read (a ledger page reads
   // up to 22, the options of a listing 2): 2 000 per day per account.
   "wallet.read.uid": { points: 2000, duration: DAY, policy: "open", key: "uid" },
+  // POST /api/wallet/packs (phase 7): opens a pack's payment page (Turnstile, 2 reads, 1 write).
+  // Closed: it leads to a charge. 20 per day per account, 60 per hour per IP.
+  "billing.checkout.uid": { points: 20, duration: DAY, policy: "closed", key: "uid" },
+  "billing.checkout.ip": { points: 60, duration: HOUR, policy: "closed", key: "ip" },
   // DELETE /api/listings/{id} and pause / resume / sold / renew (~4 writes and an ISR
   // revalidation each): 120 per day per account (an individual has at most 20 active listings).
   "listing.status.uid": { points: 120, duration: DAY, policy: "open", key: "uid" },
