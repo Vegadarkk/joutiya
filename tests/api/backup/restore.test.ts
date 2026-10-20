@@ -140,7 +140,7 @@ describe("backup and restore round trip", () => {
     expect(result.counts.full).toMatchObject({ users: 2, private: 2, listings: 3, auditLogs: 3, emailIndex: 1, staff: 0, uploads: 0 });
     expect(result.counts.incremental).toEqual({
       users: 2, emailIndex: 1, staff: 0, listings: 3, uploads: 0, moderationDecisions: 0, favorites: 0, savedSearches: 0,
-      conversations: 0, messages: 0, evidence: 0, userBlocks: 0, reports: 0, aiDecisions: 0, authorityRequests: 0, suspensions: 0, proProfiles: 0, wallets: 0,
+      conversations: 0, messages: 0, evidence: 0, userBlocks: 0, reports: 0, aiDecisions: 0, authorityRequests: 0, suspensions: 0, proProfiles: 0, wallets: 0, billingAccounts: 0, orders: 0,
     });
     const date = now.toISOString().slice(0, 10);
     expect(store.keys("private")).toContain(`backups/${date}/manifest.json.age`);

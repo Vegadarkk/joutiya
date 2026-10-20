@@ -1,9 +1,10 @@
 import { z } from "@/lib/zod";
-import { OPTION_IDS, type OptionId } from "@/config/pricing";
+import { OPTION_IDS, type OptionId, type PackCurrency } from "@/config/pricing";
 
-// Credits wallet and paid listing options (phase 7 design §5). Client-safe contract shared by the
-// promote dialog, the wallet page and the routes. Prices always come from the server: the body
-// names the option, never an amount.
+// Credits wallet, paid listing options and credit packs (phase 7 design §5, §6). Client-safe
+// contract shared by the promote dialog, the wallet and packs pages and the routes. Prices always
+// come from the server: a body names the option or the pack, and the price it saw only to be
+// refused if it changed.
 
 /** Version of the two purchase consent texts (Options.consent.* in messages/*.json, draft for legal review). */
 export const OPTION_CONSENT_VERSION = "2026-10";
@@ -97,7 +98,51 @@ export interface WalletResponse {
   next: string | null;
 }
 
+/** Version of the pack purchase consent text (Packs.consent in messages/*.json, draft for legal review). */
+export const PACK_CONSENT_VERSION = "2026-10";
+
+/** Office des Changes: online payments abroad with a Moroccan card, per person and calendar year (IGOC art. 121). */
+export const MOROCCAN_CARD_YEARLY_CAP_MAD = 20_000;
+
+export const checkoutPackSchema = z
+  .object({
+    packId: z.string().regex(/^[a-z0-9_]{1,40}$/),
+    /** Price the buyer saw, minor units: another price is refused (the page reloads). */
+    expectedPriceMinor: z.number().int().min(0).max(10_000_000),
+    /** "J'accepte les CGV ... crédits non utilisés remboursables 14 jours." */
+    acceptTerms: z.literal(true),
+    turnstileToken: z.string().min(1).max(2_048),
+  })
+  .strict();
+export type CheckoutPackInput = z.infer<typeof checkoutPackSchema>;
+
+export interface PackOffer {
+  id: string;
+  currency: PackCurrency;
+  priceMinor: number;
+  /** Credits received: paid part + bonus. */
+  credits: number;
+  bonus: number;
+}
+
+/** GET /api/wallet/packs: what the credits page shows. */
+export interface PacksResponse {
+  salesOpen: boolean;
+  /** Payments configured on this deployment (the purchase link exists). */
+  available: boolean;
+  account: "personal" | "shop";
+  packs: PackOffer[];
+  wallet: WalletSummary;
+  consentVersion: string;
+}
+
+/** POST /api/wallet/packs: the payment page to open (RevenueCat Web Purchase Link). */
+export interface CheckoutPackResponse {
+  url: string;
+}
+
 export const PAYMENTS_API = {
   wallet: "/api/wallet",
+  packs: "/api/wallet/packs",
   options: (listingId: string) => `/api/listings/${listingId}/options`,
 } as const;

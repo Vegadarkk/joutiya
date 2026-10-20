@@ -1,21 +1,26 @@
 import "server-only";
 import { requireUser } from "@/lib/auth/guards";
-import { buyOptionSchema, LEDGER_PAGE_SIZE, type LedgerEntryView, type WalletResponse } from "@/lib/contracts/payments";
+import { buyOptionSchema, checkoutPackSchema, LEDGER_PAGE_SIZE, type LedgerEntryView, type WalletResponse } from "@/lib/contracts/payments";
 import { OPTION_IDS, type OptionId } from "@/config/pricing";
 import { getWallet, listLedger, type LedgerRecord } from "@/lib/db/repositories/wallets";
 import { getFlags } from "@/lib/config/runtime";
+import { serverEnv } from "@/lib/env";
 import { HttpError, notFound } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { json } from "@/lib/http/route";
 import { isListingId } from "@/lib/listings/ids";
 import { assertQuotas, DEPOSIT_QUOTAS } from "@/lib/quota/gate";
+import { requestIdentity } from "@/lib/rate-limit/keys";
 import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
+import { verifyTurnstile } from "@/lib/security/turnstile";
 import { buyOption, listingOptions, memberBillingAccount, walletSummary } from "./options";
+import { packsView, startPackCheckout } from "./packs";
 
 // Route handlers of the credits wallet and the paid options (phase 7 design §5, §9): requireUser
 // (Origin + CSRF on the purchase), the per-account limiter before the first Firestore read, the
 // owner check inside the service (404 for someone else's listing). Reads are charged in documents
-// (`wallet.read.uid`), the purchase per attempt (`listing.options.uid`, closed: it debits credits).
+// (`wallet.read.uid`), the purchase per attempt (`listing.options.uid`, closed: it debits credits),
+// a pack checkout per attempt and per IP (`billing.checkout.*`, closed) behind Turnstile.
 
 type Params = Promise<Record<string, string | string[] | undefined>>;
 
@@ -80,4 +85,27 @@ export async function handleWallet(request: Request): Promise<Response> {
   const now = new Date();
   const body: WalletResponse = { salesOpen: flags.salesEnabled, account: kind, wallet: walletSummary(wallet, now), entries: page.entries.map(entryView), next: page.next ?? null };
   return json(body);
+}
+
+/** GET /api/wallet/packs: the packs on sale and the wallet they credit. */
+export async function handlePacks(request: Request): Promise<Response> {
+  const auth = await requireUser(request);
+  await enforceLimit("wallet.read.uid", auth.user.uid);
+  const body = await packsView(auth);
+  await consumeLimit("wallet.read.uid", auth.user.uid, 1);
+  return json(body);
+}
+
+/** POST /api/wallet/packs: the payment page of a pack (RevenueCat Web Purchase Link). */
+export async function handlePackCheckout(request: Request): Promise<Response> {
+  const auth = await requireUser(request, { mutation: true });
+  const input = await readJson(request, checkoutPackSchema);
+  const ip = requestIdentity(request.headers).ip;
+  await enforceLimit("billing.checkout.uid", auth.user.uid);
+  await enforceLimit("billing.checkout.ip", ip);
+  // The gate first (cached): Turnstile is not spent on a closed shop.
+  if (!(await getFlags()).salesEnabled) throw new HttpError(403, "sales_closed");
+  const check = await verifyTurnstile(input.turnstileToken, { action: "pack-checkout", remoteIp: ip, hostname: new URL(serverEnv().SITE_URL).hostname });
+  if (!check.ok) throw new HttpError(403, "turnstile_failed");
+  return json(await startPackCheckout(auth, input));
 }

@@ -405,7 +405,8 @@
       "messages": "Mes messages",
       "messagesLink": "Messages",
       "unreadCount": "{count, plural, one {# message non lu} other {# messages non lus}}",
-      "pro": "Espace Pro"
+      "pro": "Espace Pro",
+      "wallet": "Porte-monnaie"
     },
     "errors": {
       "invalid_body": "Certaines informations sont incorrectes. Vérifiez le formulaire, puis réessayez.",
@@ -3129,6 +3130,54 @@
     "fromAllowance": "Payé avec un À la Une inclus",
     "balanceAfter": "Solde : {count}",
     "more": "Afficher plus",
-    "available": "Crédits disponibles"
+    "available": "Crédits disponibles",
+    "buy": "Acheter des crédits",
+    "paid": "Paiement reçu. Vos crédits apparaissent ici dans quelques instants."
+  },
+  "Packs": {
+    "metaTitle": "Acheter des crédits",
+    "back": "Porte-monnaie",
+    "title": "Acheter des crédits",
+    "personal": "Les crédits arrivent sur votre porte-monnaie.",
+    "shop": "Les crédits arrivent sur le porte-monnaie de votre boutique.",
+    "current": "Solde actuel : {count, plural, one {# crédit} other {# crédits}}.",
+    "loading": "Chargement des packs",
+    "failed": "Les packs n'ont pas pu être chargés.",
+    "retry": "Réessayer",
+    "closed": "L'achat de crédits n'est pas encore ouvert sur Joutiya.",
+    "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard.",
+    "legend": "Choisissez un pack",
+    "credits": "{count, plural, one {<n>#</n> crédit} other {<n>#</n> crédits}}",
+    "bonus": "dont {count, plural, one {# crédit offert} other {# crédits offerts}}",
+    "noBonus": "Sans bonus",
+    "price": "{amount, number} {currency}",
+    "perCredit": "Soit {amount, number} {currency} le crédit",
+    "bestValue": "Meilleur prix au crédit",
+    "currency": {
+      "legend": "Votre carte",
+      "MAD": "Carte marocaine, en dirhams",
+      "EUR": "Carte européenne, en euros"
+    },
+    "notesTitle": "Avant de payer",
+    "notes": {
+      "provider": "Le paiement se fait par carte sur la page sécurisée de notre prestataire RevenueCat, avec Stripe. Cette page peut s'afficher en anglais.",
+      "moroccanCard": "Avec une carte marocaine, activez le paiement en ligne à l'international auprès de votre banque. L'achat compte dans votre dotation e-commerce de {cap, number} MAD par an (Office des Changes).",
+      "credits": "Les crédits ne sont ni transférables ni convertibles en argent. Les crédits non utilisés d'un pack sont remboursables pendant 14 jours après l'achat : écrivez à {email}."
+    },
+    "consent": {
+      "terms": "J'ai lu et j'accepte les",
+      "termsLink": "conditions générales de vente",
+      "required": "Cochez la case pour continuer."
+    },
+    "choose": "Choisissez un pack.",
+    "challenge": "Terminez la vérification anti-robot.",
+    "submit": "Payer {amount, number} {currency}",
+    "submitIdle": "Payer",
+    "errors": {
+      "sales_closed": "L'achat de crédits vient de fermer.",
+      "price_changed": "Les packs ont changé : vérifiez votre choix.",
+      "turnstile_failed": "La vérification anti-robot a échoué. Réessayez.",
+      "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard."
+    }
   }
 }
