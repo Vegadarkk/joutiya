@@ -44,8 +44,8 @@ export interface BackupCollection {
 }
 
 type CollectionId = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
-/** `account` is a document id, `system` holds the cursors themselves. */
-type BackedUpId = Exclude<CollectionId, typeof COLLECTIONS.userPrivateDoc | typeof COLLECTIONS.system>;
+/** `account` and `identity` are document ids (of `private`), `system` holds the cursors themselves. */
+type BackedUpId = Exclude<CollectionId, typeof COLLECTIONS.userPrivateDoc | typeof COLLECTIONS.userIdentityDoc | typeof COLLECTIONS.system>;
 
 /**
  * Time field per collection, from the Zod schemas of src/lib/db/schemas.ts. Adding a collection to

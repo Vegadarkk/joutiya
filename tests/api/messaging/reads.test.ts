@@ -109,6 +109,7 @@ describe("GET /api/conversations", () => {
       blockedByMe: false,
       blockedMe: false,
       frozen: false,
+      counterpartClosed: false,
     });
     const times = first.body.conversations.map((item) => item.updatedAt);
     expect([...times].sort((a, b) => b - a)).toEqual(times);

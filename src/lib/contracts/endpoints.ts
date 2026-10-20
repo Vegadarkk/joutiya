@@ -29,6 +29,14 @@ export const AUTH_API = {
   staffLogout: "/api/admin/auth/logout",
 } as const;
 
+/** Account closure and personal data export (phase 5, D26). */
+export const ACCOUNT_API = {
+  /** POST { confirm: true } -> CloseAccountResponse (session cookies cleared); recent sign-in required (403 recent_auth_required). */
+  close: "/api/account/close",
+  /** GET with the X-CSRF-Token header -> the AccountExport JSON file (attachment, no-store). */
+  export: "/api/account/export",
+} as const;
+
 export const LISTING_API = {
   /** POST create a draft; GET is not served (use `mine`). */
   listings: "/api/listings",

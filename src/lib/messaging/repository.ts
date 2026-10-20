@@ -43,7 +43,7 @@ export const FREEZE_HOLD_PREFIXES = ["authority:", "dispute:", "freeze:"] as con
 const ALREADY_EXISTS = 6;
 
 export class ConversationAccessError extends Error {
-  constructor(readonly reason: "missing" | "blocked" | "frozen") {
+  constructor(readonly reason: "missing" | "blocked" | "frozen" | "closed") {
     super(`conversation ${reason}`);
     this.name = "ConversationAccessError";
   }
@@ -197,7 +197,8 @@ export interface AppendResult {
 /**
  * Appends a message (D4, D7) in one transaction: the sender must be a participant (else
  * "missing"), nobody blocked the other ("blocked": the `blockedBy` mirror, then the userBlocks
- * lists of both accounts, which decide, audit D1a-10), the conversation is not frozen ("frozen").
+ * lists of both accounts, which decide, audit D1a-10), the conversation is not frozen ("frozen"),
+ * no participant closed the account ("closed", L7).
  * The recipient's unread count + 1; archive and delete-for-me are lifted for both participants.
  */
 export async function appendMessage(cid: string, input: NewMessageInput): Promise<AppendResult> {
@@ -210,6 +211,8 @@ export async function appendMessage(cid: string, input: NewMessageInput): Promis
     const blocks = blocksOf(await tx.getAll(userBlocksRef(input.senderUid), userBlocksRef(recipientUid)));
     if (isPairBlocked(blocks, input.senderUid, recipientUid)) throw new ConversationAccessError("blocked");
     if (conversation.status === "frozen") throw new ConversationAccessError("frozen");
+    // A participant closed the account (L7): the other one keeps reading, nobody writes.
+    if ((conversation.accountClosed ?? []).length > 0) throw new ConversationAccessError("closed");
     const message = messageDoc(conversation, input);
     const evidence = evidenceDoc(input);
     const { cid: _cid, ...current } = conversation;
@@ -360,6 +363,34 @@ export async function setPairBlockedBy(blocker: string, other: string, blocked: 
     mirrorBlockedBy(conversations().where("buyerUid", "==", other).where("sellerUid", "==", blocker), blocker, blocked),
   ]);
   return asBuyer + asSeller;
+}
+
+/**
+ * Account closure (L7): `uid` joins `accountClosed` on every conversation it takes part in, page
+ * after page (the participants array-contains index, implicit `__name__` order), at most
+ * MIRROR_MAX_PAGES x MIRROR_PAGE. Returns each conversation updated with its other participant.
+ */
+export async function markAccountClosed(uid: string): Promise<{ cid: string; other: string }[]> {
+  const base = conversations().where("participants", "array-contains", uid);
+  const updated: { cid: string; other: string }[] = [];
+  let after: QueryDocumentSnapshot | undefined;
+  for (let page = 0; page < MIRROR_MAX_PAGES; page += 1) {
+    const snapshot = await (after ? base.startAfter(after) : base).limit(MIRROR_PAGE).select("participants").get();
+    void consume("firestore.reads", Math.max(1, snapshot.size));
+    if (snapshot.empty) break;
+    const batch = db().batch();
+    for (const doc of snapshot.docs) {
+      batch.update(doc.ref, { accountClosed: FieldValue.arrayUnion(uid) });
+      const participants: unknown = doc.get("participants");
+      const other = Array.isArray(participants) ? participants.find((participant): participant is string => typeof participant === "string" && participant !== uid) : undefined;
+      updated.push({ cid: doc.id, other: other ?? uid });
+    }
+    await batch.commit();
+    void consume("firestore.writes", snapshot.size);
+    if (snapshot.size < MIRROR_PAGE) break;
+    after = snapshot.docs[snapshot.size - 1];
+  }
+  return updated;
 }
 
 /** cid -> unread count of `uid` over its newest conversations (the badge rebuild, D3). */

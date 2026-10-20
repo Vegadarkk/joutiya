@@ -18,6 +18,7 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
   staffInvite: { displayName: "Nadia", actionUrl: ACTION, role: "moderator" },
   phoneVerified: { displayName: "Nadia", phone: "+212 6 00 00 00 00" },
   phoneRemoved: { displayName: "Nadia", phone: "+212 6 00 00 00 00" },
+  accountClosed: { displayName: "Nadia", closedAt: "2026-10-20T09:30:00.000Z", purgeAt: "2027-10-20T09:30:00.000Z" },
   listingPublished: { displayName: "Nadia", title: "Vélo de ville", url: `${SITE}/fr/annonce/velo-de-ville-casablanca-abcd2345`, expiresAt: "2026-12-15T09:30:00.000Z" },
   listingPendingReview: { displayName: "Nadia", title: "Vélo de ville", listingId: "abcd2345", statement: { measure: "hold", facts: ["new_account", "dup_text"], ground: "CGU §7", automated: true, redress: "dsa@joutiya.ma" } },
   listingRejected: { displayName: "Nadia", title: "Vélo de ville", listingId: "abcd2345", statement: { measure: "reject", facts: ["prohibited_kw"], ground: "CGU §7.2", automated: true, redress: "dsa@joutiya.ma" } },

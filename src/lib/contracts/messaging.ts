@@ -106,6 +106,8 @@ export interface ConversationView {
   blockedByMe: boolean;
   blockedMe: boolean;
   frozen: boolean;
+  /** The other participant closed the account (L7): read-only, the history stays. */
+  counterpartClosed: boolean;
   updatedAt: number;
 }
 

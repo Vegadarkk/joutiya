@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -132,8 +133,8 @@ test.describe("account", () => {
     await expect(page).toHaveURL(/\/fr\/parametres$/);
     await expect(page.getByRole("heading", { level: 1, name: "Mes paramètres" })).toBeVisible();
     await expect(page.getByLabel("Nom affiché")).toHaveValue(name, { timeout: 15_000 });
-    // The header shows the account once /api/auth/me has answered.
-    await expect(page.getByRole("button", { name: "Mon compte" })).toBeVisible();
+    // The header shows the account once /api/auth/me has answered ("Fermer mon compte" is on the page too).
+    await expect(page.getByRole("button", { name: /^Mon compte/ })).toBeVisible();
 
     // Change the display name.
     await page.getByLabel("Nom affiché").fill("Yasmine B.");
@@ -294,6 +295,49 @@ test.describe("account", () => {
     await signIn(page, email, PASSWORD);
     await expect(page).toHaveURL(/\/fr$/, { timeout: 15_000 });
     await expect(page.getByRole("button", { name: "Mon compte" })).toBeVisible();
+  });
+
+  test("downloads the personal data, then closes the account for good (D26)", async ({ page, request }) => {
+    const { email } = await createVerifiedAccount(page, request, "close");
+    await page.goto("/fr/connexion");
+    await signIn(page, email, PASSWORD);
+    await expect(page).toHaveURL(/\/fr\/parametres$/, { timeout: 15_000 });
+
+    // The export: a JSON file named after the day, with the account's own data.
+    const downloading = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Télécharger mes données" }).click();
+    const file = await downloading;
+    expect(file.suggestedFilename()).toMatch(/^joutiya-mes-donnees-\d{4}-\d{2}-\d{2}\.json$/);
+    const data = JSON.parse(await readFile(await file.path(), "utf8")) as { format: string; account: { email: string } };
+    expect(data.format).toBe("joutiya.account-export");
+    expect(data.account.email).toBe(email);
+
+    // The closure: the time line, then an explicit acknowledgement before the button works.
+    await page.getByRole("button", { name: "Fermer mon compte" }).click();
+    const dialog = page.getByRole("dialog", { name: "Fermer votre compte Joutiya ?" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("Aujourd'hui")).toBeVisible();
+    const submit = dialog.getByRole("button", { name: "Fermer définitivement" });
+    await expect(submit).toBeDisabled();
+    await dialog.getByLabel("Je comprends que la fermeture de mon compte est définitive.").check();
+    await submit.click();
+    // The page gives way to the confirmation, with the purge date and the way out.
+    await expect(page.getByRole("heading", { level: 2, name: "Votre compte est fermé" })).toBeVisible({ timeout: 15_000 });
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText(/^Un e-mail de confirmation vous a été envoyé\. Les données de votre compte seront supprimées le /)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Se déconnecter" })).toBeHidden();
+    await page.getByRole("link", { name: "Retour à l'accueil" }).click();
+    await expect(page).toHaveURL(/\/fr$/, { timeout: 15_000 });
+    await expect(page.getByRole("link", { name: "Se connecter" }).first()).toBeVisible();
+    const me = (await (await page.request.get("/api/auth/me")).json()) as { session: unknown };
+    expect(me.session).toBeNull();
+    await waitForMail(request, email, "accountClosed");
+
+    // The address no longer signs in.
+    await page.goto("/fr/connexion");
+    await signIn(page, email, PASSWORD);
+    await expect(page.getByRole("alert").filter({ hasText: "Ce compte a été désactivé." })).toBeVisible({ timeout: 15_000 });
+    await expect(page).toHaveURL(/\/fr\/connexion/);
   });
 
   test("the Google button hands a rejected credential to the form message", async ({ page, request }) => {

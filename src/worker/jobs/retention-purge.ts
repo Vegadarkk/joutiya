@@ -1,3 +1,4 @@
+import { listClosedPastPurge, purgeClosedAccount, purgeClosedIdentity } from "@/lib/account/purge";
 import { alert } from "@/lib/alert";
 import { audit } from "@/lib/audit";
 import { PHOTO_VARIANTS } from "@/lib/contracts/media";
@@ -54,6 +55,10 @@ import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 // 4. rejected Pro applications past purgeAt (6 months, phase 7): the profile (identifiers) goes
 //    and the owner is unlinked; its KYBC pieces get purgeAt = now and purge-quarantine deletes
 //    them within the hour (src/lib/pro/kybc-retention.ts).
+// 5. closed accounts (phase 5 D26, lot L7; AF §7 "comptes clos"): at purgeAt (closure + 1 year) the
+//    Auth user, users/{uid}, its private account document and its emailIndex entry; the civil
+//    identity, and a ban's e-mail block, outlive them in users/{uid}/private/identity until
+//    identityPurgeAt (closure + 5 years). Legal holds keep them (src/lib/account/purge.ts).
 // At most PURGE_DELETE_BUDGET document deletions a night (Spark: 20 000 a day); the rest waits a
 // night, and a backlog older than 3 days raises an alert. Idempotent: every step re-reads.
 
@@ -65,6 +70,11 @@ export const LISTING_MEDIA_PAGES = 5;
 export const JOURNAL_BATCH = 400;
 export const PRO_PURGE_BATCH = 50;
 export const PRO_PURGE_PAGES = 4;
+/** Closed accounts: users/{uid}/private documents read per page (each purged in its own transaction). */
+export const CLOSED_PURGE_BATCH = 100;
+export const CLOSED_PURGE_PAGES = 5;
+/** Deletions one closed account may need (users/{uid}, its private document, its emailIndex entry). */
+const CLOSED_ACCOUNT_DELETES = 3;
 export const BACKLOG_ALERT_MS = 3 * 24 * 3_600_000;
 /** Phase 5: documents read per page of a held collection (each page's deletions in one transaction). */
 export const HELD_PURGE_BATCH = 200;
@@ -97,6 +107,9 @@ export interface RetentionResult {
   revealLogs: number;
   /** Rejected Pro applications deleted (phase 7). */
   proProfiles: number;
+  /** Closed accounts purged at purgeAt (L7), and the identities kept after them, purged at identityPurgeAt. */
+  accounts: number;
+  identities: number;
   /** Phase 5 (D22). Conversations deleted, with their messages and evidence documents. */
   conversations: number;
   messages: number;
@@ -248,6 +261,49 @@ async function purgeProProfiles(state: RunState): Promise<void> {
       }
     }
     if (profiles.length < PRO_PURGE_BATCH) return;
+  }
+  result.deferred = true;
+}
+
+/** Closed accounts (L7, D26): the account documents at purgeAt, then the identity kept until identityPurgeAt. */
+async function purgeClosedAccounts(state: RunState): Promise<void> {
+  const { now, result } = state;
+  let cursor: Awaited<ReturnType<typeof listClosedPastPurge>>["next"];
+  for (let pages = 0; pages < CLOSED_PURGE_PAGES; pages += 1) {
+    const page = await listClosedPastPurge(now, CLOSED_PURGE_BATCH, cursor);
+    for (const doc of page.docs) {
+      if (state.budget < CLOSED_ACCOUNT_DELETES) {
+        result.deferred = true;
+        return;
+      }
+      try {
+        const outcome = doc.kind === "account" ? await purgeClosedAccount(doc.uid, now) : await purgeClosedIdentity(doc.uid, now);
+        if (outcome.kind === "held") {
+          result.held += 1;
+          continue;
+        }
+        if (outcome.kind === "skip") {
+          result.skipped += 1;
+          continue;
+        }
+        state.budget -= outcome.deletes;
+        result[doc.kind === "account" ? "accounts" : "identities"] += 1;
+        await audit({
+          actorUid: "system",
+          actorRole: "system",
+          action: doc.kind === "account" ? "account.purge" : "account.identity_purge",
+          target: { type: "user", id: doc.uid },
+          automated: true,
+          ...(outcome.identityKept ? { reason: "identity kept until identityPurgeAt" } : {}),
+          at: now,
+        });
+      } catch (error) {
+        result.failed += 1;
+        logger.warn({ uid: doc.uid, kind: doc.kind, err: (error as Error).message }, "closed account not purged");
+      }
+    }
+    if (!page.next) return;
+    cursor = page.next;
   }
   result.deferred = true;
 }
@@ -497,6 +553,8 @@ export async function retentionPurge(now = new Date(), deps: { store?: ObjectSto
     contentOps: 0,
     revealLogs: 0,
     proProfiles: 0,
+    accounts: 0,
+    identities: 0,
     conversations: 0,
     messages: 0,
     evidence: 0,
@@ -531,6 +589,7 @@ export async function retentionPurge(now = new Date(), deps: { store?: ObjectSto
   await step("contentOps", state, () => purgeJournal(COLLECTIONS.contentOps, "contentOps", state));
   await step("revealLogs", state, () => purgeJournal(COLLECTIONS.revealLogs, "revealLogs", state));
   await step("proProfiles", state, () => purgeProProfiles(state));
+  await step("closedAccounts", state, () => purgeClosedAccounts(state));
   await step("conversations", state, () => purgeConversations(state));
   await step("reports", state, () => purgeHeld(COLLECTIONS.reports, "reports", state, reportPurgeable));
   await step("decisions", state, () => purgeHeld(COLLECTIONS.moderationDecisions, "decisions", state, decisionPurgeable));

@@ -124,7 +124,7 @@ export function groupByDay(messages: readonly MessageView[]): { day: string; mes
   return groups;
 }
 
-/** The thread can take a new message: not frozen, nobody blocked, my account not suspended. */
+/** The thread can take a new message: not frozen, nobody blocked, the other account not closed, mine not suspended. */
 export function canWrite(conversation: ConversationView, suspended: boolean): boolean {
-  return !conversation.frozen && !conversation.blockedByMe && !conversation.blockedMe && !suspended;
+  return !conversation.frozen && !conversation.blockedByMe && !conversation.blockedMe && !conversation.counterpartClosed && !suspended;
 }

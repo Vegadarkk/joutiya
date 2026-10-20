@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { Ban, CloudOff, Lock, ShieldAlert } from "lucide-react";
+import { Ban, CloudOff, Lock, ShieldAlert, UserX } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { FormMessage, useApiErrorMessage } from "@/components/auth/form-message";
 import { EmptyState } from "@/components/feedback/empty-state";
@@ -74,7 +74,12 @@ function ConversationRow({ row, selected, archived, now }: { row: ConversationVi
                 {preview}
               </span>
             </span>
-            {row.blockedByMe || row.blockedMe ? (
+            {row.counterpartClosed ? (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-surface-muted px-1.5 text-xs text-foreground-muted group-aria-[current=page]:bg-surface">
+                <UserX className="size-3" aria-hidden="true" />
+                {t("closed")}
+              </span>
+            ) : row.blockedByMe || row.blockedMe ? (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-surface-muted px-1.5 text-xs text-foreground-muted group-aria-[current=page]:bg-surface">
                 <Ban className="size-3" aria-hidden="true" />
                 {t("blocked")}
