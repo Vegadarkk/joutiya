@@ -81,6 +81,9 @@ const TABLE: Record<BackedUpId, Omit<BackupCollection, "id">> = {
   aiDecisions: { scope: "root", timeField: "createdAt" },
   authorityRequests: { scope: "root", timeField: "updatedAt" },
   suspensions: { scope: "root", timeField: "createdAt" },
+  // Phase 7: the ledger (wallets/{accountId}/ledger) only has `at` (append-only): rolling full only.
+  wallets: { scope: "root", timeField: "updatedAt" },
+  ledger: { scope: "group", timeField: null },
 };
 
 export const BACKUP_COLLECTIONS: readonly BackupCollection[] = (Object.keys(TABLE) as BackedUpId[]).map((id) => ({ id, ...TABLE[id] }));

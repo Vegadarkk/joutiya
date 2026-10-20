@@ -2077,7 +2077,8 @@
       "continueDraftOf": "Reprendre « {title} »",
       "editOf": "Modifier « {title} »",
       "resumeOf": "Remettre en ligne « {title} »",
-      "renewOf": "Renouveler pour 60 jours « {title} »"
+      "renewOf": "Renouveler pour 60 jours « {title} »",
+      "promote": "Mettre en avant"
     },
     "confirm": {
       "deleteTitle": "Supprimer cette annonce ?",
@@ -3035,5 +3036,99 @@
       "title": "{name}, boutique à {city}",
       "description": "{name}, boutique vérifiée à {city} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya."
     }
+  },
+  "Options": {
+    "title": "Mettre en avant « {title} »",
+    "intro": "L'option s'applique dès la commande et se paie avec vos crédits.",
+    "loading": "Chargement des options",
+    "failed": "Les options n'ont pas pu être chargées.",
+    "retry": "Réessayer",
+    "closed": "Les options payantes ne sont pas encore ouvertes sur Joutiya.",
+    "notPromotable": "Cette annonce ne peut pas être mise en avant : elle doit être en ligne et visible.",
+    "choose": "Choisissez une option.",
+    "legend": "Option",
+    "options": {
+      "bump": {
+        "title": "Remontée immédiate",
+        "body": "Votre annonce repasse en tête des résultats, comme si elle venait d'être publiée. La carte porte la mention « Remontée »."
+      },
+      "featured7": {
+        "title": "À la Une pendant 7 jours",
+        "body": "Votre annonce occupe aussi les emplacements À la Une, en tête des résultats et sur l'accueil, avec la mention « À la Une · Sponsorisé »."
+      },
+      "featured30": {
+        "title": "À la Une pendant 30 jours",
+        "body": "Les mêmes emplacements À la Une pendant un mois, avec la mention « À la Une · Sponsorisé »."
+      }
+    },
+    "price": "{count, plural, one {# crédit} other {# crédits}}",
+    "included": "Inclus dans votre offre",
+    "insufficient": "Crédits insuffisants",
+    "featuredRunning": "À la Une jusqu'au {date} : la nouvelle durée s'y ajoute.",
+    "bumpedOn": "Dernière remontée le {date}.",
+    "available": "Crédits disponibles : {count, plural, one {# crédit} other {# crédits}}",
+    "availableDetail": "dont {count, plural, one {# crédit} other {# crédits}} de votre offre, dépensés en premier",
+    "allowanceLeft": "{count, plural, one {# À la Une de 7 jours inclus ce mois-ci} other {# À la Une de 7 jours inclus ce mois-ci}}",
+    "frozen": "Votre porte-monnaie est bloqué après un remboursement. Il se débloque dès que votre solde redevient positif.",
+    "walletLink": "Voir mon porte-monnaie",
+    "consent": {
+      "terms": "J'accepte les CGV et je reconnais avoir pris connaissance de mon droit de rétractation de 14 jours.",
+      "immediate": "Je demande l'exécution immédiate de ma commande et je reconnais que je perdrai mon droit de rétractation une fois le service entièrement exécuté.",
+      "termsLink": "Lire les CGV (nouvel onglet)",
+      "required": "Cochez les deux cases pour commander."
+    },
+    "submit": "Commande avec obligation de paiement",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "success": {
+      "bump": "Annonce remontée en tête des résultats.",
+      "featured": "Annonce À la Une jusqu'au {date}."
+    },
+    "errors": {
+      "sales_closed": "Les options payantes ne sont pas encore ouvertes.",
+      "billing_owner_only": "Seul le titulaire de la boutique peut dépenser ses crédits.",
+      "listing_not_promotable": "Cette annonce n'est plus en ligne : elle ne peut pas être mise en avant.",
+      "bump_too_soon": "Votre annonce est déjà en tête des résultats. Réessayez dans une heure.",
+      "wallet_frozen": "Votre porte-monnaie est bloqué après un remboursement.",
+      "insufficient_credits": "Vos crédits ne suffisent pas pour cette option.",
+      "price_changed": "Le prix de cette option vient de changer. Vérifiez-le, puis commandez à nouveau."
+    },
+    "availableAt": "Disponible à partir de {time} : l'annonce est déjà en tête.",
+    "expiresFirst": "Votre annonce expire le {date}, avant la fin de cet À la Une : renouvelez-la pour en profiter jusqu'au bout."
+  },
+  "Wallet": {
+    "metaTitle": "Porte-monnaie",
+    "title": "Porte-monnaie",
+    "personal": "Vos crédits pour mettre vos annonces en avant.",
+    "shop": "Les crédits de votre boutique, partagés par toutes ses annonces.",
+    "loading": "Chargement du porte-monnaie",
+    "failed": "Le porte-monnaie n'a pas pu être chargé.",
+    "retry": "Réessayer",
+    "unit": "1 crédit = 1 MAD TTC",
+    "balance": "Crédits achetés",
+    "plan": "Crédits de votre offre",
+    "planUntil": "Valables jusqu'au {date}, non cumulables",
+    "planNone": "Aucun crédit d'offre en cours",
+    "allowance": "À la Une inclus",
+    "allowanceHint": "À la Une de 7 jours, ce mois-ci",
+    "spendOrder": "Une option se paie d'abord avec les crédits de votre offre, puis avec vos crédits achetés.",
+    "closed": "Les achats ne sont pas encore ouverts sur Joutiya. Vos crédits apparaîtront ici dès leur ouverture.",
+    "frozen": "Votre porte-monnaie est bloqué après un remboursement : aucune option ne peut être achetée tant que le solde est négatif.",
+    "historyTitle": "Historique",
+    "empty": "Aucun mouvement pour l'instant.",
+    "reasons": {
+      "purchase": "Achat de crédits",
+      "plan_grant": "Crédits de votre offre",
+      "refund": "Remboursement",
+      "refund_reversed": "Remboursement annulé",
+      "admin_adjust": "Ajustement par Joutiya",
+      "option": "Option"
+    },
+    "amount": "{count, plural, one {# crédit} other {# crédits}}",
+    "fromPlan": "dont {count, plural, one {# crédit} other {# crédits}} de votre offre",
+    "fromAllowance": "Payé avec un À la Une inclus",
+    "balanceAfter": "Solde : {count}",
+    "more": "Afficher plus",
+    "available": "Crédits disponibles"
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, MoreHorizontal, Pause, Pencil, Play, RefreshCw, Tag, Trash2 } from "lucide-react";
+import { Eye, MoreHorizontal, Pause, Pencil, Play, RefreshCw, Tag, Trash2, TrendingUp } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { wizardPath } from "@/lib/listings/client/routes";
 import { cn } from "@/lib/utils";
 import { canResume } from "./buckets";
 import { ConfirmDialog } from "@/components/post/controls/confirm-dialog";
+import { PromoteDialog } from "@/components/payments/promote-dialog";
 
 interface ListingActionsProps {
   listing: OwnerListingSummary;
@@ -21,6 +22,8 @@ interface ListingActionsProps {
   busy?: boolean;
   /** Localized path of the public page (published listings). */
   publicHref?: string | null;
+  /** Paid options are on sale (config/flags.salesEnabled): published listings offer "Mettre en avant". */
+  salesOpen?: boolean;
   now?: Date;
 }
 
@@ -40,9 +43,10 @@ export function allowedActions(listing: OwnerListingSummary, now = new Date()): 
   };
 }
 
-export function ListingActions({ listing, onAction, onDelete, busy, publicHref, now }: ListingActionsProps) {
+export function ListingActions({ listing, onAction, onDelete, busy, publicHref, salesOpen = false, now }: ListingActionsProps) {
   const t = useTranslations("MyListings");
   const [confirm, setConfirm] = useState<"delete" | "sold" | null>(null);
+  const [promote, setPromote] = useState(false);
   const [working, setWorking] = useState(false);
   const allowed = allowedActions(listing, now);
   // The seller's title keeps its own direction inside the translated labels.
@@ -85,6 +89,12 @@ export function ListingActions({ listing, onAction, onDelete, busy, publicHref, 
                 </Link>
               </DropdownMenu.Item>
             ) : null}
+            {salesOpen && listing.status === "published" ? (
+              <DropdownMenu.Item className={item} onSelect={() => setPromote(true)}>
+                <TrendingUp aria-hidden="true" />
+                {t("actions.promote")}
+              </DropdownMenu.Item>
+            ) : null}
             {allowed.pause ? (
               <DropdownMenu.Item className={item} onSelect={() => void run(() => onAction("pause"))}>
                 <Pause aria-hidden="true" />
@@ -121,6 +131,7 @@ export function ListingActions({ listing, onAction, onDelete, busy, publicHref, 
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
+      {salesOpen && promote ? <PromoteDialog listingId={listing.id} title={listing.title || t("untitled")} onClose={() => setPromote(false)} /> : null}
       <ConfirmDialog
         open={confirm === "delete"}
         onOpenChange={(open) => !open && setConfirm(null)}
