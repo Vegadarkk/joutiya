@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const getLegalConfig = vi.hoisted(() => vi.fn(async () => ({ companyName: "Société Test" })));
 vi.mock("@/lib/legal/config", () => ({ getLegalConfig }));
-vi.mock("@/lib/fonts", () => ({ readex: { variable: "font-readex" }, tarifitFallback: { variable: "font-tarifit" } }));
+vi.mock("@/lib/fonts", () => ({ readex: { variable: "font-readex" }, tarifitFallback: { variable: "font-tarifit" }, ruqaa: { variable: "font-ruqaa" } }));
 vi.mock("@/components/layout/providers", () => ({ Providers: ({ children }: { children: ReactNode }) => children }));
 vi.mock("@/components/layout/site-header", () => ({ SiteHeader: () => <header /> }));
 vi.mock("@/components/legal/footer", () => ({ Footer: ({ publisher }: { publisher: string }) => <footer data-publisher={publisher} /> }));
