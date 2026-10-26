@@ -466,7 +466,7 @@
       "listing_daily_limit": "Vous avez atteint le nombre d'annonces que vous pouvez déposer aujourd'hui. Réessayez demain.",
       "photo_limit": "Le nombre maximal de photos pour cette annonce est atteint.",
       "file_too_large": "Cette photo dépasse la taille maximale autorisée (10 Mo).",
-      "unsupported_media": "Ce format d'image n'est pas pris en charge. Utilisez une photo JPEG, WebP ou PNG.",
+      "unsupported_media": "Ce format d'image n'est pas pris en charge. Utilisez une photo JPEG, PNG, WebP ou HEIC.",
       "storage_full": "L'envoi de photos est momentanément suspendu. Votre brouillon est conservé : réessayez dans une heure.",
       "upload_not_ready": "Une photo est encore en cours de traitement. Patientez quelques secondes, puis réessayez.",
       "phone_required": "Vérifiez votre numéro de téléphone pour afficher ce moyen de contact.",
