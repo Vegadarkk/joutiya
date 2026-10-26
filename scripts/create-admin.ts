@@ -144,6 +144,8 @@ export interface PlanInput {
 export function planSteps({ args, projectId, origin, emulated }: PlanInput): string[] {
   return [
     `Project ${projectId} (${emulated ? "Auth emulator" : "Application Default Credentials"}), admin origin ${origin}`,
+    // Firebase refuses the link's continue URL otherwise ("Domain not allowlisted by project").
+    ...(emulated ? [] : [`Prerequisite: ${new URL(origin).hostname} in the project's Authentication > Settings > Authorized domains (docs/phase-2.md, step 2)`]),
     `1. Auth account ${args.email}: reuse it if it is already staff (claims or staff/<uid>), refuse any other existing account, else create it verified with the name "${args.name}"`,
     `2. staff/<uid> = { email, displayName, role: "admin", invitedBy: "script", createdAt } (before the claims)`,
     `3. Custom claims { role: "admin", v: 2 }, refresh tokens revoked`,
