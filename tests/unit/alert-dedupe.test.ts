@@ -69,3 +69,18 @@ describe("alert dedupe", () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("alert delivery log", () => {
+  it("logs each channel as sent or failed, so a silent channel shows in the logs", async () => {
+    const { logger } = await import("@/lib/logging/logger");
+    vi.mocked(logger.info).mockClear();
+    vi.mocked(logger.error).mockClear();
+    const broken = vi.fn(async () => {
+      throw new Error("down");
+    });
+    setAlertChannels([{ name: "telegram", send }, { name: "relay", send: broken }]);
+    expect(await alert(event("Signalement P0"))).toBe(true);
+    expect(logger.info).toHaveBeenCalledWith({ channel: "telegram", alert: { severity: "P1" } }, "alert channel sent");
+    expect(logger.error).toHaveBeenCalledWith({ channel: "relay", err: "Error: down" }, "alert channel failed");
+  });
+});

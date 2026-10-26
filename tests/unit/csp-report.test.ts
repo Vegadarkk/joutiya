@@ -45,7 +45,28 @@ describe("POST /api/csp-report", () => {
     const report = JSON.stringify({ "csp-report": { "effective-directive": "script-src", "blocked-uri": "https://evil.example/x.js", "document-uri": "https://joutiya.ma/fr" } });
     expect((await post(report)).status).toBe(204);
     expect(logger.warn).toHaveBeenCalledWith(
-      { csp: { directive: "script-src", blocked: "/x.js", page: "/fr", disposition: undefined } },
+      { csp: { directive: "script-src", blocked: "https://evil.example/x.js", source: undefined, line: undefined, page: "/fr", disposition: undefined } },
+      "csp violation",
+    );
+  });
+
+  it("keeps where a Reporting API violation came from, never the query", async () => {
+    const report = JSON.stringify([
+      {
+        type: "csp-violation",
+        body: {
+          effectiveDirective: "script-src",
+          blockedURL: "eval",
+          sourceFile: "chrome-extension://abcdef/content.js?token=secret",
+          lineNumber: 12,
+          documentURL: "https://joutiya.ma/fr/annonce/x?q=1",
+          disposition: "report",
+        },
+      },
+    ]);
+    expect((await post(report)).status).toBe(204);
+    expect(logger.warn).toHaveBeenCalledWith(
+      { csp: { directive: "script-src", blocked: "eval", source: "chrome-extension://abcdef/content.js", line: 12, page: "/fr/annonce/x", disposition: "report" } },
       "csp violation",
     );
   });
