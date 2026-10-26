@@ -44,6 +44,13 @@ describe("create-admin", () => {
     expect(lines.findIndex((line) => line.startsWith("2. staff/<uid>"))).toBeLessThan(lines.findIndex((line) => line.startsWith("3. Custom claims")));
   });
 
+  it("reminds that the admin host must be an authorized domain, except against the emulator", () => {
+    const deployed = planSteps({ args: { email: "a@b.co", name: "Ab", apply: false }, projectId: "joutiya-staging", origin: "https://admin-staging.joutiya.ma", emulated: false });
+    expect(deployed.join("\n")).toContain("Prerequisite: admin-staging.joutiya.ma in the project's Authentication > Settings > Authorized domains");
+    const emulated = planSteps({ args: { email: "a@b.co", name: "Ab", apply: false }, projectId: "joutiya-dev", origin: "http://admin.localhost:3000", emulated: true });
+    expect(emulated.join("\n")).not.toContain("Prerequisite");
+  });
+
   it("checks FIREBASE_PROJECT_ID against infra/targets.json for APP_ENV", () => {
     // A demo project passes in dev only (the emulators never reach Google for it).
     expect(projectErrors(targets, { APP_ENV: "dev", FIREBASE_PROJECT_ID: "demo-joutiya" })).toEqual([]);
