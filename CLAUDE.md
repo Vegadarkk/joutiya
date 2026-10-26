@@ -93,9 +93,13 @@ subscriptions, Google Ads slots, moderation).
   pins only `model: opus` (Opus 5.5). Ultracode and effort live in the owner's own
   Cody config, never in committed settings: cloud threads (Sonnet research and
   triage included) share this checkout and would inherit them.
-- Code, debug and graphic design work (logo, UI, visual identity) must run on
-  Opus 5.5 with ultracode on. If the session runs another model or ultracode is
-  off, remind the owner in French (one line) at the start of the task, then continue.
+- Code, debug and graphic design work (logo, UI, visual identity) run on Opus 5.5 at
+  effort high (owner, 2026-10-26). If the session runs another model or a lower
+  effort, remind the owner in French (one line) at the start of the task, then
+  continue. Do not ask for ultracode.
+- Fable 5.1 is for precise points only (an audit, a hard architecture, security or
+  debugging question), never routine work: suggest it to the owner in one French line
+  with the reason; the owner switches the model, never Claude.
 - Search, triage and research go to subagents / workflow agents on Sonnet (Haiku for
   trivial lookups). Keep Opus for code, debug, design and verification.
 - Never launch a workflow without `ultracode` on, the `ultracode` keyword, or
