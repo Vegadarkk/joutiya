@@ -4,6 +4,7 @@
 // the style needs neither glyphs nor sprites (no external origin for the CSP).
 
 import { layers, namedFlavor } from "@protomaps/basemaps";
+import { version as maplibreVersion } from "maplibre-gl/package.json";
 import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from "maplibre-gl";
 import { metersPerPixel } from "./projection";
 import { REGIONS_GEOJSON } from "./regions-geojson";
@@ -21,8 +22,9 @@ export const MAP_ZOOM = { min: 5, max: 12.4, listing: 12 } as const;
 /** Radius of the approximate area shown around the (already offset) position, metres. */
 export const APPROX_RADIUS_METERS = 600;
 
-/** Worker file copied by scripts/copy-vendor.mjs into public/vendor (CSP: worker-src 'self'). */
-export const MAPLIBRE_VERSION = "6.14.0";
+/** Worker file copied by scripts/copy-vendor.mjs into public/vendor (CSP: worker-src 'self'); the version is
+ * read from the installed package, so a MapLibre bump never needs a second edit here. */
+export const MAPLIBRE_VERSION: string = maplibreVersion;
 export const MAPLIBRE_WORKER_URL = `/vendor/maplibre-gl-${MAPLIBRE_VERSION}-worker.mjs`;
 
 /** Plain-text attribution, identical to publicConfig.map.attribution (src/lib/config/public.ts). */
