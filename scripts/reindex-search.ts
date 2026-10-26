@@ -97,7 +97,7 @@ export async function reindex(args: ReindexArgs, deps: ReindexDeps): Promise<Rei
     deps.log("Dry run: nothing written. Add --apply to rebuild.");
     return report;
   }
-  if (planned > args.maxReads) throw new Error(`the rebuild may read ${planned} documents, over --max-reads ${args.maxReads}`);
+  if (planned > args.maxReads) throw new Error(`the rebuild may read ${planned} documents (published + 1 + ${CATCH_UP_MAX} catch-up), over --max-reads ${args.maxReads}: rerun with --max-reads ${planned} or more`);
   if (await deps.readsDegraded()) throw new Error("the Firestore read quota is degraded: try after its reset");
 
   const start = deps.now();
