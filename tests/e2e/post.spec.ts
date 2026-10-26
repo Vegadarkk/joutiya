@@ -212,6 +212,50 @@ test.describe("posting wizard", () => {
     expect(Math.max(meta.width ?? 0, meta.height ?? 0)).toBeLessThanOrEqual(2048);
   });
 
+  test("an adults-only listing (decorative koumiya) is messaging only, needs the seller's attestation and waits for a moderator", async ({ page, request }) => {
+    const id = runId();
+    await signUpAndIn(page, request, `e2e-post-koumiya-${id}@test.joutiya.ma`);
+    await verifyPhone(page, request);
+
+    await page.goto("/fr/deposer");
+    await page.getByRole("radio", { name: "Maison & Jardin" }).click();
+    await page.getByRole("radio", { name: "Koumiyas & poignards décoratifs" }).click();
+    await expect(page).toHaveURL(/\/fr\/deposer\/[a-z0-9]+\/criteres$/);
+    const listingId = new URL(page.url()).pathname.split("/")[3]!;
+    await page.getByRole("radiogroup", { name: /État/ }).getByRole("radio", { name: "Très bon état" }).click();
+    await next(page);
+    await page.getByRole("textbox", { name: /Titre de l'annonce/ }).fill(`Koumiya décorative en cuivre ${id}`);
+    await next(page);
+    await page.getByRole("textbox", { name: /^Description/ }).fill(`Koumiya de décoration ${id} faite à la main par un artisan de Fès, fourreau en cuivre ciselé, à accrocher au mur.`);
+    await next(page);
+    await page.locator('input[type="file"][multiple]').setInputFiles({ name: "koumiya.jpg", mimeType: "image/jpeg", buffer: await photoWithExif() });
+    await expect(page.getByText("Couverture", { exact: true })).toBeVisible({ timeout: 60_000 });
+    await next(page);
+    await page.getByRole("textbox", { name: /^Prix/ }).fill("1200");
+    await next(page);
+    await page.getByRole("combobox", { name: /Ville/ }).fill("Casab");
+    await page.getByRole("option", { name: "Casablanca", exact: true }).click();
+    await next(page);
+
+    // 8. Contact: messaging only here, even with the verified badge.
+    await expect(page).toHaveURL(/\/contact$/);
+    await expect(page.getByText(/uniquement par la messagerie Joutiya/)).toBeVisible();
+    await expect(page.getByRole("switch", { name: /Afficher mon numéro sur l'annonce/ })).toBeDisabled();
+    await next(page);
+
+    // 9. Review: the attestation is required besides the rules.
+    await expect(page).toHaveURL(/\/apercu$/);
+    await page.getByRole("checkbox", { name: /conditions générales d'utilisation/ }).check();
+    await page.getByRole("button", { name: "Publier l'annonce" }).click();
+    await expect(page.getByText("Confirmez qu'il s'agit d'un objet décoratif d'artisanat vendu uniquement à une personne majeure.")).toBeVisible();
+    await page.getByRole("checkbox", { name: /objet décoratif d'artisanat/ }).check();
+    const published = page.waitForResponse((response) => response.url().endsWith(`/api/listings/${listingId}/publish`) && response.request().method() === "POST");
+    await page.getByRole("button", { name: "Publier l'annonce" }).click();
+    const answer = (await (await published).json()) as { status: string; flags: string[] };
+    expect(answer).toMatchObject({ status: "pending_review", flags: expect.arrayContaining(["restricted_category"]) });
+    await expect(page.getByRole("heading", { level: 1, name: "Votre annonce est en cours de vérification" })).toBeVisible();
+  });
+
   test("an unknown step is a 404", async ({ page, request }) => {
     const id = runId();
     await signUpAndIn(page, request, `e2e-post-404-${id}@test.joutiya.ma`);

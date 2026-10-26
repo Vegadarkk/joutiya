@@ -487,7 +487,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
   },
 
   "objets-interdits": {
-    updated: "2026-10-20",
+    updated: "2026-10-26",
     intro:
       "Ces biens, services et contenus ne peuvent pas être proposés sur Joutiya, même depuis un compte Pro. La plupart sont interdits par la loi marocaine, ou réservés par elle à des professionnels agréés dont Joutiya ne peut pas vérifier l'agrément ; les autres sont exclus par choix de Joutiya, plus stricte que la loi, pour protéger les acheteurs contre un danger ou une fraude. Une annonce qui en contient est refusée ou retirée. Cette liste n'est pas exhaustive : tout bien ou service dont la vente est interdite par la loi marocaine est exclu, ainsi que tout bien ou service que la loi réserve à des professionnels agréés lorsqu'il est proposé par une personne qui ne détient pas l'agrément requis.",
     sections: [
@@ -499,7 +499,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
             list: [
               "armes à feu, armes à air comprimé et pistolets d'alarme, leurs pièces et leurs munitions ;",
               "explosifs, pétards et feux d'artifice ;",
-              "armes de combat : poignards, couteaux papillon, matraques, poings américains, pistolets à impulsion électrique, bombes lacrymogènes (les couteaux de cuisine, de chasse ou de pêche restent autorisés) ;",
+              "armes de combat : poignards, couteaux papillon, matraques, poings américains, pistolets à impulsion électrique, bombes lacrymogènes (les couteaux de cuisine, de chasse ou de pêche restent autorisés ; les koumiyas et poignards décoratifs d'artisanat sont autorisés uniquement dans la catégorie « Koumiyas & poignards décoratifs », réservée aux personnes majeures : chaque annonce y est vérifiée par un modérateur avant sa mise en ligne, et un couteau ou un poignard de combat présenté comme décoratif reste interdit) ;",
               "répliques d'armes qui peuvent être confondues avec de vraies armes ;",
               "pesticides et produits phytosanitaires, dont la vente est réservée aux distributeurs agréés.",
             ],

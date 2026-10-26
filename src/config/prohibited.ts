@@ -41,7 +41,9 @@ export const PROHIBITED_GROUPS: readonly ProhibitedGroup[] = [
       "بندقية", "كلاشينكوف", "كلاشنكوف", "متفجرات", "سلاح ناري", "مسدس حقيقي",
     ],
     // Traps: مكحلة / mkohla (also a kohl pot), مسدس (also hexagonal), رشاش (also a sprinkler), grenade (fruit).
-    soft: ["arme", "pistolet", "fusil", "airsoft", "sabre", "epee", "machette", "poignard", "cran d'arret", "grenade", "beretta", "lacrymogene", "ferdi", "mkohla", "mkahla", "سلاح", "مسدس", "رشاش", "مكحلة", "قنبلة", "ذخيرة"],
+    // Koumiya / khanjar: allowed as decorative craft in their adults-only subcategory, which is
+    // reviewed anyway; elsewhere a moderator moves or refuses the listing. Not كمية ("quantity").
+    soft: ["arme", "pistolet", "fusil", "airsoft", "sabre", "epee", "machette", "poignard", "cran d'arret", "grenade", "beretta", "lacrymogene", "ferdi", "mkohla", "mkahla", "koumiya", "koumia", "koumya", "khanjar", "khenjar", "سلاح", "مسدس", "رشاش", "مكحلة", "قنبلة", "ذخيرة", "خنجر"],
   },
   {
     id: "drugs",

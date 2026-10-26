@@ -122,7 +122,7 @@ export async function handleThread(request: Request, params: Params): Promise<Re
   return json(body);
 }
 
-/** POST /api/conversations {listingId, text, turnstileToken} -> 201 StartConversationResponse. */
+/** POST /api/conversations {listingId, text, turnstileToken, adultConfirmed?} -> 201 StartConversationResponse. */
 export async function handleStart(request: Request): Promise<Response> {
   const auth = await requireUser(request, { mutation: true, checkRevoked: true });
   const input = await readJson(request, startConversationSchema, MESSAGE_BODY_MAX);
@@ -132,7 +132,7 @@ export async function handleStart(request: Request): Promise<Response> {
   const identity = requestIdentity(request.headers);
   const check = await verifyTurnstile(input.turnstileToken, { action: "message", remoteIp: identity.ip, hostname: new URL(serverEnv().SITE_URL).hostname });
   if (!check.ok) throw new HttpError(403, "turnstile_failed", undefined, { details: { codes: check.codes } });
-  const body: StartConversationResponse = await startConversation(actorOf(auth), { listingId: input.listingId, text: input.text });
+  const body: StartConversationResponse = await startConversation(actorOf(auth), { listingId: input.listingId, text: input.text, adultConfirmed: input.adultConfirmed === true });
   return json(body, { status: 201 });
 }
 

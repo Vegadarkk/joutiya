@@ -38,6 +38,7 @@ export const MODERATION_FLAGS = [
   "dup_photo",
   "new_account",
   "volume",
+  "restricted_category",
 ] as const;
 export type ModerationFlag = (typeof MODERATION_FLAGS)[number];
 
@@ -145,6 +146,8 @@ export const publishListingSchema = z
     /** Required when the IP limit escalates (`listing.create.ip`). */
     turnstileToken: turnstileTokenSchema.optional(),
     acceptRules: z.literal(true),
+    /** Adults-only subcategory: the seller attests a decorative craft object sold to adults only. */
+    adultsOnlyAttestation: z.literal(true).optional(),
   })
   .strict();
 export type PublishListingInput = z.infer<typeof publishListingSchema>;

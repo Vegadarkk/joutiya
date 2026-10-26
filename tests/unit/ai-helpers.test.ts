@@ -156,6 +156,11 @@ describe("planApplication (D20)", () => {
     expect(plan("anthropic", out({}), { ...held, flags: ["new_account", "volume"] }, relaxed)).toBe("record");
   });
 
+  it("never approves alone an adults-only listing, whatever autoApproveSoftFlags says", () => {
+    const relaxed = { ...DEFAULT_AI, agent: { ...DEFAULT_AI.agent, autoApproveSoftFlags: ["restricted_category"] } };
+    expect(plan("anthropic", out({ confidence: 1 }), { ...held, flags: ["restricted_category"] }, relaxed)).toBe("record");
+  });
+
   it("rejects a held listing only as obvious spam from Claude (>= 0.97)", () => {
     expect(plan("anthropic", out({ action: "reject", policy: "spam", confidence: 0.98 }))).toBe("auto_reject_spam");
     expect(plan("anthropic", out({ action: "reject", policy: "spam", confidence: 0.96 }))).toBe("record");

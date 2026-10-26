@@ -1,7 +1,7 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
-import { CalendarDays, MapPin } from "lucide-react";
+import { CalendarDays, MapPin, ShieldAlert } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { Container } from "@/components/layout/container";
@@ -183,6 +183,14 @@ export default async function ListingPage({ params }: { params: Params }) {
               {listing.title}
             </h1>
             <PriceTag price={listing.price} isDonation={listing.isDonation} negotiable={listing.priceNegotiable} unit={subcategory?.priceUnit} locale={locale} size="lg" />
+            {subcategory?.adultsOnly ? (
+              <p data-testid="adults-only-notice" className="flex items-start gap-2 self-start rounded-md border border-warning/30 bg-warning-surface px-3 py-2 text-sm text-foreground text-pretty">
+                <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+                <span>
+                  <strong className="font-semibold">{t("adultsOnly.title")}</strong> {t("adultsOnly.body")}
+                </span>
+              </p>
+            ) : null}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-foreground-muted">
               {place ? (
                 <span className="inline-flex items-center gap-1.5">
@@ -210,6 +218,7 @@ export default async function ListingPage({ params }: { params: Params }) {
                     listingTitle={listing.title}
                     showPhone={listing.contact.showPhone}
                     whatsapp={listing.contact.whatsapp}
+                    adultsOnly={Boolean(subcategory?.adultsOnly)}
                   />
                 ) : null}
               </SellerCard>

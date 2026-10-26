@@ -131,6 +131,22 @@ describe("POST /api/conversations", () => {
     expect((await start(buyer, { listingId, text: "Salam", turnstileToken: "ok" })).status).toBe(201);
   });
 
+  it("asks the buyer's 18+ confirmation on the first message about an adults-only listing, and keeps it", async () => {
+    const [buyer, seller] = await Promise.all([member({ displayName: "Karim Acheteur" }), member({ displayName: "Hassan Artisan" })]);
+    const { id } = await seedListing(seller, { categoryId: "maison-jardin", subcategoryId: "koumiyas-decoratives", attributes: { material: "cuivre" }, title: "Koumiya décorative en cuivre" });
+    expectError(await start(buyer, { listingId: id, text: "Salam, toujours dispo ?", turnstileToken: "ok" }), 422, "adult_confirmation_required");
+    expectError(await start(buyer, { listingId: id, text: "Salam", turnstileToken: "ok", adultConfirmed: false }), 400, "invalid_body");
+    const created = await start(buyer, { listingId: id, text: "Salam, toujours dispo ?", turnstileToken: "ok", adultConfirmed: true });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    expect((await conversationDoc(created.body.cid)).buyerAdultConfirmedAt).toBeDefined();
+    // Asked once: the next first-message call appends to the conversation.
+    expect((await start(buyer, { listingId: id, text: "Encore moi", turnstileToken: "ok" })).status).toBe(201);
+    // Other listings neither need nor record it.
+    const { buyer: other, listingId } = await pair();
+    const plain = await startOk(other, listingId);
+    expect((await conversationDoc(plain.cid)).buyerAdultConfirmedAt).toBeUndefined();
+  });
+
   it("refuses suspended accounts and staff accounts", async () => {
     const { buyer, listingId } = await pair();
     await withClaims(buyer, { role: "individual", st: "suspended" });

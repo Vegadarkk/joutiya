@@ -65,8 +65,9 @@ export const HELP_RIF: HelpLocaleContent = {
         "Brouillon nnec yettwaḥraz mala tettaruḍ. Tzemmreḍ ad teḥrezeḍ ar {maxDrafts} n brouillons; brouillon war yettwabeddel {draftPurgeDays} n wussan ad yettwakkes.",
         "S umata, annonce ad tban nican. Kra n annonces ad tent-iɣar umsefrez zzat n usuffeɣ, s umata deg 24 n tsaɛtin.",
         "Annonce ad teqqim {ttlDays} n wussan. Tiɣawsiwin yettwagedlen deg Joutiya ad tent-tafeḍ deg tasna « Objets interdits ».",
+        "Koumiyas d ijenwiyen n tẓeyyent ad ten-tessufɣeḍ ɣas deg taggayt « Koumiyas & poignards décoratifs », i imeqqranen kan (18 n iseggusa d uqqaren): ad tsentmeḍ belli d tɣawsa n tẓeyyent, amsefrez ad iɣar kul annonce zzat n usuffeɣ, d amsawal s tebratin kan.",
       ],
-      keywords: ["annonce", "ssuffeɣ", "zzenz", "brouillon", "publier"],
+      keywords: ["annonce", "ssuffeɣ", "zzenz", "brouillon", "publier", "koumiya"],
     },
     "photos-d-une-annonce": {
       title: "Tiwlafin n annonce",
@@ -133,6 +134,7 @@ export const HELP_RIF: HelpLocaleContent = {
             "Aḍris kan, ar {messageMax} n yisekkilen.",
             "Isuɣan war ttawḍen: ad d-banen ffren.",
             "Ad d-yban usmekti mala tabrat tessiwel x udfaɛ zzat niɣ x RIB.",
+            "Annonce i imeqqranen kan (koumiyas): ad tsentmeḍ belli tesɛiḍ 18 n iseggusa niɣ uqqaren zzat n tebrat tamezwarut.",
           ],
         },
         "E-mail nnec werǧin ad yban: isem nnec kan.",
