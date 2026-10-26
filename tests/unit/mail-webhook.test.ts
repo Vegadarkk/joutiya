@@ -2,7 +2,11 @@ import { createHmac, randomBytes } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { handleMailEvent, svixHeaders, verifySvix, type SuppressionStore } from "@/lib/mail/webhook";
 
-vi.mock("@/lib/mail/suppressions", () => ({ addSuppression: vi.fn() }));
+vi.mock("@/lib/mail/suppressions", () => ({ addSuppression: vi.fn(async () => undefined) }));
+vi.mock("@/lib/quota", () => ({ consume: vi.fn(async () => ({ level: "ok" })) }));
+
+const { addSuppression } = await import("@/lib/mail/suppressions");
+const { consume } = await import("@/lib/quota");
 
 const rawKey = randomBytes(24);
 const SECRET = `whsec_${rawKey.toString("base64")}`;
@@ -76,30 +80,39 @@ describe("verifySvix", () => {
 });
 
 describe("handleMailEvent", () => {
-  const store = (): SuppressionStore & { addSuppression: ReturnType<typeof vi.fn> } => ({ addSuppression: vi.fn(async () => undefined) });
+  const store = (): SuppressionStore & { addSuppression: ReturnType<typeof vi.fn>; countEvent: ReturnType<typeof vi.fn> } => ({
+    addSuppression: vi.fn(async () => undefined),
+    countEvent: vi.fn(async () => undefined),
+  });
 
-  it("suppresses every recipient of a permanent bounce", async () => {
+  it("counts and suppresses every recipient of a permanent bounce", async () => {
     const s = store();
     const outcome = await handleMailEvent(bounce("Permanent", ["a@example.com", "b@example.com"]), s);
     expect(outcome).toEqual({ handled: "bounce", recipients: 2 });
+    expect(s.countEvent).toHaveBeenCalledTimes(1);
+    expect(s.countEvent).toHaveBeenCalledWith("bounce", 2);
     expect(s.addSuppression).toHaveBeenCalledTimes(2);
     expect(s.addSuppression).toHaveBeenCalledWith("a@example.com", "bounce", "resend");
     expect(s.addSuppression).toHaveBeenCalledWith("b@example.com", "bounce", "resend");
+    // Counted before the writes: a failing suppression store does not hide the incident.
+    expect(s.countEvent.mock.invocationCallOrder[0]).toBeLessThan(s.addSuppression.mock.invocationCallOrder[0] ?? 0);
   });
 
-  it("ignores soft bounces whatever their spelling", async () => {
+  it("ignores soft bounces whatever their spelling, counting nothing", async () => {
     for (const type of ["Transient", "Temporary", "Undetermined", ""]) {
       const s = store();
       expect(await handleMailEvent(bounce(type), s)).toEqual({ handled: "ignored", reason: "soft_bounce" });
       expect(s.addSuppression).not.toHaveBeenCalled();
+      expect(s.countEvent).not.toHaveBeenCalled();
     }
     expect((await handleMailEvent(bounce("permanent"), store())).handled).toBe("bounce");
   });
 
-  it("suppresses complaints and accepts a string recipient", async () => {
+  it("counts and suppresses complaints and accepts a string recipient", async () => {
     const s = store();
     const raw = JSON.stringify({ type: "email.complained", created_at: "x", data: { email_id: "1", to: "nadia@example.com", tags: {} } });
     expect(await handleMailEvent(raw, s)).toEqual({ handled: "complaint", recipients: 1 });
+    expect(s.countEvent).toHaveBeenCalledWith("complaint", 1);
     expect(s.addSuppression).toHaveBeenCalledWith("nadia@example.com", "complaint", "resend");
   });
 
@@ -110,5 +123,21 @@ describe("handleMailEvent", () => {
     expect(await handleMailEvent(JSON.stringify({ data: {} }), s)).toEqual({ handled: "ignored", reason: "invalid_event" });
     expect(await handleMailEvent(JSON.stringify({ type: "email.bounced", data: { to: ["not-an-address"], bounce: { type: "Permanent" } } }), s)).toEqual({ handled: "ignored", reason: "invalid_event" });
     expect(s.addSuppression).not.toHaveBeenCalled();
+    expect(s.countEvent).not.toHaveBeenCalled();
+  });
+
+  it("feeds the resend.bounces and resend.complaints day counters by default, one per recipient (B3-06)", async () => {
+    vi.mocked(consume).mockClear();
+    vi.mocked(addSuppression).mockClear();
+    expect(await handleMailEvent(bounce("Permanent", ["a@example.com", "b@example.com"]))).toEqual({ handled: "bounce", recipients: 2 });
+    expect(consume).toHaveBeenCalledTimes(1);
+    expect(consume).toHaveBeenCalledWith("resend.bounces", 2);
+    expect(addSuppression).toHaveBeenCalledTimes(2);
+    const complaint = JSON.stringify({ type: "email.complained", created_at: "x", data: { email_id: "1", to: "nadia@example.com", tags: {} } });
+    expect(await handleMailEvent(complaint)).toEqual({ handled: "complaint", recipients: 1 });
+    expect(consume).toHaveBeenCalledWith("resend.complaints", 1);
+    // An event without recipients counts nothing.
+    expect(await handleMailEvent(JSON.stringify({ type: "email.complained", data: {} }))).toEqual({ handled: "complaint", recipients: 0 });
+    expect(consume).toHaveBeenCalledTimes(2);
   });
 });

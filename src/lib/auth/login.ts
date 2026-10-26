@@ -29,6 +29,11 @@ export interface LoginKeys {
   accountIp: string;
 }
 
+/** Outcome of countAttempt: how many attempts the account + IP still has after this one. */
+export interface LoginAttempt {
+  remaining: number;
+}
+
 export function loginKeys(email: string, ipBucket: string): LoginKeys {
   const account = emailNormHash(email);
   return { account, accountIp: `${account}:${ipBucket}` };
@@ -49,24 +54,37 @@ export async function assertNotLocked(keys: LoginKeys): Promise<{ failures: numb
 }
 
 /**
- * Counts a failed password check for the account and the account + IP. The failure that exhausts
- * the allowance starts the lock for the full blockDuration from now (not for what is left of the
- * window opened by the first failure, which is all a plain counter would give).
+ * Counts the attempt on the account + IP before the password is looked at, atomically: a burst of
+ * parallel attempts past the allowance is refused here (429), where a read-then-count would have
+ * let every one of them reach Firebase Auth. A right password forgets the counter (resetLimit).
  */
-export async function recordFailure(keys: LoginKeys): Promise<void> {
-  const [accountIp] = await Promise.all([consumeLimit("login.fail.accountIp", keys.accountIp), consumeLimit("login.fail.account", keys.account)]);
-  if (accountIp.ok && accountIp.remaining === 0) await blockLimit("login.fail.accountIp", keys.accountIp);
+export async function countAttempt(keys: LoginKeys): Promise<LoginAttempt> {
+  const outcome = await consumeLimit("login.fail.accountIp", keys.accountIp);
+  if (outcome.ok) return { remaining: outcome.remaining };
+  if (outcome.reason === "limited") throw new HttpError(429, "account_locked", undefined, { headers: { "Retry-After": String(Math.max(1, outcome.retryAfterSeconds)) } });
+  throw unavailable("rate limiter unavailable");
+}
+
+/**
+ * Counts a failed password check on the account (20 per hour: Turnstile mandatory). The attempt
+ * that exhausted the account + IP allowance starts the lock for the full blockDuration from now
+ * (not for what is left of the window opened by the first failure, which is all a plain counter
+ * would give).
+ */
+export async function recordFailure(keys: LoginKeys, attempt: LoginAttempt): Promise<void> {
+  await consumeLimit("login.fail.account", keys.account);
+  if (attempt.remaining === 0) await blockLimit("login.fail.accountIp", keys.accountIp);
 }
 
 /** Password check through Identity Toolkit; a bad credential counts as a failure (401), a disabled account is 403. */
-export async function checkPassword(email: string, password: string, keys: LoginKeys): Promise<{ localId: string; idToken: string }> {
+export async function checkPassword(email: string, password: string, keys: LoginKeys, attempt: LoginAttempt): Promise<{ localId: string; idToken: string }> {
   try {
     return await signInWithPassword(email, password);
   } catch (error) {
     const failure = classifySignInError(error);
     if (failure === null) throw error;
     if (failure === "invalid") {
-      await recordFailure(keys);
+      await recordFailure(keys, attempt);
       throw new HttpError(401, "invalid_credentials");
     }
     if (failure === "disabled") throw new HttpError(403, "account_disabled");
@@ -95,7 +113,11 @@ async function login(request: Request): Promise<Response> {
     await checkTurnstile(flow, input.turnstileToken, "login");
   }
 
-  const result = await checkPassword(input.email, input.password, keys);
+  // Counted before the check (atomic), forgotten as soon as the password is right: a pending,
+  // disabled or staff account answered below is not a failed attempt.
+  const attempt = await countAttempt(keys);
+  const result = await checkPassword(input.email, input.password, keys, attempt);
+  await resetLimit("login.fail.accountIp", keys.accountIp);
   const record = await auth().getUser(result.localId);
   if (record.disabled) throw new HttpError(403, "account_disabled");
   const claims = readClaims(record.customClaims ?? {});
@@ -111,8 +133,7 @@ async function login(request: Request): Promise<Response> {
     if (!(await activateMember(record.uid, claims))) return respond<LoginResponse>(flow, { status: "verification_required" });
     minted = await createSessionForUid(record.uid);
   }
-  await resetLimit("login.fail.accountIp", keys.accountIp);
-  await logConnection({ uid: record.uid, event: "login", ip: flow.identity.ip, userAgent: flow.userAgent });
+  await logConnection({ uid: record.uid, event: "login", ip: flow.identity.ip });
   const body: LoginResponse = { status: "signed_in", session: await sessionSummary(minted.user) };
   return finish(flow, signedIn(minted, body));
 }

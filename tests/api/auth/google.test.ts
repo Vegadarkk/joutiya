@@ -5,6 +5,8 @@ import { auth } from "@/lib/firebase/admin";
 import { setClaims } from "@/lib/firebase/claims";
 import { signInWithCustomToken } from "@/lib/firebase/rest";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
+import { DEVICE_COOKIE } from "@/lib/security/cookies";
+import { gisNonce, newDeviceCookie } from "@/lib/security/device";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 import { POST as google } from "@/app/api/auth/google/route";
@@ -12,7 +14,7 @@ import { POST as login } from "@/app/api/auth/login/route";
 import { GET as me } from "@/app/api/auth/me/route";
 import { POST as session } from "@/app/api/auth/session/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
-import { CONSENTS, Jar, PASSWORD, call, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
+import { CONSENTS, Jar as BaseJar, PASSWORD, call, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
@@ -21,17 +23,30 @@ vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
 }));
 
 const GOOGLE = "/api/auth/google";
-/** The nonce the page would have generated for GIS; the token must carry the same one. */
-const NONCE = "page-nonce-0123456789abcdef";
 
-/** The test verifier reads the identity from the credential itself (no Google keys in tests). */
-function credential(identity: Partial<GoogleIdentity> & { email: string }): string {
-  return JSON.stringify({ sub: `g-${identity.email}`, emailVerified: true, name: "Nadia Google", nonce: NONCE, ...identity });
+/**
+ * The device of this file's requests. The proxy sets __Host-did on the auth pages before any API
+ * call, and the page hands GIS a nonce derived from it: a Jar starts with that cookie and the
+ * credentials carry that nonce, so a token is accepted only from the device it was minted on.
+ * Limits reset before each test, within which this device's sign-up limit (3 a day) is shared.
+ */
+const DEVICE = newDeviceCookie();
+
+class Jar extends BaseJar {
+  constructor(ip?: string, device = DEVICE) {
+    super(ip);
+    this.cookies.set(DEVICE_COOKIE, device.value);
+  }
 }
 
-/** Request body of a Google call: the credential and the page nonce, plus the sign-up fields. */
-function body(identity: Partial<GoogleIdentity> & { email: string }, extra: Record<string, unknown> = {}): Record<string, unknown> {
-  return { credential: credential(identity), nonce: NONCE, ...extra };
+/** The test verifier reads the identity from the credential itself (no Google keys in tests). */
+function credential(identity: Partial<GoogleIdentity> & { email: string }, device = DEVICE): string {
+  return JSON.stringify({ sub: `g-${identity.email}`, emailVerified: true, name: "Nadia Google", nonce: gisNonce(device.id), ...identity });
+}
+
+/** Request body of a Google call: a credential minted on `device`, plus the sign-up fields. */
+function body(identity: Partial<GoogleIdentity> & { email: string }, extra: Record<string, unknown> = {}, device = DEVICE): Record<string, unknown> {
+  return { credential: credential(identity, device), ...extra };
 }
 
 beforeAll(() => setGoogleVerifierForTests(async (value) => JSON.parse(value) as GoogleIdentity));
@@ -69,16 +84,27 @@ describe("POST /api/auth/google", () => {
     expect((await call<{ session: SignedInBody["session"] | null }>(me, "/api/auth/me", { jar })).body.session?.uid).toBe(created.body.session.uid);
   });
 
-  it("refuses a token minted for another page (nonce) and a body without nonce", async () => {
+  it("binds the token to the device cookie: another device, no cookie, no nonce claim or a body nonce are refused", async () => {
     const email = uniqueEmail("gn");
-    const replay = await call<ErrorBody>(google, GOOGLE, { jar: new Jar(), body: body({ email, nonce: "other-page-nonce-9876543210" }) });
+    // A token minted on another device (the nonce its page gave GIS) presented from this one.
+    const other = newDeviceCookie();
+    const replay = await call<ErrorBody>(google, GOOGLE, { jar: new Jar(), body: body({ email }, {}, other) });
     expect(replay.status).toBe(403);
     expect(replay.body.error.code).toBe("invalid_credentials");
+    // The same token from its own device goes through (no consents yet: nothing created).
+    expect((await call<{ status: string }>(google, GOOGLE, { jar: new Jar(undefined, other), body: body({ email }, {}, other) })).body.status).toBe("needs_consent");
+    // Without the device cookie there is nothing to bind the token to.
+    const cookieless = new Jar();
+    cookieless.cookies.delete(DEVICE_COOKIE);
+    const bare = await call<ErrorBody>(google, GOOGLE, { jar: cookieless, body: body({ email }) });
+    expect(bare.status).toBe(403);
+    expect(bare.body.error.code).toBe("invalid_credentials");
     const noNonce = await call<ErrorBody>(google, GOOGLE, { jar: new Jar(), body: body({ email, nonce: null }) });
     expect(noNonce.status).toBe(403);
-    const missing = await call<ErrorBody>(google, GOOGLE, { jar: new Jar(), body: { credential: credential({ email }) } });
-    expect(missing.status).toBe(400);
-    expect(missing.body.error.code).toBe("invalid_body");
+    // The body never carries the nonce (the server derives it from the cookie): strict schema.
+    const selfAttested = await call<ErrorBody>(google, GOOGLE, { jar: new Jar(), body: body({ email }, { nonce: gisNonce(DEVICE.id) }) });
+    expect(selfAttested.status).toBe(400);
+    expect(selfAttested.body.error.code).toBe("invalid_body");
     expect(await findUidByEmail(email)).toBeNull();
   });
 
@@ -122,6 +148,21 @@ describe("POST /api/auth/google", () => {
     expect((await call<SignedInBody>(login, "/api/auth/login", { jar: new Jar(), body: { email, password: PASSWORD } })).status).toBe(200);
   });
 
+  it("replaces an orphan Auth record with this e-mail by a fresh uid instead of adopting it", async () => {
+    // A failed sign-up (or a purge whose Auth deletion failed) left a record without documents.
+    const email = uniqueEmail("go");
+    const orphan = await auth().createUser({ email, password: `left-over-${PASSWORD}`, emailVerified: false });
+    const created = await call<SignedInBody>(google, GOOGLE, { jar: new Jar(), body: body({ email }, { consents: CONSENTS, turnstileToken: "t" }) });
+    expect(created.status).toBe(200);
+    expect(created.body.status).toBe("signed_in");
+    expect(created.body.session.uid).not.toBe(orphan.uid);
+    expect(await findUidByEmail(email)).toBe(created.body.session.uid);
+    await expect(auth().getUser(orphan.uid)).rejects.toMatchObject({ code: "auth/user-not-found" });
+    const record = await auth().getUser(created.body.session.uid);
+    expect(record.email).toBe(email);
+    expect(record.providerData.map((p) => p.providerId)).toEqual(["google.com"]);
+  });
+
   it("never signs a +tag variant into another account: 409 instead of a merge", async () => {
     const email = uniqueEmail("gt");
     expect((await call(signup, "/api/auth/signup", { jar: new Jar(), body: { email, password: PASSWORD, displayName: "Tag Owner", locale: "fr", consents: CONSENTS, turnstileToken: "t" } })).status).toBe(202);
@@ -137,16 +178,17 @@ describe("POST /api/auth/google", () => {
   });
 
   it("counts a needs_consent pass in the sign-up limits (3 per day per device)", async () => {
-    const ip = new Jar().ip;
-    for (let i = 0; i < 3; i += 1) expect((await call(google, GOOGLE, { ip, body: body({ email: uniqueEmail("gl") }) })).status).toBe(200);
-    const limited = await call<ErrorBody>(google, GOOGLE, { ip, body: body({ email: uniqueEmail("gl") }) });
+    // The device cookie, not the IP, keys the limit: one jar per call, all on this file's device.
+    for (let i = 0; i < 3; i += 1) expect((await call(google, GOOGLE, { jar: new Jar(), body: body({ email: uniqueEmail("gl") }) })).status).toBe(200);
+    const limited = await call<ErrorBody>(google, GOOGLE, { jar: new Jar(), body: body({ email: uniqueEmail("gl") }) });
     expect(limited.status).toBe(429);
     expect(limited.body.error.code).toBe("rate_limited");
-    // An existing account still signs in from that device.
+    // An existing account (created on another device) still signs in from that device.
     const email = uniqueEmail("gl");
-    const created = await call<SignedInBody>(google, GOOGLE, { jar: new Jar(), body: body({ email }, { consents: CONSENTS, turnstileToken: "t" }) });
+    const other = newDeviceCookie();
+    const created = await call<SignedInBody>(google, GOOGLE, { jar: new Jar(undefined, other), body: body({ email }, { consents: CONSENTS, turnstileToken: "t" }, other) });
     expect(created.status).toBe(200);
-    expect((await call<SignedInBody>(google, GOOGLE, { ip, body: body({ email }) })).status).toBe(200);
+    expect((await call<SignedInBody>(google, GOOGLE, { jar: new Jar(), body: body({ email }) })).status).toBe(200);
   });
 
   it("never turns a staff account into a member: 403, claims and roster untouched", async () => {
@@ -179,6 +221,44 @@ describe("POST /api/auth/google", () => {
 });
 
 describe("POST /api/auth/session", () => {
+  /** Firebase ID token of a Google sign-in for `email`, minted through the Auth emulator (signInWithIdp takes a fake IdP token). */
+  async function googleIdToken(email: string): Promise<string> {
+    const host = process.env["FIREBASE_AUTH_EMULATOR_HOST"] ?? "127.0.0.1:9099";
+    const idp = JSON.stringify({ sub: `g-${email}`, email, email_verified: true });
+    const response = await fetch(`http://${host}/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=fake-api-key`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ postBody: `id_token=${encodeURIComponent(idp)}&providerId=google.com`, requestUri: "http://localhost", returnSecureToken: true }),
+    });
+    expect(response.ok).toBe(true);
+    return ((await response.json()) as { idToken: string }).idToken;
+  }
+
+  it("accepts a Google sign-in token under 5 minutes old and refuses an older one (§10: tokens too old refused)", async () => {
+    const email = uniqueEmail("sa");
+    const created = await call<SignedInBody>(google, GOOGLE, { jar: new Jar(), body: body({ email }, { consents: CONSENTS, turnstileToken: "t" }) });
+    expect(created.status).toBe(200);
+    const idToken = await googleIdToken(email);
+    const authTime = Date.now();
+    try {
+      // Only the clock moves (timers stay real for the emulator calls): the token's auth_time is 6 minutes old.
+      vi.useFakeTimers({ toFake: ["Date"], now: authTime + 6 * 60_000 });
+      const stale = await call<ErrorBody>(session, "/api/auth/session", { jar: new Jar(), body: { idToken } });
+      expect(stale.status).toBe(401);
+      expect(stale.body.error).toMatchObject({ code: "invalid_credentials", message: "recent sign-in required" });
+
+      vi.setSystemTime(authTime + (4 * 60 + 50) * 1000);
+      const jar = new Jar();
+      const fresh = await call<SignedInBody>(session, "/api/auth/session", { jar, body: { idToken } });
+      expect(fresh.status).toBe(200);
+      expect(fresh.body.status).toBe("signed_in");
+      expect(fresh.body.session.uid).toBe(created.body.session.uid);
+      expect(jar.get("__Host-session")).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("refuses an ID token that does not come from a Google sign-in", async () => {
     const email = uniqueEmail("s");
     const created = await call<SignedInBody>(google, GOOGLE, { jar: new Jar(), body: body({ email }, { consents: CONSENTS, turnstileToken: "t" }) });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { requireUser } from "@/lib/auth/guards";
 import { setClaims } from "@/lib/firebase/claims";
-import { createSessionForUid } from "@/lib/firebase/session";
+import { createSessionForUid, revokeSessions } from "@/lib/firebase/session";
 import { sendMail } from "@/lib/mail";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { csrfToken } from "@/lib/security/csrf";
@@ -9,9 +9,11 @@ import type * as Turnstile from "@/lib/security/turnstile";
 import { POST as action } from "@/app/api/auth/action/route";
 import { GET as me } from "@/app/api/auth/me/route";
 import { GET as inbox, POST as startConversation } from "@/app/api/conversations/route";
+import { GET as phoneStatus } from "@/app/api/auth/phone/status/route";
 import { GET as unread } from "@/app/api/messages/unread/route";
 import { POST as profile } from "@/app/api/auth/profile/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
+import { GET as myListings } from "@/app/api/listings/mine/route";
 import { CONSENTS, Jar, ORIGIN, PASSWORD, call, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
@@ -45,7 +47,31 @@ function requestWith(jar: Jar): Request {
   return new Request(`${ORIGIN}/api/anything`, { method: "POST", headers: { host: "localhost:3000", origin: ORIGIN, cookie: jar.header() ?? "", "x-csrf-token": jar.get("__Host-csrf") ?? "" } });
 }
 
+/** Revocation has a one-second granularity (auth_time vs tokensValidAfterTime): sessions minted in the same second survive. */
+const nextSecond = () => new Promise((resolve) => setTimeout(resolve, 1100));
+
 beforeEach(() => resetRateLimiters());
+
+describe("revoked session cookie", () => {
+  it("is refused on GET routes too, not only on mutations: /api/listings/mine and /api/auth/phone/status answer 401", async () => {
+    const { jar, uid } = await verifiedAccount();
+    expect((await call(myListings, "/api/listings/mine", { jar })).status).toBe(200);
+    expect((await call(phoneStatus, "/api/auth/phone/status", { jar })).status).toBe(200);
+
+    // The cookie is copied before a logout, password change or ban revokes the account's sessions.
+    await nextSecond();
+    await revokeSessions(uid);
+    const listings = await call<ErrorBody>(myListings, "/api/listings/mine", { jar });
+    expect(listings.status).toBe(401);
+    expect(listings.body.error.code).toBe("unauthenticated");
+    const phone = await call<ErrorBody>(phoneStatus, "/api/auth/phone/status", { jar });
+    expect(phone.status).toBe(401);
+    expect(phone.body.error.code).toBe("unauthenticated");
+    // requireUser checks revocation by default (the explicit `checkRevoked: false` opt-out cannot be
+    // observed here: the Admin SDK always checks revocation against the Auth emulator).
+    await expect(requireUser(requestWith(jar))).rejects.toMatchObject({ status: 401, code: "unauthenticated" });
+  });
+});
 
 describe("suspended account", () => {
   it("answers 403 account_suspended unless the route allows suspended members (messaging reads do, D9)", async () => {

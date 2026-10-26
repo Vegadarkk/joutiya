@@ -26,7 +26,7 @@ export function TitleStep({ onNext }: { onNext: () => void }) {
     control,
     setError,
     formState: { errors },
-  } = useForm<Form>({ resolver: zodResolver(titleStepSchema), defaultValues: { title: listing.title }, mode: "onBlur" });
+  } = useForm<Form>({ resolver: zodResolver(titleStepSchema), defaultValues: { title: listing.title }, mode: "onTouched" });
   const title = useWatch({ control, name: "title" });
 
   useEffect(() => {

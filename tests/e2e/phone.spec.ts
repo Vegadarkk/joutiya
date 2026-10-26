@@ -1,5 +1,9 @@
 import { createHmac } from "node:crypto";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { stubGoogleScript } from "./gsi-stub";
+
+// The sign-up page renders the Google button (stub client id): never the real script.
+test.beforeEach(({ page }) => stubGoogleScript(page));
 
 // WhatsApp phone verification against the production build and the Firebase emulators
 // (npm run test:e2e): a fresh account signs up through the UI and confirms its e-mail from the dev

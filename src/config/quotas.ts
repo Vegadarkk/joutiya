@@ -8,7 +8,7 @@ export interface QuotaDefinition {
   service: string;
   /** Free allowance per period, in `unit`. */
   limit: number;
-  unit: "operations" | "requests" | "emails" | "bytes" | "usd_micros" | "neurons";
+  unit: "operations" | "requests" | "emails" | "events" | "bytes" | "usd_micros" | "neurons";
   period: QuotaPeriod;
   /** Time zone of the provider's reset (Firestore resets at midnight Pacific time). */
   resetTimeZone: string;
@@ -84,7 +84,10 @@ export const QUOTAS = {
   },
   "resend.daily": {
     service: "Resend",
-    limit: 100,
+    // The account allows 100 a day, shared with the uptime Worker's alert relay: its RELAY_DAILY_CAP
+    // (20, workers/uptime-probe/src/lib.ts) stays reserved, so the app counts against 80. Keep the
+    // two constants in step (tests/unit/quota.test.ts checks their sum).
+    limit: 80,
     unit: "emails",
     period: "day",
     resetTimeZone: "UTC",
@@ -92,7 +95,8 @@ export const QUOTAS = {
     alertAt: 0.7,
     // The last 10 % stay for security mails (src/lib/mail/deliver.ts).
     degradeAt: 0.9,
-    degradedMode: "Seuls les e-mails de sécurité partent encore (Resend, puis Brevo) ; les autres attendent le lendemain.",
+    degradedMode:
+      'Seuls les e-mails de sécurité partent encore (Resend, puis Brevo) ; les e-mails transactionnels attendent la remise à zéro du lendemain dans la file "mail" ; les envois groupés (alertes de recherches) sont abandonnés.',
   },
   "resend.monthly": {
     service: "Resend",
@@ -103,7 +107,35 @@ export const QUOTAS = {
     kind: "counter",
     alertAt: 0.7,
     degradeAt: 0.9,
-    degradedMode: "Seuls les e-mails de sécurité partent encore (Resend, puis Brevo) ; alertes de recherches suspendues.",
+    degradedMode:
+      'Seuls les e-mails de sécurité partent encore (Resend, puis Brevo) ; les e-mails transactionnels attendent le mois suivant dans la file "mail" ; alertes de recherches suspendues.',
+  },
+  "resend.bounces": {
+    service: "Resend",
+    // Permanent bounces reported by the webhook (src/lib/mail/webhook.ts), one per recipient. A
+    // share of the ~80 daily mails: a handful already hurts the domain's reputation.
+    limit: 10,
+    unit: "emails",
+    period: "day",
+    resetTimeZone: "UTC",
+    kind: "counter",
+    alertAt: 0.7,
+    degradeAt: 1,
+    degradedMode:
+      "Pas de coupure automatique : vérifier les destinataires (inscriptions avec de fausses adresses ?) et la délivrabilité du domaine dans le tableau de bord Resend ; les adresses en rebond définitif ne reçoivent déjà plus que les e-mails de sécurité.",
+  },
+  "resend.complaints": {
+    service: "Resend",
+    // Spam complaints reported by the webhook, one per recipient: Resend pauses an account well below 1 %.
+    limit: 3,
+    unit: "emails",
+    period: "day",
+    resetTimeZone: "UTC",
+    kind: "counter",
+    alertAt: 0.7,
+    degradeAt: 1,
+    degradedMode:
+      "Pas de coupure automatique : vérifier le gabarit, la fréquence (alertes de recherches) et les destinataires des envois du jour ; les plaignants ne reçoivent déjà plus que les e-mails de sécurité.",
   },
   "brevo.daily": {
     service: "Brevo",
@@ -114,7 +146,7 @@ export const QUOTAS = {
     kind: "counter",
     alertAt: 0.7,
     degradeAt: 1,
-    degradedMode: "E-mails de sécurité reportés au lendemain ; alerte P0.",
+    degradedMode: 'E-mails de sécurité reportés au lendemain dans la file "mail" ; alerte P1 une fois par jour.',
   },
   "r2.storage": {
     service: "Cloudflare R2",
@@ -148,7 +180,9 @@ export const QUOTAS = {
     kind: "counter",
     alertAt: 0.7,
     degradeAt: 0.95,
-    degradedMode: "Lectures du worker limitées aux traitements essentiels.",
+    // Every read is essential (photo pipeline, one HEAD per nightly backup, staff photo review):
+    // nothing to cut on the app side, and the usage stays far below the allowance.
+    degradedMode: "Pas de coupure automatique (toutes les lectures servent le pipeline photo, la sauvegarde ou la modération) : vérifier l'origine des lectures dans le tableau de bord R2.",
   },
   "claude.budget": {
     service: "Claude API",
@@ -185,6 +219,21 @@ export const QUOTAS = {
     alertAt: 0.7,
     degradeAt: 1,
     degradedMode: "Modération OpenAI seule, puis votre file.",
+  },
+  "sentry.events": {
+    service: "Sentry",
+    // Errors of `web` and `worker`, counted in beforeSend (src/lib/observability/sentry-server.ts).
+    // Browser events are not counted: no server hop, and the free plan refuses events above the
+    // quota without billing.
+    limit: 5_000,
+    unit: "events",
+    period: "month",
+    resetTimeZone: "UTC",
+    kind: "counter",
+    alertAt: 0.7,
+    degradeAt: 0.9,
+    degradedMode:
+      "Événements serveur abandonnés avant envoi jusqu'à la fin du mois (les journaux pino restent sur la VM) ; les événements navigateur ne sont pas comptés, Sentry les refuse au-delà du quota sans facturation.",
   },
 } as const satisfies Record<string, QuotaDefinition>;
 

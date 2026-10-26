@@ -44,15 +44,18 @@ export interface BackupCollection {
 }
 
 type CollectionId = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
-/** `account` and `identity` are document ids (of `private`), `system` holds the cursors themselves. */
-type BackedUpId = Exclude<CollectionId, typeof COLLECTIONS.userPrivateDoc | typeof COLLECTIONS.userIdentityDoc | typeof COLLECTIONS.system>;
+/** `account` and `identity` are document ids (of `private`), `system` holds the cursors themselves, `quotaDaily` is rebuilt by the app. */
+type BackedUpId = Exclude<
+  CollectionId,
+  typeof COLLECTIONS.userPrivateDoc | typeof COLLECTIONS.userIdentityDoc | typeof COLLECTIONS.system | typeof COLLECTIONS.quotaDaily
+>;
 
 /**
  * Time field per collection, from the Zod schemas of src/lib/db/schemas.ts. Adding a collection to
  * COLLECTIONS fails to compile until it is listed here: a backup is a conscious decision.
  * `connectionLogs`, `auditLogs`, `contentOps`, `revealLogs`, `mailSuppressions` only have `at`
- * (append-only journals): rolling full only. `quotaDaily` and `config/legal` are not in
- * COLLECTIONS and are rebuilt by the app and the owner (scripts/legal-config.ts).
+ * (append-only journals): rolling full only. `quotaDaily` (nightly snapshots) and `config/legal`
+ * (not in COLLECTIONS) are rebuilt by the app and the owner (scripts/legal-config.ts).
  */
 const TABLE: Record<BackedUpId, Omit<BackupCollection, "id">> = {
   users: { scope: "root", timeField: "updatedAt" },

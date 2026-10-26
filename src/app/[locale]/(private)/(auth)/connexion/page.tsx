@@ -7,6 +7,7 @@ import { Link, redirect } from "@/i18n/navigation";
 import { pageLocale } from "@/i18n/params";
 import { currentMember } from "@/lib/auth/current-user";
 import { afterSignInTarget, safeNextPath } from "@/lib/auth/next-path";
+import { DEVICE_ID_HEADER, gisNonce } from "@/lib/security/device";
 
 type Props = { params: Promise<{ locale: string }>; searchParams: Promise<{ next?: string | string[] }> };
 
@@ -25,7 +26,10 @@ export default async function SignInPage({ params, searchParams }: Props) {
     redirect({ href: target.pathname, locale: target.locale ?? locale });
   }
   const t = await getTranslations({ locale, namespace: "Auth.signIn" });
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const requestHeaders = await headers();
+  const nonce = requestHeaders.get("x-nonce") ?? undefined;
+  // Device id set by the proxy (never the client's): the nonce Google writes in its ID token.
+  const deviceId = requestHeaders.get(DEVICE_ID_HEADER);
   // The link to the other flow keeps a valid `next`.
   const raw = (await searchParams).next;
   const next = safeNextPath(Array.isArray(raw) ? raw[0] : raw);
@@ -42,7 +46,7 @@ export default async function SignInPage({ params, searchParams }: Props) {
         </p>
       }
     >
-      <LoginForm nonce={nonce} />
+      <LoginForm nonce={nonce} gisNonce={deviceId ? gisNonce(deviceId) : undefined} />
     </AuthShell>
   );
 }

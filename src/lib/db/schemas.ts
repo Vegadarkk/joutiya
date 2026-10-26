@@ -114,6 +114,11 @@ export const userPrivateSchema = z
     legalHold: z.array(z.string().min(1).max(64)).max(50).optional(),
     /** Sign-in providers linked to the account ("password", "google.com"). */
     providers: z.array(z.enum(["password", "google.com"])).max(2),
+    /**
+     * pepperedHash("did", deviceId) of the browser that signed up by e-mail: the verification link
+     * opens a session only from that device (src/lib/auth/action.ts). Absent on Google sign-ups.
+     */
+    signupDeviceHash: z.string().min(16).max(64).optional(),
     closedAt: ts.optional(),
     purgeAt: ts.optional(),
     identityPurgeAt: ts.optional(),
@@ -145,13 +150,15 @@ export type ClosedIdentityDoc = z.infer<typeof closedIdentitySchema>;
 export const emailIndexSchema = z.object({ uid, createdAt: ts }).strict();
 export type EmailIndexDoc = z.infer<typeof emailIndexSchema>;
 
-/** connectionLogs/{id}: IP in clear (décret 2021-1362), admin-only under a requisition, purged after 1 year. */
+/**
+ * connectionLogs/{id}: IP in clear (décret 2021-1362), admin-only under a requisition, purged after
+ * 1 year. Exactly the fields of §5: no user agent (data minimisation).
+ */
 export const connectionLogSchema = z
   .object({
     uid,
     event: z.enum(["signup", "login", "google_login", "google_signup", "staff_login", "password_reset", "password_change", "logout"]),
     ip: z.string().max(45),
-    userAgent: z.string().max(200).optional(),
     at: ts,
     purgeAt: ts,
   })
@@ -180,6 +187,29 @@ export const mailSuppressionSchema = z
   .object({ reason: z.enum(["bounce", "complaint"]), provider: z.string().max(20), at: ts })
   .strict();
 export type MailSuppressionDoc = z.infer<typeof mailSuppressionSchema>;
+
+/** One counter of the nightly snapshot (src/lib/quota readQuotas): the share of the free quota reached. */
+export const quotaSnapshotSchema = z
+  .object({
+    /** Day or month the counter covers (quota period key). */
+    period: z.string().min(1).max(20),
+    used: z.number().int().min(0),
+    limit: z.number().int().min(0),
+    ratio: z.number().min(0),
+    level: z.enum(["ok", "warning", "degraded", "unknown"]),
+  })
+  .strict();
+
+/** quotaDaily/{date}: snapshot of every free-quota counter for the UTC day that ended (§5, quota-report job). */
+export const quotaDailySchema = z
+  .object({
+    /** YYYY-MM-DD (UTC), also the document id. */
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    quotas: z.record(z.string().min(1).max(64), quotaSnapshotSchema),
+    createdAt: ts,
+  })
+  .strict();
+export type QuotaDailyDoc = z.infer<typeof quotaDailySchema>;
 
 // ---- Phase 3: listings and media (architecture §5, design §1).
 
@@ -906,6 +936,8 @@ export const COLLECTIONS = {
   connectionLogs: "connectionLogs",
   auditLogs: "auditLogs",
   mailSuppressions: "mailSuppressions",
+  /** quotaDaily/{date}: nightly quota snapshot (src/lib/db/repositories/quota-daily.ts). */
+  quotaDaily: "quotaDaily",
   /** staff/{uid}: back-office roster (src/lib/db/repositories/staff.ts). */
   staff: "staff",
   // Phase 3

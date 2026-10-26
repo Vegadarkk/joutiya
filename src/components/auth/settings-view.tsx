@@ -128,6 +128,7 @@ function ProfileSection({ session }: { session: SessionSummary }) {
   } = useForm<ProfileForm, unknown, ProfileInput>({
     resolver: zodResolver(profileSchema),
     defaultValues: { displayName: session.displayName ?? "", locale: session.locale ?? "fr" },
+    mode: "onTouched",
   });
 
   const submit = handleSubmit(async (values) => {
@@ -144,7 +145,7 @@ function ProfileSection({ session }: { session: SessionSummary }) {
 
   return (
     <Section id="profile" title={t("title")} body={t("body")}>
-      <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+      <form method="post" onSubmit={submit} noValidate className="flex flex-col gap-4">
         <FormMessage error={serverError} />
         <Field label={t("displayName")} error={fieldMessage("displayName", errors.displayName)} required>
           <Input autoComplete="name" maxLength={40} {...register("displayName")} />
@@ -209,6 +210,7 @@ function PasswordChangeForm({ email, displayName }: { email: string | null; disp
   } = useForm<PasswordForm, unknown, PasswordInput>({
     resolver: zodResolver(passwordChangeSchema),
     defaultValues: { currentPassword: "", password: "" },
+    mode: "onTouched",
   });
   const password = useWatch({ control, name: "password" });
 
@@ -227,7 +229,7 @@ function PasswordChangeForm({ email, displayName }: { email: string | null; disp
   });
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+    <form method="post" onSubmit={submit} noValidate className="flex flex-col gap-4">
       <FormMessage error={serverError} />
       {/* Password managers pair the new password with the account. */}
       <input type="hidden" name="username" autoComplete="username" value={email ?? ""} readOnly />

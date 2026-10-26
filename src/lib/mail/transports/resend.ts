@@ -67,9 +67,10 @@ export class ResendTransport implements MailTransport {
 
     if (!response.ok) {
       const detail = await readErrorBody(response);
-      // 409 concurrent_idempotent_requests: the same key is in flight, a later retry resolves it.
-      const kind = response.status === 409 && detail.name === "concurrent_idempotent_requests" ? "transient" : classifyStatus(response.status);
       const retryAfter = leadingInt(response.headers.get("retry-after")) ?? leadingInt(response.headers.get("ratelimit-reset"));
+      // 409 concurrent_idempotent_requests: the same key is in flight, a later retry resolves it.
+      // 429 daily_quota_exceeded / monthly_quota_exceeded: "quota", the mail waits for the reset.
+      const kind = response.status === 409 && detail.name === "concurrent_idempotent_requests" ? "transient" : classifyStatus(response.status, detail, retryAfter);
       throw providerFailure(this.name, response.status, kind, detail, retryAfter);
     }
 

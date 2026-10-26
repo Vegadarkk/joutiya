@@ -93,14 +93,16 @@ describe("backup cursors", () => {
     expect(DEFAULT_BACKUP_CONFIG.fullBudget).toBeLessThanOrEqual(DEFAULT_BACKUP_CONFIG.maxRunReads);
   });
 
-  it("backs up every collection but the cursors themselves, once", () => {
+  it("backs up every collection but the cursors themselves and the quota snapshots (rebuilt), once", () => {
     const ids = BACKUP_COLLECTIONS.map((collection) => collection.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).not.toContain(COLLECTIONS.system);
     expect(ids).not.toContain(COLLECTIONS.userPrivateDoc);
     // A document id, not a collection: users/{uid}/private/identity goes with the `private` group.
     expect(ids).not.toContain(COLLECTIONS.userIdentityDoc);
-    const excluded: string[] = [COLLECTIONS.system, COLLECTIONS.userPrivateDoc, COLLECTIONS.userIdentityDoc];
+    // quotaDaily joined COLLECTIONS (typed registry) but stays out of the backup, as docs/backups.md says.
+    expect(ids).not.toContain(COLLECTIONS.quotaDaily);
+    const excluded: string[] = [COLLECTIONS.system, COLLECTIONS.userPrivateDoc, COLLECTIONS.userIdentityDoc, COLLECTIONS.quotaDaily];
     const expected = Object.values(COLLECTIONS).filter((id) => !excluded.includes(id));
     expect([...ids].sort()).toEqual([...expected].sort());
     expect(BACKUP_COLLECTIONS.find((collection) => collection.id === "private")).toEqual({ id: "private", scope: "group", timeField: null });

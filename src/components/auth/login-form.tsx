@@ -21,10 +21,11 @@ import { PasswordField } from "./password-field";
 import { ResendVerification } from "./resend-verification";
 import { TurnstileWidget, type TurnstileHandle } from "./turnstile-widget";
 import { useAfterSignIn } from "./use-after-sign-in";
+import { useHydrated } from "./use-hydrated";
 
 type LoginForm = z.input<typeof loginSchema>;
 
-export function LoginForm({ nonce }: { nonce?: string }) {
+export function LoginForm({ nonce, gisNonce }: { nonce?: string; gisNonce?: string }) {
   const t = useTranslations("Auth.signIn");
   const c = useTranslations("Auth.common");
   const fieldMessage = useFieldMessage();
@@ -38,12 +39,13 @@ export function LoginForm({ nonce }: { nonce?: string }) {
   const [turnstileNeeded, setTurnstileNeeded] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [consent, setConsent] = useState<GoogleNeedsConsent | null>(null);
+  const hydrated = useHydrated();
   const {
     register,
     handleSubmit,
     setValue,
     formState: { errors, isSubmitting },
-  } = useForm<LoginForm, unknown, LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
+  } = useForm<LoginForm, unknown, LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" }, mode: "onTouched" });
 
   // The "confirm your address" notice replaces nothing visible: focus tells the person it appeared.
   useEffect(() => {
@@ -93,7 +95,7 @@ export function LoginForm({ nonce }: { nonce?: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <GoogleButton nonce={nonce} onSignedIn={afterSignIn} onNeedsConsent={setConsent} onError={setServerError} divider={<OrDivider label={c("or")} />} />
+      <GoogleButton nonce={nonce} gisNonce={gisNonce} onSignedIn={afterSignIn} onNeedsConsent={setConsent} onError={setServerError} divider={<OrDivider label={c("or")} />} />
       {unverifiedEmail ? (
         // Its own form (resend): a sibling of the sign-in form, never nested in it.
         <section aria-labelledby="login-unverified" className="flex flex-col gap-4 rounded-lg border border-warning/30 bg-warning-surface p-5">
@@ -106,10 +108,13 @@ export function LoginForm({ nonce }: { nonce?: string }) {
           <ResendVerification nonce={nonce} defaultEmail={unverifiedEmail} entry="login" />
         </section>
       ) : null}
-      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
+      {/* POST, never GET: submitted before hydration, the fields must not land in the URL. */}
+      <form method="post" onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
         <FormMessage error={serverError} />
+        {/* No autoFocus: with "onTouched" validation, leaving a focused empty field (to click the
+            Google button above) would flag it as an error the person never caused. */}
         <Field label={c("email")} error={fieldMessage("email", errors.email)} required>
-          <Input type="email" inputMode="email" autoComplete="username" spellCheck={false} autoFocus dir="ltr" className="text-start" {...register("email")} />
+          <Input type="email" inputMode="email" autoComplete="username" spellCheck={false} dir="ltr" className="text-start" {...register("email")} />
         </Field>
         <PasswordField
           label={c("password")}
@@ -132,7 +137,7 @@ export function LoginForm({ nonce }: { nonce?: string }) {
             <TurnstileWidget ref={turnstile} action="login" nonce={nonce} onToken={onToken} />
           </div>
         ) : null}
-        <Button type="submit" loading={isSubmitting} className="w-full">
+        <Button type="submit" loading={isSubmitting} disabled={!hydrated} className="w-full">
           {t("submit")}
         </Button>
       </form>

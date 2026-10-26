@@ -6,6 +6,8 @@ import type * as Quota from "@/lib/quota";
 import { firstDegraded } from "@/lib/quota";
 import { QUOTA_ERROR_CODE } from "@/lib/quota/gate";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
+import { DEVICE_COOKIE } from "@/lib/security/cookies";
+import { gisNonce, newDeviceCookie } from "@/lib/security/device";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 import { POST as google } from "@/app/api/auth/google/route";
@@ -24,10 +26,17 @@ vi.mock("@/lib/quota", async (importOriginal) => ({ ...(await importOriginal<typ
 
 const SIGNUP = "/api/auth/signup";
 const GOOGLE = "/api/auth/google";
-const NONCE = "page-nonce-0123456789abcdef";
+/** Google calls come from one device: its cookie is in the jar and its GIS nonce in the credential. */
+const DEVICE = newDeviceCookie();
+
+function googleJar(): Jar {
+  const jar = new Jar();
+  jar.cookies.set(DEVICE_COOKIE, DEVICE.value);
+  return jar;
+}
 
 function googleBody(email: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
-  return { credential: JSON.stringify({ sub: `g-${email}`, email, emailVerified: true, name: "Nadia Google", nonce: NONCE }), nonce: NONCE, ...extra };
+  return { credential: JSON.stringify({ sub: `g-${email}`, email, emailVerified: true, name: "Nadia Google", nonce: gisNonce(DEVICE.id) }), ...extra };
 }
 
 async function authRecord(email: string) {
@@ -85,7 +94,7 @@ describe("sign-up with degraded Firestore writes", () => {
 
   it("does not use up the device's sign-up allowance on refused Google consent passes either", async () => {
     vi.mocked(firstDegraded).mockResolvedValue("firestore.writes");
-    const jar = new Jar();
+    const jar = googleJar();
     const email = uniqueEmail("qe");
     for (let attempt = 1; attempt <= 4; attempt += 1) {
       const refused = await call<ErrorBody>(google, GOOGLE, { jar, body: googleBody(email) });
@@ -98,18 +107,18 @@ describe("sign-up with degraded Firestore writes", () => {
 
   it("refuses a new Google account before the consent step, and still signs a member in", async () => {
     const member = uniqueEmail("qg");
-    const created = await call<SignedInBody>(google, GOOGLE, { jar: new Jar(), body: googleBody(member, { consents: CONSENTS, turnstileToken: "t", locale: "fr" }) });
+    const created = await call<SignedInBody>(google, GOOGLE, { jar: googleJar(), body: googleBody(member, { consents: CONSENTS, turnstileToken: "t", locale: "fr" }) });
     expect(created.body.status).toBe("signed_in");
 
     vi.mocked(firstDegraded).mockResolvedValue("firestore.writes");
     const newcomer = uniqueEmail("qn");
-    const consent = await call<ErrorBody>(google, GOOGLE, { jar: new Jar(), body: googleBody(newcomer) });
+    const consent = await call<ErrorBody>(google, GOOGLE, { jar: googleJar(), body: googleBody(newcomer) });
     expect([consent.status, consent.body.error.code]).toEqual([503, QUOTA_ERROR_CODE]);
-    const withConsents = await call<ErrorBody>(google, GOOGLE, { jar: new Jar(), body: googleBody(newcomer, { consents: CONSENTS, turnstileToken: "t", locale: "fr" }) });
+    const withConsents = await call<ErrorBody>(google, GOOGLE, { jar: googleJar(), body: googleBody(newcomer, { consents: CONSENTS, turnstileToken: "t", locale: "fr" }) });
     expect([withConsents.status, withConsents.body.error.code]).toEqual([503, QUOTA_ERROR_CODE]);
     expect(await authRecord(newcomer)).toBeNull();
 
-    const again = await call<SignedInBody>(google, GOOGLE, { jar: new Jar(), body: googleBody(member) });
+    const again = await call<SignedInBody>(google, GOOGLE, { jar: googleJar(), body: googleBody(member) });
     expect(again.status).toBe(200);
     expect(again.body.session.uid).toBe(created.body.session.uid);
   });

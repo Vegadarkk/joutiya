@@ -15,8 +15,9 @@ export const MAIL_QUEUE = "mail";
 
 const PRIORITY: Record<MailPriority, number> = { security: 1, transactional: 5, bulk: 10 };
 
-// Five quick attempts cover transient failures (429, 5xx, network); an exhausted quota or an
-// unavailable provider delays the job instead (MailDeferredError, src/worker/index.ts).
+// Five quick attempts cover transient failures (429 rate limit, 5xx, network); a spent or refused
+// quota (a transactional mail from 90 % of Resend, a 429 for its quota) or an unavailable provider
+// delays the job instead (MailDeferredError, src/worker/index.ts).
 // The payload holds the template data, action links included (live oobCodes): a finished job
 // leaves Valkey at once and a failed one within the hour (200 kept at most for diagnosis).
 // Later phase: generate the links at delivery time so the queue never holds them.

@@ -2,6 +2,10 @@ import { createHmac, randomBytes } from "node:crypto";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import sharp from "sharp";
 import { isolate } from "../../src/lib/i18n/bidi";
+import { stubGoogleScript } from "./gsi-stub";
+
+// The sign-up page renders the Google button (stub client id): never the real script.
+test.beforeEach(({ page }) => stubGoogleScript(page));
 
 // Posting wizard (phase 3 lot C) against the production build and the Firebase emulators
 // (npm run test:e2e): a fresh individual signs up, confirms the e-mail from the dev mailbox and

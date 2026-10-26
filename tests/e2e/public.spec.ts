@@ -1,4 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
+import { apiContentSecurityPolicy, staticSecurityHeaders } from "../../src/lib/security/headers";
+
+/** The headers next.config.ts applies to every path (src/lib/security/headers.ts), by lower-cased name. */
+const STATIC_HEADERS = Object.fromEntries(staticSecurityHeaders().map((header) => [header.key.toLowerCase(), header.value]));
+
+/** Every static security header of a served response, CORP included; nothing names the server. */
+function expectStaticHeaders(headers: Record<string, string>, where: string): void {
+  for (const [name, value] of Object.entries(STATIC_HEADERS)) expect(headers[name], `${name} on ${where}`).toBe(value);
+  expect(headers["cross-origin-resource-policy"], where).toBe("same-origin");
+  expect(headers["x-powered-by"], where).toBeUndefined();
+}
 
 /** Collects CSP violations reported by the page itself. */
 async function watchCsp(page: Page): Promise<string[]> {
@@ -48,8 +59,9 @@ test.describe("public pages", () => {
       expect(scriptSrc).not.toContain("'unsafe-inline'");
       expect(scriptSrc).not.toContain("'nonce-");
       expect(headers["set-cookie"]).toBeUndefined();
-      expect(headers["x-content-type-options"]).toBe("nosniff");
-      expect(headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+      expectStaticHeaders(headers, `/${locale}`);
+      expect(headers["cross-origin-opener-policy"]).toBe("same-origin-allow-popups");
+      expect(headers["reporting-endpoints"]).toBe('csp="/api/csp-report"');
       expect(csp).toContain("frame-ancestors 'none'");
 
       // The theme script ran before paint and hydration completed.
@@ -112,6 +124,30 @@ test.describe("public pages", () => {
   test("the back office does not exist on the public host", async ({ request }) => {
     expect((await request.get("/admin")).status()).toBe(404);
     expect((await request.get("/api/admin/quotas")).status()).toBe(404);
+  });
+});
+
+test.describe("security headers", () => {
+  test("the API answers under its own CSP, uncached, without CORS, with the device cookie only", async ({ request }) => {
+    const response = await request.get("/api/auth/me");
+    expect(response.status()).toBe(200);
+    const headers = response.headers();
+    expectStaticHeaders(headers, "/api/auth/me");
+    expect(headers["content-security-policy"]).toBe(apiContentSecurityPolicy);
+    expect(headers["cache-control"]).toBe("no-store");
+    expect(headers["access-control-allow-origin"]).toBeUndefined();
+    expect(headers["access-control-allow-credentials"]).toBeUndefined();
+    // The first anonymous call sets the device cookie (§6 rate-limit keys) and no other cookie.
+    const cookies = response.headersArray().filter((header) => header.name.toLowerCase() === "set-cookie");
+    expect(cookies.map((header) => header.value.split("=")[0])).toEqual(["__Host-did"]);
+    expect(cookies[0]?.value).toMatch(/; *HttpOnly/i);
+  });
+
+  test("the proxy's own 404 (back office on the public host) keeps the static headers", async ({ request }) => {
+    const response = await request.get("/admin");
+    expect(response.status()).toBe(404);
+    expectStaticHeaders(response.headers(), "/admin");
+    expect(response.headers()["cache-control"]).toBe("no-store");
   });
 });
 
