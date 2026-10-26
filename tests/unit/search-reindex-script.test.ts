@@ -122,7 +122,7 @@ describe("reindex", () => {
   });
 
   it("refuses before any write when the budget is too small or the read quota degraded", async () => {
-    await expect(script.reindex({ apply: true, maxReads: 100 }, deps())).rejects.toThrow("--max-reads");
+    await expect(script.reindex({ apply: true, maxReads: 100 }, deps())).rejects.toThrow("rerun with --max-reads 2004 or more");
     const d = deps();
     d.readsDegraded.mockResolvedValue(true);
     await expect(script.reindex({ apply: true, maxReads: 20_000 }, d)).rejects.toThrow("degraded");
