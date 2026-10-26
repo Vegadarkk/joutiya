@@ -30,6 +30,7 @@ export const READINESS_CODES = [
   "photos_required",
   "photos_max",
   "phone_required",
+  "messaging_only",
   "unknown",
 ] as const;
 export type ReadinessCode = (typeof READINESS_CODES)[number];
@@ -135,7 +136,11 @@ export function assessReadiness(listing: Candidate, facts: SellerFacts): FieldIs
   const quotas = listingQuotas(facts.seller);
   if (listing.photos.length === 0) issues.push(issue("photos", "photos_required"));
   else if (listing.photos.length > quotas.photosPerListing) issues.push(issue("photos", "photos_max"));
-  if ((listing.contact.showPhone || listing.contact.whatsapp) && !facts.phoneVerified) {
+  if (tree.subcategory?.adultsOnly) {
+    // Adults-only goods: messaging only (the buyer's 18+ confirmation is asked there).
+    if (listing.contact.showPhone) issues.push(issue("contact.showPhone", "messaging_only"));
+    if (listing.contact.whatsapp) issues.push(issue("contact.whatsapp", "messaging_only"));
+  } else if ((listing.contact.showPhone || listing.contact.whatsapp) && !facts.phoneVerified) {
     if (listing.contact.showPhone) issues.push(issue("contact.showPhone", "phone_required"));
     if (listing.contact.whatsapp) issues.push(issue("contact.whatsapp", "phone_required"));
   }

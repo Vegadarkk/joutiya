@@ -17,6 +17,7 @@ import { logger } from "@/lib/logging/logger";
 import { sendMail } from "@/lib/mail";
 import { listingRecipient, siteUrl } from "@/lib/mail/recipients";
 import { APPROVAL_GROUND, REJECT_REASONS, rejectStatementFacts } from "@/lib/moderation/decisions";
+import { HUMAN_REVIEW_FLAGS } from "@/lib/moderation/risk";
 import { consume } from "@/lib/quota";
 import { notifySearchIndex } from "@/lib/search/queue";
 import { markAutoAppliedTx } from "./repository";
@@ -25,7 +26,7 @@ import type { AiOutput, AiProviderId, AiTask, TaskFacts } from "./types";
 // What the agent may do alone (design D20). Everything else is a proposal shown to a moderator.
 // - A held listing (pending_review) is approved when Claude (never a fallback) proposes "approve"
 //   with confidence >= agent.autoApproveAt (0.9), no moderation flag outside
-//   agent.autoApproveSoftFlags (default none), no open report, nothing prohibited, not hidden, and
+//   agent.autoApproveSoftFlags (default none; never a HUMAN_REVIEW_FLAGS one), no open report, nothing prohibited, not hidden, and
 //   no removal decision in its history: a listing a moderator rejected before is held so that a
 //   person reviews it again, whatever the agent thinks of the edited text (audit D1b-02).
 // - A held listing is rejected when Claude proposes "reject" with policy "spam" and confidence >=
@@ -52,7 +53,7 @@ export function planApplication(task: AiTask, provider: AiProviderId, output: Ai
   const claude = provider === "anthropic";
   if (facts.status === "pending_review") {
     const softFlags = new Set(config.agent.autoApproveSoftFlags);
-    const clean = facts.flags.every((flag) => softFlags.has(flag)) && facts.openReports === 0 && facts.prohibitedHard.length === 0 && !facts.previouslyRejected;
+    const clean = facts.flags.every((flag) => softFlags.has(flag) && !HUMAN_REVIEW_FLAGS.has(flag)) && facts.openReports === 0 && facts.prohibitedHard.length === 0 && !facts.previouslyRejected;
     if (claude && output.action === "approve" && output.confidence >= config.agent.autoApproveAt && clean) return { kind: "auto_approve" };
     if (claude && output.action === "reject" && output.policy === "spam" && output.confidence >= config.agent.autoRejectSpamAt) return { kind: "auto_reject_spam" };
     return { kind: "record" };

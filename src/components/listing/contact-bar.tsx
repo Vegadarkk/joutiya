@@ -72,6 +72,8 @@ export interface ContactBarProps {
   listingTitle?: string;
   showPhone: boolean;
   whatsapp: boolean;
+  /** Adults-only listing: the message dialog asks the buyer's 18+ confirmation. */
+  adultsOnly?: boolean;
 }
 
 type Phone = PhoneRevealResponse["phone"];
@@ -128,7 +130,7 @@ function BarSpacer() {
   return mounted ? createPortal(<div aria-hidden="true" data-testid="contact-bar-spacer" className="h-24 lg:hidden" />, document.body) : null;
 }
 
-export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, listingTitle, showPhone, whatsapp }: ContactBarProps) {
+export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, listingTitle, showPhone, whatsapp, adultsOnly = false }: ContactBarProps) {
   const t = useTranslations("ListingPage.contact");
   const locale = useLocale();
   const { status, session } = useSession();
@@ -303,6 +305,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
           listingId={listingId}
           listingTitle={listingTitle}
           sellerName={sellerName}
+          adultsOnly={adultsOnly}
           onSignedOut={() => setCompose("signin")}
         />
       ) : null}

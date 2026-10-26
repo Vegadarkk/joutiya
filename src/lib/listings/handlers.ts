@@ -139,7 +139,7 @@ export async function handlePublish(request: Request, params: Params): Promise<R
   await enforceLimit("listing.publish.uid", auth.user.uid);
   await assertQuotas(DEPOSIT_QUOTAS);
   const device = deviceOf(request);
-  const outcome = await publish(actorOf(request, auth), request, id, { turnstileToken: input.turnstileToken, device });
+  const outcome = await publish(actorOf(request, auth), request, id, { turnstileToken: input.turnstileToken, adultsOnlyAttestation: input.adultsOnlyAttestation === true, device });
   const response = applyDevice(jsonResponse(outcome.response), device);
   return outcome.turnstilePassed ? applyTurnstilePass(response, device) : response;
 }

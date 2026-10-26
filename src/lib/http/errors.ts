@@ -58,6 +58,8 @@ export type ErrorCode =
   | "listing_unavailable"
   /** Phone reveal refused: account too young, e-mail unverified or quota reached. */
   | "reveal_not_allowed"
+  /** Publish in an adults-only subcategory without the seller's attestation (422). */
+  | "adults_only_attestation"
   // Search and discovery (phase 4). Messages: Listing.errors.<code>.
   /** Search engine missing or unreachable (503). */
   | "search_unavailable"
@@ -111,6 +113,8 @@ export type ErrorCode =
   | "conversation_unavailable"
   /** A seller cannot message himself about his own listing (409). */
   | "self_conversation"
+  /** First message about an adults-only listing without the buyer's 18+ confirmation (422). */
+  | "adult_confirmation_required"
   /** Reporter abusive (art. 23) or target not reportable by this account (403). */
   | "report_not_allowed"
   /** The reported target does not exist or is not visible to the reporter (404 semantics, 422). */

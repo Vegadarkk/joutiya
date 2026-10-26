@@ -88,7 +88,7 @@ interface Member {
 }
 
 /** A published listing of `owner` (one photo, messaging only: no phone, no WhatsApp). */
-async function seedListing(owner: Member): Promise<{ id: string; slugId: string; title: string }> {
+async function seedListing(owner: Member, overrides: Record<string, unknown> = {}): Promise<{ id: string; slugId: string; title: string }> {
   const now = new Date();
   const id = randomId(8);
   const title = `Tapis berbère ${id}`;
@@ -128,6 +128,7 @@ async function seedListing(owner: Member): Promise<{ id: string; slugId: string;
       adsEligible: true,
       publishedAt: now,
       expiresAt: new Date(now.getTime() + 60 * 86_400_000),
+      ...overrides,
     });
   return { id, slugId, title };
 }
@@ -214,6 +215,45 @@ test.describe("messaging", () => {
     await expect(row).toBeHidden();
     await sellerPage.getByRole("link", { name: "Toutes les conversations" }).click();
     await expect(row).toBeVisible();
+
+    expect(errors).toEqual([]);
+    await sellerContext.close();
+    await buyerContext.close();
+  });
+
+  test("an adults-only listing shows its 18+ notice and asks the buyer's confirmation before the first message", async ({ browser, request }) => {
+    const stamp = `${Date.now().toString(36)}${randomId(4)}`;
+    const sellerContext = await browser.newContext();
+    const buyerContext = await browser.newContext();
+    const sellerPage = await sellerContext.newPage();
+    const buyerPage = await buyerContext.newPage();
+    const errors: string[] = [];
+    buyerPage.on("pageerror", (error) => errors.push(error.message));
+
+    await signUpAndIn(sellerPage, request, `e2e-artisan-${stamp}@test.joutiya.ma`, "Hassan Artisan");
+    await signUpAndIn(buyerPage, request, `e2e-adult-${stamp}@test.joutiya.ma`, "Karim Acheteur");
+    const seller = await session(sellerPage);
+    const listing = await seedListing(seller, {
+      subcategoryId: "koumiyas-decoratives",
+      attributes: { material: "cuivre", handmade: true },
+      description: "Koumiya de décoration faite à la main par un artisan de Fès, fourreau en cuivre ciselé.",
+      moderation: { state: "needs_review", score: 0, flags: ["restricted_category"], openReports: 0, reviewedBy: "admin", reviewedAt: new Date() },
+    });
+
+    await buyerPage.goto(`/fr/annonce/${listing.slugId}`);
+    await expect(buyerPage.getByTestId("adults-only-notice")).toContainText("Réservé aux personnes majeures.");
+    await buyerPage.getByTestId("contact-bar").getByRole("button", { name: "Envoyer un message" }).click();
+    const dialog = buyerPage.getByRole("dialog", { name: `Écrire à ${isolate(seller.displayName)}` });
+    await expect(dialog).toBeVisible({ timeout: 15_000 });
+    await dialog.getByLabel("Votre message").fill(`Salam, la koumiya est-elle toujours disponible ? ${stamp}`);
+    await expect(dialog.locator("[data-turnstile]")).toHaveAttribute("data-turnstile", "ready", { timeout: 20_000 });
+    await dialog.getByRole("button", { name: "Envoyer le message" }).click();
+    await expect(dialog.getByText("Confirmez avoir 18 ans ou plus pour écrire au vendeur.")).toBeVisible();
+    await expect(buyerPage).toHaveURL(new RegExp(`/fr/annonce/${listing.slugId}$`));
+
+    await dialog.getByRole("checkbox", { name: "Je confirme avoir 18 ans ou plus." }).check();
+    await dialog.getByRole("button", { name: "Envoyer le message" }).click();
+    await expect(buyerPage).toHaveURL(/\/fr\/messages\/[A-Za-z0-9_-]{22}$/, { timeout: 20_000 });
 
     expect(errors).toEqual([]);
     await sellerContext.close();

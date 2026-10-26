@@ -68,6 +68,12 @@ function checkTree(input: ScreenInput, blockers: FieldIssue[]): void {
 }
 
 function checkContact(input: ScreenInput, blockers: FieldIssue[]): void {
+  // Adults-only goods: the buyer's 18+ confirmation is asked at the first message, so no other channel.
+  if (subcategoryById(input.subcategoryId)?.adultsOnly) {
+    if (input.contact.showPhone) pushIssue(blockers, issue("contact.showPhone", "messaging_only"));
+    if (input.contact.whatsapp) pushIssue(blockers, issue("contact.whatsapp", "messaging_only"));
+    return;
+  }
   if (!input.seller.phoneVerified) {
     if (input.contact.showPhone) pushIssue(blockers, issue("contact.showPhone", "phone_required"));
     if (input.contact.whatsapp) pushIssue(blockers, issue("contact.whatsapp", "phone_required"));
@@ -90,6 +96,13 @@ export function screenListing(input: ScreenInput, ctx: ScreenContext): ScreenRes
   checkTree(input, blockers);
   checkContact(input, blockers);
 
+  // Adults-only subcategory: a moderator reviews every version before it goes public.
+  const adultsOnly = Boolean(subcategoryById(input.subcategoryId)?.adultsOnly);
+  if (adultsOnly) {
+    flags.add("restricted_category");
+    note(`adults-only subcategory ${input.subcategoryId}`);
+  }
+
   // Steps 2-3 on every free text: phones, e-mails / links, prohibited keywords, sensitive data.
   const phoneKeys = new Set<string>();
   for (const field of textFields(input)) {
@@ -109,9 +122,10 @@ export function screenListing(input: ScreenInput, ctx: ScreenContext): ScreenRes
       flags.add("prohibited_kw");
       for (const group of prohibited.hard) note(`prohibited hard:${group} in ${field.path}`);
     }
-    if (prohibited.soft.length > 0) {
-      flags.add("prohibited_soft");
-      for (const group of prohibited.soft) note(`prohibited soft:${group} in ${field.path}`);
+    for (const group of prohibited.soft) {
+      // Dagger words are expected in the adults-only subcategory: noted for the moderator, no flag.
+      if (!(adultsOnly && group === "weapons")) flags.add("prohibited_soft");
+      note(`prohibited soft:${group} in ${field.path}`);
     }
     const sensitive = detectSensitiveDetailed(field.text);
     if (sensitive.length > 0) {

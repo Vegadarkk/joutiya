@@ -478,7 +478,8 @@
       "saved_search_exists": "Cette recherche est déjà sauvegardée.",
       "invalid_token": "Ce lien n'est plus valide.",
       "upload_limit": "Trop de photos ont été envoyées pour cette annonce, photos refusées comprises. Supprimez les photos refusées pour en ajouter d'autres, ou patientez : elles sont effacées automatiquement 7 jours après leur envoi.",
-      "quota_exhausted": "Le dépôt et la modification d'annonces sont momentanément suspendus : la limite quotidienne de notre service est atteinte. Votre annonce est conservée ; réessayez après 9 h (heure du Maroc)."
+      "quota_exhausted": "Le dépôt et la modification d'annonces sont momentanément suspendus : la limite quotidienne de notre service est atteinte. Votre annonce est conservée ; réessayez après 9 h (heure du Maroc).",
+      "adults_only_attestation": "Pour publier dans cette catégorie, confirmez qu'il s'agit d'un objet décoratif vendu uniquement à une personne majeure."
     },
     "wizard": {
       "title": "Déposer une annonce",
@@ -617,7 +618,8 @@
       "verifyLink": "Vérifier mon numéro",
       "verifyBody": "Vérifiez votre numéro pour l'afficher sur l'annonce ou proposer WhatsApp. Votre brouillon est conservé.",
       "verifySoon": "Afficher votre numéro ou proposer WhatsApp demande un numéro vérifié. Cette vérification n'est pas encore ouverte : en attendant, les acheteurs vous écrivent par la messagerie Joutiya.",
-      "revealNote": "Votre numéro n'apparaît jamais en clair sur la page : il faut être connecté et cliquer pour le voir."
+      "revealNote": "Votre numéro n'apparaît jamais en clair sur la page : il faut être connecté et cliquer pour le voir.",
+      "messagingOnly": "Dans cette catégorie réservée aux majeurs, les acheteurs vous contactent uniquement par la messagerie Joutiya : le téléphone et WhatsApp ne peuvent pas être affichés."
     },
     "photos": {
       "add": "Ajouter des photos",
@@ -705,7 +707,8 @@
         "self": "Moi-même",
         "explicit_consent": "Une autre personne, avec son accord explicite"
       },
-      "sensitiveNote": "Sans l'accord de la personne concernée, retirez ces informations de l'annonce."
+      "sensitiveNote": "Sans l'accord de la personne concernée, retirez ces informations de l'annonce.",
+      "adultsOnlyAttestation": "J'atteste qu'il s'agit d'un objet décoratif d'artisanat (koumiya ou poignard décoratif), qui n'est pas une arme de combat, et que je le vendrai uniquement à une personne majeure (18 ans et plus). Mon annonce sera vérifiée par un modérateur avant sa mise en ligne."
     },
     "done": {
       "publishedTitle": "Votre annonce est en ligne",
@@ -762,7 +765,9 @@
       "url_in_text": "Retirez le lien du texte : les liens vers d'autres sites ne sont pas autorisés.",
       "invalid": "Cette valeur n'est pas valide.",
       "not_allowed": "Cette information n'est pas autorisée dans cette catégorie.",
-      "sensitive_required": "Indiquez à qui se rapportent ces données personnelles."
+      "sensitive_required": "Indiquez à qui se rapportent ces données personnelles.",
+      "messaging_only": "Dans cette catégorie, le contact passe uniquement par la messagerie : désactivez le téléphone et WhatsApp.",
+      "adults_only_attestation": "Confirmez qu'il s'agit d'un objet décoratif d'artisanat vendu uniquement à une personne majeure."
     },
     "status": {
       "draft": "Brouillon",
@@ -824,6 +829,7 @@
         "ameublement": "Ameublement",
         "electromenager": "Électroménager",
         "decoration-artisanat": "Décoration & artisanat",
+        "koumiyas-decoratives": "Koumiyas & poignards décoratifs",
         "linge": "Linge de maison",
         "arts-de-la-table": "Arts de la table",
         "bricolage": "Bricolage",
@@ -2251,8 +2257,11 @@
           "account_suspended": "Votre compte est suspendu : vous ne pouvez pas envoyer de message.",
           "rate_limited": "Vous avez envoyé beaucoup de messages. Réessayez {wait}.",
           "later": "plus tard",
-          "quota_exhausted": "La messagerie est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc)."
-        }
+          "quota_exhausted": "La messagerie est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc).",
+          "adult_confirmation_required": "Cet article est réservé aux personnes majeures : confirmez avoir 18 ans ou plus pour écrire au vendeur."
+        },
+        "adultConfirm": "Je confirme avoir 18 ans ou plus.",
+        "adultMissing": "Confirmez avoir 18 ans ou plus pour écrire au vendeur."
       }
     },
     "safety": {
@@ -2287,7 +2296,11 @@
       "body": "Déposez une annonce gratuitement, en quelques minutes.",
       "cta": "Déposer une annonce"
     },
-    "cityDistrict": "{city}, {district}"
+    "cityDistrict": "{city}, {district}",
+    "adultsOnly": {
+      "title": "Réservé aux personnes majeures.",
+      "body": "Objet décoratif d'artisanat, vendu uniquement aux personnes de 18 ans et plus."
+    }
   },
   "Profile": {
     "roleIndividual": "Particulier",

@@ -145,6 +145,7 @@ export const FLAG_LABELS: Record<ModerationFlag, string> = {
   dup_photo: "Photo en double",
   new_account: "Compte récent",
   volume: "Volume élevé",
+  restricted_category: "Catégorie réservée aux majeurs",
 };
 
 export const DECISION_TEXT_MAX = 500;

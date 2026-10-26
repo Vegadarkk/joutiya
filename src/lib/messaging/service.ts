@@ -1,4 +1,5 @@
 import "server-only";
+import { subcategoryById } from "@/config/categories";
 import type { QuotaId } from "@/config/quotas";
 import { MESSAGE_TEXT_MAX, type MessageRiskFlag, type SendMessageResponse, type StartConversationResponse } from "@/lib/contracts/messaging";
 import { getListing } from "@/lib/db/repositories/listings";
@@ -121,9 +122,11 @@ async function append(actor: MessagingActor, cid: string, original: string, anal
 
 /**
  * First message about a listing (D4, D8): creates the (listing, buyer) conversation, or appends
- * to it when it exists. The caller checked Turnstile, the send limiter and the quota gate.
+ * to it when it exists. The caller checked Turnstile, the send limiter and the quota gate. An
+ * adults-only listing (decorative koumiyas) needs the buyer's 18+ confirmation, kept on the
+ * conversation as `buyerAdultConfirmedAt`.
  */
-export async function startConversation(actor: MessagingActor, input: { listingId: string; text: string }, now = new Date()): Promise<StartConversationResponse> {
+export async function startConversation(actor: MessagingActor, input: { listingId: string; text: string; adultConfirmed?: boolean }, now = new Date()): Promise<StartConversationResponse> {
   const analysis = analyze(input.text);
   const cid = conversationId(input.listingId, actor.uid);
   const [existing, buyer] = await Promise.all([getConversation(cid), getUserRecord(actor.uid)]);
@@ -141,6 +144,8 @@ export async function startConversation(actor: MessagingActor, input: { listingI
   if (!listing || !(PUBLIC_STATES as readonly string[]).includes(listing.status)) throw notFound();
   if (listing.ownerUid === actor.uid || (listing.proId !== undefined && listing.proId === actor.claims.proId)) throw new HttpError(409, "self_conversation");
   if (listing.status !== "published" || listing.moderation.hiddenBy || !listing.slugId) throw new HttpError(409, "listing_unavailable");
+  const adultsOnly = Boolean(subcategoryById(listing.subcategoryId ?? "")?.adultsOnly);
+  if (adultsOnly && !input.adultConfirmed) throw new HttpError(422, "adult_confirmation_required");
 
   const [seller, blocks] = await Promise.all([getUserRecord(listing.ownerUid), getUserBlocks([actor.uid, listing.ownerUid])]);
   if (!seller || SELLER_UNREACHABLE.includes(seller.status)) throw new HttpError(409, "listing_unavailable");
@@ -171,6 +176,7 @@ export async function startConversation(actor: MessagingActor, input: { listingI
     updatedAt: now,
     purgeAt: conversationPurgeAt(now),
     legalHold: [],
+    ...(adultsOnly ? { buyerAdultConfirmedAt: now } : {}),
   };
   let messageId: string;
   try {

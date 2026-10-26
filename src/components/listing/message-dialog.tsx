@@ -20,9 +20,10 @@ import { cn } from "@/lib/utils";
 // text, a Turnstile check (always on the first message of a conversation, AF §6), then POST
 // /api/conversations and the thread page. A conversation that already exists takes the message too
 // (the server answers its cid), so the buyer lands in it either way. Phone checks play no part.
+// An adults-only listing (decorative koumiyas) adds the buyer's 18+ confirmation, required.
 
 /** Codes with their own wording here; the rest take the generic API message. */
-export const COMPOSE_ERROR_KEYS = ["listing_unavailable", "not_found", "conversation_blocked", "account_suspended", "rate_limited", "quota_exhausted"] as const;
+export const COMPOSE_ERROR_KEYS = ["listing_unavailable", "not_found", "conversation_blocked", "account_suspended", "rate_limited", "quota_exhausted", "adult_confirmation_required"] as const;
 export type ComposeErrorKey = (typeof COMPOSE_ERROR_KEYS)[number];
 
 export function composeErrorKey(error: unknown): ComposeErrorKey | null {
@@ -43,11 +44,13 @@ export interface MessageDialogProps {
   listingId: string;
   listingTitle?: string;
   sellerName?: string;
+  /** Adults-only listing: the buyer confirms being 18 or older before the first message. */
+  adultsOnly?: boolean;
   /** The session ended meanwhile: the bar shows its sign-in prompt. */
   onSignedOut: () => void;
 }
 
-export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sellerName, onSignedOut }: MessageDialogProps) {
+export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sellerName, adultsOnly = false, onSignedOut }: MessageDialogProps) {
   const t = useTranslations("ListingPage.contact.compose");
   const generic = useApiErrorMessage();
   const locale = useLocale();
@@ -60,6 +63,8 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
   const [problem, setProblem] = useState<"empty" | "reserved" | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [challengeMissing, setChallengeMissing] = useState(false);
+  const [adult, setAdult] = useState(false);
+  const [adultMissing, setAdultMissing] = useState(false);
 
   const remaining = MESSAGE_TEXT_MAX - text.length;
 
@@ -74,7 +79,8 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
     if (pending) return;
     const found = composeProblem(text);
     setProblem(found);
-    if (found) return;
+    if (adultsOnly && !adult) setAdultMissing(true);
+    if (found || (adultsOnly && !adult)) return;
     if (!token) {
       setChallengeMissing(true);
       return;
@@ -82,7 +88,7 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
     setPending(true);
     setError(null);
     try {
-      const { cid } = await startConversation({ listingId, text: text.trim(), turnstileToken: token });
+      const { cid } = await startConversation({ listingId, text: text.trim(), turnstileToken: token, ...(adultsOnly ? { adultConfirmed: true as const } : {}) });
       router.push(`/messages/${cid}`);
     } catch (caught) {
       setPending(false);
@@ -143,6 +149,32 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
                 </p>
               ) : null}
             </div>
+
+            {adultsOnly ? (
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor={`${counterId}-adult`} className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
+                  <input
+                    id={`${counterId}-adult`}
+                    type="checkbox"
+                    checked={adult}
+                    aria-required="true"
+                    aria-invalid={adultMissing && !adult ? true : undefined}
+                    aria-describedby={adultMissing && !adult ? `${counterId}-adult-error` : undefined}
+                    onChange={(event) => {
+                      setAdult(event.target.checked);
+                      if (event.target.checked) setAdultMissing(false);
+                    }}
+                    className="mt-1 size-5 shrink-0 cursor-pointer rounded-sm border-border-strong accent-primary"
+                  />
+                  <span className="text-pretty">{t("adultConfirm")}</span>
+                </label>
+                {adultMissing && !adult ? (
+                  <InlineError id={`${counterId}-adult-error`} className="ps-8">
+                    {t("adultMissing")}
+                  </InlineError>
+                ) : null}
+              </div>
+            ) : null}
 
             <p className="flex items-start gap-2 text-sm text-foreground-muted text-pretty">
               <LockKeyhole className="mt-0.5 size-4 shrink-0 text-structure dark:text-gold-300" aria-hidden="true" />

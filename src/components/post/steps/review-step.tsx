@@ -52,9 +52,11 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
   const message = useValidationMessage();
   const saveMessage = useSaveErrorMessage();
   const acceptId = useId();
+  const adultsId = useId();
   const sensitiveId = useId();
   const issueOptions = useIssueOptions();
   const [accepted, setAccepted] = useState(false);
+  const [attested, setAttested] = useState(false);
   const [sensitive, setSensitive] = useState(listing.sensitiveDeclaration !== null);
   const [attempted, setAttempted] = useState(false);
   const [serverError, setServerError] = useState<unknown>();
@@ -75,6 +77,9 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
   const region = city ? regionByCode(city.regionCode) : undefined;
   const cover = photos.find((item) => item.status === "ready" && item.previewUrl) ?? photos.find((item) => item.previewUrl);
   const readyCount = photos.filter((item) => item.status === "ready").length;
+  // Adults-only subcategory (decorative koumiyas): the seller's attestation, sent with the publication.
+  const adultsOnly = Boolean(subcategory?.adultsOnly);
+  const attestationMissing = adultsOnly && !attested;
 
   useEffect(() => onBusy(publishing), [publishing, onBusy]);
 
@@ -92,7 +97,7 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
     try {
       // The server publishes what it holds: pending edits first. The indicator shows a failed save.
       if (!(await save({ reopen: listing.status === "rejected" }))) return;
-      const result = await publishListing(listingId, { acceptRules: true, ...(token ? { turnstileToken: token } : {}) });
+      const result = await publishListing(listingId, { acceptRules: true, ...(adultsOnly ? { adultsOnlyAttestation: true } : {}), ...(token ? { turnstileToken: token } : {}) });
       setBlockers([]);
       onPublished(result);
     } catch (error) {
@@ -137,7 +142,7 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
       return;
     }
     setAttempted(true);
-    if (incomplete || photosBusy || !accepted || sensitiveMissing) return;
+    if (incomplete || photosBusy || !accepted || attestationMissing || sensitiveMissing) return;
     if (turnstileNeeded && !token) return;
     await publish();
   }
@@ -307,6 +312,23 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
             </label>
             {attempted && !accepted ? <InlineError className="ps-8">{t("validation.accept_rules")}</InlineError> : null}
           </div>
+          {adultsOnly ? (
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor={adultsId} className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
+                <input
+                  id={adultsId}
+                  type="checkbox"
+                  checked={attested}
+                  aria-required="true"
+                  aria-invalid={attempted && !attested ? true : undefined}
+                  onChange={(event) => setAttested(event.target.checked)}
+                  className="mt-1 size-5 shrink-0 cursor-pointer rounded-sm border-border-strong accent-primary"
+                />
+                <span className="text-pretty">{t("review.adultsOnlyAttestation")}</span>
+              </label>
+              {attempted && !attested ? <InlineError className="ps-8">{t("validation.adults_only_attestation")}</InlineError> : null}
+            </div>
+          ) : null}
           <div className="flex flex-col gap-3 border-t border-border pt-4">
             <SwitchField label={t("review.sensitiveLabel")} hint={t("review.sensitiveHint")} checked={sensitive} onCheckedChange={onSensitive} />
             {sensitive ? (

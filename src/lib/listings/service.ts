@@ -378,6 +378,8 @@ export async function patchListing(actor: Actor, id: string, patch: ListingPatch
 
 export interface PublishOptions {
   turnstileToken?: string;
+  /** The seller ticked the adults-only attestation (required in an `adultsOnly` subcategory). */
+  adultsOnlyAttestation?: boolean;
   device: Device;
   now?: Date;
 }
@@ -405,6 +407,7 @@ export async function publish(actor: Actor, request: Request, id: string, option
   if (blockers.length > 0) throw invalidListing(blockers);
   const screening = await screenFor(listing, seller, now);
   if (screening.blockers.length > 0) throw invalidListing(screening.blockers);
+  if (subcategoryById(listing.subcategoryId ?? "")?.adultsOnly && !options.adultsOnlyAttestation) throw new HttpError(422, "adults_only_attestation");
 
   await assertWithinQuota(uid, seller.quotas);
   const turnstilePassed = await escalateOnIp(request, "listing.create.ip", options.device, options.turnstileToken, "listing");

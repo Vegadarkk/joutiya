@@ -65,8 +65,9 @@ export const HELP_FR: HelpLocaleContent = {
         "Votre brouillon est enregistré au fil de la saisie : vous pouvez reprendre plus tard. Vous pouvez garder jusqu'à {maxDrafts} brouillons ; un brouillon sans modification pendant {draftPurgeDays} jours est supprimé.",
         "En général, l'annonce est en ligne dès sa publication. Certaines sont relues par un modérateur avant leur mise en ligne, en général sous 24 heures ; un e-mail vous prévient.",
         "Une annonce reste en ligne {ttlDays} jours. Vous êtes responsable de ce que vous vendez au regard de la loi marocaine. Les objets et services interdits sur Joutiya sont listés dans la page « Objets interdits ».",
+        "Les koumiyas et poignards décoratifs d'artisanat se déposent uniquement dans la catégorie « Koumiyas & poignards décoratifs » (Maison & Jardin), réservée aux personnes majeures : vous attestez que l'objet est décoratif et que vous le vendrez à une personne majeure, chaque annonce est vérifiée par un modérateur avant sa mise en ligne, et le contact passe uniquement par la messagerie.",
       ],
-      keywords: ["publier", "vendre", "poster", "mettre en ligne", "nouvelle annonce", "brouillon", "gratuit", "relecture"],
+      keywords: ["publier", "vendre", "poster", "mettre en ligne", "nouvelle annonce", "brouillon", "gratuit", "relecture", "koumiya", "poignard"],
     },
     "photos-d-une-annonce": {
       title: "Les photos d'une annonce",
@@ -135,6 +136,7 @@ export const HELP_FR: HelpLocaleContent = {
             "Les liens ne sont pas transmis : ils apparaissent masqués.",
             "Un avertissement s'affiche quand un message parle de paiement à l'avance ou contient des coordonnées bancaires.",
             "Vous pouvez archiver une conversation ou la supprimer de votre messagerie ; l'autre personne garde la sienne.",
+            "Pour une annonce réservée aux majeurs (koumiyas et poignards décoratifs), vous confirmez avoir 18 ans ou plus avant votre premier message.",
           ],
         },
         "Votre adresse e-mail n'est jamais montrée à l'autre personne : seul votre nom affiché apparaît.",

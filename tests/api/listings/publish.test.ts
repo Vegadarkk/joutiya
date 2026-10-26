@@ -163,6 +163,32 @@ describe("POST /api/listings/{id}/publish", () => {
     expect(pending.body.listings.map((listing) => listing.id)).toEqual([id]);
   });
 
+  it("publishes an adults-only listing (decorative koumiyas) only with the attestation, always held for a moderator", async () => {
+    const owner = await member();
+    const koumiya = {
+      subcategoryId: "koumiyas-decoratives",
+      title: "Koumiya décorative en cuivre ciselé",
+      description: "Koumiya de décoration faite à la main par un artisan de Fès, fourreau en cuivre ciselé, à accrocher au mur.",
+      attributes: { material: "cuivre", handmade: true },
+      price: 1200,
+    };
+    const shown = await readyDraft(owner, { ...koumiya, contact: { showPhone: true, whatsapp: false } });
+    const messagingOnly = await api<ErrorBody & { error: { details: FieldIssue[] } }>(publish, "POST", `/api/listings/${shown}/publish`, { member: owner, body: { ...ACCEPT, adultsOnlyAttestation: true } });
+    expect(messagingOnly.status).toBe(422);
+    expect(codesOf(messagingOnly.body.error.details)).toEqual(["contact.showPhone:messaging_only"]);
+
+    const id = await readyDraft(owner, koumiya);
+    const missing = await api<ErrorBody>(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: ACCEPT });
+    expect(missing.status).toBe(422);
+    expect(missing.body.error.code).toBe("adults_only_attestation");
+    expect((await getListing(id))?.status).toBe("draft");
+
+    const result = await api<PublishBody>(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: { ...ACCEPT, adultsOnlyAttestation: true } });
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ status: "pending_review", flags: ["restricted_category"] });
+    expect((await getListing(id))?.moderation).toMatchObject({ state: "needs_review", flags: ["restricted_category"], score: 0 });
+  });
+
   it("limits an individual to 5 publications a day (listing_daily_limit, Retry-After)", { timeout: 90_000 }, async () => {
     const owner = await member();
     for (let i = 0; i < 5; i += 1) {

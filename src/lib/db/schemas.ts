@@ -514,6 +514,8 @@ export const conversationSchema = z
     /** Last activity + 12 months (AF §7 retention). */
     purgeAt: ts,
     legalHold: hold,
+    /** Adults-only listing: when the buyer confirmed being 18 or older (first message). */
+    buyerAdultConfirmedAt: ts.optional(),
   })
   .strict();
 export type ConversationDoc = z.infer<typeof conversationSchema>;

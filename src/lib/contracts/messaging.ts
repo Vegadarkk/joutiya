@@ -61,7 +61,13 @@ const messageTextSchema = z.preprocess(
 );
 
 export const startConversationSchema = z
-  .object({ listingId: listingIdSchema, text: messageTextSchema, turnstileToken: turnstileTokenSchema })
+  .object({
+    listingId: listingIdSchema,
+    text: messageTextSchema,
+    turnstileToken: turnstileTokenSchema,
+    /** The buyer confirms being 18 or older: required to start a conversation about an adults-only listing. */
+    adultConfirmed: z.literal(true).optional(),
+  })
   .strict();
 export type StartConversationRequest = z.infer<typeof startConversationSchema>;
 
