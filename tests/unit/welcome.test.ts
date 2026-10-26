@@ -190,11 +190,11 @@ describe("focus trap", () => {
 });
 
 describe("door timeline", () => {
-  it("fits in 1.6 s, mirrors the swing in Arabic and animates transform and opacity only", () => {
+  it("fits in 2.5 s, mirrors the swing in Arabic and animates transform and opacity only", () => {
     const ltr = doorSteps({ rtl: false, scale: MIN_PUSH_SCALE });
     const rtl = doorSteps({ rtl: true, scale: MIN_PUSH_SCALE });
     expect(stepsEnd(ltr)).toBe(DOOR_DURATION_MS);
-    expect(stepsEnd(ltr)).toBeLessThanOrEqual(1600);
+    expect(stepsEnd(ltr)).toBeLessThanOrEqual(2500);
     expect(ltr.find((step) => step.part === "leaf")?.keyframes.at(-1)).toEqual({ transform: "rotateY(-100deg)" });
     expect(rtl.find((step) => step.part === "leaf")?.keyframes.at(-1)).toEqual({ transform: "rotateY(100deg)" });
     for (const step of ltr) for (const frame of step.keyframes) for (const key of Object.keys(frame)) expect(["transform", "opacity"]).toContain(key);

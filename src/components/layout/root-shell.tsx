@@ -7,7 +7,7 @@ import type { PublicConfig } from "@/lib/config/public-types";
 import type { SessionSummary } from "@/lib/contracts/auth";
 import { getLegalConfig } from "@/lib/legal/config";
 import { pickMessages } from "@/i18n/client-messages";
-import { readex, tarifitFallback } from "@/lib/fonts";
+import { readex, ruqaa, tarifitFallback } from "@/lib/fonts";
 import { Providers } from "./providers";
 import { SiteHeader } from "./site-header";
 import { WelcomeScript } from "@/components/welcome/welcome-script";
@@ -38,7 +38,7 @@ export async function RootShell({ locale, nonce, config, initialSession, clientN
   const { companyName } = await getLegalConfig();
   const dir = isRtl(locale) ? "rtl" : "ltr";
   return (
-    <html lang={LOCALE_TAGS[locale]} dir={dir} className={`${readex.variable} ${tarifitFallback.variable}`} suppressHydrationWarning>
+    <html lang={LOCALE_TAGS[locale]} dir={dir} className={`${readex.variable} ${tarifitFallback.variable} ${ruqaa.variable}`} suppressHydrationWarning>
       <body className="flex min-h-dvh flex-col antialiased">
         <ThemeScript nonce={nonce} />
         {/* Before anything paints too: the welcome threshold of a first visit to the home page. */}
