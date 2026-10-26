@@ -108,8 +108,10 @@ export function LoginForm({ nonce, gisNonce }: { nonce?: string; gisNonce?: stri
       ) : null}
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
         <FormMessage error={serverError} />
+        {/* No autoFocus: with "onTouched" validation, leaving a focused empty field (to click the
+            Google button above) would flag it as an error the person never caused. */}
         <Field label={c("email")} error={fieldMessage("email", errors.email)} required>
-          <Input type="email" inputMode="email" autoComplete="username" spellCheck={false} autoFocus dir="ltr" className="text-start" {...register("email")} />
+          <Input type="email" inputMode="email" autoComplete="username" spellCheck={false} dir="ltr" className="text-start" {...register("email")} />
         </Field>
         <PasswordField
           label={c("password")}
