@@ -110,7 +110,7 @@ describe("planEnv", () => {
     expect(staging.values.TELEGRAM_BOT_TOKEN).toBeUndefined();
     expect(staging.ignored.map((line) => line.split(":")[0])).toEqual(["HASH_PEPPER", "FIREBASE_APP_ID", "TELEGRAM_BOT_TOKEN", "SENTRY_DSN", "CSRF_SECRET"]);
     expect(staging.ignored.join("\n")).not.toContain("FIREBASE_SERVICE_ACCOUNT_JSON");
-    expect(staging.missing).toEqual(["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "ALERT_RELAY_URL", "ALERT_RELAY_SECRET", "FIREBASE_API_KEY", "MAIL_API_KEY", "MAIL_WEBHOOK_SECRET", "CF_ACCESS_AUD"]);
+    expect(staging.missing).toEqual(["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "ALERT_RELAY_URL", "ALERT_RELAY_SECRET", "FIREBASE_API_KEY", "MAIL_API_KEY", "MAIL_WEBHOOK_SECRET"]);
 
     const prod = plan("prod");
     expect(prod.errors).toEqual([]);
