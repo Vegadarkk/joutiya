@@ -10,7 +10,8 @@ import { hasChallengePass } from "@/lib/security/challenge-pass";
 import { verifyTurnstile, type TurnstileAction } from "@/lib/security/turnstile";
 
 // Search limits (§6, design D13), shared by GET /api/search and the /recherche page: per device
-// (per account when signed in) 30 a minute and 600 an hour, per IP 120 a minute. Over any of them,
+// (per account when signed in) 30 a minute and 600 an hour, per IP 120 a minute (IPv6: also 1 200
+// a minute per /48). Over any of them,
 // a valid `__Host-tsv` pass allows `search.passed.device` more, then 429; without a pass the caller
 // must solve Turnstile (403 `turnstile_required`) and retry with the token in `x-turnstile-token`.
 // Every limiter is "open": valkey-ratelimit down never blocks searching.
@@ -33,6 +34,7 @@ export async function enforceSearchLimit(request: Request): Promise<{ passGrante
     consumeLimit("search.device.minute", subject),
     consumeLimit("search.device.hour", subject),
     consumeLimit("search.ip", identity.ipBucket),
+    ...(identity.ip48 ? [consumeLimit("search.ip48", identity.ip48)] : []),
   ]);
   if (!outcomes.some(isLimited)) return { passGranted: false };
 

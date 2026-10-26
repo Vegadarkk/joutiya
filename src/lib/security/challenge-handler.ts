@@ -22,16 +22,19 @@ import { verifyTurnstile } from "./turnstile";
 // without a siteverify call. The IP ceiling only holds against a device that already failed: an
 // IPv4 behind a carrier-grade NAT is shared by strangers, and one of them sending junk tokens must
 // not cheaply refuse the others a valid solve. A client minting a fresh device cookie for every
-// junk token never meets it; the hard IP ceiling (5x) bounds that one, for every device.
+// junk token never meets it; the hard IP ceiling (5x) bounds that one, for every device, and for
+// an IPv6 client a /48 ceiling (10x the hard one) bounds rotation across its /64s.
 
 /** Throws 429 when this client spent its failed checks (none spent: always checked). */
 export async function assertChallengeBudget(identity: RequestIdentity): Promise<void> {
-  const [device, ip, hard] = await Promise.all([
+  const [device, ip, hard, network] = await Promise.all([
     limitState("challenge.device", identity.deviceKey),
     limitState("challenge.ip", identity.ipBucket),
     limitState("challenge.ip.hard", identity.ipBucket),
+    identity.ip48 ? limitState("challenge.ip48.hard", identity.ip48) : null,
   ]);
   if (hard && hard.consumedPoints >= RATE_LIMITS["challenge.ip.hard"].points) throw rateLimited(hard.msBeforeNext / 1000);
+  if (network && network.consumedPoints >= RATE_LIMITS["challenge.ip48.hard"].points) throw rateLimited(network.msBeforeNext / 1000);
   if (!device) return;
   if (device.consumedPoints >= RATE_LIMITS["challenge.device"].points) throw rateLimited(device.msBeforeNext / 1000);
   if (device.consumedPoints > 0 && ip && ip.consumedPoints >= RATE_LIMITS["challenge.ip"].points) throw rateLimited(ip.msBeforeNext / 1000);
@@ -44,6 +47,7 @@ export async function recordChallengeFailure(identity: RequestIdentity, codes: r
     consumeLimit("challenge.device", identity.deviceKey),
     consumeLimit("challenge.ip", identity.ipBucket),
     consumeLimit("challenge.ip.hard", identity.ipBucket),
+    ...(identity.ip48 ? [consumeLimit("challenge.ip48.hard", identity.ip48)] : []),
   ]);
 }
 

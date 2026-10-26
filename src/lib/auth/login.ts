@@ -98,9 +98,12 @@ async function login(request: Request): Promise<Response> {
   // §6 "une IP n'est jamais bloquée net": past 300 attempts per hour an IP (CGNAT: hundreds of
   // subscribers behind it) escalates to Turnstile instead of a 429. The store being down still
   // refuses (policy "closed"). Device and account keys keep their hard answers.
+  // An IPv6 client also counts on its /48 (§6), with the same escalation.
   const ipOutcome = await consumeLimit("login.ip", flow.identity.ipBucket);
   if (!ipOutcome.ok && ipOutcome.reason === "unavailable") assertLimit("login.ip", ipOutcome);
-  const ipEscalated = !ipOutcome.ok;
+  const networkOutcome = flow.identity.ip48 ? await consumeLimit("login.ip48", flow.identity.ip48) : null;
+  if (networkOutcome && !networkOutcome.ok && networkOutcome.reason === "unavailable") assertLimit("login.ip48", networkOutcome);
+  const ipEscalated = !ipOutcome.ok || (networkOutcome !== null && !networkOutcome.ok);
   const keys = loginKeys(input.email, flow.identity.ipBucket);
   const { failures, accountFailures } = await assertNotLocked(keys);
 
