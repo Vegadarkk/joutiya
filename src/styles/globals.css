@@ -463,6 +463,11 @@ html[data-welcome]:has(#main:target) .welcome {
 
 /* The door (src/components/welcome/door-scene.tsx): layers sharing the logo's viewBox. */
 .welcome-door {
+  /* One unit of the artwork's viewBox, and the leaf's depth in those units (door-scene.tsx). */
+  --welcome-u: calc(var(--welcome-door-h) / 386);
+  --welcome-leaf-t: 9;
+  /* The strips reach a little behind the back face: no seam where they meet it. */
+  --welcome-edge-d: calc(var(--welcome-leaf-t) + 1);
   position: relative;
   flex: none;
   height: var(--welcome-door-h);
@@ -522,6 +527,25 @@ html[data-welcome]:has(#main:target) .welcome {
   backface-visibility: hidden;
 }
 .welcome-face-back {
-  transform: rotateY(180deg);
+  transform: translateZ(calc(var(--welcome-u) * var(--welcome-leaf-t) * -1)) rotateY(180deg);
+}
+/* The free edge: strips standing between the faces, shaded darker than the front. Mirrored in RTL,
+   where the hinge is on the right. */
+.welcome-edges {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+[dir="rtl"] .welcome-edges {
+  transform: scaleX(-1);
+}
+.welcome-edge {
+  position: absolute;
+  left: calc(var(--welcome-u) * (var(--edge-x) - var(--edge-l) / 2));
+  top: calc(var(--welcome-u) * (var(--edge-y) - var(--welcome-edge-d) / 2));
+  width: calc(var(--welcome-u) * var(--edge-l));
+  height: calc(var(--welcome-u) * var(--welcome-edge-d));
+  background: linear-gradient(var(--color-ochre-800), var(--color-ochre-700) 55%, var(--color-ochre-600));
+  transform: translateZ(calc(var(--welcome-u) * var(--welcome-edge-d) / -2)) rotateZ(var(--edge-a)) rotateX(90deg);
 }
 /* ── end welcome ── */

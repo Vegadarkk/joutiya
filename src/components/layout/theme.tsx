@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { THEME_ATTRIBUTE, THEME_STORAGE_KEY } from "@/lib/theme/script";
 
-// Light, dark or system, without a theming library: the stored choice and the system preference
+// Light (the default), dark or system, without a theming library: the stored choice and the system preference
 // are external stores; THEME_SCRIPT applies them before paint, ThemeSync keeps them applied.
 
 export type ThemeChoice = "light" | "dark" | "system";
@@ -31,9 +31,9 @@ function subscribe(listener: () => void): () => void {
 function storedChoice(): ThemeChoice {
   try {
     const value = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return value === "light" || value === "dark" ? value : "system";
+    return value === "dark" || value === "system" ? value : "light";
   } catch {
-    return "system";
+    return "light";
   }
 }
 
@@ -50,12 +50,12 @@ function apply(theme: ResolvedTheme): void {
 }
 
 export function useTheme(): { theme: ThemeChoice; resolvedTheme: ResolvedTheme; setTheme: (choice: ThemeChoice) => void } {
-  const theme = useSyncExternalStore(subscribe, storedChoice, () => "system" as const);
+  const theme = useSyncExternalStore(subscribe, storedChoice, () => "light" as const);
   const dark = useSyncExternalStore(subscribe, systemDark, () => false);
   const resolvedTheme: ResolvedTheme = theme === "system" ? (dark ? "dark" : "light") : theme;
   const setTheme = useCallback((choice: ThemeChoice) => {
     try {
-      if (choice === "system") window.localStorage.removeItem(THEME_STORAGE_KEY);
+      if (choice === "light") window.localStorage.removeItem(THEME_STORAGE_KEY);
       else window.localStorage.setItem(THEME_STORAGE_KEY, choice);
     } catch {
       // Storage blocked: the choice lasts for this page only.

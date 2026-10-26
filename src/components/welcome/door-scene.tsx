@@ -34,6 +34,35 @@ export const LEAF_BOX = { x: 191.49, y: 141.37, width: 129.02, height: 272.79 } 
 /** The hinge: the leaf's straight side, from the start edge of its box. */
 const HINGE = (202.24 - LEAF_BOX.x) / LEAF_BOX.width;
 
+/**
+ * The leaf's thickness (owner, 21 Oct: "beaucoup trop fine"): the free edge, which turns towards the
+ * viewer as the leaf opens, built from flat strips: the straight side, then the arch up to its apex
+ * (centre and angles of LEAF's free-side arc, radius 76.34). The leaf is LEAF_THICKNESS deep
+ * (globals.css: --welcome-leaf-t), front face in place, back face behind.
+ */
+const ARC = { cx: 244.17, cy: 216.79, r: 76.34, from: 30.78, to: -81.09 } as const;
+const ARC_SEGMENTS = 12;
+type Point = { x: number; y: number };
+const arcPoint = (degrees: number): Point => {
+  const angle = (degrees * Math.PI) / 180;
+  return { x: ARC.cx + ARC.r * Math.cos(angle), y: ARC.cy + ARC.r * Math.sin(angle) };
+};
+const EDGE_POINTS: Point[] = [
+  { x: 309.76, y: 414.16 },
+  ...Array.from({ length: ARC_SEGMENTS + 1 }, (_, index) => arcPoint(ARC.from + ((ARC.to - ARC.from) * index) / ARC_SEGMENTS)),
+];
+/** One strip per segment, centred on it in the leaf's box (viewBox units), along its direction. */
+const EDGE_STYLES = EDGE_POINTS.slice(0, -1).map((start, index) => {
+  const end = EDGE_POINTS[index + 1] ?? start;
+  return {
+    "--edge-x": ((start.x + end.x) / 2 - LEAF_BOX.x).toFixed(2),
+    "--edge-y": ((start.y + end.y) / 2 - LEAF_BOX.y).toFixed(2),
+    // Longer than the segment: strips overlap, no seam where they meet.
+    "--edge-l": (Math.hypot(end.x - start.x, end.y - start.y) + 1.5).toFixed(2),
+    "--edge-a": `${((Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI).toFixed(2)}deg`,
+  } as CSSProperties;
+});
+
 const VIEWBOX = `${DOOR_VIEWBOX.x} ${DOOR_VIEWBOX.y} ${DOOR_VIEWBOX.width} ${DOOR_VIEWBOX.height}`;
 const LEAF_VIEWBOX = `${LEAF_BOX.x} ${LEAF_BOX.y} ${LEAF_BOX.width} ${LEAF_BOX.height}`;
 
@@ -107,9 +136,15 @@ export function DoorScene() {
               <path className="fill-bab-950" d={LEAF} />
             </svg>
           </div>
+          <div className="welcome-edges">
+            {EDGE_STYLES.map((style, index) => (
+              <div key={index} className="welcome-edge" style={style} />
+            ))}
+          </div>
           <div className="welcome-face welcome-face-back">
             <svg className="welcome-layer" viewBox={LEAF_VIEWBOX} focusable="false">
-              <path className="fill-ochre-800" d={LEAF} />
+              {/* The stroke closes the anti-aliased seam with the edge strips. */}
+              <path className="fill-ochre-800 stroke-ochre-800" strokeWidth="1.5" d={LEAF} />
             </svg>
           </div>
         </div>
