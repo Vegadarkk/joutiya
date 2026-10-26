@@ -9,12 +9,12 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | # | Étape | Qui | État |
 |---|---|---|---|
 | 1 | Tunnels Cloudflare | Claude (API) | Fait |
-| 2 | DNS de `joutiya.ma` | Claude (API) | `joutiya.ma` et `www` faits ; les noms protégés attendent l'étape 6 |
+| 2 | DNS de `joutiya.ma` | Claude (API) | Fait ; noms protégés le 26 octobre, avec leurs applications Access |
 | 3 | Réseau et VM Oracle | Claude (API), Nav pour le quota | Réseau fait, quota corrigé par Nav ; VM en création |
 | 4 | Accès de Claude à la VM | Nav, sur votre phrase | Fait ; vérifié sur la VM dès sa création |
 | 5 | Connexion Google d'Access | Nav, puis vous | Fait le 16 octobre, vérifié |
-| 6 | Applications Access et jetons de service | Claude (API), Nav | Après les étapes 5 et 7 (Access exige une zone active) |
-| 7 | Serveurs DNS chez Cloudflare | Nav (Hostinger) | Après la validation du .MA, avant le 12 novembre |
+| 6 | Applications Access et jetons de service | Claude (API), Nav | Fait le 26 octobre ; secrets des jetons renouvelés par API à la pose de leur destination (étapes 8 et 11) |
+| 7 | Serveurs DNS chez Cloudflare | Nav (Hostinger) | Fait le 26 octobre (bascule 13:07 UTC, zone active 15:24 UTC) ; `notif.joutiya.ma` vérifié chez Resend et Brevo |
 | 8 | Déploiement automatique du staging | Claude (API), vous pour un jeton | Après les étapes 6 et 7 |
 | 9 | Accès sans clé de la VM à Firestore | Claude (outil), Nav sur le PC2 pour la partie Google | Partie Google faite le 16 octobre (staging et production testés) ; certificats de la VM dès qu'elle existe |
 | 10 | Mentions légales de la production | Claude | Hébergeurs relevés le 16 octobre, dans le code |
