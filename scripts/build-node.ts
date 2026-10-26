@@ -51,6 +51,8 @@ await build({
     "worker/search-setup": "scripts/search-setup.ts",
   },
   packages: "external",
+  // The web server revalidates ISR pages itself; Node cannot import "next/cache" from the worker.
+  alias: { ...common.alias, "next/cache": "./src/lib/next-cache-outside-next.ts" },
 });
 
 const worker = "dist/worker/index.mjs";

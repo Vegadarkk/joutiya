@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "node scripts/copy-vendor.mjs && next dev",
     "build": "node scripts/copy-vendor.mjs && next build && npm run build:node",
-    "build:node": "node scripts/build-node.ts",
+    "build:node": "node scripts/build-node.ts && node --experimental-import-meta-resolve scripts/check-worker-imports.ts",
     "start": "next start",
     "worker": "node dist/worker/index.mjs",
     "lint": "eslint .",
