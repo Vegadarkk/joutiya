@@ -17,6 +17,7 @@ import { FormMessage, useApiErrorMessage, useFieldMessage } from "./form-message
 import { PasswordField } from "./password-field";
 import { ResendVerification } from "./resend-verification";
 import { StatusPanel } from "./status-panel";
+import { useHydrated } from "./use-hydrated";
 
 // /action?mode=verifyEmail|resetPassword&oobCode=...: the code is read in the browser and posted
 // to /api/auth/action, never fetched server side (it stays out of logs and caches). Once read, it is
@@ -204,6 +205,7 @@ function ResetPasswordForm({ oobCode, email, onDone }: { oobCode: string; email:
   const fieldMessage = useFieldMessage();
   const apiMessage = useApiErrorMessage();
   const [serverError, setServerError] = useState<unknown>();
+  const hydrated = useHydrated();
   const {
     register,
     handleSubmit,
@@ -225,7 +227,7 @@ function ResetPasswordForm({ oobCode, email, onDone }: { oobCode: string; email:
   }
 
   return (
-    <form onSubmit={(event) => void handleSubmit(onValid)(event)} noValidate className="flex flex-col gap-5">
+    <form method="post" onSubmit={(event) => void handleSubmit(onValid)(event)} noValidate className="flex flex-col gap-5">
       <div className="flex items-center gap-3 rounded-md bg-surface-muted px-4 py-3 text-sm">
         <KeyRound className="size-4 shrink-0 text-primary" aria-hidden="true" />
         <span className="text-pretty">{t("resetLead", { email })}</span>
@@ -242,7 +244,7 @@ function ResetPasswordForm({ oobCode, email, onDone }: { oobCode: string; email:
       />
       {/* Password managers read the account from this hidden field. */}
       <input type="hidden" name="username" autoComplete="username" value={email} readOnly />
-      <Button type="submit" loading={isSubmitting} className="w-full">
+      <Button type="submit" loading={isSubmitting} disabled={!hydrated} className="w-full">
         {t("resetSubmit")}
       </Button>
     </form>

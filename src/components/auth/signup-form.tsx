@@ -22,6 +22,7 @@ import { ResendVerification } from "./resend-verification";
 import { StatusPanel } from "./status-panel";
 import { TurnstileWidget, type TurnstileHandle } from "./turnstile-widget";
 import { useAfterSignIn } from "./use-after-sign-in";
+import { useHydrated } from "./use-hydrated";
 
 type SignupForm = z.input<typeof signupSchema>;
 
@@ -36,6 +37,7 @@ export function SignupForm({ nonce, gisNonce }: { nonce?: string; gisNonce?: str
   const [serverError, setServerError] = useState<unknown>();
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [consent, setConsent] = useState<GoogleNeedsConsent | null>(null);
+  const hydrated = useHydrated();
   const {
     register,
     handleSubmit,
@@ -87,7 +89,8 @@ export function SignupForm({ nonce, gisNonce }: { nonce?: string; gisNonce?: str
   return (
     <div className="flex flex-col gap-6">
       <GoogleButton nonce={nonce} gisNonce={gisNonce} onSignedIn={afterSignIn} onNeedsConsent={setConsent} onError={setServerError} divider={<OrDivider label={c("or")} />} />
-      <form onSubmit={(event) => void handleSubmit(onValid)(event)} noValidate className="flex flex-col gap-5">
+      {/* POST, never GET: submitted before hydration, the fields must not land in the URL. */}
+      <form method="post" onSubmit={(event) => void handleSubmit(onValid)(event)} noValidate className="flex flex-col gap-5">
         <FormMessage error={serverError} />
         <Field label={t("displayName")} hint={t("displayNameHint")} error={fieldMessage("displayName", errors.displayName)} required>
           <Input autoComplete="name" maxLength={40} {...register("displayName")} />
@@ -114,7 +117,7 @@ export function SignupForm({ nonce, gisNonce }: { nonce?: string; gisNonce?: str
           onToken={(token) => setValue("turnstileToken", token ?? "", { shouldValidate: submitCount > 0 })}
           error={errors.turnstileToken ? c("turnstilePending") : undefined}
         />
-        <Button type="submit" loading={isSubmitting} className="w-full">
+        <Button type="submit" loading={isSubmitting} disabled={!hydrated} className="w-full">
           {t("submit")}
         </Button>
       </form>

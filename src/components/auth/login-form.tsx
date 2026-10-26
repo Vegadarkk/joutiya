@@ -21,6 +21,7 @@ import { PasswordField } from "./password-field";
 import { ResendVerification } from "./resend-verification";
 import { TurnstileWidget, type TurnstileHandle } from "./turnstile-widget";
 import { useAfterSignIn } from "./use-after-sign-in";
+import { useHydrated } from "./use-hydrated";
 
 type LoginForm = z.input<typeof loginSchema>;
 
@@ -38,6 +39,7 @@ export function LoginForm({ nonce, gisNonce }: { nonce?: string; gisNonce?: stri
   const [turnstileNeeded, setTurnstileNeeded] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [consent, setConsent] = useState<GoogleNeedsConsent | null>(null);
+  const hydrated = useHydrated();
   const {
     register,
     handleSubmit,
@@ -106,7 +108,8 @@ export function LoginForm({ nonce, gisNonce }: { nonce?: string; gisNonce?: stri
           <ResendVerification nonce={nonce} defaultEmail={unverifiedEmail} entry="login" />
         </section>
       ) : null}
-      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
+      {/* POST, never GET: submitted before hydration, the fields must not land in the URL. */}
+      <form method="post" onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
         <FormMessage error={serverError} />
         {/* No autoFocus: with "onTouched" validation, leaving a focused empty field (to click the
             Google button above) would flag it as an error the person never caused. */}
@@ -134,7 +137,7 @@ export function LoginForm({ nonce, gisNonce }: { nonce?: string; gisNonce?: stri
             <TurnstileWidget ref={turnstile} action="login" nonce={nonce} onToken={onToken} />
           </div>
         ) : null}
-        <Button type="submit" loading={isSubmitting} className="w-full">
+        <Button type="submit" loading={isSubmitting} disabled={!hydrated} className="w-full">
           {t("submit")}
         </Button>
       </form>

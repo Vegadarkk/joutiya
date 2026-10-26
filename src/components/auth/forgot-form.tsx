@@ -16,6 +16,7 @@ import { AUTH_API, resetRequestSchema, type ResetRequestInput, type ResetRequest
 import { FormMessage, useFieldMessage } from "./form-message";
 import { StatusPanel } from "./status-panel";
 import { TurnstileWidget, type TurnstileHandle } from "./turnstile-widget";
+import { useHydrated } from "./use-hydrated";
 
 type ForgotForm = z.input<typeof resetRequestSchema>;
 
@@ -27,6 +28,7 @@ export function ForgotForm({ nonce }: { nonce?: string }) {
   const turnstile = useRef<TurnstileHandle>(null);
   const [serverError, setServerError] = useState<unknown>();
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const hydrated = useHydrated();
   const {
     register,
     handleSubmit,
@@ -66,7 +68,7 @@ export function ForgotForm({ nonce }: { nonce?: string }) {
   }
 
   return (
-    <form onSubmit={(event) => void handleSubmit(onValid)(event)} noValidate className="flex flex-col gap-5">
+    <form method="post" onSubmit={(event) => void handleSubmit(onValid)(event)} noValidate className="flex flex-col gap-5">
       <FormMessage error={serverError} />
       <Field label={c("email")} error={fieldMessage("email", errors.email)} required>
         <Input type="email" inputMode="email" autoComplete="username" spellCheck={false} autoFocus dir="ltr" className="text-start" {...register("email")} />
@@ -78,7 +80,7 @@ export function ForgotForm({ nonce }: { nonce?: string }) {
         onToken={(token) => setValue("turnstileToken", token ?? "", { shouldValidate: submitCount > 0 })}
         error={errors.turnstileToken ? c("turnstilePending") : undefined}
       />
-      <Button type="submit" loading={isSubmitting} className="w-full">
+      <Button type="submit" loading={isSubmitting} disabled={!hydrated} className="w-full">
         {t("submit")}
       </Button>
     </form>
