@@ -78,6 +78,18 @@ describe("checkPageLimits", () => {
     expect(store.calls[0]?.key).toBe("session-cookie-value");
   });
 
+  it("also counts an IPv6 visitor on its /48, so rotating /64s meets a limit (§6, audit A2-02)", async () => {
+    await checkPageLimits(request({}, { "x-forwarded-for": "2001:db8:abcd:12::7" }));
+    expect(store.calls).toEqual([
+      { id: "pages.ip", key: "2001:0db8:abcd:0012::/64" },
+      { id: "pages.ip48", key: "2001:0db8:abcd::/48" },
+    ]);
+    store.calls.length = 0;
+    store.outcomes.set("pages.ip48", LIMITED);
+    await expect(checkPageLimits(request({}, { "x-forwarded-for": "2001:db8:abcd:9999::1" }))).resolves.toEqual({ kind: "challenge", retryAfterSeconds: 90 });
+    expect(store.calls.at(-1)).toEqual({ id: "pages.ip48", key: "2001:0db8:abcd::/48" });
+  });
+
   it("exempts verified bots without consuming anything", async () => {
     store.outcomes.set("pages.ip", LIMITED);
     await expect(checkPageLimits(request({}, { "x-verified-bot": "1" }))).resolves.toEqual({ kind: "allow" });

@@ -63,6 +63,7 @@ async function signup(request: Request): Promise<Response> {
   const flow = beginAnonymous(request);
   const input = await readJson(request, signupSchema);
   await enforceLimit("signup.ip", flow.identity.ipBucket);
+  if (flow.identity.ip48) await enforceLimit("signup.ip48", flow.identity.ip48);
   // Firestore writes degraded (§2): the documents would fail after the Auth record; refused first.
   // Before the device limit (3 a day): a refusal must not use up the retry its Retry-After invites.
   await assertQuotas(SIGNUP_QUOTAS);

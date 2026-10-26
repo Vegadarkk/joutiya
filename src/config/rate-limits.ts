@@ -27,6 +27,9 @@ export const RATE_LIMITS = {
   // IP: 30 per hour, Turnstile always required.
   "signup.device": { points: 3, duration: DAY, policy: "closed", key: "device" },
   "signup.ip": { points: 30, duration: HOUR, policy: "closed", key: "ip" },
+  // IPv6 clients also count on their /48 (§6 "Les clés": the wider counter for aggressive sources),
+  // ten times the /64 allowance; IPv4 clients have no such counter (keys.ts `ip48`).
+  "signup.ip48": { points: 300, duration: HOUR, policy: "closed", key: "ip48" },
   // Sign-up attempt on an e-mail that already has an account: the warning mail to its owner is
   // sent 3 times per hour at most per normalized e-mail (mail bombing); the answer never changes.
   "signup.existing.email": { points: 3, duration: HOUR, policy: "closed", key: "email" },
@@ -39,6 +42,7 @@ export const RATE_LIMITS = {
   "login.fail.account": { points: 20, duration: HOUR, policy: "closed", key: "account" },
   // Login attempts per IP (CGNAT: high, escalates to Turnstile, never a hard block).
   "login.ip": { points: 300, duration: HOUR, policy: "closed", key: "ip" },
+  "login.ip48": { points: 3000, duration: HOUR, policy: "closed", key: "ip48" },
   // Password reset: 3 per hour per normalized e-mail, IP in escalation.
   "reset.email": { points: 3, duration: HOUR, policy: "closed", key: "email" },
   "reset.ip": { points: 30, duration: HOUR, policy: "closed", key: "ip" },
@@ -141,6 +145,7 @@ export const RATE_LIMITS = {
   "search.device.minute": { points: 30, duration: MINUTE, policy: "open", key: "device" },
   "search.device.hour": { points: 600, duration: HOUR, policy: "open", key: "device" },
   "search.ip": { points: 120, duration: MINUTE, policy: "open", key: "ip" },
+  "search.ip48": { points: 1200, duration: MINUTE, policy: "open", key: "ip48" },
   // After a solved challenge (30 min pass): a bounded allowance, then 429.
   "search.passed.device": { points: 300, duration: 30 * MINUTE, policy: "open", key: "device" },
   // Server-rendered pages /annonce, /c, /profil, /boutique (proxy.ts): visitor 120 per hour per
@@ -148,6 +153,7 @@ export const RATE_LIMITS = {
   "pages.device": { points: 120, duration: HOUR, policy: "open", key: "device" },
   "pages.session": { points: 600, duration: HOUR, policy: "open", key: "account" },
   "pages.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
+  "pages.ip48": { points: 12000, duration: HOUR, policy: "open", key: "ip48" },
   "pages.passed.device": { points: 600, duration: HOUR, policy: "open", key: "device" },
   // Turnstile tokens refused by the page and search challenges (security/challenge-handler.ts):
   // past 10 an hour per device, 429 without a siteverify call. Per IP, 300 an hour, only held
@@ -157,6 +163,7 @@ export const RATE_LIMITS = {
   "challenge.device": { points: 10, duration: HOUR, policy: "closed", key: "device" },
   "challenge.ip": { points: 300, duration: HOUR, policy: "closed", key: "ip" },
   "challenge.ip.hard": { points: 1500, duration: HOUR, policy: "closed", key: "ip" },
+  "challenge.ip48.hard": { points: 15000, duration: HOUR, policy: "closed", key: "ip48" },
   // Favorites: adding and removing hearts (one write or delete each), 300 per day per account.
   "favorites.write.uid": { points: 300, duration: DAY, policy: "open", key: "uid" },
   // Reading them: 1 200 calls per hour (GET /api/favorites/ids answers from the Valkey set), and

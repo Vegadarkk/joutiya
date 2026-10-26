@@ -238,6 +238,7 @@ async function googleSignIn(request: Request): Promise<Response> {
   }
   // New account: the sign-up limits apply, a `needs_consent` pass included (§6).
   await enforceLimit("signup.ip", flow.identity.ipBucket);
+  if (flow.identity.ip48) await enforceLimit("signup.ip48", flow.identity.ip48);
   // Firestore writes degraded (§2): refused before the consent step; members still sign in above.
   // Before the device limit, which a refusal must not use up (as for a password sign-up).
   await assertQuotas(SIGNUP_QUOTAS);

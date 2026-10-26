@@ -15,6 +15,11 @@ export interface RequestIdentity {
   ipBucket: string;
   /** IPv6 /48 (or the IPv4 address). */
   ipNetwork: string;
+  /**
+   * IPv6 /48 of an IPv6 client, null for IPv4: the key of the wider `*.ip48` counters (§6 "Les
+   * clés"), so a host rotating through the 65 536 /64s of its allocation still meets a limit.
+   */
+  ip48: string | null;
   /** Device id from the signed __Host-did cookie, or null. */
   deviceId: string | null;
   /** Key for device-scoped limits: the device, else "unknown device on this IP". */
@@ -29,6 +34,7 @@ export function requestIdentity(headers: Headers): RequestIdentity {
     ip: buckets.ip,
     ipBucket: buckets.subscriber,
     ipNetwork: buckets.network,
+    ip48: buckets.version === 6 ? buckets.network : null,
     deviceId,
     deviceKey: deviceId ? `d:${deviceId}` : `anon:${buckets.subscriber}`,
   };
