@@ -40,6 +40,20 @@ export function sealedHeader(env: DeployedEnv, target: SealedTarget): string {
   return `joutiya-sealed v1 ${env} ${target}`;
 }
 
+/**
+ * Root script lines opening sealed file <n>, whose CMS block is at "$work/<n>.pem", with the
+ * transfer key and certificate in keyDir: the inner label must match the outer one, and the lines
+ * land in "$work/<n>.lines". Shared by the PC2 staging and the VM; they expect $work.
+ */
+export function openSealedLines(file: Pick<Sealed, "env" | "target">, n: number, keyDir: string, host: string): string[] {
+  const base = `"$work/${n}`;
+  return [
+    `openssl cms -decrypt -binary -inform PEM -in ${base}.pem" -inkey ${keyDir}/transfer.key -recip ${keyDir}/transfer.pem -out ${base}.txt" 2> /dev/null || { echo "sealed file ${n}: not sealed for this ${host}, or changed on the way" >&2; exit 1; }`,
+    `[[ "$(head -n 1 ${base}.txt")" == '${sealedHeader(file.env, file.target)}' ]] || { echo "sealed file ${n}: its label does not match its content" >&2; exit 1; }`,
+    `tail -n +2 ${base}.txt" > ${base}.lines"`,
+  ];
+}
+
 /** The label and CMS block of a sealed file, also once pasted (line endings, spaces, blank lines). */
 export function parseSealed(text: string): Sealed {
   const lines = text.split(/\r\n?|\n/).map((line) => line.trim()).filter((line) => line !== "");

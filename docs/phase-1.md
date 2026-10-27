@@ -225,12 +225,27 @@ Chaque environnement lit `/etc/joutiya/<env>/app.env` (root, 0600) et deux mots 
 
 `HASH_PEPPER` sert aux empreintes des e-mails, des téléphones et des désabonnements dans Firestore : il ne doit jamais changer. Nav le génère dans votre `.env.local` (`HASH_PEPPER_STAGING`, `HASH_PEPPER_PROD`, prompt O), qui en garde la copie ; **Vous :** rangez-la aussi dans votre gestionnaire de mots de passe. Les réglages R2 ne s'écrivent qu'avec les deux clés `R2_ACCESS_KEY_ID` et `R2_SECRET_ACCESS_KEY` de l'environnement : un jeu partiel empêche l'application de démarrer.
 
-La clé Oracle de Claude reste dans l'environnement cloud (décision du 19 octobre, constat C4-03 de l'audit) : ni Cody ni Nav ne l'ont. Les secrets de votre `.env.local` partent donc dans un fichier chiffré pour la VM : Claude lit la clé publique de la VM, Nav chiffre sur votre PC avec cette clé, puis Claude envoie le fichier par Run Command, et seule la VM peut le lire. L'outil arrive avec cette étape, dès que la VM existe. Oracle garde le texte des commandes 7 jours, lisible seulement par les administrateurs du compte et `joutiya-claude`.
+La clé Oracle de Claude reste dans l'environnement cloud (décision du 19 octobre, constat C4-03 de l'audit) : ni Cody ni Nav ne l'ont. Les secrets de votre `.env.local` partent donc dans un fichier chiffré pour la VM : Claude lit la clé publique de la VM, Nav chiffre sur votre PC avec cette clé, puis Claude envoie le fichier par Run Command, et seule la VM peut le lire :
+1. Claude : `node scripts/oracle-vm.ts transfer --apply` crée sur la VM sa paire de transfert (RSA, 30 jours, renouvelée quand il reste moins de 7 jours ; la clé ne sort jamais de la VM) et affiche son certificat (ligne `transfer-certificate ...`) et son empreinte, qu'il donne à Nav (prompt R).
+2. Nav : scelle `app.env` du staging et de la prod depuis le fichier du PC2 et colle les deux fichiers scellés dans son fil.
+3. Claude : `node scripts/oracle-vm.ts env <staging|prod> --sealed=<fichier> --apply` envoie le fichier par morceaux, la VM l'ouvre, vérifie chaque ligne et fusionne `app.env` comme `--from`. Ni le fil, ni Run Command, ni l'historique d'Oracle (7 jours) ne contiennent de valeur.
+
+Les valeurs que Claude tient lui-même (jetons Telegram, secrets générés par API) passent par `--from=-` ; `--from` et `--sealed` ne se mélangent pas dans une même commande.
 
 **O. Poivre des empreintes** (prompt Nav)
 
 ```text
 Dans le dépôt Joutiya sur mon PC, lance `node scripts/vm-env.ts pepper .env.local` (docs/phase-1.md, étape 16) : il ajoute HASH_PEPPER_STAGING et HASH_PEPPER_PROD à la fin du fichier s'ils manquent, sans montrer de valeur. Ce fichier sert aussi à un autre produit : ne le lis pas toi-même (ni cat, head, tail, sed, ni grep sans -q), ne l'affiche pas, ne le réécris pas et ne change ni l'ordre ni le texte de ses lignes. Dis-moi ensuite de copier ces deux lignes dans mon gestionnaire de mots de passe. Ne me donne aucune valeur.
+```
+
+**R. Variables de la VM** (prompt Nav ; Claude donne dans le fil le certificat de transfert de la VM et son empreinte, affichés par `oracle-vm.ts transfer`)
+
+```text
+Dans ton clone de main à jour (`git pull --ff-only`), scelle les variables de la VM (docs/phase-1.md, étape 16), tirées de `~/HarnessAgents/joutiya-env/.env.local`, désigné ci-dessous par <fichier> :
+1. Lance `node scripts/seal-env.ts app staging --from=<fichier> --to=<certificat> --fingerprint=<empreinte> --out=joutiya-vm-staging.sealed`, puis la même commande avec `prod` et `--out=joutiya-vm-prod.sealed`.
+2. Colle dans ton fil le contenu des deux fichiers .sealed (ils ne s'ouvrent que sur la VM), puis supprime-les.
+3. Montre-moi les sorties de l'outil (des noms, jamais une valeur).
+Ne lis pas <fichier> toi-même (ni cat, head, tail, sed, ni grep sans -q), ne l'affiche pas et ne le modifie pas. Ne me donne aucune valeur.
 ```
 
 ## Staging provisoire sur le PC2
