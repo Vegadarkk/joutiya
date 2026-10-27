@@ -275,7 +275,7 @@ export interface EnvDirs {
   /** Root-only directory where the payload is assembled, removed once merged. */
   stage: string;
 }
-const VM_DIRS: EnvDirs = { etc: "/etc/joutiya", stage: "/var/lib/joutiya/env" };
+export const VM_DIRS: EnvDirs = { etc: "/etc/joutiya", stage: "/var/lib/joutiya/env" };
 
 /** Read-only root script: the names already in app.env, never a value. */
 export function namesScript(env: DeployedEnv, dirs: EnvDirs = VM_DIRS): string {

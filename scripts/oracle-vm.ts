@@ -32,6 +32,13 @@
 //       and Meilisearch's master key generated once on the VM. Prints names and sources, never a
 //       value. Oracle keeps the text 7 days, readable only by the tenancy's administrators and
 //       joutiya-claude, who can read these files as root anyway.
+//   node scripts/oracle-vm.ts transfer [--apply]
+//       the VM's transfer key pair (RSA, made on the VM, renewed when it has less than 7 days left),
+//       for the owner's secrets sealed on his PC (scripts/seal-env.ts): prints its certificate as a
+//       `transfer-certificate ...` line with its SHA-256 fingerprint.
+//   node scripts/oracle-vm.ts env <staging|prod> --sealed=<file>[,<file>...] [--apply]
+//       the same merge from files sealed for that certificate: only the VM opens them, so Run
+//       Command and Oracle's 7-day record carry no value. --from and --sealed do not mix.
 //   node scripts/oracle-vm.ts search-setup <staging|prod> [--reindex=<max reads>] [--apply]
 //       Meilisearch's index and the app's two keys in app.env, then web and worker recreated
 //       (infra/vm/search-setup.sh); --reindex also rebuilds the index from Firestore (new VM).
@@ -62,7 +69,8 @@ import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { tunnelTokenErrors, validateTargets, type Targets } from "./assert-target.ts";
 import { LEAF_DAYS, WIF_SERVICES, certificateConfig, credentialConfig, csrFromOutput, derBase64, pemBlock, subjectName, wifLines, type WifService } from "./google-wif.ts";
-import { DEPLOYED_ENVS, envPayload, envScripts, namesScript, parseMissing, parseNames, planEnv, type DeployedEnv, type Source } from "./vm-env.ts";
+import { type Sealed, openSealedLines, parseSealed } from "./seal-env.ts";
+import { DEPLOYED_ENVS, VM_DIRS, envPayload, envScripts, mergeLines, namesScript, parseMissing, parseNames, planEnv, type DeployedEnv, type EnvDirs, type Source } from "./vm-env.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 
@@ -761,12 +769,14 @@ async function runCommand(oci: Oci, compartmentId: string, instanceId: string, d
   // Delivery waits for the agent's next poll; past the timeout plus a delivery margin, it is cancelled.
   const deadline = Date.now() + (timeoutSeconds + 300) * 1000;
   for (;;) {
-    const execution = await oci
-      .call<CommandExecution>("GET", "iaas", `/20180530/instanceAgentCommands/${command.id}/status${query({ instanceId })}`)
-      .catch((error: unknown) => {
-        if (error instanceof OciError && error.status === 404) return undefined; // not delivered yet
-        throw error;
-      });
+    // Read through the execution list: joutiya-run-command-policy lets joutiya-claude list executions,
+    // while GET on one command or its status answers 404 (seen on 27 Oct 2026).
+    const executions = await oci.call<(CommandExecution & { instanceAgentCommandId: string })[]>(
+      "GET",
+      "iaas",
+      `/20180530/instanceAgentCommandExecutions${query({ compartmentId, instanceId, limit: "100", sortBy: "TIMECREATED", sortOrder: "DESC" })}`,
+    );
+    const execution = executions.find((item) => item.instanceAgentCommandId === command.id);
     if (execution && COMMAND_DONE.includes(execution.lifecycleState)) {
       const output = execution.content?.text ?? "";
       const exitCode = execution.content?.exitCode;
@@ -857,6 +867,127 @@ async function envFiles(oci: Oci, targets: Targets, compartmentId: string, env: 
   console.log(output.trimEnd());
   const missing = parseMissing(output);
   if (missing === undefined) console.warn("warning: the VM's report is incomplete; rerun the dry run to see what is missing");
+  else console.log(missing.length > 0 ? `still missing: ${missing.join(", ")} (the app does not start without them)` : "every required variable is set");
+}
+
+// The owner's secrets reach the VM sealed for its transfer certificate (docs/phase-1.md, step 16):
+// sealed on his PC by Nav, they travel through the thread and Run Command, and only the VM opens them.
+
+const TRANSFER_SUBJECT = "joutiya-vm-transfer";
+/** Characters of the certificate's base64 read back per command (Run Command returns 1 KB). */
+const TRANSFER_SLICE = 900;
+
+/** Root script of `transfer`: the key pair made once, renewed when it has less than 7 days left. */
+export function transferScript(etc = VM_DIRS.etc): string {
+  return [
+    "umask 077",
+    `install -d -m 0700 ${etc}`,
+    `if [[ ! -s ${etc}/transfer.key ]] || ! openssl x509 -checkend 604800 -noout -in ${etc}/transfer.pem > /dev/null 2>&1; then`,
+    `  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out ${etc}/transfer.key.new 2> /dev/null`,
+    `  openssl req -x509 -new -key ${etc}/transfer.key.new -subj /CN=${TRANSFER_SUBJECT} -days 30 -out ${etc}/transfer.pem.new`,
+    `  mv -f ${etc}/transfer.key.new ${etc}/transfer.key`,
+    `  mv -f ${etc}/transfer.pem.new ${etc}/transfer.pem`,
+    '  echo "transfer key made"',
+    "fi",
+    `der="$(openssl x509 -in ${etc}/transfer.pem -outform DER | base64 -w0)"`,
+    'echo "transfer-length ${#der}"',
+    'echo "transfer-sha256 $(printf \'%s\' "$der" | sha256sum | cut -c1-64)"',
+  ].join("\n");
+}
+
+/** Read-only root script: characters from..to (1-based) of the certificate's base64. */
+export function transferSliceScript(from: number, to: number, etc = VM_DIRS.etc): string {
+  return `echo "slice $(openssl x509 -in ${etc}/transfer.pem -outform DER | base64 -w0 | cut -c${from}-${to})"`;
+}
+
+async function transfer(oci: Oci, compartmentId: string): Promise<void> {
+  const instance = await runningInstance(oci, compartmentId);
+  const output = await runCommand(oci, compartmentId, instance.id, "joutiya-transfer", rootCommand(transferScript()));
+  if (!oci.apply) return;
+  const length = Number(/^transfer-length (\d+)$/m.exec(output)?.[1]);
+  const sha256 = /^transfer-sha256 ([0-9a-f]{64})$/m.exec(output)?.[1];
+  if (!Number.isInteger(length) || length <= 0 || !sha256) throw new Error(`unexpected answer from the VM:\n${output}`);
+  let base64 = "";
+  for (let from = 1; from <= length; from += TRANSFER_SLICE) {
+    const slice = await runCommand(oci, compartmentId, instance.id, "joutiya-transfer read", rootCommand(transferSliceScript(from, from + TRANSFER_SLICE - 1)), 300, true);
+    base64 += /^slice ([A-Za-z0-9+/=]*)$/m.exec(slice)?.[1] ?? "";
+  }
+  if (createHash("sha256").update(base64).digest("hex") !== sha256) throw new Error("the certificate read back does not match its SHA-256");
+  const certificate = new X509Certificate(Buffer.from(base64, "base64"));
+  if (certificate.subject !== `CN=${TRANSFER_SUBJECT}` || certificate.publicKey.asymmetricKeyType !== "rsa") throw new Error(`unexpected certificate: ${certificate.subject}`);
+  console.log(`transfer-certificate ${base64}`);
+  console.log(`fingerprint ${certificate.fingerprint256}`);
+  console.log(`valid to    ${certificate.validTo}`);
+}
+
+/**
+ * Root scripts of `env --sealed`: each sealed app.env staged in chunks, then opened one per command
+ * (checked against its SHA-256, decrypted with the VM's transfer key, its lines checked), then
+ * merged into app.env (mergeLines). Opened lines stay in the root-only stage until the merge, which
+ * removes them; a failed step removes everything staged for <env>.
+ */
+export function sealedEnvScripts(env: DeployedEnv, files: Sealed[], dirs: EnvDirs = VM_DIRS, chunkSize = 3_000): string[] {
+  if (files.length === 0) throw new Error("env needs --sealed=<file>[,<file>...]");
+  for (const [index, file] of files.entries()) {
+    if (file.env !== env) throw new Error(`sealed file ${index + 1} is for ${file.env}, not ${env}`);
+    if (file.target !== "app.env") throw new Error(`sealed file ${index + 1} holds ${file.target}: the VM's tunnel tokens come from \`tunnels\``);
+  }
+  const staged = (n: number): string => `${dirs.stage}/${env}.sealed.${n}`;
+  const opened = (n: number): string => `${dirs.stage}/${env}.opened.${n}`;
+  const cleanup = `rm -rf ${dirs.stage}/${env}.sealed.* ${dirs.stage}/${env}.opened.* "\${work:-}"`;
+  const encoded = files.map((file) => Buffer.from(file.pem).toString("base64"));
+  const append = encoded.flatMap((text, index) => {
+    const chunks = text.match(new RegExp(`.{1,${chunkSize}}`, "g")) ?? [];
+    return chunks.map((chunk, part) =>
+      [
+        ...(index === 0 && part === 0 ? [`install -d -m 0700 ${dirs.stage}`, cleanup] : []),
+        ...(part === 0 ? [`: > ${staged(index + 1)}`] : []),
+        `printf '%s' '${chunk}' >> ${staged(index + 1)}`,
+        `echo "sealed file ${index + 1}, chunk ${part + 1}/${chunks.length}"`,
+      ].join("\n"),
+    );
+  });
+  const open = encoded.map((text, index) => {
+    const n = index + 1;
+    return [
+      "umask 077",
+      `trap 'rm -rf "\${work:-}"; [[ -s ${opened(n)} ]] || ${cleanup}' EXIT`,
+      `[[ -s ${dirs.etc}/transfer.key ]] || { echo "no transfer key in ${dirs.etc}: run oracle-vm.ts transfer first" >&2; exit 1; }`,
+      `work="$(mktemp -d ${dirs.stage}/.sealed.XXXXXX)"`,
+      `echo "${createHash("sha256").update(text).digest("hex")}  ${staged(n)}" | sha256sum -c --quiet`,
+      `base64 -d ${staged(n)} > "$work/${n}.pem"`,
+      ...openSealedLines(files[index] as Sealed, n, dirs.etc, "VM"),
+      `line="^[A-Z][A-Z0-9_]*='[^'[:cntrl:]]*'\$"`,
+      `if grep -qvE "$line" "$work/${n}.lines"; then echo "sealed file ${n}: a line is not NAME='value'" >&2; exit 1; fi`,
+      `mv -f "$work/${n}.lines" ${opened(n)}`,
+      `echo "sealed file ${n} opened: $(wc -l < ${opened(n)}) line(s)"`,
+    ].join("\n");
+  });
+  const merge = [
+    "umask 077",
+    `trap '${cleanup} "\${new:-}"' EXIT`,
+    `work="$(mktemp -d ${dirs.stage}/.sealed.XXXXXX)"`,
+    `LC_ALL=C sort -u ${files.map((_, index) => opened(index + 1)).join(" ")} > "$work/app.env"`,
+    `twice="$(cut -d= -f1 "$work/app.env" | LC_ALL=C uniq -d | tr '\\n' ' ')"`,
+    '[[ -z "$twice" ]] || { echo "sealed files disagree on: $twice" >&2; exit 1; }',
+    ...mergeLines(env, '"$work/app.env"', dirs),
+  ].join("\n");
+  return [...append, ...open, merge];
+}
+
+async function sealedEnv(oci: Oci, compartmentId: string, env: DeployedEnv, paths: string[]): Promise<void> {
+  const files = paths.map((path) => parseSealed(readFileSync(path, "utf8")));
+  const commands = sealedEnvScripts(env, files).map((script) => rootCommand(script));
+  const instance = await runningInstance(oci, compartmentId);
+  console.log(`app.env of ${env}: ${files.length} sealed file(s), opened on the VM only`);
+  let output = "";
+  for (const [index, text] of commands.entries()) {
+    output = await runCommand(oci, compartmentId, instance.id, `joutiya-env ${env} sealed ${index + 1}/${commands.length}`, text);
+  }
+  if (!oci.apply) return;
+  console.log(output.trimEnd());
+  const missing = parseMissing(output);
+  if (missing === undefined) console.warn("warning: the VM's report is incomplete");
   else console.log(missing.length > 0 ? `still missing: ${missing.join(", ")} (the app does not start without them)` : "every required variable is set");
 }
 
@@ -1142,12 +1273,12 @@ async function main(): Promise<void> {
   const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);
   const smallFallback = args.includes("--small-fallback");
-  const actions = ["create", "launcher", "tunnels", "rebuild", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback"];
+  const actions = ["create", "launcher", "tunnels", "transfer", "rebuild", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback"];
   const perEnv = action === "env" || action === "search-setup" || action === "wif";
   const argument = action === "run" || perEnv;
   if (!action || !actions.includes(action) || argument !== (file !== undefined) || (perEnv && !(DEPLOYED_ENVS as readonly string[]).includes(file ?? ""))) {
     throw new Error(
-      "usage: scripts/oracle-vm.ts <create|launcher|tunnels|rebuild [--keep-disk]|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
+      "usage: scripts/oracle-vm.ts <create|launcher|tunnels|transfer|rebuild [--keep-disk]|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|--sealed=<file>[,...]|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
     );
   }
 
@@ -1173,7 +1304,14 @@ async function main(): Promise<void> {
   else if (action === "sync") await sync(oci, compartment, args.find((arg) => arg.startsWith("--deploy-staging-key="))?.split("=").slice(1).join("="));
   else if (action === "search-setup") await searchSetup(oci, compartment, file as DeployedEnv, args.find((arg) => arg.startsWith("--reindex="))?.slice("--reindex=".length));
   else if (action === "wif") await wif(oci, targets, compartment, file as DeployedEnv, args.find((arg) => arg.startsWith("--certificates="))?.slice("--certificates=".length));
-  else if (action === "env") await envFiles(oci, targets, compartment, file as DeployedEnv, args.filter((arg) => arg.startsWith("--from=")).map((arg) => arg.slice("--from=".length)));
+  else if (action === "transfer") await transfer(oci, compartment);
+  else if (action === "env") {
+    const froms = args.filter((arg) => arg.startsWith("--from=")).map((arg) => arg.slice("--from=".length));
+    const sealed = args.filter((arg) => arg.startsWith("--sealed=")).flatMap((arg) => arg.slice("--sealed=".length).split(",").filter((path) => path !== ""));
+    if (froms.length > 0 && sealed.length > 0) throw new Error("env takes --from or --sealed, not both");
+    if (sealed.length > 0) await sealedEnv(oci, compartment, file as DeployedEnv, sealed);
+    else await envFiles(oci, targets, compartment, file as DeployedEnv, froms);
+  }
   else if (action === "deploy-status") await release(oci, targets, compartment, "status");
   else if (action === "promote" || action === "rollback") await release(oci, targets, compartment, action);
   else await status(oci, targets, compartment);

@@ -1,10 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { generateKeyPairSync, createVerify, randomBytes } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { X509Certificate, createHash, generateKeyPairSync, createVerify, randomBytes } from "node:crypto";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { afterAll, describe, expect, it } from "vitest";
+import { parseSealed, seal, sealedHeader } from "../../scripts/seal-env";
+import { envPayload } from "../../scripts/vm-env";
 import {
   MAX_METADATA_BYTES,
   NAMES,
@@ -25,6 +27,9 @@ import {
   rebuildDetails,
   recordedTarballs,
   rootCommand,
+  sealedEnvScripts,
+  transferScript,
+  transferSliceScript,
   securityList,
   shapeForAttempt,
   signedHeaders,
@@ -260,5 +265,61 @@ describe("CI deploy key", () => {
     expect(() => deployStagingKey(`${key}\n${key}`)).toThrow("one ssh-ed25519");
     expect(() => deployStagingKey(`command="sh" ${key}`)).toThrow("one ssh-ed25519");
     expect(() => deployStagingKey("ssh-rsa AAAAB3NzaC1yc2E joutiya-ci")).toThrow("one ssh-ed25519");
+  });
+});
+
+describe("transfer and sealed env", () => {
+  const root = mkdtempSync(join(tmpdir(), "vm-sealed-"));
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  const dirs = { etc: join(root, "etc"), stage: join(root, "stage") };
+  mkdirSync(join(dirs.etc, "prod"), { recursive: true, mode: 0o700 });
+  const bash = (script: string) => spawnSync("bash", ["-euo", "pipefail"], { input: script, encoding: "utf8" });
+  /** The commands in order, as Run Command sends them: the first failure stops the rest. */
+  const runAll = (commands: string[]) => {
+    let last = bash("true");
+    for (const command of commands) {
+      last = bash(command);
+      if (last.status !== 0) break;
+    }
+    return last;
+  };
+
+  it("makes the transfer key pair once and reads its certificate back in slices", () => {
+    const first = bash(transferScript(dirs.etc));
+    expect(first.stderr).toBe("");
+    expect(first.stdout).toContain("transfer key made");
+    const length = Number(/^transfer-length (\d+)$/m.exec(first.stdout)?.[1]);
+    const again = bash(transferScript(dirs.etc));
+    expect(again.stdout).not.toContain("transfer key made");
+    let base64 = "";
+    for (let from = 1; from <= length; from += 900) base64 += /^slice (\S*)$/m.exec(bash(transferSliceScript(from, from + 899, dirs.etc)).stdout)?.[1] ?? "";
+    expect(createHash("sha256").update(base64).digest("hex")).toBe(/^transfer-sha256 (\S+)$/m.exec(again.stdout)?.[1]);
+    expect(new X509Certificate(Buffer.from(base64, "base64")).subject).toBe("CN=joutiya-vm-transfer");
+    expect(transferScript().length + 300).toBeLessThan(RUN_COMMAND_MAX_BYTES);
+  }, 60_000);
+
+  it("opens app.env sealed for the VM and merges it, printing names only; refuses other keys and environments", () => {
+    const pem = readFileSync(join(dirs.etc, "transfer.pem"), "utf8");
+    const other = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "/dev/null", "-subj", "/CN=other", "-days", "1"], { encoding: "utf8" }).stdout;
+    const sealed = (body: string, recipient = pem) => parseSealed(`${sealedHeader("prod", "app.env")}\n${seal(`${sealedHeader("prod", "app.env")}\n${body}`, recipient)}`);
+    const app = sealed(envPayload({ SITE_URL: "https://joutiya.ma", TURNSTILE_SECRET_KEY: "sealed $secret #1" }));
+    const commands = sealedEnvScripts("prod", [app, sealed(envPayload({ HASH_PEPPER: "p".repeat(64) }))], dirs, 500);
+    expect(commands.length).toBeGreaterThan(3);
+    for (const command of commands) expect(Buffer.byteLength(rootCommand(command))).toBeLessThanOrEqual(RUN_COMMAND_MAX_BYTES);
+    const last = runAll(commands);
+    expect(last.stderr).toBe("");
+    expect(last.status).toBe(0);
+    const merged = readFileSync(join(dirs.etc, "prod", "app.env"), "utf8");
+    expect(merged).toContain("TURNSTILE_SECRET_KEY='sealed $secret #1'\n");
+    expect(merged).toMatch(/^HASH_PEPPER='p{64}'$/m);
+    expect(last.stdout).not.toMatch(/secret|ppp/);
+    expect(existsSync(join(dirs.stage, "prod.sealed.1"))).toBe(false);
+    const scripts = (files: Parameters<typeof sealedEnvScripts>[1]) => sealedEnvScripts("prod", files, dirs);
+    expect(runAll(scripts([sealed("A='1'\n", other)])).stderr).toContain("not sealed for this VM");
+    expect(readdirSync(dirs.stage)).toEqual([]);
+    expect(runAll(scripts([app, sealed(envPayload({ SITE_URL: "https://other.example" }))])).stderr).toContain("sealed files disagree on: SITE_URL");
+    expect(readdirSync(dirs.stage)).toEqual([]);
+    expect(() => sealedEnvScripts("staging", [app], dirs)).toThrow("is for prod, not staging");
+    expect(() => sealedEnvScripts("prod", [{ ...app, target: "tunnel.env" }], dirs)).toThrow("tunnels");
   });
 });

@@ -40,7 +40,7 @@ import { fileURLToPath } from "node:url";
 import { validateTargets, type Targets } from "./assert-target.ts";
 import { WIF_SERVICES, caFiles, certificateConfig, credentialConfig, csrFromOutput, readCa, signCsr, subjectName } from "./google-wif.ts";
 import { searchSetupScript, wifDir, wifInstallScript, wifKeyScript, wifRecreateScript } from "./oracle-vm.ts";
-import { type Sealed, parseSealed, sealedHeader } from "./seal-env.ts";
+import { type Sealed, openSealedLines, parseSealed } from "./seal-env.ts";
 import { REQUIRED, mergeLines } from "./vm-env.ts";
 
 export const DISTRO = "joutiya-staging";
@@ -282,9 +282,7 @@ export function envScript(files: Sealed[], etc = "/etc/joutiya"): string {
       `cat > ${base}.pem" << 'JOUTIYA_SEALED'`,
       file.pem.trimEnd(),
       "JOUTIYA_SEALED",
-      `openssl cms -decrypt -binary -inform PEM -in ${base}.pem" -inkey ${dir}/transfer.key -recip ${dir}/transfer.pem -out ${base}.txt" 2> /dev/null || { echo "sealed file ${index + 1}: not sealed for this distro, or changed on the way" >&2; exit 1; }`,
-      `[[ "$(head -n 1 ${base}.txt")" == '${sealedHeader(ENV, file.target)}' ]] || { echo "sealed file ${index + 1}: its label does not match its content" >&2; exit 1; }`,
-      `tail -n +2 ${base}.txt" > ${base}.lines"`,
+      ...openSealedLines(file, index + 1, dir, "distro"),
       ...(file.target === "app.env"
         ? [`if grep -qvE "$line" ${base}.lines"; then echo "sealed file ${index + 1}: a line is not NAME='value'" >&2; exit 1; fi`, `cat ${base}.lines" >> "$work/app.env"`]
         : [
