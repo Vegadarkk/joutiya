@@ -240,6 +240,19 @@ export function photoOrder(photos: readonly PhotoItem[]): string[] {
   return photos.filter((item) => item.uploadId && (item.status === "ready" || item.status === "processing" || item.status === "timeout")).map((item) => item.uploadId!);
 }
 
+/**
+ * Whether the tile takes one of the listing's photo slots: a failed or refused upload does not
+ * (the counter and the room ignore it), and retrying it needs a free slot again.
+ */
+export function occupiesSlot(item: PhotoItem): boolean {
+  return item.status !== "failed" && item.status !== "rejected";
+}
+
+/** Photo slots the tiles take (occupiesSlot). */
+export function usedSlots(photos: readonly PhotoItem[]): number {
+  return photos.filter(occupiesSlot).length;
+}
+
 export function isPhotoBusy(item: PhotoItem): boolean {
   return item.status === "preparing" || item.status === "uploading" || item.status === "processing";
 }
@@ -607,7 +620,7 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
 
   const addFiles = useCallback(
     (files: Iterable<File>) => {
-      const room = Math.max(0, maxPhotos - photosRef.current.length);
+      const room = Math.max(0, maxPhotos - usedSlots(photosRef.current));
       for (const file of Array.from(files).slice(0, room)) {
         const key = `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
         const previewUrl = typeof URL !== "undefined" && "createObjectURL" in URL ? URL.createObjectURL(file) : null;
@@ -678,6 +691,8 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
     (key: string) => {
       const item = photosRef.current.find((photo) => photo.key === key);
       if (!item?.file) return;
+      // A failed tile takes no slot: it needs a free one to start again.
+      if (!occupiesSlot(item) && usedSlots(photosRef.current) >= maxPhotos) return;
       // The refused or half-done upload goes: a new one is signed.
       if (item.uploadId) void deleteUpload(item.uploadId).catch(() => undefined);
       dispatch({
@@ -691,9 +706,10 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
           uploadId: null,
         },
       });
+      photosRef.current = photosRef.current.map((photo) => (photo.key === key ? { ...photo, status: "preparing" } : photo));
       startUpload(key, item.file);
     },
-    [startUpload],
+    [maxPhotos, startUpload],
   );
 
   /** A photo whose processing outlasted the poll deadline: ask again, then keep polling. */

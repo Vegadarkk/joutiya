@@ -1,6 +1,6 @@
 import "server-only";
 import { isDeepStrictEqual } from "node:util";
-import { subcategoryById } from "@/config/categories";
+import { subcategoryAllowsAds, subcategoryById } from "@/config/categories";
 import { listingLifetime, listingQuotas, withinQuota, type ListingQuotas, type Seller } from "@/config/pricing";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { AuthContext } from "@/lib/auth/guards";
@@ -356,7 +356,7 @@ export async function patchListing(actor: Actor, id: string, patch: ListingPatch
         mail = { template: "listingPendingReview", statement: statementOf("hold", result.flags, await redressAddress()) };
       } else {
         fields.moderation = moderationPatch(fields.moderation ?? listing.moderation, result);
-        fields.adsEligible = result.state === "auto_ok" && listing.status !== "pending_review" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy;
+        fields.adsEligible = result.state === "auto_ok" && listing.status !== "pending_review" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy && subcategoryAllowsAds(next.subcategoryId);
       }
     }
   } else if (listing.status === "rejected") {
@@ -421,7 +421,7 @@ export async function publish(actor: Actor, request: Request, id: string, option
   const { patch, effects } = step(() => transition(listing, to, ctx));
   patch.slugId = slugId;
   patch.moderation = moderationPatch(listing.moderation, screening, to === "pending_review");
-  patch.adsEligible = to === "published" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy;
+  patch.adsEligible = to === "published" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy && subcategoryAllowsAds(listing.subcategoryId);
   const hold = to === "pending_review" ? holdRecord(listing, screening, now, rejectedBefore) : undefined;
 
   const updated = await commit(listing, patch, effects, { actor, user: seller.user, now, hold, maxActive: seller.quotas.activeListings });
@@ -554,7 +554,7 @@ async function renewExpired(actor: Actor, listing: ListingRecord, seller: Seller
   const held = (screening.state === "needs_review" && !approved) || rejectedBefore;
   const { patch, effects } = step(() => (held ? renewForReview(listing, ctx) : renew(listing, ctx)));
   if (!approved) patch.moderation = moderationPatch(listing.moderation, screening, held);
-  patch.adsEligible = !held && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy;
+  patch.adsEligible = !held && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy && subcategoryAllowsAds(listing.subcategoryId);
   const hold = held ? holdRecord(listing, screening, now, rejectedBefore) : undefined;
   const updated = await commit(listing, patch, effects, { actor, user: seller.user, now, hold, maxActive: seller.quotas.activeListings });
   // Content a moderator approved and unchanged since was not screened: nothing for the agent either.

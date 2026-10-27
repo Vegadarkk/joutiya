@@ -179,7 +179,7 @@ export async function resumeModerationPaused(uid: string, now: Date): Promise<st
       const { patch } = transition(listing, live ? "published" : "expired", { now, lifetime: life });
       const moderation = listing.moderation;
       return {
-        patch: { ...patch, pausedReason: null, adsEligible: live && adsEligibleOf({ status: "published", moderation }) },
+        patch: { ...patch, pausedReason: null, adsEligible: live && adsEligibleOf({ status: "published", moderation, subcategoryId: listing.subcategoryId }) },
         search: live ? "upsert" : null,
       };
     },
@@ -233,7 +233,7 @@ export async function restoreBannedListings(uid: string, banDecisionId: string, 
       const change = unremovePatch(listing, now, life);
       const moderation = { ...listing.moderation, reviewedBy: actorUid, reviewedAt: now };
       const status = change.patch.status ?? listing.status;
-      return { patch: { ...change.patch, moderation, adsEligible: adsEligibleOf({ status, moderation }) }, search: change.search };
+      return { patch: { ...change.patch, moderation, adsEligible: adsEligibleOf({ status, moderation, subcategoryId: listing.subcategoryId }) }, search: change.search };
     },
     now,
     "ban reversal",

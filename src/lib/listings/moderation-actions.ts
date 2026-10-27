@@ -1,4 +1,5 @@
 import "server-only";
+import { subcategoryAllowsAds } from "@/config/categories";
 import { listingLifetime } from "@/config/pricing";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { StaffContext } from "@/lib/auth/guards";
@@ -297,7 +298,7 @@ export async function decide(staff: StaffContext, id: string, input: ModerationD
       if (!current || current.status !== "pending_review" || current.version !== input.version) throw new ListingVersionError();
       decisionId = recordModerationDecisionTx(tx, record);
       patch.moderation = { ...current.moderation, state: approve ? "human_ok" : "human_rejected", reviewedBy: staff.user.uid, reviewedAt: now, lastDecisionId: decisionId };
-      patch.adsEligible = approve && current.moderation.openReports === 0 && !current.moderation.hiddenBy;
+      patch.adsEligible = approve && current.moderation.openReports === 0 && !current.moderation.hiddenBy && subcategoryAllowsAds(current.subcategoryId);
       updateListingTx(tx, id, patch);
       if (effects.search) enqueueSearchOutboxTx(tx, id, effects.search, patch.version, now);
     });

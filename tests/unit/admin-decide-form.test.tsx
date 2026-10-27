@@ -122,13 +122,16 @@ describe("the agent's proposal", () => {
     expect(aiTemplate(proposal({ templateId: "listing_remove_unknown" }), "listing")).toBeNull();
   });
 
-  it("marks it confirmed, edited or rejected from the decision, pending ones only", () => {
+  it("marks it confirmed, edited, rejected or handed over from the decision, pending ones only", () => {
     expect(aiReview(proposal(), template("listing.remove.scam"), "listing")).toEqual({ decisionId: AI_ID, outcome: "confirmed" });
     expect(aiReview(proposal(), template("listing.remove.counterfeit"), "listing")).toEqual({ decisionId: AI_ID, outcome: "edited" });
     expect(aiReview(proposal(), template("listing.restore"), "listing")).toEqual({ decisionId: AI_ID, outcome: "rejected" });
     expect(aiReview(proposal({ templateId: null }), template("listing.remove.counterfeit"), "listing")?.outcome).toBe("confirmed");
     expect(aiReview(proposal({ applied: "confirmed" }), template("listing.remove.scam"), "listing")).toBeNull();
-    expect(aiReview(proposal({ verdict: "unclear" }), template("listing.remove.scam"), "listing")).toBeNull();
+    // No side taken (unclear, needs_human, escalate): the human decided, the proposal leaves "En attente".
+    expect(aiReview(proposal({ verdict: "unclear" }), template("listing.remove.scam"), "listing")).toEqual({ decisionId: AI_ID, outcome: "handed_over" });
+    expect(aiReview(proposal({ verdict: "needs_human", action: "escalate" }), template("listing.restore"), "listing")?.outcome).toBe("handed_over");
+    expect(decideSchema.safeParse(buildDecideRequest("listing:abcd2345", { template: template("listing.remove.scam"), details: "", sanction: "none", manifestlyUnfounded: false }, MODERATOR, proposal({ verdict: "needs_human" }))).success).toBe(true);
     const body = buildDecideRequest("listing:abcd2345", { template: template("listing.remove.scam"), details: "", sanction: "none", manifestlyUnfounded: false }, MODERATOR, proposal());
     expect(body.ai).toEqual({ decisionId: AI_ID, outcome: "confirmed" });
     expect(decideSchema.safeParse(body).success).toBe(true);
@@ -136,6 +139,12 @@ describe("the agent's proposal", () => {
 });
 
 describe("decision form", () => {
+  it("labels a proposal handed over to a human once decided", () => {
+    const content = text(renderToStaticMarkup(<AiProposalPanel ai={proposal({ verdict: "needs_human", action: "escalate", applied: "handed_over" })} />));
+    expect(content).toContain("Transmise, décidée par un humain");
+    expect(content).not.toContain("En attente");
+  });
+
   it("shows the proposal as advice, with its verdict and confidence", () => {
     const content = text(renderToStaticMarkup(<AiProposalPanel ai={proposal()} templateLabel="Retrait : arnaque ou tentative d'escroquerie" />));
     expect(content).toContain("Proposition de l'agent");

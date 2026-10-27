@@ -229,14 +229,14 @@ async function uphold(record: DecisionRecord, reviewerUid: string, note: string,
 /**
  * The agent's verdict on the appeal (approve = reverse, reject = uphold) read against the
  * reviewer's: confirmed when they agree, rejected when they do not; an "escalate"/"hold" proposal
- * took no side and stays as it is. The reviewer's own verdict (`input.ai`) wins when given.
+ * took no side and is marked handed_over. The reviewer's own verdict (`input.ai`) wins when given.
  */
 async function proposalReview(record: DecisionRecord, input: ReviewAppealRequest): Promise<{ decisionId: string; outcome: AiReviewOutcome } | null> {
   if (input.ai) return input.ai;
   const proposal = await appealProposal(record.id);
   if (!proposal) return null;
   const agent = proposal.action === "approve" ? "reversed" : proposal.action === "reject" ? "upheld" : null;
-  if (!agent) return null;
+  if (!agent) return { decisionId: proposal.id, outcome: "handed_over" };
   return { decisionId: proposal.id, outcome: agent === input.outcome ? "confirmed" : "rejected" };
 }
 

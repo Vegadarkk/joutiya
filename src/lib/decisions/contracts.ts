@@ -41,7 +41,7 @@ export const decideSchema = z
     details: z.string().trim().max(DETAILS_MAX).optional(),
     sanction: sanctionSchema.optional(),
     manifestlyUnfounded: z.union([z.literal(true), z.array(docIdSchema).min(1).max(100)]).optional(),
-    ai: z.object({ decisionId: docIdSchema, outcome: z.enum(["confirmed", "edited", "rejected"]) }).strict().optional(),
+    ai: z.object({ decisionId: docIdSchema, outcome: z.enum(["confirmed", "edited", "rejected", "handed_over"]) }).strict().optional(),
   })
   .strict()
   .superRefine((input, ctx) => {
@@ -182,7 +182,7 @@ export const APPEAL_NOTE_MIN = 10;
 export const APPEAL_NOTE_MAX = 2000;
 
 /** The agent's proposal the staff member followed, edited or refused (decisions and appeal reviews). */
-const aiReviewSchema = z.object({ decisionId: docIdSchema, outcome: z.enum(["confirmed", "edited", "rejected"]) }).strict();
+const aiReviewSchema = z.object({ decisionId: docIdSchema, outcome: z.enum(["confirmed", "edited", "rejected", "handed_over"]) }).strict();
 
 /**
  * POST /api/admin/appeals/{decisionId}: the review by another moderator, or by an admin (his own
