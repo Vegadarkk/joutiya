@@ -69,7 +69,7 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 export const NAMES = { vcn: "joutiya-vcn", gateway: "joutiya-igw", securityList: "joutiya-vcn-security-list", subnet: "joutiya-public", instance: "joutiya-vm" } as const;
 export const VCN_CIDR = "10.0.0.0/16";
 export const SUBNET_CIDR = "10.0.0.0/24";
-/** Always Free: Ampere A1, at most 4 OCPU and 24 GB per tenancy; the joutiya-free-tier quota allows 2 and 12. */
+/** Always Free: Ampere A1, 2 OCPU and 12 GB per tenancy (paid accounts included; more is billed), the joutiya-free-tier quota. */
 export const SHAPE = { shape: "VM.Standard.A1.Flex", ocpus: 2, memoryInGBs: 12 } as const;
 export interface ShapeConfig {
   ocpus: number;
@@ -86,6 +86,11 @@ export function shapeForAttempt(attempt: number, smallFallback: boolean): ShapeC
   return smallFallback && attempt % 2 === 0 ? SMALL_SHAPE_CONFIG : { ocpus: SHAPE.ocpus, memoryInGBs: SHAPE.memoryInGBs };
 }
 export const BOOT_VOLUME_GB = 100;
+/**
+ * The two Always Free E2.1.Micro VMs (1 GB each), kept aside for tests or another project: neutral
+ * names, no user data, no Joutiya file. Boot volumes: 100 + 2 x 50 GB = the 200 GB Always Free total.
+ */
+export const SPARE = { shape: "VM.Standard.E2.1.Micro", names: ["spare-micro-1", "spare-micro-2"], bootVolumeGB: 50 } as const;
 export const IMAGE = { operatingSystem: "Canonical Ubuntu", operatingSystemVersion: "24.04" } as const;
 /** OCI limit on the metadata of an instance (user_data included, base64). */
 export const MAX_METADATA_BYTES = 32_000;
@@ -330,17 +335,18 @@ export function securityList(): SecurityListFile {
   return list;
 }
 
-/** The newest platform image of Ubuntu 24.04 for A1 (not Minimal, not a GPU build). */
-export function pickImage(images: Image[]): Image {
+/** The newest platform image of Ubuntu 24.04 for A1, or for x86 (not Minimal, not a GPU build). */
+export function pickImage(images: Image[], arch: "aarch64" | "x86_64" = "aarch64"): Image {
+  const name = arch === "aarch64" ? /^Canonical-Ubuntu-24\.04-aarch64-\d{4}\.\d{2}\.\d{2}-\d+$/ : /^Canonical-Ubuntu-24\.04-\d{4}\.\d{2}\.\d{2}-\d+$/;
   const candidates = images.filter(
     (image) =>
       image.lifecycleState === "AVAILABLE" &&
       image.operatingSystem === IMAGE.operatingSystem &&
       image.operatingSystemVersion === IMAGE.operatingSystemVersion &&
-      /^Canonical-Ubuntu-24\.04-aarch64-\d{4}\.\d{2}\.\d{2}-\d+$/.test(image.displayName),
+      name.test(image.displayName),
   );
   const [newest] = candidates.sort((a, b) => b.displayName.localeCompare(a.displayName));
-  if (!newest) throw new Error("no Canonical Ubuntu 24.04 aarch64 platform image found");
+  if (!newest) throw new Error(`no Canonical Ubuntu 24.04 ${arch} platform image found`);
   return newest;
 }
 
@@ -426,6 +432,21 @@ export function launchDetails(input: {
   };
 }
 
+/** LaunchInstance body of the spare VMs, without their names (the Worker adds them). */
+export function spareRequest(input: { availabilityDomain: string; compartmentId: string; subnetId: string; imageId: string }): Record<string, unknown> {
+  const { freeformTags: _joutiya, ...settings } = INSTANCE_SETTINGS;
+  return {
+    availabilityDomain: input.availabilityDomain,
+    compartmentId: input.compartmentId,
+    shape: SPARE.shape,
+    sourceDetails: { sourceType: "image", imageId: input.imageId, bootVolumeSizeInGBs: SPARE.bootVolumeGB },
+    // Egress only, like joutiya-vm; reached through Run Command until another project takes it.
+    createVnicDetails: { subnetId: input.subnetId, assignPublicIp: true },
+    ...settings,
+    freeformTags: { role: "spare" },
+  };
+}
+
 /** Settings of launchDetails that `rebuild` also applies to an existing VM. */
 const INSTANCE_SETTINGS = {
   agentConfig: {
@@ -456,7 +477,7 @@ async function launchPlan(
   compartmentId: string,
   subnetId: string,
   withTokens: boolean,
-): Promise<{ userData: string; imageId: string; details: (shapeConfig: ShapeConfig) => Record<string, unknown> }> {
+): Promise<{ userData: string; imageId: string; availabilityDomain: string; details: (shapeConfig: ShapeConfig) => Record<string, unknown> }> {
   const tenancy = targets.shared.oracle.tenancyId as string;
   const [ad] = await oci.call<{ name: string }[]>("GET", "identity", `/20160918/availabilityDomains${query({ compartmentId: tenancy })}`);
   if (!ad) throw new Error("no availability domain");
@@ -473,7 +494,7 @@ async function launchPlan(
     prodTunnelToken: await token("prod"),
     vmFiles: vmFilesTarball(),
   });
-  return { userData, imageId: image.id, details: (shapeConfig) => launchDetails({ availabilityDomain: ad.name, compartmentId, subnetId, imageId: image.id, userData, shapeConfig }) };
+  return { userData, imageId: image.id, availabilityDomain: ad.name, details: (shapeConfig) => launchDetails({ availabilityDomain: ad.name, compartmentId, subnetId, imageId: image.id, userData, shapeConfig }) };
 }
 
 async function create(oci: Oci, targets: Targets, compartmentId: string, retryMinutes: number, smallFallback: boolean): Promise<void> {
@@ -556,11 +577,17 @@ export function consoleCloudInit(userData: string): string {
 
 /**
  * `launcher`: the create request the Worker sends every minute (workers/vm-launcher), with "none"
- * for each tunnel token and both shapes, plus the same first boot for the console. Read-only on OCI;
+ * for each tunnel token and both shapes, the spare VMs' request, plus the same first boot for the console. Read-only on OCI;
  * the files may lag infra/vm, since `sync` brings a new VM up to date anyway.
  */
 async function launcher(oci: Oci, targets: Targets, compartmentId: string): Promise<void> {
-  const { userData, details } = await launchPlan(oci, targets, compartmentId, await existingSubnet(oci, compartmentId), false);
+  const subnetId = await existingSubnet(oci, compartmentId);
+  const { userData, availabilityDomain, details } = await launchPlan(oci, targets, compartmentId, subnetId, false);
+  const spareImage = pickImage(
+    await oci.call<Image[]>("GET", "iaas", `/20160918/images${query({ compartmentId, ...IMAGE, shape: SPARE.shape, sortBy: "TIMECREATED", sortOrder: "DESC" })}`),
+    "x86_64",
+  );
+  console.log(`spare    ${spareImage.displayName}`);
   const { shapeConfig: _shape, ...request } = details(shapeForAttempt(1, false));
   const config = {
     tenancy: targets.shared.oracle.tenancyId,
@@ -569,6 +596,7 @@ async function launcher(oci: Oci, targets: Targets, compartmentId: string): Prom
     displayName: NAMES.instance,
     request,
     shapes: [shapeForAttempt(1, false), SMALL_SHAPE_CONFIG],
+    spare: { names: SPARE.names, request: spareRequest({ availabilityDomain, compartmentId, subnetId, imageId: spareImage.id }) },
   };
   const text = `${JSON.stringify(config, null, 2)}\n`;
   writeFileSync(join(root, LAUNCHER_FILE), text);

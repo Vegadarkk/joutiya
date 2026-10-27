@@ -1,7 +1,7 @@
-// Free launcher of joutiya-vm (docs/phase-1.md, step 3): one launch request a minute while the
-// compartment has no instance. Free plan: 1 of the 5 cron triggers, 2 subrequests and about 2 ms
-// of CPU per run. Deploy: npx wrangler@4.144.0 deploy, from the owner's machine; delete the Worker
-// once the VM is configured.
+// Free launcher of joutiya-vm and the free spare VMs (docs/phase-1.md, step 3): at most one launch
+// request a minute while one of them is missing. Free plan: 1 of the 5 cron triggers, 2 subrequests
+// and about 2 ms of CPU per run. Deploy: npx wrangler@4.144.0 deploy, from the owner's machine; delete the Worker
+// once the VM is configured and both spares exist.
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "joutiya-vm-launcher",

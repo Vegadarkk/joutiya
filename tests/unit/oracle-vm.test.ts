@@ -114,6 +114,8 @@ describe("instance", () => {
     ]);
     expect(picked.displayName).toBe("Canonical-Ubuntu-24.04-aarch64-2026.09.18-0");
     expect(() => pickImage([image("Canonical-Ubuntu-24.04-Minimal-aarch64-2026.09.30-0")])).toThrow("no Canonical");
+    const x86 = [image("Canonical-Ubuntu-24.04-2026.09.18-0"), image("Canonical-Ubuntu-24.04-aarch64-2026.09.30-0"), image("Canonical-Ubuntu-24.04-Minimal-2026.09.30-0")];
+    expect(pickImage(x86, "x86_64").displayName).toBe("Canonical-Ubuntu-24.04-2026.09.18-0");
   });
 
   it("retries on missing A1 capacity only", () => {

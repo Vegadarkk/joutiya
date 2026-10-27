@@ -4,13 +4,25 @@ import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import registry from "../../infra/targets.json";
-import { SHAPE, SMALL_SHAPE_CONFIG, consoleCloudInit } from "../../scripts/oracle-vm";
+import { SHAPE, SMALL_SHAPE_CONFIG, SPARE, consoleCloudInit } from "../../scripts/oracle-vm";
 import plan from "../../workers/vm-launcher/src/launch.json";
-import { launchOnce, pkcs8, signedHeaders, signingString, type Env, type Launch } from "../../workers/vm-launcher/src/lib";
+import { SPARE_EVERY, launchOnce, pkcs8, signedHeaders, signingString, type Env, type Launch } from "../../workers/vm-launcher/src/lib";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const env = (type: "pkcs8" | "pkcs1"): Required<Env> => ({ OCI_USER: "usr", OCI_FINGERPRINT: "aa:bb", OCI_PRIVATE_KEY: privateKey.export({ type, format: "pem" }).toString() });
-const launch: Launch = { tenancy: "ten", region: "eu-paris-1", compartmentId: "ocid1.compartment.oc1..c", displayName: "joutiya-vm", request: { displayName: "joutiya-vm" }, shapes: [{ ocpus: 2, memoryInGBs: 12 }, SMALL_SHAPE_CONFIG] };
+const A1 = "VM.Standard.A1.Flex";
+const MICRO = "VM.Standard.E2.1.Micro";
+const launch: Launch = {
+  tenancy: "ten",
+  region: "eu-paris-1",
+  compartmentId: "ocid1.compartment.oc1..c",
+  displayName: "joutiya-vm",
+  request: { displayName: "joutiya-vm", shape: A1 },
+  shapes: [{ ocpus: 2, memoryInGBs: 12 }, SMALL_SHAPE_CONFIG],
+  spare: { names: ["spare-micro-1", "spare-micro-2"], request: { shape: MICRO, createVnicDetails: { subnetId: "sub" } } },
+};
+const vm = (displayName: string, shape: string, lifecycleState = "RUNNING") => ({ displayName, shape, lifecycleState });
+const micro = (name: string) => ({ shape: MICRO, displayName: name, createVnicDetails: { subnetId: "sub", displayName: name, hostnameLabel: name } });
 
 describe("vm-launcher signing", () => {
   it("signs x-date, target, host and the body headers with a PKCS#8 or PKCS#1 key", async () => {
@@ -61,7 +73,7 @@ describe("vm-launcher key parsing", () => {
 });
 
 describe("vm-launcher run", () => {
-  const run = async (instances: object[], minute: number, launched: Response = Response.json({ id: "ocid1.instance.new", lifecycleState: "PROVISIONING" }), more = false) => {
+  const run = async (instances: object[], minute: number, launched: Response = Response.json({ id: "ocid1.instance.new", lifecycleState: "PROVISIONING" }), more = false, plan: Launch = launch) => {
     const posts: unknown[] = [];
     const fetcher = async (url: string, init: RequestInit): Promise<Response> => {
       if (init.method === "GET") {
@@ -71,25 +83,49 @@ describe("vm-launcher run", () => {
       posts.push(JSON.parse(new TextDecoder().decode(init.body as Uint8Array)));
       return launched;
     };
-    const line = await launchOnce(launch, env("pkcs8"), minute * 60_000, fetcher);
+    const line = await launchOnce(plan, env("pkcs8"), minute * 60_000, fetcher);
     return { line, posts };
   };
 
-  it("launches nothing while the compartment holds a live instance, or when the list has more pages", async () => {
-    expect(await run([{ displayName: "joutiya-vm", lifecycleState: "PROVISIONING" }], 0)).toEqual({ line: "instance present (joutiya-vm PROVISIONING): nothing launched", posts: [] });
-    expect((await run([], 0, undefined, true)).posts).toEqual([]);
+  it("launches nothing once joutiya-vm and both spares live, or when the list has more pages", async () => {
+    const all = [vm("joutiya-vm", A1, "PROVISIONING"), vm("spare-micro-1", MICRO), vm("spare-micro-2", MICRO)];
+    expect(await run(all, 0)).toEqual({ line: "instances present (joutiya-vm PROVISIONING, spare-micro-1 RUNNING, spare-micro-2 RUNNING): nothing launched", posts: [] });
+    expect(await run([], 0, undefined, true)).toEqual({ line: "instance list has more than one page: nothing launched", posts: [] });
   });
 
-  it("launches with this minute's shape when every instance is gone", async () => {
-    const even = await run([{ displayName: "joutiya-vm", lifecycleState: "TERMINATED" }], 10);
-    expect(even.posts).toEqual([{ displayName: "joutiya-vm", shapeConfig: { ocpus: 2, memoryInGBs: 12 } }]);
+  it("never launches a second A1 VM, whatever the first one is called", async () => {
+    const { spare: _spare, ...withoutSpare } = launch;
+    expect((await run([vm("renamed-by-hand", A1)], 0, undefined, false, withoutSpare)).posts).toEqual([]);
+    expect((await run([vm("joutiya-vm", A1)], 1, undefined, false, withoutSpare)).posts).toEqual([]);
+  });
+
+  it("launches joutiya-vm with this minute's shape when every instance is gone", async () => {
+    const even = await run([vm("joutiya-vm", A1, "TERMINATED")], 10);
+    expect(even.posts).toEqual([{ displayName: "joutiya-vm", shape: A1, shapeConfig: { ocpus: 2, memoryInGBs: 12 } }]);
     expect(even.line).toBe("launched joutiya-vm PROVISIONING (2 OCPU, 12 GB, ocid1.instance.new)");
-    expect((await run([], 11)).posts).toEqual([{ displayName: "joutiya-vm", shapeConfig: SMALL_SHAPE_CONFIG }]);
+    expect((await run([], 9)).posts).toEqual([{ displayName: "joutiya-vm", shape: A1, shapeConfig: SMALL_SHAPE_CONFIG }]);
+  });
+
+  it("gives one minute in SPARE_EVERY to a spare while joutiya-vm is missing, every minute once it lives", async () => {
+    const minutes = Array.from({ length: SPARE_EVERY * 2 }, (_, minute) => minute);
+    const missing = await Promise.all(minutes.map(async (minute) => ((await run([], minute)).posts[0] as { shape: string }).shape));
+    expect(missing.filter((shape) => shape === MICRO)).toHaveLength(2);
+    const live = await run([vm("joutiya-vm", A1)], 0);
+    expect(live.posts).toEqual([micro("spare-micro-1")]);
+    expect(live.line).toBe(`launched spare-micro-1 PROVISIONING (${MICRO}, ocid1.instance.new)`);
+  });
+
+  it("names a spare after the first free name and stops at as many spares as names", async () => {
+    expect((await run([vm("joutiya-vm", A1), vm("spare-micro-1", MICRO)], 0)).posts).toEqual([micro("spare-micro-2")]);
+    expect((await run([vm("joutiya-vm", A1), vm("spare-micro-2", MICRO, "STOPPED")], 0)).posts).toEqual([micro("spare-micro-1")]);
+    expect((await run([vm("joutiya-vm", A1), vm("other", MICRO), vm("spare-micro-1", MICRO)], 0)).posts).toEqual([]);
+    const full = Response.json({ code: "QuotaExceeded", message: "standard-e2-micro-core-count" }, { status: 400 });
+    expect((await run([vm("joutiya-vm", A1)], 0, full)).line).toBe("no launch (spare-micro-1): HTTP 400 QuotaExceeded standard-e2-micro-core-count");
   });
 
   it("logs Oracle's answer when the launch fails", async () => {
     const full = Response.json({ code: "InternalError", message: "Out of host capacity." }, { status: 500 });
-    expect((await run([], 0, full)).line).toBe("no launch (2 OCPU, 12 GB): HTTP 500 InternalError Out of host capacity.");
+    expect((await run([vm("spare-micro-1", MICRO), vm("spare-micro-2", MICRO)], 0, full)).line).toBe("no launch (2 OCPU, 12 GB): HTTP 500 InternalError Out of host capacity.");
   });
 });
 
@@ -104,6 +140,17 @@ describe("vm-launcher launch.json", () => {
     expect(file.request).not.toHaveProperty("shapeConfig");
     expect(Object.keys(file.request.metadata as object)).toEqual(["user_data"]);
     expect(file.shapes).toEqual([{ ocpus: 2, memoryInGBs: 12 }, SMALL_SHAPE_CONFIG]);
+  });
+
+  it("asks for the free Micro spares under neutral names, with no user data and within 200 GB of boot volumes", () => {
+    const spare = file.spare;
+    expect(spare?.names).toEqual([...SPARE.names]);
+    expect(spare?.request).toMatchObject({ compartmentId: registry.shared.oracle.compartmentId, shape: SPARE.shape, freeformTags: { role: "spare" } });
+    expect(spare?.request).not.toHaveProperty("metadata");
+    expect(spare?.request).not.toHaveProperty("displayName");
+    expect(JSON.stringify(spare)).not.toMatch(/joutiya-/);
+    const boot = (request: Record<string, unknown>) => (request.sourceDetails as { bootVolumeSizeInGBs: number }).bootVolumeSizeInGBs;
+    expect(boot(file.request) + (spare?.names.length ?? 0) * boot(spare?.request ?? {})).toBeLessThanOrEqual(200);
   });
 
   it("carries the current bootstrap.sh with no tunnel token (rerun `node scripts/oracle-vm.ts launcher` after a change)", () => {

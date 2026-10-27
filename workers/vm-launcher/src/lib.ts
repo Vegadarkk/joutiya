@@ -27,7 +27,20 @@ export interface Launch {
   request: Record<string, unknown>;
   /** Tried in turn, one a minute. */
   shapes: ShapeConfig[];
+  /** Always Free extra VMs, launched once each name is free (absent: joutiya-vm only). */
+  spare?: Spare;
 }
+
+/** The free E2.1.Micro VMs kept aside under neutral names, for tests or another project. */
+export interface Spare {
+  /** One display name (and hostname) per VM; Oracle gives two for free. */
+  names: string[];
+  /** Their LaunchInstance body, without the names. */
+  request: Record<string, unknown>;
+}
+
+/** While joutiya-vm is missing, one minute in this many goes to a spare VM: joutiya-vm comes first. */
+export const SPARE_EVERY = 3;
 
 export type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -106,9 +119,17 @@ async function failure(response: Response): Promise<string> {
 
 const GONE = ["TERMINATING", "TERMINATED"];
 
+interface Instance {
+  displayName: string;
+  lifecycleState: string;
+  shape?: string;
+}
+
 /**
- * One run: nothing while the compartment holds a live instance (never a second VM), otherwise one
- * launch with this minute's shape. Returns the log line; "Out of host capacity" is the usual answer.
+ * One run: at most one launch request a minute. joutiya-vm (any live A1 instance counts, so never a
+ * second one: Always Free stops at 2 OCPU and 12 GB) with this minute's shape, otherwise the first
+ * free spare name while fewer spares live than names. Returns the log line; "Out of host capacity"
+ * is the usual answer.
  */
 export async function launchOnce(launch: Launch, env: Env, scheduledTime: number, fetcher: Fetcher): Promise<string> {
   const { OCI_USER, OCI_FINGERPRINT, OCI_PRIVATE_KEY } = env;
@@ -123,11 +144,26 @@ export async function launchOnce(launch: Launch, env: Env, scheduledTime: number
   };
   const list = await call("GET", `/20160918/instances?compartmentId=${encodeURIComponent(launch.compartmentId)}&limit=100`);
   if (!list.ok) return `instance list failed: ${await failure(list)}`;
-  const alive = ((await list.json()) as { displayName: string; lifecycleState: string }[]).filter((instance) => !GONE.includes(instance.lifecycleState));
-  if (alive.length > 0 || list.headers.has("opc-next-page")) {
-    return `instance present (${alive.map((instance) => `${instance.displayName} ${instance.lifecycleState}`).join(", ") || "more than one page"}): nothing launched`;
+  if (list.headers.has("opc-next-page")) return "instance list has more than one page: nothing launched";
+  const alive = ((await list.json()) as Instance[]).filter((instance) => !GONE.includes(instance.lifecycleState));
+  const present = `instances present (${alive.map((instance) => `${instance.displayName} ${instance.lifecycleState}`).join(", ")})`;
+
+  const needsMain = !alive.some((instance) => instance.displayName === launch.displayName || instance.shape === launch.request.shape);
+  const { spare } = launch;
+  const isSpare = (instance: Instance): boolean => !!spare && (spare.names.includes(instance.displayName) || instance.shape === spare.request.shape);
+  const spareName = spare && alive.filter(isSpare).length < spare.names.length ? spare.names.find((name) => !alive.some((instance) => instance.displayName === name)) : undefined;
+  const minute = Math.floor(scheduledTime / 60_000);
+  if (!needsMain && !spareName) return `${present}: nothing launched`;
+
+  if (spare && spareName && (!needsMain || minute % SPARE_EVERY === SPARE_EVERY - 1)) {
+    const vnic = (spare.request.createVnicDetails ?? {}) as Record<string, unknown>;
+    const response = await call("POST", "/20160918/instances", { ...spare.request, displayName: spareName, createVnicDetails: { ...vnic, displayName: spareName, hostnameLabel: spareName } });
+    if (!response.ok) return `no launch (${spareName}): ${await failure(response)}`;
+    const instance = (await response.json()) as { id: string; lifecycleState: string };
+    return `launched ${spareName} ${instance.lifecycleState} (${String(spare.request.shape)}, ${instance.id})`;
   }
-  const shape = launch.shapes[Math.floor(scheduledTime / 60_000) % launch.shapes.length];
+
+  const shape = launch.shapes[minute % launch.shapes.length];
   if (!shape) return "launch.json has no shape";
   const size = `${shape.ocpus} OCPU, ${shape.memoryInGBs} GB`;
   const response = await call("POST", "/20160918/instances", { ...launch.request, shapeConfig: shape });
