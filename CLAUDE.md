@@ -139,7 +139,8 @@ Node 24; `npm ci --ignore-scripts` once.
   Unit tests: `node --test scripts/assert-target.test.ts` (run in CI).
 - Scripts, dry run unless `--apply`: `scripts/cloudflare.ts` (edge config),
   `scripts/legal-config.ts` (Firestore `config/legal`), `scripts/oracle-vm.ts` (VM by API; sync,
-  promote, rollback and root scripts through OCI Run Command); `scripts/deploy-prod.ts firestore`
+  promote, rollback and root scripts through OCI Run Command); `scripts/github-ci.ts` (CI secrets of
+  deploy-staging: sealed in the cloud, sent by Nav from PC2); `scripts/deploy-prod.ts firestore`
   (production rules), `scripts/stripe-setup.ts` (Stripe objects of the Pro plans). Steps in
   `docs/phase-1.md`, rebuild in `infra/redeploy.md`.
 - Image: `docker build -f docker/Dockerfile --target web` (or `worker`); Compose in `docker/`.
