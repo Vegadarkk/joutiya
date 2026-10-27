@@ -1,7 +1,7 @@
 import "server-only";
 import type { Locale } from "@/config/site";
 import { sendMail } from "@/lib/mail";
-import { pageUrl, resetActionUrl, verificationActionUrl } from "./links";
+import { actionLinkRequest, pageUrl } from "./links";
 
 // The security mails of the auth flows. Every one of them has priority "security": it bypasses
 // the suppression list and falls back to the second provider (src/lib/mail).
@@ -16,12 +16,11 @@ const hourBucket = () => Math.floor(Date.now() / 3_600_000);
 
 /** Verification link of a pending account; one mail per account and hour at most (queue dedupe). */
 export async function sendVerificationMail(input: Recipient & { uid: string }): Promise<void> {
-  const actionUrl = await verificationActionUrl(input.email, input.locale);
   await sendMail({
     template: "verifyEmail",
     locale: input.locale,
     to: input.email,
-    data: { displayName: input.displayName, actionUrl },
+    data: { displayName: input.displayName, actionLink: actionLinkRequest(input.locale, "verifyEmail") },
     priority: "security",
     idempotencyKey: `verify-${input.uid}-${hourBucket()}`,
   });
@@ -40,8 +39,13 @@ export async function sendSignupExistingMail(input: Recipient & { uid: string })
 }
 
 export async function sendResetMail(input: Recipient): Promise<void> {
-  const actionUrl = await resetActionUrl(input.email, input.locale);
-  await sendMail({ template: "resetPassword", locale: input.locale, to: input.email, data: { displayName: input.displayName, actionUrl }, priority: "security" });
+  await sendMail({
+    template: "resetPassword",
+    locale: input.locale,
+    to: input.email,
+    data: { displayName: input.displayName, actionLink: actionLinkRequest(input.locale, "resetPassword") },
+    priority: "security",
+  });
 }
 
 export async function sendPasswordChangedMail(input: Recipient): Promise<void> {

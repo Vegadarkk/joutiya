@@ -55,7 +55,7 @@ async function finish<T>(response: Response): Promise<Result<T>> {
 }
 
 /** A back-office call (admin host, Access e-mail, session, CSRF). */
-export async function adminCall<T>(handler: Handler, method: "GET" | "POST" | "PATCH", path: string, options: CallOptions & { as?: Staff; host?: string } = {}): Promise<Result<T>> {
+export async function adminCall<T>(handler: Handler, method: "GET" | "POST" | "PATCH" | "DELETE", path: string, options: CallOptions & { as?: Staff; host?: string } = {}): Promise<Result<T>> {
   const adminOrigin = expectedOrigin("admin");
   const host = options.host ?? new URL(adminOrigin).host;
   const headers = new Headers({ host, "user-agent": "vitest", "x-forwarded-for": options.ip ?? "10.88.0.1", origin: adminOrigin });

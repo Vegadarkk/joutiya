@@ -13,6 +13,7 @@ vi.mock("@/lib/quota", async (importOriginal) => ({
 }));
 vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => true) }));
 vi.mock("@/lib/valkey/clients", () => ({ isValkeyConfigured: () => false, valkey: () => ({}), clientOptions: () => ({}) }));
+vi.mock("@/lib/auth/links", () => ({ generateActionUrl: vi.fn(async () => "https://joutiya.test/fr/action?mode=verifyEmail&oobCode=fresh") }));
 vi.mock("@/lib/legal/config", () => ({ getLegalConfig: vi.fn(async () => ({ companyName: "Adark Prime", hqAddress: "6 rue d'Armaillé, 75017 Paris" })) }));
 
 const { isSuppressed } = await import("@/lib/mail/suppressions");
@@ -21,6 +22,7 @@ const { alert } = await import("@/lib/alert");
 const { resetServerEnv } = await import("@/lib/env");
 const { deliverMail, MailDeferredError, PROVIDER_UNAVAILABLE_RETRY_MS, resetMailAlertMarkers } = await import("@/lib/mail/deliver");
 const { memoryMailbox } = await import("@/lib/mail/transports/memory");
+const { generateActionUrl } = await import("@/lib/auth/links");
 
 const MAIL: TemplateMail<"verifyEmail"> = {
   template: "verifyEmail",
@@ -87,6 +89,41 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   setEnv({});
+});
+
+describe("deliverMail action links", () => {
+  const LINK = { action: "verifyEmail" as const, url: "https://joutiya.test/fr/action?mode=verifyEmail", continueUrl: "https://joutiya.test/fr/action" };
+
+  it("generates the link at delivery: the job carries only the request", async () => {
+    setEnv({ APP_ENV: "dev", DEV_MAILBOX: "true" });
+    const outcome = await deliverMail({ ...MAIL, to: "link@example.com", data: { displayName: "Nadia", actionLink: LINK } });
+    expect(outcome).toMatchObject({ provider: "memory" });
+    expect(generateActionUrl).toHaveBeenCalledWith("link@example.com", LINK);
+    const [sent] = memoryMailbox().list({ to: "link@example.com" });
+    expect(sent?.data).toEqual({ displayName: "Nadia", actionUrl: "https://joutiya.test/fr/action?mode=verifyEmail&oobCode=fresh" });
+    expect(sent?.text).toContain("oobCode=fresh");
+  });
+
+  it("drops the mail when its recipient has no account any more", async () => {
+    setEnv({ APP_ENV: "dev", DEV_MAILBOX: "true" });
+    vi.mocked(generateActionUrl).mockResolvedValueOnce(null);
+    const outcome = await deliverMail({ ...MAIL, to: "gone@example.com", data: { displayName: "Nadia", actionLink: LINK } });
+    expect(outcome).toEqual({ skipped: "rejected" });
+    expect(memoryMailbox().list({ to: "gone@example.com" })).toHaveLength(0);
+  });
+
+  it("lets a link failure reach the queue's retries", async () => {
+    setEnv({ APP_ENV: "dev", DEV_MAILBOX: "true" });
+    vi.mocked(generateActionUrl).mockRejectedValueOnce(new Error("TOO_MANY_ATTEMPTS_TRY_LATER"));
+    await expect(deliverMail({ ...MAIL, to: "busy@example.com", data: { displayName: "Nadia", actionLink: LINK } })).rejects.toThrow("TOO_MANY_ATTEMPTS_TRY_LATER");
+  });
+
+  it("delivers a job queued with a resolved link as is", async () => {
+    setEnv({ APP_ENV: "dev", DEV_MAILBOX: "true" });
+    vi.mocked(generateActionUrl).mockClear();
+    await deliverMail({ ...MAIL, to: "old@example.com" });
+    expect(generateActionUrl).not.toHaveBeenCalled();
+  });
 });
 
 describe("deliverMail in development", () => {

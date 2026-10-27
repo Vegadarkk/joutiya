@@ -7,7 +7,7 @@ import { auth, db } from "@/lib/firebase/admin";
 import { setClaims } from "@/lib/firebase/claims";
 import { sendMail } from "@/lib/mail";
 import { addSuppression, isSuppressed } from "@/lib/mail/suppressions";
-import type { TemplateMail } from "@/lib/mail/types";
+import type { MailJob } from "@/lib/mail/types";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { POST as action } from "@/app/api/auth/action/route";
@@ -18,7 +18,7 @@ import { GET as me } from "@/app/api/auth/me/route";
 import { POST as profile } from "@/app/api/auth/profile/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
 import { POST as verifyResend } from "@/app/api/auth/verify/resend/route";
-import { CONSENTS, Jar, PASSWORD, call, capturedMails, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
+import { CONSENTS, Jar, PASSWORD, actionLinkOf, actionUrlOf, call, capturedMails, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
@@ -44,8 +44,9 @@ async function signUp(jar: Jar, email: string, displayName?: string) {
   return mail!;
 }
 
-async function verify(jar: Jar, actionUrl: string) {
-  const result = await call<SignedInBody>(action, ACTION, { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(actionUrl) } });
+/** Opens the verification link the worker would generate for `mail`; returns the call and the code it used. */
+async function verify(jar: Jar, mail: MailJob) {
+  const result = await call<SignedInBody>(action, ACTION, { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(await actionUrlOf(mail)) } });
   expect(result.status).toBe(200);
   expect(result.body.status).toBe("verified");
   return result;
@@ -76,10 +77,14 @@ describe("sign-up, verification, session, profile, logout", () => {
     expect(jar.get("__Host-tsv")).toBeDefined();
     expect(jar.get("__Host-session")).toBeUndefined();
     expect(mail.priority).toBe("security");
-    expect(mail.data.actionUrl).toMatch(/^http:\/\/localhost:3000\/fr\/action\?mode=verifyEmail&oobCode=/);
+    expect(actionLinkOf(mail)).toEqual({ action: "verifyEmail", url: "http://localhost:3000/fr/action?mode=verifyEmail", continueUrl: "http://localhost:3000/fr/action" });
     expect(mail.idempotencyKey).toMatch(/^verify-.+-\d+$/);
 
-    const verified = await verify(jar, mail.data.actionUrl);
+    const actionUrl = await actionUrlOf(mail);
+    expect(actionUrl).toMatch(/^http:\/\/localhost:3000\/fr\/action\?mode=verifyEmail&oobCode=/);
+    const verified = await call<SignedInBody>(action, ACTION, { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(actionUrl) } });
+    expect(verified.status).toBe(200);
+    expect(verified.body.status).toBe("verified");
     const { session } = verified.body;
     expect(session.role).toBe("individual");
     expect(session.emailVerified).toBe(true);
@@ -92,7 +97,7 @@ describe("sign-up, verification, session, profile, logout", () => {
     expect(verified.response.headers.get("cache-control")).toBe("no-store");
 
     // The same code cannot be used twice.
-    const again = await call<ErrorBody>(action, ACTION, { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(mail.data.actionUrl) } });
+    const again = await call<ErrorBody>(action, ACTION, { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(actionUrl) } });
     expect(again.status).toBe(400);
     expect(again.body.error.code).toBe("invalid_code");
 
@@ -219,11 +224,11 @@ describe("sign-up, verification, session, profile, logout", () => {
     const resend = await call<{ status: string }>(verifyResend, "/api/auth/verify/resend", { jar: new Jar(), body: { email, turnstileToken: "t" } });
     expect(resend.status).toBe(202);
     expect(resend.body).toEqual({ status: "verification_sent" });
-    const mails = capturedMails(sendMail).filter((mail): mail is TemplateMail<"verifyEmail"> => mail.template === "verifyEmail" && mail.to === email);
+    const mails = capturedMails(sendMail).filter((mail): mail is MailJob<"verifyEmail"> => mail.template === "verifyEmail" && mail.to === email);
     expect(mails).toHaveLength(2);
-    expect(mails[1]?.data.actionUrl).not.toBe(first.data.actionUrl);
+    expect(actionLinkOf(mails[1]!)).toEqual(actionLinkOf(first));
 
-    await verify(jar, first.data.actionUrl);
+    await verify(jar, first);
     const verifiedResend = await call<{ status: string }>(verifyResend, "/api/auth/verify/resend", { jar: new Jar(), body: { email, turnstileToken: "t" } });
     expect(verifiedResend.status).toBe(202);
     // An unknown e-mail takes no less time than a pending account (timing enumeration).
@@ -262,7 +267,7 @@ describe("sign-up, verification, session, profile, logout", () => {
     // Same device (the cookie the sign-up answer set, kept by the jar): activated and signed in.
     const jar = new Jar();
     const email = uniqueEmail("dev");
-    const verified = await verify(jar, (await signUp(jar, email)).data.actionUrl);
+    const verified = await verify(jar, await signUp(jar, email));
     expect(verified.body.session.uid).toBe(await findUidByEmail(email));
     expect(jar.get("__Host-session")).toBeDefined();
     const account = await getUserPrivate(verified.body.session.uid);
@@ -276,7 +281,7 @@ describe("sign-up, verification, session, profile, logout", () => {
     const otherEmail = uniqueEmail("elsewhere");
     const mail = await signUp(signupJar, otherEmail);
     const elsewhere = new Jar();
-    const activated = await call<{ status: string; session: null }>(action, ACTION, { jar: elsewhere, body: { mode: "verifyEmail", oobCode: oobCodeOf(mail.data.actionUrl) } });
+    const activated = await call<{ status: string; session: null }>(action, ACTION, { jar: elsewhere, body: { mode: "verifyEmail", oobCode: oobCodeOf(await actionUrlOf(mail)) } });
     expect(activated.status).toBe(200);
     expect(activated.body).toEqual({ status: "verified", session: null });
     expect(elsewhere.get("__Host-session")).toBeUndefined();
@@ -298,7 +303,7 @@ describe("sign-up, verification, session, profile, logout", () => {
     const mail = await signUp(jar, email);
     await addSuppression(email, "bounce", "resend");
     expect(await isSuppressed(email)).toBe(true);
-    await verify(jar, mail.data.actionUrl);
+    await verify(jar, mail);
     expect(await isSuppressed(email)).toBe(false);
   });
 
@@ -317,7 +322,7 @@ describe("sign-up, verification, session, profile, logout", () => {
     // An activated account is never purged.
     const jar = new Jar();
     const activeEmail = uniqueEmail("keep");
-    const verified = await verify(jar, (await signUp(jar, activeEmail)).data.actionUrl);
+    const verified = await verify(jar, await signUp(jar, activeEmail));
     const activeUid = verified.body.session.uid;
     expect(await deleteAccountDocumentsIfPending(activeUid)).toBe(false);
     expect((await getUser(activeUid))?.activation).toBe("done");
@@ -327,10 +332,10 @@ describe("sign-up, verification, session, profile, logout", () => {
   it("IDOR: a session only ever changes its own profile", async () => {
     const jarA = new Jar();
     const emailA = uniqueEmail("a");
-    const verifiedA = await verify(jarA, (await signUp(jarA, emailA, "Alice Owner")).data.actionUrl);
+    const verifiedA = await verify(jarA, await signUp(jarA, emailA, "Alice Owner"));
     const jarB = new Jar();
     const emailB = uniqueEmail("b");
-    const verifiedB = await verify(jarB, (await signUp(jarB, emailB, "Bob Other")).data.actionUrl);
+    const verifiedB = await verify(jarB, await signUp(jarB, emailB, "Bob Other"));
 
     const attack = await call<{ session: SignedInBody["session"] }>(profile, PROFILE, { jar: jarB, body: { displayName: "Bob Hacker" } });
     expect(attack.status).toBe(200);

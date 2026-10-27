@@ -14,6 +14,7 @@ export const ADMIN_API = {
   authorities: "/api/admin/authorities",
   conversations: "/api/admin/conversations",
   exports: "/api/admin/exports",
+  users: "/api/admin/users",
 } as const;
 
 const CSRF_COOKIE = "__Host-csrf";

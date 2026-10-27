@@ -189,6 +189,29 @@ export interface SavedSearchAlertListing {
   citySlug: string | null;
 }
 
+/** Templates whose Firebase action link (live oobCode) the worker generates at delivery. */
+export type ActionLinkTemplate = "verifyEmail" | "resetPassword" | "staffInvite";
+
+/**
+ * The action link of a queued mail, for its recipient (`to`): the queue holds this request, never
+ * a live oobCode (audit B3-12). At delivery the Admin SDK generates the code and the mail gets
+ * `actionUrl` = `url` plus `oobCode`; `continueUrl` is the SDK's own continue URL.
+ */
+export interface ActionLinkRequest {
+  action: "verifyEmail" | "resetPassword";
+  /** The Joutiya page the code is appended to, its other query parameters included (`mode`). */
+  url: string;
+  continueUrl: string;
+}
+
+/**
+ * The data of a queued mail: an action-link template carries its link request in place of
+ * `actionUrl` (a resolved `actionUrl` stays accepted: jobs queued before B3-12, and tests).
+ */
+export type QueuedTemplateData = {
+  [T in TemplateId]: T extends ActionLinkTemplate ? TemplateData[T] | (Omit<TemplateData[T], "actionUrl"> & { actionLink: ActionLinkRequest }) : TemplateData[T];
+};
+
 /** Security mails bypass the suppression list and fall back to Brevo when Resend is exhausted. */
 export type MailPriority = "security" | "transactional" | "bulk";
 
@@ -200,6 +223,11 @@ export interface TemplateMail<T extends TemplateId = TemplateId> {
   priority?: MailPriority;
   /** Dedupe key for the queue (same key within 24 h = one mail). */
   idempotencyKey?: string;
+}
+
+/** A mail as the web app enqueues it and the worker receives it (`deliverMail` resolves its action link). */
+export interface MailJob<T extends TemplateId = TemplateId> extends Omit<TemplateMail<T>, "data"> {
+  data: QueuedTemplateData[T];
 }
 
 export interface RenderedMail {

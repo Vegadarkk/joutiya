@@ -30,6 +30,7 @@ import { sendMail } from "@/lib/mail";
 import * as limiter from "@/lib/rate-limit/limiter";
 import { expectedOrigin } from "@/lib/security/origin";
 import { verifyTurnstile } from "@/lib/security/turnstile";
+import { actionLinkOf, actionUrlOf } from "../auth/helpers";
 
 const ADMIN_ORIGIN = expectedOrigin("admin");
 const ADMIN_HOST = new URL(ADMIN_ORIGIN).host;
@@ -236,6 +237,14 @@ describe("POST /api/admin/auth/login", () => {
     expect(elsewhere.status).toBe(200);
   });
 
+  it("counts the attempt before the password check: a parallel burst past the allowance is refused (TOCTOU, F8)", async () => {
+    const ip = "203.0.113.77";
+    const burst = await Promise.all(Array.from({ length: 8 }, () => loginCall(EMAIL.ghost, "wrong-password", { ip })));
+    const codes = await Promise.all(burst.map((response) => errorCode(response)));
+    expect(codes.filter((code) => code === "invalid_credentials")).toHaveLength(5);
+    expect(codes.filter((code) => code === "account_locked")).toHaveLength(3);
+  });
+
   it("fails closed when the rate-limit store is unavailable", async () => {
     vi.mocked(limiter.enforceLimit).mockRejectedValueOnce(new HttpError(503, "unavailable", "rate limiter unavailable"));
     const perIp = await loginCall(EMAIL.moderator, PASSWORD);
@@ -367,9 +376,10 @@ describe("invitation, password and revocation", () => {
     expect(vi.mocked(sendMail)).toHaveBeenCalledTimes(1);
     const mail = vi.mocked(sendMail).mock.calls[0]![0];
     expect(mail).toMatchObject({ template: "staffInvite", locale: "fr", to: EMAIL.invited, priority: "security" });
-    const data = mail.data as { displayName: string; actionUrl: string; role: string };
+    const data = mail.data as { displayName: string; role: string };
     expect(data.role).toBe("moderator");
-    const url = new URL(data.actionUrl);
+    expect(actionLinkOf(mail)).toEqual({ action: "resetPassword", url: `${ADMIN_ORIGIN}/connexion?mode=setPassword`, continueUrl: `${ADMIN_ORIGIN}/connexion` });
+    const url = new URL(await actionUrlOf(mail));
     expect(url.origin).toBe(ADMIN_ORIGIN);
     expect(url.pathname).toBe("/connexion");
     expect(url.searchParams.get("mode")).toBe("setPassword");

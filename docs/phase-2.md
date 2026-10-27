@@ -132,6 +132,13 @@ Le back-office (`admin.joutiya.ma`) exige deux choses : passer Cloudflare Access
 1. Cody lance `APP_ENV=prod node scripts/create-admin.ts --email … --name …` (ou `APP_ENV=staging …`) en simulation puis avec `--apply` (prompt M), sans `--env-file` : votre `.env.local` ne contient que les valeurs du développement. Le script prend le projet Firebase et les hôtes de l'environnement dans `infra/targets.json` (`environments.<env>.firebase.projectId`, consigné par la phase 0 à la création des projets ; `joutiya.ma` et `admin.joutiya.ma`, ou `staging.joutiya.ma` et `admin-staging.joutiya.ma`), comme les variables de la VM ; un `FIREBASE_PROJECT_ID` donné à la main doit être celui du registre, sinon il refuse. Prérequis : l'hôte du back-office figure dans les domaines autorisés du projet (étape 2), sinon le lien imprimé échoue. Il crée le compte, lui donne le rôle `admin` et affiche une seule ligne, l'adresse `https://admin.joutiya.ma/connexion?mode=setPassword&oobCode=…` (staging : `https://admin-staging.joutiya.ma/…`).
 2. **Vous :** ouvrez cette adresse dans votre navigateur (connexion Access par Google), choisissez un mot de passe (12 caractères ou plus), puis connectez-vous. Le lien n'est valable qu'une heure et une seule fois.
 
+## Suivis de l'audit du jalon 50 % (C1-02, B3-12)
+
+- **Liens des e-mails de compte** (vérification, mot de passe, invitation du personnel) : générés par le worker au moment de l'envoi. La file `mail` ne contient plus de code valable, seulement la demande de lien ; un compte supprimé entre-temps ne reçoit rien.
+- **Badge téléphone** : un modérateur peut retirer le numéro vérifié d'un compte (page **Comptes**, panneau « Téléphone », motif obligatoire, inscrit au journal d'audit). Le membre peut vérifier un numéro de nouveau ; en cas d'escroquerie, une sanction s'ajoute.
+- **Connexion du personnel** : la tentative est comptée avant la vérification du mot de passe, comme pour les membres (une rafale en parallèle ne dépasse plus les 5 essais).
+- **Accepté tel quel** : la révocation d'un membre du personnel ne modifie pas la politique Cloudflare Access (le site n'a pas de jeton Zero Trust, par choix de moindre privilège) ; le back-office rappelle de le faire, et la session est de toute façon refusée. Les appareils sans cookie n'ont pas de seuils propres : tous ceux d'une même IP partagent une seule allocation « appareil », déjà plus stricte que celle d'un appareil connu, et des seuils plus bas pénaliseraient les IP partagées (CGNAT).
+
 ## 9. Contrôles
 
 - Dépôt : `npm run check`, `npm run test:api` et `npm run test:rules` (Auth + Firestore en émulateur), `npm run build` puis `npm run test:e2e`.

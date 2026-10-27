@@ -12,7 +12,7 @@ import { POST as action } from "@/app/api/auth/action/route";
 import { POST as login } from "@/app/api/auth/login/route";
 import { GET as me } from "@/app/api/auth/me/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
-import { CONSENTS, Jar, PASSWORD, call, freshIp, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
+import { CONSENTS, Jar, PASSWORD, actionUrlOf, call, freshIp, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/rate-limit/limiter", { spy: true });
@@ -32,7 +32,7 @@ async function createAccount(verified: boolean, displayName = "Login Tester") {
   expect(created.status).toBe(202);
   let uid: string | undefined;
   if (verified) {
-    const verifiedResult = await call<SignedInBody>(action, "/api/auth/action", { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(lastMail(sendMail, "verifyEmail", email)!.data.actionUrl) } });
+    const verifiedResult = await call<SignedInBody>(action, "/api/auth/action", { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(await actionUrlOf(lastMail(sendMail, "verifyEmail", email)!)) } });
     expect(verifiedResult.status).toBe(200);
     uid = verifiedResult.body.session.uid;
   }
