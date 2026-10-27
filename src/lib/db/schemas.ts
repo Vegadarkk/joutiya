@@ -642,7 +642,7 @@ export const AI_PROVIDERS = ["anthropic", "workers-ai", "openai", "rules"] as co
 export const AI_ACTIONS = ["approve", "hold", "reject", "escalate"] as const;
 /** What a triage or appeal proposal says of the report or appeal it is about (src/lib/ai/types.ts). */
 export const AI_VERDICTS = ["founded", "unfounded", "needs_human", "unclear"] as const;
-export const AI_APPLIED = ["auto", "pending", "confirmed", "edited", "rejected"] as const;
+export const AI_APPLIED = ["auto", "pending", "confirmed", "edited", "rejected", "handed_over"] as const;
 
 /** aiDecisions/{id}: the agent's proposal (Z4); never a sanction by itself. */
 export const aiDecisionSchema = z

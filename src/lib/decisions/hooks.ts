@@ -7,7 +7,8 @@ import { logger } from "@/lib/logging/logger";
 // decision marks the proposal it followed as confirmed, edited or rejected. Imported lazily (the
 // agent's providers load only when used); tests replace the hooks with setDecisionAiHooks.
 
-export type AiReviewOutcome = "confirmed" | "edited" | "rejected";
+/** handed_over: a proposal that took no side (escalate, needs_human), decided by a human. */
+export type AiReviewOutcome = "confirmed" | "edited" | "rejected" | "handed_over";
 
 /** The agent's appeal_review proposal on a decision: approve = reverse, reject = uphold, escalate = cannot tell. */
 export interface AppealProposal {

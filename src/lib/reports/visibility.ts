@@ -1,5 +1,6 @@
 import "server-only";
 import { Timestamp, type Transaction } from "firebase-admin/firestore";
+import { subcategoryAllowsAds } from "@/config/categories";
 import { audit } from "@/lib/audit";
 import { getListingTx, listPublishedByOwner, updateListingTx, type ListingFieldPatch, type ListingRecord } from "@/lib/db/repositories/listings";
 import { enqueueSearchOutboxTx } from "@/lib/db/repositories/search-outbox";
@@ -30,9 +31,9 @@ const USER_RESTORE_LISTINGS_MAX = 100;
 
 const hasPublicPage = (listing: Pick<ListingRecord, "status">) => (PUBLIC_STATES as readonly string[]).includes(listing.status);
 
-/** adsEligible (§5): published, no open report, not hidden. */
-export function adsEligibleOf(listing: Pick<ListingRecord, "status" | "moderation">): boolean {
-  return listing.status === "published" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy;
+/** adsEligible (§5): published, no open report, not hidden, and a subcategory that allows ads. */
+export function adsEligibleOf(listing: Pick<ListingRecord, "status" | "moderation" | "subcategoryId">): boolean {
+  return listing.status === "published" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy && subcategoryAllowsAds(listing.subcategoryId);
 }
 
 /** The patch hiding a listing, or null when it is hidden already (the first report keeps the credit). */
@@ -50,7 +51,7 @@ export function hidePatch(listing: ListingRecord, signal: StrongSignal, reportId
 export function unhidePatch(listing: ListingRecord, now: Date): (ListingFieldPatch & { version: number }) | null {
   if (!listing.moderation.hiddenBy) return null;
   const { hiddenBy: _hidden, ...moderation } = listing.moderation;
-  return { moderation, adsEligible: adsEligibleOf({ status: listing.status, moderation }), version: listing.version + 1, updatedAt: now };
+  return { moderation, adsEligible: adsEligibleOf({ status: listing.status, moderation, subcategoryId: listing.subcategoryId }), version: listing.version + 1, updatedAt: now };
 }
 
 /**

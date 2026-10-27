@@ -27,7 +27,7 @@ import { readJson } from "@/lib/http/json";
 import { json } from "@/lib/http/route";
 import { logConnection } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
-import { sendMail } from "@/lib/mail";
+import { sendMail, type ActionLinkRequest } from "@/lib/mail";
 import { requestIdentity, type RequestIdentity } from "@/lib/rate-limit/keys";
 import { blockLimit, consumeLimit, enforceLimit, limitState, resetLimit } from "@/lib/rate-limit/limiter";
 import { clearSessionCookies, CSRF_HEADER, SESSION_COOKIE, setSessionCookies } from "@/lib/security/cookies";
@@ -175,10 +175,18 @@ export async function login(request: Request): Promise<Response> {
     if (!check.ok) throw new HttpError(400, "turnstile_failed");
   }
 
-  /** A failure on the pair and on the account; the one that fills the window locks the pair for blockDuration right away. */
+  // Counted on the pair before the password is looked at, atomically (F8, as the member login): a
+  // burst of parallel attempts past the allowance is refused here instead of all reaching Firebase
+  // Auth. A right password on a staff account forgets the count.
+  const counted = await consumeLimit(LOGIN_LIMIT, accountIp);
+  if (!counted.ok) {
+    if (counted.reason === "limited") throw accountLocked(counted.retryAfterSeconds);
+    throw unavailable("rate limiter unavailable");
+  }
+  /** A failure also counts on the account; the attempt that filled the pair's window locks it for blockDuration right away. */
   const fail = async (): Promise<void> => {
-    const [counted] = await Promise.all([consumeLimit(LOGIN_LIMIT, accountIp), consumeLimit(ACCOUNT_LIMIT, account)]);
-    if (counted.ok && counted.remaining === 0) await blockLimit(LOGIN_LIMIT, accountIp);
+    await consumeLimit(ACCOUNT_LIMIT, account);
+    if (counted.remaining === 0) await blockLimit(LOGIN_LIMIT, accountIp);
   };
 
   let localId: string;
@@ -286,9 +294,12 @@ export async function list(): Promise<StaffListResponse> {
   return { staff: (await listStaff()).map(toMember) };
 }
 
-/** Invitation link: our own page, the oobCode of the Admin SDK link (the Firebase page is never used). */
-export function invitationUrl(oobCode: string, origin = expectedOrigin("admin")): string {
-  return `${origin}/connexion?mode=setPassword&oobCode=${encodeURIComponent(oobCode)}`;
+/**
+ * Invitation link request: our own page, plus the oobCode of an Admin SDK reset link generated at
+ * delivery (the Firebase page is never used, the queue never holds the code).
+ */
+export function invitationLinkRequest(origin = expectedOrigin("admin")): ActionLinkRequest {
+  return { action: "resetPassword", url: `${origin}/connexion?mode=setPassword`, continueUrl: `${origin}/connexion` };
 }
 
 /**
@@ -331,16 +342,12 @@ export async function invite(ctx: StaffContext, input: InviteInput, identity: Re
   await upsertStaff({ uid, email: input.email, displayName: input.displayName, role: input.role, invitedBy: ctx.user.uid });
   await setClaims(uid, { role: input.role, v: 2 });
 
-  const origin = expectedOrigin("admin");
   try {
-    const link = await auth().generatePasswordResetLink(input.email, { url: `${origin}/connexion` });
-    const oobCode = new URL(link).searchParams.get("oobCode");
-    if (!oobCode) throw new Error("the generated link carries no oobCode");
     await sendMail({
       template: "staffInvite",
       locale: "fr",
       to: input.email,
-      data: { displayName: input.displayName, actionUrl: invitationUrl(oobCode, origin), role: input.role },
+      data: { displayName: input.displayName, actionLink: invitationLinkRequest(), role: input.role },
       priority: "security",
     });
   } catch (error) {

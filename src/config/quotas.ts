@@ -80,7 +80,8 @@ export const QUOTAS = {
     kind: "gauge",
     alertAt: 0.7,
     degradeAt: 1,
-    degradedMode: "Bascule vers l'offre Blaze à décider (seuil de 700 Mo, §2) ; dépôt suspendu à 100 %.",
+    // Alert only (src/lib/quota/gate.ts): the estimate is a floor, so it gates no route.
+    degradedMode: "Alerte seulement, aucun blocage par le site (estimation plancher) : bascule vers l'offre Blaze à décider dès 700 Mo (§2) ; à 1 Go, Spark refuse les écritures.",
   },
   "resend.daily": {
     service: "Resend",

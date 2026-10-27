@@ -1,5 +1,6 @@
 import "server-only";
 import { alert } from "@/lib/alert";
+import { generateActionUrl } from "@/lib/auth/links";
 import { serverEnv } from "@/lib/env";
 import { getLegalConfig } from "@/lib/legal/config";
 import { logger } from "@/lib/logging/logger";
@@ -12,7 +13,7 @@ import { BrevoTransport } from "./transports/brevo";
 import { ProviderError } from "./transports/errors";
 import { MemoryTransport } from "./transports/memory";
 import { ResendTransport } from "./transports/resend";
-import type { MailPriority, MailTransport, RenderedMail, SendResult, TemplateMail } from "./types";
+import type { ActionLinkRequest, MailJob, MailPriority, MailTransport, RenderedMail, SendResult, TemplateMail } from "./types";
 
 // One delivery (worker job, or inline without a queue). Transport choice (§2 adapters, §9 quotas):
 //   dev + DEV_MAILBOX, or no provider key      → memory mailbox
@@ -25,7 +26,8 @@ import type { MailPriority, MailTransport, RenderedMail, SendResult, TemplateMai
 //   Resend transient failure (429, 5xx, net)   → Brevo for security mails, else rethrown (backoff)
 //   nothing left (both quotas, no key)         → MailDeferredError: the worker delays the job; a
 //                                                waiting security mail raises a P1 once a day
-// A rejected mail (bad address or payload) is logged and dropped.
+// A rejected mail (bad address or payload) is logged and dropped. An action link (verification,
+// reset, staff invitation) is generated here, at delivery: the queue never holds a live code.
 
 export type DeliverOutcome = SendResult | { skipped: "suppressed" | "quota" | "rejected" };
 
@@ -153,7 +155,22 @@ async function syncResendCounters(quota: SendResult["quota"]): Promise<void> {
   if (quota?.monthly !== undefined) await raiseTo("resend.monthly", quota.monthly);
 }
 
-export async function deliverMail(mail: TemplateMail): Promise<DeliverOutcome> {
+/** The mail with its action link generated, or null when its recipient has no Auth account any more. */
+async function withActionLink(job: MailJob): Promise<TemplateMail | null> {
+  const data = job.data as { actionLink?: ActionLinkRequest };
+  if (!data.actionLink) return job as TemplateMail;
+  const { actionLink, ...rest } = data;
+  const actionUrl = await generateActionUrl(job.to, actionLink);
+  if (!actionUrl) return null;
+  return { ...job, data: { ...rest, actionUrl } } as TemplateMail;
+}
+
+export async function deliverMail(job: MailJob): Promise<DeliverOutcome> {
+  const mail = await withActionLink(job);
+  if (!mail) {
+    logger.warn({ template: job.template, key: job.idempotencyKey }, "mail dropped: no account for its action link");
+    return { skipped: "rejected" };
+  }
   const env = serverEnv();
   const priority: MailPriority = mail.priority ?? "transactional";
   const security = priority === "security";

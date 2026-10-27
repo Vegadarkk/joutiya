@@ -26,6 +26,7 @@ const APPLIED_LABEL: Record<AiProposal["applied"], string> = {
   confirmed: "Suivie",
   edited: "Suivie avec des modifications",
   rejected: "Écartée",
+  handed_over: "Transmise, décidée par un humain",
 };
 
 export function aiOpinion(ai: Pick<AiProposal, "task" | "verdict" | "action">): string {

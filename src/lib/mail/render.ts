@@ -29,7 +29,7 @@ import { newMessages } from "./templates/newMessages";
 import { signupExisting } from "./templates/signupExisting";
 import { staffInvite } from "./templates/staffInvite";
 import { verifyEmail } from "./templates/verifyEmail";
-import type { RenderedMail, TemplateData, TemplateId, TemplateMail } from "./types";
+import type { MailJob, RenderedMail, TemplateData, TemplateId, TemplateMail } from "./types";
 
 type TemplateRenderer<T extends TemplateId> = (data: TemplateData[T], ctx: TemplateContext) => BuiltMail;
 
@@ -70,9 +70,9 @@ export function isTemplateId(value: unknown): value is TemplateId {
 }
 
 /** Structural check of a queued job payload before it is rendered (never trust the queue blindly). */
-export function isTemplateMail(value: unknown): value is TemplateMail {
+export function isTemplateMail(value: unknown): value is MailJob {
   if (!value || typeof value !== "object") return false;
-  const mail = value as Partial<TemplateMail>;
+  const mail = value as Partial<MailJob>;
   return (
     isTemplateId(mail.template) &&
     (LOCALES as readonly string[]).includes(String(mail.locale)) &&

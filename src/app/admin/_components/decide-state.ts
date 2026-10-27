@@ -99,19 +99,20 @@ const DOC_ID = /^[A-Za-z0-9]{20}$/;
 
 /**
  * How the decision marks a pending proposal: confirmed when it goes the agent's way (its template
- * or none suggested), edited when it goes that way with another template, rejected otherwise.
- * Null when there is nothing to mark (none, already reviewed, no usable verdict).
+ * or none suggested), edited when it goes that way with another template, rejected otherwise;
+ * handed_over when the agent took no side (escalate, needs_human, unclear). Null when there is
+ * nothing to mark (none, already reviewed).
  */
 export function aiReview(ai: AiProposal | null, template: DecisionTemplate, type: DecisionTargetType): NonNullable<DecideRequest["ai"]> | null {
   if (!ai || ai.applied !== "pending" || !DOC_ID.test(ai.id)) return null;
   const direction = aiDirection(ai);
-  if (!direction) return null;
+  if (!direction) return { decisionId: ai.id, outcome: "handed_over" };
   if (direction !== template.outcome) return { decisionId: ai.id, outcome: "rejected" };
   const suggested = aiTemplate(ai, type);
   return { decisionId: ai.id, outcome: suggested && suggested.id !== template.id ? "edited" : "confirmed" };
 }
 
-export const AI_REVIEW_LABEL = { confirmed: "suivie", edited: "suivie avec un autre modèle", rejected: "écartée" } as const;
+export const AI_REVIEW_LABEL = { confirmed: "suivie", edited: "suivie avec un autre modèle", rejected: "écartée", handed_over: "transmise, vous décidez" } as const;
 
 // ---- The request ------------------------------------------------------------------------------
 

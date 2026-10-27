@@ -92,7 +92,8 @@ export async function getAiDecision(id: string): Promise<AiDecisionRecord | null
   return snapshot.exists ? fromData(snapshot.id, snapshot.data()) : null;
 }
 
-export type ReviewOutcome = "confirmed" | "edited" | "rejected";
+/** handed_over: the agent took no side (escalate, needs_human) and a human decided. */
+export type ReviewOutcome = "confirmed" | "edited" | "rejected" | "handed_over";
 
 function reviewPatch(applied: ReviewOutcome, reviewedBy: string, decisionId: string | undefined, now: Date): Record<string, unknown> {
   return {

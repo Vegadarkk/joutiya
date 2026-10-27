@@ -6,8 +6,9 @@ import { nextStep } from "./ladder";
 import { getPrivate, getSuspension } from "./repository";
 
 // Account view of the back office (design D14, D15, D24): status, strikes and the ladder's next
-// step, the running suspension, reporter accuracy (art. 23) and the latest decisions. No e-mail,
-// phone or IP: the moderator decides on the account's conduct, not its identity.
+// step, the running suspension, the phone badge, reporter accuracy (art. 23) and the latest
+// decisions. No e-mail, phone number or IP: the moderator decides on the account's conduct, not
+// its identity.
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MANIFEST_WINDOW_DAYS = 30;
@@ -30,6 +31,7 @@ export async function userModerationView(uid: string, now = new Date()): Promise
     strikes: { level: strikes.level, lastAt: strikes.lastAt?.toISOString() ?? null, suspendedUntil: strikes.suspendedUntil?.toISOString() ?? null },
     nextStep: nextStep(strikes.level),
     suspension: suspension ? { until: suspension.until.toISOString(), decisionId: suspension.decisionId } : null,
+    phone: { verified: user.badges.phoneVerified, verifiedAt: account?.phoneVerifiedAt?.toISOString() ?? null },
     reporter: {
       total: reporter?.total ?? 0,
       recent: [...recent],

@@ -6,7 +6,9 @@ import { clientIp, ipBuckets } from "@/lib/security/ip";
 import { readCookie } from "@/lib/http/cookies";
 
 // Rate-limit identity of a request (§6 "Les clés"): IP bucket, wider IPv6 bucket, and the signed
-// device id when the browser sent one. An unknown device counts on its IP with low thresholds.
+// device id when the browser sent one. Every cookie-less client of an IP bucket shares one device
+// allowance (`anon:<bucket>`): stricter than a known device, without separate lower thresholds
+// that would punish shared IPs (CGNAT; follow-up S5 accepted as is, docs/phase-2.md).
 
 export interface RequestIdentity {
   /** Exact client IP (connectionLogs only). */

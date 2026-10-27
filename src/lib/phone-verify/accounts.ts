@@ -59,3 +59,25 @@ export async function claimVerifiedPhoneIn(tx: Transaction, uid: string, e164: s
   tx.update(userRef(uid), { "badges.phoneVerified": true, updatedAt: now });
   return { previousUid, moved };
 }
+
+/**
+ * Staff withdrawal of a verified number (audit C1-02): the number, its verification date and the
+ * badge leave the account in one transaction. False when the account holds no verified number.
+ * The member can verify a number again; a fraudulent use is handled by the sanctions ladder.
+ */
+export async function revokeVerifiedPhone(uid: string, now = new Date()): Promise<boolean> {
+  const firestore = db();
+  const userRef = firestore.collection(COLLECTIONS.users).doc(uid);
+  const privateRef = userRef.collection(COLLECTIONS.userPrivate).doc(COLLECTIONS.userPrivateDoc);
+  const revoked = await firestore.runTransaction(async (tx) => {
+    const [user, account] = await Promise.all([tx.get(userRef), tx.get(privateRef)]);
+    if (!user.exists) return false;
+    if (user.get("badges.phoneVerified") !== true && !account.get("phoneVerifiedAt")) return false;
+    if (account.exists) tx.update(privateRef, { phoneE164: FieldValue.delete(), phoneVerifiedAt: FieldValue.delete() });
+    tx.update(userRef, { "badges.phoneVerified": false, updatedAt: now });
+    return true;
+  });
+  void consume("firestore.reads", 2);
+  if (revoked) void consume("firestore.writes", 2);
+  return revoked;
+}

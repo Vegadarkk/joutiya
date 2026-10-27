@@ -14,7 +14,7 @@ import { GET as unread } from "@/app/api/messages/unread/route";
 import { POST as profile } from "@/app/api/auth/profile/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
 import { GET as myListings } from "@/app/api/listings/mine/route";
-import { CONSENTS, Jar, ORIGIN, PASSWORD, call, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
+import { CONSENTS, Jar, ORIGIN, PASSWORD, actionUrlOf, call, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
@@ -29,7 +29,7 @@ async function verifiedAccount() {
   const jar = new Jar();
   const email = uniqueEmail("gs");
   expect((await call(signup, "/api/auth/signup", { jar, body: { email, password: PASSWORD, displayName: "Suspended Soon", locale: "fr", consents: CONSENTS, turnstileToken: "t" } })).status).toBe(202);
-  const verified = await call<SignedInBody>(action, "/api/auth/action", { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(lastMail(sendMail, "verifyEmail", email)!.data.actionUrl) } });
+  const verified = await call<SignedInBody>(action, "/api/auth/action", { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(await actionUrlOf(lastMail(sendMail, "verifyEmail", email)!)) } });
   expect(verified.status).toBe(200);
   return { jar, uid: verified.body.session.uid };
 }

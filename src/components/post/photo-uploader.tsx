@@ -9,7 +9,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useNumbersTranslations } from "@/i18n/numbers";
 import { blurhashDataUrl } from "@/lib/listings/client/blurhash";
 import { ACCEPTED_INPUT_TYPES } from "@/lib/listings/client/prepare-image";
-import { isPhotoBusy, type PhotoItem } from "@/lib/listings/client/store";
+import { isPhotoBusy, usedSlots, type PhotoItem } from "@/lib/listings/client/store";
 import { cn } from "@/lib/utils";
 
 // Step 5: tiles with progress, cancel, retry, remove, drag or button reorder (first = cover),
@@ -46,7 +46,9 @@ export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onR
   const [fileOver, setFileOver] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const focusAfterMove = useRef<FocusTarget | null>(null);
-  const room = Math.max(0, maxPhotos - photos.length);
+  // Failed and refused tiles take no slot: the counter and the room leave them out.
+  const used = usedSlots(photos);
+  const room = Math.max(0, maxPhotos - used);
   const readyCount = photos.filter((item) => item.status === "ready").length;
   // The upload cap counts refused photos too: the tile says it briefly, the banner what to do.
   const uploadLimited = photos.some((item) => item.status === "failed" && item.errorCode === "upload_limit");
@@ -95,7 +97,7 @@ export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onR
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-foreground-muted">
-        <span className="font-medium tabular-nums text-foreground">{t("count", { count: photos.length, max: maxPhotos })}</span>
+        <span className="font-medium tabular-nums text-foreground">{t("count", { count: used, max: maxPhotos })}</span>
         <span>{room > 0 ? t("tooMany", { count: room }) : t("full")}</span>
       </div>
       {uploadLimited ? <ErrorBanner tone="warning" title={errors("upload_limit")} /> : null}
@@ -133,6 +135,7 @@ export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onR
               index={index}
               total={photos.length}
               canRemove={!(keepOne && item.status === "ready" && readyCount <= 1)}
+              canRetry={room > 0}
               onRemove={onRemove}
               onRetry={onRetry}
               onRefresh={onRefresh}
@@ -193,11 +196,13 @@ interface PhotoTileProps {
   canRemove: boolean;
   onRemove: (key: string) => void;
   onRetry: (key: string) => void;
+  /** A free slot exists: a failed or refused tile may start again. */
+  canRetry: boolean;
   onRefresh: (key: string) => void;
   onMove: (key: string, to: number, action: FocusTarget["action"]) => void;
 }
 
-function PhotoTile({ item, index, total, canRemove, onRemove, onRetry, onRefresh, onMove }: PhotoTileProps) {
+function PhotoTile({ item, index, total, canRemove, onRemove, onRetry, canRetry, onRefresh, onMove }: PhotoTileProps) {
   const t = useNumbersTranslations("Listing.photos");
   const errors = useTranslations("Listing.errors");
   const n = index + 1;
@@ -302,7 +307,7 @@ function PhotoTile({ item, index, total, canRemove, onRemove, onRetry, onRefresh
           </span>
         )}
         {(item.status === "failed" || item.status === "rejected") && item.file && !item.errorCode?.startsWith("remove") ? (
-          <TileButton label={t("retry", { index: n })} onClick={() => onRetry(item.key)}>
+          <TileButton label={t("retry", { index: n })} disabled={!canRetry} onClick={() => onRetry(item.key)}>
             <RotateCcw className="size-4" aria-hidden="true" />
           </TileButton>
         ) : item.status === "timeout" ? (

@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { ACCOUNT_STATUS_LABEL, APPEAL_STATUS_LABEL, formatDateTime, plural, TARGET_LABEL, targetHref, templateLabel } from "../../../_lib/moderation-format";
 import { SANCTION_LABEL, stepChoice } from "../../../_components/decide-state";
 import { Facts, linkClassName, Panel } from "../../../_components/panel";
+import { RevokePhoneButton } from "../../../_components/revoke-phone-button";
 
 // An account's moderation page (design D14, D15, D24): the sanctions ladder and where it stands,
 // the running suspension, its accuracy as a reporter (art. 23), and the decisions about it.
@@ -89,6 +90,11 @@ export default async function AccountPage({ params }: { params: Promise<{ uid: s
               Décision de suspension
             </Link>
           ) : null}
+        </Panel>
+
+        <Panel title="Téléphone">
+          <Facts rows={[["Numéro vérifié", user.phone.verified ? (user.phone.verifiedAt ? `Oui, depuis le ${formatDateTime(user.phone.verifiedAt)}` : "Oui") : "Non"]]} />
+          {user.phone.verified ? <RevokePhoneButton uid={user.uid} name={user.displayName} /> : null}
         </Panel>
 
         <Panel title="Comme signalant">

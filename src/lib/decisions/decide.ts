@@ -301,7 +301,7 @@ function listingDecision(
   const legalHold = withoutReportHolds(listing.legalHold, input.closedIds);
   const version = listing.version + 1;
   return {
-    patch: { ...statusPatch, moderation, adsEligible: adsEligibleOf({ status, moderation }), ...(legalHold ? { legalHold } : {}), version, updatedAt: now },
+    patch: { ...statusPatch, moderation, adsEligible: adsEligibleOf({ status, moderation, subcategoryId: listing.subcategoryId }), ...(legalHold ? { legalHold } : {}), version, updatedAt: now },
     search,
     effect,
   };

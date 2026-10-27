@@ -1,5 +1,6 @@
 import "server-only";
 import type { AiConfig } from "@/config/ai";
+import { subcategoryAllowsAds } from "@/config/categories";
 import { listingLifetime } from "@/config/pricing";
 import { cityBySlug, cityName } from "@/config/regions";
 import { reportReason, type ReportReasonId } from "@/config/report-reasons";
@@ -150,7 +151,7 @@ export async function applyAutoDecision(kind: "approve" | "reject", input: AutoD
         lastDecisionId: decisionId,
         ai: { decisionId: input.aiDecisionId, action: kind, confidence: input.confidence, applied: true },
       };
-      patch.adsEligible = kind === "approve" && current.moderation.openReports === 0 && !current.moderation.hiddenBy;
+      patch.adsEligible = kind === "approve" && current.moderation.openReports === 0 && !current.moderation.hiddenBy && subcategoryAllowsAds(current.subcategoryId);
       updateListingTx(tx, listing.id, patch);
       if (effects.search) enqueueSearchOutboxTx(tx, listing.id, effects.search, patch.version ?? current.version, now);
       markAutoAppliedTx(tx, input.aiDecisionId, decisionId, now);

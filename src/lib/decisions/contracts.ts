@@ -41,7 +41,7 @@ export const decideSchema = z
     details: z.string().trim().max(DETAILS_MAX).optional(),
     sanction: sanctionSchema.optional(),
     manifestlyUnfounded: z.union([z.literal(true), z.array(docIdSchema).min(1).max(100)]).optional(),
-    ai: z.object({ decisionId: docIdSchema, outcome: z.enum(["confirmed", "edited", "rejected"]) }).strict().optional(),
+    ai: z.object({ decisionId: docIdSchema, outcome: z.enum(["confirmed", "edited", "rejected", "handed_over"]) }).strict().optional(),
   })
   .strict()
   .superRefine((input, ctx) => {
@@ -182,7 +182,7 @@ export const APPEAL_NOTE_MIN = 10;
 export const APPEAL_NOTE_MAX = 2000;
 
 /** The agent's proposal the staff member followed, edited or refused (decisions and appeal reviews). */
-const aiReviewSchema = z.object({ decisionId: docIdSchema, outcome: z.enum(["confirmed", "edited", "rejected"]) }).strict();
+const aiReviewSchema = z.object({ decisionId: docIdSchema, outcome: z.enum(["confirmed", "edited", "rejected", "handed_over"]) }).strict();
 
 /**
  * POST /api/admin/appeals/{decisionId}: the review by another moderator, or by an admin (his own
@@ -349,6 +349,8 @@ export interface UserModerationView {
   /** What the back office proposes next (D14); the moderator may choose another step. */
   nextStep: LadderStep;
   suspension: { until: string; decisionId: string } | null;
+  /** Phone badge and when it was earned (never the number). */
+  phone: { verified: boolean; verifiedAt: string | null };
   reporter: { total: number; recent: boolean[]; foundedShare: number | null; manifestRecent: number; warnedAt: string | null; abusiveUntil: string | null };
   decisions: { id: string; action: string; templateId: string; target: { type: string; id: string }; createdAt: string; appeal: string | null }[];
 }
@@ -368,3 +370,9 @@ export interface ModerationStats {
 }
 
 export type { DecisionTargetType };
+
+// ---- Phone badge (audit C1-02) -----------------------------------------------------------------
+
+/** DELETE /api/admin/users/{uid}/phone: why the verified number is withdrawn (audited). */
+export const revokePhoneSchema = z.object({ reason: z.string().trim().min(3).max(500) }).strict();
+export type RevokePhoneInput = z.infer<typeof revokePhoneSchema>;

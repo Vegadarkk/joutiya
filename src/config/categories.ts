@@ -329,6 +329,14 @@ export function subcategoryById(id: string): Subcategory | undefined {
   return subcategoryIndex.get(id);
 }
 
+/**
+ * Whether ads may ever run beside a listing of this subcategory: never on an adults-only one
+ * (decorative koumiyas, Google's weapons and knives policy). Every `adsEligible` writer applies it.
+ */
+export function subcategoryAllowsAds(id: string | undefined): boolean {
+  return !(id && subcategoryById(id)?.adultsOnly);
+}
+
 export function criterionById(id: string): FieldDef | undefined {
   return Object.hasOwn(FIELDS, id) ? FIELDS[id as CriterionId] : undefined;
 }

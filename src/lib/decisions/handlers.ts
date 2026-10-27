@@ -1,9 +1,11 @@
 import "server-only";
+import { audit } from "@/lib/audit";
 import { requireSameOrigin, requireStaff, requireUser, type StaffContext } from "@/lib/auth/guards";
 import { publicIdSchema } from "@/lib/db/schemas";
 import { HttpError, notFound } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
-import { json } from "@/lib/http/route";
+import { json, noContent } from "@/lib/http/route";
+import { revokeVerifiedPhone } from "@/lib/phone-verify/accounts";
 import { requestIdentity } from "@/lib/rate-limit/keys";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { parseTargetKey } from "@/lib/reports/target-key";
@@ -20,6 +22,7 @@ import {
   linkAppealSchema,
   openAppealSchema,
   reviewAppealSchema,
+  revokePhoneSchema,
   staffConversationQuerySchema,
   updateAuthorityRequestSchema,
   type AppealQueueResponse,
@@ -219,6 +222,20 @@ export async function handleUserGet(request: Request, context: Params): Promise<
   const view = await userModerationView(uid);
   if (!view) throw notFound();
   return json<{ user: UserModerationView }>({ user: view });
+}
+
+/**
+ * DELETE /api/admin/users/{uid}/phone: withdraws the verified number and its badge (audit C1-02),
+ * for a number used to defraud; audited with the moderator's reason. 409 when there is none.
+ */
+export async function handlePhoneRevoke(request: Request, context: Params): Promise<Response> {
+  const staff = await requireStaff(request, { mutation: true, ...STAFF });
+  const uid = await param(context, "uid", uidSchema);
+  await enforceLimit("moderation.decision.uid", staff.user.uid);
+  const { reason } = await readJson(request, revokePhoneSchema);
+  if (!(await revokeVerifiedPhone(uid))) throw new HttpError(409, "conflict", "no verified phone on this account");
+  await audit({ actorUid: staff.user.uid, actorRole: staff.role, action: "phone.revoked", target: { type: "user", id: uid }, automated: false, ip: ipOf(request), reason });
+  return noContent();
 }
 
 /** GET /api/admin/stats */
