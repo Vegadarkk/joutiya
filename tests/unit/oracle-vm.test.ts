@@ -26,6 +26,7 @@ import {
   promoteCommand,
   rebuildDetails,
   recordedTarballs,
+  buildStagingScript,
   rootCommand,
   sealedEnvScripts,
   transferScript,
@@ -323,5 +324,17 @@ describe("transfer and sealed env", () => {
     expect(readdirSync(dirs.stage)).toEqual([]);
     expect(() => sealedEnvScripts("staging", [app], dirs)).toThrow("is for prod, not staging");
     expect(() => sealedEnvScripts("prod", [{ ...app, target: "tunnel.env" }], dirs)).toThrow("tunnels");
+  });
+});
+
+describe("build-staging", () => {
+  it("clones once, builds a commit of origin/main and starts it only once every secret is there", () => {
+    const script = buildStagingScript("e84c7209f7bd");
+    expect(Buffer.byteLength(rootCommand(script))).toBeLessThanOrEqual(RUN_COMMAND_MAX_BYTES);
+    expect(script).toContain("[[ -d /opt/joutiya/src/.git ]] || git clone --quiet https://github.com/Vegadarkk/joutiya.git /opt/joutiya/src");
+    expect(script).toContain("merge-base --is-ancestor");
+    expect(script).toContain("/etc/joutiya/staging/app.env");
+    expect(script.indexOf("the start waits for")).toBeLessThan(script.indexOf("joutiya-deploy staging"));
+    expect(() => buildStagingScript("main; rm -rf /")).toThrow("--commit");
   });
 });

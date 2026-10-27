@@ -39,20 +39,17 @@ import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { validateTargets, type Targets } from "./assert-target.ts";
 import { WIF_SERVICES, caFiles, certificateConfig, credentialConfig, csrFromOutput, readCa, signCsr, subjectName } from "./google-wif.ts";
-import { searchSetupScript, wifDir, wifInstallScript, wifKeyScript, wifRecreateScript } from "./oracle-vm.ts";
+import { REPOSITORY, SECRET_FILES, SOURCE_DIR, searchSetupScript, stagingReleaseLines, wifDir, wifInstallScript, wifKeyScript, wifRecreateScript } from "./oracle-vm.ts";
 import { type Sealed, openSealedLines, parseSealed } from "./seal-env.ts";
-import { REQUIRED, mergeLines } from "./vm-env.ts";
+import { mergeLines } from "./vm-env.ts";
 
 export const DISTRO = "joutiya-staging";
 const ENV = "staging";
-export const REPOSITORY = "https://github.com/Vegadarkk/joutiya.git";
-export const SOURCE_DIR = "/opt/joutiya/src";
 const ETC = `/etc/joutiya/${ENV}`;
 const COMPOSE = `APP_ENV=${ENV} RELEASE="$release" docker compose --project-directory /opt/joutiya/docker -f /opt/joutiya/docker/compose.yml -f /opt/joutiya/docker/compose.${ENV}.yml`;
 /** Certificates of this temporary host live shorter than the VM's 365 days; `wif` renews them. */
 export const PC_LEAF_DAYS = 90;
-/** Secret files the start needs besides app.env (Compose's env_file entries and §9's credentials). */
-export const SECRET_FILES = ["tunnel.env", "valkey-queue.env", "valkey-ratelimit.env", "meilisearch.env", "gcp/web/credentials.json", "gcp/worker/credentials.json"] as const;
+export { REPOSITORY, SECRET_FILES, SOURCE_DIR };
 
 // ---------------------------------------------------------------------------------------------
 // Running root scripts in the distro.
@@ -225,8 +222,6 @@ export function setupScript(): string {
  * started by the VM's deploy command, which waits for health and rolls back on failure.
  */
 export function deployScript(commit?: string): string {
-  if (commit !== undefined && !/^[0-9a-f]{7,40}$/.test(commit)) throw new Error("--commit takes a commit SHA of origin/main");
-  const src = SOURCE_DIR;
   return [
     // The image keeps the modes of the build context: files checked out as the CI's are (0644).
     "umask 022",
@@ -234,27 +229,8 @@ export function deployScript(commit?: string): string {
     NO_INTEROP,
     INTEROP_CHECK,
     ...OWN_ENGINE,
-    `[[ -d ${src}/.git ]] || { echo "no clone in ${src}: run setup first" >&2; exit 1; }`,
-    `git -C ${src} fetch --quiet origin main`,
-    `commit="$(git -C ${src} rev-parse --verify --quiet '${commit ?? "origin/main"}^{commit}')" || { echo "unknown commit" >&2; exit 1; }`,
-    `git -C ${src} merge-base --is-ancestor "$commit" origin/main || { echo "$commit is not on origin/main" >&2; exit 1; }`,
-    `git -C ${src} checkout --quiet --force --detach "$commit"`,
-    `release="$(git -C ${src} rev-parse --short=12 "$commit")"`,
-    // The files infra/vm/install.sh installs on the VM, from the same commit.
-    `install -m 0644 ${src}/docker/compose.yml ${src}/docker/compose.staging.yml /opt/joutiya/docker/`,
-    `install -m 0644 ${src}/docker/valkey/*.conf /opt/joutiya/docker/valkey/`,
-    `install -m 0755 ${src}/infra/vm/deploy-forced-command.sh /usr/local/sbin/joutiya-deploy`,
-    `install -m 0755 ${src}/infra/vm/search-setup.sh /usr/local/sbin/joutiya-search-setup`,
-    "for target in web worker; do",
-    '  echo "building joutiya-$target:$release"',
-    `  docker build --progress=plain -f ${src}/docker/Dockerfile --target "$target" --build-arg RELEASE="$release" -t "joutiya-$target:$release" ${src} 2>&1 | tail -n 20`,
-    "done",
-    'missing=""',
-    `for name in ${REQUIRED.join(" ")}; do grep -q "^$name=" ${ETC}/app.env 2> /dev/null || missing="$missing $name"; done`,
-    `for file in ${SECRET_FILES.join(" ")}; do [[ -s ${ETC}/$file ]] || missing="$missing $file"; done`,
-    'if [[ -n "$missing" ]]; then echo "built $release; the start waits for:$missing"; exit 0; fi',
-    'docker save "joutiya-web:$release" "joutiya-worker:$release" | zstd -T0 -3 -q | SSH_ORIGINAL_COMMAND="load $release" /usr/local/sbin/joutiya-deploy staging',
-    'echo "running $release"',
+    `[[ -d ${SOURCE_DIR}/.git ]] || { echo "no clone in ${SOURCE_DIR}: run setup first" >&2; exit 1; }`,
+    ...stagingReleaseLines(commit),
   ].join("\n");
 }
 

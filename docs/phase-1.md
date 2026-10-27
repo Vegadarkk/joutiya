@@ -117,6 +117,8 @@ Après la validation du .MA par le registre, et avant le 12 novembre (Cloudflare
 
 ## 8. Déploiement automatique du staging
 
+En attendant, le staging de la VM se construit sur la VM elle-même, comme sur le PC2 : `node scripts/oracle-vm.ts build-staging [--commit=<sha>] --apply` récupère un commit de `main` depuis le dépôt public, construit les images et démarre le staging dès que tous ses secrets sont en place. Ces images n'ont pas de trace de la CI : `promote` les refuse, la production attend donc cette étape.
+
 1. Nav prépare un jeton GitHub à grain fin `joutiya-claude-actions` : dépôt `joutiya` seul, permissions **Secrets** et **Variables** en lecture et écriture, 90 jours. Vous cliquez sur **Generate token** et l'enregistrez dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
 2. Claude, dans une nouvelle session :
    - crée la clé de `deploy-staging` : la clé privée va dans le secret GitHub `STAGING_DEPLOY_SSH_KEY`, la clé publique sur la VM (`oracle-vm.ts sync --deploy-staging-key`) ;

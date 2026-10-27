@@ -39,6 +39,10 @@
 //   node scripts/oracle-vm.ts env <staging|prod> --sealed=<file>[,<file>...] [--apply]
 //       the same merge from files sealed for that certificate: only the VM opens them, so Run
 //       Command and Oracle's 7-day record carry no value. --from and --sealed do not mix.
+//   node scripts/oracle-vm.ts build-staging [--commit=<sha>] [--apply]
+//       a commit of origin/main (default its head) built on the VM from the public repository and,
+//       once every secret is in place, started as staging; until the CI deploys staging (step 8).
+//       Its images have no CI record, so `promote` refuses them.
 //   node scripts/oracle-vm.ts search-setup <staging|prod> [--reindex=<max reads>] [--apply]
 //       Meilisearch's index and the app's two keys in app.env, then web and worker recreated
 //       (infra/vm/search-setup.sh); --reindex also rebuilds the index from Firestore (new VM).
@@ -70,7 +74,7 @@ import { gzipSync } from "node:zlib";
 import { tunnelTokenErrors, validateTargets, type Targets } from "./assert-target.ts";
 import { LEAF_DAYS, WIF_SERVICES, certificateConfig, credentialConfig, csrFromOutput, derBase64, pemBlock, subjectName, wifLines, type WifService } from "./google-wif.ts";
 import { type Sealed, openSealedLines, parseSealed } from "./seal-env.ts";
-import { DEPLOYED_ENVS, VM_DIRS, envPayload, envScripts, mergeLines, namesScript, parseMissing, parseNames, planEnv, type DeployedEnv, type EnvDirs, type Source } from "./vm-env.ts";
+import { DEPLOYED_ENVS, REQUIRED, VM_DIRS, envPayload, envScripts, mergeLines, namesScript, parseMissing, parseNames, planEnv, type DeployedEnv, type EnvDirs, type Source } from "./vm-env.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 
@@ -1019,6 +1023,64 @@ async function sealedEnv(oci: Oci, compartmentId: string, env: DeployedEnv, path
   else console.log(missing.length > 0 ? `still missing: ${missing.join(", ")} (the app does not start without them)` : "every required variable is set");
 }
 
+// Staging releases built on the VM itself from the public repository, until the CI deploys staging
+// (step 8). The PC2 staging builds the same way (scripts/wsl-staging.ts deploy). Such images carry no
+// CI record, so `promote` refuses them: production stays on CI-built releases.
+
+export const REPOSITORY = "https://github.com/Vegadarkk/joutiya.git";
+export const SOURCE_DIR = "/opt/joutiya/src";
+/** Secret files the start needs besides app.env (Compose's env_file entries and §9's credentials). */
+export const SECRET_FILES = ["tunnel.env", "valkey-queue.env", "valkey-ratelimit.env", "meilisearch.env", "gcp/web/credentials.json", "gcp/worker/credentials.json"] as const;
+
+/**
+ * Root script lines: a commit of origin/main checked out in SOURCE_DIR, built, and, once every
+ * secret is in place, loaded and started by the deploy command, which waits for health and rolls
+ * back on failure. Shared with the PC2 staging.
+ */
+export function stagingReleaseLines(commit?: string): string[] {
+  if (commit !== undefined && !/^[0-9a-f]{7,40}$/.test(commit)) throw new Error("--commit takes a commit SHA of origin/main");
+  const src = SOURCE_DIR;
+  const etc = "/etc/joutiya/staging";
+  return [
+    `git -C ${src} fetch --quiet origin main`,
+    `commit="$(git -C ${src} rev-parse --verify --quiet '${commit ?? "origin/main"}^{commit}')" || { echo "unknown commit" >&2; exit 1; }`,
+    `git -C ${src} merge-base --is-ancestor "$commit" origin/main || { echo "$commit is not on origin/main" >&2; exit 1; }`,
+    `git -C ${src} checkout --quiet --force --detach "$commit"`,
+    `release="$(git -C ${src} rev-parse --short=12 "$commit")"`,
+    // The files infra/vm/install.sh installs on the VM, from the same commit.
+    `install -m 0644 ${src}/docker/compose.yml ${src}/docker/compose.staging.yml /opt/joutiya/docker/`,
+    `install -m 0644 ${src}/docker/valkey/*.conf /opt/joutiya/docker/valkey/`,
+    `install -m 0755 ${src}/infra/vm/deploy-forced-command.sh /usr/local/sbin/joutiya-deploy`,
+    `install -m 0755 ${src}/infra/vm/search-setup.sh /usr/local/sbin/joutiya-search-setup`,
+    "for target in web worker; do",
+    '  echo "building joutiya-$target:$release"',
+    `  docker build --progress=plain -f ${src}/docker/Dockerfile --target "$target" --build-arg RELEASE="$release" -t "joutiya-$target:$release" ${src} 2>&1 | tail -n 20`,
+    "done",
+    'missing=""',
+    `for name in ${REQUIRED.join(" ")}; do grep -q "^$name=" ${etc}/app.env 2> /dev/null || missing="$missing $name"; done`,
+    `for file in ${SECRET_FILES.join(" ")}; do [[ -s ${etc}/$file ]] || missing="$missing $file"; done`,
+    'if [[ -n "$missing" ]]; then echo "built $release; the start waits for:$missing"; exit 0; fi',
+    'docker save "joutiya-web:$release" "joutiya-worker:$release" | zstd -T0 -3 -q | SSH_ORIGINAL_COMMAND="load $release" /usr/local/sbin/joutiya-deploy staging',
+    'echo "running $release"',
+  ];
+}
+
+/** Root script of `build-staging`: the clone made once, then stagingReleaseLines. */
+export function buildStagingScript(commit?: string): string {
+  return [
+    "umask 022",
+    "command -v git > /dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -q git > /dev/null",
+    `[[ -d ${SOURCE_DIR}/.git ]] || git clone --quiet ${REPOSITORY} ${SOURCE_DIR}`,
+    ...stagingReleaseLines(commit),
+  ].join("\n");
+}
+
+async function buildStaging(oci: Oci, compartmentId: string, commit: string | undefined): Promise<void> {
+  const instance = await runningInstance(oci, compartmentId);
+  const output = await runCommand(oci, compartmentId, instance.id, "joutiya-build-staging", rootCommand(buildStagingScript(commit)), 5_400);
+  if (oci.apply) console.log(output.trimEnd());
+}
+
 // ---------------------------------------------------------------------------------------------
 // Production releases (§2), run by root through Run Command with the forced command of the deploy
 // users (infra/vm/deploy-forced-command.sh, environment prod). Production only runs images already
@@ -1301,12 +1363,12 @@ async function main(): Promise<void> {
   const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);
   const smallFallback = args.includes("--small-fallback");
-  const actions = ["create", "launcher", "tunnels", "transfer", "rebuild", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback"];
+  const actions = ["create", "launcher", "tunnels", "transfer", "build-staging", "rebuild", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback"];
   const perEnv = action === "env" || action === "search-setup" || action === "wif";
   const argument = action === "run" || perEnv;
   if (!action || !actions.includes(action) || argument !== (file !== undefined) || (perEnv && !(DEPLOYED_ENVS as readonly string[]).includes(file ?? ""))) {
     throw new Error(
-      "usage: scripts/oracle-vm.ts <create|launcher|tunnels|transfer|rebuild [--keep-disk]|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|--sealed=<file>[,...]|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
+      "usage: scripts/oracle-vm.ts <create|launcher|tunnels|transfer|build-staging [--commit=<sha>]|rebuild [--keep-disk]|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|--sealed=<file>[,...]|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
     );
   }
 
@@ -1333,6 +1395,7 @@ async function main(): Promise<void> {
   else if (action === "search-setup") await searchSetup(oci, compartment, file as DeployedEnv, args.find((arg) => arg.startsWith("--reindex="))?.slice("--reindex=".length));
   else if (action === "wif") await wif(oci, targets, compartment, file as DeployedEnv, args.find((arg) => arg.startsWith("--certificates="))?.slice("--certificates=".length));
   else if (action === "transfer") await transfer(oci, compartment);
+  else if (action === "build-staging") await buildStaging(oci, compartment, args.find((arg) => arg.startsWith("--commit="))?.slice("--commit=".length));
   else if (action === "env") {
     const froms = args.filter((arg) => arg.startsWith("--from=")).map((arg) => arg.slice("--from=".length));
     const sealed = args.filter((arg) => arg.startsWith("--sealed=")).flatMap((arg) => arg.slice("--sealed=".length).split(",").filter((path) => path !== ""));
