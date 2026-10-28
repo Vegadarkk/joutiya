@@ -9,6 +9,7 @@ import { RootShell } from "@/components/layout/root-shell";
 import { currentUser, renderUserPrivate } from "@/lib/auth/current-user";
 import { sessionSummary } from "@/lib/auth/summary";
 import { publicConfig } from "@/lib/config/public";
+import { getFlags } from "@/lib/config/runtime";
 import type { SessionSummary } from "@/lib/contracts/auth";
 import { rootMetadata, SITE_VIEWPORT } from "@/lib/i18n/metadata";
 
@@ -46,7 +47,7 @@ export default async function PrivateLayout({ children, params }: { children: Re
   setRequestLocale(locale);
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
-    <RootShell locale={locale} nonce={nonce} config={publicConfig()} initialSession={await initialSession()}>
+    <RootShell locale={locale} nonce={nonce} config={publicConfig(undefined, await getFlags())} initialSession={await initialSession()}>
       {children}
     </RootShell>
   );

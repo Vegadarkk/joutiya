@@ -13,6 +13,8 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   "Theme",
   "Error",
   "Toaster",
+  // Cookie consent: banner, panel and the footer's "Gérer mes cookies".
+  "Consent",
   "Auth.menu",
   "Auth.settings",
   // Listing page islands: gallery, map, contact (the reveal errors and challenge load on demand).
