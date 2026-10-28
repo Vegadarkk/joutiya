@@ -5,6 +5,14 @@ import type { ListingDoc } from "@/lib/db/schemas";
 // Real-estate rules across fields (Agence pack design, phase-7/agence-immobiliere.md §1), on top of
 // the declarative criteria. Pure, shared by the publish readiness and its tests.
 
+/**
+ * Every real-estate listing: the advertiser attests at publication that its declared data (title,
+ * mandate, fees, authorisation) are accurate and its own responsibility; the site checks none.
+ */
+export function needsRealEstateAttestation(subcategory: Pick<Subcategory, "categoryId"> | undefined): boolean {
+  return subcategory?.categoryId === "immobilier";
+}
+
 /** Law 67-12 art. 20: the security deposit of a residential lease is at most two months' rent. */
 export const DEPOSIT_MAX_MONTHS = 2;
 

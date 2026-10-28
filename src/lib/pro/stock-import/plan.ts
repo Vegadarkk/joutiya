@@ -17,7 +17,6 @@ export const UPDATABLE_STATUSES: readonly ListingStatus[] = ["draft", "pending_r
 const ABSENT_STATUSES: readonly ListingStatus[] = ["published", "paused"];
 
 export interface StockEntry extends StockListing {
-  subcategoryId: string | null;
   fields: ImportedFields;
 }
 
@@ -121,6 +120,6 @@ export function planImport(rows: readonly ParsedRow[], stock: readonly StockEntr
 
   const absent = stock
     .filter((entry) => ABSENT_STATUSES.includes(entry.status) && !seen.has(refKey(entry.ref)))
-    .map(({ id, ref, title, status, photoCount, slugId }) => ({ id, ref, title, status, photoCount, slugId }));
+    .map(({ id, ref, title, status, photoCount, slugId, subcategoryId }) => ({ id, ref, title, status, photoCount, slugId, subcategoryId }));
   return { results, creates, updates, absent };
 }

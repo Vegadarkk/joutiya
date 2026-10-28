@@ -1,6 +1,6 @@
-import { BadgeCheck } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { useTranslations } from "next-intl";
-import type { Locale } from "@/config/site";
+import { SITE_NAME, type Locale } from "@/config/site";
 import type { ListingAttributes } from "@/lib/contracts/listings";
 import { formatPrice } from "@/lib/listings/client/format";
 import { cn } from "@/lib/utils";
@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 // reference and fees (law 31-08 art. 3: the price and what comes on top of it, side by side), an
 // off-plan sale's delivery and permit (law 44-00), a holiday rental's tourist authorisation as
 // declared by the host (law 80-14: never checked by the site). These fields leave the criteria
-// grid (PROPERTY_TERM_FIELDS) so each shows once.
+// grid (PROPERTY_TERM_FIELDS) so each shows once. All of it is the advertiser's declaration, under its
+// sole responsibility (attested at publication): the block says so and never looks verified.
 
 export const PROPERTY_TERM_FIELDS: readonly string[] = ["mandate", "agency-reference", "agency-fees", "agency-fees-amount", "off-plan", "building-permit", "delivery-year", "tourism-authorization"];
 
@@ -50,7 +51,7 @@ export function PropertyTerms({ attributes, locale, className }: { attributes: L
     <div data-testid="property-terms" className={cn("flex flex-col gap-3 rounded-md border border-border bg-surface-muted/60 p-4", className)}>
       {mandate === "exclusif" ? (
         <p className="inline-flex items-center gap-1.5 self-start rounded-sm bg-featured px-2 py-0.5 text-xs font-medium text-featured-foreground">
-          <BadgeCheck className="size-3.5" aria-hidden="true" />
+          <KeyRound className="size-3.5" aria-hidden="true" />
           {t("exclusive")}
         </p>
       ) : null}
@@ -64,6 +65,9 @@ export function PropertyTerms({ attributes, locale, className }: { attributes: L
           </div>
         ))}
       </dl>
+      <p data-testid="property-terms-declared" className="text-xs text-foreground-muted text-pretty">
+        {t("declaredNote", { brand: SITE_NAME })}
+      </p>
     </div>
   );
 }

@@ -149,6 +149,8 @@ export const publishListingSchema = z
     acceptRules: z.literal(true),
     /** Adults-only subcategory: the seller attests a decorative craft object sold to adults only. */
     adultsOnlyAttestation: z.literal(true).optional(),
+    /** Real estate: the advertiser attests its declared data and bears sole responsibility for them. */
+    realEstateAttestation: z.literal(true).optional(),
   })
   .strict();
 export type PublishListingInput = z.infer<typeof publishListingSchema>;
