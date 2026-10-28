@@ -145,10 +145,11 @@ describe("criteriaSchema", () => {
   });
 
   it("binds the Pro-only criteria to Pros: hidden from individuals, required for Pros, optional when the seller is unknown", () => {
+    // An individual's Pro-only value is a known key here; the publish readiness refuses it (criterion_pro_only).
     const flat = { "property-type": "appartement", surface: 90 };
     const agency = { ...flat, mandate: "exclusif", "agency-fees": "en-sus", "agency-fees-amount": 25000, "agency-reference": "CASA-118" };
     expect(criteriaSchema("vente", "individual").safeParse(flat).success).toBe(true);
-    expect(criteriaSchema("vente", "individual").safeParse({ ...flat, mandate: "exclusif" }).success).toBe(false);
+    expect(criteriaSchema("vente", "individual").safeParse({ ...flat, mandate: "exclusif" }).success).toBe(true);
     expect(criteriaSchema("vente", "pro").safeParse(flat).success).toBe(false);
     expect(criteriaSchema("vente", "pro").safeParse(agency).success).toBe(true);
     expect(criteriaSchema("vente", "pro").safeParse({ ...agency, mandate: "verbal" }).success).toBe(false);
