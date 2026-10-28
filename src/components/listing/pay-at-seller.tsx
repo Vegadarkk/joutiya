@@ -18,6 +18,9 @@ import { cn } from "@/lib/utils";
 // The dialog says who handles the payment before the buyer leaves; the link opens in a new tab,
 // without referrer, and is never followed by crawlers (nofollow). Nothing is added to the link.
 
+/** First-strong isolate: a Latin shop name inside an Arabic sentence keeps the brackets around it in place. */
+const isolate = (text: string) => `\u2068${text}\u2069`;
+
 export function CashOnDeliveryBadge({ className }: { className?: string }) {
   const t = useTranslations("SellerPayment.public");
   return (
@@ -65,7 +68,7 @@ export function PayAtSeller({ payment, listingId, className }: { payment: Public
               {t("button")}
             </Button>
           </Dialog.Trigger>
-          <p className="text-xs text-foreground-muted text-pretty">{t("short", { shop: payment.shopName, site: SITE_NAME })}</p>
+          <p className="text-xs text-foreground-muted text-pretty">{t("short", { shop: isolate(payment.shopName), site: SITE_NAME })}</p>
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 z-50 bg-bab-950/50 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
             <Dialog.Content
@@ -78,7 +81,7 @@ export function PayAtSeller({ payment, listingId, className }: { payment: Public
               <Dialog.Title className="text-lg font-semibold text-balance">{t("title", { site: SITE_NAME })}</Dialog.Title>
               <Dialog.Description asChild>
                 <div className="flex flex-col gap-3 text-sm text-pretty">
-                  <p>{t("handledBy", { shop: link?.shopName ?? payment.shopName, ice: link?.ice ?? payment.ice })}</p>
+                  <p>{t("handledBy", { shop: isolate(link?.shopName ?? payment.shopName), ice: link?.ice ?? payment.ice })}</p>
                   <p className="font-medium">{t("noGuarantee", { site: SITE_NAME })}</p>
                   {host ? (
                     <p>
@@ -95,7 +98,8 @@ export function PayAtSeller({ payment, listingId, className }: { payment: Public
                 </div>
               </Dialog.Description>
               {failure !== undefined ? <FormMessage error={failure} title={isApiError(failure, "payment_unavailable", "not_found") ? t("unavailable") : apiMessage(failure)} /> : null}
-              <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              {/* Stacked, full width: the host in the main button can be long. */}
+              <div className="mt-2 flex flex-col-reverse gap-2">
                 <Dialog.Close asChild>
                   <Button type="button" variant="outline">
                     {t("write")}
@@ -103,8 +107,8 @@ export function PayAtSeller({ payment, listingId, className }: { payment: Public
                 </Dialog.Close>
                 {link ? (
                   <Button asChild variant="structure">
-                    <a href={link.url} target="_blank" rel="noopener noreferrer nofollow" onClick={() => setOpen(false)}>
-                      {t("continue", { host: link.host })}
+                    <a href={link.url} target="_blank" rel="noopener noreferrer nofollow" onClick={() => setOpen(false)} className="h-auto min-h-11 whitespace-normal text-center">
+                      <span className="min-w-0 whitespace-normal [overflow-wrap:anywhere]">{t("continue", { host: link.host })}</span>
                       <ExternalLink aria-hidden="true" className="size-4" />
                     </a>
                   </Button>

@@ -213,8 +213,8 @@ function Settings({ data, onSaved }: { data: SellerPaymentView; onSaved: (data: 
         </fieldset>
 
         <fieldset className="flex flex-col gap-5">
-          <legend className="mb-1 text-lg font-semibold">{t("info.title")}</legend>
-          <p className="-mt-2 mb-1 text-sm text-foreground-muted text-pretty">{t("info.lead")}</p>
+          <legend className="mb-2 text-lg font-semibold">{t("info.title")}</legend>
+          <p className="-mt-1 text-sm text-foreground-muted text-pretty">{t("info.lead")}</p>
           <Field label={t("info.address")} hint={t("info.addressHint")} required={turningOn} error={missing("address") ? t("info.required") : undefined}>
             <Textarea rows={2} className="min-h-20" value={draft.info.address} maxLength={SELLER_INFO_LIMITS.address} onChange={(event) => setInfo("address", event.target.value)} />
           </Field>
