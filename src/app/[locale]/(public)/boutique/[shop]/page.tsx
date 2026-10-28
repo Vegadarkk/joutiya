@@ -9,6 +9,7 @@ import { Container } from "@/components/layout/container";
 import { AdSlot } from "@/components/ads/ad-slot";
 import { ListingCard } from "@/components/listing/listing-card";
 import { formatMemberSince } from "@/components/listing/seller-card";
+import { DealerStock } from "@/components/pro/dealer-stock";
 import { ReportButton } from "@/components/report/report-button";
 import { Button } from "@/components/ui/button";
 import { availablePromos } from "@/config/house-promos";
@@ -21,6 +22,7 @@ import { isolate } from "@/lib/i18n/bidi";
 import { alternates } from "@/lib/i18n/metadata";
 import { getLegalConfig } from "@/lib/legal/config";
 import { getPublicStorefront, parseStorefrontSegment, storefrontPath } from "@/lib/listings/public";
+import { dealerStock } from "@/lib/search/dealer";
 import { mediaBaseUrl } from "@/lib/storage/keys";
 
 // Storefront of a verified Pro shop (phase 7 design §4): /boutique/{slug}-{proId}. ISR like the
@@ -75,11 +77,13 @@ export default async function StorefrontPage({ params }: { params: Params }) {
   if (!store) notFound();
   if (store.segment !== shop) permanentRedirect(storefrontPath(locale, store.segment));
 
-  const [t, profile, legal, flags] = await Promise.all([
+  const [t, profile, legal, flags, vehicles] = await Promise.all([
     getTranslations({ locale: numbersLocale(locale), namespace: "Storefront" }),
     getTranslations({ locale: numbersLocale(locale), namespace: "Profile" }),
     getLegalConfig(),
     getFlags(),
+    // A car dealer's stock at a glance (Concession pack); null for a shop without vehicles.
+    store.seller.publishedCount > 0 ? dealerStock(store.seller.publicId) : null,
   ]);
   const media = mediaBaseUrl();
   const city = cityBySlug(store.citySlug);
@@ -133,6 +137,8 @@ export default async function StorefrontPage({ params }: { params: Params }) {
           {t("verifiedNote")}
         </p>
       </div>
+
+      {vehicles ? <DealerStock stock={vehicles} shop={seller.publicId} /> : null}
 
       <section aria-labelledby="storefront-listings" className="flex flex-col gap-6">
         <h2 id="storefront-listings" className="text-xl font-semibold">

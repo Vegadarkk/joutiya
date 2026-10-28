@@ -232,6 +232,7 @@ export default async function ListingPage({ params }: { params: Params }) {
                     showPhone={listing.contact.showPhone}
                     whatsapp={listing.contact.whatsapp}
                     adultsOnly={Boolean(subcategory?.adultsOnly)}
+                    testDrive={listing.seller.type === "pro" && VEHICLE_SALE_SUBCATEGORIES.includes(listing.subcategoryId)}
                   />
                 ) : null}
               </SellerCard>

@@ -24,7 +24,7 @@ async function authEmulator<T>(action: string, body: unknown): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function seedShop(email: string): Promise<void> {
+async function seedShop(email: string): Promise<string> {
   const app = firebase();
   const { users } = await authEmulator<{ users: { localId: string }[] }>("lookup", { email: [email] });
   const uid = users[0]!.localId;
@@ -53,6 +53,7 @@ async function seedShop(email: string): Promise<void> {
     });
   await getFirestore(app).collection("users").doc(uid).update({ type: "pro", proId, updatedAt: now });
   await authEmulator("update", { localId: uid, customAttributes: JSON.stringify({ role: "pro", proId, proRole: "owner", v: 2 }) });
+  return proId;
 }
 
 /** A fresh session carries the new claims (the old one was minted before them). */
@@ -77,16 +78,17 @@ async function attachSeededPhoto(ref: string): Promise<void> {
 }
 
 test.describe("Stock import", () => {
-  test("a dealer imports, publishes and clears a car from a CSV file", async ({ page, request }) => {
+  test("a dealer imports, publishes and clears a car from a CSV file", async ({ page, request, browser }) => {
     test.setTimeout(120_000);
     const email = `stock-${randomId(10)}@joutiya.test`;
     const ref = `DUS-${randomId(4).toUpperCase()}`;
     await signUpAndIn(page, request, email, "Atlas Auto");
-    await seedShop(email);
+    const proId = await seedShop(email);
     await signInAgain(page, email);
 
-    await page.goto("/fr/pro");
-    await page.getByRole("link", { name: "Importer mon stock" }).click();
+    // Straight to the import: the Pro space links (and so prefetches) the storefront, whose ISR
+    // copy would then predate the published car. The shortcut is checked at the end.
+    await page.goto("/fr/pro/stock");
     await expect(page.getByRole("heading", { name: "Importer mon stock", level: 1 })).toBeVisible();
 
     const file = `${HEADER}\n${ref};Dacia Duster 1.5 dCi;${DESCRIPTION};185 000;Casablanca;Dacia;Duster;2022;41 000;Diesel;Manuelle\nBAD-1;Logan;${DESCRIPTION};90000;Atlantis;Dacia;Logan;2019;90000;Charbon;Manuelle\n`;
@@ -118,6 +120,23 @@ test.describe("Stock import", () => {
     await expect(page.getByText(/^(1 annonce en ligne|0 annonce en ligne, 1 en vérification)/)).toBeVisible({ timeout: 20_000 });
     await page.screenshot({ path: "test-results/stock-published.png", fullPage: true });
 
+    // Once online, the storefront sums the dealer's vehicles, each chip a search of the shop.
+    if ((await page.getByText(/^1 annonce en ligne/).count()) > 0) {
+      await page.goto(`/fr/boutique/atlas-auto-${proId}`);
+      const dealer = page.getByTestId("dealer-stock");
+      await expect(dealer.getByText("1 véhicule en vente")).toBeVisible({ timeout: 15_000 });
+      await expect(dealer.getByRole("link", { name: /Dacia/ })).toHaveAttribute("href", /boutique=.*f-car-brand=dacia/);
+      await page.screenshot({ path: "test-results/stock-storefront.png", fullPage: true });
+      // A visitor sees the test drive request next to the message button.
+      const visitor = await browser.newPage();
+      await visitor.goto(page.url());
+      await visitor.getByRole("link", { name: /Dacia Duster/ }).first().click();
+      await expect(visitor.getByRole("button", { name: "Demander un essai" }).first()).toBeVisible({ timeout: 15_000 });
+      await visitor.screenshot({ path: "test-results/stock-test-drive.png", fullPage: true });
+      await visitor.close();
+      await page.goBack();
+    }
+
     // A new file without the car: it is offered as sold, never removed on its own.
     await page.locator('input[type="file"][accept*=".csv"]').setInputFiles({
       name: "stock-2.csv",
@@ -132,5 +151,9 @@ test.describe("Stock import", () => {
       await expect(absent.getByText("Vendu")).toBeVisible({ timeout: 15_000 });
     }
     await page.screenshot({ path: "test-results/stock-absent.png", fullPage: true });
+
+    await page.goto("/fr/pro");
+    await page.getByRole("link", { name: "Importer mon stock" }).click();
+    await expect(page.getByRole("heading", { name: "Importer mon stock", level: 1 })).toBeVisible();
   });
 });
