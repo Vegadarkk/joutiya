@@ -2325,12 +2325,6 @@
       },
       "browse": "Voir d'autres annonces"
     },
-    "ad": {
-      "label": "Espace promotionnel",
-      "title": "Un objet qui dort chez vous ?",
-      "body": "Déposez une annonce gratuitement, en quelques minutes.",
-      "cta": "Déposer une annonce"
-    },
     "cityDistrict": "{city}, {district}",
     "adultsOnly": {
       "title": "Réservé aux personnes majeures.",
@@ -3417,5 +3411,36 @@
     "save": "Enregistrer mes choix",
     "close": "Fermer",
     "footerLink": "Gérer mes cookies"
+  },
+  "Ads": {
+    "label": "Publicité",
+    "promoLabel": "À découvrir sur {brand}",
+    "promos": {
+      "post": {
+        "title": "Un objet qui dort chez vous ?",
+        "body": "Déposez une annonce gratuitement, en quelques minutes.",
+        "cta": "Déposer une annonce"
+      },
+      "alert": {
+        "title": "Ne ratez plus la bonne affaire",
+        "body": "Enregistrez une recherche : vous êtes prévenu dès qu'une annonce y répond.",
+        "cta": "Lancer une recherche"
+      },
+      "safety": {
+        "title": "Achetez et vendez en confiance",
+        "body": "Nos conseils pour repérer une arnaque et se rencontrer en sécurité.",
+        "cta": "Lire les conseils"
+      },
+      "pro": {
+        "title": "Vous vendez souvent ?",
+        "body": "Ouvrez une boutique Pro : une vitrine à votre nom et des annonces marquées Pro.",
+        "cta": "Découvrir l'espace Pro"
+      },
+      "boost": {
+        "title": "Vendez plus vite",
+        "body": "Mettez votre annonce À la Une : elle passe en tête des résultats et sur l'accueil.",
+        "cta": "Mettre À la Une"
+      }
+    }
   }
 }

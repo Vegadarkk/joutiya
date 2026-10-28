@@ -28,7 +28,7 @@ const config = (phoneVerification: boolean): PublicConfig => ({
   upload: { maxBytes: 10 * 1024 * 1024, maxPhotos: 10 },
   map: null,
   phoneVerification,
-  ads: { mode: "off", cmpEea: false, client: null },
+  ads: { mode: "off", cmpEea: false, client: null, units: { leaderboard: null, halfpage: null, rectangle: null, banner: null } },
 });
 
 const session = (phoneVerified: boolean): SessionSummary => ({

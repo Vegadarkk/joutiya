@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { HandCoins, MapPinned, ShieldCheck } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { AdSlot } from "@/components/ads/ad-slot";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { CategoryGrid } from "@/components/home/category-grid";
 import { FeaturedCarousel } from "@/components/home/featured-carousel";
@@ -9,8 +10,10 @@ import { Container } from "@/components/layout/container";
 import { ResultsGrid } from "@/components/search/results-grid";
 import { Button } from "@/components/ui/button";
 import { WelcomeThreshold, welcomeTexts } from "@/components/welcome/welcome-threshold";
+import { availablePromos } from "@/config/house-promos";
 import { Link } from "@/i18n/navigation";
 import { pageLocale } from "@/i18n/params";
+import { getFlags } from "@/lib/config/runtime";
 import { alternates } from "@/lib/i18n/metadata";
 import { logger } from "@/lib/logging/logger";
 import { FEATURED_HOME_SLOTS } from "@/lib/search/featured";
@@ -61,9 +64,10 @@ async function section(name: string, load: () => Promise<SearchCard[]>): Promise
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const locale = pageLocale((await params).locale);
   setRequestLocale(locale);
-  const [t, welcome, featured, recent] = await Promise.all([
+  const [t, welcome, flags, featured, recent] = await Promise.all([
     getTranslations({ locale, namespace: "Home" }),
     welcomeTexts(locale),
+    getFlags(),
     section("featured", () => featuredListings({}, FEATURED_HOME_SLOTS)),
     section("recent", () => latestListings({}, HOME_RECENT_COUNT)),
   ]);
@@ -75,6 +79,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         <SearchPanel locale={locale} />
       </Container>
       <Container className="flex flex-col gap-12 py-10 sm:gap-14 sm:py-14">
+        {/* Desktop only (AF §8 table): no ad on the phone home page. */}
+        <AdSlot placement="home-leaderboard" eligible promos={availablePromos(flags)} seed="home" />
         <CategoryGrid />
         {featured && featured.length > 0 ? <FeaturedCarousel cards={featured} locale={locale} renderAction={favoriteAction} /> : null}
         {recent && recent.length > 0 ? (

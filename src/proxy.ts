@@ -59,11 +59,17 @@ function cspHeaderName(): string {
   return process.env.CSP_REPORT_ONLY === "true" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy";
 }
 
-function csp(variant: CspVariant, nonce?: string, scriptHashes?: readonly string[]): string {
+/** AdSense hosts go into the CSP of ad pages once a publisher id is configured (phase 6, D10). */
+function adsConfigured(): boolean {
+  return Boolean(process.env.ADSENSE_CLIENT_ID);
+}
+
+function csp(variant: CspVariant, nonce?: string, scriptHashes?: readonly string[], ads?: "strict" | "broad"): string {
   return buildCsp({
     variant,
     nonce,
     scriptHashes,
+    ads,
     dev: process.env.NODE_ENV === "development",
     mediaOrigin: mediaOrigin(),
     r2Origin: process.env.R2_S3_ENDPOINT,
@@ -76,9 +82,13 @@ function csp(variant: CspVariant, nonce?: string, scriptHashes?: readonly string
   });
 }
 
-/** Headers shared by every page response. */
-function decorate(response: NextResponse, host: "public" | "admin", policy: string): NextResponse {
+/**
+ * Headers shared by every page response. `adsTwin`: the strict AdSense policy, sent report-only
+ * beside the enforced broad one so the reports fix the host list (D10).
+ */
+function decorate(response: NextResponse, host: "public" | "admin", policy: string, adsTwin?: string): NextResponse {
   response.headers.set(cspHeaderName(), policy);
+  if (adsTwin && cspHeaderName() === "Content-Security-Policy") response.headers.set("Content-Security-Policy-Report-Only", adsTwin);
   response.headers.set("Cross-Origin-Opener-Policy", coopFor(host));
   response.headers.set("Reporting-Endpoints", 'csp="/api/csp-report"');
   if (host === "admin" || process.env.APP_ENV !== "prod") {
@@ -217,10 +227,12 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const dynamicPublic = DYNAMIC_PUBLIC_SEGMENTS.includes(pageSegment(pathname));
   if (isPrivatePath(pathname) || dynamicPublic) {
     const nonce = createNonce();
-    const policy = csp("private", nonce, dynamicPublic ? [...PINNED_SCRIPT_HASHES] : undefined);
+    const ads = dynamicPublic && adsConfigured();
+    const policy = csp("private", nonce, dynamicPublic ? [...PINNED_SCRIPT_HASHES] : undefined, ads ? "broad" : undefined);
     const deviceId = readDeviceId(request.cookies.get(DEVICE_COOKIE)?.value);
     if (dynamicPublic) {
-      const response = decorate(forwardWithNonce(routed, request, policy, nonce), "public", policy);
+      const twin = ads ? csp("private", nonce, [...PINNED_SCRIPT_HASHES], "strict") : undefined;
+      const response = decorate(forwardWithNonce(routed, request, policy, nonce), "public", policy, twin);
       // Like shared pages, no locale cookie. The device cookie makes the per-device search limits
       // apply (D13) instead of the anonymous bucket of the IP. It is not forwarded to this render:
       // a request without it is an unknown device on its IP (§6), or dropping cookies would skip
@@ -240,7 +252,8 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return response;
   }
   // Fallback policy; the server hook swaps 'unsafe-inline' for the hashes of this HTML.
-  const response = decorate(routed, "public", csp("public"));
+  const ads = adsConfigured();
+  const response = decorate(routed, "public", csp("public", undefined, undefined, ads ? "broad" : undefined), ads ? csp("public", undefined, undefined, "strict") : undefined);
   response.headers.set(INLINE_HASH_MARKER, "1");
   // Shared pages carry no cookie, so Cloudflare can cache them. The locale cookie is written by
   // the locale switcher (next-intl Link) and still read here for the "/" redirect.

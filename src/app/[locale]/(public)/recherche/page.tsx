@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { NextIntlClientProvider, useTranslations } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
+import { AdSlot } from "@/components/ads/ad-slot";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Container } from "@/components/layout/container";
@@ -18,9 +19,13 @@ import { SearchEmpty } from "@/components/search/search-empty";
 import { SearchError } from "@/components/search/search-error";
 import { PendingBar, PendingRegion, SearchNavigationProvider } from "@/components/search/search-navigation";
 import { SortSelect } from "@/components/search/sort-select";
+import { infeedPositions } from "@/config/ads";
+import { subcategoryAllowsAds } from "@/config/categories";
+import { availablePromos, type HousePromo } from "@/config/house-promos";
 import type { Locale } from "@/config/site";
 import { PUBLIC_CLIENT_NAMESPACES, SEARCH_PAGE_CLIENT_NAMESPACES, pickMessages } from "@/i18n/client-messages";
 import { numbersLocale, pageLocale } from "@/i18n/params";
+import { getFlags } from "@/lib/config/runtime";
 import { parseSearchParams, SEARCH_MAX_TOTAL_HITS, SEARCH_PATH, searchPath } from "@/lib/search/params";
 import type { SearchCard, SearchResponse } from "@/lib/search/types";
 import { loadSearch, pageRequest, searchPageTitle } from "./search-state";
@@ -51,12 +56,26 @@ interface ResultsProps {
   toolbarAction?: ReactNode;
   /** L5 wiring point: FavoriteButton on every card. */
   renderAction?: (card: SearchCard) => ReactNode;
+  /** House promotions open now, for the ad slots. */
+  promos: readonly HousePromo[];
 }
 
-function Results({ response, locale, toolbarAction, renderAction }: ResultsProps) {
+/**
+ * Ads only beside results (never an empty search, AF §8) whose every card may carry them, and never
+ * under an adults-only subcategory filter (D6).
+ */
+function resultsAdsEligible(response: SearchResponse, organic: readonly SearchCard[]): boolean {
+  if (organic.length === 0) return false;
+  if (response.params.subcategory && !subcategoryAllowsAds(response.params.subcategory)) return false;
+  return response.hits.every((card) => subcategoryAllowsAds(card.subcategoryId ?? undefined));
+}
+
+function Results({ response, locale, toolbarAction, renderAction, promos }: ResultsProps) {
   const t = useTranslations("SearchPage");
   const { params, hits, featured } = response;
   const organic = withoutFeatured(hits, featured);
+  const adsEligible = resultsAdsEligible(response, organic);
+  const seed = `${searchPath(params)}:${response.page}`;
   return (
     <>
       <RefineChips params={params} facets={response.facets} />
@@ -78,18 +97,35 @@ function Results({ response, locale, toolbarAction, renderAction }: ResultsProps
       ) : null}
       <PendingRegion className="flex flex-col gap-8">
         {hits.length > 0 ? (
-          <>
-            <FeaturedRow cards={featured} locale={locale} renderAction={renderAction} />
-            {organic.length > 0 ? (
-              <section aria-labelledby="search-results-title">
-                <h2 id="search-results-title" className="sr-only">
-                  {t("results")}
-                </h2>
-                <ResultsGrid cards={organic} locale={locale} renderAction={renderAction} priorityCount={featured.length > 0 ? 2 : 4} />
-              </section>
-            ) : null}
-            <Pagination params={params} page={response.page} totalPages={response.totalPages} total={response.total} className="pt-2" />
-          </>
+          <div className="flex flex-col gap-8 xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+            <div className="flex min-w-0 flex-col gap-8">
+              <FeaturedRow cards={featured} locale={locale} renderAction={renderAction} />
+              {organic.length > 0 ? (
+                <section aria-labelledby="search-results-title">
+                  <h2 id="search-results-title" className="sr-only">
+                    {t("results")}
+                  </h2>
+                  <ResultsGrid
+                    cards={organic}
+                    locale={locale}
+                    renderAction={renderAction}
+                    priorityCount={featured.length > 0 ? 2 : 4}
+                    className="xl:grid-cols-3"
+                    inserts={{
+                      after: infeedPositions(organic.length),
+                      render: (after) => <AdSlot placement="search-infeed" eligible={adsEligible} promos={promos} seed={`${seed}:${after}`} />,
+                    }}
+                  />
+                </section>
+              ) : null}
+              <Pagination params={params} page={response.page} totalPages={response.totalPages} total={response.total} className="pt-2" />
+            </div>
+            {/* Wide screens: a 300x600 column that follows the scroll under the sticky toolbar, when the
+                window is tall enough to show the whole unit there (else it stays at the top). */}
+            <div className="top-40 max-xl:hidden [@media(min-height:50rem)]:sticky">
+              <AdSlot placement="search-aside" eligible={adsEligible} promos={promos} seed={seed} />
+            </div>
+          </div>
         ) : (
           <>
             <SearchEmpty params={params} locale={locale} outOfRange={response.total > 0} />
@@ -110,6 +146,7 @@ export default async function SearchPage({ params, searchParams }: Props) {
   // The count prints a number: Tarifit pages format it as French (no Intl data for "rif").
   const [t, title] = await Promise.all([getTranslations({ locale: numbersLocale(locale), namespace: "SearchPage" }), searchPageTitle(locale, applied)]);
   const total = outcome.kind === "results" ? outcome.response.total : 0;
+  const promos = availablePromos(await getFlags());
 
   // The public layout ships only the public client namespaces; the filters sheet and the save
   // dialog read more (src/i18n/client-messages.ts). A nested provider replaces, never merges.
@@ -139,6 +176,7 @@ export default async function SearchPage({ params, searchParams }: Props) {
               locale={locale}
               toolbarAction={<SaveSearchButton params={outcome.response.params} />}
               renderAction={favoriteAction}
+              promos={promos}
             />
           ) : outcome.kind === "challenge" ? (
             <SearchChallenge params={applied} />

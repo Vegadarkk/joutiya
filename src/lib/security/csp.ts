@@ -36,6 +36,12 @@ export interface CspOptions {
   reportPath?: string;
   /** Adds upgrade-insecure-requests (default: outside dev). Off for a plain-http local server. */
   upgradeInsecure?: boolean;
+  /**
+   * AdSense hosts (phase 6, D10), only once a publisher id is configured. "strict": the listed
+   * hosts only (the report-only twin); "broad": also any https image and frame (ad creatives come
+   * from advertisers' own hosts), the enforced policy until reports settle the list.
+   */
+  ads?: "strict" | "broad";
 }
 
 export const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
@@ -43,6 +49,24 @@ export const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 const GIS_SCRIPT = "https://accounts.google.com/gsi/client";
 const GIS_FRAME = "https://accounts.google.com/gsi/";
 const GIS_STYLE = "https://accounts.google.com/gsi/style";
+
+// AdSense (phase 6, D10). Only the loader host is documented; the rest is the initial guess that
+// the report-only twin confirms or corrects before the list is fixed.
+export const ADSENSE_SCRIPT_HOSTS: readonly string[] = [
+  "https://pagead2.googlesyndication.com",
+  "https://tpc.googlesyndication.com",
+  "https://*.adtrafficquality.google",
+  "https://fundingchoicesmessages.google.com",
+];
+const ADSENSE_FRAME_HOSTS = [
+  "https://googleads.g.doubleclick.net",
+  "https://tpc.googlesyndication.com",
+  "https://*.adtrafficquality.google",
+  "https://www.google.com",
+  "https://fundingchoicesmessages.google.com",
+];
+const ADSENSE_IMG_HOSTS = ["https://pagead2.googlesyndication.com", "https://tpc.googlesyndication.com", "https://googleads.g.doubleclick.net", "https://www.google.com", "https://*.adtrafficquality.google"];
+const ADSENSE_CONNECT_HOSTS = ["https://pagead2.googlesyndication.com", "https://googleads.g.doubleclick.net", "https://*.adtrafficquality.google", "https://fundingchoicesmessages.google.com"];
 
 function origin(value: string | undefined): string | undefined {
   if (!value) return undefined;
@@ -92,6 +116,9 @@ export function buildCsp(options: CspOptions): string {
         ]
       : ["'self'", "'unsafe-inline'", TURNSTILE_ORIGIN, GIS_SCRIPT];
   if (dev) scriptSrc.push("'unsafe-eval'");
+  const ads = options.ads;
+  if (ads) scriptSrc.push(...ADSENSE_SCRIPT_HOSTS);
+  const adHosts = (hosts: readonly string[]): string[] => (!ads ? [] : ads === "broad" ? [...hosts, "https:"] : [...hosts]);
 
   const media = origin(options.mediaOrigin);
   // MapLibre fetches PMTiles with fetch + Range (connect-src) and draws raster sprites as images.
@@ -101,7 +128,7 @@ export function buildCsp(options: CspOptions): string {
     "script-src": scriptSrc,
     // Radix and Sonner set inline style attributes; a nonce cannot cover attributes.
     "style-src": ["'self'", "'unsafe-inline'", GIS_STYLE],
-    "img-src": compact(["'self'", "data:", "blob:", media, tiles]),
+    "img-src": compact(["'self'", "data:", "blob:", media, tiles, ...adHosts(ADSENSE_IMG_HOSTS)]),
     "font-src": ["'self'"],
     "connect-src": compact([
       "'self'",
@@ -111,9 +138,10 @@ export function buildCsp(options: CspOptions): string {
       origin(options.errorIngestOrigin),
       origin(options.authEmulatorOrigin),
       dev ? "ws:" : undefined,
+      ...(ads ? ADSENSE_CONNECT_HOSTS : []),
     ]),
     // Turnstile widget and the Google sign-in button (GIS) render in iframes.
-    "frame-src": ["'self'", TURNSTILE_ORIGIN, GIS_FRAME],
+    "frame-src": ["'self'", TURNSTILE_ORIGIN, GIS_FRAME, ...adHosts(ADSENSE_FRAME_HOSTS)],
     "worker-src": ["'self'", "blob:"],
     "manifest-src": ["'self'"],
     "media-src": compact(["'self'", media]),

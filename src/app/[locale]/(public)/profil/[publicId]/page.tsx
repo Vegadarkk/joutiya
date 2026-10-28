@@ -6,15 +6,17 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { Container } from "@/components/layout/container";
-import { AdSlot } from "@/components/listing/ad-slot";
+import { AdSlot } from "@/components/ads/ad-slot";
 import { ListingCard } from "@/components/listing/listing-card";
 import { formatMemberSince, SellerAvatar, SellerBadges } from "@/components/listing/seller-card";
 import { ReportButton } from "@/components/report/report-button";
 import { Button } from "@/components/ui/button";
+import { availablePromos } from "@/config/house-promos";
 import { cityBySlug, cityName } from "@/config/regions";
 import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
 import { numbersLocale, pageLocale } from "@/i18n/params";
+import { getFlags } from "@/lib/config/runtime";
 import { isolate } from "@/lib/i18n/bidi";
 import { alternates } from "@/lib/i18n/metadata";
 import { getLegalConfig } from "@/lib/legal/config";
@@ -65,7 +67,7 @@ export default async function ProfilePage({ params }: { params: Params }) {
   const profile = await load(publicId);
   if (!profile) notFound();
 
-  const [t, legal] = await Promise.all([getTranslations({ locale: numbersLocale(locale), namespace: "Profile" }), getLegalConfig()]);
+  const [t, legal, flags] = await Promise.all([getTranslations({ locale: numbersLocale(locale), namespace: "Profile" }), getLegalConfig(), getFlags()]);
   const media = mediaBaseUrl();
   const city = profile.citySlug ? cityBySlug(profile.citySlug) : undefined;
   const hidden = profile.publishedCount - profile.listings.length;
@@ -125,7 +127,8 @@ export default async function ProfilePage({ params }: { params: Params }) {
         {hidden > 0 ? <p className="text-sm text-foreground-muted">{t("newest", { shown: profile.listings.length })}</p> : null}
       </section>
 
-      <AdSlot slot="profile-bottom" />
+      {/* Profiles stay out of the ad inventory (AF §8 table): house promotion only. */}
+      <AdSlot placement="profile-bottom" eligible={false} promos={availablePromos(flags)} seed={publicId} />
       <ReportButton
         target={{ type: "user", id: profile.publicId }}
         subject={profile.displayName}

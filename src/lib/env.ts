@@ -99,6 +99,11 @@ const schema = z.object({
   R2_STORAGE_BASELINE_BYTES: integer(4_140_000_000),
   /** AdSense publisher id (ca-pub- and 16 digits, public; phase 6 D8): unset = no ad unit, no ads.txt. */
   ADSENSE_CLIENT_ID: optional.refine((value) => value === undefined || /^ca-pub-\d{16}$/.test(value), "ADSENSE_CLIENT_ID must be ca-pub- followed by 16 digits"),
+  /** AdSense ad unit ids, one per slot format (phase 6, D6); an unset format shows house promotions only. */
+  AD_SLOT_LEADERBOARD: optional,
+  AD_SLOT_HALFPAGE: optional,
+  AD_SLOT_RECTANGLE: optional,
+  AD_SLOT_BANNER: optional,
   /** Morocco PMTiles archive for the interactive map (D10); unset = static SVG map only. */
   MAP_PMTILES_URL: optionalUrl,
   /** Worker only: directory holding the local ONNX models (nudity, faces; docs/models.md). */

@@ -5,7 +5,7 @@ import { CalendarDays, MapPin, ShieldAlert } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { Container } from "@/components/layout/container";
-import { AdSlot } from "@/components/listing/ad-slot";
+import { AdSlot } from "@/components/ads/ad-slot";
 import { Breadcrumb, landingHref } from "@/components/listing/breadcrumb";
 import { ContactBar } from "@/components/listing/contact-bar";
 import { CriteriaSection } from "@/components/listing/criteria-grid";
@@ -18,9 +18,11 @@ import { SellerCard } from "@/components/listing/seller-card";
 import { ListingMapBlock } from "@/components/map/listing-map-block";
 import { ReportButton } from "@/components/report/report-button";
 import { categoryById, subcategoryById } from "@/config/categories";
+import { availablePromos } from "@/config/house-promos";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
 import { pageLocale } from "@/i18n/params";
+import { getFlags } from "@/lib/config/runtime";
 import { isolate } from "@/lib/i18n/bidi";
 import { alternates } from "@/lib/i18n/metadata";
 import { getLegalConfig } from "@/lib/legal/config";
@@ -54,6 +56,8 @@ interface Loaded {
   redirect: boolean;
   /** In the search index (D9), so counted by its deeper category landing pages. */
   indexed: boolean;
+  /** Ads may run on the page (phase 6, D6): published, no open report, an eligible subcategory. */
+  adsEligible: boolean;
 }
 
 /** One Firestore read per render, shared by generateMetadata and the page. */
@@ -62,7 +66,13 @@ const load = cache(async (segment: string): Promise<Loaded | null> => {
   if (!found) return null;
   const listing = toPublicListing(found.listing, found.state, found.canonicalSlugId);
   if (!listing) return null;
-  return { listing, ownerUid: found.listing.ownerUid, redirect: found.redirect, indexed: isIndexable(found.listing) };
+  return {
+    listing,
+    ownerUid: found.listing.ownerUid,
+    redirect: found.redirect,
+    indexed: isIndexable(found.listing),
+    adsEligible: found.state === "published" && found.listing.adsEligible === true,
+  };
 });
 
 async function sellerOf(ownerUid: string): Promise<PublicSeller | null> {
@@ -116,9 +126,10 @@ export default async function ListingPage({ params }: { params: Params }) {
   if (found.redirect) permanentRedirect(listingPath(locale, found.listing.slugId));
 
   const { listing } = found;
-  const [seller, legal, t, names] = await Promise.all([
+  const [seller, legal, flags, t, names] = await Promise.all([
     sellerOf(found.ownerUid),
     getLegalConfig(),
+    getFlags(),
     getTranslations({ locale, namespace: "ListingPage" }),
     getTranslations({ locale, namespace: "Categories" }),
   ]);
@@ -222,7 +233,6 @@ export default async function ListingPage({ params }: { params: Params }) {
                   />
                 ) : null}
               </SellerCard>
-              <AdSlot slot="listing-aside" className="hidden lg:flex" />
             </div>
           </aside>
 
@@ -248,9 +258,11 @@ export default async function ListingPage({ params }: { params: Params }) {
               <ListingMapBlock citySlug={listing.location.citySlug} regionCode={listing.location.regionCode} seed={listing.id} locale={locale} className="w-full max-w-[35rem]" />
             </section>
 
-            <SafetyTips />
-            <AdSlot slot="listing-bottom" className="lg:hidden" />
+            {/* Report link, then the safety tips: a non-interactive block always stands between the ad
+                and the contact or report controls (D6). */}
             <ReportButton target={{ type: "listing", id: listing.id }} subject={listing.title} ownerPublicId={listing.seller.publicId} email={legal.dsaContactEmail} url={canonicalUrl} />
+            <SafetyTips />
+            <AdSlot placement="listing-bottom" eligible={found.adsEligible} promos={availablePromos(flags)} seed={listing.id} />
           </div>
         </div>
       </Container>

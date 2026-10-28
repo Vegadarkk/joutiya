@@ -6,15 +6,17 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { Container } from "@/components/layout/container";
-import { AdSlot } from "@/components/listing/ad-slot";
+import { AdSlot } from "@/components/ads/ad-slot";
 import { ListingCard } from "@/components/listing/listing-card";
 import { formatMemberSince } from "@/components/listing/seller-card";
 import { ReportButton } from "@/components/report/report-button";
 import { Button } from "@/components/ui/button";
+import { availablePromos } from "@/config/house-promos";
 import { cityBySlug, cityName } from "@/config/regions";
 import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
 import { numbersLocale, pageLocale } from "@/i18n/params";
+import { getFlags } from "@/lib/config/runtime";
 import { isolate } from "@/lib/i18n/bidi";
 import { alternates } from "@/lib/i18n/metadata";
 import { getLegalConfig } from "@/lib/legal/config";
@@ -73,10 +75,11 @@ export default async function StorefrontPage({ params }: { params: Params }) {
   if (!store) notFound();
   if (store.segment !== shop) permanentRedirect(storefrontPath(locale, store.segment));
 
-  const [t, profile, legal] = await Promise.all([
+  const [t, profile, legal, flags] = await Promise.all([
     getTranslations({ locale: numbersLocale(locale), namespace: "Storefront" }),
     getTranslations({ locale: numbersLocale(locale), namespace: "Profile" }),
     getLegalConfig(),
+    getFlags(),
   ]);
   const media = mediaBaseUrl();
   const city = cityBySlug(store.citySlug);
@@ -158,7 +161,8 @@ export default async function StorefrontPage({ params }: { params: Params }) {
         {hidden > 0 ? <p className="text-sm text-foreground-muted">{profile("newest", { shown: seller.listings.length })}</p> : null}
       </section>
 
-      <AdSlot slot="profile-bottom" />
+      {/* Profiles stay out of the ad inventory (AF §8 table): house promotion only. */}
+      <AdSlot placement="profile-bottom" eligible={false} promos={availablePromos(flags)} seed={store.segment} />
       <ReportButton
         target={{ type: "user", id: seller.publicId }}
         subject={store.name}

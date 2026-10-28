@@ -34,6 +34,8 @@ export interface PublicAdsConfig {
   cmpEea: boolean;
   /** AdSense publisher id (ca-pub-…), null while unset. */
   client: string | null;
+  /** Ad unit id per slot format (src/config/ads.ts), null while unset. */
+  units: Record<"leaderboard" | "halfpage" | "rectangle" | "banner", string | null>;
 }
 
 export interface PublicConfig {

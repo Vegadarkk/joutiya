@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { ListingCard } from "@/components/listing/listing-card";
 import type { Locale } from "@/config/site";
 import type { SearchCard } from "@/lib/search/types";
@@ -19,16 +19,25 @@ export interface ResultsGridProps {
   priorityCount?: number;
   headingLevel?: "h2" | "h3";
   className?: string;
+  /**
+   * Full-width rows inserted after the given card counts (phase 6 in-feed ads, D6). The grid then
+   * packs densely: the cards of a row the insert cannot share fill it first, so no hole is left.
+   */
+  inserts?: { after: readonly number[]; render: (after: number) => ReactNode };
 }
 
-export function ResultsGrid({ cards, locale, renderAction, priorityCount = 0, headingLevel, className }: ResultsGridProps) {
+export function ResultsGrid({ cards, locale, renderAction, priorityCount = 0, headingLevel, className, inserts }: ResultsGridProps) {
   const media = mediaBaseUrl();
+  const after = new Set(inserts?.after);
   return (
-    <ul data-testid="results-grid" className={cn(RESULTS_GRID_CLASS, className)}>
+    <ul data-testid="results-grid" className={cn(RESULTS_GRID_CLASS, inserts && "grid-flow-row-dense", className)}>
       {cards.map((card, index) => (
-        <li key={card.id} className="min-w-0">
-          <ListingCard listing={card} mediaBaseUrl={media} locale={locale} headingLevel={headingLevel} badge={cardBadge(card)} action={renderAction?.(card)} priority={index < priorityCount} />
-        </li>
+        <Fragment key={card.id}>
+          <li className="min-w-0">
+            <ListingCard listing={card} mediaBaseUrl={media} locale={locale} headingLevel={headingLevel} badge={cardBadge(card)} action={renderAction?.(card)} priority={index < priorityCount} />
+          </li>
+          {inserts && after.has(index + 1) ? <li className="col-span-full">{inserts.render(index + 1)}</li> : null}
+        </Fragment>
       ))}
     </ul>
   );
