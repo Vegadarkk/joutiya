@@ -70,6 +70,11 @@ describe("toSearchCard", () => {
     expect(card.photo).toEqual({ id: "p", w: 1, h: 1, blurhash: "x" });
   });
 
+  it("marks an example listing", () => {
+    expect(toSearchCard(doc({ isExample: true }), NOW)?.example).toBe(true);
+    expect(toSearchCard(doc(), NOW)).not.toHaveProperty("example");
+  });
+
   it("marks bumped listings and pro sellers", () => {
     expect(toSearchCard(doc({ isBumped: true, sellerType: "pro" }), NOW)).toMatchObject({ bumped: true, sellerType: "pro", featured: false });
   });

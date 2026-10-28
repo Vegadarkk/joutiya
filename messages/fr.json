@@ -457,6 +457,7 @@
       "verifications": "Vérifications",
       "signOut": "Déconnexion",
       "favorites": "Mes favoris",
+      "reviews": "Mes avis",
       "savedSearches": "Mes recherches",
       "decisions": "Décisions et recours",
       "help": "Aide",
@@ -514,7 +515,8 @@
       "internal": "Une erreur technique est survenue. Réessayez.",
       "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez.",
       "quota_exhausted": "Cette action est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc).",
-      "invalid_text": "Le texte contient un élément refusé. Corrigez-le puis réessayez."
+      "invalid_text": "Le texte contient un élément refusé. Corrigez-le puis réessayez.",
+      "review_unavailable": "Vous ne pouvez plus donner d'avis sur cette conversation."
     }
   },
   "Listing": {
@@ -2356,7 +2358,8 @@
       "surface": "{count} m²",
       "rooms": "{count, plural, one {# pièce} other {# pièces}}",
       "bedrooms": "{count} ch."
-    }
+    },
+    "example": "Exemple"
   },
   "ListingPage": {
     "home": "Accueil",
@@ -2557,6 +2560,12 @@
       "permit": "Permis de construire",
       "authorization": "Autorisation d'hébergement",
       "declared": "N° {number}, déclaré par l'annonceur"
+    },
+    "example": {
+      "title": "Annonce exemple",
+      "body": "Joutiya a créé cette annonce pour montrer à quoi ressemble une bonne annonce de ce type : photos nettes, description complète, prix et caractéristiques renseignés. Le vendeur et l'article sont fictifs : on ne peut ni le contacter, ni acheter, ni réserver.",
+      "cta": "Déposer une annonce",
+      "contact": "Contact désactivé : c'est une annonce exemple."
     }
   },
   "Profile": {
@@ -2582,6 +2591,92 @@
       "priceDesc": "Prix décroissant",
       "filter": "Filtrer par catégorie",
       "all": "Toutes"
+    }
+  },
+  "Reviews": {
+    "title": "Avis",
+    "titleCount": "Avis ({count})",
+    "count": "{count, plural, one {# avis vérifié} other {# avis vérifiés}}",
+    "average": "Note moyenne : {average} sur 5",
+    "stars": "{count, plural, one {# étoile sur 5} other {# étoiles sur 5}}",
+    "spread": "Répartition des notes",
+    "spreadRow": "{stars, plural, one {# étoile} other {# étoiles}} : {count, plural, one {# avis} other {# avis}}",
+    "verified": "Échange vérifié",
+    "verifiedHint": "Seuls les acheteurs qui ont échangé avec ce vendeur par la messagerie du site peuvent donner un avis.",
+    "listing": "Annonce :",
+    "reply": "Réponse de {name}",
+    "formerMember": "Ancien membre",
+    "more": "Voir plus d'avis",
+    "failed": "Les avis suivants n'ont pas pu être chargés. Réessayez.",
+    "emptyTitle": "Pas encore d'avis",
+    "emptyBody": "Les acheteurs qui échangent avec {name} par la messagerie pourront donner leur avis ici.",
+    "dialog": {
+      "title": "Votre avis sur {name}",
+      "listing": "Annonce : {title}",
+      "rating": "Votre note",
+      "ratingHint": "Choisissez de 1 à 5 étoiles",
+      "words": {
+        "1": "Très décevant",
+        "2": "Décevant",
+        "3": "Correct",
+        "4": "Bien",
+        "5": "Excellent"
+      },
+      "text": "Votre avis",
+      "textHint": "Racontez l'échange : ponctualité, état de l'article, communication. Restez factuel et courtois.",
+      "count": "{count} / {max}",
+      "confirm": "Nous avons conclu un échange ou une rencontre",
+      "confirmHint": "Un avis porte sur un échange réel. Un faux avis est retiré et peut entraîner la suspension du compte.",
+      "public": "Votre nom affiché et votre avis seront visibles sur la vitrine du vendeur, qui pourra y répondre une fois. Vous pourrez supprimer votre avis à tout moment depuis « Mes avis ».",
+      "submit": "Publier mon avis",
+      "cancel": "Annuler",
+      "close": "Fermer",
+      "problems": {
+        "rating": "Choisissez une note.",
+        "short": "Encore {count, plural, one {# caractère} other {# caractères}} au minimum.",
+        "confirm": "Cochez cette case pour confirmer l'échange."
+      },
+      "publishedTitle": "Merci, votre avis est publié",
+      "publishedBody": "Il apparaît sur la vitrine de {name}.",
+      "pendingTitle": "Merci, votre avis sera publié après vérification",
+      "pendingBody": "Il contient peut-être des informations personnelles : un modérateur le relit avant sa publication.",
+      "viewStorefront": "Voir la vitrine"
+    },
+    "mine": {
+      "title": "Mes avis",
+      "intro": "Les avis que vos acheteurs vous ont laissés, et ceux que vous avez donnés aux vendeurs.",
+      "tabs": {
+        "label": "Avis reçus ou donnés",
+        "received": "Reçus",
+        "given": "Donnés"
+      },
+      "loading": "Chargement de vos avis",
+      "retry": "Réessayer",
+      "emptyReceived": "Vous n'avez pas encore reçu d'avis",
+      "emptyReceivedBody": "Après un échange par la messagerie, vos acheteurs pourront noter la transaction.",
+      "emptyGiven": "Vous n'avez pas encore donné d'avis",
+      "emptyGivenBody": "Dans une conversation avec un vendeur, un bandeau vous invite à donner votre avis 24 heures après sa réponse.",
+      "toMessages": "Ouvrir mes messages",
+      "from": "De {name}",
+      "fromFormer": "D'un ancien membre",
+      "to": "Pour {name}",
+      "status": {
+        "pending": "En attente de vérification",
+        "hidden": "Masqué par la modération"
+      },
+      "yourReply": "Votre réponse",
+      "theirReply": "Réponse de {name}",
+      "reply": "Répondre",
+      "replyLabel": "Votre réponse publique",
+      "replyHint": "Une seule réponse, affichée sous l'avis. Restez courtois et ne donnez pas de coordonnées.",
+      "replySubmit": "Publier la réponse",
+      "replied": "Réponse publiée",
+      "delete": "Supprimer mon avis",
+      "deleteTitle": "Supprimer votre avis ?",
+      "deleteBody": "Il disparaît de la vitrine de {name}. Vous ne pourrez pas en donner un autre pour cette conversation.",
+      "deleteConfirm": "Supprimer",
+      "deleted": "Avis supprimé",
+      "cancel": "Annuler"
     }
   },
   "FreeText": {
@@ -2888,7 +2983,7 @@
     "retry": "Réessayer",
     "intro": {
       "title": "Ouvrir une boutique Pro sur Joutiya",
-      "lead": "Pour les sociétés, commerçants et auto-entrepreneurs : une boutique à votre nom, des annonces marquées Pro et des quotas adaptés à votre activité.",
+      "lead": "Pour les sociétés, coopératives, commerçants et auto-entrepreneurs : une boutique à votre nom, des annonces marquées Pro et des quotas adaptés à votre activité.",
       "offer": "L'offre Essentiel est offerte aux boutiques validées jusqu'à l'ouverture des ventes. Vous serez prévenu {days} jours avant tout paiement.",
       "how": "Nous vérifions vos identifiants (ICE, registre) et une pièce justificative avant d'ouvrir la boutique, en général sous deux jours ouvrés."
     },
@@ -2917,7 +3012,8 @@
       "forms": {
         "societe": "Société (SARL, SA…)",
         "auto_entrepreneur": "Auto-entrepreneur",
-        "commercant": "Commerçant personne physique"
+        "commercant": "Commerçant personne physique",
+        "cooperative": "Coopérative"
       },
       "ice": "ICE",
       "iceHint": "Identifiant commun de l'entreprise : 15 chiffres.",
@@ -2925,8 +3021,9 @@
       "if": "Identifiant fiscal (IF)",
       "aeNumber": "Numéro d'auto-entrepreneur",
       "tp": "Numéro de taxe professionnelle (TP)",
+      "coopNumber": "Numéro d'immatriculation au registre des coopératives",
       "rcOrTp": "Indiquez le RC ou la taxe professionnelle.",
-      "piecesLead": "Ajoutez de 1 à {max} documents : extrait du registre de commerce (modèle J), attestation d'auto-entrepreneur ou de taxe professionnelle. Pas de copie de carte d'identité : si un document porte votre numéro de CNIE, masquez-le avant l'envoi. Formats acceptés : PDF, JPEG ou PNG, 10 Mo au plus chacun.",
+      "piecesLead": "Ajoutez de 1 à {max} documents : extrait du registre de commerce (modèle J), attestation d'auto-entrepreneur ou de taxe professionnelle, certificat d'immatriculation de la coopérative. Pas de copie de carte d'identité : si un document porte votre numéro de CNIE, masquez-le avant l'envoi. Formats acceptés : PDF, JPEG ou PNG, 10 Mo au plus chacun.",
       "piecesNotice": "Ces documents servent uniquement à vérifier votre activité professionnelle. Seuls nos modérateurs les consultent et chaque consultation est journalisée. Ils sont hébergés hors du Maroc, conservés le temps de la vérification, puis supprimés 6 mois après la fermeture de votre boutique ou le refus de la demande. Vous pouvez demander à y accéder ou à les faire supprimer à tout moment : <link>politique de confidentialité</link>.",
       "addPiece": "Ajouter un document",
       "removePiece": "Retirer {name}",
@@ -2961,7 +3058,8 @@
       "legalFormHint": {
         "societe": "ICE, RC et identifiant fiscal.",
         "auto_entrepreneur": "ICE et numéro d'auto-entrepreneur.",
-        "commercant": "ICE, et RC ou taxe professionnelle."
+        "commercant": "ICE, et RC ou taxe professionnelle.",
+        "cooperative": "ICE et numéro d'immatriculation au registre des coopératives."
       }
     },
     "pending": {
@@ -3107,6 +3205,13 @@
       "counterpartClosed": "{name} a fermé son compte : vous pouvez relire la conversation, mais plus y écrire.",
       "frozen": "Cette conversation est suspendue : vous pouvez la lire, mais plus y écrire.",
       "suspended": "Votre compte est suspendu : vous pouvez lire vos conversations, mais plus envoyer de message."
+    },
+    "review": {
+      "label": "Donner votre avis",
+      "title": "Comment s'est passé votre échange avec {name} ?",
+      "body": "Votre avis aide les autres acheteurs.",
+      "action": "Donner mon avis",
+      "later": "Plus tard"
     },
     "composer": {
       "label": "Votre message",

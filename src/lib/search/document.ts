@@ -7,7 +7,7 @@ import ar from "../../../messages/ar.json";
 import fr from "../../../messages/fr.json";
 import { foldDigits } from "./normalize";
 import { districtKey } from "./params";
-import { SEARCH_DESCRIPTION_MAX, attributeField, sitemapShardOf, type SearchDocument } from "./types";
+import { SEARCH_DESCRIPTION_MAX, SITEMAP_SHARDS, attributeField, sitemapShardOf, type SearchDocument } from "./types";
 
 // Listing -> search document (design D4, D9; architecture §5 "Ce qui vit dans Meilisearch").
 // Public data only: never the owner uid, proId, phone, contact settings or an exact position.
@@ -190,9 +190,11 @@ export function toSearchDocument(listing: ListingRecord, now: Date = new Date())
     photoCount: listing.photos.length,
     sortAt: listing.sortAt.getTime(),
     updatedAt: listing.updatedAt.getTime(),
-    sitemapShard: sitemapShardOf(listing.id),
+    // Example listings stay out of every sitemap file (listingShards keeps 0 to SITEMAP_SHARDS - 1).
+    sitemapShard: listing.example ? SITEMAP_SHARDS : sitemapShardOf(listing.id),
     isBumped: listing.sortSource === "bump",
     ...(featuredUntil !== undefined && featuredUntil > now.getTime() ? { featuredUntil } : {}),
+    ...(listing.example ? { isExample: true as const } : {}),
     _geo: { lat: roundGeo(location.geo.lat), lng: roundGeo(location.geo.lng) },
     version: listing.version,
     ...attributes,

@@ -20,7 +20,8 @@ import { blurhashPlaceholder, photoSources } from "./photo";
 // (D22): an optional §8 mention under the place line and an action slot (the favorite heart) on
 // the photo, both above the stretched link. Engine cards (SearchCard) have this shape too. The
 // title is user text in any script: its own direction (dir="auto", so a Latin title keeps its
-// punctuation and ellipsis on the right in Arabic), aligned with the page.
+// punctuation and ellipsis on the right in Arabic), aligned with the page. An example listing
+// (src/lib/demo) carries an "Exemple" chip and no action: it cannot be saved or contacted.
 
 /** Grid columns: 2 on phones, 3 from sm, 4 from lg (ListingGridSkeleton). */
 type FactKey = "surface" | "rooms" | "bedrooms";
@@ -88,6 +89,7 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
     <article
       data-testid="listing-card"
       data-badge={badge}
+      data-example={listing.example ? "" : undefined}
       className={cn(
         "group relative flex min-w-0 flex-col gap-1.5 rounded-lg has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-4 has-[a:focus-visible]:outline-ring",
         wide && "md:flex-row md:items-start md:gap-4",
@@ -125,13 +127,18 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
             <span aria-hidden="true">{listing.photoCount}</span>
           </span>
         ) : null}
+        {listing.example ? (
+          <span data-testid="example-chip" className="absolute bottom-2 start-2 rounded-sm bg-featured px-2 py-0.5 text-xs font-semibold text-featured-foreground">
+            {t("example")}
+          </span>
+        ) : null}
         {listing.sellerType === "pro" || listing.facts?.exclusive ? (
           <span className="absolute top-2 start-2 flex gap-1">
             {listing.sellerType === "pro" ? <span className="rounded-sm bg-structure px-2 py-0.5 text-xs font-medium text-structure-foreground">{t("pro")}</span> : null}
             {listing.facts?.exclusive ? <span className="rounded-sm bg-featured px-2 py-0.5 text-xs font-medium text-featured-foreground">{t("exclusive")}</span> : null}
           </span>
         ) : null}
-        {action ? <div className="absolute top-1 end-1 z-10">{action}</div> : null}
+        {action && !listing.example ? <div className="absolute top-1 end-1 z-10">{action}</div> : null}
       </div>
       {wide ? <div className="flex min-w-0 flex-1 flex-col gap-1.5 md:py-1">{details}</div> : details}
     </article>

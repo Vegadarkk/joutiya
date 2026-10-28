@@ -237,6 +237,14 @@ export const RATE_LIMITS = {
   "report.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
   "report.device": { points: 5, duration: HOUR, policy: "open", key: "device" },
   "report.ip": { points: 20, duration: HOUR, policy: "open", key: "ip" },
+  // --- Reviews (vitrine-avis §2) --------------------------------------------------------------
+  // POST /api/reviews: 5 per day per account (one transaction: conversation, review, seller).
+  "review.create.uid": { points: 5, duration: DAY, policy: "closed", key: "uid" },
+  // Delete or reply (one transaction each), "Mes avis" reads (up to 2 x 50 reads).
+  "review.mutation.uid": { points: 30, duration: HOUR, policy: "open", key: "uid" },
+  "review.mine.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
+  // GET /api/reviews (storefront "more"): a page of 10 reads, metered like a profile view.
+  "review.read.ip": { points: 120, duration: HOUR, policy: "open", key: "ip" },
   "report.p0.uid": { points: 3, duration: DAY, policy: "open", key: "uid" },
   "report.p0.device": { points: 2, duration: DAY, policy: "open", key: "device" },
   "report.p0.ip": { points: 5, duration: DAY, policy: "open", key: "ip" },

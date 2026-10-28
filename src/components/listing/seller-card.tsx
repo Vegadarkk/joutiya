@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { BadgeCheck, MailCheck, MapPin, ShieldCheck } from "lucide-react";
+import { RatingLink } from "@/components/reviews/rating-link";
 import { quietLinkClassName, textLinkClassName } from "@/components/ui/text-link";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
@@ -99,6 +100,7 @@ export function SellerCard({ seller, fallbackName, fallbackType, locale, childre
             {type === "pro" ? <span className="rounded-sm bg-structure px-2 py-0.5 text-xs font-medium text-structure-foreground">{t("pro")}</span> : null}
           </h2>
           {seller ? <p className="text-sm text-foreground-muted">{t("memberSince", { date: formatMemberSince(seller.memberSince, locale) })}</p> : null}
+          {seller ? <RatingLink rating={seller.rating} locale={locale} href={`/${locale}/profil/${seller.publicId}#avis`} /> : null}
           {city ? (
             <p className="flex items-center gap-1 text-sm text-foreground-muted">
               <MapPin className="size-3.5 shrink-0" aria-hidden="true" />

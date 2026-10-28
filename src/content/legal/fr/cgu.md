@@ -201,7 +201,7 @@ Il est interdit :
 - de créer des comptes fictifs ou multiples, ou d'usurper l'identité d'une personne, d'une entreprise ou de {brand} ;
 - d'envoyer du spam, des messages en masse ou de la prospection non sollicitée ;
 - de tenter d'accéder sans droit aux systèmes de {brand} ou au compte d'un autre utilisateur, ou d'introduire un code malveillant ;
-- de manipuler le classement des annonces, les signalements ou, quand ils existeront, les avis ;
+- de manipuler le classement des annonces, les signalements ou les avis (voir [Avis utilisateurs](/legal/avis-utilisateurs)) ;
 - de vendre, louer ou céder votre compte.
 
 ### 5.3 Données des autres utilisateurs {#utilisation-3}

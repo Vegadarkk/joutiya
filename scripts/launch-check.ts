@@ -45,7 +45,7 @@ export const MANUAL_ITEMS = [
   "Back office: salesEnabled=false, the Pro launch offer active, no 'Sauvegarde Firestore trop ancienne' alert in the last days",
   "Anti-abuse thresholds and moderation word lists changed or moved to config/ (their committed values are public)",
   "Tarifit catalogue reviewed by a native speaker",
-  "Staging demo listings removed (worker: node dist/worker/seed-demo.mjs --remove --apply); none was ever seeded in prod",
+  "Example listings: in prod only if the owner said go (worker: node dist/worker/seed-demo.mjs --production --apply), each one labelled 'Annonce exemple' and not contactable",
   "Prod Firestore rules and indexes deployed (scripts/deploy-prod.ts firestore)",
   "Repository back to private on the day the site opens to visitors (spec §10)",
 ] as const;

@@ -12,6 +12,7 @@ import { ErrorBanner } from "@/components/feedback/error-banner";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { loadWithRetry } from "@/components/layout/chunk-retry";
 import type { ReportDialogProps } from "@/components/report/report-dialog";
+import { ReviewPrompt, reviewInvited } from "@/components/reviews/review-prompt";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Locale } from "@/config/site";
@@ -549,6 +550,17 @@ export function ThreadView({ cid }: { cid: string }) {
         </div>
       </div>
 
+      {!suspended && reviewInvited(conversation, now) ? (
+        <ReviewPrompt
+          key={conversation.cid}
+          conversation={conversation}
+          onReviewed={() => {
+            const next = { ...conversation, review: { ...conversation.review, reviewedAt: Date.now() } };
+            updateData((data) => ({ ...data, conversation: next }));
+            putRow(next);
+          }}
+        />
+      ) : null}
       {writable ? (
         <Composer
           onSend={send}

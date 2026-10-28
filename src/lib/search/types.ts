@@ -58,6 +58,8 @@ export interface SearchDocument {
   isBumped: boolean;
   /** Epoch ms; À la Une while > now (separate query, never the main sort). */
   featuredUntil?: number;
+  /** Example listing (src/lib/demo): labelled card, no contact; out of the sitemap (`sitemapShard` out of range). */
+  isExample?: true;
   /** Rounded city (later district) centroid. */
   _geo: { lat: number; lng: number };
   version: number;
@@ -106,6 +108,7 @@ export const CARD_FIELDS = [
   "a_rooms",
   "a_bedrooms",
   "a_mandate",
+  "isExample",
 ] as const satisfies readonly (keyof SearchDocument)[];
 type CardField = (typeof CARD_FIELDS)[number];
 /** The `a_*` card fields stay optional, as in the index (a listing without the criterion). */
@@ -203,6 +206,8 @@ export interface SearchCard {
   featured: boolean;
   /** Key numbers under the title and the exclusive mandate (card-facts.ts); absent = none. */
   facts?: CardFacts;
+  /** Example listing: "Exemple" label, no favorite action. */
+  example?: true;
 }
 
 export interface SearchFacets {

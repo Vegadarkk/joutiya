@@ -25,6 +25,7 @@ function listing(overrides: Partial<PublicListing> = {}): PublicListing {
     photos: [{ id: "photo0001", w: 1600, h: 1200, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj" }],
     contact: { showPhone: true, whatsapp: true },
     seller: { publicId: "abcdefghjk", name: "Salma Testeuse", type: "individual" },
+    example: false,
     publishedAt: "2026-10-12T10:00:00.000Z",
     sortAt: "2026-10-12T10:00:00.000Z",
     updatedAt: "2026-10-12T10:00:00.000Z",

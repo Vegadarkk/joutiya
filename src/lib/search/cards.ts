@@ -26,5 +26,6 @@ export function toSearchCard(doc: CardDocument, now: Date, featured = false): Se
     bumped: doc.isBumped === true,
     featured: featured && typeof doc.featuredUntil === "number" && doc.featuredUntil > now.getTime(),
     ...cardFactsField(cardFactsOf(doc.subcategoryId, (id) => (doc as Record<string, unknown>)[attributeField(id)])),
+    ...(doc.isExample === true ? { example: true as const } : {}),
   };
 }

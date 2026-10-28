@@ -1,8 +1,10 @@
 import "server-only";
 import type { Condition } from "@/config/categories";
+import { REVIEWS_PAGE } from "@/config/reviews";
 import { DEFAULT_BANNER, type BannerKey } from "@/config/storefront";
 import type { ListingAttributes, ListingStatus } from "@/lib/contracts/listings";
 import type { PhotoVariant } from "@/lib/contracts/photo-variants";
+import type { RatingSummary, ReviewPage } from "@/lib/contracts/reviews";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { getListing, listPublishedByOwner, type ListingRecord } from "@/lib/db/repositories/listings";
 import { findUserByPublicId, getUserRecord, type UserRecord } from "@/lib/db/repositories/profiles";
@@ -15,6 +17,8 @@ import { aggregationReads, consume } from "@/lib/quota";
 import { assertQuotas, PUBLIC_READ_QUOTAS } from "@/lib/quota/gate";
 import { storefrontShown } from "@/lib/pro/lifecycle";
 import { PRO_ID_PATTERN, type ProSector } from "@/lib/pro/profile-schema";
+import { sellerReviews } from "@/lib/reviews/seller";
+import { ratingSummary } from "@/lib/reviews/views";
 import { cardFactsField, cardFactsOf, type CardFacts } from "./card-facts";
 import { buildSlugId, parseSlugId } from "./ids";
 
@@ -47,6 +51,15 @@ function isPublicState(status: ListingStatus): status is PublicState {
  */
 export function isPubliclyVisible(listing: Pick<ListingRecord, "status" | "moderation">): boolean {
   return isPublicState(listing.status) && !listing.moderation.hiddenBy;
+}
+
+/**
+ * Whether a buyer may reach the seller from this listing (message, phone, appointment, payment):
+ * never on an example listing (src/lib/demo), which only shows what a listing of its kind looks like.
+ * Every contact entry point checks it next to the listing's status.
+ */
+export function acceptsContact(listing: Pick<ListingRecord, "example">): boolean {
+  return listing.example !== true;
 }
 
 /**
@@ -144,6 +157,8 @@ export interface PublicListing {
   /** Which contact actions exist; the number itself only comes from POST /api/listings/{id}/phone. */
   contact: { showPhone: boolean; whatsapp: boolean };
   seller: { publicId: string; name: string; type: UserRecord["type"] };
+  /** Example listing (src/lib/demo): labelled, no contact action, not indexed by search engines. */
+  example: boolean;
   /** ISO 8601. */
   publishedAt: string;
   sortAt: string;
@@ -167,6 +182,8 @@ export interface PublicListingCard {
   sortAt: string;
   /** Key numbers under the title and the exclusive mandate (card-facts.ts); absent = none. */
   facts?: CardFacts;
+  /** Example listing: "Exemple" label, no favorite action. */
+  example?: true;
 }
 
 function publicPhotos(record: ListingRecord): PublicPhoto[] {
@@ -198,6 +215,7 @@ export function toPublicListing(record: ListingRecord, state: PublicState, slugI
     photos: publicPhotos(record),
     contact: { showPhone: record.contact.showPhone, whatsapp: record.contact.whatsapp },
     seller: { publicId: record.sellerPublicId, name: record.sellerName, type: record.sellerType },
+    example: record.example === true,
     publishedAt: publishedAt.toISOString(),
     sortAt: record.sortAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
@@ -222,6 +240,7 @@ export function toPublicCard(record: ListingRecord): PublicListingCard | null {
     sellerType: record.sellerType,
     sortAt: record.sortAt.toISOString(),
     ...cardFactsField(cardFactsOf(record.subcategoryId, (id) => record.attributes[id])),
+    ...(record.example ? { example: true as const } : {}),
   };
 }
 
@@ -239,6 +258,8 @@ export interface PublicSeller {
   /** Storefront (vitrine-avis §1): the "about" text, if any, and the house banner. */
   bio: string | null;
   bannerKey: BannerKey;
+  /** Verified reviews (vitrine-avis §2): published ratings only; none shown while suspended. */
+  rating: RatingSummary;
 }
 
 /**
@@ -263,6 +284,7 @@ function toSeller(user: UserRecord, publishedCount: number): PublicSeller {
     publishedCount,
     bio: user.storefront?.bio ?? null,
     bannerKey: user.storefront?.bannerKey ?? DEFAULT_BANNER,
+    rating: user.status === "suspended" ? ratingSummary({ ...user.stats, ratingCount: 0 }) : ratingSummary(user.stats),
   };
 }
 
@@ -277,7 +299,11 @@ export async function getSeller(ownerUid: string): Promise<PublicSeller | null> 
 export interface PublicProfileView extends PublicSeller {
   /** Published listings as cards, newest first (at most `limit`). */
   listings: PublicListingCard[];
+  /** The newest published reviews (no query while the seller has none). */
+  reviews: ReviewPage;
 }
+
+const NO_REVIEWS: ReviewPage = { reviews: [], next: null };
 
 /**
  * The profile page: the seller header and the cards of the published listings, or null (404).
@@ -288,11 +314,16 @@ export async function getPublicProfile(publicId: string, limit = 24): Promise<Pu
   await assertQuotas(PUBLIC_READ_QUOTAS);
   const user = await findUserByPublicId(publicId);
   if (!user || !isVisibleAccount(user)) return null;
-  if (user.status === "suspended") return { ...toSeller(user, 0), listings: [] };
-  return publishedView(user, limit);
+  if (user.status === "suspended") return { ...toSeller(user, 0), listings: [], reviews: NO_REVIEWS };
+  return profileView(user, limit);
 }
 
-async function publishedView(user: UserRecord, limit: number): Promise<PublicProfileView> {
+async function profileView(user: UserRecord, limit: number): Promise<PublicProfileView> {
+  const [view, reviews] = await Promise.all([publishedView(user, limit), user.stats.ratingCount > 0 ? sellerReviews(user.uid, REVIEWS_PAGE) : NO_REVIEWS]);
+  return { ...view, reviews };
+}
+
+async function publishedView(user: UserRecord, limit: number): Promise<Omit<PublicProfileView, "reviews">> {
   const fetched = await listPublishedByOwner(user.uid, limit);
   // Listings hidden by a report (D11) are not shown, nor counted when the page shows them all.
   const records = fetched.filter((listing) => !listing.moderation.hiddenBy);
@@ -341,7 +372,7 @@ export async function getPublicStorefront(proId: string, limit = 24): Promise<Pu
     citySlug: profile.citySlug,
     sector: profile.sector ?? "general",
     feeSchedule: profile.sector === "real_estate" ? (profile.agency?.feeSchedule ?? "") : "",
-    seller: await publishedView(user, limit),
+    seller: await profileView(user, limit),
   };
 }
 

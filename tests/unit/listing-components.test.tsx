@@ -172,6 +172,7 @@ const seller: PublicSeller = {
   publishedCount: 2,
   bio: null,
   bannerKey: "zellige",
+  rating: { count: 0, average: null, histogram: [0, 0, 0, 0, 0] },
 };
 
 describe("SellerCard", () => {

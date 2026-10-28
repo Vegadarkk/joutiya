@@ -20,6 +20,7 @@ import { revalidateListingPaths } from "@/lib/listings/revalidate";
 import { logger } from "@/lib/logging/logger";
 import { sendMail } from "@/lib/mail";
 import { closeAccountConversations, publishRevoked } from "@/lib/messaging";
+import { anonymizeAuthoredReviews } from "@/lib/reviews/repository";
 import { assertQuotas } from "@/lib/quota/gate";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { requestIdentity } from "@/lib/rate-limit/keys";
@@ -39,7 +40,8 @@ import { CLOSURE_LISTING_STATUSES, closureBlocker, closurePurgeAt, isRecentSignI
 //  3. live, paused, held, sold and expired listings removed (search outbox delete, fast lane, ISR),
 //     the shop's storefront page revalidated (hidden: its owner is closed);
 //  4. conversations marked accountClosed (the other participant reads, nobody writes);
-//  5. favorites and saved searches deleted;
+//  5. favorites and saved searches deleted; the reviews the member wrote lose the author's name
+//     (vitrine-avis §3: "Ancien membre"), the storefronts showing them revalidated;
 //  6. audit entry, then the Auth user disabled and its refresh tokens revoked, open streams closed,
 //     confirmation mail (transactional).
 // Untouched: reports, decisions and appeals, authority requests, suspensions, strikes, legal holds,
@@ -135,6 +137,15 @@ async function deleteFavorites(uid: string): Promise<number> {
   return ids.length;
 }
 
+/** Best effort: a failure is logged, the retry of the closure runs it again. */
+async function anonymizeReviews(uid: string, now: Date): Promise<void> {
+  try {
+    for (const publicId of await anonymizeAuthoredReviews(uid, now)) revalidateListingPaths({ publicId });
+  } catch (error) {
+    logger.warn({ err: (error as Error).message }, "account closure: reviews not anonymized");
+  }
+}
+
 const localeOf = (value: string): Locale => ((LOCALES as readonly string[]).includes(value) ? (value as Locale) : "fr");
 
 /**
@@ -154,6 +165,7 @@ export async function closeAccount(uid: string, options: { now?: Date; ip?: stri
   const conversations = await closeAccountConversations(uid, now);
   const favorites = await deleteFavorites(uid);
   const savedSearches = await deleteAllSavedSearches(uid);
+  await anonymizeReviews(uid, now);
 
   await audit({
     actorUid: uid,
