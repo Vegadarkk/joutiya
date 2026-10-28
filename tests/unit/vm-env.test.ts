@@ -79,8 +79,9 @@ describe("app.env names", () => {
       GOOGLE_CLOUD_PROJECT: "joutiya-staging",
       TURNSTILE_SITE_KEY: "0x4AAAAAAFYY7P8KeaWCGihV",
       MEDIA_BASE_URL: "https://media-staging.joutiya.ma",
-      MEILI_URL: "http://meilisearch:7700",
     });
+    // search-setup writes it with the keys: alone, it would stop the first start.
+    expect(staging.MEILI_URL).toBeUndefined();
     const prod = derivedValues("prod", targets);
     expect(prod).toMatchObject({ SITE_URL: "https://joutiya.ma", ADMIN_HOST: "admin.joutiya.ma", MEDIA_BASE_URL: "https://media.joutiya.ma" });
     expect(prod.CSP_REPORT_ONLY).toBeUndefined();
@@ -109,7 +110,7 @@ describe("planEnv", () => {
     expect(staging.values.TELEGRAM_BOT_TOKEN).toBeUndefined();
     expect(staging.ignored.map((line) => line.split(":")[0])).toEqual(["HASH_PEPPER", "FIREBASE_APP_ID", "TELEGRAM_BOT_TOKEN", "SENTRY_DSN", "CSRF_SECRET"]);
     expect(staging.ignored.join("\n")).not.toContain("FIREBASE_SERVICE_ACCOUNT_JSON");
-    expect(staging.missing).toEqual(["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "ALERT_RELAY_URL", "ALERT_RELAY_SECRET", "FIREBASE_API_KEY", "MAIL_API_KEY", "MAIL_WEBHOOK_SECRET", "CF_ACCESS_AUD"]);
+    expect(staging.missing).toEqual(["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "ALERT_RELAY_URL", "ALERT_RELAY_SECRET", "FIREBASE_API_KEY", "MAIL_API_KEY", "MAIL_WEBHOOK_SECRET"]);
 
     const prod = plan("prod");
     expect(prod.errors).toEqual([]);

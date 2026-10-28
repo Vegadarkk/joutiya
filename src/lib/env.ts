@@ -122,6 +122,28 @@ const schema = z.object({
   MEILI_URL: optionalUrl,
   MEILI_SEARCH_KEY: optional,
   MEILI_INDEX_KEY: optional,
+  // Payments (phase 7, design §6), behind config/flags `salesEnabled`. RevenueCat project "Joutiya"
+  // (sandbox outside prod): the v2 secret key reads a customer's purchases, every webhook carries
+  // the static Authorization value and the HMAC signature, and the purchase link is the Web
+  // Purchase Link of the credit packs offering (`https://pay.rev.cat/<token>`).
+  REVENUECAT_PROJECT_ID: optional,
+  REVENUECAT_SECRET_API_KEY: optional,
+  REVENUECAT_WEBHOOK_AUTH: optional,
+  REVENUECAT_WEBHOOK_HMAC_SECRET: optional,
+  REVENUECAT_PURCHASE_LINK: optionalUrl,
+  // Pro subscriptions (design §7): Stripe restricted key (Customers, Checkout Sessions, Customer
+  // Portal, Invoices) and the webhook endpoint's signing secret; RevenueCat tracks each
+  // subscription from POST /v1/receipts with the public API key of its Stripe app.
+  STRIPE_SECRET_KEY: optional,
+  STRIPE_WEBHOOK_SECRET: optional,
+  REVENUECAT_STRIPE_PUBLIC_KEY: optional,
+  // AI agent (phase 5, design D19), worker only. Each key is optional: an absent key disables its
+  // provider, and the deterministic rules provider always runs (src/lib/ai).
+  ANTHROPIC_API_KEY: optional,
+  OPENAI_API_KEY: optional,
+  CF_WORKERS_AI_TOKEN: optional,
+  /** Cloudflare account of the Workers AI REST endpoint (also listed in infra/targets.json). */
+  CF_ACCOUNT_ID: optional,
 });
 
 export type ServerEnv = z.infer<typeof schema>;

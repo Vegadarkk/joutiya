@@ -18,6 +18,8 @@ import {
   derBase64,
   githubProviderBody,
   githubProviderName,
+  keylessEnv,
+  mintCredentials,
   missingGrants,
   openssl,
   providerChanges,
@@ -33,6 +35,7 @@ import {
   type Provider,
   type Waits,
 } from "../../scripts/google-wif";
+import type { Targets } from "../../scripts/assert-target";
 import { RUN_COMMAND_MAX_BYTES, rootCommand, wifCertificates, wifDir, wifInstallScript, wifKeyScript, wifRecreateScript } from "../../scripts/oracle-vm";
 
 const work = mkdtempSync(join(tmpdir(), "joutiya-wif-"));
@@ -192,6 +195,37 @@ describe("the CA and the certificates", () => {
     expect(days).toBeLessThan(LEAF_DAYS + 1);
 
     expect(() => signCsr({ csr, subject: "joutiya-prod-web", days: LEAF_DAYS, ca })).toThrow(/refused: subject CN=joutiya-staging-web instead of CN=joutiya-prod-web/);
+  });
+
+  it("mints one-day credentials of a container, read by google-auth-library, and deletes them", async () => {
+    const targets = { environments: { staging: { firebase: { projectId: "joutiya-staging", projectNumber: "365736224142" } } } } as unknown as Targets;
+    const minted = mintCredentials(targets, "staging", "worker", ca);
+    const dir = join(minted.path, "..");
+    try {
+      expect(readdirSync(dir).sort()).toEqual(["cert.pem", "certificate_config.json", "credentials.json", "key.pem"]);
+      if (process.platform !== "win32") expect(statSync(dir).mode & 0o777).toBe(0o700);
+      const certificate = new X509Certificate(readFileSync(join(dir, "cert.pem")));
+      expect(certificate.subject).toBe("CN=joutiya-staging-worker");
+      expect((new Date(certificate.validTo).getTime() - Date.now()) / 86_400_000).toBeLessThan(1.01);
+      const client = authLibrary.ExternalAccountClient.fromJSON(JSON.parse(readFileSync(minted.path, "utf8")) as Record<string, unknown>);
+      expect(client?.constructor.name).toBe("IdentityPoolClient");
+      expect(JSON.parse((await client?.retrieveSubjectToken()) ?? "[]")).toEqual([certificate.raw.toString("base64")]);
+    } finally {
+      minted.remove();
+    }
+    expect(existsSync(dir)).toBe(false);
+    expect(() => mintCredentials(targets, "prod", "worker", ca)).toThrow();
+  });
+
+  it("signs a process in with those credentials only", () => {
+    const base = { NODE_ENV: "test" as const, PATH: "/bin", FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080", CLOUDSDK_CONFIG: "/home/owner/.config/gcloud", GOOGLE_API_USE_CLIENT_CERTIFICATE: "true" };
+    expect(keylessEnv("joutiya-staging", "/tmp/c.json", base)).toEqual({
+      NODE_ENV: "test",
+      PATH: "/bin",
+      GOOGLE_APPLICATION_CREDENTIALS: "/tmp/c.json",
+      GOOGLE_CLOUD_PROJECT: "joutiya-staging",
+      GCLOUD_PROJECT: "joutiya-staging",
+    });
   });
 
   it("never copies the request's extensions (a request cannot make itself a CA)", () => {

@@ -1,5 +1,9 @@
+import { alert } from "@/lib/alert";
 import { LEGACY_PHOTO_VARIANTS, PHOTO_VARIANTS, type PhotoVariant } from "@/lib/contracts/media";
 import { getListings, type ListingRecord } from "@/lib/db/repositories/listings";
+import { getProProfile } from "@/lib/db/repositories/pro-profiles";
+import { getUserRecord } from "@/lib/db/repositories/profiles";
+import { getUserPrivate } from "@/lib/db/repositories/users";
 import { listListingsChangedBefore, type ListingCursor } from "@/lib/db/repositories/retention";
 import {
   deleteUploadDocument,
@@ -20,6 +24,8 @@ import {
 import { isFirestoreConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
 import { MEDIA_CONTENT_TYPE, photoFinalKey, photoObjectKey, type PhotoBucket } from "@/lib/media/urls";
+import { kybcObjectKey } from "@/lib/pro/kybc";
+import { kybcRetention } from "@/lib/pro/kybc-retention";
 import { isDegraded } from "@/lib/quota";
 import { isStorageNotConfigured, moveObject, objectStore, type ObjectStore } from "@/lib/storage";
 import { RETAINED_STATUSES, storedBytes } from "@/lib/uploads/policy";
@@ -48,7 +54,8 @@ import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 //    their variants move to the private bucket if step 3 has not done it yet, then their purgeAt
 //    moves to the listing's. A legal hold keeps everything, rechecked daily. A purged listing
 //    (tombstone) does not read as a listing: its uploads are orphans, deleted (both buckets).
-//    Every skipped upload gets a later purgeAt, so no run reads it again before then.
+//    Every skipped upload gets a later purgeAt, so no run reads it again before then. A KYBC piece
+//    (phase 7) follows its owner's application instead (src/lib/pro/kybc-retention.ts).
 // Steps 2 to 4 never mark anything before its objects are handled: a storage failure leaves the
 // upload for the next run. Moving photos changes no byte count: the R2 storage gauge sums the
 // uploads whose variants are stored (`ready`, and `heldObjects`), whichever bucket holds them
@@ -251,6 +258,32 @@ export function retainedUntil(listing: Pick<ListingRecord, "purgeAt">, now: Date
   return new Date(Math.max(listing.purgeAt.getTime(), floor));
 }
 
+/**
+ * A KYBC piece past purgeAt (phase 7): kept with its owner's application while the relationship
+ * lasts and 6 months after its end (src/lib/pro/kybc-retention.ts), else deleted from both buckets.
+ */
+async function purgeKybcPiece(store: ObjectStore, upload: UploadRecord, now: Date, result: PurgeQuarantineResult): Promise<void> {
+  try {
+    const user = await getUserRecord(upload.ownerUid);
+    const profile = user?.proId ? await getProProfile(user.proId) : null;
+    // The closure date is private; read only for a closed account.
+    const closedAt = user?.status === "closed" ? (await getUserPrivate(upload.ownerUid))?.closedAt : undefined;
+    const owner = user ? { status: user.status, updatedAt: user.updatedAt, ...(closedAt ? { closedAt } : {}) } : null;
+    const retention = kybcRetention(upload.id, profile && profile.ownerUid === upload.ownerUid ? profile : null, owner, now);
+    if (retention.keep) {
+      await updateUpload(upload.id, { purgeAt: retention.until }, now);
+      result.extended += 1;
+      return;
+    }
+    await store.delete("quarantine", upload.quarantineKey);
+    await store.delete("private", kybcObjectKey(upload.ownerUid, upload.id));
+    if (await deleteUploadDocument(upload.id)) result.purged += 1;
+  } catch (error) {
+    result.failed += 1;
+    logger.warn({ uploadId: upload.id, err: (error as Error).message }, "expired KYBC piece not purged");
+  }
+}
+
 async function purgeExpiredDocuments(store: ObjectStore, now: Date, result: PurgeQuarantineResult): Promise<void> {
   try {
     await purgeExpiredPages(store, now, result);
@@ -265,8 +298,12 @@ async function purgeExpiredPages(store: ObjectStore, now: Date, result: PurgeQua
   for (let pages = 0; pages < PURGE_PAGES; pages += 1) {
     const uploads = await listPastPurge(now, PURGE_QUARANTINE_BATCH, page);
     if (uploads.length === 0) break;
-    const listings = new Map((await getListings([...new Set(uploads.map((upload) => upload.targetId))])).map((listing) => [listing.id, listing]));
+    const listings = new Map((await getListings([...new Set(uploads.filter((upload) => upload.purpose !== "kyb").map((upload) => upload.targetId))])).map((listing) => [listing.id, listing]));
     for (const upload of uploads) {
+      if (upload.purpose === "kyb") {
+        await purgeKybcPiece(store, upload, now, result);
+        continue;
+      }
       const listing = listings.get(upload.targetId);
       try {
         const retained = listing !== undefined && RETAINED_STATUSES.includes(listing.status);
@@ -326,12 +363,22 @@ export async function purgeQuarantine(now = new Date(), deps: { store?: ObjectSt
   return result;
 }
 
-/** A failing query stops that step only: the document purge still runs. */
+/**
+ * A failing query stops that step only: the document purge still runs. The job completes anyway, so
+ * the step alerts itself (one step per run: one alert).
+ */
 async function step(name: string, result: PurgeQuarantineResult, run: () => Promise<void>): Promise<void> {
   try {
     await run();
   } catch (error) {
     result.failed += 1;
-    logger.error({ step: name, err: (error as Error).message }, "purge-quarantine step failed");
+    const message = (error as Error).message;
+    logger.error({ step: name, err: message }, "purge-quarantine step failed");
+    await alert({
+      severity: "P2",
+      title: "Tâche système en échec : purge-quarantine",
+      // The document purge runs after this step and may still fail on its own: claim nothing about it.
+      body: `Étape en échec : ${name} (${message.slice(0, 200)}). L'exécution de l'heure suivante réessaie ; détails dans les journaux du worker.`,
+    });
   }
 }

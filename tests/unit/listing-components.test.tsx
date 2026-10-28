@@ -10,9 +10,9 @@ import { CriteriaGrid, CriteriaSection } from "@/components/listing/criteria-gri
 import { ListingCard } from "@/components/listing/listing-card";
 import { ListingStatusBanner } from "@/components/listing/listing-status-banner";
 import { PriceTag } from "@/components/listing/price-tag";
-import { ReportLink, reportMailto } from "@/components/listing/report-link";
 import { SafetyTips } from "@/components/listing/safety-tips";
 import { formatMemberSince, initialOf, SellerCard } from "@/components/listing/seller-card";
+import { ReportButton, reportMailto } from "@/components/report/report-button";
 import type { Locale } from "@/config/site";
 import type { PublicListingCard, PublicSeller } from "@/lib/listings/public";
 
@@ -228,16 +228,23 @@ describe("ListingStatusBanner", () => {
   });
 });
 
-describe("ReportLink", () => {
-  it("writes a mailto to the DSA contact with the content's id and URL, spaces as %20", () => {
+describe("ReportButton", () => {
+  it("writes the stand-in mailto to the DSA contact with the content's id and URL, spaces as %20", () => {
     const href = reportMailto("dsa@joutiya.ma", "Signalement de l'annonce abcd2345", "Adresse : https://joutiya.ma/fr/annonce/x-abcd2345");
     expect(href.startsWith("mailto:dsa@joutiya.ma?subject=")).toBe(true);
     expect(href).not.toContain("+");
     expect(decodeURIComponent(href)).toContain("Signalement de l'annonce abcd2345");
-    const html = render(<ReportLink email="dsa@joutiya.ma" target="listing" id="abcd2345" url="https://joutiya.ma/fr/annonce/x-abcd2345" />);
-    expect(text(html)).toContain(fr.ListingPage.report.listing.link);
-    expect(html).toContain("mailto:dsa@joutiya.ma?subject=Signalement%20de%20l");
-    expect(render(<ReportLink email="dsa@joutiya.ma" target="profile" id="abcdefghjk" url="https://joutiya.ma/fr/profil/abcdefghjk" />)).toContain(escape(fr.ListingPage.report.profile.link));
+  });
+
+  it("renders a button that opens the notice form, the form itself loaded on demand", () => {
+    const props = { subject: "Vélo", ownerPublicId: "owner12345", email: "dsa@joutiya.ma", url: "https://joutiya.ma/fr/annonce/x-abcd2345" };
+    const listing = render(<ReportButton target={{ type: "listing", id: "abcd2345" }} {...props} />);
+    expect(listing).toContain('type="button"');
+    expect(text(listing)).toContain(fr.Report.trigger.listing);
+    expect(text(listing)).toContain(fr.Report.hint);
+    expect(listing).not.toContain("mailto:");
+    expect(text(render(<ReportButton target={{ type: "user", id: "abcdefghjk" }} {...props} />))).toContain(fr.Report.trigger.user);
+    expect(text(render(<ReportButton target={{ type: "user", id: "abcdefghjk" }} {...props} />, "ar"))).toContain(ar.Report.trigger.user);
   });
 });
 

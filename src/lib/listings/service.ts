@@ -1,11 +1,12 @@
 import "server-only";
 import { isDeepStrictEqual } from "node:util";
-import { subcategoryById } from "@/config/categories";
+import { subcategoryAllowsAds, subcategoryById } from "@/config/categories";
 import { listingLifetime, listingQuotas, withinQuota, type ListingQuotas, type Seller } from "@/config/pricing";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { AuthContext } from "@/lib/auth/guards";
 import { requireOwner } from "@/lib/auth/guards";
 import type { Device } from "@/lib/auth/respond";
+import { enqueueAiTask } from "@/lib/ai/queue";
 import { audit } from "@/lib/audit";
 import { MAX_DRAFTS, type CreateListingInput, type FieldIssue, type ListingPatch, type ListingStatus, type ModerationFlag, type PublishListingResponse } from "@/lib/contracts/listings";
 import { listingPhotoSchema, type ListingPhoto } from "@/lib/contracts/media";
@@ -33,7 +34,9 @@ import { getUserRecord, type UserRecord } from "@/lib/db/repositories/profiles";
 import { enqueueSearchOutboxTx } from "@/lib/db/repositories/search-outbox";
 import { getUploads, updateUpload } from "@/lib/db/repositories/uploads";
 import { getUserPrivate } from "@/lib/db/repositories/users";
+import { getProProfile } from "@/lib/db/repositories/pro-profiles";
 import { listingSchema, type ListingDoc, type ListingModeration } from "@/lib/db/schemas";
+import { getPricing } from "@/lib/config/runtime";
 import { serverEnv } from "@/lib/env";
 import { db } from "@/lib/firebase/admin";
 import { HttpError, notFound } from "@/lib/http/errors";
@@ -42,10 +45,11 @@ import { logger } from "@/lib/logging/logger";
 import { sendMail } from "@/lib/mail";
 import type { ModerationStatement, TemplateData } from "@/lib/mail/types";
 import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
+import { publishesAsPro } from "@/lib/pro/lifecycle";
 import { notifySearchIndex } from "@/lib/search/queue";
 import { escalateOnIp } from "./escalation";
 import { buildSlugId, newListingId } from "./ids";
-import { IllegalTransitionError, canRenew, canTransition, renew, renewForReview, transition, type Lifetime, type TransitionContext, type TransitionEffects, type TransitionResult } from "./lifecycle";
+import { IllegalTransitionError, canRenew, canTransition, draftPurgeAt, renew, renewForReview, transition, type Lifetime, type TransitionContext, type TransitionEffects, type TransitionResult } from "./lifecycle";
 import { ownerListingView } from "./owner-view";
 import { PUBLIC_STATES } from "./public";
 import { assessReadiness } from "./readiness";
@@ -87,9 +91,15 @@ interface SellerContext {
 async function sellerOf(auth: AuthContext): Promise<SellerContext> {
   const user = await getUserRecord(auth.user.uid);
   if (!user) throw new HttpError(403, "forbidden", "account record missing");
-  // Phase 3 publishes individuals; a verified Pro without a plan has the `none` quotas (D5).
-  const seller: Seller = user.type === "pro" || auth.user.claims.role === "pro" ? { type: "pro", plan: "none" } : { type: "individual" };
-  return { user, seller, quotas: listingQuotas(seller) };
+  const pricing = await getPricing();
+  if (user.type !== "pro" && auth.user.claims.role !== "pro") return { user, seller: { type: "individual" }, quotas: listingQuotas({ type: "individual" }, pricing) };
+  // Phase 7: the shop's plan (subscription or launch offer). Suspended, or no profile: the `none`
+  // quotas (nothing new as a Pro).
+  const proId = auth.user.claims.proId ?? user.proId;
+  const profile = proId ? await getProProfile(proId) : null;
+  const plan = profile && profile.ownerUid === user.uid && publishesAsPro(profile.lifecycle) ? profile.plan : "none";
+  const seller: Seller = { type: "pro", plan };
+  return { user, seller, quotas: listingQuotas(seller, pricing) };
 }
 
 async function lifetime(): Promise<Lifetime> {
@@ -154,6 +164,8 @@ export async function createDraft(actor: Actor, input: CreateListingInput, now =
     legalHold: [],
     createdAt: now,
     updatedAt: now,
+    // A draft nobody edits for 30 days goes with its photos (retention-purge, audit A4-04).
+    purgeAt: draftPurgeAt(now),
     version: 0,
   });
   try {
@@ -310,6 +322,8 @@ export async function patchListing(actor: Actor, id: string, patch: ListingPatch
   const fields = changedFields(listing, await fieldsOf(listing, patch, { uid, quotas: seller.quotas, now }));
   // Nothing changes: nothing is written. A rejected listing's save reopens it, even an empty one.
   if (Object.keys(fields).length === 0 && listing.status !== "rejected") return ownerListingView(listing);
+  // Every draft edit restarts its 30-day clock (written with the edit: no extra write).
+  if (listing.status === "draft") fields.purgeAt = draftPurgeAt(now);
   let effects: TransitionEffects = { search: null, contentOp: null, audit: null, revalidate: false, mail: null };
   let mail: MailJob | null = null;
   let hold: ModerationDecisionInput | undefined;
@@ -342,7 +356,7 @@ export async function patchListing(actor: Actor, id: string, patch: ListingPatch
         mail = { template: "listingPendingReview", statement: statementOf("hold", result.flags, await redressAddress()) };
       } else {
         fields.moderation = moderationPatch(fields.moderation ?? listing.moderation, result);
-        fields.adsEligible = result.state === "auto_ok" && listing.status !== "pending_review" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy;
+        fields.adsEligible = result.state === "auto_ok" && listing.status !== "pending_review" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy && subcategoryAllowsAds(next.subcategoryId);
       }
     }
   } else if (listing.status === "rejected") {
@@ -364,6 +378,8 @@ export async function patchListing(actor: Actor, id: string, patch: ListingPatch
 
 export interface PublishOptions {
   turnstileToken?: string;
+  /** The seller ticked the adults-only attestation (required in an `adultsOnly` subcategory). */
+  adultsOnlyAttestation?: boolean;
   device: Device;
   now?: Date;
 }
@@ -391,10 +407,11 @@ export async function publish(actor: Actor, request: Request, id: string, option
   if (blockers.length > 0) throw invalidListing(blockers);
   const screening = await screenFor(listing, seller, now);
   if (screening.blockers.length > 0) throw invalidListing(screening.blockers);
+  if (subcategoryById(listing.subcategoryId ?? "")?.adultsOnly && !options.adultsOnlyAttestation) throw new HttpError(422, "adults_only_attestation");
 
   await assertWithinQuota(uid, seller.quotas);
   const turnstilePassed = await escalateOnIp(request, "listing.create.ip", options.device, options.turnstileToken, "listing");
-  await enforceDailyLimit(uid, seller.quotas, now);
+  await enforceDailyLimit(uid, seller.seller, seller.quotas, now);
 
   const city = cityBySlug(listing.location!.citySlug)!;
   const slugId = buildSlugId({ id, title: listing.title, city: cityName(city, "fr"), categoryId: listing.categoryId });
@@ -404,10 +421,11 @@ export async function publish(actor: Actor, request: Request, id: string, option
   const { patch, effects } = step(() => transition(listing, to, ctx));
   patch.slugId = slugId;
   patch.moderation = moderationPatch(listing.moderation, screening, to === "pending_review");
-  patch.adsEligible = to === "published" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy;
+  patch.adsEligible = to === "published" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy && subcategoryAllowsAds(listing.subcategoryId);
   const hold = to === "pending_review" ? holdRecord(listing, screening, now, rejectedBefore) : undefined;
 
   const updated = await commit(listing, patch, effects, { actor, user: seller.user, now, hold, maxActive: seller.quotas.activeListings });
+  await requestScreening(updated);
   const path = `/${seller.user.locale}/annonce/${slugId}`;
   if (to === "published") await notifySeller(updated, seller.user, { template: "listingPublished", path });
   else await notifySeller(updated, seller.user, { template: "listingPendingReview", statement: statementOf("hold", screening.flags, await redressAddress()) });
@@ -418,13 +436,31 @@ export async function publish(actor: Actor, request: Request, id: string, option
   };
 }
 
-/** 5 listings a day per account (D5): the limiter, else (store down, policy open) the Firestore count. */
-async function enforceDailyLimit(uid: string, quotas: ListingQuotas, now: Date): Promise<void> {
-  const outcome = await consumeLimit("listing.create.uid", uid);
-  if (outcome.ok) return;
-  if (outcome.reason === "limited") throw new HttpError(429, "listing_daily_limit", undefined, { headers: { "Retry-After": String(Math.max(1, outcome.retryAfterSeconds)) } });
+/**
+ * Publications a day (D5). Individuals: 5, by the limiter, else (store down, policy open) the
+ * Firestore count. Pros (phase 7): the plan's `listingsPerDay` by the Firestore count, the plans
+ * differ too much for one limiter, under the coarse `listing.create.pro.uid` abuse cap.
+ */
+async function enforceDailyLimit(uid: string, seller: Seller, quotas: ListingQuotas, now: Date): Promise<void> {
+  const outcome = await consumeLimit(seller.type === "pro" ? "listing.create.pro.uid" : "listing.create.uid", uid);
+  if (!outcome.ok && outcome.reason === "limited") throw new HttpError(429, "listing_daily_limit", undefined, { headers: { "Retry-After": String(Math.max(1, outcome.retryAfterSeconds)) } });
+  if (outcome.ok && seller.type !== "pro") return;
   if (quotas.listingsPerDay !== null && (await countPublishedSince(uid, new Date(now.getTime() - DAY_MS))) >= quotas.listingsPerDay) {
     throw new HttpError(429, "listing_daily_limit", undefined, { headers: { "Retry-After": "3600" } });
+  }
+}
+
+/**
+ * After a publication or a screened renewal commits (design D19, D20): the agent screens the
+ * listing (a held one may be approved alone, a published one may get a system report). The job
+ * id carries the committed version, so a republish is screened even while an older job runs.
+ * Never throws: a publication never fails because the agent queue is down.
+ */
+async function requestScreening(listing: ListingRecord): Promise<void> {
+  try {
+    await enqueueAiTask("listing_screen", { type: "listing", id: listing.id }, { version: listing.version });
+  } catch (error) {
+    logger.warn({ listingId: listing.id, err: (error as Error).message }, "listings: screening request failed");
   }
 }
 
@@ -518,9 +554,11 @@ async function renewExpired(actor: Actor, listing: ListingRecord, seller: Seller
   const held = (screening.state === "needs_review" && !approved) || rejectedBefore;
   const { patch, effects } = step(() => (held ? renewForReview(listing, ctx) : renew(listing, ctx)));
   if (!approved) patch.moderation = moderationPatch(listing.moderation, screening, held);
-  patch.adsEligible = !held && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy;
+  patch.adsEligible = !held && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy && subcategoryAllowsAds(listing.subcategoryId);
   const hold = held ? holdRecord(listing, screening, now, rejectedBefore) : undefined;
   const updated = await commit(listing, patch, effects, { actor, user: seller.user, now, hold, maxActive: seller.quotas.activeListings });
+  // Content a moderator approved and unchanged since was not screened: nothing for the agent either.
+  if (!approved) await requestScreening(updated);
   if (held) await notifySeller(updated, seller.user, { template: "listingPendingReview", statement: statementOf("hold", screening.flags, await redressAddress()) });
   return updated;
 }

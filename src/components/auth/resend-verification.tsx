@@ -47,6 +47,7 @@ export function ResendVerification({ nonce, defaultEmail = "", entry, className 
   } = useForm<ResendForm, unknown, ResendInput>({
     resolver: zodResolver(resendSchema),
     defaultValues: { email: defaultEmail, locale, turnstileToken: "" },
+    mode: "onTouched",
   });
 
   async function onValid(values: ResendInput) {

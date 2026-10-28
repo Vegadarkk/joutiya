@@ -170,12 +170,12 @@ export function SaveIndicator({ state, error, mode = "auto", onRetry, onSave, he
       ) : null}
       <span className="min-w-0">{message}</span>
       {state === "error" && !isApiError(error, "invalid_listing") ? (
-        <button type="button" onClick={onRetry} className="-my-2 inline-flex min-h-11 items-center rounded-sm px-1 font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
+        <button type="button" onClick={onRetry} className="-my-2 inline-flex min-h-11 items-center rounded-sm px-1 font-medium underline underline-offset-2">
           {t("retrySave")}
         </button>
       ) : null}
       {state === "pending" && live && onSave ? (
-        <button type="button" onClick={onSave} className="-my-2 inline-flex min-h-11 items-center rounded-sm px-1 font-medium text-link underline underline-offset-2 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
+        <button type="button" onClick={onSave} className="-my-2 inline-flex min-h-11 items-center rounded-sm px-1 font-medium text-link underline underline-offset-2">
           {t("saveNow")}
         </button>
       ) : null}

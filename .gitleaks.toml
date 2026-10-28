@@ -1,0 +1,11 @@
+# Gitleaks' default rules, plus one allowlist: the Access AUD tags of infra/targets.json are public
+# 64-hex identifiers (they sit in every Access JWT's aud claim), which generic-api-key mistakes for keys.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Cloudflare Access AUD tags in the registry"
+condition = "AND"
+paths = ['''^infra/targets\.json$''']
+regexTarget = "line"
+regexes = ['''^\s*"accessAud": "[0-9a-f]{64}",?$''']

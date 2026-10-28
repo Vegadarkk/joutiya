@@ -210,3 +210,5 @@ $RECYCLE.BIN/
 .terraform/
 *.tfstate
 *.tfstate.*
+# Sealed environment files (scripts/seal-env.ts): ciphertext, still never committed.
+*.sealed

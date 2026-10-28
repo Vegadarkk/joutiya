@@ -1,6 +1,19 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { QUOTA_IDS, QUOTAS } from "@/config/quotas";
+import { claudeBudgetMicroUsd, QUOTA_IDS, QUOTAS } from "@/config/quotas";
 import { classify, periodKey, retentionSeconds } from "@/lib/quota/period";
+import { usedMemoryBytes } from "@/lib/quota/valkey-memory";
+import { RELAY_DAILY_CAP } from "../../workers/uptime-probe/src/lib";
+
+describe("claude.budget", () => {
+  it("gives the full 5 USD to production only; staging and dev stop at 1 USD (§9, audit D1b-06)", () => {
+    expect(claudeBudgetMicroUsd("prod")).toBe(5_000_000);
+    expect(claudeBudgetMicroUsd("staging")).toBe(1_000_000);
+    expect(claudeBudgetMicroUsd("dev")).toBe(1_000_000);
+    expect(claudeBudgetMicroUsd(undefined)).toBe(1_000_000);
+    expect(QUOTAS["claude.budget"].limit).toBe(claudeBudgetMicroUsd(process.env.APP_ENV));
+  });
+});
 
 describe("quota periods", () => {
   it("buckets Firestore by the Pacific day and others by UTC", () => {
@@ -31,6 +44,23 @@ describe("quota periods", () => {
       expect(quota.degradedMode.length).toBeGreaterThan(10);
     }
   });
+
+  it("leaves the uptime Worker's relay cap out of the app's share of Resend's 100 mails a day", () => {
+    expect(QUOTAS["resend.daily"].limit + RELAY_DAILY_CAP).toBe(100);
+    // Non-security mails stop at 90 % of the app's share; security mails keep the rest.
+    expect(classify(QUOTAS["resend.daily"], 72)).toBe("degraded");
+    expect(classify(QUOTAS["resend.daily"], 71)).toBe("warning");
+  });
+
+  it("guards the delivery incidents and the Sentry events too (alert at 70 %, no silent spending)", () => {
+    expect(QUOTAS["resend.bounces"]).toMatchObject({ limit: 10, period: "day", resetTimeZone: "UTC", kind: "counter", alertAt: 0.7, degradeAt: 1 });
+    expect(QUOTAS["resend.complaints"]).toMatchObject({ limit: 3, period: "day", resetTimeZone: "UTC", kind: "counter", alertAt: 0.7, degradeAt: 1 });
+    expect(classify(QUOTAS["resend.bounces"], 7)).toBe("warning");
+    expect(classify(QUOTAS["resend.complaints"], 3)).toBe("degraded");
+    expect(QUOTAS["sentry.events"]).toMatchObject({ limit: 5_000, period: "month", resetTimeZone: "UTC", kind: "counter", alertAt: 0.7, degradeAt: 0.9 });
+    expect(classify(QUOTAS["sentry.events"], 4_500)).toBe("degraded");
+    expect(periodKey(QUOTAS["sentry.events"], new Date("2026-10-13T05:00:00Z"))).toBe("2026-10");
+  });
 });
 
 describe("nextPeriodStart", () => {
@@ -45,5 +75,19 @@ describe("nextPeriodStart", () => {
     // Pacific day on the DST switch (2026-11-01, 02:00 PDT → 01:00 PST): next midnight is 08:00 UTC.
     near(nextPeriodStart({ period: "day", resetTimeZone: "America/Los_Angeles" }, new Date("2026-11-01T12:00:00Z")), "2026-11-02T08:00:00Z");
     near(nextPeriodStart({ period: "month", resetTimeZone: "UTC" }, new Date("2026-02-10T00:00:00Z")), "2026-03-01T00:00:00Z");
+  });
+});
+
+describe("valkey-queue memory gauge", () => {
+  it("reads used_memory from INFO memory", () => {
+    expect(usedMemoryBytes("# Memory\r\nused_memory:1048576\r\nused_memory_human:1.00M\r\nmaxmemory:201326592\r\n")).toBe(1_048_576);
+    expect(usedMemoryBytes("# Memory\nused_memory_rss:5\n")).toBeNull();
+  });
+
+  it("uses the maxmemory of docker/valkey/queue.conf as its limit", () => {
+    const conf = readFileSync(new URL("../../docker/valkey/queue.conf", import.meta.url), "utf8");
+    const mb = Number(/^maxmemory (\d+)mb$/m.exec(conf)?.[1]);
+    expect(QUOTAS["valkey.queueMemory"].limit).toBe(mb * 1024 * 1024);
+    expect(/^maxmemory-policy noeviction$/m.test(conf)).toBe(true);
   });
 });

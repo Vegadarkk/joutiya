@@ -8,6 +8,7 @@ import type * as Quota from "@/lib/quota";
 
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/quota", async (importOriginal) => ({ ...(await importOriginal<typeof Quota>()), consume: vi.fn(async () => ({ level: "ok" })) }));
+vi.mock("@/lib/observability/capture", () => ({ captureServerException: vi.fn() }));
 
 type Data = Record<string, unknown>;
 const docs = new Map<string, Data>();
@@ -103,8 +104,10 @@ const fakeDb = {
 vi.mock("@/lib/firebase/admin", () => ({ db: () => fakeDb, isFirebaseConfigured: () => true, isFirestoreConfigured: () => true }));
 
 const { consume } = await import("@/lib/quota");
+const { captureServerException } = await import("@/lib/observability/capture");
 const users = await import("@/lib/db/repositories/users");
 const staff = await import("@/lib/db/repositories/staff");
+const quotaDaily = await import("@/lib/db/repositories/quota-daily");
 const suppressions = await import("@/lib/mail/suppressions");
 const { audit } = await import("@/lib/audit");
 const connectionLogs = await import("@/lib/logging/connection-logs");
@@ -181,12 +184,45 @@ describe("users repository", () => {
     expect(used()).toEqual({ "firestore.reads": 2 });
   });
 
-  it("counts the deletions of a closed account", async () => {
+  it("counts the deletions of a closed account (a transaction: the private document, then the index it names)", async () => {
     await users.createAccountDocuments(input);
     vi.mocked(consume).mockClear();
     await users.deleteAccountDocuments("uid-1");
-    expect(used()).toEqual({ "firestore.reads": 1, "firestore.deletes": 3 });
+    // Two reads now (the index is read inside the transaction before its deletion), three deletions.
+    expect(used()).toEqual({ "firestore.reads": 2, "firestore.deletes": 3 });
     expect(docs.size).toBe(0);
+  });
+
+  it("keeps an e-mail index entry that another account took over (re-registration between closure steps)", async () => {
+    await users.createAccountDocuments(input);
+    const indexPath = `emailIndex/${users.emailNormHash(input.email)}`;
+    docs.set(indexPath, { uid: "uid-2", createdAt: NOW });
+    vi.mocked(consume).mockClear();
+    await users.deleteAccountDocuments("uid-1");
+    expect(used()).toEqual({ "firestore.reads": 2, "firestore.deletes": 2 });
+    expect([...docs.keys()]).toEqual([indexPath]);
+  });
+
+  it("parses what it reads: a drifted document reads as absent and is reported by uid and paths, never values", async () => {
+    await users.createAccountDocuments(input);
+    expect(await users.getUser("uid-1")).toMatchObject({ displayName: "Yasmine", activation: "pending", createdAt: NOW });
+    expect(await users.getUserPrivate("uid-1")).toMatchObject({ email: "yasmine@example.com", providers: ["password"] });
+    expect(captureServerException).not.toHaveBeenCalled();
+
+    docs.set("users/uid-bad", { displayName: "Drifted", type: "individual" });
+    docs.set("users/uid-bad/private/account", { email: "secret@example.com", providers: ["password"] });
+    expect(await users.getUser("uid-bad")).toBeNull();
+    expect(await users.getUserPrivate("uid-bad")).toBeNull();
+    expect(captureServerException).toHaveBeenCalledTimes(2);
+    const calls = vi.mocked(captureServerException).mock.calls;
+    const [userError, userContext] = calls[0]!;
+    const [privateError, privateContext] = calls[1]!;
+    expect((userError as Error).message).toBe("invalid users document");
+    expect(userContext).toMatchObject({ uid: "uid-bad", issues: expect.arrayContaining(["publicId", "badges", "stats"]) });
+    expect((privateError as Error).message).toBe("invalid private document");
+    expect(privateContext).toMatchObject({ uid: "uid-bad", issues: expect.arrayContaining(["emailNormHash", "consents"]) });
+    expect(JSON.stringify([userContext, privateContext])).not.toContain("secret@");
+    expect(JSON.stringify([userContext, privateContext])).not.toContain("Drifted");
   });
 });
 
@@ -199,6 +235,31 @@ describe("staff repository", () => {
     await staff.getStaff("staff-1");
     await staff.listStaff();
     expect(used()).toEqual({ "firestore.reads": 2, "firestore.writes": 1 });
+  });
+
+  it("lists the active admins (revoked ones excluded) and counts the query by documents returned", async () => {
+    // The fake ignores the role filter (Firestore applies it): admins only are seeded.
+    expect(await staff.listActiveAdmins()).toEqual([]);
+    expect(used()).toEqual({ "firestore.reads": 1 });
+    await staff.upsertStaff({ uid: "admin-1", email: "a1@joutiya.ma", displayName: "Admin Un", role: "admin", invitedBy: "script", now: NOW });
+    await staff.upsertStaff({ uid: "admin-2", email: "a2@joutiya.ma", displayName: "Admin Deux", role: "admin", invitedBy: "admin-1", now: NOW });
+    await staff.revokeStaff("admin-2", NOW);
+    vi.mocked(consume).mockClear();
+    expect((await staff.listActiveAdmins()).map((admin) => admin.uid)).toEqual(["admin-1"]);
+    expect(used()).toEqual({ "firestore.reads": 2 });
+  });
+});
+
+describe("quotaDaily repository", () => {
+  it("writes the nightly snapshot through the typed collection and counts one write", async () => {
+    const quotas = { "firestore.reads": { period: "2026-10-15", used: 1234, limit: 50_000, ratio: 0.0247, level: "ok" as const } };
+    await quotaDaily.writeQuotaDaily({ date: "2026-10-15", quotas, createdAt: NOW });
+    expect(used()).toEqual({ "firestore.writes": 1 });
+    const stored = docs.get("quotaDaily/2026-10-15");
+    expect(stored).toMatchObject({ date: "2026-10-15", quotas });
+    expect((stored?.["createdAt"] as Timestamp).toDate()).toEqual(NOW);
+    // The schema is strict: a snapshot with an unknown field never reaches Firestore.
+    await expect(quotaDaily.writeQuotaDaily({ date: "2026-10-15", quotas, createdAt: NOW, extra: 1 } as never)).rejects.toThrow();
   });
 });
 

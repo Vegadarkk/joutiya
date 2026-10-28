@@ -16,6 +16,7 @@ export const REJECT_REASON_CODES = [
   "category",
   "scam",
   "pro_as_individual",
+  "spam",
   "other",
 ] as const;
 export type RejectReasonCode = (typeof REJECT_REASON_CODES)[number];
@@ -97,6 +98,14 @@ export const REJECT_REASONS: Record<RejectReasonCode, RejectReason> = {
     facts: { fr: "l'annonce relève d'une activité professionnelle publiée depuis un compte de particulier", ar: "الإعلان يتعلق بنشاط مهني نُشر من حساب فرد" },
     ground: { type: "terms", ref: "CGU « Inscription et comptes », compte Pro" },
   },
+  spam: {
+    label: "Spam ou publicité",
+    facts: {
+      fr: "l'annonce est un contenu indésirable (annonce répétée, aucun bien réel, publicité pour un autre site ou un service sans rapport)",
+      ar: "الإعلان محتوى غير مرغوب فيه (إعلان مكرر، لا يوجد غرض حقيقي، إشهار لموقع آخر أو لخدمة لا علاقة لها بالفئة)",
+    },
+    ground: { type: "terms", ref: `${LISTING_RULES}, spam` },
+  },
   other: {
     label: "Autre motif (à préciser)",
     facts: { fr: "autre manquement aux conditions d'utilisation", ar: "إخلال آخر بشروط الاستخدام" },
@@ -136,6 +145,7 @@ export const FLAG_LABELS: Record<ModerationFlag, string> = {
   dup_photo: "Photo en double",
   new_account: "Compte récent",
   volume: "Volume élevé",
+  restricted_category: "Catégorie réservée aux majeurs",
 };
 
 export const DECISION_TEXT_MAX = 500;

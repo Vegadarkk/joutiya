@@ -5,6 +5,7 @@ import { applyDevice, applyTurnstilePass, deviceOf, jsonResponse } from "@/lib/a
 import { OWNER_LIST_BUCKETS, createListingSchema, listingPatchSchema, publishListingSchema, type CreateListingResponse, type ListingResponse, type OwnerListingsResponse } from "@/lib/contracts/listings";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
 import { getListing, listOwnerListings } from "@/lib/db/repositories/listings";
+import { getFlags } from "@/lib/config/runtime";
 import { HttpError, notFound } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { json, noContent } from "@/lib/http/route";
@@ -70,7 +71,7 @@ export async function handleMine(request: Request): Promise<Response> {
   const listings = await listOwnerListings(auth.user.uid, bucket.data);
   await chargeOwnerRead(auth.user.uid, listings.length);
   const now = new Date();
-  const body: OwnerListingsResponse = { listings: listings.map((listing) => toOwnerSummary(listing, now)) };
+  const body: OwnerListingsResponse = { listings: listings.map((listing) => toOwnerSummary(listing, now)), salesOpen: (await getFlags()).salesEnabled };
   return json(body);
 }
 
@@ -138,7 +139,7 @@ export async function handlePublish(request: Request, params: Params): Promise<R
   await enforceLimit("listing.publish.uid", auth.user.uid);
   await assertQuotas(DEPOSIT_QUOTAS);
   const device = deviceOf(request);
-  const outcome = await publish(actorOf(request, auth), request, id, { turnstileToken: input.turnstileToken, device });
+  const outcome = await publish(actorOf(request, auth), request, id, { turnstileToken: input.turnstileToken, adultsOnlyAttestation: input.adultsOnlyAttestation === true, device });
   const response = applyDevice(jsonResponse(outcome.response), device);
   return outcome.turnstilePassed ? applyTurnstilePass(response, device) : response;
 }

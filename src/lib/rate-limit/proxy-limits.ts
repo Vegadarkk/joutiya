@@ -12,7 +12,7 @@ import { requestIdentity } from "./keys";
 // proxy bundle has its own module instances, so these limiters use their own valkey-ratelimit
 // client (limiter.ts connects it). Visitor: 120/h per device; signed in: 600/h keyed by the session
 // cookie (never verified here: a forged cookie only buys a bucket the IP limit still caps); always
-// 1 200/h per IP /64. Over a limit: a valid challenge pass gets its own allowance, else the visitor
+// 1 200/h per IP /64, and 12 000/h per /48 for an IPv6 client. Over a limit: a valid challenge pass gets its own allowance, else the visitor
 // is sent to the Turnstile page. Store down: open. Verified bots (Cloudflare header) are exempt.
 
 /** Second path segment of the metered pages: /{locale}/annonce/..., /c/..., /profil/..., /boutique/... */
@@ -59,6 +59,7 @@ export async function checkPageLimits(request: Request): Promise<PageLimitDecisi
   if (session) checks.push(["pages.session", session]);
   else if (identity.deviceId) checks.push(["pages.device", identity.deviceKey]);
   checks.push(["pages.ip", identity.ipBucket]);
+  if (identity.ip48) checks.push(["pages.ip48", identity.ip48]);
   // limitKey() stores a peppered HMAC of each raw key: no cookie or IP in clear in Valkey.
   const over = retryAfter(await Promise.all(checks.map(([id, key]) => consumeLimit(id, key))));
   if (over === null) return { kind: "allow" };

@@ -20,6 +20,7 @@ const FLAGS: Record<MailLocale, Record<string, string>> = {
     dup_photo: "photo identique à une autre de vos annonces",
     new_account: "compte créé récemment",
     volume: "nombre élevé d'annonces déposées en 24 heures",
+    restricted_category: "catégorie réservée aux personnes majeures : chaque annonce est vérifiée par un modérateur avant sa mise en ligne",
   },
   ar: {
     prohibited_kw: "ذكر غرض أو خدمة ممنوعة على Joutiya",
@@ -33,6 +34,7 @@ const FLAGS: Record<MailLocale, Record<string, string>> = {
     dup_photo: "صورة مطابقة لإعلان آخر من إعلاناتك",
     new_account: "حساب أُنشئ مؤخرًا",
     volume: "عدد كبير من الإعلانات المودعة خلال 24 ساعة",
+    restricted_category: "فئة مخصصة للبالغين: يراجع مشرف كل إعلان قبل نشره",
   },
 };
 

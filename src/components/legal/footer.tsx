@@ -4,6 +4,8 @@ import { LEGAL_PAGES } from "@/config/legal-pages";
 import { Container } from "@/components/layout/container";
 import { Logo } from "@/components/layout/logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { quietLinkClassName } from "@/components/ui/text-link";
+import { cn } from "@/lib/utils";
 
 /** Footer with the "Informations légales" column, Leboncoin's structure (brief §4). */
 export function Footer({ publisher }: { publisher: string }) {
@@ -26,7 +28,7 @@ export function Footer({ publisher }: { publisher: string }) {
           <ul className="flex flex-col gap-2.5 text-sm">
             {column("legal").map((page) => (
               <li key={page.slug}>
-                <Link href={`/legal/${page.slug}`} className="text-foreground-muted hover:text-foreground hover:underline">
+                <Link href={`/legal/${page.slug}`} className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>
                   {t(`links.${page.key}`)}
                 </Link>
               </li>
@@ -38,9 +40,14 @@ export function Footer({ publisher }: { publisher: string }) {
             {t("trustTitle")}
           </h2>
           <ul className="flex flex-col gap-2.5 text-sm">
+            <li>
+              <Link href="/aide" className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>
+                {t("help")}
+              </Link>
+            </li>
             {column("trust").map((page) => (
               <li key={page.slug}>
-                <Link href={`/legal/${page.slug}`} className="text-foreground-muted hover:text-foreground hover:underline">
+                <Link href={`/legal/${page.slug}`} className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>
                   {t(`links.${page.key}`)}
                 </Link>
               </li>

@@ -6,7 +6,7 @@ import { serverEnv } from "@/lib/env";
 import { logger } from "@/lib/logging/logger";
 import { clientOptions } from "@/lib/valkey/clients";
 import { deliverMail, MailDeferredError } from "./deliver";
-import type { MailPriority, TemplateId, TemplateMail } from "./types";
+import type { MailJob, MailPriority, TemplateId } from "./types";
 
 // The web app enqueues on valkey-queue (the worker delivers, with retries and priorities); without
 // QUEUE_REDIS_URL (local dev) the mail is delivered inline.
@@ -15,11 +15,12 @@ export const MAIL_QUEUE = "mail";
 
 const PRIORITY: Record<MailPriority, number> = { security: 1, transactional: 5, bulk: 10 };
 
-// Five quick attempts cover transient failures (429, 5xx, network); an exhausted quota or an
-// unavailable provider delays the job instead (MailDeferredError, src/worker/index.ts).
-// The payload holds the template data, action links included (live oobCodes): a finished job
-// leaves Valkey at once and a failed one within the hour (200 kept at most for diagnosis).
-// Later phase: generate the links at delivery time so the queue never holds them.
+// Five quick attempts cover transient failures (429 rate limit, 5xx, network); a spent or refused
+// quota (a transactional mail from 90 % of Resend, a 429 for its quota) or an unavailable provider
+// delays the job instead (MailDeferredError, src/worker/index.ts).
+// The payload holds the template data and the recipient's address, never a live action link (the
+// worker generates it at delivery, deliver.ts): a finished job leaves Valkey at once and a failed
+// one within the hour (200 kept at most for diagnosis).
 export const MAIL_JOB_OPTIONS = {
   attempts: 5,
   backoff: { type: "exponential", delay: 30_000 },
@@ -47,7 +48,7 @@ function mailQueue(url: string): Queue {
   return queue;
 }
 
-export async function enqueueMail<T extends TemplateId>(mail: TemplateMail<T>): Promise<void> {
+export async function enqueueMail<T extends TemplateId>(mail: MailJob<T>): Promise<void> {
   const env = serverEnv();
   if (!env.QUEUE_REDIS_URL) {
     try {

@@ -69,7 +69,7 @@ export interface ScreenResult {
 }
 
 /** Codes of the blockers raised by the screen (client messages: `Listing.validation.<code>`). */
-export const SCREEN_BLOCKER_CODES = ["phone_in_text", "email_in_text", "url_in_text", "prohibited", "required", "invalid", "unknown", "not_allowed", "phone_required"] as const;
+export const SCREEN_BLOCKER_CODES = ["phone_in_text", "email_in_text", "url_in_text", "prohibited", "required", "invalid", "unknown", "not_allowed", "phone_required", "messaging_only"] as const;
 export type ScreenBlockerCode = (typeof SCREEN_BLOCKER_CODES)[number];
 
 export interface PhoneMatch {

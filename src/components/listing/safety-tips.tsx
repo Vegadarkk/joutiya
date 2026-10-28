@@ -1,5 +1,6 @@
 import { HandCoins, ShieldAlert, Store, Users } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { textLinkClassName } from "@/components/ui/text-link";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +30,7 @@ export function SafetyTips({ className }: { className?: string }) {
         ))}
       </ul>
       <p className="text-xs text-foreground-muted text-pretty">{t("host")}</p>
-      <Link href="/legal/confiance-et-securite" className="inline-flex min-h-11 items-center self-start rounded-sm text-sm font-medium text-link underline underline-offset-4 hover:no-underline -my-2">
+      <Link href="/legal/confiance-et-securite" className={cn("-my-2 inline-flex min-h-11 items-center self-start rounded-sm text-sm font-medium text-link", textLinkClassName)}>
         {t("more")}
       </Link>
     </section>

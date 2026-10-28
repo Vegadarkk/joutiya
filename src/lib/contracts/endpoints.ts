@@ -16,7 +16,6 @@ export const AUTH_API = {
   google: "/api/auth/google",
   /** Firebase ID token (google.com provider) -> session; kept for the SDK flow. */
   session: "/api/auth/session",
-  clientToken: "/api/auth/client-token",
   me: "/api/auth/me",
   resetRequest: "/api/auth/password/reset",
   resetConfirm: "/api/auth/password/confirm",
@@ -32,6 +31,14 @@ export const AUTH_API = {
   staffLogout: "/api/admin/auth/logout",
 } as const;
 
+/** Account closure and personal data export (phase 5, D26). */
+export const ACCOUNT_API = {
+  /** POST { confirm: true } -> CloseAccountResponse (session cookies cleared); recent sign-in required (403 recent_auth_required). */
+  close: "/api/account/close",
+  /** GET with the X-CSRF-Token header -> the AccountExport JSON file (attachment, no-store). */
+  export: "/api/account/export",
+} as const;
+
 export const LISTING_API = {
   /** POST create a draft; GET is not served (use `mine`). */
   listings: "/api/listings",
@@ -45,6 +52,57 @@ export const LISTING_API = {
   renew: (id: string) => `/api/listings/${id}/renew`,
   /** POST, answer `Cache-Control: no-store`. */
   phone: (id: string) => `/api/listings/${id}/phone`,
+} as const;
+
+// Phase 5 (design phase-5 §3, §4).
+/** Longest message text (characters after trimming); messaging.ts re-exports it. */
+export const MESSAGE_TEXT_MAX = 2000;
+
+export const MESSAGING_API = {
+  /** POST: first message about a listing (Turnstile). GET ?cursor=&archived=1 -> ConversationsPage. */
+  conversations: "/api/conversations",
+  /** GET -> ConversationResponse (one inbox row). */
+  conversation: (cid: string) => `/api/conversations/${cid}`,
+  /** POST a message. GET ?cursor= (older) or ?after= (newer) -> MessagesPage. */
+  messages: (cid: string) => `/api/conversations/${cid}/messages`,
+  /** POST: zero my unread count. */
+  read: (cid: string) => `/api/conversations/${cid}/read`,
+  /** POST { archived } | { hidden: true } | { blocked }. */
+  state: (cid: string) => `/api/conversations/${cid}/state`,
+  /** GET { total } (Valkey). */
+  unread: "/api/messages/unread",
+  /** GET text/event-stream of MessagingEvent (session cookie; one per tab, D2). */
+  stream: "/api/messages/stream",
+} as const;
+
+/** Explanation of a notice, in characters after trimming (reports.ts re-exports them). */
+export const REPORT_EXPLANATION_MIN = 10;
+export const REPORT_EXPLANATION_MAX = 2000;
+
+export const REPORT_API = {
+  /** POST the notice form -> 201 (new) or 200 (duplicate) CreateReportResponse. */
+  reports: "/api/reports",
+} as const;
+
+/** Text of an appeal, in characters after trimming (appeals.ts re-exports them). */
+export const APPEAL_TEXT_MIN = 10;
+export const APPEAL_TEXT_MAX = 2000;
+
+export const APPEAL_API = {
+  /** GET -> MyDecisionsResponse (signed in, suspended included); POST { decisionId, text } -> 201. */
+  appeals: "/api/appeals",
+  /** GET ?token= -> { decision }; POST { token, text } -> 201 (the signed link of the e-mail). */
+  link: "/api/appeals/link",
+} as const;
+
+/** Assistant Joutiya (assistant.ts re-exports them): question, earlier turns, how many turns. */
+export const ASSISTANT_QUESTION_MAX = 500;
+export const ASSISTANT_TURN_MAX = 1500;
+export const ASSISTANT_HISTORY_MAX = 6;
+
+export const ASSISTANT_API = {
+  /** POST AssistantRequest -> AssistantResponse (`ai`, or `search` when the AI is unavailable). */
+  assistant: "/api/assistant",
 } as const;
 
 export const SEARCH_API = {

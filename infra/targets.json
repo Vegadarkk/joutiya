@@ -13,7 +13,9 @@
       "compartmentId": "ocid1.compartment.oc1..aaaaaaaag4vrrhtajdpxdtzd4mfv4g5nceyoth4nsvs42ehebb65g2yo4iua",
       "userId": "ocid1.user.oc1..aaaaaaaapcgofwhegeb4jkc3xzmd6kqsug5zlhunsgxyuwlqbnk7udeqgiiq",
       "vmDynamicGroupId": "ocid1.dynamicgroup.oc1..aaaaaaaaak5yk4fgam3ptrq2sfwexkny26bmca6nq7iv57c4mpcxfbi25pqa",
-      "runCommandPolicyId": "ocid1.policy.oc1..aaaaaaaay54vhb66dno3sf4645wxjxjde6ujkldrfwdhvypx2a34smssu4fq"
+      "runCommandPolicyId": "ocid1.policy.oc1..aaaaaaaay54vhb66dno3sf4645wxjxjde6ujkldrfwdhvypx2a34smssu4fq",
+      "launcherUserId": "ocid1.user.oc1..aaaaaaaata4uafdpaz2hgm4zsoqtjuwjvpqqfwmtg33bpxbmxi7ujewfeg4a",
+      "launcherGroupId": "ocid1.group.oc1..aaaaaaaap7qh33fivmbmfwih2uycyb3wsikgfwmhlirnwasmhq3jlwjqmwqa"
     },
     "anthropic": {
       "organizationId": "de60375e-fd8c-47a8-bbbc-c40672c4eee5"
@@ -91,7 +93,7 @@
       },
       "cloudflare": {
         "tunnelId": "9131a94f-52ec-46c6-b6cd-ec87792eabf1",
-        "accessAud": null
+        "accessAud": "294202afc611b88c2126921f60dcccbddab1d14def1f7b69289cc4bd8bade31e"
       }
     },
     "prod": {
@@ -121,7 +123,7 @@
       },
       "cloudflare": {
         "tunnelId": "91426433-7a77-46cb-b3ca-ff68067a2007",
-        "accessAud": null
+        "accessAud": "d173b7a8dcfa63f3e7460d732d0b5061544c1f46761a85dbd357e3a0e9661030"
       }
     }
   }

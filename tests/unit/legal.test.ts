@@ -33,7 +33,7 @@ describe("config/legal", () => {
   });
 
   it("renders the publisher by legal form", () => {
-    expect(publisherIdentity(DEFAULT_LEGAL)).toBe("Adil DARKAOUI DAHMANI, entrepreneur individuel (EI), nom commercial Adark Prime");
+    expect(publisherIdentity({ ...complete, entrepreneurName: "Prénom NOM" })).toBe("Prénom NOM, entrepreneur individuel (EI), nom commercial Adark Prime");
     expect(publisherIdentity({ ...complete, legalForm: "SASU", shareCapital: "1 000", rcsCity: "Paris" })).toBe(
       "Adark Prime, SASU au capital de 1 000 €, RCS Paris 947788303",
     );

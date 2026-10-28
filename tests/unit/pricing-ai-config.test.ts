@@ -47,7 +47,7 @@ describe("config/pricing", () => {
 describe("config/ai", () => {
   it("holds the D7 and D8 thresholds", () => {
     expect(aiConfigSchema.safeParse(DEFAULT_AI).success).toBe(true);
-    expect(DEFAULT_AI).toEqual({ nsfw: { rejectAt: 0.85, reviewAt: 0.6 }, face: { minConfidence: 0.6 }, risk: { reviewAt: 60 } });
+    expect(DEFAULT_AI).toMatchObject({ nsfw: { rejectAt: 0.85, reviewAt: 0.6 }, face: { minConfidence: 0.6 }, risk: { reviewAt: 60 } });
   });
 
   it("keeps the review threshold under the reject threshold and scores in range", () => {

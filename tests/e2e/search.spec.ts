@@ -2,6 +2,10 @@ import { randomBytes } from "node:crypto";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { stubGoogleScript } from "./gsi-stub";
+
+// The auth pages render the Google button (stub client id): never the real script.
+test.beforeEach(({ page }) => stubGoogleScript(page));
 
 // Search and discovery (phase 4) against the production build and the Firebase emulators
 // (npm run test:e2e). Listings are written straight into the emulator, then indexed by the dev

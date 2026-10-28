@@ -53,3 +53,21 @@ describe("PhotoUploader errors", () => {
     expect(text(render([failed("a", "quota_exhausted")], "ar"))).toContain(ar.Listing.errors.quota_exhausted);
   });
 });
+
+describe("PhotoUploader counter", () => {
+  const ready = (key: string): PhotoItem => ({ key, uploadId: key, status: "ready", progress: 1, previewUrl: null, photo: null });
+  const withFile = (item: PhotoItem): PhotoItem => ({ ...item, status: "rejected", file: new File(["x"], "x.jpg", { type: "image/jpeg" }) });
+
+  it("leaves failed and refused tiles out of the count and the room", () => {
+    const html = text(render([ready("a"), ready("b"), failed("c", "network"), withFile(failed("d", "nsfw"))]));
+    expect(html).toContain("2 / 10 photos");
+    expect(html).toContain("Vous pouvez encore ajouter 8 photos.");
+  });
+
+  it("disables the retry of a refused tile when every slot is taken", () => {
+    const full = Array.from({ length: 10 }, (_, index) => ready(`r${index}`));
+    const html = render([...full, withFile(failed("x", "network"))]);
+    expect(text(html)).toContain("10 / 10 photos");
+    expect(html).toMatch(/<button[^>]*aria-label="Réessayer la photo 11"[^>]*disabled=""/);
+  });
+});

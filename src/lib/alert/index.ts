@@ -59,10 +59,13 @@ export async function alert(event: Alert): Promise<boolean> {
     return false;
   }
   logger.warn({ alert: { severity: event.severity, title: event.title } }, "alert");
-  const results = await Promise.allSettled(configuredChannels().map((channel) => channel.send(event, env)));
+  const channels = configuredChannels();
+  const results = await Promise.allSettled(channels.map((channel) => channel.send(event, env)));
   results.forEach((result, index) => {
     if (result.status === "rejected") {
-      logger.error({ channel: configuredChannels()[index]?.name, err: String(result.reason) }, "alert channel failed");
+      logger.error({ channel: channels[index]?.name, err: String(result.reason) }, "alert channel failed");
+    } else {
+      logger.info({ channel: channels[index]?.name, alert: { severity: event.severity } }, "alert channel sent");
     }
   });
   return true;

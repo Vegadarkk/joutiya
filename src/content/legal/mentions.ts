@@ -19,6 +19,7 @@ export function legalValues(config: LegalConfig): LegalValues {
     publisher: config.companyName,
     address: config.hqAddress,
     email: config.email,
+    phone: config.phone,
     dpo: config.dpoContact,
     dsaEmail: config.dsaContactEmail,
     abuseEmail: config.abuseEmail,
@@ -27,6 +28,8 @@ export function legalValues(config: LegalConfig): LegalValues {
     purgeMonths: String(config.listingPurgeMonths),
     // Empty until a receipt exists: the CNDP sentence (an `ifSet` block) is then left out.
     cndp: config.cndpReceiptNo ? `récépissé n° ${config.cndpReceiptNo}` : "",
+    vat: vatMention(config),
+    mediator: config.consumerMediator.name ? `${config.consumerMediator.name} (${config.consumerMediator.url})` : "désigné avant l'ouverture des ventes",
   };
 }
 

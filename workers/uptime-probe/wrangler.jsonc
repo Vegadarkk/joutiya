@@ -11,7 +11,7 @@
   "triggers": { "crons": ["*/5 * * * *"] },
   "observability": { "enabled": true },
   // KV namespace "joutiya-uptime-state": its id is printed by `wrangler kv namespace create`.
-  "kv_namespaces": [{ "binding": "STATE", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }],
+  "kv_namespaces": [{ "binding": "STATE", "id": "6126e524b9a547bcb6d6ec6431316d2a" }],
   "vars": {
     // Alert e-mails leave through the Resend API (domain notif.joutiya.ma, phase 0 step 7), with a
     // key dedicated to this Worker. No Email Routing: @joutiya.ma mail lives at Hostinger.

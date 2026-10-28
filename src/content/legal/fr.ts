@@ -25,7 +25,7 @@ const SAFEGUARD =
 
 export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalText> = {
   cgu: {
-    updated: "2026-10-13",
+    updated: "2026-10-20",
     intro:
       "Les présentes conditions encadrent l'utilisation de Joutiya, service de petites annonces édité par {publisher} ({address}). En utilisant le site, vous les acceptez.",
     sections: [
@@ -42,7 +42,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
         heading: "Inscription et comptes",
         blocks: [
           "L'inscription est réservée aux personnes majeures. Chaque personne ne détient qu'un compte de particulier. Les informations fournies doivent être exactes et tenues à jour ; vous êtes responsable de la confidentialité de vos identifiants.",
-          "Un professionnel (vente habituelle ou à titre lucratif) doit ouvrir un compte Pro et se présenter comme tel. Se présenter faussement comme un particulier est interdit par la loi.",
+          "Un professionnel (vente habituelle ou à titre lucratif) doit ouvrir un compte Pro et se présenter comme tel. Se présenter faussement comme un particulier est interdit par la loi marocaine sur la protection du consommateur (loi n° 31-08).",
           "Lors de l'inscription, vous consentez expressément aux transferts de données décrits dans la politique de confidentialité, dont ceux vers les États-Unis.",
         ],
       },
@@ -90,7 +90,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
         id: "transactions",
         heading: "Transactions entre utilisateurs",
         blocks: [
-          "Les ventes se concluent directement entre utilisateurs, de gré à gré. La qualité, la conformité, la livraison et le paiement relèvent de leur seule relation. Consultez la page « Confiance et sécurité » avant toute transaction.",
+          "Les ventes se concluent directement entre utilisateurs, de gré à gré, et sont régies par la loi marocaine : le Dahir formant Code des obligations et des contrats (DOC), complété par la loi n° 31-08 sur la protection du consommateur quand un vendeur professionnel vend à un consommateur. La qualité, la conformité, la livraison et le paiement relèvent de leur seule relation. Consultez la page « Confiance et sécurité » avant toute transaction.",
         ],
       },
       {
@@ -113,7 +113,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
         id: "droit",
         heading: "Droit applicable",
         blocks: [
-          "Les présentes conditions sont soumises au droit français. Un consommateur conserve la protection des règles impératives du pays où il réside. Pour toute réclamation : {email}.",
+          "Les présentes conditions, qui lient l'utilisateur à Joutiya, sont soumises au droit français. Un consommateur conserve la protection des règles impératives du pays où il réside. Les ventes entre utilisateurs relèvent de la loi marocaine (voir « Transactions entre utilisateurs »). Pour toute réclamation : {email}.",
         ],
       },
     ],
@@ -158,43 +158,99 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
   },
 
   cgv: {
-    updated: "2026-10-13",
+    updated: "2026-10-20",
     intro:
-      "Les présentes conditions s'appliqueront aux options payantes et aux offres Pro vendues par {publisher}. Aucune vente n'est ouverte à ce jour : elles seront complétées avant l'ouverture des ventes.",
+      "Version provisoire, avant relecture juridique. Les présentes conditions encadrent les crédits, les options et les abonnements Pro vendus par {publisher} ({address}) sur Joutiya. Aucune vente n'est ouverte à ce jour : elles s'appliqueront à la première vente, dans leur version en vigueur ce jour-là.",
     sections: [
       {
-        id: "offres",
-        heading: "Options et offres",
+        id: "vendeur",
+        heading: "Vendeur et champ",
         blocks: [
-          "Options pour les annonces (remontée, À la Une) payées en crédits, et abonnements Pro mensuels. Les prix sont affichés toutes taxes comprises pour les particuliers et hors taxes pour les professionnels.",
+          "Le vendeur est {publisher}, {address}, joignable à {email} et au {phone}. Les conditions couvrent les packs de crédits, les options d'annonce payées en crédits et les abonnements Pro. Elles complètent les conditions générales d'utilisation.",
+          "Joutiya est un hébergeur neutre : il n'est pas partie aux ventes conclues entre utilisateurs, et une option ne garantit ni une vente ni un contact.",
         ],
       },
       {
         id: "credits",
         heading: "Crédits",
         blocks: [
-          "Un crédit vaut 1 dirham toutes taxes comprises. Les crédits achetés restent valables 12 mois. Ils ne sont ni remboursables ni convertibles en argent, sauf disposition légale contraire. Les crédits offerts en bonus sont utilisés en dernier et ne sont jamais remboursés.",
+          "Un crédit vaut 1 dirham toutes taxes comprises. Les crédits s'achètent par packs, en dirhams avec une carte marocaine ou en euros avec une carte européenne ; certains packs comprennent des crédits offerts en bonus.",
+          {
+            list: [
+              "Les crédits servent uniquement à payer les options de Joutiya. Ils ne sont ni transférables à un autre compte, ni convertibles en argent, ni utilisables en dehors de Joutiya : ce n'est pas de la monnaie électronique.",
+              "Les crédits achetés n'expirent pas tant que le compte est ouvert.",
+              "Les crédits mensuels d'un abonnement Pro sont utilisés en premier. Ils ne se cumulent pas : ils sont remis à niveau au début de chaque période, et ceux qui restent sont perdus.",
+              "Payer une option avec des crédits vaut exécution complète du service acheté avec ces crédits.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "prix",
+        heading: "Prix, commande et paiement",
+        blocks: [
+          {
+            list: [
+              "Les packs sont affichés toutes taxes comprises. Les packs en dirhams comprennent la TVA marocaine de 20 % (article 115 bis du Code général des impôts marocain).",
+              "Les abonnements Pro sont affichés hors taxes.",
+              "Mention fiscale de l'éditeur : {vat}.",
+              "Le prix dû est celui affiché au moment de la commande.",
+            ],
+          },
+          "Avant de payer, l'acheteur accepte les présentes conditions ; pour une option, il demande aussi son exécution immédiate. Le bouton de paiement vaut commande avec obligation de paiement.",
+          "Les packs se paient par carte sur la page sécurisée de notre prestataire RevenueCat, avec Stripe, et les abonnements Pro par Stripe. Avec une carte marocaine, le paiement en ligne à l'international doit être activé, et l'achat compte dans la dotation annuelle fixée par l'Office des changes. Les crédits sont versés sur le compte dès que le paiement est confirmé.",
         ],
       },
       {
         id: "abonnements",
-        heading: "Durée et renouvellement des abonnements Pro",
+        heading: "Abonnements Pro",
         blocks: [
-          "Les abonnements se renouvellent chaque mois jusqu'à résiliation, possible à tout moment depuis l'espace Pro, avec effet à la fin de la période en cours.",
+          {
+            list: [
+              "Les abonnements sont réservés aux comptes Pro vérifiés. Les offres Essentiel et Business se souscrivent au mois ou à l'année.",
+              "L'abonnement se renouvelle automatiquement à la fin de chaque période. Il se résilie à tout moment depuis l'espace Pro et court jusqu'à la fin de la période payée, qui n'est pas remboursée.",
+              "Passer à une offre supérieure prend effet aussitôt et la différence est facturée. Passer à une offre inférieure prend effet à la fin de la période.",
+              "Après un échec de paiement, l'abonnement reste actif pendant un délai de grâce, puis prend fin. Les annonces au-delà du quota du compte sont alors mises en pause ; elles peuvent être remises en ligne depuis « Mes annonces ».",
+              "Offre de lancement : tant que les ventes sont fermées, les Pros vérifiés bénéficient gratuitement des quotas de l'offre Essentiel, sans crédits mensuels. Ils sont prévenus au moins 30 jours avant la fin de cette offre.",
+            ],
+          },
         ],
       },
       {
         id: "retractation",
         heading: "Droit de rétractation",
         blocks: [
-          "Le consommateur dispose d'un délai de rétractation de 14 jours en France et de 7 jours au Maroc. Lorsqu'il demande l'exécution immédiate d'une option, il renonce expressément à ce droit une fois l'option pleinement exécutée ; à défaut, il est remboursé au prorata de ce qui n'a pas été fourni.",
+          "Le consommateur peut se rétracter sans motif ni pénalité pendant 14 jours à compter de l'achat d'un pack ; ce délai respecte le minimum légal (14 jours en droit français, 7 jours selon l'article 36 de la loi marocaine n° 31-08). Les crédits non utilisés du pack lui sont alors remboursés sur simple demande à {email}, au plus tard dans les 14 jours suivant cette demande ; les crédits bonus du pack sont retirés en proportion.",
+          "Les crédits déjà utilisés ne sont pas remboursables. En demandant l'exécution immédiate d'une option, le consommateur reconnaît perdre son droit de rétractation une fois l'option exécutée.",
+          "Les abonnements Pro sont souscrits par des professionnels pour leur activité. Ces professionnels ne sont pas des consommateurs au sens de la loi n° 31-08 (article 2) : le droit de rétractation ne s'applique donc pas à ces abonnements.",
+        ],
+      },
+      {
+        id: "remboursements",
+        heading: "Remboursements, contestations et solde négatif",
+        blocks: [
+          "Un remboursement, ou une contestation du paiement auprès de la banque, retire du compte les crédits du pack concerné, même déjà utilisés. Si le solde devient négatif, le porte-monnaie est bloqué jusqu'à sa régularisation.",
         ],
       },
       {
         id: "factures",
-        heading: "Factures et médiation",
+        heading: "Factures et reçus",
         blocks: [
-          "Une facture est émise pour chaque achat et reste disponible dans votre compte. En cas de litige non résolu avec notre service client ({email}), le consommateur peut recourir gratuitement à un médiateur de la consommation, désigné avant l'ouverture des ventes.",
+          "Chaque paiement d'abonnement Pro donne lieu à une facture, disponible dans l'espace Pro. Chaque achat de pack donne lieu à un reçu, envoyé par e-mail par notre prestataire de paiement.",
+        ],
+      },
+      {
+        id: "mediation",
+        heading: "Réclamations et médiation",
+        blocks: [
+          "Toute réclamation s'adresse à {email}. En cas de litige non résolu, le consommateur peut recourir gratuitement au médiateur de la consommation : {mediator}. Il peut aussi s'adresser à une association de protection du consommateur ou saisir le tribunal compétent.",
+        ],
+      },
+      {
+        id: "droit",
+        heading: "Droit applicable",
+        blocks: [
+          "Les présentes conditions sont soumises au droit français. Le consommateur garde la protection des règles impératives du pays où il réside : pour un consommateur résidant au Maroc, les dispositions d'ordre public de la loi n° 31-08, notamment celles sur les contrats conclus à distance (articles 25 à 43).",
           SAFEGUARD,
         ],
       },
@@ -318,22 +374,22 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
   },
 
   "droits-et-obligations": {
-    updated: "2026-10-13",
-    intro: "Ce que la loi vous demande quand vous vendez sur Joutiya, en France comme au Maroc.",
+    updated: "2026-10-20",
+    intro: "Ce que la loi marocaine vous demande quand vous vendez sur Joutiya.",
     sections: [
       {
         id: "vendeurs",
         heading: "Particulier ou professionnel",
         blocks: [
-          "Vendre de temps en temps vos propres affaires reste une activité de particulier. Acheter pour revendre, ou vendre de façon régulière et organisée, fait de vous un professionnel : vous devez alors ouvrir un compte Pro et respecter les obligations du commerce (information, garanties, facturation).",
+          "Vendre de temps en temps vos propres affaires reste une activité de particulier ; même entre particuliers, le vendeur répond des défauts cachés de la chose vendue (Dahir formant Code des obligations et des contrats). Acheter pour revendre, ou vendre de façon régulière et organisée, fait de vous un professionnel. Vous devez alors ouvrir un compte Pro et respecter les obligations du commerce au Maroc : immatriculation au registre du commerce si vous êtes commerçant (loi n° 15-95 formant Code de commerce), sauf sous le statut d'auto-entrepreneur (loi n° 114-13), et, envers les consommateurs, information, garantie légale et remise d'une facture (loi n° 31-08 sur la protection du consommateur).",
         ],
       },
       {
         id: "fiscal",
         heading: "Obligations fiscales",
         blocks: [
-          "Les revenus tirés de ventes régulières ou professionnelles doivent être déclarés à l'administration fiscale du pays où vous êtes imposable (DGI au Maroc, DGFiP en France).",
-          "Joutiya n'encaisse aucun paiement entre utilisateurs et ne connaît pas le prix final des ventes : elle ne transmet donc pas de déclaration de vos revenus aux administrations fiscales.",
+          "Les revenus tirés de ventes régulières ou professionnelles sont imposables au Maroc et se déclarent à la Direction générale des impôts (DGI), selon le Code général des impôts. Si vous vendez de façon habituelle, vous relevez d'un régime d'imposition professionnel, par exemple celui de l'auto-entrepreneur (loi n° 114-13), et pouvez, selon votre chiffre d'affaires, être assujetti à la TVA. Renseignez-vous auprès de la DGI (tax.gov.ma).",
+          "Joutiya n'encaisse aucun paiement entre utilisateurs et ne connaît pas le prix final des ventes : elle ne transmet donc pas de déclaration de vos revenus à l'administration fiscale.",
         ],
       },
       {
@@ -368,7 +424,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
   },
 
   "confiance-et-securite": {
-    updated: "2026-10-13",
+    updated: "2026-10-20",
     intro: "Joutiya ne vous demandera jamais de paiement. Voici comment repérer et éviter les arnaques.",
     sections: [
       {
@@ -404,7 +460,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
         heading: "Vos outils",
         blocks: [
           "Le badge « téléphone vérifié » indique un numéro confirmé par WhatsApp. Le badge « Certifié » signale un professionnel vérifié. Vous pouvez signaler une annonce, un profil ou un message, et bloquer un utilisateur depuis la conversation.",
-          "En cas d'escroquerie, portez plainte auprès de la police. En France, signalez aussi les contenus illicites sur internet-signalement.gouv.fr.",
+          "En cas d'escroquerie, portez plainte dans un commissariat de police, auprès d'une brigade de la Gendarmerie royale ou du procureur du Roi. Vous pouvez aussi signaler une escroquerie ou un contenu illicite en ligne sur e-blagh.ma, la plateforme de la Sûreté nationale. En cas de danger immédiat, appelez le 19 (police) ou le 177 (Gendarmerie royale).",
         ],
       },
     ],
@@ -448,30 +504,125 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
   },
 
   "objets-interdits": {
-    updated: "2026-10-13",
-    intro: "Ces biens, services et contenus ne peuvent pas être proposés sur Joutiya. Une annonce qui en contient est refusée ou retirée.",
+    updated: "2026-10-26",
+    intro:
+      "Ces biens, services et contenus ne peuvent pas être proposés sur Joutiya, même depuis un compte Pro. La plupart sont interdits par la loi marocaine, ou réservés par elle à des professionnels agréés dont Joutiya ne peut pas vérifier l'agrément ; les autres sont exclus par choix de Joutiya, plus stricte que la loi, pour protéger les acheteurs contre un danger ou une fraude. Une annonce qui en contient est refusée ou retirée. Cette liste n'est pas exhaustive : tout bien ou service dont la vente est interdite par la loi marocaine est exclu, ainsi que tout bien ou service que la loi réserve à des professionnels agréés lorsqu'il est proposé par une personne qui ne détient pas l'agrément requis.",
     sections: [
       {
-        id: "liste",
-        heading: "Liste",
+        id: "armes",
+        heading: "Armes et produits dangereux",
         blocks: [
           {
             list: [
-              "armes, munitions, explosifs et leurs pièces, y compris les répliques susceptibles d'être confondues avec de vraies armes ;",
-              "drogues, stupéfiants, médicaments et produits de santé soumis à prescription ;",
-              "alcool, tabac et produits du vapotage ;",
-              "contrefaçons et copies illégales (logiciels, films, jeux) ;",
-              "biens volés ou d'origine douteuse, documents officiels, papiers d'identité, plaques d'immatriculation ;",
-              "animaux d'espèces protégées, produits issus de ces espèces ;",
-              "organes, sang et produits du corps humain ;",
-              "contenus à caractère sexuel, services sexuels, et tout contenu impliquant des mineurs ;",
-              "contenus haineux, discriminatoires ou faisant l'apologie de la violence ou du terrorisme ;",
-              "données personnelles, comptes et abonnements revendus, moyens de paiement, devises et crypto-actifs ;",
-              "jeux d'argent, loteries, chaînes et systèmes pyramidaux ;",
-              "offres d'emploi (catégorie prévue ultérieurement) et services financiers non autorisés.",
+              "armes à feu, armes à air comprimé et pistolets d'alarme, leurs pièces et leurs munitions ;",
+              "explosifs, pétards et feux d'artifice ;",
+              "armes de combat : poignards, couteaux papillon, matraques, poings américains, pistolets à impulsion électrique, bombes lacrymogènes (les couteaux de cuisine, de chasse ou de pêche restent autorisés ; les koumiyas et poignards décoratifs d'artisanat sont autorisés uniquement dans la catégorie « Koumiyas & poignards décoratifs », réservée aux personnes majeures : chaque annonce y est vérifiée par un modérateur avant sa mise en ligne, et un couteau ou un poignard de combat présenté comme décoratif reste interdit) ;",
+              "répliques d'armes qui peuvent être confondues avec de vraies armes ;",
+              "pesticides et produits phytosanitaires, dont la vente est réservée aux distributeurs agréés.",
             ],
           },
-          "Cette liste n'est pas exhaustive : tout bien ou service dont la vente est interdite par la loi française ou marocaine est exclu.",
+        ],
+      },
+      {
+        id: "sante",
+        heading: "Santé et corps humain",
+        blocks: [
+          {
+            list: [
+              "drogues, stupéfiants et psychotropes ;",
+              "cannabis et ses dérivés (kif, haschich, huile, graines, CBD) ;",
+              "médicaments, avec ou sans ordonnance, y compris vétérinaires : leur vente est réservée aux pharmacies et aux vétérinaires ;",
+              "autres produits de santé soumis à prescription ;",
+              "organes, tissus, sang et autres produits du corps humain.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "alcool-tabac",
+        heading: "Alcool, tabac et nicotine",
+        blocks: [
+          {
+            list: [
+              "boissons alcoolisées, dont la vente est réservée aux commerces titulaires d'une licence ;",
+              "tabac (cigarettes, tabac à rouler, tabac à chicha), dont la vente est réservée aux débitants autorisés ;",
+              "cigarettes électroniques, e-liquides et sachets de nicotine.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "illicites",
+        heading: "Biens illicites, faux et contrefaçons",
+        blocks: [
+          {
+            list: [
+              "biens volés, ou dont le vendeur ne peut pas justifier l'origine ;",
+              "contrefaçons de marques (vêtements, chaussures, parfums, montres, électronique) ;",
+              "copies illégales de logiciels, de films, de jeux ou de musique, abonnements IPTV pirates et boîtiers préconfigurés pour ces abonnements ;",
+              "documents officiels, papiers d'identité, passeports, permis, diplômes, cartes grises et plaques d'immatriculation ;",
+              "uniformes, insignes et décorations officiels des Forces armées royales, de la Sûreté nationale, de la Gendarmerie royale ou des douanes ;",
+              "fausse monnaie et faux billets.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "patrimoine",
+        heading: "Espèces protégées et patrimoine",
+        blocks: [
+          {
+            list: [
+              "animaux d'espèces protégées, vivants ou naturalisés, et produits qui en sont issus (ivoire, peaux, carapaces) ;",
+              "objets archéologiques, et objets d'art ou antiquités classés ou inscrits au patrimoine national.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "personnes",
+        heading: "Personnes et contenus",
+        blocks: [
+          {
+            list: [
+              "personnes : traite des êtres humains, enfants à adopter, gestation pour autrui, mariage contre rémunération ;",
+              "contenus, objets et services à caractère sexuel, et tout contenu impliquant des mineurs ;",
+              "contenus haineux, discriminatoires ou faisant l'apologie de la violence ou du terrorisme ;",
+              "voyance, sorcellerie et désenvoûtement.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "finance",
+        heading: "Argent, finance et données",
+        blocks: [
+          {
+            list: [
+              "données personnelles et fichiers de contacts ;",
+              "comptes, identifiants et abonnements revendus (réseaux sociaux, streaming, jeux) ;",
+              "cartes bancaires, comptes de paiement, chèques et portefeuilles électroniques ;",
+              "change de devises, réservé aux banques et aux bureaux de change agréés (les pièces et billets de collection restent autorisés) ;",
+              "crypto-actifs ;",
+              "prêts, crédits, placements, assurances et autres services financiers ;",
+              "jeux d'argent, paris, loteries, chaînes et systèmes pyramidaux.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "autres",
+        heading: "Autres biens et services",
+        blocks: [
+          {
+            list: [
+              "drones, dont l'importation et l'utilisation sont soumises à autorisation ;",
+              "brouilleurs de signaux et émetteurs radio sans agrément de l'Agence nationale de réglementation des télécommunications (les téléphones et appareils grand public restent autorisés) ;",
+              "sacs en plastique interdits par la loi depuis 2016 (les sacs isothermes, de congélation, les sacs poubelle et les sacs à usage agricole ou industriel restent autorisés) ;",
+              "services dont l'exercice exige un diplôme ou un agrément (soins, conseil juridique), proposés par une personne qui ne le détient pas ;",
+              "offres d'emploi (catégorie prévue ultérieurement).",
+            ],
+          },
         ],
       },
     ],
@@ -482,6 +633,8 @@ export interface LegalValues {
   publisher: string;
   address: string;
   email: string;
+  /** Publisher phone, also required in a distance-selling offer to a Moroccan consumer (loi 31-08, art. 29). */
+  phone: string;
   dpo: string;
   dsaEmail: string;
   abuseEmail: string;
@@ -489,6 +642,10 @@ export interface LegalValues {
   ttlDays: string;
   purgeMonths: string;
   cndp: string;
+  /** VAT mention of the publisher (franchise or VAT number), from config/legal. */
+  vat: string;
+  /** Consumer mediator, or when it will be named. */
+  mediator: string;
 }
 
 export function fill(text: string, values: LegalValues): string {

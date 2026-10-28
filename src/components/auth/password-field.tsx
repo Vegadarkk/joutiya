@@ -68,7 +68,7 @@ export const PasswordField = forwardRef<HTMLInputElement, PasswordFieldProps>(fu
           type="button"
           onClick={() => setVisible((current) => !current)}
           aria-label={visible ? t("hidePassword") : t("showPassword")}
-          className="absolute end-1 top-1/2 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-sm text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+          className="absolute end-1 top-1/2 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-sm text-foreground-muted transition-[background-color,color,scale] duration-150 ease-door hover:bg-surface-muted hover:text-foreground active:scale-[0.98]"
         >
           {visible ? <EyeOff className="size-5" aria-hidden="true" /> : <Eye className="size-5" aria-hidden="true" />}
         </button>
@@ -93,7 +93,7 @@ export const PasswordField = forwardRef<HTMLInputElement, PasswordFieldProps>(fu
 
 function Rule({ ok, children }: { ok: boolean; children: ReactNode }) {
   return (
-    <li className={cn("flex items-center gap-2 transition-colors", ok ? "text-success" : "text-foreground-muted")}>
+    <li className={cn("flex items-center gap-2 transition-colors duration-150 ease-door", ok ? "text-success" : "text-foreground-muted")}>
       {ok ? <CircleCheck className="size-4 shrink-0" aria-hidden="true" /> : <Circle className="size-4 shrink-0" aria-hidden="true" />}
       <span>{children}</span>
     </li>

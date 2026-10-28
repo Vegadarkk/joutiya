@@ -1,10 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { generateKeyPairSync, createVerify, randomBytes } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { X509Certificate, createHash, generateKeyPairSync, createVerify, randomBytes } from "node:crypto";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { afterAll, describe, expect, it } from "vitest";
+import { parseSealed, seal, sealedHeader } from "../../scripts/seal-env";
+import { envPayload } from "../../scripts/vm-env";
 import {
   MAX_METADATA_BYTES,
   NAMES,
@@ -22,12 +24,19 @@ import {
   parseStatus,
   pickImage,
   promoteCommand,
+  rebuildDetails,
+  recordedTarballs,
+  buildStagingScript,
   rootCommand,
+  sealedEnvScripts,
+  transferScript,
+  transferSliceScript,
   securityList,
   shapeForAttempt,
   signedHeaders,
   signingString,
   syncCommands,
+  tunnelsScript,
 } from "../../scripts/oracle-vm";
 
 const template = readFileSync(new URL("../../infra/vm/bootstrap.sh", import.meta.url), "utf8");
@@ -111,6 +120,8 @@ describe("instance", () => {
     ]);
     expect(picked.displayName).toBe("Canonical-Ubuntu-24.04-aarch64-2026.09.18-0");
     expect(() => pickImage([image("Canonical-Ubuntu-24.04-Minimal-aarch64-2026.09.30-0")])).toThrow("no Canonical");
+    const x86 = [image("Canonical-Ubuntu-24.04-2026.09.18-0"), image("Canonical-Ubuntu-24.04-aarch64-2026.09.30-0"), image("Canonical-Ubuntu-24.04-Minimal-2026.09.30-0")];
+    expect(pickImage(x86, "x86_64").displayName).toBe("Canonical-Ubuntu-24.04-2026.09.18-0");
   });
 
   it("retries on missing A1 capacity only", () => {
@@ -132,6 +143,17 @@ describe("instance", () => {
   it("reads the bootstrap progress from the serial console", () => {
     const console = "[  12.1] cloud-init[812]: noise\r\n[  30.2] joutiya-bootstrap: ssh tunnel installed\r\nCloud-init v. 25.1 finished at Fri, 16 Oct 2026. Up 300 seconds\r\n";
     expect(bootstrapLines(console)).toEqual(["joutiya-bootstrap: ssh tunnel installed", "Cloud-init v. 25.1 finished at Fri, 16 Oct 2026. Up 300 seconds"]);
+  });
+});
+
+describe("rebuild", () => {
+  it("replaces the boot volume and the user data together, keeping any SSH key", () => {
+    const details = rebuildDetails({ imageId: "ocid1.image.oc1.x", userData: "bmV3", metadata: { user_data: "b2xk", ssh_authorized_keys: "ssh-ed25519 AAAA" }, keepDisk: false });
+    expect(details).toEqual({
+      metadata: { user_data: "bmV3", ssh_authorized_keys: "ssh-ed25519 AAAA" },
+      sourceDetails: { sourceType: "image", imageId: "ocid1.image.oc1.x", bootVolumeSizeInGBs: 100, isPreserveBootVolumeEnabled: false },
+    });
+    expect(rebuildDetails({ imageId: "i", userData: "bmV3", keepDisk: true })).toMatchObject({ metadata: { user_data: "bmV3" }, sourceDetails: { isPreserveBootVolumeEnabled: true } });
   });
 });
 
@@ -187,6 +209,16 @@ describe("OCI Run Command", () => {
     expect(install.stdout).not.toContain("installed");
     expect(() => syncCommands("not base64!")).toThrow("not base64");
   });
+  it("writes the tunnel tokens of a launcher VM root-only, then starts the SSH tunnel", () => {
+    const script = tunnelsScript({ ssh: token("ssh"), staging: token("staging"), prod: token("prod") });
+    const lines = script.split("\n");
+    expect(lines.indexOf("umask 077")).toBeLessThan(lines.findIndex((line) => line.startsWith("printf")));
+    expect(lines).toContain(`printf 'TUNNEL_TOKEN=%s\\n' '${token("prod")}' > /etc/joutiya/prod/tunnel.env`);
+    expect(lines.slice(-3, -1)).toEqual(["systemctl enable cloudflared.service", "systemctl restart cloudflared.service"]);
+    expect(() => rootCommand(script)).not.toThrow();
+    expect(() => tunnelsScript({ ssh: "none", staging: token("staging"), prod: token("prod") })).toThrow("joutiya-ssh-tunnel");
+    expect(() => tunnelsScript({ ssh: token("ssh"), staging: "x' y", prod: token("prod") })).toThrow("joutiya-staging-tunnel");
+  });
 });
 
 describe("production releases", () => {
@@ -196,6 +228,23 @@ describe("production releases", () => {
     const text = JSON.stringify({ staging: { release: "0123456789ab", web: id("a"), worker: id("b") }, prod: { release: "", web: "", worker: "" } });
     expect(parseStatus(text).staging.release).toBe("0123456789ab");
     expect(() => parseStatus('{"staging":{}}')).toThrow(/staging is missing/);
+  });
+
+  it("trusts only the tarballs GitHub Actions recorded on the release's commit", () => {
+    const sha = "0123456789ab".padEnd(40, "c");
+    const run = { name: "Release images", head_sha: sha, conclusion: "success", app: { slug: "github-actions" }, output: { summary: `tarball ${id("d")}` } };
+    const answer = {
+      check_runs: [
+        run,
+        { ...run, app: { slug: "some-app" }, output: { summary: `tarball ${id("e")}` } },
+        { ...run, conclusion: "failure", output: { summary: `tarball ${id("f")}` } },
+        { ...run, head_sha: "f".repeat(40), output: { summary: `tarball ${id("1")}` } },
+        { ...run, name: "Dependabot", output: { summary: null } },
+      ],
+    };
+    expect(recordedTarballs(answer, "0123456789ab")).toEqual([id("d")]);
+    expect(recordedTarballs({ check_runs: [] }, "0123456789ab")).toEqual([]);
+    expect(() => recordedTarballs({ message: "Not Found" }, "0123456789ab")).toThrow("unexpected answer");
   });
 
   it("promotes only a valid release with both image IDs", () => {
@@ -219,5 +268,73 @@ describe("CI deploy key", () => {
     expect(() => deployStagingKey(`${key}\n${key}`)).toThrow("one ssh-ed25519");
     expect(() => deployStagingKey(`command="sh" ${key}`)).toThrow("one ssh-ed25519");
     expect(() => deployStagingKey("ssh-rsa AAAAB3NzaC1yc2E joutiya-ci")).toThrow("one ssh-ed25519");
+  });
+});
+
+describe("transfer and sealed env", () => {
+  const root = mkdtempSync(join(tmpdir(), "vm-sealed-"));
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  const dirs = { etc: join(root, "etc"), stage: join(root, "stage") };
+  mkdirSync(join(dirs.etc, "prod"), { recursive: true, mode: 0o700 });
+  const bash = (script: string) => spawnSync("bash", ["-euo", "pipefail"], { input: script, encoding: "utf8" });
+  /** The commands in order, as Run Command sends them: the first failure stops the rest. */
+  const runAll = (commands: string[]) => {
+    let last = bash("true");
+    for (const command of commands) {
+      last = bash(command);
+      if (last.status !== 0) break;
+    }
+    return last;
+  };
+
+  it("makes the transfer key pair once and reads its certificate back in slices", () => {
+    const first = bash(transferScript(dirs.etc));
+    expect(first.stderr).toBe("");
+    expect(first.stdout).toContain("transfer key made");
+    const length = Number(/^transfer-length (\d+)$/m.exec(first.stdout)?.[1]);
+    const again = bash(transferScript(dirs.etc));
+    expect(again.stdout).not.toContain("transfer key made");
+    let base64 = "";
+    for (let from = 1; from <= length; from += 900) base64 += /^slice (\S*)$/m.exec(bash(transferSliceScript(from, from + 899, dirs.etc)).stdout)?.[1] ?? "";
+    expect(createHash("sha256").update(base64).digest("hex")).toBe(/^transfer-sha256 (\S+)$/m.exec(again.stdout)?.[1]);
+    expect(new X509Certificate(Buffer.from(base64, "base64")).subject).toBe("CN=joutiya-vm-transfer");
+    expect(transferScript().length + 300).toBeLessThan(RUN_COMMAND_MAX_BYTES);
+  }, 60_000);
+
+  it("opens app.env sealed for the VM and merges it, printing names only; refuses other keys and environments", () => {
+    const pem = readFileSync(join(dirs.etc, "transfer.pem"), "utf8");
+    const other = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "/dev/null", "-subj", "/CN=other", "-days", "1"], { encoding: "utf8" }).stdout;
+    const sealed = (body: string, recipient = pem) => parseSealed(`${sealedHeader("prod", "app.env")}\n${seal(`${sealedHeader("prod", "app.env")}\n${body}`, recipient)}`);
+    const app = sealed(envPayload({ SITE_URL: "https://joutiya.ma", TURNSTILE_SECRET_KEY: "sealed $secret #1" }));
+    const commands = sealedEnvScripts("prod", [app, sealed(envPayload({ HASH_PEPPER: "p".repeat(64) }))], dirs, 500);
+    expect(commands.length).toBeGreaterThan(3);
+    for (const command of commands) expect(Buffer.byteLength(rootCommand(command))).toBeLessThanOrEqual(RUN_COMMAND_MAX_BYTES);
+    const last = runAll(commands);
+    expect(last.stderr).toBe("");
+    expect(last.status).toBe(0);
+    const merged = readFileSync(join(dirs.etc, "prod", "app.env"), "utf8");
+    expect(merged).toContain("TURNSTILE_SECRET_KEY='sealed $secret #1'\n");
+    expect(merged).toMatch(/^HASH_PEPPER='p{64}'$/m);
+    expect(last.stdout).not.toMatch(/secret|ppp/);
+    expect(existsSync(join(dirs.stage, "prod.sealed.1"))).toBe(false);
+    const scripts = (files: Parameters<typeof sealedEnvScripts>[1]) => sealedEnvScripts("prod", files, dirs);
+    expect(runAll(scripts([sealed("A='1'\n", other)])).stderr).toContain("not sealed for this VM");
+    expect(readdirSync(dirs.stage)).toEqual([]);
+    expect(runAll(scripts([app, sealed(envPayload({ SITE_URL: "https://other.example" }))])).stderr).toContain("sealed files disagree on: SITE_URL");
+    expect(readdirSync(dirs.stage)).toEqual([]);
+    expect(() => sealedEnvScripts("staging", [app], dirs)).toThrow("is for prod, not staging");
+    expect(() => sealedEnvScripts("prod", [{ ...app, target: "tunnel.env" }], dirs)).toThrow("tunnels");
+  });
+});
+
+describe("build-staging", () => {
+  it("clones once, builds a commit of origin/main and starts it only once every secret is there", () => {
+    const script = buildStagingScript("e84c7209f7bd");
+    expect(Buffer.byteLength(rootCommand(script))).toBeLessThanOrEqual(RUN_COMMAND_MAX_BYTES);
+    expect(script).toContain("[[ -d /opt/joutiya/src/.git ]] || git clone --quiet https://github.com/Vegadarkk/joutiya.git /opt/joutiya/src");
+    expect(script).toContain("merge-base --is-ancestor");
+    expect(script).toContain("/etc/joutiya/staging/app.env");
+    expect(script.indexOf("the start waits for")).toBeLessThan(script.indexOf("joutiya-deploy staging"));
+    expect(() => buildStagingScript("main; rm -rf /")).toThrow("--commit");
   });
 });

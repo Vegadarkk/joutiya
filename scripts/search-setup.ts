@@ -1,7 +1,8 @@
 // Prepares the Meilisearch of one environment (design D3, D12): the live index `listings_v1` with
 // its settings (src/lib/search/settings.ts) and the two API keys of the app, created with fixed uids:
-//   joutiya-search  `search`, `documents.get`                              on listings_*  (web: MEILI_SEARCH_KEY)
-//   joutiya-index   documents.*, indexes.*, settings.*, tasks.get, stats.get on listings_*  (worker: MEILI_INDEX_KEY)
+//   joutiya-search  `search`, `documents.get`                              on listings_*, help  (web: MEILI_SEARCH_KEY)
+//   joutiya-index   documents.*, indexes.*, settings.*, tasks.get, stats.get on listings_*, help  (worker: MEILI_INDEX_KEY)
+// The `help` index (phase-5 D25) is created and filled by the worker at start (src/lib/help/search.ts).
 // A key's value is derived from the master key and its uid, so re-running yields the same values.
 // The master key comes from MEILI_MASTER_KEY in the environment (never an argument, never printed);
 // key values are written only to the env file given with --write-env (mode 600), never printed
@@ -16,6 +17,7 @@ import { registerHooks } from "node:module";
 import { dirname, resolve as resolvePath } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 export interface KeySpec {
   uid: string;
@@ -31,18 +33,18 @@ export const SEARCH_KEYS: readonly KeySpec[] = [
   {
     uid: "5e7b1c3a-9d2f-4b8e-a1c6-0f4d2e8b7a31",
     name: "joutiya-search",
-    description: "Joutiya web: search and documents.get (sitemaps) on listings_*",
+    description: "Joutiya web: search and documents.get (sitemaps) on listings_* and help",
     envName: "MEILI_SEARCH_KEY",
     actions: ["search", "documents.get"],
-    indexes: ["listings_*"],
+    indexes: ["listings_*", "help"],
   },
   {
     uid: "a3c9e2f1-6b4d-4e7a-9c8b-1d2f3e4a5b62",
     name: "joutiya-index",
-    description: "Joutiya worker: indexing, settings, rebuilds on listings_*",
+    description: "Joutiya worker: indexing, settings, rebuilds on listings_* and help",
     envName: "MEILI_INDEX_KEY",
     actions: ["documents.*", "indexes.*", "settings.*", "tasks.get", "stats.get"],
-    indexes: ["listings_*"],
+    indexes: ["listings_*", "help"],
   },
 ];
 
@@ -127,6 +129,7 @@ function fail(what: string, result: { status: number; body: unknown }): never {
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const { values: args } = parseArgs({ options: { url: { type: "string" }, "write-env": { type: "string" }, apply: { type: "boolean", default: false } } });
   const url = (args.url ?? process.env.MEILI_URL ?? "").replace(/\/+$/, "");
   const masterKey = process.env.MEILI_MASTER_KEY ?? "";

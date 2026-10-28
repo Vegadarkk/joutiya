@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_AI } from "@/config/ai";
 import { MODERATION_FLAGS, type ModerationFlag } from "@/lib/contracts/listings";
-import { ALWAYS_REVIEW_FLAGS, FACE_REVIEW_CATEGORIES, PREVIOUS_REJECTION_CAP, RISK_WEIGHTS, decideState, riskScore, sortFlags } from "@/lib/moderation/risk";
+import { ALWAYS_REVIEW_FLAGS, FACE_REVIEW_CATEGORIES, HUMAN_REVIEW_FLAGS, PREVIOUS_REJECTION_CAP, RISK_WEIGHTS, decideState, riskScore, sortFlags } from "@/lib/moderation/risk";
 
 describe("risk table", () => {
   it("weights every moderation flag with a reason, hard keywords and nudity the heaviest", () => {
     for (const flag of MODERATION_FLAGS) {
-      expect(RISK_WEIGHTS[flag].weight).toBeGreaterThan(0);
+      // A rule flag (adults-only subcategory) carries no risk: it forces a person's review instead.
+      if (HUMAN_REVIEW_FLAGS.has(flag)) {
+        expect(RISK_WEIGHTS[flag].weight).toBe(0);
+        expect(ALWAYS_REVIEW_FLAGS.has(flag)).toBe(true);
+      } else {
+        expect(RISK_WEIGHTS[flag].weight).toBeGreaterThan(0);
+      }
       expect(RISK_WEIGHTS[flag].weight).toBeLessThanOrEqual(100);
       expect(RISK_WEIGHTS[flag].reason).not.toBe("");
     }
@@ -47,7 +53,7 @@ describe("decideState", () => {
   });
 
   it("always reviews the legal and strong signals whatever the score", () => {
-    for (const flag of ["prohibited_soft", "sensitive_text", "third_party_phone", "nsfw_review", "prohibited_kw"] as ModerationFlag[]) {
+    for (const flag of ["prohibited_soft", "sensitive_text", "third_party_phone", "nsfw_review", "prohibited_kw", "restricted_category"] as ModerationFlag[]) {
       expect(decideState(0, [flag], { reviewAt }), flag).toBe("needs_review");
     }
     expect(decideState(0, ["price_outlier"], { reviewAt })).toBe("auto_ok");

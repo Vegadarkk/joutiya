@@ -32,6 +32,17 @@
 //       and Meilisearch's master key generated once on the VM. Prints names and sources, never a
 //       value. Oracle keeps the text 7 days, readable only by the tenancy's administrators and
 //       joutiya-claude, who can read these files as root anyway.
+//   node scripts/oracle-vm.ts transfer [--apply]
+//       the VM's transfer key pair (RSA, made on the VM, renewed when it has less than 7 days left),
+//       for the owner's secrets sealed on his PC (scripts/seal-env.ts): prints its certificate as a
+//       `transfer-certificate ...` line with its SHA-256 fingerprint.
+//   node scripts/oracle-vm.ts env <staging|prod> --sealed=<file>[,<file>...] [--apply]
+//       the same merge from files sealed for that certificate: only the VM opens them, so Run
+//       Command and Oracle's 7-day record carry no value. --from and --sealed do not mix.
+//   node scripts/oracle-vm.ts build-staging [--commit=<sha>] [--apply]
+//       a commit of origin/main (default its head) built on the VM from the public repository and,
+//       once every secret is in place, started as staging; until the CI deploys staging (step 8).
+//       Its images have no CI record, so `promote` refuses them.
 //   node scripts/oracle-vm.ts search-setup <staging|prod> [--reindex=<max reads>] [--apply]
 //       Meilisearch's index and the app's two keys in app.env, then web and worker recreated
 //       (infra/vm/search-setup.sh); --reindex also rebuilds the index from Firestore (new VM).
@@ -62,14 +73,16 @@ import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { tunnelTokenErrors, validateTargets, type Targets } from "./assert-target.ts";
 import { LEAF_DAYS, WIF_SERVICES, certificateConfig, credentialConfig, csrFromOutput, derBase64, pemBlock, subjectName, wifLines, type WifService } from "./google-wif.ts";
-import { DEPLOYED_ENVS, envPayload, envScripts, namesScript, parseMissing, parseNames, planEnv, type DeployedEnv, type Source } from "./vm-env.ts";
+import { type Sealed, openSealedLines, parseSealed } from "./seal-env.ts";
+import { DEPLOYED_ENVS, REQUIRED, VM_DIRS, envPayload, envScripts, mergeLines, namesScript, parseMissing, parseNames, planEnv, type DeployedEnv, type EnvDirs, type Source } from "./vm-env.ts";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 
 export const NAMES = { vcn: "joutiya-vcn", gateway: "joutiya-igw", securityList: "joutiya-vcn-security-list", subnet: "joutiya-public", instance: "joutiya-vm" } as const;
 export const VCN_CIDR = "10.0.0.0/16";
 export const SUBNET_CIDR = "10.0.0.0/24";
-/** Always Free: Ampere A1, at most 4 OCPU and 24 GB per tenancy; the joutiya-free-tier quota allows 2 and 12. */
+/** Always Free: Ampere A1, 2 OCPU and 12 GB per tenancy (paid accounts included; more is billed), the joutiya-free-tier quota. */
 export const SHAPE = { shape: "VM.Standard.A1.Flex", ocpus: 2, memoryInGBs: 12 } as const;
 export interface ShapeConfig {
   ocpus: number;
@@ -86,6 +99,11 @@ export function shapeForAttempt(attempt: number, smallFallback: boolean): ShapeC
   return smallFallback && attempt % 2 === 0 ? SMALL_SHAPE_CONFIG : { ocpus: SHAPE.ocpus, memoryInGBs: SHAPE.memoryInGBs };
 }
 export const BOOT_VOLUME_GB = 100;
+/**
+ * The two Always Free E2.1.Micro VMs (1 GB each), kept aside for tests or another project: neutral
+ * names, no user data, no Joutiya file. Boot volumes: 100 + 2 x 50 GB = the 200 GB Always Free total.
+ */
+export const SPARE = { shape: "VM.Standard.E2.1.Micro", names: ["spare-micro-1", "spare-micro-2"], bootVolumeGB: 50 } as const;
 export const IMAGE = { operatingSystem: "Canonical Ubuntu", operatingSystemVersion: "24.04" } as const;
 /** OCI limit on the metadata of an instance (user_data included, base64). */
 export const MAX_METADATA_BYTES = 32_000;
@@ -282,7 +300,7 @@ function tunnelId(targets: Targets, name: TunnelName): { id: string; field: stri
   return { id, field };
 }
 
-async function tunnelToken(targets: Targets, name: TunnelName): Promise<string> {
+export async function tunnelToken(targets: Targets, name: TunnelName): Promise<string> {
   const account = targets.shared.cloudflare.accountId;
   if (!account) throw new Error("shared.cloudflare.accountId must be recorded in infra/targets.json first");
   const { id, field } = tunnelId(targets, name);
@@ -330,17 +348,18 @@ export function securityList(): SecurityListFile {
   return list;
 }
 
-/** The newest platform image of Ubuntu 24.04 for A1 (not Minimal, not a GPU build). */
-export function pickImage(images: Image[]): Image {
+/** The newest platform image of Ubuntu 24.04 for A1, or for x86 (not Minimal, not a GPU build). */
+export function pickImage(images: Image[], arch: "aarch64" | "x86_64" = "aarch64"): Image {
+  const name = arch === "aarch64" ? /^Canonical-Ubuntu-24\.04-aarch64-\d{4}\.\d{2}\.\d{2}-\d+$/ : /^Canonical-Ubuntu-24\.04-\d{4}\.\d{2}\.\d{2}-\d+$/;
   const candidates = images.filter(
     (image) =>
       image.lifecycleState === "AVAILABLE" &&
       image.operatingSystem === IMAGE.operatingSystem &&
       image.operatingSystemVersion === IMAGE.operatingSystemVersion &&
-      /^Canonical-Ubuntu-24\.04-aarch64-\d{4}\.\d{2}\.\d{2}-\d+$/.test(image.displayName),
+      name.test(image.displayName),
   );
   const [newest] = candidates.sort((a, b) => b.displayName.localeCompare(a.displayName));
-  if (!newest) throw new Error("no Canonical Ubuntu 24.04 aarch64 platform image found");
+  if (!newest) throw new Error(`no Canonical Ubuntu 24.04 ${arch} platform image found`);
   return newest;
 }
 
@@ -422,24 +441,56 @@ export function launchDetails(input: {
     createVnicDetails: { subnetId: input.subnetId, assignPublicIp: true, displayName: NAMES.instance, hostnameLabel: NAMES.instance },
     // No SSH key: administration goes through OCI Run Command; ssh.joutiya.ma serves the CI only.
     metadata: { user_data: input.userData },
-    agentConfig: {
-      isMonitoringDisabled: false,
-      isManagementDisabled: false,
-      pluginsConfig: [{ name: "Compute Instance Run Command", desiredState: "ENABLED" }],
-    },
-    // Metadata service v2 only (header-authenticated); v1 endpoints are disabled.
-    instanceOptions: { areLegacyImdsEndpointsDisabled: true },
-    freeformTags: { project: "joutiya" },
+    ...INSTANCE_SETTINGS,
   };
 }
 
-async function create(oci: Oci, targets: Targets, compartmentId: string, retryMinutes: number, smallFallback: boolean): Promise<void> {
-  const existing = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance);
-  if (existing) {
-    console.log(`instance ${NAMES.instance} already exists (${existing.lifecycleState}): nothing to create`);
-    return;
-  }
-  const subnetId = await ensureNetwork(oci, compartmentId);
+/** LaunchInstance body of the spare VMs, without their names (the Worker adds them). */
+export function spareRequest(input: { availabilityDomain: string; compartmentId: string; subnetId: string; imageId: string }): Record<string, unknown> {
+  const { freeformTags: _joutiya, ...settings } = INSTANCE_SETTINGS;
+  return {
+    availabilityDomain: input.availabilityDomain,
+    compartmentId: input.compartmentId,
+    shape: SPARE.shape,
+    sourceDetails: { sourceType: "image", imageId: input.imageId, bootVolumeSizeInGBs: SPARE.bootVolumeGB },
+    // Egress only, like joutiya-vm; reached through Run Command until another project takes it.
+    createVnicDetails: { subnetId: input.subnetId, assignPublicIp: true },
+    ...settings,
+    freeformTags: { role: "spare" },
+  };
+}
+
+/** Settings of launchDetails that `rebuild` also applies to an existing VM. */
+const INSTANCE_SETTINGS = {
+  agentConfig: {
+    isMonitoringDisabled: false,
+    isManagementDisabled: false,
+    pluginsConfig: [{ name: "Compute Instance Run Command", desiredState: "ENABLED" }],
+  },
+  // Metadata service v2 only (header-authenticated); v1 endpoints are disabled.
+  instanceOptions: { areLegacyImdsEndpointsDisabled: true },
+  freeformTags: { project: "joutiya" },
+};
+
+/** Tunnel token value of a user data built for the launcher Worker: bootstrap.sh then skips the tunnels. */
+export const NO_TOKEN = "none";
+
+/** The subnet `create` made, found without writing anything (for `launcher`). */
+async function existingSubnet(oci: Oci, compartmentId: string): Promise<string> {
+  const vcn = await findOne<Vcn>(oci, "/20160918/vcns", { compartmentId }, NAMES.vcn);
+  const subnet = vcn && (await findOne<Resource>(oci, "/20160918/subnets", { compartmentId, vcnId: vcn.id }, NAMES.subnet));
+  if (!subnet) throw new Error(`subnet ${NAMES.subnet} not found: run create --apply once first`);
+  return subnet.id;
+}
+
+/** The create request (availability domain, newest image, user data), with or without tunnel tokens. */
+async function launchPlan(
+  oci: Oci,
+  targets: Targets,
+  compartmentId: string,
+  subnetId: string,
+  withTokens: boolean,
+): Promise<{ userData: string; imageId: string; availabilityDomain: string; details: (shapeConfig: ShapeConfig) => Record<string, unknown> }> {
   const tenancy = targets.shared.oracle.tenancyId as string;
   const [ad] = await oci.call<{ name: string }[]>("GET", "identity", `/20160918/availabilityDomains${query({ compartmentId: tenancy })}`);
   if (!ad) throw new Error("no availability domain");
@@ -448,14 +499,24 @@ async function create(oci: Oci, targets: Targets, compartmentId: string, retryMi
   );
   console.log(`image    ${image.displayName}`);
 
+  const token = (name: TunnelName): Promise<string> => (withTokens ? tunnelToken(targets, name) : Promise.resolve(NO_TOKEN));
   const userData = buildUserData({
     template: readFileSync(new URL("../infra/vm/bootstrap.sh", import.meta.url), "utf8"),
-    sshTunnelToken: await tunnelToken(targets, "ssh"),
-    stagingTunnelToken: await tunnelToken(targets, "staging"),
-    prodTunnelToken: await tunnelToken(targets, "prod"),
+    sshTunnelToken: await token("ssh"),
+    stagingTunnelToken: await token("staging"),
+    prodTunnelToken: await token("prod"),
     vmFiles: vmFilesTarball(),
   });
-  const details = (shapeConfig: ShapeConfig) => launchDetails({ availabilityDomain: ad.name, compartmentId, subnetId, imageId: image.id, userData, shapeConfig });
+  return { userData, imageId: image.id, availabilityDomain: ad.name, details: (shapeConfig) => launchDetails({ availabilityDomain: ad.name, compartmentId, subnetId, imageId: image.id, userData, shapeConfig }) };
+}
+
+async function create(oci: Oci, targets: Targets, compartmentId: string, retryMinutes: number, smallFallback: boolean): Promise<void> {
+  const existing = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance);
+  if (existing) {
+    console.log(`instance ${NAMES.instance} already exists (${existing.lifecycleState}): nothing to create`);
+    return;
+  }
+  const { userData, details } = await launchPlan(oci, targets, compartmentId, await ensureNetwork(oci, compartmentId), true);
   const shown = { ...details(shapeForAttempt(1, false)), metadata: { user_data: `<bootstrap.sh with tokens, ${userData.length} bytes>` } };
   const size = ({ ocpus, memoryInGBs }: ShapeConfig) => `${ocpus} OCPU, ${memoryInGBs} GB`;
   if (smallFallback) console.log(`every other attempt asks for ${size(SMALL_SHAPE_CONFIG)}`);
@@ -464,27 +525,163 @@ async function create(oci: Oci, targets: Targets, compartmentId: string, retryMi
     return;
   }
   const deadline = Date.now() + retryMinutes * 60_000;
-  for (let attempt = 1; ; attempt += 1) {
+  let attempt = 0;
+  let launched: Instance | undefined;
+  while (!launched) {
+    // Look before every launch but the first (checked above): a request cut off earlier may have
+    // launched the VM, and in --small-fallback mode two 1 OCPU VMs fit the quota. Never launch
+    // while the lookup fails: wait and look again.
+    if (attempt > 0) {
+      try {
+        launched = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance);
+      } catch (error) {
+        if ((!isTransientError(error) && !isCapacityError(error)) || Date.now() > deadline) throw error;
+        console.log(`instance lookup failed (${(error as Error).message}): looking again in 60 s`);
+        await sleep(60_000);
+        continue;
+      }
+      if (launched) break;
+    }
+    attempt += 1;
     const shapeConfig = shapeForAttempt(attempt, smallFallback);
-    let launched: Instance | undefined;
     try {
       launched = await oci.write<Instance>("POST", "/20160918/instances", details(shapeConfig), attempt === 1 ? shown : { attempt, ...shapeConfig });
     } catch (error) {
       const capacity = isCapacityError(error);
       if ((!capacity && !isTransientError(error)) || Date.now() > deadline) throw error;
-      // A request cut off may still have launched the VM (the quota allows one): look before retrying.
-      if (!capacity) launched = await findOne<Instance>(oci, "/20160918/instances", { compartmentId }, NAMES.instance).catch(() => undefined);
-      if (!launched) {
-        console.log(`${capacity ? `no A1 capacity for ${size(shapeConfig)}` : `transient error (${(error as Error).message})`} (attempt ${attempt}): retrying in 60 s`);
-        await sleep(60_000);
-        continue;
-      }
+      console.log(`${capacity ? `no A1 capacity for ${size(shapeConfig)}` : `transient error (${(error as Error).message})`} (attempt ${attempt}): retrying in 60 s`);
+      await sleep(60_000);
     }
-    if (!launched) return;
-    const running = await waitFor<Instance>(oci, `/20160918/instances/${launched.id}`, "RUNNING", 15);
-    console.log(`instance ${NAMES.instance} ${running.lifecycleState} (${running.id}), ${size(running.shapeConfig ?? shapeConfig)}`);
-    return;
   }
+  const running = await waitFor<Instance>(oci, `/20160918/instances/${launched.id}`, "RUNNING", 15);
+  console.log(`instance ${NAMES.instance} ${running.lifecycleState} (${running.id})${running.shapeConfig ? `, ${size(running.shapeConfig)}` : ""}`);
+}
+
+/** Request file of the free launcher Worker, written by `launcher` (no secret: commit it). */
+export const LAUNCHER_FILE = "workers/vm-launcher/src/launch.json";
+/** The same first boot for a joutiya-vm created by hand in the OCI console, also written by `launcher`. */
+export const CONSOLE_CLOUD_INIT_FILE = "workers/vm-launcher/console-cloud-init.sh";
+
+/**
+ * Cloud-init script to paste in the console's form, which base64-encodes it into the metadata: the
+ * plain bootstrap would not fit, so it carries the gzipped user data and unpacks it as root.
+ */
+export function consoleCloudInit(userData: string): string {
+  const text = [
+    "#!/bin/bash",
+    "# First boot of a joutiya-vm created in the OCI console: paste this whole file as its cloud-init",
+    "# script. It runs infra/vm/bootstrap.sh without tunnel tokens, like the launcher Worker (written by",
+    "# `node scripts/oracle-vm.ts launcher`).",
+    "set -euo pipefail",
+    "umask 077",
+    "base64 -d << 'JOUTIYA_BOOTSTRAP' | gunzip > /root/joutiya-bootstrap.sh",
+    ...(userData.match(/.{1,76}/g) ?? []),
+    "JOUTIYA_BOOTSTRAP",
+    "status=0",
+    "bash /root/joutiya-bootstrap.sh || status=$?",
+    "rm -f /root/joutiya-bootstrap.sh",
+    'exit "$status"',
+    "",
+  ].join("\n");
+  const encoded = Math.ceil(Buffer.byteLength(text) / 3) * 4;
+  if (encoded > MAX_METADATA_BYTES) throw new Error(`console cloud-init is ${encoded} bytes once encoded, OCI allows ${MAX_METADATA_BYTES}`);
+  return text;
+}
+
+/**
+ * `launcher`: the create request the Worker sends every minute (workers/vm-launcher), with "none"
+ * for each tunnel token and both shapes, the spare VMs' request, plus the same first boot for the console. Read-only on OCI;
+ * the files may lag infra/vm, since `sync` brings a new VM up to date anyway.
+ */
+async function launcher(oci: Oci, targets: Targets, compartmentId: string): Promise<void> {
+  const subnetId = await existingSubnet(oci, compartmentId);
+  const { userData, availabilityDomain, details } = await launchPlan(oci, targets, compartmentId, subnetId, false);
+  const spareImage = pickImage(
+    await oci.call<Image[]>("GET", "iaas", `/20160918/images${query({ compartmentId, ...IMAGE, shape: SPARE.shape, sortBy: "TIMECREATED", sortOrder: "DESC" })}`),
+    "x86_64",
+  );
+  console.log(`spare    ${spareImage.displayName}`);
+  const { shapeConfig: _shape, ...request } = details(shapeForAttempt(1, false));
+  const config = {
+    tenancy: targets.shared.oracle.tenancyId,
+    region: targets.shared.oracle.homeRegion,
+    compartmentId,
+    displayName: NAMES.instance,
+    request,
+    shapes: [shapeForAttempt(1, false), SMALL_SHAPE_CONFIG],
+    spare: { names: SPARE.names, request: spareRequest({ availabilityDomain, compartmentId, subnetId, imageId: spareImage.id }) },
+  };
+  const text = `${JSON.stringify(config, null, 2)}\n`;
+  writeFileSync(join(root, LAUNCHER_FILE), text);
+  console.log(`${LAUNCHER_FILE}: ${text.length} bytes, no tunnel token; commit it, then redeploy the Worker`);
+  const script = consoleCloudInit(userData);
+  writeFileSync(join(root, CONSOLE_CLOUD_INIT_FILE), script);
+  console.log(`${CONSOLE_CLOUD_INIT_FILE}: ${script.length} bytes, for a VM created in the console`);
+}
+
+/** Root script of `tunnels`: the three tunnel tokens a VM launched by the Worker lacks, then the SSH tunnel. */
+export function tunnelsScript(tokens: Record<TunnelName, string>): string {
+  for (const [name, token] of Object.entries(tokens)) {
+    if (!/^[A-Za-z0-9+/=_-]+$/.test(token) || token === NO_TOKEN) throw new Error(`token of joutiya-${name}-tunnel is not a base64 value`);
+  }
+  return [
+    "[[ -d /etc/joutiya/staging && -d /etc/joutiya/prod ]] || { echo 'the bootstrap has not finished' >&2; exit 1; }",
+    "umask 077",
+    `printf 'TUNNEL_TOKEN=%s\\n' '${tokens.ssh}' > /etc/joutiya/ssh-tunnel.env`,
+    `printf 'TUNNEL_TOKEN=%s\\n' '${tokens.staging}' > /etc/joutiya/staging/tunnel.env`,
+    `printf 'TUNNEL_TOKEN=%s\\n' '${tokens.prod}' > /etc/joutiya/prod/tunnel.env`,
+    "systemctl enable cloudflared.service",
+    "systemctl restart cloudflared.service",
+    'echo "ssh tunnel: $(systemctl is-active cloudflared.service)"',
+  ].join("\n");
+}
+
+async function tunnels(oci: Oci, targets: Targets, compartmentId: string): Promise<void> {
+  const instance = await runningInstance(oci, compartmentId);
+  const script = tunnelsScript({ ssh: await tunnelToken(targets, "ssh"), staging: await tunnelToken(targets, "staging"), prod: await tunnelToken(targets, "prod") });
+  const output = await runCommand(oci, compartmentId, instance.id, "joutiya tunnels", rootCommand(script));
+  if (oci.apply) console.log(output.trimEnd());
+}
+
+/**
+ * Boot volume replacement of `rebuild`: a new boot volume from the image and a new first boot. Oracle
+ * accepts new user data only together with a new boot volume; any SSH key stays as it is.
+ */
+export function rebuildDetails(input: { imageId: string; userData: string; metadata?: Record<string, string>; keepDisk: boolean }): Record<string, unknown> {
+  return {
+    metadata: { ...input.metadata, user_data: input.userData },
+    sourceDetails: { sourceType: "image", imageId: input.imageId, bootVolumeSizeInGBs: BOOT_VOLUME_GB, isPreserveBootVolumeEnabled: input.keepDisk },
+  };
+}
+
+/**
+ * `rebuild`: the compartment's VM gets a new boot volume (newest image) and a new first boot with the
+ * tunnel tokens, keeping the instance and its A1 capacity (guide step 13, infra/redeploy.md). Also
+ * repairs a VM created in the console without the cloud-init script or public IP, whatever its name. --keep-disk
+ * keeps the old boot volume, detached, as evidence after an incident.
+ */
+async function rebuild(oci: Oci, targets: Targets, compartmentId: string, keepDisk: boolean): Promise<void> {
+  const instances = await oci.call<Instance[]>("GET", "iaas", `/20160918/instances${query({ compartmentId })}`);
+  const live = instances.filter((instance) => !["TERMINATING", "TERMINATED"].includes(instance.lifecycleState));
+  if (live.length !== 1 || !live[0]) throw new Error(`expected one instance in the compartment, found ${live.length}: nothing done`);
+  const instance = await oci.call<Instance & { metadata?: Record<string, string> }>("GET", "iaas", `/20160918/instances/${live[0].id}`);
+  if (!["RUNNING", "STOPPED"].includes(instance.lifecycleState)) throw new Error(`instance ${instance.displayName} is ${instance.lifecycleState}: nothing done`);
+  console.log(`instance ${instance.displayName} ${instance.lifecycleState} (${instance.id})`);
+  const { userData, imageId } = await launchPlan(oci, targets, compartmentId, await existingSubnet(oci, compartmentId), true);
+  await oci.write("PUT", `/20160918/instances/${instance.id}`, { displayName: NAMES.instance, ...INSTANCE_SETTINGS });
+  // Without a public IP the VM cannot reach the internet (no NAT gateway): an ephemeral one, free.
+  const attachments = await oci.call<{ vnicId: string; lifecycleState: string }[]>("GET", "iaas", `/20160918/vnicAttachments${query({ compartmentId, instanceId: instance.id })}`);
+  for (const attachment of attachments.filter((item) => item.lifecycleState === "ATTACHED")) {
+    const vnic = await oci.call<{ id: string; isPrimary?: boolean; publicIp?: string }>("GET", "iaas", `/20160918/vnics/${attachment.vnicId}`);
+    if (!vnic.isPrimary || vnic.publicIp) continue;
+    const primary = (await oci.call<{ id: string; isPrimary: boolean }[]>("GET", "iaas", `/20160918/privateIps${query({ vnicId: vnic.id })}`)).find((ip) => ip.isPrimary);
+    if (!primary) throw new Error(`vnic ${vnic.id} has no primary private IP`);
+    await oci.write("POST", "/20160918/publicIps", { compartmentId, lifetime: "EPHEMERAL", privateIpId: primary.id, displayName: NAMES.instance });
+  }
+  const details = rebuildDetails({ imageId, userData, metadata: instance.metadata, keepDisk });
+  const shown = { ...details, metadata: { keys: Object.keys(details.metadata as object), user_data: `<bootstrap.sh with tokens, ${userData.length} bytes>` } };
+  await oci.write("PUT", `/20160918/instances/${instance.id}`, details, shown);
+  if (oci.apply) console.log("boot volume replacement requested: follow it with `node scripts/oracle-vm.ts status`");
 }
 
 /** Bootstrap lines (joutiya-bootstrap: ...) and cloud-init's verdict, from the serial console. */
@@ -605,12 +802,14 @@ async function runCommand(oci: Oci, compartmentId: string, instanceId: string, d
   // Delivery waits for the agent's next poll; past the timeout plus a delivery margin, it is cancelled.
   const deadline = Date.now() + (timeoutSeconds + 300) * 1000;
   for (;;) {
-    const execution = await oci
-      .call<CommandExecution>("GET", "iaas", `/20180530/instanceAgentCommands/${command.id}/status${query({ instanceId })}`)
-      .catch((error: unknown) => {
-        if (error instanceof OciError && error.status === 404) return undefined; // not delivered yet
-        throw error;
-      });
+    // Read through the execution list: joutiya-run-command-policy lets joutiya-claude list executions,
+    // while GET on one command or its status answers 404 (seen on 27 Oct 2026).
+    const executions = await oci.call<(CommandExecution & { instanceAgentCommandId: string })[]>(
+      "GET",
+      "iaas",
+      `/20180530/instanceAgentCommandExecutions${query({ compartmentId, instanceId, limit: "100", sortBy: "TIMECREATED", sortOrder: "DESC" })}`,
+    );
+    const execution = executions.find((item) => item.instanceAgentCommandId === command.id);
     if (execution && COMMAND_DONE.includes(execution.lifecycleState)) {
       const output = execution.content?.text ?? "";
       const exitCode = execution.content?.exitCode;
@@ -704,18 +903,202 @@ async function envFiles(oci: Oci, targets: Targets, compartmentId: string, env: 
   else console.log(missing.length > 0 ? `still missing: ${missing.join(", ")} (the app does not start without them)` : "every required variable is set");
 }
 
+// The owner's secrets reach the VM sealed for its transfer certificate (docs/phase-1.md, step 16):
+// sealed on his PC by Nav, they travel through the thread and Run Command, and only the VM opens them.
+
+const TRANSFER_SUBJECT = "joutiya-vm-transfer";
+/** Characters of the certificate's base64 read back per command (Run Command returns 1 KB). */
+const TRANSFER_SLICE = 900;
+
+/** Root script of `transfer`: the key pair made once, renewed when it has less than 7 days left. */
+export function transferScript(etc = VM_DIRS.etc): string {
+  return [
+    "umask 077",
+    `install -d -m 0700 ${etc}`,
+    `if [[ ! -s ${etc}/transfer.key ]] || ! openssl x509 -checkend 604800 -noout -in ${etc}/transfer.pem > /dev/null 2>&1; then`,
+    `  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out ${etc}/transfer.key.new 2> /dev/null`,
+    `  openssl req -x509 -new -key ${etc}/transfer.key.new -subj /CN=${TRANSFER_SUBJECT} -days 30 -out ${etc}/transfer.pem.new`,
+    `  mv -f ${etc}/transfer.key.new ${etc}/transfer.key`,
+    `  mv -f ${etc}/transfer.pem.new ${etc}/transfer.pem`,
+    '  echo "transfer key made"',
+    "fi",
+    `der="$(openssl x509 -in ${etc}/transfer.pem -outform DER | base64 -w0)"`,
+    'echo "transfer-length ${#der}"',
+    'echo "transfer-sha256 $(printf \'%s\' "$der" | sha256sum | cut -c1-64)"',
+  ].join("\n");
+}
+
+/** Read-only root script: characters from..to (1-based) of the certificate's base64. */
+export function transferSliceScript(from: number, to: number, etc = VM_DIRS.etc): string {
+  return `echo "slice $(openssl x509 -in ${etc}/transfer.pem -outform DER | base64 -w0 | cut -c${from}-${to})"`;
+}
+
+async function transfer(oci: Oci, compartmentId: string): Promise<void> {
+  const instance = await runningInstance(oci, compartmentId);
+  const output = await runCommand(oci, compartmentId, instance.id, "joutiya-transfer", rootCommand(transferScript()));
+  if (!oci.apply) return;
+  const length = Number(/^transfer-length (\d+)$/m.exec(output)?.[1]);
+  const sha256 = /^transfer-sha256 ([0-9a-f]{64})$/m.exec(output)?.[1];
+  if (!Number.isInteger(length) || length <= 0 || !sha256) throw new Error(`unexpected answer from the VM:\n${output}`);
+  let base64 = "";
+  for (let from = 1; from <= length; from += TRANSFER_SLICE) {
+    const slice = await runCommand(oci, compartmentId, instance.id, "joutiya-transfer read", rootCommand(transferSliceScript(from, from + TRANSFER_SLICE - 1)), 300, true);
+    base64 += /^slice ([A-Za-z0-9+/=]*)$/m.exec(slice)?.[1] ?? "";
+  }
+  if (createHash("sha256").update(base64).digest("hex") !== sha256) throw new Error("the certificate read back does not match its SHA-256");
+  const certificate = new X509Certificate(Buffer.from(base64, "base64"));
+  if (certificate.subject !== `CN=${TRANSFER_SUBJECT}` || certificate.publicKey.asymmetricKeyType !== "rsa") throw new Error(`unexpected certificate: ${certificate.subject}`);
+  console.log(`transfer-certificate ${base64}`);
+  console.log(`fingerprint ${certificate.fingerprint256}`);
+  console.log(`valid to    ${certificate.validTo}`);
+}
+
+/**
+ * Root scripts of `env --sealed`: each sealed app.env staged in chunks, then opened one per command
+ * (checked against its SHA-256, decrypted with the VM's transfer key, its lines checked), then
+ * merged into app.env (mergeLines). Opened lines stay in the root-only stage until the merge, which
+ * removes them; a failed step removes everything staged for <env>.
+ */
+export function sealedEnvScripts(env: DeployedEnv, files: Sealed[], dirs: EnvDirs = VM_DIRS, chunkSize = 3_000): string[] {
+  if (files.length === 0) throw new Error("env needs --sealed=<file>[,<file>...]");
+  for (const [index, file] of files.entries()) {
+    if (file.env !== env) throw new Error(`sealed file ${index + 1} is for ${file.env}, not ${env}`);
+    if (file.target !== "app.env") throw new Error(`sealed file ${index + 1} holds ${file.target}: the VM's tunnel tokens come from \`tunnels\``);
+  }
+  const staged = (n: number): string => `${dirs.stage}/${env}.sealed.${n}`;
+  const opened = (n: number): string => `${dirs.stage}/${env}.opened.${n}`;
+  const cleanup = `rm -rf ${dirs.stage}/${env}.sealed.* ${dirs.stage}/${env}.opened.* "\${work:-}"`;
+  const encoded = files.map((file) => Buffer.from(file.pem).toString("base64"));
+  const append = encoded.flatMap((text, index) => {
+    const chunks = text.match(new RegExp(`.{1,${chunkSize}}`, "g")) ?? [];
+    return chunks.map((chunk, part) =>
+      [
+        ...(index === 0 && part === 0 ? [`install -d -m 0700 ${dirs.stage}`, cleanup] : []),
+        ...(part === 0 ? [`: > ${staged(index + 1)}`] : []),
+        `printf '%s' '${chunk}' >> ${staged(index + 1)}`,
+        `echo "sealed file ${index + 1}, chunk ${part + 1}/${chunks.length}"`,
+      ].join("\n"),
+    );
+  });
+  const open = encoded.map((text, index) => {
+    const n = index + 1;
+    return [
+      "umask 077",
+      `trap 'rm -rf "\${work:-}"; [[ -s ${opened(n)} ]] || ${cleanup}' EXIT`,
+      `[[ -s ${dirs.etc}/transfer.key ]] || { echo "no transfer key in ${dirs.etc}: run oracle-vm.ts transfer first" >&2; exit 1; }`,
+      `work="$(mktemp -d ${dirs.stage}/.sealed.XXXXXX)"`,
+      `echo "${createHash("sha256").update(text).digest("hex")}  ${staged(n)}" | sha256sum -c --quiet`,
+      `base64 -d ${staged(n)} > "$work/${n}.pem"`,
+      ...openSealedLines(files[index] as Sealed, n, dirs.etc, "VM"),
+      `line="^[A-Z][A-Z0-9_]*='[^'[:cntrl:]]*'\$"`,
+      `if grep -qvE "$line" "$work/${n}.lines"; then echo "sealed file ${n}: a line is not NAME='value'" >&2; exit 1; fi`,
+      `mv -f "$work/${n}.lines" ${opened(n)}`,
+      `echo "sealed file ${n} opened: $(wc -l < ${opened(n)}) line(s)"`,
+    ].join("\n");
+  });
+  const merge = [
+    "umask 077",
+    `trap '${cleanup} "\${new:-}"' EXIT`,
+    `work="$(mktemp -d ${dirs.stage}/.sealed.XXXXXX)"`,
+    `LC_ALL=C sort -u ${files.map((_, index) => opened(index + 1)).join(" ")} > "$work/app.env"`,
+    `twice="$(cut -d= -f1 "$work/app.env" | LC_ALL=C uniq -d | tr '\\n' ' ')"`,
+    '[[ -z "$twice" ]] || { echo "sealed files disagree on: $twice" >&2; exit 1; }',
+    ...mergeLines(env, '"$work/app.env"', dirs),
+  ].join("\n");
+  return [...append, ...open, merge];
+}
+
+async function sealedEnv(oci: Oci, compartmentId: string, env: DeployedEnv, paths: string[]): Promise<void> {
+  const files = paths.map((path) => parseSealed(readFileSync(path, "utf8")));
+  const commands = sealedEnvScripts(env, files).map((script) => rootCommand(script));
+  const instance = await runningInstance(oci, compartmentId);
+  console.log(`app.env of ${env}: ${files.length} sealed file(s), opened on the VM only`);
+  let output = "";
+  for (const [index, text] of commands.entries()) {
+    output = await runCommand(oci, compartmentId, instance.id, `joutiya-env ${env} sealed ${index + 1}/${commands.length}`, text);
+  }
+  if (!oci.apply) return;
+  console.log(output.trimEnd());
+  const missing = parseMissing(output);
+  if (missing === undefined) console.warn("warning: the VM's report is incomplete");
+  else console.log(missing.length > 0 ? `still missing: ${missing.join(", ")} (the app does not start without them)` : "every required variable is set");
+}
+
+// Staging releases built on the VM itself from the public repository, until the CI deploys staging
+// (step 8). The PC2 staging builds the same way (scripts/wsl-staging.ts deploy). Such images carry no
+// CI record, so `promote` refuses them: production stays on CI-built releases.
+
+export const REPOSITORY = "https://github.com/Vegadarkk/joutiya.git";
+export const SOURCE_DIR = "/opt/joutiya/src";
+/** Secret files the start needs besides app.env (Compose's env_file entries and §9's credentials). */
+export const SECRET_FILES = ["tunnel.env", "valkey-queue.env", "valkey-ratelimit.env", "meilisearch.env", "gcp/web/credentials.json", "gcp/worker/credentials.json"] as const;
+
+/**
+ * Root script lines: a commit of origin/main checked out in SOURCE_DIR, built, and, once every
+ * secret is in place, loaded and started by the deploy command, which waits for health and rolls
+ * back on failure. Shared with the PC2 staging.
+ */
+export function stagingReleaseLines(commit?: string): string[] {
+  if (commit !== undefined && !/^[0-9a-f]{7,40}$/.test(commit)) throw new Error("--commit takes a commit SHA of origin/main");
+  const src = SOURCE_DIR;
+  const etc = "/etc/joutiya/staging";
+  return [
+    `git -C ${src} fetch --quiet origin main`,
+    `commit="$(git -C ${src} rev-parse --verify --quiet '${commit ?? "origin/main"}^{commit}')" || { echo "unknown commit" >&2; exit 1; }`,
+    `git -C ${src} merge-base --is-ancestor "$commit" origin/main || { echo "$commit is not on origin/main" >&2; exit 1; }`,
+    `git -C ${src} checkout --quiet --force --detach "$commit"`,
+    `release="$(git -C ${src} rev-parse --short=12 "$commit")"`,
+    // The files infra/vm/install.sh installs on the VM, from the same commit.
+    `install -m 0644 ${src}/docker/compose.yml ${src}/docker/compose.staging.yml /opt/joutiya/docker/`,
+    `install -m 0644 ${src}/docker/valkey/*.conf /opt/joutiya/docker/valkey/`,
+    `install -m 0755 ${src}/infra/vm/deploy-forced-command.sh /usr/local/sbin/joutiya-deploy`,
+    `install -m 0755 ${src}/infra/vm/search-setup.sh /usr/local/sbin/joutiya-search-setup`,
+    "for target in web worker; do",
+    '  echo "building joutiya-$target:$release"',
+    `  docker build --progress=plain -f ${src}/docker/Dockerfile --target "$target" --build-arg RELEASE="$release" -t "joutiya-$target:$release" ${src} 2>&1 | tail -n 20`,
+    "done",
+    'missing=""',
+    `for name in ${REQUIRED.join(" ")}; do grep -q "^$name=" ${etc}/app.env 2> /dev/null || missing="$missing $name"; done`,
+    `for file in ${SECRET_FILES.join(" ")}; do [[ -s ${etc}/$file ]] || missing="$missing $file"; done`,
+    'if [[ -n "$missing" ]]; then echo "built $release; the start waits for:$missing"; exit 0; fi',
+    'docker save "joutiya-web:$release" "joutiya-worker:$release" | zstd -T0 -3 -q | SSH_ORIGINAL_COMMAND="load $release" /usr/local/sbin/joutiya-deploy staging',
+    'echo "running $release"',
+  ];
+}
+
+/** Root script of `build-staging`: the clone made once, then stagingReleaseLines. */
+export function buildStagingScript(commit?: string): string {
+  return [
+    "umask 022",
+    "command -v git > /dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -q git > /dev/null",
+    `[[ -d ${SOURCE_DIR}/.git ]] || git clone --quiet ${REPOSITORY} ${SOURCE_DIR}`,
+    ...stagingReleaseLines(commit),
+  ].join("\n");
+}
+
+async function buildStaging(oci: Oci, compartmentId: string, commit: string | undefined): Promise<void> {
+  const instance = await runningInstance(oci, compartmentId);
+  const output = await runCommand(oci, compartmentId, instance.id, "joutiya-build-staging", rootCommand(buildStagingScript(commit)), 5_400);
+  if (oci.apply) console.log(output.trimEnd());
+}
+
 // ---------------------------------------------------------------------------------------------
 // Production releases (§2), run by root through Run Command with the forced command of the deploy
 // users (infra/vm/deploy-forced-command.sh, environment prod). Production only runs images already
-// running in staging, pinned by image ID; no production key exists anywhere.
+// running in staging, pinned by image ID, from the tarball the CI recorded; no production key exists
+// anywhere.
 
 const RELEASE = /^[0-9a-f]{12,40}$/;
 const IMAGE_ID = /^sha256:[0-9a-f]{64}$/;
+/** Check run of deploy-staging.yml that records, on each release's commit, the tarball sent to the VM. */
+export const RELEASE_CHECK = "Release images";
 
 export interface EnvStatus {
   release: string;
   web: string;
   worker: string;
+  /** sha256 of the tarball the release's images were loaded from (empty before the first load). */
+  tarball?: string;
 }
 export type VmStatus = Record<"staging" | "prod", EnvStatus>;
 
@@ -736,6 +1119,30 @@ export function promoteCommand(staging: EnvStatus): string {
   if (!RELEASE.test(staging.release)) throw new Error("staging runs no valid release");
   if (!IMAGE_ID.test(staging.web) || !IMAGE_ID.test(staging.worker)) throw new Error("staging image IDs are missing");
   return `promote ${staging.release} ${staging.web} ${staging.worker}`;
+}
+
+/**
+ * Tarball digests that the GitHub Actions app recorded for a release, from a GitHub "list check runs
+ * for a Git reference" answer. Nobody else can write these: the staging deploy key and its Access
+ * token cannot.
+ */
+export function recordedTarballs(answer: unknown, release: string): string[] {
+  const runs = (answer as { check_runs?: unknown } | null)?.check_runs;
+  if (!Array.isArray(runs)) throw new Error("unexpected answer from GitHub");
+  return (runs as { name?: unknown; head_sha?: unknown; conclusion?: unknown; app?: { slug?: unknown }; output?: { summary?: unknown } }[]).flatMap((run) => {
+    if (run.name !== RELEASE_CHECK || run.app?.slug !== "github-actions" || run.conclusion !== "success") return [];
+    if (typeof run.head_sha !== "string" || !run.head_sha.startsWith(release)) return [];
+    const digest = /^tarball (sha256:[0-9a-f]{64})$/m.exec(typeof run.output?.summary === "string" ? run.output.summary : "")?.[1];
+    return digest ? [digest] : [];
+  });
+}
+
+/** The CI's records of a release, read through curl: in the Claude environment its proxy signs requests to the private repository. */
+function ciTarballs(repository: string, release: string): string[] {
+  const url = `https://api.github.com/repos/${repository}/commits/${release}/check-runs?check_name=${encodeURIComponent(RELEASE_CHECK)}&filter=all&per_page=100`;
+  const answer = spawnSync("curl", ["-fsS", "--max-time", "30", "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28", url], { encoding: "utf8" });
+  if (answer.status !== 0) throw new Error(`the CI's record of ${release} could not be read from GitHub (${answer.stderr.trim() || `curl exit ${answer.status}`}): not promoted`);
+  return recordedTarballs(JSON.parse(answer.stdout), release);
 }
 
 /** Root script sending one request to the forced command of production (it splits the request on spaces, no shell parses it). */
@@ -783,6 +1190,12 @@ async function release(oci: Oci, targets: Targets, compartmentId: string, action
     request = promoteCommand(current.staging);
     if (current.staging.release === current.prod.release) throw new Error("production already runs this release");
     if (!isOnMain(current.staging.release)) throw new Error(`release ${current.staging.release} is not a commit of origin/main: not promoted`);
+    const { tarball } = current.staging;
+    const repository = targets.shared.github.repository;
+    if (!repository) throw new Error("shared.github.repository is not recorded in infra/targets.json");
+    if (!tarball || !ciTarballs(repository, current.staging.release).includes(tarball)) {
+      throw new Error(`staging's images of ${current.staging.release} do not come from the tarball the CI recorded (check run "${RELEASE_CHECK}"): not promoted`);
+    }
   }
   const output = await runCommand(oci, compartmentId, instance.id, `joutiya-deploy ${request.split(" ").slice(0, 2).join(" ")}`, rootCommand(deployScript(request)));
   if (!oci.apply) return;
@@ -947,16 +1360,17 @@ function credentialsFromEnv(): OciCredentials {
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const args = process.argv.slice(2);
   const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);
   const smallFallback = args.includes("--small-fallback");
-  const actions = ["create", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback"];
+  const actions = ["create", "launcher", "tunnels", "transfer", "build-staging", "rebuild", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback"];
   const perEnv = action === "env" || action === "search-setup" || action === "wif";
   const argument = action === "run" || perEnv;
   if (!action || !actions.includes(action) || argument !== (file !== undefined) || (perEnv && !(DEPLOYED_ENVS as readonly string[]).includes(file ?? ""))) {
     throw new Error(
-      "usage: scripts/oracle-vm.ts <create|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
+      "usage: scripts/oracle-vm.ts <create|launcher|tunnels|transfer|build-staging [--commit=<sha>]|rebuild [--keep-disk]|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|--sealed=<file>[,...]|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
     );
   }
 
@@ -973,17 +1387,28 @@ async function main(): Promise<void> {
   const oci = new Oci(credentials, args.includes("--apply"));
   const compartment = compartmentId as string;
   if (action === "create") await create(oci, targets, compartment, retry, smallFallback);
+  else if (action === "launcher") await launcher(oci, targets, compartment);
+  else if (action === "tunnels") await tunnels(oci, targets, compartment);
+  else if (action === "rebuild") await rebuild(oci, targets, compartment, args.includes("--keep-disk"));
   else if (action === "reboot") await reboot(oci, compartment);
   else if (action === "agent") await agent(oci, compartment);
   else if (action === "run") await run(oci, compartment, file as string);
   else if (action === "sync") await sync(oci, compartment, args.find((arg) => arg.startsWith("--deploy-staging-key="))?.split("=").slice(1).join("="));
   else if (action === "search-setup") await searchSetup(oci, compartment, file as DeployedEnv, args.find((arg) => arg.startsWith("--reindex="))?.slice("--reindex=".length));
   else if (action === "wif") await wif(oci, targets, compartment, file as DeployedEnv, args.find((arg) => arg.startsWith("--certificates="))?.slice("--certificates=".length));
-  else if (action === "env") await envFiles(oci, targets, compartment, file as DeployedEnv, args.filter((arg) => arg.startsWith("--from=")).map((arg) => arg.slice("--from=".length)));
+  else if (action === "transfer") await transfer(oci, compartment);
+  else if (action === "build-staging") await buildStaging(oci, compartment, args.find((arg) => arg.startsWith("--commit="))?.slice("--commit=".length));
+  else if (action === "env") {
+    const froms = args.filter((arg) => arg.startsWith("--from=")).map((arg) => arg.slice("--from=".length));
+    const sealed = args.filter((arg) => arg.startsWith("--sealed=")).flatMap((arg) => arg.slice("--sealed=".length).split(",").filter((path) => path !== ""));
+    if (froms.length > 0 && sealed.length > 0) throw new Error("env takes --from or --sealed, not both");
+    if (sealed.length > 0) await sealedEnv(oci, compartment, file as DeployedEnv, sealed);
+    else await envFiles(oci, targets, compartment, file as DeployedEnv, froms);
+  }
   else if (action === "deploy-status") await release(oci, targets, compartment, "status");
   else if (action === "promote" || action === "rollback") await release(oci, targets, compartment, action);
   else await status(oci, targets, compartment);
-  if (!["status", "agent", "deploy-status"].includes(action)) console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
+  if (!["status", "agent", "deploy-status", "launcher"].includes(action)) console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
 }
 
 const self = fileURLToPath(import.meta.url);

@@ -37,6 +37,7 @@ export const PRICE_RANGES: Readonly<Record<string, PriceRange>> = {
   ameublement: { min: 50, max: 100_000 },
   electromenager: { min: 50, max: 60_000 },
   "decoration-artisanat": { min: 20, max: 100_000 },
+  "koumiyas-decoratives": { min: 50, max: 200_000 },
   linge: { min: 20, max: 10_000 },
   "arts-de-la-table": { min: 20, max: 50_000 },
   bricolage: { min: 20, max: 50_000 },

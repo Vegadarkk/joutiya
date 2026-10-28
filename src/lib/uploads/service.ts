@@ -71,10 +71,14 @@ async function ownedListing(uploader: Uploader, listingId: string): Promise<List
   return listing;
 }
 
-/** The caller's upload; anyone else's (or a missing one) answers 404, never 403 (IDOR). */
+/**
+ * The caller's listing photo; anyone else's (or a missing one) answers 404, never 403 (IDOR). So
+ * does an upload of another purpose: a KYBC piece (phase 7) has its own routes, its own objects
+ * and its own retention, and the photo delete would orphan its private copy.
+ */
 async function ownedUpload(uploader: Uploader, id: string): Promise<UploadRecord> {
   const upload = await getUpload(id);
-  if (!upload || upload.ownerUid !== uploader.auth.user.uid) throw notFound();
+  if (!upload || upload.ownerUid !== uploader.auth.user.uid || upload.purpose !== "listing") throw notFound();
   return upload;
 }
 
@@ -124,7 +128,15 @@ export async function signUpload(uploader: Uploader, input: SignUploadInput, now
     createdAt: now,
     updatedAt: now,
   });
-  const signed = await objects.presignPut({ bucket: "quarantine", key: quarantineKey, contentType: input.declaredType, contentLength: input.declaredSize, expiresInSeconds: UPLOAD_URL_TTL_SECONDS });
+  // The document comes first, so it counts against the limits checked above while the URL is
+  // signed; a failed presign removes it, or it would hold a photo slot with no URL to use.
+  const signed = await objects
+    .presignPut({ bucket: "quarantine", key: quarantineKey, contentType: input.declaredType, contentLength: input.declaredSize, expiresInSeconds: UPLOAD_URL_TTL_SECONDS })
+    .catch(async (error: unknown) => {
+      // Left behind if this fails too: purge-quarantine expires it.
+      await deleteUploadDocument(id).catch(() => undefined);
+      throw error;
+    });
   if (uploader.ip) await recordContentOp({ uid, op: "upload.create", contentRef: uploadContentRef(id), ip: uploader.ip, now });
   return { uploadId: id, url: signed.url, method: "PUT", headers: { "Content-Type": input.declaredType }, expiresAt: signed.expiresAt.toISOString() };
 }

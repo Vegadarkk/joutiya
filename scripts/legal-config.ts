@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { missingLegalMentions, resolveLegalConfig, type LegalConfig } from "../src/config/legal.ts";
 import { validateTargets, type Targets } from "./assert-target.ts";
 import { gcloudAccessToken } from "./google-wif.ts";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 export interface LegalPlan {
   config: LegalConfig;
@@ -44,6 +45,7 @@ export function firestoreFields(object: Record<string, unknown>): Record<string,
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const [env, file] = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
   const apply = process.argv.includes("--apply");
   if ((env !== "staging" && env !== "prod") || !file) throw new Error("usage: scripts/legal-config.ts <staging|prod> <file.json> [--apply]");

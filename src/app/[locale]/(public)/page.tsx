@@ -8,6 +8,7 @@ import { SearchPanel } from "@/components/home/search-panel";
 import { Container } from "@/components/layout/container";
 import { ResultsGrid } from "@/components/search/results-grid";
 import { Button } from "@/components/ui/button";
+import { WelcomeThreshold, welcomeTexts } from "@/components/welcome/welcome-threshold";
 import { Link } from "@/i18n/navigation";
 import { pageLocale } from "@/i18n/params";
 import { alternates } from "@/lib/i18n/metadata";
@@ -20,8 +21,8 @@ import type { SearchCard } from "@/lib/search/types";
 const favoriteAction = (card: SearchCard) => <FavoriteButton listingId={card.id} />;
 
 // Home (design D21): search hero, the eleven categories, À la Une (8 drawn) and the 12 newest
-// listings. ISR every 5 minutes; an engine failure hides the two listing sections (D2) and the
-// page still renders.
+// listings, behind the welcome threshold of a first visit (design C7). ISR every 5 minutes; an
+// engine failure hides the two listing sections (D2) and the page still renders.
 
 export const revalidate = 300;
 // Rendered on the first visit, never at build: the image is built without a search engine, so a
@@ -60,13 +61,16 @@ async function section(name: string, load: () => Promise<SearchCard[]>): Promise
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const locale = pageLocale((await params).locale);
   setRequestLocale(locale);
-  const [t, featured, recent] = await Promise.all([
+  const [t, welcome, featured, recent] = await Promise.all([
     getTranslations({ locale, namespace: "Home" }),
+    welcomeTexts(locale),
     section("featured", () => featuredListings({}, FEATURED_HOME_SLOTS)),
     section("recent", () => latestListings({}, HOME_RECENT_COUNT)),
   ]);
   return (
     <>
+      {/* First visit only (decided before paint, see src/lib/welcome/script.ts); hidden otherwise. */}
+      <WelcomeThreshold locale={locale} texts={welcome} />
       <Container className="pt-6 sm:pt-10">
         <SearchPanel locale={locale} />
       </Container>

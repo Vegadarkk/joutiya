@@ -6,7 +6,9 @@ import { clientIp, ipBuckets } from "@/lib/security/ip";
 import { readCookie } from "@/lib/http/cookies";
 
 // Rate-limit identity of a request (§6 "Les clés"): IP bucket, wider IPv6 bucket, and the signed
-// device id when the browser sent one. An unknown device counts on its IP with low thresholds.
+// device id when the browser sent one. Every cookie-less client of an IP bucket shares one device
+// allowance (`anon:<bucket>`): stricter than a known device, without separate lower thresholds
+// that would punish shared IPs (CGNAT; follow-up S5 accepted as is, docs/phase-2.md).
 
 export interface RequestIdentity {
   /** Exact client IP (connectionLogs only). */
@@ -15,6 +17,11 @@ export interface RequestIdentity {
   ipBucket: string;
   /** IPv6 /48 (or the IPv4 address). */
   ipNetwork: string;
+  /**
+   * IPv6 /48 of an IPv6 client, null for IPv4: the key of the wider `*.ip48` counters (§6 "Les
+   * clés"), so a host rotating through the 65 536 /64s of its allocation still meets a limit.
+   */
+  ip48: string | null;
   /** Device id from the signed __Host-did cookie, or null. */
   deviceId: string | null;
   /** Key for device-scoped limits: the device, else "unknown device on this IP". */
@@ -29,6 +36,7 @@ export function requestIdentity(headers: Headers): RequestIdentity {
     ip: buckets.ip,
     ipBucket: buckets.subscriber,
     ipNetwork: buckets.network,
+    ip48: buckets.version === 6 ? buckets.network : null,
     deviceId,
     deviceKey: deviceId ? `d:${deviceId}` : `anon:${buckets.subscriber}`,
   };

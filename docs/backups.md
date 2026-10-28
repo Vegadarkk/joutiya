@@ -1,31 +1,52 @@
-# Firestore backups (runbook)
+# Sauvegardes Firestore (procédure d'incident)
 
-Encrypted nightly export of Firestore (DESIGN D17). Code: `src/lib/backup/`, job
-`src/worker/jobs/backup-firestore.ts`, restore `scripts/restore-firestore.ts`.
+Export chiffré de Firestore chaque nuit (DESIGN D17). Code : `src/lib/backup/`, tâche
+`src/worker/jobs/backup-firestore.ts`, restauration `scripts/restore-firestore.ts`.
 
-## Nightly job
+## Tâche de nuit
 
-- `backup-firestore`, 03:30 UTC on the worker's `system` queue, one attempt. Reads through the Admin SDK,
-  counted in `firestore.reads`.
-- Pass 1, incremental: per collection with a time field (`updatedAt`, else `createdAt`), the documents at or
-  after the collection's cursor, in (time, path) order, up to 20 000 a night. A cut scan resumes strictly
-  after the last exported (time, path), so documents sharing a timestamp are never skipped. The next pass
-  starts with the collection that was cut (round robin).
-- Pass 2, rolling full: up to 10 000 documents a night in document-path order, continued per collection;
-  one cycle covers every collection in the backup table (`export.ts`, `TABLE`). It gets what the incremental
-  left of the run limit below.
-- One run reads at most 20 000 documents (40 % of the Spark daily read quota) across both passes, and scans
-  stop when the daily read quota reaches 75 %; the cursors keep the progress.
-- Cursors live in `system/backup` and move only after the manifest is stored: a failed run is redone the
-  next night. One run per UTC date (a second run, or a manifest already there, is skipped).
-- Alerts: P1 when `BACKUP_AGE_RECIPIENT` is missing or invalid, or R2 is not configured (once a day,
-  nothing written), and on any failure; P2 when the read quota stopped the run, or when a rolling full
-  cycle is still unfinished after 60 days (past the 98-day retention some documents would have no copy).
-  The result (counts, parts, bytes, reads, duration) is logged as `backup-firestore`.
+- `backup-firestore`, à 03:30 UTC sur la file `system` du worker, une seule tentative. Lectures par le SDK
+  Admin, comptées dans `firestore.reads`.
+- Passe 1, incrémentale : pour chaque collection qui a un champ de date (`updatedAt`, sinon `createdAt`),
+  les documents à partir du curseur de la collection, dans l'ordre (date, chemin), jusqu'à 20 000 par nuit.
+  Un parcours coupé reprend strictement après le dernier (date, chemin) exporté : des documents qui
+  partagent la même date ne sont jamais sautés. La passe suivante commence par la collection coupée
+  (tourniquet).
+- Passe 2, rotation complète : jusqu'à 10 000 documents par nuit dans l'ordre des chemins, reprise
+  collection par collection ; un cycle couvre toutes les collections de la table de sauvegarde
+  (`export.ts`, `TABLE`). Elle reçoit ce que l'incrémentale a laissé de la limite par nuit ci-dessous.
+- Une nuit lit au plus 20 000 documents (40 % du quota Spark de lectures du jour) pour les deux passes, et
+  les parcours s'arrêtent quand le quota de lectures du jour atteint 75 % ; les curseurs gardent
+  l'avancement.
+- Les curseurs sont dans `system/backup` et n'avancent qu'une fois le manifeste déposé : une nuit en échec
+  est refaite la nuit suivante. Une seule exécution par date UTC (une deuxième, ou un manifeste déjà
+  présent, est ignorée).
+- Alertes : P1 si `BACKUP_AGE_RECIPIENT` est absent ou invalide, ou si R2 n'est pas configuré (une fois par
+  jour, rien n'est écrit), et à tout échec ; P2 si le quota de lectures a arrêté la nuit, ou si un cycle
+  de rotation complète n'est toujours pas fini après 60 jours (au-delà des 98 jours de rétention, des
+  documents n'auraient plus de copie). Le résultat (nombres, parties, octets, lectures, durée) est journalisé
+  sous `backup-firestore`.
 
-## Files
+### Jauge du stockage Firestore
 
-Private bucket (`R2_BUCKET_PRIVATE`):
+Spark offre 1 Go de stockage Firestore, sans remise à zéro. Aucune API gratuite ne donne ce chiffre :
+la sauvegarde l'estime sans aucune lecture de plus. Elle additionne les octets NDJSON (avant compression)
+de la rotation complète ; un cycle complet contient chaque document une fois. Firestore compte aussi les
+entrées d'index (deux par champ indexé, croissant et décroissant) : l'estimation vaut 2 fois ces octets
+(`FIRESTORE_STORAGE_FACTOR`, justifié dans `export.ts`).
+
+- C'est un plancher : le vrai chiffre est plus élevé (petits documents très indexés, collections hors
+  sauvegarde comme `quotaDaily` et `system`). Le chiffre réel est dans la console Firebase → Firestore →
+  *Usage*.
+- La jauge `firestore.storage` (back-office, page Quotas) prend la valeur du dernier cycle complet après
+  chaque nuit réussie. Elle reste « Inconnu » tant qu'aucun cycle n'a été additionné du début à la fin.
+- Alerte P2 à 70 % (700 Mo, le seuil du §2 pour décider du passage à Blaze), P1 à 100 %. La période est le
+  mois : chaque alerte part au plus une fois par mois, pas chaque nuit. La jauge ne bloque rien.
+- Quand l'alerte part : comparez avec la console, puis décidez (Blaze, ou purge des journaux).
+
+## Fichiers
+
+Bucket privé (`R2_BUCKET_PRIVATE`) :
 
 ```
 backups/<YYYY-MM-DD>/incremental/<collection>[-<n>].ndjson.gz.age
@@ -33,67 +54,139 @@ backups/<YYYY-MM-DD>/full/<collection>[-<n>].ndjson.gz.age
 backups/<YYYY-MM-DD>/manifest.json.age
 ```
 
-A part is NDJSON (one line per document: `{"p": path, "d": data, "u": updateTime}`, Firestore types as
-tagged objects) -> gzip -> age, at most 20 000 documents or 16 MiB of NDJSON. The manifest (age only)
-lists each part with its document count, size and SHA-256, plus the cursors. Nothing is ever written in
-clear text, on the VM or in the bucket.
+Une partie est du NDJSON (une ligne par document : `{"p": chemin, "d": données, "u": updateTime}`, les types
+Firestore en objets étiquetés) -> gzip -> age, au plus 20 000 documents ou 16 Mio de NDJSON. Le manifeste
+(age seulement) liste chaque partie avec son nombre de documents, sa taille et son SHA-256, plus les
+curseurs. Rien n'est jamais écrit en clair, ni sur la VM ni dans le bucket.
 
-Retention: 98 days, by an R2 lifecycle rule on the `backups/` prefix of each private bucket (infra item,
-DESIGN section 7; not set by this code):
+Rétention : 98 jours, par une règle de cycle de vie R2 sur le préfixe `backups/` de chaque bucket privé
+(réglage d'infrastructure, DESIGN section 7 ; pas posé par ce code) :
 `{"rules":[{"id":"backups-98d","enabled":true,"conditions":{"prefix":"backups/"},"deleteObjectsTransition":{"condition":{"type":"Age","maxAge":8467200}}}]}`.
 
-## Keys
+## Clés
 
-- The owner generates the pair offline: `age-keygen -o joutiya-backup.key` (age v1.3+). The printed
-  public key (`age1...`, 62 chars) goes to `BACKUP_AGE_RECIPIENT` in the worker's `app.env`.
-- The key file (`AGE-SECRET-KEY-1...`) stays offline with the owner (password manager plus an offline
-  copy): never on the VM, in the repo, in CI or in a chat. Without it no backup can be read.
-- Rotation: new pair, new `BACKUP_AGE_RECIPIENT`; keep the old key file 98 days for the older backups.
-- Manual look: `age -d -i joutiya-backup.key manifest.json.age`, or
+- Vous générez la paire hors ligne : `age-keygen -o joutiya-backup.key` (age v1.3 ou plus). La clé publique
+  affichée (`age1...`, 62 caractères) va dans `BACKUP_AGE_RECIPIENT`, dans le `app.env` du worker.
+- Le fichier de clé (`AGE-SECRET-KEY-1...`) reste hors ligne chez vous (gestionnaire de mots de passe et une
+  copie hors ligne) : jamais sur la VM, dans le dépôt, dans la CI ni dans un chat. Sans lui, aucune
+  sauvegarde n'est lisible.
+- Rotation : nouvelle paire, nouveau `BACKUP_AGE_RECIPIENT` ; gardez l'ancien fichier de clé 98 jours pour
+  les sauvegardes plus anciennes.
+- Lecture à la main : `age -d -i joutiya-backup.key manifest.json.age`, ou
   `age -d -i joutiya-backup.key users.ndjson.gz.age | gunzip | head`.
 
-## Restore
+## Restauration
 
-From the owner's machine (the key file never leaves it), with Node 24:
+Depuis votre PC (le fichier de clé ne le quitte jamais), avec Node 24 :
 
 ```
-# 1. Dry run: decrypts and checks every part in memory, prints counts only.
+# 1. Simulation : déchiffre et vérifie chaque partie en mémoire, n'affiche que des nombres.
 node scripts/restore-firestore.ts --identity joutiya-backup.key --from ./backups --project <project-id>
-# Straight from the bucket instead of a download (R2_* variables in .env.local):
-node --env-file=.env.local scripts/restore-firestore.ts --identity joutiya-backup.key --from-bucket --project <project-id>
-# 2. Write.
+# Directement depuis le bucket privé d'un environnement au lieu d'une copie téléchargée :
+node --env-file=.env.local scripts/restore-firestore.ts --identity joutiya-backup.key --from-bucket <staging|prod> --project <project-id>
+# 2. Écriture.
 node scripts/restore-firestore.ts ... --apply
 ```
 
-- Target: with `FIRESTORE_EMULATOR_HOST` set, the local emulator (any project id). Otherwise a project
-  recorded in `infra/targets.json`; the production one also needs `--allow-production`. Credentials:
-  `gcloud auth application-default login`.
-- Options: `--collections users,listings` (backup table ids, `private` = `users/{uid}/private/*`),
-  `--until YYYY-MM-DD` (state as of that night, e.g. before a bad deploy).
-- Each document gets its newest captured version (highest update time across all dates and passes),
-  written with `set()` in batches of 500. A date whose manifest is missing (run that did not finish) is
-  restored unverified, with a warning; a part that does not match its manifest stops the restore; days
-  without any backup are reported.
-- `set()` replaces whole documents: restoring into a live database reverts what changed since the backup.
-  Prefer an empty project, or narrow with `--collections`.
-- Spark allows 20 000 writes a day: split a larger restore with `--collections` over several days.
+- Source : `--from` prend une copie téléchargée du préfixe `backups/` (le dossier qui contient les dates).
+  `--from-bucket <staging|prod>` lit le bucket privé de cet environnement : nom et adresse viennent de
+  `infra/targets.json`, les clés de votre `.env.local` sous `R2_ACCESS_KEY_ID_<ENV>` et
+  `R2_SECRET_ACCESS_KEY_<ENV>` (les noms sans suffixe sont ignorés : ils peuvent être ceux de l'autre produit).
 
-After a restore:
+- Cible : avec `FIRESTORE_EMULATOR_HOST`, l'émulateur local (n'importe quel identifiant de projet). Sinon le
+  projet du staging ou de la production enregistré dans `infra/targets.json` ; celui de production demande
+  en plus `--allow-production`. `joutiya-dev` est refusé : il n'a pas d'identité de worker, ses données vont
+  dans l'émulateur.
+- Identifiants : la simulation n'en demande aucun. `--apply` dans un vrai projet écrit en tant que worker de
+  cet environnement, avec un certificat d'un jour signé par l'autorité de `scripts/google-wif.ts` : il se
+  lance donc sur le PC2, qui la détient (dossier `~/.joutiya`), avec le fichier de clé age. Aucune connexion
+  gcloud, jamais `gcloud auth application-default login` ; le certificat et sa clé sont effacés à la fin.
+- Options : `--collections users,listings` (identifiants de la table de sauvegarde, `private` =
+  `users/{uid}/private/*`), `--until YYYY-MM-DD` (l'état de cette nuit-là, par exemple avant un mauvais
+  déploiement).
+- Chaque document reçoit sa version capturée la plus récente (la plus haute date de mise à jour, toutes
+  dates et passes confondues), écrite avec `set()` par lots de 500. Une partie qui ne correspond pas à son
+  manifeste arrête la restauration ; les jours sans aucune sauvegarde sont signalés.
+- Une date sans manifeste (nuit qui n'a pas fini, ou nuit en cours à 03:30 UTC) est refusée : ses parties
+  n'ont ni nombre de documents ni SHA-256 à vérifier. Le message liste les parties et propose
+  `--until <la veille>` pour s'arrêter avant. `--allow-unverified` les restaure quand même, sans
+  vérification, en les listant.
+- `set()` remplace des documents entiers : restaurer dans une base en service annule ce qui a changé depuis
+  la sauvegarde. Préférez un projet vide, ou réduisez avec `--collections`.
 
-1. Deletions are not in the backups: documents deleted outright after a backup are back. A purged listing
-   comes back as its tombstone (it carries `updatedAt`) once the incremental that followed the purge is
-   restored; before that, its full text is back. Run `retention-purge` and `purge-unactivated`, and check
-   legal holds, before reopening.
-2. Not in the backups: Firebase Auth accounts (export them separately), `config/legal`
-   (`scripts/legal-config.ts`), `quotaDaily`, `system/*` cursors (rebuilt), R2 objects (photos).
-3. Rebuild the search index from Firestore (phase 4).
+### Plus de 20 000 documents (Spark)
 
-## Known limits
+Spark accepte 20 000 écritures par jour, celles de l'application comprises ; au-delà, toute écriture
+échoue jusqu'à la remise à zéro (minuit heure du Pacifique, entre 7 h et 9 h au Maroc). Avec `--apply`,
+le script refuse donc d'écrire plus de 20 000 documents dans un vrai projet (l'émulateur n'a pas de
+limite) ; la simulation l'annonce déjà.
 
-- A change to a document without `updatedAt` (journals, `listingStats`, `searchOutbox`, `private`) or with
-  `createdAt` only (`emailIndex`, `staff`, `moderationDecisions`) reaches the backups through the rolling
-  full only: within one cycle (documents / 10 000 nights).
-- A collection's first incremental covers its last 24 h; older documents come with the rolling full.
-- age files are encrypted, not signed: anyone holding the public key and write access to the bucket could
-  plant a part. Restore only from the environment's own private bucket (R2 token scoped to it).
-- Restore on real data (prod backups into staging) is a pending phase 3 check on the live environment.
+1. Lancez la simulation : elle donne le nombre de documents par collection.
+2. Regroupez les collections en lots de moins de 20 000 documents (gardez de la marge pour l'application
+   si le projet est en service), un lot par jour, après la remise à zéro.
+3. Chaque jour : `node scripts/restore-firestore.ts ... --collections <lot du jour> --until <même date pour
+   tous les lots> --apply`. Le même `--until` garde un état cohérent d'un jour à l'autre.
+4. Une seule collection de plus de 20 000 documents (par exemple `connectionLogs`, gardé un an) ne se
+   découpe pas : il faut passer le projet cible à Blaze le temps de la restauration (votre décision : compte
+   de facturation, les écritures au-delà du gratuit sont payantes), puis ajouter `--allow-over-quota`.
+
+Après une restauration :
+
+1. Les suppressions ne sont pas dans les sauvegardes : les documents supprimés après une sauvegarde
+   reviennent. Une annonce purgée revient sous forme de pierre tombale (elle porte `updatedAt`) dès que
+   l'incrémentale qui a suivi la purge est restaurée ; avant cela, son texte complet revient. Lancez
+   `retention-purge` et `purge-unactivated`, et vérifiez les conservations légales, avant de rouvrir.
+2. Hors sauvegarde : les comptes Firebase Auth (à exporter à part), `config/legal`
+   (`scripts/legal-config.ts`), `quotaDaily`, les curseurs `system/*` (reconstruits), les objets R2
+   (photos).
+3. Reconstruisez l'index de recherche depuis Firestore (phase 4).
+
+## Répétition de la restauration
+
+Le test contre l'émulateur (`tests/api/backup/restore.test.ts`) passe. La chaîne réelle ne l'est pas
+encore : identifiants du worker -> bucket privé -> cycle de vie -> clé age hors ligne ->
+`restore-firestore.ts --apply` sur un vrai projet. Elle se répète deux fois :
+
+- **A, critère de sortie de la phase 3**, dès que le staging tourne et a au moins deux nuits de sauvegarde
+  dont un cycle complet (jauge `firestore.storage` connue au back-office) : sauvegardes du staging vers
+  l'émulateur Firestore du PC (`npx firebase emulators:start --only firestore --project demo-joutiya`, Java 21,
+  puis `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080`). Toute la chaîne y passe sauf l'écriture dans un vrai projet,
+  que B couvre.
+- **B, avant le lancement (porte de la phase 6)** : sauvegardes de la production vers le staging, écrites en
+  tant que worker du staging, donc sur le PC2. Avant le lancement, la production ne contient pas encore de
+  données de vrais utilisateurs ; après, ne copiez plus la production vers le staging.
+
+Prérequis : le fichier de clé age sur le PC qui lance la restauration (le PC2 pour B) ; le projet cible
+vide ou jetable.
+
+1. Notez l'heure, puis lancez la simulation depuis le bucket de la source (`--from-bucket staging` et
+   l'émulateur pour A, `--from-bucket prod --project joutiya-staging` pour B). Notez la plage de dates, le nombre
+   de parties, les dates vérifiées et les documents par collection. Toute alerte (jour manquant, partie
+   ignorée, date sans manifeste) est un résultat à noter, pas à contourner.
+2. Si la simulation dépasse 20 000 documents, découpez comme ci-dessus.
+3. Même commande avec `--apply` ; notez l'heure de fin et le nombre de documents écrits. Il doit égaler le
+   total de la simulation.
+4. Comparez trois documents avec la source : une annonce, un utilisateur, son document `private/account`
+   (dates, position, références intactes). Pour B dans la console Firebase du staging ; pour A dans
+   l'émulateur, sans interface, par son API REST sur le PC (`curl
+   "http://127.0.0.1:8080/v1/projects/demo-joutiya/databases/(default)/documents/listings/<id>"`).
+5. Remplissez une ligne du tableau. Pour B, gardez le staging tel quel (données d'avant le lancement) ou
+   videz-le ; pour A, arrêtez l'émulateur (il ne garde rien).
+
+| Date | Répétition | Source -> cible | Nuits (de … à …) | Parties | Documents (simulation) | Documents écrits | Durée simulation | Durée écriture | Écarts, remarques |
+|---|---|---|---|---|---|---|---|---|---|
+| | A | staging -> émulateur du PC | | | | | | | |
+| | B | prod -> `joutiya-staging` | | | | | | | |
+
+## Limites connues
+
+- Une modification d'un document sans `updatedAt` (journaux, `listingStats`, `searchOutbox`, `private`) ou
+  avec `createdAt` seulement (`emailIndex`, `staff`, `moderationDecisions`) n'arrive dans les sauvegardes
+  que par la rotation complète : dans un cycle (documents / 10 000 nuits).
+- La première incrémentale d'une collection couvre ses dernières 24 h ; les documents plus anciens arrivent
+  avec la rotation complète.
+- Les fichiers age sont chiffrés, pas signés : quiconque a la clé publique et un droit d'écriture sur le
+  bucket pourrait y déposer une partie, voire un manifeste. Ne restaurez que depuis le bucket privé de
+  l'environnement (jeton R2 limité à ses buckets), et n'utilisez `--allow-unverified` qu'en connaissant
+  l'origine des parties listées.
+- La restauration sur de vraies données reste à faire (répétitions A et B ci-dessus).

@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import type { EngineQuery, FilterExpr, SearchDocument, SortSpec } from "../src/lib/search/types.ts";
 import { registerSrcResolver } from "./search-setup.ts";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 /** Deterministic PRNG (mulberry32): the same data and queries on every run. */
 export function prng(seed: number): () => number {
@@ -41,6 +42,7 @@ const WORDS = [
 ];
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const { values: args } = parseArgs({
     options: {
       docs: { type: "string", default: "20000" },

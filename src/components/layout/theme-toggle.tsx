@@ -33,7 +33,7 @@ export function ThemeToggle({ className }: { className?: string }) {
             title={t(value)}
             onClick={() => setTheme(value)}
             className={cn(
-              "inline-flex size-11 items-center justify-center rounded-sm text-foreground-muted transition-colors",
+              "inline-flex size-11 items-center justify-center rounded-sm text-foreground-muted transition-[background-color,color,box-shadow,scale] duration-150 ease-door active:scale-[0.98]",
               "hover:text-foreground aria-checked:bg-surface aria-checked:text-foreground aria-checked:shadow-sm",
             )}
           >

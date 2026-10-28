@@ -26,7 +26,7 @@ export function LocaleSwitcher({ className }: { className?: string }) {
   const current = useLocale() as Locale;
   const [requested, setRequested] = useState(false);
   const triggerClassName = cn(
-    "inline-flex h-11 items-center gap-2 rounded-md px-3 text-sm font-medium text-foreground hover:bg-surface-muted",
+    "inline-flex h-11 items-center gap-2 rounded-md px-3 text-sm font-medium text-foreground transition-[background-color,scale] duration-150 ease-door hover:bg-surface-muted active:scale-[0.98]",
     "data-[state=open]:bg-surface-muted",
     className,
   );

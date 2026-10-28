@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { BadgeCheck, KeyRound, LogOut, Mail, Smartphone } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -15,10 +15,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LOCALES, type Locale } from "@/config/site";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { ApiError, apiPost, isApiError, setSession, signOut, useSession } from "@/lib/auth/client";
+import { usePublicConfig } from "@/lib/config/client";
 import { AUTH_API, passwordChangeSchema, profileSchema, type SessionSummary } from "@/lib/contracts/auth";
 import { toast } from "sonner";
 import { FormMessage, useApiErrorMessage, useFieldMessage } from "./form-message";
 import { PasswordField } from "./password-field";
+import { Section } from "./settings-section";
+import { AccountClosedView, CloseAccountSection, DataSection } from "@/components/account/account-sections";
+import type { CloseAccountResponse } from "@/lib/contracts/account";
 
 // /parametres. The layout already requires a member; the data comes from GET /api/auth/me (or the
 // session the private layout rendered with). One page, its sections separated by rules: borders
@@ -28,6 +32,8 @@ export function SettingsView() {
   const t = useTranslations("Auth.settings");
   const router = useRouter();
   const { status, session } = useSession();
+  // Set by the closure (L7): the page gives way to its confirmation, whatever the session does next.
+  const [closed, setClosed] = useState<CloseAccountResponse | null>(null);
 
   async function onSignOut() {
     await signOut();
@@ -43,12 +49,16 @@ export function SettingsView() {
           <h1 className="text-3xl font-semibold text-balance">{t("title")}</h1>
           <p className="text-foreground-muted text-pretty">{t("lead")}</p>
         </div>
-        <Button type="button" variant="outline" onClick={() => void onSignOut()} className="w-fit">
-          <LogOut aria-hidden="true" />
-          {t("signOut")}
-        </Button>
+        {closed ? null : (
+          <Button type="button" variant="outline" onClick={() => void onSignOut()} className="w-fit">
+            <LogOut aria-hidden="true" />
+            {t("signOut")}
+          </Button>
+        )}
       </header>
-      {status !== "ready" ? (
+      {closed ? (
+        <AccountClosedView closed={closed} />
+      ) : status !== "ready" ? (
         <LoadingSections label={t("loading")} />
       ) : !session ? (
         <SessionLost />
@@ -58,6 +68,8 @@ export function SettingsView() {
           <PasswordSection email={session.email} displayName={session.displayName} hasPassword={session.providers.includes("password")} />
           <VerificationSection session={session} />
           <MethodsSection session={session} />
+          <DataSection />
+          <CloseAccountSection onClosed={setClosed} />
         </div>
       )}
     </div>
@@ -99,21 +111,6 @@ function SessionLost() {
   );
 }
 
-/** Settings section: title and purpose on the start side, the controls on the end side. */
-function Section({ id, title, body, children }: { id: string; title: string; body: string; children: ReactNode }) {
-  return (
-    <section aria-labelledby={`${id}-title`} className="grid gap-6 py-8 first:pt-0 last:pb-0 sm:grid-cols-[13rem_1fr]">
-      <div className="flex flex-col gap-1">
-        <h2 id={`${id}-title`} className="text-lg font-semibold">
-          {title}
-        </h2>
-        <p className="text-sm text-foreground-muted text-pretty">{body}</p>
-      </div>
-      <div className="min-w-0">{children}</div>
-    </section>
-  );
-}
-
 type ProfileForm = z.input<typeof profileSchema>;
 type ProfileInput = z.output<typeof profileSchema>;
 
@@ -131,6 +128,7 @@ function ProfileSection({ session }: { session: SessionSummary }) {
   } = useForm<ProfileForm, unknown, ProfileInput>({
     resolver: zodResolver(profileSchema),
     defaultValues: { displayName: session.displayName ?? "", locale: session.locale ?? "fr" },
+    mode: "onTouched",
   });
 
   const submit = handleSubmit(async (values) => {
@@ -147,7 +145,7 @@ function ProfileSection({ session }: { session: SessionSummary }) {
 
   return (
     <Section id="profile" title={t("title")} body={t("body")}>
-      <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+      <form method="post" onSubmit={submit} noValidate className="flex flex-col gap-4">
         <FormMessage error={serverError} />
         <Field label={t("displayName")} error={fieldMessage("displayName", errors.displayName)} required>
           <Input autoComplete="name" maxLength={40} {...register("displayName")} />
@@ -212,6 +210,7 @@ function PasswordChangeForm({ email, displayName }: { email: string | null; disp
   } = useForm<PasswordForm, unknown, PasswordInput>({
     resolver: zodResolver(passwordChangeSchema),
     defaultValues: { currentPassword: "", password: "" },
+    mode: "onTouched",
   });
   const password = useWatch({ control, name: "password" });
 
@@ -230,7 +229,7 @@ function PasswordChangeForm({ email, displayName }: { email: string | null; disp
   });
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+    <form method="post" onSubmit={submit} noValidate className="flex flex-col gap-4">
       <FormMessage error={serverError} />
       {/* Password managers pair the new password with the account. */}
       <input type="hidden" name="username" autoComplete="username" value={email ?? ""} readOnly />
@@ -250,8 +249,10 @@ function PasswordChangeForm({ email, displayName }: { email: string | null; disp
   );
 }
 
-function VerificationSection({ session }: { session: SessionSummary }) {
+export function VerificationSection({ session }: { session: SessionSummary }) {
   const t = useTranslations("Auth.settings.verification");
+  // WhatsApp parked (no phone number id): the check cannot start, so no call to action leads to a 503.
+  const phoneOpen = usePublicConfig()?.phoneVerification !== false;
   return (
     <Section id="verification" title={t("title")} body={t("body")}>
       <ul className="flex flex-col divide-y divide-border">
@@ -277,9 +278,13 @@ function VerificationSection({ session }: { session: SessionSummary }) {
               {session.phoneVerified ? t("phoneVerified") : t("phoneMissing")}
             </Badge>
           </div>
-          <Button asChild variant={session.phoneVerified ? "ghost" : "structure"} size="sm">
-            <Link href="/verifications">{session.phoneVerified ? t("managePhone") : t("verifyPhone")}</Link>
-          </Button>
+          {session.phoneVerified || phoneOpen ? (
+            <Button asChild variant={session.phoneVerified ? "ghost" : "structure"} size="sm">
+              <Link href="/verifications">{session.phoneVerified ? t("managePhone") : t("verifyPhone")}</Link>
+            </Button>
+          ) : (
+            <span className="text-sm text-foreground-muted">{t("phoneSoon")}</span>
+          )}
         </li>
       </ul>
     </Section>

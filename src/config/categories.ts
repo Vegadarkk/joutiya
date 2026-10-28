@@ -55,6 +55,13 @@ export interface Subcategory {
   donationAllowed?: boolean;
   /** Reserved to Pro accounts (waitlist until phase 7). */
   proOnly?: boolean;
+  /**
+   * Restricted goods sold to adults only (owner decisions of 2026-10-21 and 2026-10-26): every
+   * listing is reviewed by a moderator before publication, the seller attests it at publish,
+   * contact goes through the messaging only, and a buyer confirms being 18 or older before the
+   * first message. Listings stay public, with an 18+ notice.
+   */
+  adultsOnly?: boolean;
 }
 
 export interface Category {
@@ -234,6 +241,7 @@ export const CATEGORIES: readonly Category[] = [
       { id: "ameublement", categoryId: "maison-jardin", condition: "required", donationAllowed: true, criteria: [required("furniture-type"), optional("material"), optional("color")] },
       { id: "electromenager", categoryId: "maison-jardin", condition: "required", donationAllowed: true, criteria: [required("appliance-type"), optional("brand"), optional("warranty")] },
       { id: "decoration-artisanat", categoryId: "maison-jardin", condition: "required", donationAllowed: true, criteria: [required("decor-type"), optional("material"), optional("handmade")] },
+      { id: "koumiyas-decoratives", categoryId: "maison-jardin", condition: "required", adultsOnly: true, criteria: [optional("material"), optional("handmade")] },
       { id: "linge", categoryId: "maison-jardin", condition: "required", donationAllowed: true, criteria: [required("linen-type"), optional("material")] },
       { id: "arts-de-la-table", categoryId: "maison-jardin", condition: "required", donationAllowed: true, criteria: [required("tableware-type"), optional("material")] },
       { id: "bricolage", categoryId: "maison-jardin", condition: "required", donationAllowed: true, criteria: [required("diy-type"), optional("brand")] },
@@ -319,6 +327,14 @@ export function categoryById(id: string): Category | undefined {
 /** Subcategory ids are unique across the tree (`categoryId` is on the object). */
 export function subcategoryById(id: string): Subcategory | undefined {
   return subcategoryIndex.get(id);
+}
+
+/**
+ * Whether ads may ever run beside a listing of this subcategory: never on an adults-only one
+ * (decorative koumiyas, Google's weapons and knives policy). Every `adsEligible` writer applies it.
+ */
+export function subcategoryAllowsAds(id: string | undefined): boolean {
+  return !(id && subcategoryById(id)?.adultsOnly);
 }
 
 export function criterionById(id: string): FieldDef | undefined {

@@ -7,7 +7,7 @@ import { audit } from "@/lib/audit";
 import { accessIdentity, requireSameOrigin, type StaffContext } from "@/lib/auth/guards";
 import { assertPasswordPolicy } from "@/lib/auth/password-policy";
 import { displayNameSchema, emailSchema, PASSWORD_MAX } from "@/lib/contracts/auth";
-import { getStaff, listStaff, revokeStaff, staffRoleSchema, upsertStaff, type StaffRecord, type StaffRole } from "@/lib/db/repositories/staff";
+import { getStaff, listActiveAdmins, listStaff, revokeStaff, staffRoleSchema, upsertStaff, type StaffRecord, type StaffRole } from "@/lib/db/repositories/staff";
 import { emailNormHash } from "@/lib/db/repositories/users";
 import { serverEnv } from "@/lib/env";
 import { auth } from "@/lib/firebase/admin";
@@ -27,7 +27,7 @@ import { readJson } from "@/lib/http/json";
 import { json } from "@/lib/http/route";
 import { logConnection } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
-import { sendMail } from "@/lib/mail";
+import { sendMail, type ActionLinkRequest } from "@/lib/mail";
 import { requestIdentity, type RequestIdentity } from "@/lib/rate-limit/keys";
 import { blockLimit, consumeLimit, enforceLimit, limitState, resetLimit } from "@/lib/rate-limit/limiter";
 import { clearSessionCookies, CSRF_HEADER, SESSION_COOKIE, setSessionCookies } from "@/lib/security/cookies";
@@ -175,10 +175,18 @@ export async function login(request: Request): Promise<Response> {
     if (!check.ok) throw new HttpError(400, "turnstile_failed");
   }
 
-  /** A failure on the pair and on the account; the one that fills the window locks the pair for blockDuration right away. */
+  // Counted on the pair before the password is looked at, atomically (F8, as the member login): a
+  // burst of parallel attempts past the allowance is refused here instead of all reaching Firebase
+  // Auth. A right password on a staff account forgets the count.
+  const counted = await consumeLimit(LOGIN_LIMIT, accountIp);
+  if (!counted.ok) {
+    if (counted.reason === "limited") throw accountLocked(counted.retryAfterSeconds);
+    throw unavailable("rate limiter unavailable");
+  }
+  /** A failure also counts on the account; the attempt that filled the pair's window locks it for blockDuration right away. */
   const fail = async (): Promise<void> => {
-    const [counted] = await Promise.all([consumeLimit(LOGIN_LIMIT, accountIp), consumeLimit(ACCOUNT_LIMIT, account)]);
-    if (counted.ok && counted.remaining === 0) await blockLimit(LOGIN_LIMIT, accountIp);
+    await consumeLimit(ACCOUNT_LIMIT, account);
+    if (counted.remaining === 0) await blockLimit(LOGIN_LIMIT, accountIp);
   };
 
   let localId: string;
@@ -207,8 +215,7 @@ export async function login(request: Request): Promise<Response> {
 
   const minted = await createSessionForUid(record.uid);
   await resetLimit(LOGIN_LIMIT, accountIp);
-  const userAgent = request.headers.get("user-agent")?.slice(0, 200);
-  await logConnection({ uid: record.uid, event: "staff_login", ip: identity.ip, ...(userAgent ? { userAgent } : {}) });
+  await logConnection({ uid: record.uid, event: "staff_login", ip: identity.ip });
 
   const payload: StaffLoginResponse = {
     status: "signed_in",
@@ -287,9 +294,12 @@ export async function list(): Promise<StaffListResponse> {
   return { staff: (await listStaff()).map(toMember) };
 }
 
-/** Invitation link: our own page, the oobCode of the Admin SDK link (the Firebase page is never used). */
-export function invitationUrl(oobCode: string, origin = expectedOrigin("admin")): string {
-  return `${origin}/connexion?mode=setPassword&oobCode=${encodeURIComponent(oobCode)}`;
+/**
+ * Invitation link request: our own page, plus the oobCode of an Admin SDK reset link generated at
+ * delivery (the Firebase page is never used, the queue never holds the code).
+ */
+export function invitationLinkRequest(origin = expectedOrigin("admin")): ActionLinkRequest {
+  return { action: "resetPassword", url: `${origin}/connexion?mode=setPassword`, continueUrl: `${origin}/connexion` };
 }
 
 /**
@@ -302,16 +312,27 @@ async function isStaffAccount(record: UserRecord): Promise<boolean> {
   return isStaff(readClaims(record.customClaims ?? {})) || (await getStaff(record.uid)) !== null;
 }
 
+/** 409 unless another active admin remains once `targetUid` is demoted or revoked: the back office keeps at least one. */
+async function assertAnotherAdmin(targetUid: string): Promise<void> {
+  const others = (await listActiveAdmins()).filter((admin) => admin.uid !== targetUid);
+  if (others.length === 0) throw new HttpError(409, "conflict", "the last active admin cannot be demoted or revoked");
+}
+
 /**
  * POST /api/admin/staff: creates the Auth account (or reuses a staff one, revoked included), writes
  * the roster entry, sets the staff claims and mails the set-password link. Refused with 409: the
- * caller themself (nobody grants a role to themself, §6) and any existing non-staff account (staff
- * accounts are separate from shopper accounts).
+ * caller themself (nobody grants a role to themself, §6), any existing non-staff account (staff
+ * accounts are separate from shopper accounts) and the demotion of the last active admin. A new
+ * role on an active colleague is audited as `staff.role_change` on top of the invitation.
  */
 export async function invite(ctx: StaffContext, input: InviteInput, identity: RequestIdentity): Promise<StaffInviteResponse> {
   const existing = await auth().getUserByEmail(input.email).catch(() => null);
   if (existing && existing.uid === ctx.user.uid) throw new HttpError(409, "conflict", "cannot invite yourself");
   if (existing && !(await isStaffAccount(existing))) throw new HttpError(409, "conflict", "a Joutiya account exists with this e-mail");
+  const current = existing ? await getStaff(existing.uid) : null;
+  /** The roster role of an active colleague (a revoked entry is a re-invitation, not a role change). */
+  const activeRole = current && !current.revokedAt ? current.role : null;
+  if (current && activeRole === "admin" && input.role !== "admin") await assertAnotherAdmin(current.uid);
   const uid = existing?.uid ?? (await auth().createUser({ email: input.email, emailVerified: true, displayName: input.displayName })).uid;
   if (existing && (existing.disabled || existing.displayName !== input.displayName)) {
     // Re-invitation of a revoked or renamed member: the account is active again.
@@ -321,16 +342,12 @@ export async function invite(ctx: StaffContext, input: InviteInput, identity: Re
   await upsertStaff({ uid, email: input.email, displayName: input.displayName, role: input.role, invitedBy: ctx.user.uid });
   await setClaims(uid, { role: input.role, v: 2 });
 
-  const origin = expectedOrigin("admin");
   try {
-    const link = await auth().generatePasswordResetLink(input.email, { url: `${origin}/connexion` });
-    const oobCode = new URL(link).searchParams.get("oobCode");
-    if (!oobCode) throw new Error("the generated link carries no oobCode");
     await sendMail({
       template: "staffInvite",
       locale: "fr",
       to: input.email,
-      data: { displayName: input.displayName, actionUrl: invitationUrl(oobCode, origin), role: input.role },
+      data: { displayName: input.displayName, actionLink: invitationLinkRequest(), role: input.role },
       priority: "security",
     });
   } catch (error) {
@@ -346,28 +363,45 @@ export async function invite(ctx: StaffContext, input: InviteInput, identity: Re
     ip: identity.ip,
     reason: input.role,
   });
+  if (activeRole && activeRole !== input.role) {
+    await audit({
+      actorUid: ctx.user.uid,
+      actorRole: ctx.role,
+      action: "staff.role_change",
+      target: { type: "staff", id: uid },
+      automated: false,
+      ip: identity.ip,
+      reason: `${activeRole}->${input.role}`,
+    });
+  }
   return { uid };
 }
 
 /** Revocation here never touches Cloudflare Access: the admin removes the person from its policy by hand. */
 export const REVOKE_ACCESS_REMINDER = "retirer aussi de Cloudflare Access";
 
+/** An account with staff claims but no roster entry (a bootstrap stopped halfway), or 404. */
+async function staffClaimsOf(uid: string): Promise<{ email: string; displayName: string; role: StaffRole }> {
+  const record = await auth().getUser(uid).catch(() => null);
+  const claims = record ? readClaims(record.customClaims ?? {}) : {};
+  if (!record?.email || !isStaff(claims) || !claims.role) throw notFound();
+  const displayName = displayNameSchema.safeParse(record.displayName);
+  return { email: record.email, displayName: displayName.success ? displayName.data : "Membre", role: claims.role as StaffRole };
+}
+
 /**
  * DELETE /api/admin/staff/[uid]: clears the claims, revokes every session, disables the Auth
- * account and marks the roster entry revoked. Never on oneself (403); unknown member: 404. An
- * account with staff claims but no roster entry (a bootstrap stopped halfway) is revoked all the
- * same, with a roster tombstone so the /personnel page shows it.
+ * account and marks the roster entry revoked. Never on oneself (403), never the last active admin
+ * (409); unknown member: 404. An account with staff claims but no roster entry (a bootstrap
+ * stopped halfway) is revoked all the same, with a roster tombstone so the /personnel page shows it.
  */
 export async function revoke(ctx: StaffContext, uid: string, identity: RequestIdentity): Promise<void> {
   if (uid === ctx.user.uid) throw forbidden("a member cannot revoke themself");
   const target = await getStaff(uid);
-  if (!target) {
-    const record = await auth().getUser(uid).catch(() => null);
-    const claims = record ? readClaims(record.customClaims ?? {}) : {};
-    if (!record?.email || !isStaff(claims) || !claims.role) throw notFound();
-    const displayName = displayNameSchema.safeParse(record.displayName);
-    await upsertStaff({ uid, email: record.email, displayName: displayName.success ? displayName.data : "Membre", role: claims.role as StaffRole, invitedBy: "script" });
-  }
+  const ghost = target ? null : await staffClaimsOf(uid);
+  const activeRole = target ? (target.revokedAt ? null : target.role) : (ghost?.role ?? null);
+  if (activeRole === "admin") await assertAnotherAdmin(uid);
+  if (ghost) await upsertStaff({ uid, ...ghost, invitedBy: "script" });
   await setClaims(uid, null);
   await revokeSessions(uid);
   await auth().updateUser(uid, { disabled: true });

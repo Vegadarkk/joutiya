@@ -261,8 +261,14 @@ export function stepIssues(step: WizardStep, draft: DraftLike, options: IssueOpt
 }
 
 function phoneIssues(draft: DraftLike, options: IssueOptions): FieldIssue[] {
-  if (options.phoneVerified !== false) return [];
   const issues: FieldIssue[] = [];
+  // Adults-only goods (screen.ts checkContact): messaging only, whatever the badge.
+  if (draft.subcategoryId && subcategoryById(draft.subcategoryId)?.adultsOnly) {
+    if (draft.contact.showPhone) issues.push({ path: "contact.showPhone", code: "messaging_only" });
+    if (draft.contact.whatsapp) issues.push({ path: "contact.whatsapp", code: "messaging_only" });
+    return issues;
+  }
+  if (options.phoneVerified !== false) return [];
   if (draft.contact.showPhone) issues.push({ path: "contact.showPhone", code: "phone_required" });
   if (draft.contact.whatsapp) issues.push({ path: "contact.whatsapp", code: "phone_required" });
   return issues;

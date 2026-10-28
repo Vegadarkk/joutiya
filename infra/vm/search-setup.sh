@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Meilisearch of one environment (phase 4): the index and the app's two scoped keys, made by
-# scripts/search-setup.ts in the worker image, then web and worker recreated so that they read them.
+# scripts/search-setup.ts in the worker image and written to app.env with MEILI_URL, then web and
+# worker recreated so that they read them. A first start runs without the three (search answers 503).
 # Run as root through Run Command once a release with Meilisearch runs, and after a rebuild
 # (`node scripts/oracle-vm.ts search-setup <env> --apply`):
 #
@@ -46,12 +47,12 @@ keys="$(grep -E '^MEILI_(SEARCH|INDEX)_KEY=[A-Za-z0-9_-]+$' "$out/keys.env" || t
 [[ "$(grep -c . <<< "$keys")" -eq 2 ]] || { echo "search-setup left no usable keys: app.env unchanged" >&2; exit 1; }
 umask 077
 new="$(mktemp "$DIR/.app.env.XXXXXX")"
-grep -v -E '^MEILI_(SEARCH|INDEX)_KEY=' "$DIR/app.env" > "$new" || [[ $? -eq 1 ]]
-printf '%s\n' "$keys" >> "$new"
+grep -v -E '^MEILI_(URL|SEARCH_KEY|INDEX_KEY)=' "$DIR/app.env" > "$new" || [[ $? -eq 1 ]]
+printf '%s\n' "$keys" "MEILI_URL=http://meilisearch:7700" >> "$new"
 chmod 0600 "$new"
 mv -f "$new" "$DIR/app.env"
 new=""
-echo "app.env: MEILI_SEARCH_KEY and MEILI_INDEX_KEY set (values not shown)"
+echo "app.env: MEILI_URL, MEILI_SEARCH_KEY and MEILI_INDEX_KEY set (values not shown)"
 
 # Compose reads app.env only when it creates a container.
 compose up -d --no-deps --force-recreate --wait --wait-timeout 240 web worker

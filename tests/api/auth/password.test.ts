@@ -8,14 +8,14 @@ import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { csrfToken } from "@/lib/security/csrf";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { POST as action } from "@/app/api/auth/action/route";
-import { POST as clientToken } from "@/app/api/auth/client-token/route";
+import { GET as inbox } from "@/app/api/conversations/route";
 import { POST as login } from "@/app/api/auth/login/route";
 import { GET as me } from "@/app/api/auth/me/route";
 import { POST as passwordChange } from "@/app/api/auth/password/change/route";
 import { POST as resetConfirm } from "@/app/api/auth/password/confirm/route";
 import { POST as resetRequest } from "@/app/api/auth/password/reset/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
-import { CONSENTS, Jar, PASSWORD, call, capturedMails, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
+import { CONSENTS, Jar, PASSWORD, actionLinkOf, actionUrlOf, call, capturedMails, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
@@ -30,7 +30,7 @@ async function verifiedAccount(displayName = "Reset Tester") {
   const jar = new Jar();
   const email = uniqueEmail("p");
   expect((await call(signup, "/api/auth/signup", { jar, body: { email, password: PASSWORD, displayName, locale: "fr", consents: CONSENTS, turnstileToken: "t" } })).status).toBe(202);
-  const verified = await call<SignedInBody>(action, "/api/auth/action", { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(lastMail(sendMail, "verifyEmail", email)!.data.actionUrl) } });
+  const verified = await call<SignedInBody>(action, "/api/auth/action", { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(await actionUrlOf(lastMail(sendMail, "verifyEmail", email)!)) } });
   expect(verified.status).toBe(200);
   return { jar, email, uid: verified.body.session.uid };
 }
@@ -56,8 +56,10 @@ describe("password reset", () => {
     const mail = lastMail(sendMail, "resetPassword", email)!;
     expect(mail.priority).toBe("security");
     expect(mail.data.displayName).toBe("Reset Tester");
-    expect(mail.data.actionUrl).toMatch(/^http:\/\/localhost:3000\/fr\/action\?mode=resetPassword&oobCode=/);
-    const oobCode = oobCodeOf(mail.data.actionUrl);
+    expect(actionLinkOf(mail)).toEqual({ action: "resetPassword", url: "http://localhost:3000/fr/action?mode=resetPassword", continueUrl: "http://localhost:3000/fr/action" });
+    const actionUrl = await actionUrlOf(mail);
+    expect(actionUrl).toMatch(/^http:\/\/localhost:3000\/fr\/action\?mode=resetPassword&oobCode=/);
+    const oobCode = oobCodeOf(actionUrl);
 
     const checked = await call<{ status: string; email: string }>(action, "/api/auth/action", { jar: new Jar(), body: { mode: "resetPassword", oobCode } });
     expect(checked.status).toBe(200);
@@ -167,15 +169,15 @@ describe("POST /api/auth/password/change", () => {
     expect((await call<{ session: SignedInBody["session"] | null }>(me, "/api/auth/me", { jar })).body.session?.uid).toBe(uid);
     expect((await call<SignedInBody>(login, "/api/auth/login", { jar: new Jar(), body: { email, password: NEW_PASSWORD } })).status).toBe(200);
 
-    // The revoked cookie mutates nothing any more, even with its own CSRF token: no SDK token, signed out on /me.
+    // The revoked cookie reads and mutates nothing any more: no conversation (checkRevoked, D2), signed out on /me.
     const stale = new Jar();
     stale.cookies.set("__Host-session", oldCookie!);
     stale.cookies.set("__Host-csrf", csrfToken(oldCookie!));
-    const token = await call<ErrorBody>(clientToken, "/api/auth/client-token", { jar: stale, body: {} });
-    expect(token.status).toBe(401);
-    expect(token.body.error.code).toBe("unauthenticated");
+    const conversations = await call<ErrorBody>(inbox, "/api/conversations", { jar: stale });
+    expect(conversations.status).toBe(401);
+    expect(conversations.body.error.code).toBe("unauthenticated");
     expect((await call<{ session: SignedInBody["session"] | null }>(me, "/api/auth/me", { jar: stale })).body.session).toBeNull();
-    const otherToken = await call<ErrorBody>(clientToken, "/api/auth/client-token", { jar: other, body: {} });
-    expect(otherToken.status).toBe(401);
+    const otherConversations = await call<ErrorBody>(inbox, "/api/conversations", { jar: other });
+    expect(otherConversations.status).toBe(401);
   });
 });

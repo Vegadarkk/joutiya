@@ -20,7 +20,7 @@ import { SearchUnavailableError, type FilterExpr } from "@/lib/search/types";
 // approximate retry). Horizon: the run time minus the indexing delay (5 min, or the outbox lag
 // when longer): a matching listing indexed after the run with an older sortAt than one already
 // sent would fall behind the moved cursor for good; listings past the horizon wait for the next run.
-// Budget: 40 e-mails per run (SAVED_SEARCH_ALERTS_MAX_MAILS) out of Resend's ~90 non-security
+// Budget: 40 e-mails per run (SAVED_SEARCH_ALERTS_MAX_MAILS) out of the site's ~72 non-security
 // mails a day, so transactional mails keep the rest; nothing starts while a Resend quota (day or
 // month) is degraded. The digest is delivered here (deliverMail, the mail worker's own call), not
 // queued: the search cursors move only once Resend accepted it, so a digest the quotas skip or a

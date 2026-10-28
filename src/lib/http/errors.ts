@@ -52,10 +52,14 @@ export type ErrorCode =
   | "upload_not_ready"
   /** A verified phone is needed (showPhone, WhatsApp). */
   | "phone_required"
+  /** Pro verification: the owner's number is not verified yet (WhatsApp, or the moderator's call). */
+  | "phone_unverified"
   /** Listing not published any more (paused, sold, expired, removed). */
   | "listing_unavailable"
   /** Phone reveal refused: account too young, e-mail unverified or quota reached. */
   | "reveal_not_allowed"
+  /** Publish in an adults-only subcategory without the seller's attestation (422). */
+  | "adults_only_attestation"
   // Search and discovery (phase 4). Messages: Listing.errors.<code>.
   /** Search engine missing or unreachable (503). */
   | "search_unavailable"
@@ -67,8 +71,73 @@ export type ErrorCode =
   | "saved_search_exists"
   /** Unsubscribe link token invalid or for another account. */
   | "invalid_token"
-  /** Firestore daily quota degraded (src/lib/quota/gate.ts): deposit or sign-up suspended until the reset. */
+  // Pro accounts (phase 7, design §4). Messages: Pro.errors.<code> (with the wizard UI).
+  /** config/flags.proSignupEnabled is off. */
+  | "pro_signup_closed"
+  /** The account is already a Pro. */
+  | "already_pro"
+  /** An application is pending or accepted for this account (409). */
+  | "pro_application_exists"
+  /** KYBC pieces that are not the applicant's `kyb` uploads. */
+  | "invalid_pieces"
+  // Credits and paid options (phase 7, design §5). Messages: Options.errors.<code>.
+  /** config/flags.salesEnabled is off: nothing can be bought (403). */
+  | "sales_closed"
+  /** A shop's credits are spent by its owner only (403). */
+  | "billing_owner_only"
+  /** The listing is not published or is hidden by moderation (409). */
+  | "listing_not_promotable"
+  /** The listing sorted from a publication, renewal or bump within the last hour (409). */
+  | "bump_too_soon"
+  /** Negative balance after a refund: no purchase until it is covered (409). */
+  | "wallet_frozen"
+  /** Plan credits + balance below the price (402). */
+  | "insufficient_credits"
+  /** The option's cost moved since the buyer saw it (price, allowance or plan credits; 409). */
+  | "price_changed"
+  // Pro subscriptions (phase 7, design §7). Messages: Subscription.errors.<code>.
+  /** The shop already has a plan: changes go through the Stripe portal (409). */
+  | "already_subscribed"
+  /** The shop's KYBC is not verified, or the shop is suspended (409). */
+  | "pro_not_verified"
+  /** No Stripe customer yet: nothing to manage before a first plan (409). */
+  | "no_billing_customer"
+  /** A webhook whose signature does not match (400, Stripe's expected answer). */
+  | "invalid_signature"
+    /** Firestore daily quota degraded (src/lib/quota/gate.ts): deposit or sign-up suspended until the reset. */
   | "quota_exhausted"
+  // Messaging, reports, appeals, assistant (phase 5). Messages: Messaging.errors / Report.errors.
+  /** One side blocked the other (403). */
+  | "conversation_blocked"
+  /** Conversation frozen (dispute or authority request) or the other account is gone (409). */
+  | "conversation_unavailable"
+  /** A seller cannot message himself about his own listing (409). */
+  | "self_conversation"
+  /** First message about an adults-only listing without the buyer's 18+ confirmation (422). */
+  | "adult_confirmation_required"
+  /** Reporter abusive (art. 23) or target not reportable by this account (403). */
+  | "report_not_allowed"
+  /** The reported target does not exist or is not visible to the reporter (404 semantics, 422). */
+  | "report_target_invalid"
+  /** Appeal window (6 months) closed, or the decision cannot be appealed (409). */
+  | "appeal_closed"
+  /** An appeal is already open or decided for this decision (409). */
+  | "appeal_exists"
+  /** Not the affected user nor a reporter of this decision (403). */
+  | "appeal_not_allowed"
+  /** An appeal is reviewed by another moderator than the one who decided (403). */
+  | "same_reviewer"
+  /** Ban by a moderator outside a P0 he confirmed, or a sanction above his role (403). */
+  | "sanction_not_allowed"
+  /** AI budget or provider unavailable: the assistant answers with help-center search results. */
+  | "assistant_unavailable"
+  // Account closure (phase 5, L7). Messages: Auth.errors.
+  /** The session's sign-in is older than RECENT_AUTH_SECONDS: sign in again, then retry (403). */
+  | "recent_auth_required"
+  /** A Pro subscription still renews: cancel it before closing the account (409). */
+  | "pro_subscription_active"
+  /** Purchased credits are left in the wallet (409). */
+  | "wallet_not_empty"
   | "unavailable"
   | "internal";
 

@@ -1,5 +1,5 @@
 import "server-only";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, type Transaction } from "firebase-admin/firestore";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { db } from "@/lib/firebase/admin";
 import { consume } from "@/lib/quota";
@@ -22,30 +22,62 @@ export interface ClaimResult {
  * query on every attempt (a contended transaction runs again), the writes once committed.
  */
 export async function claimVerifiedPhone(uid: string, e164: string, now = new Date()): Promise<ClaimResult> {
-  const firestore = db();
-  const userRef = (id: string) => firestore.collection(COLLECTIONS.users).doc(id);
-  const privateRef = (id: string) => userRef(id).collection(COLLECTIONS.userPrivate).doc(COLLECTIONS.userPrivateDoc);
   let moved = 0;
-  const result = await firestore.runTransaction(async (tx) => {
-    const holders = await tx.get(firestore.collectionGroup(COLLECTIONS.userPrivate).where("phoneE164", "==", e164));
-    // A query is billed one read per document returned, at least one.
-    void consume("firestore.reads", Math.max(1, holders.size));
-    moved = 0;
-    let previousUid: string | null = null;
-    for (const holder of holders.docs) {
-      // users/{uid}/private/account: the uid is the grandparent document.
-      const holderUid = holder.ref.parent.parent?.id;
-      if (!holderUid || holderUid === uid) continue;
-      previousUid ??= holderUid;
-      tx.update(holder.ref, { phoneE164: FieldValue.delete(), phoneVerifiedAt: FieldValue.delete() });
-      tx.update(userRef(holderUid), { "badges.phoneVerified": false, updatedAt: now });
-      moved += 1;
-    }
-    tx.update(privateRef(uid), { phoneE164: e164, phoneVerifiedAt: now });
-    tx.update(userRef(uid), { "badges.phoneVerified": true, updatedAt: now });
-    return { previousUid };
+  const result = await db().runTransaction(async (tx) => {
+    const claimed = await claimVerifiedPhoneIn(tx, uid, e164, now);
+    moved = claimed.moved;
+    return { previousUid: claimed.previousUid };
   });
   // The caller's two documents, and two per account that lost the number.
   void consume("firestore.writes", 2 + 2 * moved);
   return result;
+}
+
+/**
+ * The same claim inside a caller's transaction (a moderator's phone check writes the Pro profile
+ * and the number together). The caller counts the writes once committed: 2 + 2 * `moved`.
+ */
+export async function claimVerifiedPhoneIn(tx: Transaction, uid: string, e164: string, now: Date): Promise<ClaimResult & { moved: number }> {
+  const firestore = db();
+  const userRef = (id: string) => firestore.collection(COLLECTIONS.users).doc(id);
+  const privateRef = (id: string) => userRef(id).collection(COLLECTIONS.userPrivate).doc(COLLECTIONS.userPrivateDoc);
+  const holders = await tx.get(firestore.collectionGroup(COLLECTIONS.userPrivate).where("phoneE164", "==", e164));
+  // A query is billed one read per document returned, at least one.
+  void consume("firestore.reads", Math.max(1, holders.size));
+  let moved = 0;
+  let previousUid: string | null = null;
+  for (const holder of holders.docs) {
+    // users/{uid}/private/account: the uid is the grandparent document.
+    const holderUid = holder.ref.parent.parent?.id;
+    if (!holderUid || holderUid === uid) continue;
+    previousUid ??= holderUid;
+    tx.update(holder.ref, { phoneE164: FieldValue.delete(), phoneVerifiedAt: FieldValue.delete() });
+    tx.update(userRef(holderUid), { "badges.phoneVerified": false, updatedAt: now });
+    moved += 1;
+  }
+  tx.update(privateRef(uid), { phoneE164: e164, phoneVerifiedAt: now });
+  tx.update(userRef(uid), { "badges.phoneVerified": true, updatedAt: now });
+  return { previousUid, moved };
+}
+
+/**
+ * Staff withdrawal of a verified number (audit C1-02): the number, its verification date and the
+ * badge leave the account in one transaction. False when the account holds no verified number.
+ * The member can verify a number again; a fraudulent use is handled by the sanctions ladder.
+ */
+export async function revokeVerifiedPhone(uid: string, now = new Date()): Promise<boolean> {
+  const firestore = db();
+  const userRef = firestore.collection(COLLECTIONS.users).doc(uid);
+  const privateRef = userRef.collection(COLLECTIONS.userPrivate).doc(COLLECTIONS.userPrivateDoc);
+  const revoked = await firestore.runTransaction(async (tx) => {
+    const [user, account] = await Promise.all([tx.get(userRef), tx.get(privateRef)]);
+    if (!user.exists) return false;
+    if (user.get("badges.phoneVerified") !== true && !account.get("phoneVerifiedAt")) return false;
+    if (account.exists) tx.update(privateRef, { phoneE164: FieldValue.delete(), phoneVerifiedAt: FieldValue.delete() });
+    tx.update(userRef, { "badges.phoneVerified": false, updatedAt: now });
+    return true;
+  });
+  void consume("firestore.reads", 2);
+  if (revoked) void consume("firestore.writes", 2);
+  return revoked;
 }

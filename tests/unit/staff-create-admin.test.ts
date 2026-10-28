@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import targets from "../../infra/targets.json";
-import { adminOrigin, existingAccountProblem, oobCodeOf, parseCli, planSteps, projectErrors, setPasswordUrl } from "../../scripts/create-admin";
+import type { Targets } from "../../scripts/assert-target";
+import { adminOrigin, existingAccountProblem, oobCodeOf, parseCli, planSteps, projectErrors, resolveSettings, setPasswordUrl } from "../../scripts/create-admin";
+
+/** What resolveSettings throws for an environment, or "" when it does not (the message never names a value). */
+function settingsError(env: Record<string, string | undefined>, registry: unknown = targets): string {
+  try {
+    resolveSettings(env, registry);
+    return "";
+  } catch (error) {
+    return (error as Error).message;
+  }
+}
 
 describe("create-admin", () => {
   it("derives the admin origin like expectedOrigin('admin')", () => {
@@ -33,6 +44,13 @@ describe("create-admin", () => {
     expect(lines.findIndex((line) => line.startsWith("2. staff/<uid>"))).toBeLessThan(lines.findIndex((line) => line.startsWith("3. Custom claims")));
   });
 
+  it("reminds that the admin host must be an authorized domain, except against the emulator", () => {
+    const deployed = planSteps({ args: { email: "a@b.co", name: "Ab", apply: false }, projectId: "joutiya-staging", origin: "https://admin-staging.joutiya.ma", emulated: false });
+    expect(deployed.join("\n")).toContain("Prerequisite: admin-staging.joutiya.ma in the project's Authentication > Settings > Authorized domains");
+    const emulated = planSteps({ args: { email: "a@b.co", name: "Ab", apply: false }, projectId: "joutiya-dev", origin: "http://admin.localhost:3000", emulated: true });
+    expect(emulated.join("\n")).not.toContain("Prerequisite");
+  });
+
   it("checks FIREBASE_PROJECT_ID against infra/targets.json for APP_ENV", () => {
     // A demo project passes in dev only (the emulators never reach Google for it).
     expect(projectErrors(targets, { APP_ENV: "dev", FIREBASE_PROJECT_ID: "demo-joutiya" })).toEqual([]);
@@ -47,6 +65,32 @@ describe("create-admin", () => {
     expect(mismatch[0]).toMatch(/^FIREBASE_PROJECT_ID (is set but|does not match) environments\.prod\.firebase\.projectId/);
     expect(mismatch[0]).not.toContain("joutiya-prod-1234");
     expect(projectErrors({ shared: {} }, { APP_ENV: "dev", FIREBASE_PROJECT_ID: "demo-joutiya" })[0]).toMatch(/^infra\/targets\.json: /);
+  });
+
+  it("takes the project and the hosts of staging and prod from infra/targets.json, like the VM does", () => {
+    const prodProject = targets.environments.prod.firebase.projectId;
+    expect(resolveSettings({ APP_ENV: "prod" }, targets)).toEqual({ projectId: prodProject, origin: "https://admin.joutiya.ma", emulated: false });
+    expect(resolveSettings({ APP_ENV: "staging" }, targets)).toEqual({ projectId: targets.environments.staging.firebase.projectId, origin: "https://admin-staging.joutiya.ma", emulated: false });
+    // Set by hand, the project must still be the recorded one; a wrong value is refused without being printed.
+    expect(resolveSettings({ APP_ENV: "prod", FIREBASE_PROJECT_ID: prodProject }, targets).projectId).toBe(prodProject);
+    const mismatch = settingsError({ APP_ENV: "prod", FIREBASE_PROJECT_ID: "joutiya-prod-1234" });
+    expect(mismatch).toMatch(/^FIREBASE_PROJECT_ID (is set but|does not match) environments\.prod\.firebase\.projectId/);
+    expect(mismatch).not.toContain("joutiya-prod-1234");
+    // Hosts set on purpose are kept; a dev .env.local loaded by mistake never yields a localhost link.
+    expect(resolveSettings({ APP_ENV: "staging", SITE_URL: "https://staging.joutiya.ma", ADMIN_HOST: "admin-staging.joutiya.ma" }, targets).origin).toBe("https://admin-staging.joutiya.ma");
+    expect(settingsError({ APP_ENV: "prod", SITE_URL: "http://localhost:3000", ADMIN_HOST: "" })).toMatch(/^SITE_URL must be https when APP_ENV=prod/);
+    // A project not recorded yet is named, never guessed.
+    const unrecorded = structuredClone(targets) as unknown as Targets;
+    unrecorded.environments.prod.firebase.projectId = null;
+    expect(settingsError({ APP_ENV: "prod" }, unrecorded)).toBe("FIREBASE_PROJECT_ID is required: environments.prod.firebase.projectId is not recorded in infra/targets.json");
+  });
+
+  it("keeps dev as given: the emulators' demo project and the local origin", () => {
+    const emulated = { FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099", FIREBASE_PROJECT_ID: "demo-joutiya", ADMIN_HOST: "admin.localhost" };
+    expect(resolveSettings(emulated, targets)).toEqual({ projectId: "demo-joutiya", origin: "http://admin.localhost:3000", emulated: true });
+    expect(settingsError({ APP_ENV: "dev" })).toMatch(/^FIREBASE_PROJECT_ID is required \(derived/);
+    expect(settingsError({ FIREBASE_PROJECT_ID: "joutiya-prod-1234" })).toBe("APP_ENV is required when FIREBASE_PROJECT_ID is set");
+    expect(settingsError({ APP_ENV: "prod" }, { shared: {} })).toMatch(/^infra\/targets\.json: /);
   });
 
   it("reuses only an existing staff account, revoked included, and refuses every other one", () => {

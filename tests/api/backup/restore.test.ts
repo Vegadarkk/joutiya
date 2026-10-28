@@ -138,7 +138,10 @@ describe("backup and restore round trip", () => {
     const result = await runBackup({ db: source, store, recipient, now });
     expect(result).toMatchObject({ status: "done", truncated: false, quotaStopped: false });
     expect(result.counts.full).toMatchObject({ users: 2, private: 2, listings: 3, auditLogs: 3, emailIndex: 1, staff: 0, uploads: 0 });
-    expect(result.counts.incremental).toEqual({ users: 2, emailIndex: 1, staff: 0, listings: 3, uploads: 0, moderationDecisions: 0, favorites: 0, savedSearches: 0 });
+    expect(result.counts.incremental).toEqual({
+      users: 2, emailIndex: 1, staff: 0, listings: 3, uploads: 0, moderationDecisions: 0, favorites: 0, savedSearches: 0,
+      conversations: 0, messages: 0, evidence: 0, userBlocks: 0, reports: 0, aiDecisions: 0, authorityRequests: 0, suspensions: 0, proProfiles: 0, wallets: 0, billingAccounts: 0, orders: 0, subscriptions: 0,
+    });
     const date = now.toISOString().slice(0, 10);
     expect(store.keys("private")).toContain(`backups/${date}/manifest.json.age`);
     expect(store.keys("private")).toContain(`backups/${date}/full/private.ndjson.gz.age`);
@@ -271,13 +274,20 @@ describe("cursors across nights", () => {
     expect(vi.mocked(alert).mock.calls.map(([event]) => event.title)).toEqual(["Sauvegarde Firestore : rotation complète trop lente"]);
     expect(results[3]?.cursors?.full.cycleStartedAt).toEqual(night(0));
     expect(results[3]?.cursors?.full.cycleCompletedAt).toEqual(night(3));
-    const { check } = await restore(store, database());
+    const { plan, check } = await restore(store, database());
     expect(check.documents).toBe(10);
     expect(check.lines).toBe(10);
-    // The next night starts a new cycle.
+    // The cycle's NDJSON, summed over its four nights, is the Firestore storage estimate (x2).
+    const cycleBytes = plan.parts.reduce((sum, part) => sum + (part.expected?.plainBytes ?? 0), 0);
+    expect(cycleBytes).toBeGreaterThan(0);
+    expect(results.map((result) => result.firestoreStorageBytes)).toEqual([null, null, null, 2 * cycleBytes]);
+    expect(results[3]?.cursors?.full).toMatchObject({ cycleBytes, lastCycleBytes: cycleBytes });
+    // The next night starts a new cycle; the estimate stays the last complete one.
     const fifth = await runBackup({ db, store, recipient, now: night(4), config });
     expect(fifth.counts.full).toEqual({ auditLogs: 3 });
     expect(fifth.cursors?.full.cycleStartedAt).toEqual(night(4));
+    expect(fifth.cursors?.full.cycleBytes).toBeLessThan(cycleBytes);
+    expect(fifth.firestoreStorageBytes).toBe(2 * cycleBytes);
   });
 
   it("leaves the cursors untouched when an upload fails, and the retry completes the backup", async () => {

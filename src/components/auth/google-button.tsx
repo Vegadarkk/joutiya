@@ -57,16 +57,6 @@ declare global {
   }
 }
 
-/**
- * Replay protection: a fresh random value per mount, given to GIS so Google writes it in the ID
- * token's `nonce` claim; the server accepts the token only with the same value (32 bytes, base64url).
- */
-function randomNonce(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
 const noSubscription = () => () => {};
 // The user agent never changes: one detection, cached (useSyncExternalStore wants a stable snapshot).
 let detected: InAppBrowser | null | undefined;
@@ -74,15 +64,21 @@ const readInApp = () => (detected ??= detectInAppBrowser(navigator.userAgent));
 const readServerInApp = (): InAppBrowser | null | undefined => undefined;
 
 export interface GoogleNeedsConsent {
+  /** Posted again by the consent step, from the same device (its nonce is bound to the device cookie). */
   credential: string;
-  /** The nonce the credential was issued with: the consent step posts it again. */
-  nonce: string;
   email: string;
   displayName: string | null;
 }
 
 interface GoogleButtonProps {
+  /** CSP nonce of the page: the GIS script tag carries it. */
   nonce?: string;
+  /**
+   * Nonce for GIS (`initialize({ nonce })`), derived by the page from the device cookie the proxy
+   * set (src/lib/security/device.ts): Google writes it in the ID token and POST /api/auth/google
+   * recomputes it from the same cookie. Without it no token could be accepted: nothing renders.
+   */
+  gisNonce?: string;
   onSignedIn: (session: SessionSummary) => void;
   /** New Google account: the consents (and Turnstile) are needed before the account is created. */
   onNeedsConsent: (payload: GoogleNeedsConsent) => void;
@@ -92,9 +88,9 @@ interface GoogleButtonProps {
   className?: string;
 }
 
-export function GoogleButton({ nonce, onSignedIn, onNeedsConsent, onError, divider, className }: GoogleButtonProps) {
+export function GoogleButton({ nonce, gisNonce, onSignedIn, onNeedsConsent, onError, divider, className }: GoogleButtonProps) {
   const config = usePublicConfig();
-  const clientId = config?.googleClientId ?? null;
+  const clientId = gisNonce ? (config?.googleClientId ?? null) : null;
   const locale = useLocale();
   const t = useTranslations("Auth.common");
   const slot = useRef<HTMLDivElement>(null);
@@ -110,19 +106,18 @@ export function GoogleButton({ nonce, onSignedIn, onNeedsConsent, onError, divid
   }, [onSignedIn, onNeedsConsent, onError]);
 
   useEffect(() => {
-    if (!clientId || inApp !== null) return;
+    if (!clientId || !gisNonce || inApp !== null) return;
     let cancelled = false;
-    const gisNonce = randomNonce();
     async function submit(credential: string) {
       setBusy(true);
       try {
-        const answer = await googleSignIn({ credential, nonce: gisNonce, locale });
+        const answer = await googleSignIn({ credential, locale });
         if (cancelled) return;
         if (answer.status === "signed_in") {
           setSession(answer.session);
           handlers.current.onSignedIn(answer.session);
         } else {
-          handlers.current.onNeedsConsent({ credential, nonce: gisNonce, email: answer.email, displayName: answer.displayName });
+          handlers.current.onNeedsConsent({ credential, email: answer.email, displayName: answer.displayName });
         }
       } catch (error) {
         if (!cancelled) handlers.current.onError(error);
@@ -162,7 +157,7 @@ export function GoogleButton({ nonce, onSignedIn, onNeedsConsent, onError, divid
     return () => {
       cancelled = true;
     };
-  }, [clientId, inApp, nonce, locale]);
+  }, [clientId, gisNonce, inApp, nonce, locale]);
 
   if (!clientId) return null;
   return (

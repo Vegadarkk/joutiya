@@ -294,6 +294,36 @@ export class MeiliEngine implements SearchEngine {
     return { created, settingsUpdated: true };
   }
 
+  // ---- Another index of the same server with its own document shape (help index, phase-5 D25).
+
+  /** POST /indexes/{uid}/search with the search key; the raw answer. */
+  searchRaw(body: Record<string, unknown>): Promise<unknown> {
+    return this.read("POST", `${this.indexPath}/search`, body, this.key("search"));
+  }
+
+  /**
+   * A small static index: created when missing, `settings` applied, `documents` added or replaced,
+   * documents whose id is not among them deleted. Indexing key.
+   */
+  async replaceAll(settings: Record<string, unknown>, documents: readonly { id: string }[]): Promise<void> {
+    try {
+      await this.write("GET", this.indexPath);
+    } catch (error) {
+      if (!(error instanceof SearchUnavailableError) || !error.message.includes("index_not_found")) throw error;
+      await this.writeTask("POST", "/indexes", { uid: this.index, primaryKey: "id" });
+    }
+    await this.writeTask("PATCH", `${this.indexPath}/settings`, settings);
+    if (documents.length > 0) await this.writeTask("POST", `${this.indexPath}/documents?primaryKey=id`, documents);
+    const keep = new Set(documents.map((document) => document.id));
+    const live = this.parse(
+      z.object({ results: z.array(z.object({ id: z.union([z.string(), z.number()]) }).passthrough()) }).passthrough(),
+      await this.write("POST", `${this.indexPath}/documents/fetch`, { fields: ["id"], limit: 10_000 }),
+      "documents",
+    );
+    const stale = live.results.map((row) => String(row.id)).filter((id) => !keep.has(id));
+    if (stale.length > 0) await this.writeTask("POST", `${this.indexPath}/documents/delete-batch`, stale);
+  }
+
   async healthy(): Promise<boolean> {
     try {
       await this.request("GET", "/health", { timeoutMs: 1000 });

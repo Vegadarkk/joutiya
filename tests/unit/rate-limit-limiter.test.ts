@@ -55,8 +55,8 @@ describe("rate limiter with the store down", () => {
     store.consume.mockImplementation(down);
     expect(RATE_LIMITS["signup.ip"].policy).toBe("closed");
     await expect(enforceLimit("signup.ip", "1.2.3.4")).rejects.toMatchObject({ status: 503, code: "unavailable" });
-    expect(RATE_LIMITS["clientToken.uid"].policy).toBe("open");
-    await expect(enforceLimit("clientToken.uid", "uid")).resolves.toBeUndefined();
+    expect(RATE_LIMITS["conversation.read.uid"].policy).toBe("open");
+    await expect(enforceLimit("conversation.read.uid", "uid")).resolves.toBeUndefined();
   });
 
   it("treats a store that hangs as down after the command timeout", async () => {

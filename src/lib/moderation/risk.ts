@@ -11,6 +11,8 @@ import type { ScreenState } from "@/lib/moderation/types";
 // - sensitive_text / third_party_phone 25 / 20: legally mandatory review (step 3) -> always review.
 // - price_outlier 20, face 15, new_account 15, volume 15: weak alone, review when combined
 //   (new account + volume + outlier = 50 stays auto; + a duplicate -> review).
+// - restricted_category 0: not a risk signal but a rule: an adults-only subcategory (decorative
+//   koumiyas) is always reviewed by a person, never auto-approved by the agent (HUMAN_REVIEW_FLAGS).
 // - previous rejections: +10 each, max 30, no flag (history, not content).
 
 export interface RiskWeight {
@@ -30,13 +32,17 @@ export const RISK_WEIGHTS: Readonly<Record<ModerationFlag, RiskWeight>> = {
   dup_photo: { weight: 30, reason: "same photo as another listing" },
   new_account: { weight: 15, reason: "account younger than the threshold" },
   volume: { weight: 15, reason: "many listings in 24 hours" },
+  restricted_category: { weight: 0, reason: "adults-only subcategory, human review required" },
 };
 
 export const PREVIOUS_REJECTION_WEIGHT = 10;
 export const PREVIOUS_REJECTION_CAP = 30;
 
 /** Flags that send the listing to review whatever the score (step 2 soft hits, step 3 legal review, step 5 nudity). */
-export const ALWAYS_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["prohibited_kw", "prohibited_soft", "sensitive_text", "third_party_phone", "nsfw_review"]);
+export const ALWAYS_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["prohibited_kw", "prohibited_soft", "sensitive_text", "third_party_phone", "nsfw_review", "restricted_category"]);
+
+/** Flags the agent may never lift alone, whatever `agent.autoApproveSoftFlags` says (a moderator decides). */
+export const HUMAN_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["restricted_category"]);
 
 /**
  * Categories where a face alone sends the listing to review (children's goods: a child's face is

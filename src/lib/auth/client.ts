@@ -125,6 +125,22 @@ export function apiGet<T>(path: string): Promise<T> {
   return request<T>(path, { method: "GET", headers: { accept: "application/json" } });
 }
 
+/**
+ * GET a file with the CSRF header (the personal data export asks for it: a link from another site
+ * carries the session cookie, never the header). Resolves to the body and the server's file name.
+ */
+export async function apiDownload(path: string): Promise<{ blob: Blob; filename: string | null }> {
+  let response: Response;
+  try {
+    response = await fetch(path, { method: "GET", credentials: "same-origin", cache: "no-store", headers: mutationHeaders(false) });
+  } catch {
+    throw new ApiError(0, "network");
+  }
+  if (!response.ok) throw await toError(response);
+  const match = /filename="([^"\\/]+)"/.exec(response.headers.get("Content-Disposition") ?? "");
+  return { blob: await response.blob(), filename: match?.[1] ?? null };
+}
+
 /** Upload progress: `fraction` in [0, 1] when the browser knows the total, plus the raw counts. */
 export type UploadProgress = (fraction: number, loaded: number, total: number) => void;
 
@@ -165,8 +181,9 @@ export function uploadToPresignedUrl(url: string, headers: Record<string, string
 }
 
 /**
- * POST /api/auth/google: the Google Identity Services credential with the nonce the page gave GIS
- * (the server matches it against the token's `nonce` claim: a captured token cannot be replayed).
+ * POST /api/auth/google: the Google Identity Services credential. The page gave GIS a nonce derived
+ * from the device cookie; the server recomputes it from that cookie and matches the token's `nonce`
+ * claim, so a token cannot be used from another device (nothing in this body attests it).
  */
 export function googleSignIn(input: GoogleInput): Promise<GoogleResponse> {
   return apiPost<GoogleResponse>(AUTH_API.google, input);

@@ -55,9 +55,3 @@ export const PRIVATE_SEGMENTS: readonly string[] = [
   "anti-robot",
   "alertes",
 ];
-
-/** Feature flags defaults; the live values come from Firestore `config/flags` (phase 2+). */
-export const DEFAULT_FLAGS = {
-  salesEnabled: false,
-  paymentInstallmentsEnabled: false,
-} as const;

@@ -38,6 +38,7 @@ export const MODERATION_FLAGS = [
   "dup_photo",
   "new_account",
   "volume",
+  "restricted_category",
 ] as const;
 export type ModerationFlag = (typeof MODERATION_FLAGS)[number];
 
@@ -145,6 +146,8 @@ export const publishListingSchema = z
     /** Required when the IP limit escalates (`listing.create.ip`). */
     turnstileToken: turnstileTokenSchema.optional(),
     acceptRules: z.literal(true),
+    /** Adults-only subcategory: the seller attests a decorative craft object sold to adults only. */
+    adultsOnlyAttestation: z.literal(true).optional(),
   })
   .strict();
 export type PublishListingInput = z.infer<typeof publishListingSchema>;
@@ -192,7 +195,7 @@ export interface OwnerListing {
   id: string;
   slugId: string | null;
   status: ListingStatus;
-  pausedReason: "owner" | "quota" | null;
+  pausedReason: "owner" | "quota" | "moderation" | null;
   categoryId: string | null;
   subcategoryId: string | null;
   title: string;
@@ -216,7 +219,8 @@ export interface OwnerListing {
 }
 
 export type CreateListingResponse = { id: string };
-export type OwnerListingsResponse = { listings: OwnerListingSummary[] };
+/** `salesOpen`: paid options can be bought (config/flags.salesEnabled, phase 7). */
+export type OwnerListingsResponse = { listings: OwnerListingSummary[]; salesOpen: boolean };
 export type ListingResponse = { listing: OwnerListing };
 export type PublishListingResponse = {
   status: Extract<ListingStatus, "published" | "pending_review" | "rejected">;

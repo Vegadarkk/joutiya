@@ -5,13 +5,14 @@ name: Deploy staging
 # (infra/vm/deploy-forced-command.sh). Production is promoted by Claude through OCI Run Command
 # (scripts/oracle-vm.ts promote): no production key exists, here or anywhere.
 #
-# Inert until the owner sets the repository variable STAGING_DEPLOY_ENABLED=true (docs/phase-1.md)
-# and these values:
+# The deploy job is inert until the owner sets the repository variable STAGING_DEPLOY_ENABLED=true
+# (docs/phase-1.md) and these values:
 #   secrets STAGING_DEPLOY_SSH_KEY           private key of deploy-staging (ed25519)
 #           STAGING_ACCESS_CLIENT_ID         Access service token "joutiya-ci" (ssh.joutiya.ma)
 #           STAGING_ACCESS_CLIENT_SECRET
 #   vars    VM_SSH_KNOWN_HOSTS               "ssh.joutiya.ma ssh-ed25519 AAAA..." (host key of the VM)
-#           FIREBASE_STAGING_WIF_PROVIDER    projects/<number>/locations/global/workloadIdentityPools/github/providers/joutiya
+# The rules job needs only these two (step 9), and runs with or without the VM:
+#   vars    FIREBASE_STAGING_WIF_PROVIDER    projects/<number>/locations/global/workloadIdentityPools/github/providers/joutiya
 #           FIREBASE_STAGING_DEPLOYER        joutiya-deployer@<staging project>.iam.gserviceaccount.com
 #
 # Two jobs on purpose: the SSH key only ever exists inside one step of the build job, where no
@@ -49,6 +50,9 @@ jobs:
     timeout-minutes: 40
     permissions:
       contents: read
+      # The "Release images" check run: `oracle-vm.ts promote` refuses images that staging did not
+      # load from the tarball recorded there (a leaked staging key can send its own).
+      checks: write
     outputs:
       release: ${{ steps.release.outputs.id }}
     steps:
@@ -71,6 +75,17 @@ jobs:
             echo '|---|---|'
             for target in web worker; do echo "| joutiya-$target | \`$(docker image inspect --format '{{.Id}}' "joutiya-$target:$RELEASE")\` |"; done
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Save and record the tarball
+        env:
+          RELEASE: ${{ steps.release.outputs.id }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          docker save -o "$RUNNER_TEMP/release.tar" "joutiya-web:$RELEASE" "joutiya-worker:$RELEASE"
+          digest="sha256:$(sha256sum "$RUNNER_TEMP/release.tar" | cut -d ' ' -f 1)"
+          echo "| tarball | \`$digest\` |" >> "$GITHUB_STEP_SUMMARY"
+          gh api "repos/$GITHUB_REPOSITORY/check-runs" -f name="Release images" -f head_sha="$SHA" \
+            -f status=completed -f conclusion=success -f "output[title]=Release $RELEASE" -f "output[summary]=tarball $digest" > /dev/null
       - name: Send to the VM
         env:
           RELEASE: ${{ steps.release.outputs.id }}
@@ -89,16 +104,21 @@ jobs:
           CLOUDFLARED_IMAGE="$(grep -m 1 -oE 'cloudflare/cloudflared:[^[:space:]]+' docker/compose.yml)"
           test -n "$CLOUDFLARED_IMAGE" || { echo "cloudflared image not found in docker/compose.yml"; exit 1; }
           docker pull --quiet "$CLOUDFLARED_IMAGE"
-          docker save "joutiya-web:$RELEASE" "joutiya-worker:$RELEASE" | zstd -T0 -10 -q \
+          zstd -T0 -10 -q -c "$RUNNER_TEMP/release.tar" \
             | ssh -i ~/.ssh/deploy_staging -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
                 -o ProxyCommand="docker run --rm -i -e TUNNEL_SERVICE_TOKEN_ID -e TUNNEL_SERVICE_TOKEN_SECRET $CLOUDFLARED_IMAGE access ssh --hostname %h" \
                 deploy-staging@ssh.joutiya.ma "load $RELEASE"
 
   rules:
     name: Firestore rules and indexes (staging)
-    needs: deploy
-    # Skipped with the deploy job; also waits for the Workload Identity Federation provider.
-    if: vars.FIREBASE_STAGING_WIF_PROVIDER != ''
+    # Same events as the deploy job, without its VM: staging may run elsewhere meanwhile (the PC2).
+    # The rules deny every client and an index deploy never deletes, so the order against the image
+    # does not matter.
+    if: >-
+      vars.FIREBASE_STAGING_WIF_PROVIDER != '' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

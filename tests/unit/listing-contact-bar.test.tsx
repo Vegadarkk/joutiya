@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it } from "vitest";
 import fr from "../../messages/fr.json";
-import { ContactBar, isWhatsappUrl, REVEAL_ERROR_KEYS, revealFailure, type ContactBarProps } from "@/components/listing/contact-bar";
+import { ContactBar, isWhatsappUrl, messageStep, REVEAL_ERROR_KEYS, revealFailure, type ContactBarProps } from "@/components/listing/contact-bar";
 import { ApiError, InitialSessionContext, type ApiErrorCode } from "@/lib/auth/client";
 import type { SessionSummary } from "@/lib/contracts/auth";
 
@@ -57,18 +57,29 @@ describe("isWhatsappUrl", () => {
 });
 
 describe("ContactBar", () => {
-  it("never puts a number in the shared HTML: a reveal button and the disabled message button", () => {
+  it("never puts a number in the shared HTML: a reveal button and the message button", () => {
     const html = render();
     expect(html).toContain(fr.ListingPage.contact.showPhone);
     expect(html).not.toContain("tel:");
     expect(html).not.toContain("wa.me");
     expect(html).not.toMatch(/\+212|0[67]\d{8}/);
     expect(html).toContain(fr.ListingPage.contact.message);
-    expect(html).toContain(fr.ListingPage.contact.soon);
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="([^"]+)"/);
-    const describedBy = /aria-describedby="([^"]+)"/.exec(html)?.[1];
-    expect(html).toContain(`id="${describedBy}"`);
-    expect(html).toContain(escape(fr.ListingPage.contact.messagingSoon));
+    expect(html).toContain(fr.ListingPage.contact.messageShort);
+  });
+
+  it("enables the message button for everyone, described by its hint, with no 'soon' wording", () => {
+    for (const session of [undefined, null, { uid: "u2", publicId: "zzzzzzzzzz", role: "individual", phoneVerified: false } as SessionSummary]) {
+      const html = render({}, session);
+      const buttons = html.match(/<button[^>]*aria-haspopup="dialog"[^>]*>/g) ?? [];
+      // One in the seller card (lg), one in the phone bar.
+      expect(buttons).toHaveLength(2);
+      for (const button of buttons) expect(button).not.toContain(" disabled=\"\"");
+      const describedBy = /aria-haspopup="dialog"[^>]*aria-describedby="([^"]+)"|aria-describedby="([^"]+)"[^>]*aria-haspopup="dialog"/.exec(html);
+      const id = describedBy?.[1] ?? describedBy?.[2];
+      expect(html).toContain(`id="${id}"`);
+      expect(html).toContain(escape(fr.ListingPage.contact.messageHint));
+      expect(html).not.toMatch(/bientôt/i);
+    }
   });
 
   it("offers WhatsApp when the seller shows no phone number", () => {
@@ -77,12 +88,14 @@ describe("ContactBar", () => {
     expect(html).not.toContain(fr.ListingPage.contact.showPhone);
   });
 
-  it("keeps only the message placeholder when the seller offers neither", () => {
+  it("keeps only the message button, as the main action, when the seller offers neither", () => {
     const html = render({ showPhone: false, whatsapp: false });
     expect(html).not.toContain(fr.ListingPage.contact.showPhone);
     expect(html).not.toContain(fr.ListingPage.contact.showWhatsapp);
-    expect(html).toContain(fr.ListingPage.contact.messagingSoonOnly);
-    expect(html).not.toContain("fixed inset-x-0");
+    // The phone bar holds the full label (no short one next to a phone button).
+    expect(html).toContain("fixed inset-x-0 bottom-0");
+    expect(html).not.toContain(`>${fr.ListingPage.contact.messageShort}<`);
+    expect(html.match(/aria-haspopup="dialog"/g)).toHaveLength(2);
   });
 
   it("puts the actions in a bar fixed to the bottom of phone screens, with a safe-area inset", () => {
@@ -98,7 +111,32 @@ describe("ContactBar", () => {
     expect(html).toContain(escape(fr.ListingPage.contact.own));
     expect(html).toContain('href="/fr/mes-annonces"');
     expect(html).not.toContain(fr.ListingPage.contact.showPhone);
+    expect(html).not.toContain(fr.ListingPage.contact.message);
+    expect(html).not.toContain("aria-haspopup");
     const other = { ...own, publicId: "zzzzzzzzzz" } as SessionSummary;
     expect(render({}, other)).toContain(fr.ListingPage.contact.showPhone);
+  });
+});
+
+describe("messageStep", () => {
+  const member = { uid: "u2", publicId: "zzzzzzzzzz", role: "individual", phoneVerified: false } as SessionSummary;
+  const deps = (viewer: SessionSummary | null, find: (id: string) => Promise<string | null>) => ({ loadSession: async () => viewer, findListingConversation: find });
+
+  it("asks an anonymous visitor to sign in, without looking for a conversation", async () => {
+    let looked = false;
+    const step = await messageStep("abcd2345", deps(null, async () => ((looked = true), null)));
+    expect(step).toEqual({ kind: "signin" });
+    expect(looked).toBe(false);
+  });
+
+  it("opens the conversation the buyer already has about the listing", async () => {
+    const step = await messageStep("abcd2345", deps(member, async (id) => (id === "abcd2345" ? "C".repeat(22) : null)));
+    expect(step).toEqual({ kind: "thread", cid: "C".repeat(22) });
+  });
+
+  it("opens the first-message dialog otherwise, phone verified or not, and when the lookup fails", async () => {
+    expect(await messageStep("abcd2345", deps(member, async () => null))).toEqual({ kind: "compose" });
+    expect(await messageStep("abcd2345", deps({ ...member, phoneVerified: true }, async () => null))).toEqual({ kind: "compose" });
+    expect(await messageStep("abcd2345", deps(member, async () => Promise.reject(new ApiError(429, "rate_limited"))))).toEqual({ kind: "compose" });
   });
 });

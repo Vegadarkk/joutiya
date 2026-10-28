@@ -26,7 +26,6 @@ export function BoostBadge({ kind, className }: { kind: CardBadge; className?: s
           aria-describedby={`${id}-info`}
           className={cn(
             "relative z-10 inline-flex max-w-full items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-medium",
-            "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/40",
             // 44 px touch target around a small label.
             "after:absolute after:-inset-x-1 after:-inset-y-3 after:content-['']",
             kind === "featured" ? "bg-featured text-featured-foreground" : "border border-featured/70 bg-gold-100/60 text-foreground dark:bg-transparent",

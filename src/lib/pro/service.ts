@@ -1,0 +1,161 @@
+import "server-only";
+import { launchOfferOpen, listingQuotas } from "@/config/pricing";
+import type { AuthContext } from "@/lib/auth/guards";
+import { getFlags, getPricing } from "@/lib/config/runtime";
+import type { ProApplyInput, ProMeResponse } from "@/lib/contracts/pro";
+import { db } from "@/lib/firebase/admin";
+import { Timestamp } from "firebase-admin/firestore";
+import { countActive } from "@/lib/db/repositories/listings";
+import { getProProfile, proProfileFromSnapshot, proProfileRef, proProfileToFirestore, type ProProfileRecord } from "@/lib/db/repositories/pro-profiles";
+import { COLLECTIONS, type UserDoc } from "@/lib/db/schemas";
+import { getUploads } from "@/lib/db/repositories/uploads";
+import { getUser } from "@/lib/db/repositories/users";
+import { HttpError } from "@/lib/http/errors";
+import { newListingId, slugify } from "@/lib/listings/ids";
+import { isPhoneVerificationConfigured } from "@/lib/phone-verify/config";
+import { normalizeMoroccanMobile } from "@/lib/phone/normalize";
+import { consume } from "@/lib/quota";
+import { iceFormatOk, KYBC_NOTICE_VERSION } from "./kybc";
+import { storefrontShown, transition } from "./lifecycle";
+import type { ProProfileDoc } from "./profile-schema";
+
+// Pro accounts (architecture §5 lifecycle, §6 "Devenir Pro", phase 7 design §4). The application
+// creates proProfiles/{proId} in `pending_verification`; the account stays `individual` and
+// publishes nothing as a Pro until a moderator validates the KYBC (verifyApplication, admin).
+// `users/{uid}.proId` links the account to its shop from the application on (one shop per account
+// at the MVP); the role and the claims change only at the verification.
+
+export interface ProActor {
+  auth: AuthContext;
+  ip: string;
+}
+
+/** Shop id: same alphabet and length as a listing id, so `/boutique/{slug}-{proId}` reuses the slug helpers. */
+export const newProId = newListingId;
+
+/**
+ * Eligibility of an application (and of sending its pieces): applications open
+ * (`config/flags.proSignupEnabled`), an account not Pro yet, active, with a verified e-mail and
+ * phone, and no application in progress for it (a rejected one may be resubmitted). While the
+ * WhatsApp check is unavailable (Meta app pending), the phone is verified by a moderator's call
+ * during the review instead: the application then carries the number to call.
+ */
+export async function assertCanApply(auth: AuthContext): Promise<{ user: UserDoc; existing: ProProfileRecord | null }> {
+  const uid = auth.user.uid;
+  const flags = await getFlags();
+  if (!flags.proSignupEnabled) throw new HttpError(403, "pro_signup_closed");
+  if (auth.user.claims.role === "pro") throw new HttpError(409, "already_pro");
+
+  const user = await getUser(uid);
+  if (!user || user.status !== "active") throw new HttpError(403, "account_suspended");
+  if (!user.badges.emailVerified) throw new HttpError(403, "email_not_verified");
+  if (!user.badges.phoneVerified && isPhoneVerificationConfigured()) throw new HttpError(403, "phone_required");
+
+  const existing = user.proId ? await getProProfile(user.proId) : null;
+  if (existing && existing.lifecycle !== "rejected") throw new HttpError(409, "pro_application_exists");
+  return { user, existing };
+}
+
+/**
+ * Submits (or, after a rejection, resubmits) the application. Refuses what `assertCanApply`
+ * refuses, and pieces that are not the applicant's `kyb` uploads.
+ */
+export async function submitApplication(actor: ProActor, input: ProApplyInput, now = new Date()): Promise<{ proId: string }> {
+  const uid = actor.auth.user.uid;
+  const { user, existing } = await assertCanApply(actor.auth);
+  // The badge may be false only while the WhatsApp check is unavailable: the number to call is then part of the application.
+  let phoneToCheck: string | undefined;
+  if (!user.badges.phoneVerified) {
+    if (!input.phone) throw new HttpError(400, "phone_required");
+    phoneToCheck = normalizeMoroccanMobile(input.phone).e164;
+  }
+
+  const pieces = await getUploads(input.uploadIds);
+  const valid = pieces.filter((upload) => upload.ownerUid === uid && upload.purpose === "kyb" && upload.status === "ready");
+  if (valid.length !== new Set(input.uploadIds).size) throw new HttpError(400, "invalid_pieces");
+
+  const proId = existing?.proId ?? newProId();
+  const pricing = await getPricing();
+
+  const slug = slugify(`${input.name} ${input.citySlug.replace(/-/g, " ")}`) || "boutique";
+  const doc: ProProfileDoc = {
+    ownerUid: uid,
+    members: { [uid]: "owner" },
+    name: input.name,
+    slug,
+    description: input.description,
+    whatsapp: false,
+    regionCode: input.regionCode,
+    citySlug: input.citySlug,
+    legal: input.legal,
+    kybc: {
+      status: "submitted",
+      iceFormatOk: iceFormatOk(input.legal.ice),
+      uploadIds: [...new Set(input.uploadIds)],
+      complianceCommitmentAt: now,
+      noticeVersion: KYBC_NOTICE_VERSION,
+      ...(phoneToCheck ? { phoneToCheck } : {}),
+      submittedAt: now,
+    },
+    lifecycle: "pending_verification",
+    plan: "none",
+    planSource: "none",
+    quotas: listingQuotas({ type: "pro", plan: "none" }, pricing),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+  if (existing) transition(existing, { type: "reapplied" }, { now, graceDays: pricing.graceDays });
+
+  const ref = proProfileRef(proId);
+  const userRef = db().collection(COLLECTIONS.users).doc(uid);
+  // Two concurrent applications both read and write users/{uid}: Firestore serialises them and
+  // the second one sees the first one's proId.
+  await db().runTransaction(async (tx) => {
+    const [userSnapshot, profileSnapshot] = await Promise.all([tx.get(userRef), tx.get(ref)]);
+    const linked: unknown = userSnapshot.get("proId");
+    if (linked !== undefined && linked !== proId) throw new HttpError(409, "pro_application_exists");
+    const current = proProfileFromSnapshot(profileSnapshot);
+    if (current && current.lifecycle !== "rejected") throw new HttpError(409, "pro_application_exists");
+    tx.set(ref, proProfileToFirestore(doc));
+    tx.update(userRef, { proId, updatedAt: Timestamp.fromDate(now) });
+  });
+  void consume("firestore.reads", 2);
+  void consume("firestore.writes", 2);
+  return { proId };
+}
+
+/** GET /api/pro/me: the account's shop or application, the switches and the eligibility checks. */
+export async function proSelf(auth: AuthContext): Promise<ProMeResponse> {
+  const uid = auth.user.uid;
+  const [flags, user, pricing] = await Promise.all([getFlags(), getUser(uid), getPricing()]);
+  const eligibility = { emailVerified: user?.badges.emailVerified ?? false, phoneVerified: user?.badges.phoneVerified ?? false, accountActive: user?.status === "active" };
+  // The offer a shop verified today receives (as decideApplication grants it).
+  const launchOffer = !flags.salesEnabled && launchOfferOpen(pricing.launchOffer, new Date()) ? { noticeDays: pricing.launchOffer.noticeDays } : null;
+  const base = { signupOpen: flags.proSignupEnabled, salesOpen: flags.salesEnabled, phoneVerification: isPhoneVerificationConfigured() ? ("whatsapp" as const) : ("call" as const), launchOffer, eligibility };
+  const profile = user?.proId ? await getProProfile(user.proId) : null;
+  if (!profile || profile.ownerUid !== uid) return { ...base, shop: null };
+  const active = profile.lifecycle === "pending_verification" || profile.lifecycle === "rejected" ? 0 : await countActive(uid);
+  return {
+    ...base,
+    shop: {
+      proId: profile.proId,
+      name: profile.name,
+      slug: profile.slug,
+      description: profile.description,
+      regionCode: profile.regionCode,
+      citySlug: profile.citySlug,
+      legalForm: profile.legal.form,
+      ice: profile.legal.ice,
+      lifecycle: profile.lifecycle,
+      plan: profile.plan,
+      planSource: profile.planSource,
+      kybcStatus: profile.kybc.status,
+      rejectReason: profile.kybc.rejectReason ?? null,
+      submittedAt: profile.kybc.submittedAt?.toISOString() ?? null,
+      quotas: profile.quotas,
+      activeListings: active,
+      launchOffer: profile.planSource === "launch_offer" ? { endsAt: pricing.launchOffer.endsAt, noticeDays: pricing.launchOffer.noticeDays } : null,
+      storefront: storefrontShown(profile.lifecycle, profile.plan) ? `${profile.slug}-${profile.proId}` : null,
+    },
+  };
+}

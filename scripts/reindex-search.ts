@@ -35,6 +35,7 @@ import { closeSearchQueue, enqueueIndex } from "@/lib/search/queue";
 import { MeiliEngine } from "@/lib/search/meili";
 import { SEARCH_INDEX, SEARCH_REBUILD_INDEX, type SearchDocument } from "@/lib/search/types";
 import { closeValkey } from "@/lib/valkey/clients";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 export const DEFAULT_MAX_READS = 20_000;
 /** Reads kept for the catch-up query (listings changed during the build). */
@@ -97,7 +98,7 @@ export async function reindex(args: ReindexArgs, deps: ReindexDeps): Promise<Rei
     deps.log("Dry run: nothing written. Add --apply to rebuild.");
     return report;
   }
-  if (planned > args.maxReads) throw new Error(`the rebuild may read ${planned} documents, over --max-reads ${args.maxReads}`);
+  if (planned > args.maxReads) throw new Error(`the rebuild may read ${planned} documents (published + 1 + ${CATCH_UP_MAX} catch-up), over --max-reads ${args.maxReads}: rerun with --max-reads ${planned} or more`);
   if (await deps.readsDegraded()) throw new Error("the Firestore read quota is degraded: try after its reset");
 
   const start = deps.now();
@@ -152,6 +153,7 @@ async function changedSince(since: Date, limit: number): Promise<string[]> {
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const args = parseCli(process.argv.slice(2));
   const env = serverEnv();
   if (!env.MEILI_URL || !env.MEILI_INDEX_KEY) throw new Error("MEILI_URL and MEILI_INDEX_KEY are required (run it in the worker container)");

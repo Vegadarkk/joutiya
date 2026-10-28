@@ -12,10 +12,12 @@ import { Spinner } from "@/components/ui/spinner";
 import { Link } from "@/i18n/navigation";
 import { apiPost, isApiError, setSession } from "@/lib/auth/client";
 import { AUTH_API, passwordSchema, type ActionResponse, type SessionSummary } from "@/lib/contracts/auth";
+import { markWelcomeSeen, queueDoorOpening } from "@/lib/welcome/flags";
 import { FormMessage, useApiErrorMessage, useFieldMessage } from "./form-message";
 import { PasswordField } from "./password-field";
 import { ResendVerification } from "./resend-verification";
 import { StatusPanel } from "./status-panel";
+import { useHydrated } from "./use-hydrated";
 
 // /action?mode=verifyEmail|resetPassword&oobCode=...: the code is read in the browser and posted
 // to /api/auth/action, never fetched server side (it stays out of logs and caches). Once read, it is
@@ -52,7 +54,11 @@ export function ActionView({ nonce }: { nonce?: string }) {
     try {
       const answer = await apiPost<ActionResponse>(AUTH_API.action, { mode, oobCode });
       if (answer.status === "verified") {
-        if (answer.session) setSession(answer.session);
+        if (answer.session) {
+          setSession(answer.session);
+          // A member's device: the home page no longer greets it with the welcome screen.
+          markWelcomeSeen();
+        }
         setState({ kind: "verified", session: answer.session });
       } else {
         setState({ kind: "reset", email: answer.email });
@@ -114,7 +120,10 @@ export function ActionView({ nonce }: { nonce?: string }) {
                 <Link href="/parametres">{t("goSettings")}</Link>
               </Button>
               <Button asChild variant="outline">
-                <Link href="/">{t("goHome")}</Link>
+                {/* The account is created: the door of the home page opens for it (once per device). */}
+                <Link href="/" onClick={queueDoorOpening}>
+                  {t("goHome")}
+                </Link>
               </Button>
             </>
           ) : (
@@ -196,13 +205,14 @@ function ResetPasswordForm({ oobCode, email, onDone }: { oobCode: string; email:
   const fieldMessage = useFieldMessage();
   const apiMessage = useApiErrorMessage();
   const [serverError, setServerError] = useState<unknown>();
+  const hydrated = useHydrated();
   const {
     register,
     handleSubmit,
     setError,
     control,
     formState: { errors, isSubmitting },
-  } = useForm<ResetForm>({ resolver: zodResolver(resetFormSchema), defaultValues: { password: "" } });
+  } = useForm<ResetForm>({ resolver: zodResolver(resetFormSchema), defaultValues: { password: "" }, mode: "onTouched" });
   const password = useWatch({ control, name: "password" });
 
   async function onValid(values: ResetForm) {
@@ -217,7 +227,7 @@ function ResetPasswordForm({ oobCode, email, onDone }: { oobCode: string; email:
   }
 
   return (
-    <form onSubmit={(event) => void handleSubmit(onValid)(event)} noValidate className="flex flex-col gap-5">
+    <form method="post" onSubmit={(event) => void handleSubmit(onValid)(event)} noValidate className="flex flex-col gap-5">
       <div className="flex items-center gap-3 rounded-md bg-surface-muted px-4 py-3 text-sm">
         <KeyRound className="size-4 shrink-0 text-primary" aria-hidden="true" />
         <span className="text-pretty">{t("resetLead", { email })}</span>
@@ -234,7 +244,7 @@ function ResetPasswordForm({ oobCode, email, onDone }: { oobCode: string; email:
       />
       {/* Password managers read the account from this hidden field. */}
       <input type="hidden" name="username" autoComplete="username" value={email} readOnly />
-      <Button type="submit" loading={isSubmitting} className="w-full">
+      <Button type="submit" loading={isSubmitting} disabled={!hydrated} className="w-full">
         {t("resetSubmit")}
       </Button>
     </form>

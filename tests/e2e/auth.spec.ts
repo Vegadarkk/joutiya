@@ -1,12 +1,17 @@
+import { readFile } from "node:fs/promises";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { stubGoogleScript } from "./gsi-stub";
 
 // Account flows against the production build and the Firebase emulators (npm run test:e2e).
 // Mails stay in memory (DEV_MAILBOX=true) and are read back from /api/dev/mailbox; Turnstile runs
 // with Cloudflare's always-pass test keys (playwright.config.ts). The revocation test talks to the
 // Auth emulator directly (`npm run test:e2e` runs inside `firebase emulators:exec`).
 process.env.FIREBASE_AUTH_EMULATOR_HOST ??= "127.0.0.1:9099";
+
+// The auth pages render the Google button (stub client id): never the real script.
+test.beforeEach(({ page }) => stubGoogleScript(page));
 
 // Assembled at runtime: a literal would look like a credential to the secret scan.
 const PASSWORD = ["Souk", "Tanger", "2026!"].join("-");
@@ -92,23 +97,6 @@ async function createVerifiedAccount(page: Page, request: APIRequestContext, pre
   return { email, name };
 }
 
-/**
- * Stand-in for https://accounts.google.com/gsi/client: records the `initialize` configuration and
- * renders a button that fires the callback with a fake credential (the server rejects it).
- */
-const GSI_STUB = `
-window.google = { accounts: { id: {
-  initialize(config) { window.__gsi = config; },
-  renderButton(parent) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = "Continuer avec Google (stub)";
-    button.addEventListener("click", () => window.__gsi.callback({ credential: "stub-credential-" + "x".repeat(40), select_by: "btn" }));
-    parent.appendChild(button);
-  },
-} } };
-`;
-
 test.describe("account", () => {
   test("signs up, confirms the e-mail, edits the profile, signs out and back in", async ({ page, request }) => {
     const email = uniqueEmail();
@@ -132,8 +120,8 @@ test.describe("account", () => {
     await expect(page).toHaveURL(/\/fr\/parametres$/);
     await expect(page.getByRole("heading", { level: 1, name: "Mes paramètres" })).toBeVisible();
     await expect(page.getByLabel("Nom affiché")).toHaveValue(name, { timeout: 15_000 });
-    // The header shows the account once /api/auth/me has answered.
-    await expect(page.getByRole("button", { name: "Mon compte" })).toBeVisible();
+    // The header shows the account once /api/auth/me has answered ("Fermer mon compte" is on the page too).
+    await expect(page.getByRole("button", { name: /^Mon compte/ })).toBeVisible();
 
     // Change the display name.
     await page.getByLabel("Nom affiché").fill("Yasmine B.");
@@ -296,21 +284,73 @@ test.describe("account", () => {
     await expect(page.getByRole("button", { name: "Mon compte" })).toBeVisible();
   });
 
-  test("the Google button hands a rejected credential to the form message", async ({ page, request }) => {
-    const config = (await (await request.get("/api/config")).json()) as { googleClientId: string | null };
-    // Without a client id the button never renders (playwright.config.ts sets no GOOGLE_OAUTH_CLIENT_ID).
-    test.skip(!config.googleClientId, "GOOGLE_OAUTH_CLIENT_ID is not set for the e2e server: the Google button does not render");
-    await page.route("https://accounts.google.com/gsi/client", (route) => route.fulfill({ status: 200, contentType: "application/javascript", body: GSI_STUB }));
+  test("downloads the personal data, then closes the account for good (D26)", async ({ page, request }) => {
+    const { email } = await createVerifiedAccount(page, request, "close");
     await page.goto("/fr/connexion");
-    await page.getByRole("button", { name: "Continuer avec Google (stub)" }).click();
-    // The fake token is refused server side: the form says so, and the page stays.
-    // Next's empty route announcer is an alert too: the message is the alert with text.
+    await signIn(page, email, PASSWORD);
+    await expect(page).toHaveURL(/\/fr\/parametres$/, { timeout: 15_000 });
+
+    // The export: a JSON file named after the day, with the account's own data.
+    const downloading = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Télécharger mes données" }).click();
+    const file = await downloading;
+    expect(file.suggestedFilename()).toMatch(/^joutiya-mes-donnees-\d{4}-\d{2}-\d{2}\.json$/);
+    const data = JSON.parse(await readFile(await file.path(), "utf8")) as { format: string; account: { email: string } };
+    expect(data.format).toBe("joutiya.account-export");
+    expect(data.account.email).toBe(email);
+
+    // The closure: the time line, then an explicit acknowledgement before the button works.
+    await page.getByRole("button", { name: "Fermer mon compte" }).click();
+    const dialog = page.getByRole("dialog", { name: "Fermer votre compte Joutiya ?" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("Aujourd'hui")).toBeVisible();
+    const submit = dialog.getByRole("button", { name: "Fermer définitivement" });
+    await expect(submit).toBeDisabled();
+    await dialog.getByLabel("Je comprends que la fermeture de mon compte est définitive.").check();
+    await submit.click();
+    // The page gives way to the confirmation, with the purge date and the way out.
+    await expect(page.getByRole("heading", { level: 2, name: "Votre compte est fermé" })).toBeVisible({ timeout: 15_000 });
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText(/^Un e-mail de confirmation vous a été envoyé\. Les données de votre compte seront supprimées le /)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Se déconnecter" })).toBeHidden();
+    await page.getByRole("link", { name: "Retour à l'accueil" }).click();
+    await expect(page).toHaveURL(/\/fr$/, { timeout: 15_000 });
+    await expect(page.getByRole("link", { name: "Se connecter" }).first()).toBeVisible();
+    const me = (await (await page.request.get("/api/auth/me")).json()) as { session: unknown };
+    expect(me.session).toBeNull();
+    await waitForMail(request, email, "accountClosed");
+
+    // The address no longer signs in.
+    await page.goto("/fr/connexion");
+    await signIn(page, email, PASSWORD);
+    await expect(page.getByRole("alert").filter({ hasText: "Ce compte a été désactivé." })).toBeVisible({ timeout: 15_000 });
+    await expect(page).toHaveURL(/\/fr\/connexion/);
+  });
+
+  test("the Google button hands a rejected credential to the form message, under a device-bound nonce", async ({ page }) => {
+    const stubButton = page.getByRole("button", { name: "Continuer avec Google (stub)" });
+    const gisNonce = () => page.evaluate(() => (window as unknown as { __gsi?: { nonce?: string } }).__gsi?.nonce ?? "");
+    await page.goto("/fr/connexion");
+    const [post] = await Promise.all([page.waitForResponse((candidate) => candidate.url().includes("/api/auth/google")), stubButton.click()]);
+    // The fake token is refused server side (no Google signature): the form says so, and the page
+    // stays. Next's empty route announcer is an alert too: the message is the alert with text.
+    expect(post.status()).toBe(401);
+    expect(post.request().postDataJSON()).toEqual({ credential: expect.stringMatching(/^stub-credential-/), locale: "fr" });
     await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toBeVisible({ timeout: 15_000 });
     await expect(page).toHaveURL(/\/fr\/connexion/);
-    // GIS was initialised with a per-page nonce (replay protection).
-    const nonce = await page.evaluate(() => (window as unknown as { __gsi?: { nonce?: string } }).__gsi?.nonce ?? "");
-    expect(nonce.length).toBeGreaterThanOrEqual(16);
-    expect(nonce).toMatch(/^[A-Za-z0-9_-]+$/);
+    // GIS was initialised with the nonce the page derived from the device cookie (an HMAC, never
+    // posted back): the same one on the next page of this device, another one without the cookie.
+    const nonce = await gisNonce();
+    expect(nonce).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    await page.goto("/fr/inscription");
+    await expect(stubButton).toBeVisible();
+    expect(await gisNonce()).toBe(nonce);
+    await page.context().clearCookies();
+    await page.goto("/fr/connexion");
+    await expect(stubButton).toBeVisible();
+    const fresh = await gisNonce();
+    expect(fresh).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(fresh).not.toBe(nonce);
   });
 
   test("/rif/connexion is consistently French, with a notice", async ({ page }) => {

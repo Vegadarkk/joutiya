@@ -22,8 +22,27 @@ export type TemplateId =
   | "listingChangesApproved"
   | "listingExpiringSoon"
   | "listingExpired"
+  // Reports (phase 5, L2): acknowledgement of a notice (art. 16(4) DSA).
+  | "reportReceived"
+  // Decisions (phase 5, L3): statement of reasons (art. 17), outcome to the reporter (art. 16(5)),
+  // restoration, appeal received and decided (art. 20), reporter warning (art. 23).
+  | "decisionNotice"
+  | "reportOutcome"
+  | "contentRestored"
+  | "appealReceived"
+  | "appealOutcome"
+  | "reporterWarning"
   // Search (phase 4): the daily digest of the saved searches with an alert (design D19).
-  | "savedSearchAlert";
+  | "savedSearchAlert"
+  // Pro accounts (phase 7): the moderator's decision on the application.
+  | "proApproved"
+  | "proRejected"
+  // Pro plans (phase 7, lot 4b): the end of the launch offer, notices then downgrade (design D3).
+  | "launchOfferNotice"
+  // Messaging (phase 5, L5): the grouped new-messages mail (design D21).
+  | "newMessages"
+  // Account closure (phase 5, L7, D26): confirmation with what is kept and until when.
+  | "accountClosed";
 
 /**
  * Statement of reasons (art. 17 DSA, design D8) carried by the hold and rejection mails. The
@@ -42,6 +61,14 @@ export interface ModerationStatement {
   automated: boolean;
   /** Where to object: the DSA contact address of the legal configuration. */
   redress: string;
+}
+
+/** Why a phase 5 decision was taken (art. 17(3)(b)): a notice, our own check, or an authority order. */
+export type DecisionSource = "notice" | "own_initiative" | "authority_order";
+/** Automated means used (art. 17(3)(c)): detection and/or decision. */
+export interface DecisionAutomation {
+  detection: boolean;
+  decision: boolean;
 }
 
 export interface TemplateData {
@@ -71,11 +98,76 @@ export interface TemplateData {
   /** Expired: renewable from "Mes annonces" until `purgeAt` (ISO), then deleted. */
   listingExpired: { displayName: string; title: string; purgeAt: string };
   /**
+   * Notice received (art. 16(4) DSA): reference, target type, reason id (labels in
+   * src/config/report-reasons.ts), target delay in hours, reception date (ISO). `displayName` is
+   * null for a visitor who gave no name (P0); `urgent` adds the emergency numbers.
+   */
+  reportReceived: { displayName: string | null; reportId: string; targetType: "listing" | "user" | "message" | "pro"; reasonId: string; slaHours: number; receivedAt: string; urgent: boolean };
+  /** Statement of reasons of a restrictive decision (art. 17 DSA), with the signed appeal link (null: authority order). */
+  decisionNotice: {
+    displayName: string;
+    decisionId: string;
+    /** src/config/decision-templates.ts: facts and ground in the recipient's language. */
+    templateId: string;
+    action: "remove" | "restrict_visibility" | "warn" | "suspend_account" | "ban";
+    targetType: "listing" | "user" | "message";
+    /** Listing title (listing target), else null. */
+    title: string | null;
+    /** The moderator's own words, quoted as written. */
+    details: string | null;
+    durationDays: number | null;
+    /** End of a suspension (ISO). */
+    until: string | null;
+    source: DecisionSource;
+    automated: DecisionAutomation;
+    appealToken: string | null;
+    /** ISO. */
+    appealDeadline: string;
+  };
+  /** What became of a notice (art. 16(5) DSA); no detail on the measures beyond what is needed. */
+  reportOutcome: {
+    displayName: string | null;
+    reportId: string;
+    /** ISO date of the notice. */
+    reportedAt: string;
+    targetType: "listing" | "user" | "message" | "pro";
+    outcome: "actioned" | "dismissed";
+    action: "remove" | "restrict_visibility" | "restore" | "no_action" | "warn" | "suspend_account" | "ban";
+    automated: DecisionAutomation;
+    decisionId: string;
+    appealToken: string | null;
+    appealDeadline: string;
+  };
+  /** Hidden content shown again, or an account restriction lifted (report dismissed or appeal granted). */
+  contentRestored: { displayName: string; targetType: "listing" | "user" | "message"; title: string | null; via: "report" | "appeal"; decisionId: string };
+  /** Appeal received (art. 20 DSA): reference, date (ISO), answer delay. */
+  appealReceived: { displayName: string | null; decisionId: string; receivedAt: string; slaDays: number };
+  /** Appeal decided by another moderator: upheld or reversed, with the reasons. */
+  appealOutcome: { displayName: string | null; decisionId: string; outcome: "upheld" | "reversed"; by: "affected" | "reporter"; note: string; reviewedAt: string };
+  /** Art. 23(2) DSA: prior warning after manifestly unfounded notices, then the suspension of the notices until `until`. */
+  reporterWarning: { displayName: string; kind: "warning" | "suspended"; count: number; windowDays: number; until: string | null };
+  /**
    * Daily digest (bulk): the saved searches with new listings since the last digest.
    * `unsubscribeToken` (src/lib/alerts/unsubscribe-token.ts, every alert of the account) builds the
    * List-Unsubscribe header and the "Se désabonner" link.
    */
   savedSearchAlert: { displayName: string; searches: SavedSearchAlertSection[]; unsubscribeToken: string };
+  /** `launchOffer`: Essentiel offered until sales open, `noticeDays` of notice before any payment. */
+  proApproved: { displayName: string; shopName: string; launchOffer: boolean; noticeDays: number };
+  /** The moderator's reason; `contact` is where to object (legal configuration). */
+  proRejected: { displayName: string; shopName: string; reason: string; contact: string };
+  /**
+   * `ending`: notice before `endsAt` (ISO); `ended`: the shop was downgraded, `paused` listings over
+   * the free quota (`freeListings`, null = unlimited) were paused.
+   */
+  launchOfferNotice: { displayName: string; shopName: string; plan: "essentiel" | "business"; kind: "ending" | "ended"; endsAt: string; freeListings: number | null; paused: number };
+  /**
+   * Grouped new-messages mail (bulk, D21): the unread total and up to 3 conversations (listing
+   * title, the other member's display name). Never the text of a message.
+   */
+  newMessages: { displayName: string; count: number; conversations: { listingTitle: string; counterpartName: string }[] };
+  /** The account is closed: closure date and the purge of the account data (ISO). */
+  accountClosed: { displayName: string; closedAt: string; purgeAt: string };
 }
 
 /** One saved search of the digest: its results page, the count of new listings and the newest few. */
@@ -97,6 +189,29 @@ export interface SavedSearchAlertListing {
   citySlug: string | null;
 }
 
+/** Templates whose Firebase action link (live oobCode) the worker generates at delivery. */
+export type ActionLinkTemplate = "verifyEmail" | "resetPassword" | "staffInvite";
+
+/**
+ * The action link of a queued mail, for its recipient (`to`): the queue holds this request, never
+ * a live oobCode (audit B3-12). At delivery the Admin SDK generates the code and the mail gets
+ * `actionUrl` = `url` plus `oobCode`; `continueUrl` is the SDK's own continue URL.
+ */
+export interface ActionLinkRequest {
+  action: "verifyEmail" | "resetPassword";
+  /** The Joutiya page the code is appended to, its other query parameters included (`mode`). */
+  url: string;
+  continueUrl: string;
+}
+
+/**
+ * The data of a queued mail: an action-link template carries its link request in place of
+ * `actionUrl` (a resolved `actionUrl` stays accepted: jobs queued before B3-12, and tests).
+ */
+export type QueuedTemplateData = {
+  [T in TemplateId]: T extends ActionLinkTemplate ? TemplateData[T] | (Omit<TemplateData[T], "actionUrl"> & { actionLink: ActionLinkRequest }) : TemplateData[T];
+};
+
 /** Security mails bypass the suppression list and fall back to Brevo when Resend is exhausted. */
 export type MailPriority = "security" | "transactional" | "bulk";
 
@@ -108,6 +223,11 @@ export interface TemplateMail<T extends TemplateId = TemplateId> {
   priority?: MailPriority;
   /** Dedupe key for the queue (same key within 24 h = one mail). */
   idempotencyKey?: string;
+}
+
+/** A mail as the web app enqueues it and the worker receives it (`deliverMail` resolves its action link). */
+export interface MailJob<T extends TemplateId = TemplateId> extends Omit<TemplateMail<T>, "data"> {
+  data: QueuedTemplateData[T];
 }
 
 export interface RenderedMail {

@@ -109,6 +109,40 @@ describe("screenListing: hard blockers", () => {
   });
 });
 
+describe("screenListing: adults-only subcategory (decorative koumiyas)", () => {
+  const koumiya = (overrides: Partial<ScreenInput> = {}) =>
+    cleanListing({
+      title: "Koumiya décorative en cuivre ciselé",
+      description: "Koumiya de décoration faite à la main par un artisan de Fès, fourreau en cuivre ciselé, à accrocher au mur.",
+      attributes: { material: "cuivre", handmade: true },
+      categoryId: "maison-jardin",
+      subcategoryId: "koumiyas-decoratives",
+      price: 1_200,
+      contact: { showPhone: false, whatsapp: false },
+      ...overrides,
+    });
+
+  it("always sends the listing to a moderator, without adding risk points", () => {
+    const result = screenListing(koumiya(), ctx);
+    expect(result).toMatchObject({ state: "needs_review", flags: ["restricted_category"], score: 0, blockers: [] });
+    // Dagger words are expected here: noted for the moderator, not flagged as risky vocabulary.
+    expect(result.evidence).toEqual(["adults-only subcategory koumiyas-decoratives", "prohibited soft:weapons in title", "prohibited soft:weapons in description"]);
+    const drugs = screenListing(koumiya({ description: "Koumiya décorative en cuivre, faite à la main, livrée avec un sachet de kif en cadeau pour la décoration." }), ctx);
+    expect(drugs.flags).toEqual(["prohibited_soft", "restricted_category"]);
+  });
+
+  it("keeps the contact to the messaging, even with a verified phone", () => {
+    expect(codes(koumiya({ contact: { showPhone: true, whatsapp: true } }))).toEqual(["contact.showPhone:messaging_only", "contact.whatsapp:messaging_only"]);
+  });
+
+  it("refuses a donation and flags koumiya words anywhere else for review", () => {
+    expect(codes(koumiya({ price: null, isDonation: true }))).toEqual(["isDonation:not_allowed"]);
+    const elsewhere = screenListing(cleanListing({ description: "Vends ma Logan, et aussi une koumiya ancienne en argent, à voir sur place." }), ctx);
+    expect(elsewhere.flags).toEqual(["prohibited_soft"]);
+    expect(elsewhere.state).toBe("needs_review");
+  });
+});
+
 describe("screenListing: soft flags and state", () => {
   it("sends soft keywords and sensitive text to review", () => {
     const soft = screenListing(cleanListing({ description: "Voiture propre, vends aussi un pistolet à colle et des outils, le tout en bon état." }), ctx);

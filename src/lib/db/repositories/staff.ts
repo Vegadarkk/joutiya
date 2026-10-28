@@ -98,3 +98,10 @@ export async function listStaff(): Promise<StaffRecord[]> {
   void consume("firestore.reads", Math.max(1, snapshot.size));
   return snapshot.docs.map(fromSnapshot).filter((record): record is StaffRecord => record !== null);
 }
+
+/** Admins still active (role admin, not revoked): the back office must keep at least one. */
+export async function listActiveAdmins(): Promise<StaffRecord[]> {
+  const snapshot = await db().collection(STAFF_COLLECTION).where("role", "==", "admin").get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  return snapshot.docs.map(fromSnapshot).filter((record): record is StaffRecord => record !== null && record.revokedAt === undefined);
+}

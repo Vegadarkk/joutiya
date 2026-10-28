@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Button } from "@/components/ui/button";
+import { quietLinkClassName } from "@/components/ui/text-link";
 import { Link, getPathname } from "@/i18n/navigation";
 import type { OwnerListingSummary } from "@/lib/contracts/listings";
 import { isolate } from "@/lib/i18n/bidi";
@@ -25,6 +26,7 @@ interface OwnerListingCardProps {
   onDelete: () => Promise<void>;
   /** An action of this row is running. */
   busy?: boolean;
+  salesOpen?: boolean;
   now?: Date;
 }
 
@@ -32,7 +34,7 @@ interface OwnerListingCardProps {
  * One row of "Mes annonces": cover, title, price, city, status, expiry, actions. On phones the
  * primary action takes the full row under the cover (its label is longer than the text column).
  */
-export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, busy = false, now = new Date() }: OwnerListingCardProps) {
+export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, busy = false, salesOpen = false, now = new Date() }: OwnerListingCardProps) {
   const t = useTranslations("MyListings");
   const locale = useLocale() as Locale;
   const city = listing.citySlug ? cityBySlug(listing.citySlug) : undefined;
@@ -70,16 +72,16 @@ export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, bu
         <div className="flex items-start justify-between gap-2">
           <h2 className="min-w-0 text-base font-semibold leading-snug">
             {href ? (
-              <Link href={href} dir="auto" className="line-clamp-2 break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
+              <Link href={href} dir="auto" className={cn("line-clamp-2 break-words rounded-sm", quietLinkClassName)}>
                 {title}
               </Link>
             ) : (
-              <a href={publicHref ?? undefined} dir="auto" className="line-clamp-2 break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
+              <a href={publicHref ?? undefined} dir="auto" className={cn("line-clamp-2 break-words rounded-sm", quietLinkClassName)}>
                 {title}
               </a>
             )}
           </h2>
-          <ListingActions listing={listing} onAction={onAction} onDelete={onDelete} busy={busy} publicHref={publicHref} now={now} />
+          <ListingActions listing={listing} onAction={onAction} onDelete={onDelete} busy={busy} publicHref={publicHref} salesOpen={salesOpen} now={now} />
         </div>
         <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
           <span className="font-semibold tabular-nums">{price}</span>

@@ -14,10 +14,11 @@ import { logConnection } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
 import { assertQuotas, SIGNUP_QUOTAS } from "@/lib/quota/gate";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
+import { gisNonce } from "@/lib/security/device";
 import { safeEqual } from "@/lib/security/hash";
 import { errorCode, localPart, userByEmail } from "./accounts";
 import { activateMember } from "./activation";
-import { recordState } from "./orphan";
+import { deleteOrphanRecord, recordState } from "./orphan";
 import { anonymous, beginAnonymous, checkTurnstile, finish, respond, type AnonymousFlow } from "./anonymous";
 import { signedIn } from "./respond";
 import { sessionSummary } from "./summary";
@@ -38,7 +39,7 @@ export interface GoogleIdentity {
   email: string;
   emailVerified: boolean;
   name: string | null;
-  /** `nonce` claim: the random value the page gave GIS, so a token cannot be replayed from elsewhere. */
+  /** `nonce` claim: the value the page gave GIS, derived from its device cookie (src/lib/security/device.ts). */
   nonce: string | null;
 }
 
@@ -82,9 +83,16 @@ export async function verifyGoogleCredential(credential: string): Promise<Google
   };
 }
 
-/** The token must carry the nonce this page generated (constant-time): a token minted for another page is a replay. */
-export function assertNonce(identity: GoogleIdentity, nonce: string): void {
-  if (!identity.nonce || !safeEqual(identity.nonce, nonce)) throw new HttpError(403, "invalid_credentials", "Google credential nonce mismatch");
+/**
+ * The token's `nonce` claim must be the value derived from this request's device cookie
+ * (constant-time): the browser never sends the expected nonce, so a token minted on another
+ * device, or presented without the cookie, is refused. Within the device nothing stops a second
+ * use of the same token before it expires: the audience, `exp` and the google.* limits bound that.
+ */
+export function assertNonce(identity: GoogleIdentity, deviceId: string | null): void {
+  if (!deviceId || !identity.nonce || !safeEqual(identity.nonce, gisNonce(deviceId))) {
+    throw new HttpError(403, "invalid_credentials", "Google credential nonce mismatch");
+  }
 }
 
 /** Google's name reduced to the display-name rules, or null when nothing usable remains. */
@@ -134,13 +142,17 @@ async function signInExisting(flow: AnonymousFlow, uid: string, identity: Google
   // Google verified the e-mail: a pending password account is activated by this sign-in.
   if (!(await activateMember(uid, claims))) throw new HttpError(403, "role_missing");
   const minted = await createSessionForUid(uid);
-  await logConnection({ uid, event, ip: flow.identity.ip, userAgent: flow.userAgent });
+  await logConnection({ uid, event, ip: flow.identity.ip });
   const body: GoogleResponse = { status: "signed_in", session: await sessionSummary(minted.user) };
   return finish(flow, signedIn(minted, body));
 }
 
-/** Auth record for a new Google account; an orphan record with this exact e-mail (no documents) is reused. */
-async function ensureAuthUser(identity: GoogleIdentity, displayName: string): Promise<{ uid: string; created: boolean }> {
+/**
+ * Auth record for a new Google account. An orphan record with this exact e-mail (no documents, not
+ * staff) is never reused: its uid may still key data, so it is deleted and the creation retried
+ * once with a fresh uid. A member record (a first sign-in that won the race) is linked and reused.
+ */
+async function ensureAuthUser(identity: GoogleIdentity, displayName: string, retry = true): Promise<{ uid: string; created: boolean }> {
   try {
     const record = await auth().createUser({ email: identity.email, emailVerified: true, displayName });
     await auth().updateUser(record.uid, { providerToLink: { providerId: PROVIDER, uid: identity.sub, email: identity.email } });
@@ -149,8 +161,14 @@ async function ensureAuthUser(identity: GoogleIdentity, displayName: string): Pr
     if (errorCode(error) !== "auth/email-already-exists") throw error;
     const record = await userByEmail(identity.email);
     if (!record) throw error;
+    const state = await recordState(record);
     // A staff account has no documents either: it never becomes a member (its claims would be replaced).
-    if ((await recordState(record)) === "staff") throw forbidden("staff accounts sign in on the back office");
+    if (state === "staff") throw forbidden("staff accounts sign in on the back office");
+    if (state === "orphan") {
+      if (!retry) throw unavailable("auth record could not be created");
+      await deleteOrphanRecord(record.uid);
+      return ensureAuthUser(identity, displayName, false);
+    }
     await linkGoogleOnRecord(record, identity);
     return { uid: record.uid, created: false };
   }
@@ -182,7 +200,7 @@ async function signUp(flow: AnonymousFlow, input: GoogleInput & { consents: NonN
   }
   await setClaims(uid, { role: "individual" });
   const minted = await createSessionForUid(uid);
-  await logConnection({ uid, event: "google_signup", ip: flow.identity.ip, userAgent: flow.userAgent });
+  await logConnection({ uid, event: "google_signup", ip: flow.identity.ip });
   const body: GoogleResponse = { status: "signed_in", session: await sessionSummary(minted.user) };
   return finish(flow, signedIn(minted, body));
 }
@@ -207,7 +225,7 @@ async function googleSignIn(request: Request): Promise<Response> {
   await enforceLimit("google.ip", flow.identity.ipBucket);
   await enforceLimit("google.device", flow.identity.deviceKey);
   const identity = await verifyGoogleCredential(input.credential);
-  assertNonce(identity, input.nonce);
+  assertNonce(identity, flow.identity.deviceId);
   if (!identity.emailVerified) throw new HttpError(403, "email_not_verified");
 
   const record = await existingRecord(identity);
@@ -220,6 +238,7 @@ async function googleSignIn(request: Request): Promise<Response> {
   }
   // New account: the sign-up limits apply, a `needs_consent` pass included (§6).
   await enforceLimit("signup.ip", flow.identity.ipBucket);
+  if (flow.identity.ip48) await enforceLimit("signup.ip48", flow.identity.ip48);
   // Firestore writes degraded (§2): refused before the consent step; members still sign in above.
   // Before the device limit, which a refusal must not use up (as for a password sign-up).
   await assertQuotas(SIGNUP_QUOTAS);

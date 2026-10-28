@@ -5,9 +5,12 @@ import type { PhotoVariant } from "@/lib/contracts/photo-variants";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { getListing, listPublishedByOwner, type ListingRecord } from "@/lib/db/repositories/listings";
 import { findUserByPublicId, getUserRecord, type UserRecord } from "@/lib/db/repositories/profiles";
+import { getProProfile } from "@/lib/db/repositories/pro-profiles";
 import { db } from "@/lib/firebase/admin";
 import { aggregationReads, consume } from "@/lib/quota";
 import { assertQuotas, PUBLIC_READ_QUOTAS } from "@/lib/quota/gate";
+import { storefrontShown } from "@/lib/pro/lifecycle";
+import { PRO_ID_PATTERN } from "@/lib/pro/profile-schema";
 import { buildSlugId, parseSlugId } from "./ids";
 
 // Public reads (design §4 public.ts): the listing page by its `{slug}-{id}` segment and the
@@ -34,8 +37,16 @@ function isPublicState(status: ListingStatus): status is PublicState {
 }
 
 /**
- * The listing behind a URL segment: null (404) when the id is malformed, the document missing, or
- * the listing never/no longer public (draft, pending_review, rejected, removed, purged). Throws
+ * Whether the public may see a listing: a public status and not hidden by a report's strong signal
+ * (phase 5, D11: `moderation.hiddenBy`). The phone reveal and new conversations check it too.
+ */
+export function isPubliclyVisible(listing: Pick<ListingRecord, "status" | "moderation">): boolean {
+  return isPublicState(listing.status) && !listing.moderation.hiddenBy;
+}
+
+/**
+ * The listing behind a URL segment: null (404) when the id is malformed, the document missing, the
+ * listing hidden by a report (D11), or never/no longer public (draft, pending_review, rejected, removed, purged). Throws
  * once Firestore reads are degraded (src/lib/quota/gate.ts): an ISR revalidation then fails and
  * Next keeps serving the last page it generated. Only the ISR listing page calls it.
  */
@@ -45,7 +56,7 @@ export async function getPublishedBySlugId(segment: string): Promise<PublicListi
   if (!parsed) return null;
   await assertQuotas(PUBLIC_READ_QUOTAS);
   const listing = await getListing(parsed.id);
-  if (!listing || !isPublicState(listing.status)) return null;
+  if (!listing || !isPublicState(listing.status) || listing.moderation.hiddenBy) return null;
   const canonicalSlugId = listing.slugId ?? buildSlugId({ id: listing.id, title: listing.title, categoryId: listing.categoryId });
   return { listing, canonicalSlugId, redirect: segment !== canonicalSlugId, state: listing.status };
 }
@@ -74,16 +85,24 @@ export function memberSince(createdAt: Date): string {
   return `${createdAt.getUTCFullYear()}-${String(createdAt.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-/** Accounts that have a public face: activated, neither closed nor banned (suspended: no listing). */
+/**
+ * Accounts that have a public face: activated, neither closed nor banned, nor restricted by a
+ * report's strong signal (phase 5, D11). Suspended: the profile stays, without listings.
+ */
 function isVisibleAccount(user: UserRecord): boolean {
-  return user.status !== "closed" && user.status !== "banned" && user.activation === "done";
+  return user.status !== "closed" && user.status !== "banned" && user.status !== "restricted" && user.activation === "done";
 }
 
-/** Public profile of a seller by publicId, or null (unknown id, closed or banned account). */
+/** Published listings of a seller that are not hidden by a report (D11). */
+async function listVisibleByOwner(uid: string, limit: number): Promise<ListingRecord[]> {
+  return (await listPublishedByOwner(uid, limit)).filter((listing) => !listing.moderation.hiddenBy);
+}
+
+/** Public profile of a seller by publicId, or null (unknown id, closed, banned or restricted account). */
 export async function getProfile(publicId: string, limit = 24): Promise<PublicProfile | null> {
   const user = await findUserByPublicId(publicId);
   if (!user || !isVisibleAccount(user)) return null;
-  const listings = user.status === "suspended" ? [] : await listPublishedByOwner(user.uid, limit);
+  const listings = user.status === "suspended" ? [] : await listVisibleByOwner(user.uid, limit);
   return { publicId: user.publicId, displayName: user.displayName, memberSince: memberSince(user.createdAt), badges: user.badges, sellerType: user.type, listings };
 }
 
@@ -257,9 +276,64 @@ export async function getPublicProfile(publicId: string, limit = 24): Promise<Pu
   const user = await findUserByPublicId(publicId);
   if (!user || !isVisibleAccount(user)) return null;
   if (user.status === "suspended") return { ...toSeller(user, 0), listings: [] };
-  const records = await listPublishedByOwner(user.uid, limit);
+  return publishedView(user, limit);
+}
+
+async function publishedView(user: UserRecord, limit: number): Promise<PublicProfileView> {
+  const fetched = await listPublishedByOwner(user.uid, limit);
+  // Listings hidden by a report (D11) are not shown, nor counted when the page shows them all.
+  const records = fetched.filter((listing) => !listing.moderation.hiddenBy);
   // A full page may hide more listings: count them; otherwise the page is the count.
-  const count = records.length >= limit ? await countPublishedByOwner(user.uid) : records.length;
+  const count = fetched.length >= limit ? Math.max(records.length, (await countPublishedByOwner(user.uid)) - (fetched.length - records.length)) : records.length;
   const listings = records.map(toPublicCard).filter((card): card is PublicListingCard => card !== null);
   return { ...toSeller(user, count), listings };
+}
+
+export interface PublicStorefront {
+  proId: string;
+  /** URL segment "{slug}-{proId}" of /boutique. */
+  segment: string;
+  name: string;
+  description: string;
+  citySlug: string;
+  /** The owner's public face and listings, as on /profil. */
+  seller: PublicProfileView;
+}
+
+/**
+ * The storefront page of a Pro shop (phase 7 design §4), or null (404): unknown shop, or one whose
+ * storefront is not shown (`storefrontShown`: verified, active or grace with a plan), or whose
+ * owner has no public face or is suspended. The listings are the owner's published ones, as on
+ * the profile page (a Pro account publishes as its shop only).
+ */
+export async function getPublicStorefront(proId: string, limit = 24): Promise<PublicStorefront | null> {
+  await assertQuotas(PUBLIC_READ_QUOTAS);
+  const profile = await getProProfile(proId);
+  if (!profile || !storefrontShown(profile.lifecycle, profile.plan)) return null;
+  const user = await getUserRecord(profile.ownerUid);
+  if (!user || !isVisibleAccount(user) || user.status === "suspended") return null;
+  return {
+    proId: profile.proId,
+    segment: storefrontSegment(profile.slug, profile.proId),
+    name: profile.name,
+    description: profile.description,
+    citySlug: profile.citySlug,
+    seller: await publishedView(user, limit),
+  };
+}
+
+export function storefrontSegment(slug: string, proId: string): string {
+  return `${slug}-${proId}`;
+}
+
+/** The proId of a /boutique segment "{slug}-{proId}", or null when it cannot be one. */
+export function parseStorefrontSegment(segment: string): { slug: string; proId: string } | null {
+  const cut = segment.lastIndexOf("-");
+  if (cut <= 0) return null;
+  const proId = segment.slice(cut + 1);
+  return PRO_ID_PATTERN.test(proId) ? { slug: segment.slice(0, cut), proId } : null;
+}
+
+export function storefrontPath(locale: string, segment: string): string {
+  return `/${locale}/boutique/${segment}`;
 }

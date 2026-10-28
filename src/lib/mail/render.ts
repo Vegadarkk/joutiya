@@ -2,6 +2,13 @@ import "server-only";
 import { LOCALES } from "@/config/site";
 import { serverEnv } from "@/lib/env";
 import { mailLocale, type BuiltMail, type TemplateContext } from "./templates/layout";
+import { accountClosed } from "./templates/accountClosed";
+import { appealOutcome } from "./templates/appealOutcome";
+import { appealReceived } from "./templates/appealReceived";
+import { contentRestored } from "./templates/contentRestored";
+import { decisionNotice } from "./templates/decisionNotice";
+import { reportOutcome } from "./templates/reportOutcome";
+import { reporterWarning } from "./templates/reporterWarning";
 import { listingApproved } from "./templates/listingApproved";
 import { listingChangesApproved } from "./templates/listingChangesApproved";
 import { listingExpired } from "./templates/listingExpired";
@@ -12,12 +19,17 @@ import { listingRejected } from "./templates/listingRejected";
 import { passwordChanged } from "./templates/passwordChanged";
 import { phoneRemoved } from "./templates/phoneRemoved";
 import { phoneVerified } from "./templates/phoneVerified";
+import { launchOfferNotice } from "./templates/launchOfferNotice";
+import { proApproved } from "./templates/proApproved";
+import { proRejected } from "./templates/proRejected";
+import { reportReceived } from "./templates/reportReceived";
 import { resetPassword } from "./templates/resetPassword";
 import { savedSearchAlert } from "./templates/savedSearchAlert";
+import { newMessages } from "./templates/newMessages";
 import { signupExisting } from "./templates/signupExisting";
 import { staffInvite } from "./templates/staffInvite";
 import { verifyEmail } from "./templates/verifyEmail";
-import type { RenderedMail, TemplateData, TemplateId, TemplateMail } from "./types";
+import type { MailJob, RenderedMail, TemplateData, TemplateId, TemplateMail } from "./types";
 
 type TemplateRenderer<T extends TemplateId> = (data: TemplateData[T], ctx: TemplateContext) => BuiltMail;
 
@@ -36,7 +48,19 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   listingChangesApproved,
   listingExpiringSoon,
   listingExpired,
+  reportReceived,
+  decisionNotice,
+  reportOutcome,
+  contentRestored,
+  appealReceived,
+  appealOutcome,
+  reporterWarning,
   savedSearchAlert,
+  proApproved,
+  proRejected,
+  launchOfferNotice,
+  newMessages,
+  accountClosed,
 };
 
 export const TEMPLATE_IDS = Object.keys(TEMPLATES) as TemplateId[];
@@ -46,9 +70,9 @@ export function isTemplateId(value: unknown): value is TemplateId {
 }
 
 /** Structural check of a queued job payload before it is rendered (never trust the queue blindly). */
-export function isTemplateMail(value: unknown): value is TemplateMail {
+export function isTemplateMail(value: unknown): value is MailJob {
   if (!value || typeof value !== "object") return false;
-  const mail = value as Partial<TemplateMail>;
+  const mail = value as Partial<MailJob>;
   return (
     isTemplateId(mail.template) &&
     (LOCALES as readonly string[]).includes(String(mail.locale)) &&

@@ -22,6 +22,8 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   "Auth.common",
   "Auth.errors",
   "Listing.errors",
+  // Report button of the listing and profile pages; its dialog loads on demand (phase 5).
+  "Report",
   // Search islands shared by the home, category and listing pages (phase 4): favorite heart,
   // À la Une badge, search bar and place field, home search panel.
   "Favorites.button",
@@ -47,6 +49,12 @@ export const SEARCH_PAGE_CLIENT_NAMESPACES = [
   "SavedSearches.summary",
   "SavedSearches.dialog",
 ] as const;
+
+/**
+ * Added on the help centre pages only (src/app/[locale]/(public)/aide/layout.tsx): the article
+ * search box and the Assistant Joutiya widget (design phase-5 D25).
+ */
+export const HELP_PAGE_CLIENT_NAMESPACES = ["Help.search", "Help.assistant"] as const;
 
 /** The subtrees of `messages` named by `paths` ("Auth.menu" keeps `{ Auth: { menu } }`); unknown paths are skipped. */
 export function pickMessages(messages: AbstractIntlMessages, paths: readonly string[]): AbstractIntlMessages {

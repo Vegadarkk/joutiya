@@ -12,7 +12,7 @@ import type * as Turnstile from "@/lib/security/turnstile";
 import { POST as action } from "@/app/api/auth/action/route";
 import { POST as consents } from "@/app/api/auth/consents/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
-import { CONSENTS, Jar, PASSWORD, call, lastMail, oobCodeOf, uniqueEmail, type ErrorBody } from "./helpers";
+import { CONSENTS, Jar, PASSWORD, actionUrlOf, call, lastMail, oobCodeOf, uniqueEmail, type ErrorBody } from "./helpers";
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
@@ -29,7 +29,7 @@ async function verifiedAccount() {
   const jar = new Jar();
   const email = uniqueEmail("rc");
   expect((await call(signup, "/api/auth/signup", { jar, body: { email, password: PASSWORD, displayName: "Consent Tester", locale: "fr", consents: CONSENTS, turnstileToken: "t" } })).status).toBe(202);
-  const verified = await call<{ session: { uid: string } }>(action, "/api/auth/action", { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(lastMail(sendMail, "verifyEmail", email)!.data.actionUrl) } });
+  const verified = await call<{ session: { uid: string } }>(action, "/api/auth/action", { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(await actionUrlOf(lastMail(sendMail, "verifyEmail", email)!)) } });
   expect(verified.status).toBe(200);
   return { jar, email, uid: verified.body.session.uid };
 }

@@ -9,12 +9,12 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 | # | Étape | Qui | État |
 |---|---|---|---|
 | 1 | Tunnels Cloudflare | Claude (API) | Fait |
-| 2 | DNS de `joutiya.ma` | Claude (API) | `joutiya.ma` et `www` faits ; les noms protégés attendent l'étape 6 |
+| 2 | DNS de `joutiya.ma` | Claude (API) | Fait ; noms protégés le 26 octobre, avec leurs applications Access |
 | 3 | Réseau et VM Oracle | Claude (API), Nav pour le quota | Réseau fait, quota corrigé par Nav ; VM en création |
 | 4 | Accès de Claude à la VM | Nav, sur votre phrase | Fait ; vérifié sur la VM dès sa création |
 | 5 | Connexion Google d'Access | Nav, puis vous | Fait le 16 octobre, vérifié |
-| 6 | Applications Access et jetons de service | Claude (API), Nav | Après les étapes 5 et 7 (Access exige une zone active) |
-| 7 | Serveurs DNS chez Cloudflare | Nav (Hostinger) | Après la validation du .MA, avant le 12 novembre |
+| 6 | Applications Access et jetons de service | Claude (API), Nav | Fait le 26 octobre ; secrets des jetons renouvelés par API à la pose de leur destination (étapes 8 et 11) |
+| 7 | Serveurs DNS chez Cloudflare | Nav (Hostinger) | Fait le 26 octobre (bascule 13:07 UTC, zone active 15:24 UTC) ; `notif.joutiya.ma` vérifié chez Resend et Brevo |
 | 8 | Déploiement automatique du staging | Claude (API), vous pour un jeton | Après les étapes 6 et 7 |
 | 9 | Accès sans clé de la VM à Firestore | Claude (outil), Nav sur le PC2 pour la partie Google | Partie Google faite le 16 octobre (staging et production testés) ; certificats de la VM dès qu'elle existe |
 | 10 | Mentions légales de la production | Claude | Hébergeurs relevés le 16 octobre, dans le code |
@@ -27,7 +27,7 @@ Le code de la phase 1 est dans `main` (PR #8). Ce guide dit qui fait quoi, dans 
 
 Point d'arrêt du 16 octobre au soir, avant l'audit de lundi : tout le travail de la phase 1 est dans `main`. La suite attend la VM, dont la création gratuite est relancée chaque minute (étapes 3, 4, 9 pour les certificats, 16, puis 12), ou la bascule DNS après le .MA (étapes 6, 7, 8, 11 et 15). Les échéances à renouveler sont plus bas (Renouvellements).
 
-Relance de la VM : 856 essais du 16 octobre, de 01:44 à 17:00 UTC, un par minute hors trois pauses du matin, tous refusés par Oracle faute de place (« Out of host capacity ») : aucune machine A1 gratuite libre à Paris, région à un seul domaine de disponibilité, domaine de pannes laissé au choix d'Oracle. La relance tourne dans le conteneur de Claude, qui s'arrête avec le quota de la semaine : pause du 16 octobre vers 19 h UTC au lundi 19 octobre 10:05 UTC, où la routine du coordinateur la relance. Pas de relance depuis la CI ni depuis un autre serveur : les clés `JOUTIYA_OCI_*` ne quittent pas l'environnement cloud de Claude.
+Relance de la VM : 856 essais du 16 octobre, de 01:44 à 17:00 UTC, un par minute hors trois pauses du matin, tous refusés par Oracle faute de place (« Out of host capacity ») : aucune machine A1 gratuite libre à Paris, région à un seul domaine de disponibilité, domaine de pannes laissé au choix d'Oracle. Pause du 16 octobre vers 19 h UTC au lundi 19 octobre 10:05 UTC (quota de la semaine). Depuis le 19 octobre 16:24 UTC, un fil léger dédié (« Chasse à la VM Oracle ») relance la création chaque minute ; le lanceur gratuit hors Claude que vous avez choisi le 19 octobre (étape 3) prendra le relais une fois installé par Nav. Pas de relance depuis la CI : 2 000 minutes gratuites par mois seulement, et la clé Oracle de Claude (`JOUTIYA_OCI_*`) ne quitte pas l'environnement cloud.
 
 ## Ce qui reste à vous
 
@@ -63,6 +63,10 @@ Claude lance `node scripts/oracle-vm.ts create --apply --retry-minutes=4800 --sm
 `node scripts/oracle-vm.ts status` montre l'état de la VM, les connexions du tunnel SSH et la progression du démarrage, lue sur la console série. Aucun secret n'y est écrit.
 
 État au 16 octobre : réseau créé. La première création de la VM a été refusée par le quota `joutiya-free-tier` : ses lignes `zero` mettaient à 0 les quotas A1 régionaux, que ses lignes `set` ne relevaient pas. Nav a ajouté les deux lignes régionales (2 OCPU, 12 Go) à 01:31 UTC ; Claude relance la création. Depuis 01:47 UTC, Oracle n'a plus de place A1 libre à Paris et le paiement à l'usage est exclu (16 octobre) : Claude réessaie chaque minute, en alternant 2 OCPU / 12 Go et 1 OCPU / 6 Go depuis 13:13 UTC.
+
+**Lanceur gratuit** (`workers/vm-launcher`, votre choix du 19 octobre) : un Worker Cloudflare envoie la même demande de création chaque minute, hors Claude, donc sans quota consommé ni pause. Il agit sous un utilisateur Oracle dédié, `joutiya-launcher`, qui peut seulement lister et créer des instances dans `joutiya` ; sa clé est générée sur votre PC2 et posée dans Cloudflare par Nav, Claude ne la voit jamais. Il ne lance jamais une deuxième VM A1 : l'offre gratuite s'arrête à 2 OCPU et 12 Go au total, comptes payants compris. Une fois `joutiya-vm` créée (le 27 octobre à 17:21 UTC, 2 OCPU et 12 Go), il cherche les deux VM gratuites E2.1.Micro (1 Go de mémoire chacune) que vous avez demandées le 27 octobre, `spare-micro-1` et `spare-micro-2` : noms neutres, aucun fichier ni donnée de Joutiya, disques de 50 Go pour rester dans les 200 Go gratuits avec les 100 Go de `joutiya-vm`. Tant que `joutiya-vm` manque, une minute sur trois leur revient. Sa demande (`src/launch.json`, écrite par `node scripts/oracle-vm.ts launcher`) ne contient aucun jeton de tunnel : la VM démarre avec ses tunnels en attente, puis Claude les écrit par Run Command (`node scripts/oracle-vm.ts tunnels --apply`). Une fois `joutiya-vm` configurée et les deux VM de secours obtenues, Nav supprime le Worker et l'utilisateur `joutiya-launcher`.
+
+Création à la main dans la console Oracle : même nom `joutiya-vm`, même forme, même sous-réseau, aucune clé SSH, et surtout le script cloud-init `workers/vm-launcher/console-cloud-init.sh` collé en entier (le même démarrage, sans jeton de tunnel). Sans lui, la VM n'a ni agent de Claude ni tunnel : Claude la répare sur place avec `node scripts/oracle-vm.ts rebuild --apply` (disque de démarrage neuf et bon démarrage ; l'instance et sa place chez Oracle restent).
 
 Oracle peut reprendre une VM gratuite inactive 7 jours de suite (processeur, réseau et mémoire sous 20 %). Le staging et la sonde réduisent ce risque. Ne passez pas en *Pay As You Go* sans en parler dans le projet.
 
@@ -113,15 +117,16 @@ Après la validation du .MA par le registre, et avant le 12 novembre (Cloudflare
 
 ## 8. Déploiement automatique du staging
 
+En attendant, le staging de la VM se construit sur la VM elle-même, comme sur le PC2 : `node scripts/oracle-vm.ts build-staging [--commit=<sha>] --apply` récupère un commit de `main` depuis le dépôt public, construit les images et démarre le staging dès que tous ses secrets sont en place. Ces images n'ont pas de trace de la CI : `promote` les refuse, la production attend donc cette étape.
+
 1. Nav prépare un jeton GitHub à grain fin `joutiya-claude-actions` : dépôt `joutiya` seul, permissions **Secrets** et **Variables** en lecture et écriture, 90 jours. Vous cliquez sur **Generate token** et l'enregistrez dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
-2. Claude, dans une nouvelle session :
-   - crée la clé de `deploy-staging` : la clé privée va dans le secret GitHub `STAGING_DEPLOY_SSH_KEY`, la clé publique sur la VM (`oracle-vm.ts sync --deploy-staging-key`) ;
-   - met `STAGING_ACCESS_CLIENT_ID` et `STAGING_ACCESS_CLIENT_SECRET` (jeton `joutiya-ci`) ;
-   - met la variable `VM_SSH_KNOWN_HOSTS`, avec la clé d'hôte lue sur la console série ;
-   - puis met `STAGING_DEPLOY_ENABLED` à `true`.
+2. Le réseau de la session cloud refuse l'API des secrets et variables d'Actions : Claude prépare et chiffre, Nav envoie depuis le PC2 avec le même jeton, rangé aussi dans le fichier du PC2 (`scripts/github-ci.ts`). Chaque secret est chiffré pour la clé publique du dépôt : seul GitHub peut le relire, et le paquet peut passer par le chat.
+   - Nav : `node --env-file=<fichier du PC2> scripts/github-ci.ts public-key` affiche la clé publique du dépôt (publique) et les noms des secrets et variables ;
+   - Claude : `node scripts/github-ci.ts seal --public-key=<fichier> --host-key="<ligne host key de la console série>" --out=<paquet> --enable --apply` crée la clé de `deploy-staging` et renouvelle le secret du jeton `joutiya-ci`, puis pose la clé publique sur la VM (`oracle-vm.ts sync --deploy-staging-key=<paquet>.pub --apply`) ;
+   - Nav : `node --env-file=<fichier du PC2> scripts/github-ci.ts apply <paquet> --apply` pose `STAGING_DEPLOY_SSH_KEY`, `STAGING_ACCESS_CLIENT_ID`, `STAGING_ACCESS_CLIENT_SECRET`, `VM_SSH_KNOWN_HOSTS`, puis `STAGING_DEPLOY_ENABLED` à `true`.
 3. Claude lance *Deploy staging* sur `main`. Ensuite, chaque fusion sur `main` construit l'image et la déploie en staging toute seule.
 
-Les variables `FIREBASE_STAGING_WIF_PROVIDER` et `FIREBASE_STAGING_DEPLOYER` (rien de secret, les valeurs que `setup staging` affiche) sont posées depuis le 16 octobre (Nav). Le déploiement des règles Firestore du staging par la CI attend encore l'étape 9 : sans le fournisseur et le compte qu'elle crée, son job échouerait.
+Les variables `FIREBASE_STAGING_WIF_PROVIDER` et `FIREBASE_STAGING_DEPLOYER` (rien de secret, les valeurs que `setup staging` affiche) sont posées depuis le 16 octobre (Nav), et l'étape 9 a créé le fournisseur et le compte qu'elles désignent. Le job des règles et des index Firestore du staging ne dépend donc pas de la VM : il tourne à chaque fusion sur `main`.
 
 ## 9. Accès sans clé de la VM à Firestore
 
@@ -166,7 +171,7 @@ Garde-fous : au plus 20 e-mails relayés par jour UTC, dont les 5 derniers gard�
 ## 12. Mise en production et contrôles
 
 1. Claude vérifie que le dernier *Deploy staging* est vert, et que `https://staging.joutiya.ma` affiche l'accueil et les pages légales.
-2. Claude promeut la version du staging par Run Command (`node scripts/oracle-vm.ts promote --apply`, qui vide ensuite le cache Cloudflare) : seules les images déjà en service en staging peuvent passer, désignées par leur identifiant exact, et seulement un commit de `main`. Retour arrière : `rollback --apply`. La production n'a aucun accès SSH : seul le staging en garde un, pour la CI. Un déploiement, en staging comme en production, n'attend que web et worker : une recherche en panne répond 503 sans faire revenir la version précédente.
+2. Claude promeut la version du staging par Run Command (`node scripts/oracle-vm.ts promote --apply`, qui vide ensuite le cache Cloudflare) : seules les images déjà en service en staging peuvent passer, désignées par leur identifiant exact, chargées depuis l'archive que la CI a construite (son empreinte est publiée sur le commit, contrôle « Release images ») et seulement pour un commit de `main`. Retour arrière : `rollback --apply`. La production n'a aucun accès SSH : seul le staging en garde un, pour la CI. Un déploiement, en staging comme en production, n'attend que web et worker : une recherche en panne répond 503 sans faire revenir la version précédente.
 3. Contrôles de fin de phase :
    - `https://joutiya.ma/api/health` répond `ok` ;
    - un balayage de tous les ports de l'IP publique de la VM n'en trouve aucun ouvert ;
@@ -175,7 +180,7 @@ Garde-fous : au plus 20 e-mails relayés par jour UTC, dont les 5 derniers gard�
 
 ## 13. Tester la reconstruction de la VM
 
-La VM ne doit garder aucune donnée unique. On le vérifie une fois, avant le lancement, tant que personne n'utilise le site : Claude supprime `joutiya-vm` (disque compris) et la reconstruit selon `infra/redeploy.md`, refait les contrôles de l'étape 12 et note la durée totale.
+La VM ne doit garder aucune donnée unique. On le vérifie une fois, avant le lancement, tant que personne n'utilise le site : Claude reconstruit `joutiya-vm` sur place (`node scripts/oracle-vm.ts rebuild --apply`) : il remplace son disque de démarrage par une image neuve et rejoue le démarrage (l'instance et sa place chez Oracle restent), suit `infra/redeploy.md`, refait les contrôles de l'étape 12 et note la durée totale. Jamais de suppression puis recréation : la place A1 gratuite pourrait ne pas revenir.
 
 ## 14. Réglages des buckets R2 (fiche Nav N16)
 
@@ -214,19 +219,55 @@ Puis, pour chacun, version TLS minimale **1.2**, comme le reste de la zone. Clou
 
 Chaque environnement lit `/etc/joutiya/<env>/app.env` (root, 0600) et deux mots de passe Valkey. Claude les écrit par Run Command avec `node scripts/oracle-vm.ts env <staging|prod>`, qui fusionne les noms envoyés avec ceux déjà présents et ne montre jamais une valeur : seulement les noms, leur provenance et ce qui manque encore.
 - **Registre** `infra/targets.json` : adresses du site et du back-office, projet et application web Firebase, compte de service `joutiya-web`, client Google de connexion, clé de site Turnstile, DSN Sentry, compte et buckets R2, Access.
-- **VM** : `CSRF_SECRET`, les mots de passe Valkey et la clé maîtresse de Meilisearch (`meilisearch.env`, phase 4), générés une fois sur place ; ils n'en sortent jamais et une VM reconstruite en reçoit de nouveaux. Les deux clés de recherche de l'application en dérivent : `node scripts/oracle-vm.ts search-setup <env> --apply` crée l'index et les écrit dans `app.env`, puis recrée web et worker, une fois qu'une version avec Meilisearch tourne.
-- **Votre `.env.local`**, lu sur votre PC par Cody (prompt O) : les clés secrètes. Le fichier sert aussi à un autre produit : l'outil ne fait que le lire, ne prend que des noms de `.env.example` et seulement sous deux formes : `NOM_STAGING=…` ou `NOM_PROD=…`, ou la paire rangée par Nav le 16 octobre (ligne de production active, ligne du staging en commentaire juste dessous) pour `FIREBASE_SERVER_API_KEY`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` et `MAIL_FALLBACK_API_KEY`. Toute autre ligne est ignorée : valeur de développement ou de l'autre produit. Une clé de site Turnstile différente du registre arrête tout : la paire aurait été mal lue.
+- **VM** : `CSRF_SECRET`, les mots de passe Valkey et la clé maîtresse de Meilisearch (`meilisearch.env`, phase 4), générés une fois sur place ; ils n'en sortent jamais et une VM reconstruite en reçoit de nouveaux. Les deux clés de recherche de l'application en dérivent : `node scripts/oracle-vm.ts search-setup <env> --apply` crée l'index et les écrit dans `app.env` avec `MEILI_URL`, puis recrée web et worker, une fois qu'une version avec Meilisearch tourne : le premier démarrage se fait sans recherche (elle répond 503). À relancer après une version qui ajoute un index (l'aide, phase 5) : les clés gardent leur valeur.
+- **Votre `.env.local`**, lu sur votre PC par Nav : les clés secrètes, envoyées chiffrées pour la VM (ci-dessous). Le fichier sert aussi à un autre produit : l'outil ne fait que le lire, ne prend que des noms de `.env.example` et seulement sous deux formes : `NOM_STAGING=…` ou `NOM_PROD=…`, ou la paire rangée par Nav le 16 octobre (ligne de production active, ligne du staging en commentaire juste dessous) pour `FIREBASE_SERVER_API_KEY`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` et `MAIL_FALLBACK_API_KEY`. Toute autre ligne est ignorée : valeur de développement ou de l'autre produit. Une clé de site Turnstile différente du registre arrête tout : la paire aurait été mal lue.
 - **Google** : `GOOGLE_CLOUD_PROJECT`, égal au projet Firebase, évite à la bibliothèque de Google de chercher le projet avant chaque premier jeton. Les certificats de web et worker ne sont pas dans `app.env` : ils sont posés ensuite dans `/etc/joutiya/<env>/gcp` (étape 9, point 5).
-- **Claude, au fil des étapes** : `CF_ACCESS_AUD` (étape 6), `ALERT_RELAY_URL` et `ALERT_RELAY_SECRET` (Worker, étape 11), `MAIL_API_KEY` et `MAIL_WEBHOOK_SECRET` (Resend, après la bascule DNS), `MAP_PMTILES_URL` (phase 3). Puis il relance web et worker.
+- **Claude, au fil des étapes** : `CF_ACCESS_AUD` (étape 6), `ALERT_RELAY_URL` et `ALERT_RELAY_SECRET` (Worker, étape 11), `MAIL_API_KEY` et `MAIL_WEBHOOK_SECRET` (Resend, après la bascule DNS), `MAP_PMTILES_URL` (phase 3), `TELEGRAM_BOT_TOKEN` (depuis `JOUTIYA_TELEGRAM_BOT_TOKEN` de l'environnement cloud) et `TELEGRAM_CHAT_ID` (relu avec `getUpdates` après un message de votre part à `@Joutiyabot`), les mêmes pour les deux environnements. Puis il relance web et worker.
 
-`HASH_PEPPER` sert aux empreintes des e-mails, des téléphones et des désabonnements dans Firestore : il ne doit jamais changer. Cody le génère dans votre `.env.local` (`HASH_PEPPER_STAGING`, `HASH_PEPPER_PROD`), qui en garde la copie ; **Vous :** rangez-la aussi dans votre gestionnaire de mots de passe. Les réglages R2 ne s'écrivent qu'avec les deux clés `R2_ACCESS_KEY_ID` et `R2_SECRET_ACCESS_KEY` de l'environnement : un jeu partiel empêche l'application de démarrer.
+`HASH_PEPPER` sert aux empreintes des e-mails, des téléphones et des désabonnements dans Firestore : il ne doit jamais changer. Nav le génère dans votre `.env.local` (`HASH_PEPPER_STAGING`, `HASH_PEPPER_PROD`, prompt O), qui en garde la copie ; **Vous :** rangez-la aussi dans votre gestionnaire de mots de passe. Les réglages R2 ne s'écrivent qu'avec les deux clés `R2_ACCESS_KEY_ID` et `R2_SECRET_ACCESS_KEY` de l'environnement : un jeu partiel empêche l'application de démarrer.
 
-Pour l'envoi, Cody a besoin dans votre `.env.local` des six lignes `JOUTIYA_OCI_*` de votre environnement cloud (mêmes noms, mêmes valeurs : la clé de `joutiya-claude`). Oracle garde le texte des commandes 7 jours, lisible seulement par les administrateurs du compte et `joutiya-claude`, qui lisent déjà ces fichiers en root.
+La clé Oracle de Claude reste dans l'environnement cloud (décision du 19 octobre, constat C4-03 de l'audit) : ni Cody ni Nav ne l'ont. Les secrets de votre `.env.local` partent donc dans un fichier chiffré pour la VM : Claude lit la clé publique de la VM, Nav chiffre sur votre PC avec cette clé, puis Claude envoie le fichier par Run Command, et seule la VM peut le lire :
+1. Claude : `node scripts/oracle-vm.ts transfer --apply` crée sur la VM sa paire de transfert (RSA, 30 jours, renouvelée quand il reste moins de 7 jours ; la clé ne sort jamais de la VM) et affiche son certificat (ligne `transfer-certificate ...`) et son empreinte, qu'il donne à Nav (prompt R).
+2. Nav : scelle `app.env` du staging et de la prod depuis le fichier du PC2 et colle les deux fichiers scellés dans son fil.
+3. Claude : `node scripts/oracle-vm.ts env <staging|prod> --sealed=<fichier> --apply` envoie le fichier par morceaux, la VM l'ouvre, vérifie chaque ligne et fusionne `app.env` comme `--from`. Ni le fil, ni Run Command, ni l'historique d'Oracle (7 jours) ne contiennent de valeur.
 
-**O. Variables de la VM** (prompt Cody)
+Les valeurs que Claude tient lui-même (jetons Telegram, secrets générés par API) passent par `--from=-` ; `--from` et `--sealed` ne se mélangent pas dans une même commande.
+
+**O. Poivre des empreintes** (prompt Nav)
 
 ```text
-Envoie les clés de mon .env.local sur la VM de Joutiya (docs/phase-1.md, étape 16). Ce fichier sert aussi à un autre produit : ne le lis pas toi-même (ni cat, head, tail, sed, ni grep sans -q), ne l'affiche pas, ne le réécris pas et ne change ni l'ordre ni le texte de ses lignes ; seuls les deux scripts ci-dessous le lisent. 1) `node scripts/vm-env.ts pepper .env.local` : ajoute HASH_PEPPER_STAGING et HASH_PEPPER_PROD à la fin du fichier s'ils manquent, sans montrer de valeur ; dis-moi alors de les copier dans mon gestionnaire de mots de passe. 2) Pour staging puis prod : `node --env-file=.env.local scripts/oracle-vm.ts env <env> --from=.env.local`, simulation qui liste les noms, leurs lignes et ce qui manque. Sans erreur, relance la même commande avec --apply ; sinon montre-moi les erreurs et arrête. S'il manque des variables JOUTIYA_OCI_*, dis-moi lesquelles ajouter, sans valeur. Ne me donne aucune valeur, seulement des noms.
+Dans le dépôt Joutiya sur mon PC, lance `node scripts/vm-env.ts pepper .env.local` (docs/phase-1.md, étape 16) : il ajoute HASH_PEPPER_STAGING et HASH_PEPPER_PROD à la fin du fichier s'ils manquent, sans montrer de valeur. Ce fichier sert aussi à un autre produit : ne le lis pas toi-même (ni cat, head, tail, sed, ni grep sans -q), ne l'affiche pas, ne le réécris pas et ne change ni l'ordre ni le texte de ses lignes. Dis-moi ensuite de copier ces deux lignes dans mon gestionnaire de mots de passe. Ne me donne aucune valeur.
+```
+
+**R. Variables de la VM** (prompt Nav ; Claude donne dans le fil le certificat de transfert de la VM et son empreinte, affichés par `oracle-vm.ts transfer`)
+
+```text
+Dans ton clone de main à jour (`git pull --ff-only`), scelle les variables de la VM (docs/phase-1.md, étape 16), tirées de `~/HarnessAgents/joutiya-env/.env.local`, désigné ci-dessous par <fichier> :
+1. Lance `node scripts/seal-env.ts app staging --from=<fichier> --to=<certificat> --fingerprint=<empreinte> --out=joutiya-vm-staging.sealed`, puis la même commande avec `prod` et `--out=joutiya-vm-prod.sealed`.
+2. Colle dans ton fil le contenu des deux fichiers .sealed (ils ne s'ouvrent que sur la VM), puis supprime-les.
+3. Montre-moi les sorties de l'outil (des noms, jamais une valeur).
+Ne lis pas <fichier> toi-même (ni cat, head, tail, sed, ni grep sans -q), ne l'affiche pas et ne le modifie pas. Ne me donne aucune valeur.
+```
+
+## Staging provisoire sur le PC2
+
+En attendant la VM (votre accord du 19 octobre), le staging tourne sur votre PC2 dans une distribution WSL2 dédiée, `joutiya-staging` (Ubuntu 24.04), avec Docker Engine et l'organisation exacte de la VM : mêmes fichiers Compose, mêmes chemins, même commande de déploiement, même tunnel `joutiya-staging-tunnel`. Aucun port n'est ouvert sur le PC2 : le site se verra à `staging.joutiya.ma` une fois la zone Cloudflare active. Nav pilote tout avec `node scripts/wsl-staging.ts` (`setup`, `wif`, `env`, `deploy`, `search-setup`, `status`, `stop`) depuis son clone de main, et une tâche planifiée à votre ouverture de session garde la distribution allumée. La distribution ne voit ni vos disques ni vos programmes Windows. Docker Desktop n'est pas utilisé : s'il démarre, son intégration WSL doit rester désactivée pour `joutiya-staging` (l'outil refuse son moteur).
+
+- **Variables** : les clés du staging vivent sur le PC2 dans `%USERPROFILE%\HarnessAgents\joutiya-env\.env.local`, hors de tout clone. Nav y génère le poivre et y ajoute la clé API Web de Firebase (un identifiant public) ; **Vous :** le secret Turnstile du staging, collé vous-même. Nav les scelle (prompt Q) pour le certificat de transfert de la distribution, dont la clé ne sort jamais : aucune valeur ne passe par une ligne de commande ni par le fil. Claude scelle de la même façon, depuis le cloud, le jeton du tunnel et les deux valeurs Telegram (`node scripts/seal-env.ts`). Un fichier scellé peut passer par le fil : seule la distribution l'ouvre, et un octet changé le rend illisible. Nav les pose avec `node scripts/wsl-staging.ts env --sealed=<fichier>,<fichier> --apply`, qui fusionne `app.env` comme sur la VM et génère sur place `CSRF_SECRET`, les mots de passe Valkey et la clé de Meilisearch. Tant qu'il en manque, `deploy` construit les images et dit ce qu'attend le démarrage. Une fois le staging démarré, `node scripts/wsl-staging.ts search-setup --reindex=3000 --apply` met en place la recherche, comme sur la VM (le budget de lectures doit dépasser le nombre d'annonces publiées plus 2 001 : la reconstruction se réserve 2 000 lectures de rattrapage). Le certificat de transfert vaut 30 jours (« Échéances »).
+- **Certificats Google** (étape 9) : signés sur le PC2 pour 90 jours ; `wif --apply` les renouvelle.
+- **Passage à la VM** : d'abord `node scripts/wsl-staging.ts stop --apply` (sinon les deux machines se partageraient le trafic du tunnel), puis la procédure de la VM. Firestore et R2 ne bougent pas ; la recherche est réindexée sur la VM.
+- **Retrait** : `wsl --unregister joutiya-staging`, puis supprimer `~/.joutiya/wsl` et la tâche planifiée `joutiya-staging`. Rien en production ne dépend du PC2.
+
+**Q. Variables du staging du PC2** (prompt Nav ; Claude donne dans le fil le certificat de transfert, affiché par `setup`, et son empreinte)
+
+```text
+Dans ton clone de main à jour (`git pull --ff-only`), pose les variables du staging du PC2 (docs/phase-1.md, « Staging provisoire sur le PC2 »), tirées de `~/HarnessAgents/joutiya-env/.env.local`, désigné ci-dessous par <fichier> (crée-le vide s'il n'existe pas : il est hors de tout clone) :
+1. Lance `node scripts/vm-env.ts pepper <fichier>` : il ajoute HASH_PEPPER_STAGING et HASH_PEPPER_PROD s'ils manquent, sans montrer de valeur. S'il en ajoute, dis-moi de copier ces deux lignes dans mon gestionnaire de mots de passe.
+2. Si la ligne FIREBASE_API_KEY_STAGING manque (`grep -q`), ajoute-la : la « Clé API Web » du projet joutiya-staging (console Firebase, Paramètres du projet), un identifiant public.
+3. Si la ligne TURNSTILE_SECRET_KEY_STAGING manque, demande-moi de l'ajouter moi-même : le secret du widget Turnstile du staging.
+4. Lance `node scripts/seal-env.ts app staging --from=<fichier> --to=<certificat> --fingerprint=<empreinte> --out=joutiya-staging.sealed`, puis `node scripts/wsl-staging.ts env --sealed=joutiya-staging.sealed --apply`, et supprime joutiya-staging.sealed.
+5. Montre-moi les sorties des deux outils (des noms, jamais une valeur).
+Ne lis pas <fichier> toi-même (ni cat, head, tail, sed, ni grep sans -q), ne l'affiche pas et ne le modifie que par les étapes 1 et 2. Ne me donne aucune valeur.
 ```
 
 ## Renouvellements
@@ -241,7 +282,7 @@ Toutes les échéances du projet sont dans `joutiya/echeances.md`, dans les fich
   Un rappel part 30 jours avant l'échéance : Claude le pose avec les certificats.
 - **Autorité des certificats** (PC2, `~/.joutiya/wif-ca`) : 10 ans, jusqu'au 13 octobre 2036. Gardez le dossier `~/.joutiya` du PC2 (autorité et connexion gcloud). S'il est perdu ou si l'autorité expire, Nav en crée une nouvelle (`ca --new`) et refait `setup staging --apply` et `setup prod --apply`, puis Claude refait les certificats de la VM comme ci-dessus.
 - **Jeton Cloudflare `joutiya-edge`** : jusqu'au 15 novembre 2026. Oublié, Claude ne peut plus régler Cloudflare par API (DNS, tunnels, cache) ; le site continue de tourner. Nav prépare un jeton aux mêmes droits, vous le rangez sous `JOUTIYA_CLOUDFLARE_API_TOKEN`.
-- **Jeton GitHub `joutiya-claude-actions`** (étape 8) : 90 jours à partir de sa création. Oublié, Claude ne peut plus changer les secrets et variables de la CI ; les déploiements continuent.
+- **Jeton GitHub `joutiya-claude-actions`** (étape 8) : jusqu'au 25 janvier 2027. Oublié, plus aucun changement des secrets et variables de la CI ; les déploiements continuent. Nav prépare un jeton aux mêmes droits ; vous le rangez sous le même nom, dans l'environnement cloud et dans le fichier du PC2.
 
 ## Fin de la phase 1
 

@@ -34,7 +34,7 @@ export function TransfersReconsent({ dpo }: { dpo: string }) {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<ReconsentForm, unknown, ReconsentInput>({ resolver: zodResolver(transfersConsentSchema) });
+  } = useForm<ReconsentForm, unknown, ReconsentInput>({ resolver: zodResolver(transfersConsentSchema), mode: "onTouched" });
 
   async function onValid(values: ReconsentInput) {
     setServerError(undefined);

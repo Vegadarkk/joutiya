@@ -24,6 +24,18 @@ function path(value: unknown): string | undefined {
   }
 }
 
+/** Scheme, host and path, never the query: tells our chunks from a CDN or a browser extension. */
+function location(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  try {
+    const url = new URL(value);
+    return `${url.protocol}//${url.host}${url.pathname}`.slice(0, 200);
+  } catch {
+    // Keywords such as "eval", "inline" or "wasm-eval".
+    return value.slice(0, 200);
+  }
+}
+
 export async function POST(request: Request): Promise<Response> {
   if (Number(request.headers.get("content-length") ?? "0") > MAX_BYTES) return new Response(null, { status: 413 });
   // Chunked bodies carry no Content-Length: the read itself is capped.
@@ -39,7 +51,9 @@ export async function POST(request: Request): Promise<Response> {
           {
             csp: {
               directive: r["effectiveDirective"] ?? r["effective-directive"] ?? r["violated-directive"],
-              blocked: path(r["blockedURL"] ?? r["blocked-uri"]),
+              blocked: location(r["blockedURL"] ?? r["blocked-uri"]),
+              source: location(r["sourceFile"] ?? r["source-file"]),
+              line: r["lineNumber"] ?? r["line-number"],
               page: path(r["documentURL"] ?? r["document-uri"]),
               disposition: r["disposition"],
             },

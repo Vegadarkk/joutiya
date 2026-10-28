@@ -40,7 +40,7 @@
     "submit": "Rechercher",
     "pillars": {
       "free": {
-        "title": "Déposer est gratuit",
+        "title": "Publier gratuitement",
         "body": "Publiez vos annonces sans frais, avec vos photos."
       },
       "near": {
@@ -64,6 +64,12 @@
       "all": "Voir toutes les annonces"
     }
   },
+  "Welcome": {
+    "title": "Bienvenue sur Joutiya",
+    "createAccount": "Créer un compte",
+    "signIn": "Se connecter",
+    "discover": "Découvrir sans compte"
+  },
   "Search": {
     "bar": {
       "label": "Rechercher des annonces",
@@ -85,9 +91,10 @@
     "postBody": "Vous pourrez publier une annonce avec ses photos en quelques minutes."
   },
   "Footer": {
-    "about": "Joutiya, la place de marché des petites annonces au Maroc. Ouvrez la porte à une nouvelle façon d'acheter et de vendre.",
+    "about": "Joutiya, la place de marché des petites annonces au Maroc. Une porte ouverte sur le monde.",
     "legalTitle": "Informations légales",
     "trustTitle": "Mentions et autorités",
+    "help": "Centre d'aide",
     "disclaimer": "Joutiya héberge les annonces de ses utilisateurs : elle n'est ni vendeur, ni acheteur, ni partie aux ventes conclues entre eux.",
     "copyright": "© {year} {publisher}",
     "links": {
@@ -111,6 +118,68 @@
     "frenchPrevails": "Les textes légaux font foi en français.",
     "updated": "Mise à jour : {date}",
     "contents": "Sommaire"
+  },
+  "Help": {
+    "metaTitle": "Centre d'aide",
+    "metaDescription": "Les réponses aux questions sur Joutiya : compte, annonces, recherche, messagerie, sécurité, signalements et recours.",
+    "title": "Centre d'aide",
+    "lead": "Votre compte, vos annonces, la messagerie, la sécurité : trouvez la réponse, ou posez la question à l'Assistant Joutiya.",
+    "search": {
+      "label": "Rechercher dans le centre d'aide",
+      "placeholder": "Ex. : renouveler une annonce",
+      "clear": "Effacer la recherche",
+      "results": "{count, plural, one {# article correspond à votre recherche} other {# articles correspondent à votre recherche}}",
+      "noResults": "Aucun article ne correspond à « {query} ». Essayez d'autres mots, ou posez la question à l'Assistant Joutiya."
+    },
+    "browse": "Parcourir par thème",
+    "articleCount": "{count, plural, one {# article} other {# articles}}",
+    "home": "Centre d'aide",
+    "breadcrumb": "Fil d'Ariane",
+    "related": "Pour aller plus loin",
+    "stillTitle": "Votre question reste sans réponse ?",
+    "stillBody": "L'Assistant Joutiya, une intelligence artificielle, vous répond à partir des articles du centre d'aide.",
+    "pages": {
+      "inscription": "Créer un compte",
+      "connexion": "Se connecter",
+      "motDePasse": "Mot de passe oublié",
+      "parametres": "Mes paramètres",
+      "deposer": "Déposer une annonce",
+      "mesAnnonces": "Mes annonces",
+      "recherche": "Rechercher une annonce",
+      "favoris": "Mes favoris",
+      "recherches": "Mes recherches",
+      "messages": "Mes messages",
+      "recours": "Décisions et recours"
+    },
+    "assistant": {
+      "open": "Poser une question à l'Assistant",
+      "title": "Assistant Joutiya",
+      "badge": "IA",
+      "disclosure": "Vous échangez avec une intelligence artificielle, pas avec une personne. Elle répond à partir du centre d'aide et peut se tromper : vérifiez dans l'article cité.",
+      "privacy": "Ne donnez aucune donnée personnelle (nom, téléphone, e-mail, adresse, mot de passe, code). L'assistant n'a pas accès à votre compte et ne peut rien modifier.",
+      "welcome": "Posez votre question sur Joutiya : déposer une annonce, contacter un vendeur, éviter une arnaque, contester une décision…",
+      "conversation": "Conversation avec l'Assistant Joutiya",
+      "you": "Vous",
+      "label": "Votre question",
+      "placeholder": "Écrivez votre question",
+      "send": "Envoyer",
+      "close": "Fermer l'assistant",
+      "restart": "Nouvelle conversation",
+      "thinking": "L'assistant prépare sa réponse…",
+      "sources": "Articles utilisés",
+      "degradedTitle": "L'assistant n'est pas disponible pour le moment",
+      "degradedBody": "Voici les articles du centre d'aide qui correspondent à votre question.",
+      "degradedEmpty": "Aucun article ne correspond à votre question. Reformulez-la, ou parcourez les thèmes du centre d'aide.",
+      "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}",
+      "empty": "Écrivez votre question avant de l'envoyer.",
+      "challenge": "Cochez la vérification anti-robots, puis envoyez à nouveau votre question.",
+      "errors": {
+        "rate_limited": "Vous avez posé beaucoup de questions. Réessayez {wait}.",
+        "later": "plus tard",
+        "unavailable": "L'assistant est momentanément indisponible. Les articles du centre d'aide restent consultables.",
+        "turnstile_failed": "La vérification anti-robots a échoué. Cochez à nouveau la case, puis renvoyez votre question."
+      }
+    }
   },
   "NotFound": {
     "title": "Cette page n'existe pas",
@@ -137,7 +206,7 @@
       "googleLoading": "Chargement du bouton Google…",
       "backHome": "Revenir à l'accueil",
       "waitLater": "dans quelques minutes",
-      "brandPromise": "Ouvrez la porte à une nouvelle façon d'acheter et de vendre.",
+      "brandPromise": "Une porte ouverte sur le monde.",
       "trust": {
         "messages": "Vos échanges restent dans la messagerie Joutiya.",
         "phone": "Votre numéro n'est jamais affiché en clair.",
@@ -315,7 +384,8 @@
         "phoneVerified": "Vérifié",
         "phoneMissing": "Non vérifié",
         "verifyPhone": "Vérifier mon numéro",
-        "managePhone": "Voir la vérification"
+        "managePhone": "Voir la vérification",
+        "phoneSoon": "Vérification pas encore ouverte"
       },
       "methods": {
         "title": "Méthodes de connexion",
@@ -353,7 +423,7 @@
       "changeNumber": "Changer de numéro",
       "badge": "Téléphone vérifié",
       "backSettings": "Retour aux paramètres",
-      "unavailable": "La vérification WhatsApp n'est pas encore ouverte. Revenez dans quelques jours.",
+      "unavailable": "La vérification du numéro par WhatsApp n'est pas encore ouverte. En attendant, les acheteurs vous écrivent par la messagerie Joutiya.",
       "loadFailedTitle": "L'état de la vérification n'a pas pu être chargé",
       "retry": "Réessayer",
       "alreadyVerified": "Votre compte a déjà un numéro vérifié."
@@ -364,7 +434,14 @@
       "verifications": "Vérifications",
       "signOut": "Déconnexion",
       "favorites": "Mes favoris",
-      "savedSearches": "Mes recherches"
+      "savedSearches": "Mes recherches",
+      "decisions": "Décisions et recours",
+      "help": "Aide",
+      "messages": "Mes messages",
+      "messagesLink": "Messages",
+      "unreadCount": "{count, plural, one {# message non lu} other {# messages non lus}}",
+      "pro": "Espace Pro",
+      "wallet": "Porte-monnaie"
     },
     "errors": {
       "invalid_body": "Certaines informations sont incorrectes. Vérifiez le formulaire, puis réessayez.",
@@ -397,6 +474,19 @@
       "consent_required": "Acceptez les conditions pour continuer.",
       "phone_invalid": "Ce numéro n'est pas valide.",
       "phone_not_mobile": "Seul un numéro de mobile marocain (06 ou 07) peut être vérifié.",
+      "conversation_blocked": "Vous ne pouvez plus écrire dans cette conversation.",
+      "conversation_unavailable": "Cette conversation est fermée : vous ne pouvez plus y écrire pour le moment.",
+      "self_conversation": "Vous ne pouvez pas vous envoyer un message à propos de votre propre annonce.",
+      "report_not_allowed": "Vous ne pouvez pas signaler ce contenu.",
+      "report_target_invalid": "Ce contenu n'existe plus ou ne peut pas être signalé.",
+      "appeal_closed": "Cette décision ne peut plus faire l'objet d'un recours : le délai est dépassé ou la décision a été remplacée.",
+      "appeal_exists": "Un recours a déjà été déposé contre cette décision.",
+      "appeal_not_allowed": "Vous ne pouvez pas faire de recours contre cette décision.",
+      "same_reviewer": "Un recours doit être examiné par un autre modérateur que celui qui a pris la décision.",
+      "sanction_not_allowed": "Cette sanction dépasse vos droits : demandez à un administrateur.",
+      "recent_auth_required": "Par sécurité, reconnectez-vous puis réessayez dans les dix minutes.",
+      "pro_subscription_active": "Résiliez d'abord votre abonnement Pro, puis réessayez.",
+      "wallet_not_empty": "Il reste des crédits achetés sur votre compte : utilisez-les ou demandez leur remboursement, puis réessayez.",
       "unavailable": "Le service est momentanément indisponible. Réessayez dans quelques minutes.",
       "internal": "Une erreur technique est survenue. Réessayez.",
       "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez.",
@@ -411,7 +501,7 @@
       "listing_daily_limit": "Vous avez atteint le nombre d'annonces que vous pouvez déposer aujourd'hui. Réessayez demain.",
       "photo_limit": "Le nombre maximal de photos pour cette annonce est atteint.",
       "file_too_large": "Cette photo dépasse la taille maximale autorisée (10 Mo).",
-      "unsupported_media": "Ce format d'image n'est pas pris en charge. Utilisez une photo JPEG, WebP ou PNG.",
+      "unsupported_media": "Ce format d'image n'est pas pris en charge. Utilisez une photo JPEG, PNG, WebP ou HEIC.",
       "storage_full": "L'envoi de photos est momentanément suspendu. Votre brouillon est conservé : réessayez dans une heure.",
       "upload_not_ready": "Une photo est encore en cours de traitement. Patientez quelques secondes, puis réessayez.",
       "phone_required": "Vérifiez votre numéro de téléphone pour afficher ce moyen de contact.",
@@ -423,7 +513,8 @@
       "saved_search_exists": "Cette recherche est déjà sauvegardée.",
       "invalid_token": "Ce lien n'est plus valide.",
       "upload_limit": "Trop de photos ont été envoyées pour cette annonce, photos refusées comprises. Supprimez les photos refusées pour en ajouter d'autres, ou patientez : elles sont effacées automatiquement 7 jours après leur envoi.",
-      "quota_exhausted": "Le dépôt et la modification d'annonces sont momentanément suspendus : la limite quotidienne de notre service est atteinte. Votre annonce est conservée ; réessayez après 9 h (heure du Maroc)."
+      "quota_exhausted": "Le dépôt et la modification d'annonces sont momentanément suspendus : la limite quotidienne de notre service est atteinte. Votre annonce est conservée ; réessayez après 9 h (heure du Maroc).",
+      "adults_only_attestation": "Pour publier dans cette catégorie, confirmez qu'il s'agit d'un objet décoratif vendu uniquement à une personne majeure."
     },
     "wizard": {
       "title": "Déposer une annonce",
@@ -561,7 +652,9 @@
       "phoneNotVerified": "Numéro non vérifié",
       "verifyLink": "Vérifier mon numéro",
       "verifyBody": "Vérifiez votre numéro pour l'afficher sur l'annonce ou proposer WhatsApp. Votre brouillon est conservé.",
-      "revealNote": "Votre numéro n'apparaît jamais en clair sur la page : il faut être connecté et cliquer pour le voir."
+      "verifySoon": "Afficher votre numéro ou proposer WhatsApp demande un numéro vérifié. Cette vérification n'est pas encore ouverte : en attendant, les acheteurs vous écrivent par la messagerie Joutiya.",
+      "revealNote": "Votre numéro n'apparaît jamais en clair sur la page : il faut être connecté et cliquer pour le voir.",
+      "messagingOnly": "Dans cette catégorie réservée aux majeurs, les acheteurs vous contactent uniquement par la messagerie Joutiya : le téléphone et WhatsApp ne peuvent pas être affichés."
     },
     "photos": {
       "add": "Ajouter des photos",
@@ -590,7 +683,8 @@
         "decode_failed": "Cette image est illisible ou abîmée.",
         "nsfw": "Cette photo ne respecte pas les règles de Joutiya.",
         "expired": "L'envoi a expiré. Réessayez.",
-        "quota": "Le nombre maximal de photos est atteint."
+        "quota": "Le nombre maximal de photos est atteint.",
+        "active_content": "Ce fichier contient des éléments actifs et ne peut pas être accepté."
       },
       "tooMany": "Vous pouvez encore ajouter {count, plural, one {# photo} other {# photos}}.",
       "full": "Vous avez atteint le nombre maximal de photos.",
@@ -648,7 +742,8 @@
         "self": "Moi-même",
         "explicit_consent": "Une autre personne, avec son accord explicite"
       },
-      "sensitiveNote": "Sans l'accord de la personne concernée, retirez ces informations de l'annonce."
+      "sensitiveNote": "Sans l'accord de la personne concernée, retirez ces informations de l'annonce.",
+      "adultsOnlyAttestation": "J'atteste qu'il s'agit d'un objet décoratif d'artisanat (koumiya ou poignard décoratif), qui n'est pas une arme de combat, et que je le vendrai uniquement à une personne majeure (18 ans et plus). Mon annonce sera vérifiée par un modérateur avant sa mise en ligne."
     },
     "done": {
       "publishedTitle": "Votre annonce est en ligne",
@@ -705,7 +800,9 @@
       "url_in_text": "Retirez le lien du texte : les liens vers d'autres sites ne sont pas autorisés.",
       "invalid": "Cette valeur n'est pas valide.",
       "not_allowed": "Cette information n'est pas autorisée dans cette catégorie.",
-      "sensitive_required": "Indiquez à qui se rapportent ces données personnelles."
+      "sensitive_required": "Indiquez à qui se rapportent ces données personnelles.",
+      "messaging_only": "Dans cette catégorie, le contact passe uniquement par la messagerie : désactivez le téléphone et WhatsApp.",
+      "adults_only_attestation": "Confirmez qu'il s'agit d'un objet décoratif d'artisanat vendu uniquement à une personne majeure."
     },
     "status": {
       "draft": "Brouillon",
@@ -767,6 +864,7 @@
         "ameublement": "Ameublement",
         "electromenager": "Électroménager",
         "decoration-artisanat": "Décoration & artisanat",
+        "koumiyas-decoratives": "Koumiyas & poignards décoratifs",
         "linge": "Linge de maison",
         "arts-de-la-table": "Arts de la table",
         "bricolage": "Bricolage",
@@ -2024,7 +2122,8 @@
       "continueDraftOf": "Reprendre « {title} »",
       "editOf": "Modifier « {title} »",
       "resumeOf": "Remettre en ligne « {title} »",
-      "renewOf": "Renouveler pour 60 jours « {title} »"
+      "renewOf": "Renouveler pour 60 jours « {title} »",
+      "promote": "Mettre en avant"
     },
     "confirm": {
       "deleteTitle": "Supprimer cette annonce ?",
@@ -2054,6 +2153,7 @@
     "pausedQuota": "En pause : le nombre d'annonces actives de votre compte est atteint.",
     "loading": "Chargement de vos annonces…",
     "draftsLimit": "{count, plural, one {# brouillon} other {# brouillons}} sur {max} possibles",
+    "draftsRetention": "Un brouillon non modifié pendant 30 jours est supprimé avec ses photos.",
     "errors": {
       "renewBlocked": "Votre annonce doit être corrigée avant d'être renouvelée : corrigez les points signalés et enregistrez, puis renouvelez-la depuis « Mes annonces ».",
       "listingLimit": "Vous avez atteint le nombre maximal d'annonces actives. Mettez en pause ou supprimez une autre annonce pour remettre celle-ci en ligne."
@@ -2150,10 +2250,9 @@
       "whatsapp": "WhatsApp",
       "message": "Envoyer un message",
       "messageShort": "Message",
-      "soon": "Bientôt",
-      "messagingSoon": "La messagerie Joutiya arrive bientôt. En attendant, utilisez le contact proposé par le vendeur.",
-      "messagingSoonOnly": "Ce vendeur sera joignable par la messagerie Joutiya, qui arrive bientôt.",
+      "messageHint": "Votre message arrive dans la messagerie Joutiya du vendeur. Ni votre e-mail ni votre numéro ne lui sont transmis.",
       "signInBody": "Connectez-vous pour voir le numéro du vendeur. Vous reviendrez ensuite sur cette annonce.",
+      "signInMessage": "Connectez-vous pour écrire au vendeur. Vous reviendrez ensuite sur cette annonce.",
       "signIn": "Se connecter",
       "own": "C'est votre annonce. Les acheteurs voient ici les boutons pour vous contacter.",
       "manage": "Gérer mes annonces",
@@ -2171,7 +2270,34 @@
       },
       "challenge": "Beaucoup de numéros ont été consultés depuis votre connexion internet : confirmez que vous n'êtes pas un robot pour afficher celui-ci.",
       "challengeFailed": "La vérification n'a pas abouti. Réessayez.",
-      "reload": "Recharger la page"
+      "reload": "Recharger la page",
+      "compose": {
+        "title": "Écrire à {name}",
+        "titleFallback": "Écrire au vendeur",
+        "about": "À propos de « {title} »",
+        "label": "Votre message",
+        "placeholder": "Bonjour, l'article est-il toujours disponible ?",
+        "privacy": "Le vendeur voit votre nom affiché, jamais votre e-mail ni votre numéro.",
+        "safety": "Ne payez jamais à l'avance : voyez l'article avant de payer.",
+        "send": "Envoyer le message",
+        "cancel": "Annuler",
+        "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}",
+        "empty": "Écrivez votre message.",
+        "reserved": "Retirez les caractères ⟦ et ⟧ : ils ne sont pas acceptés.",
+        "challenge": "Confirmez que vous n'êtes pas un robot pour envoyer ce premier message.",
+        "errors": {
+          "listing_unavailable": "Cette annonce n'est plus disponible : vous ne pouvez plus écrire au vendeur.",
+          "not_found": "Cette annonce n'est plus disponible : vous ne pouvez plus écrire au vendeur.",
+          "conversation_blocked": "Vous ne pouvez pas écrire à ce vendeur.",
+          "account_suspended": "Votre compte est suspendu : vous ne pouvez pas envoyer de message.",
+          "rate_limited": "Vous avez envoyé beaucoup de messages. Réessayez {wait}.",
+          "later": "plus tard",
+          "quota_exhausted": "La messagerie est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc).",
+          "adult_confirmation_required": "Cet article est réservé aux personnes majeures : confirmez avoir 18 ans ou plus pour écrire au vendeur."
+        },
+        "adultConfirm": "Je confirme avoir 18 ans ou plus.",
+        "adultMissing": "Confirmez avoir 18 ans ou plus pour écrire au vendeur."
+      }
     },
     "safety": {
       "title": "Conseils de sécurité",
@@ -2205,19 +2331,11 @@
       "body": "Déposez une annonce gratuitement, en quelques minutes.",
       "cta": "Déposer une annonce"
     },
-    "report": {
-      "listing": {
-        "link": "Signaler l'annonce",
-        "subject": "Signalement de l'annonce {id}"
-      },
-      "profile": {
-        "link": "Signaler ce profil",
-        "subject": "Signalement du profil {id}"
-      },
-      "body": "Adresse de la page : {url}\n\nMotif du signalement :\n",
-      "hint": "Le signalement part par e-mail vers notre équipe de modération. Indiquez le motif : nous vous informerons de la suite donnée."
-    },
-    "cityDistrict": "{city}, {district}"
+    "cityDistrict": "{city}, {district}",
+    "adultsOnly": {
+      "title": "Réservé aux personnes majeures.",
+      "body": "Objet décoratif d'artisanat, vendu uniquement aux personnes de 18 ans et plus."
+    }
   },
   "Profile": {
     "roleIndividual": "Particulier",
@@ -2521,6 +2639,764 @@
       "rangeFrom": "{label} : dès {min}",
       "rangeTo": "{label} : jusqu'à {max}",
       "options": "{label} : {values}"
+    }
+  },
+  "Pro": {
+    "metaTitle": "Espace Pro",
+    "title": "Espace Pro",
+    "lead": "Votre boutique sur Joutiya : la demande, sa vérification, puis votre offre et vos quotas.",
+    "loadFailed": "Votre espace Pro n'a pas pu être chargé",
+    "retry": "Réessayer",
+    "intro": {
+      "title": "Ouvrir une boutique Pro sur Joutiya",
+      "lead": "Pour les sociétés, commerçants et auto-entrepreneurs : une boutique à votre nom, des annonces marquées Pro et des quotas adaptés à votre activité.",
+      "offer": "L'offre Essentiel est offerte aux boutiques validées jusqu'à l'ouverture des ventes. Vous serez prévenu {days} jours avant tout paiement.",
+      "how": "Nous vérifions vos identifiants (ICE, registre) et une pièce justificative avant d'ouvrir la boutique, en général sous deux jours ouvrés."
+    },
+    "eligibility": {
+      "title": "Avant de commencer",
+      "email": "Adresse e-mail confirmée",
+      "phone": "Numéro de mobile vérifié",
+      "verifyPhone": "Vérifier mon numéro",
+      "settings": "Ouvrir mes paramètres",
+      "inactive": "Votre compte doit être actif pour demander un compte Pro.",
+      "phoneCall": "Votre numéro de mobile sera vérifié par un appel de notre équipe pendant l'examen de la demande.",
+      "ready": "Votre compte remplit les conditions pour demander un compte Pro."
+    },
+    "closed": "Les demandes de compte Pro sont fermées pour le moment. Revenez bientôt.",
+    "form": {
+      "shopTitle": "Votre boutique",
+      "legalTitle": "Votre statut",
+      "piecesTitle": "Vos justificatifs",
+      "commitTitle": "Votre engagement",
+      "name": "Nom de la boutique",
+      "nameHint": "Le nom affiché sur vos annonces et votre vitrine, de 2 à {max} caractères.",
+      "description": "Présentation",
+      "descriptionHint": "Facultatif. Ce que vous vendez, vos services, vos horaires.",
+      "city": "Ville de la boutique",
+      "legalForm": "Forme juridique",
+      "forms": {
+        "societe": "Société (SARL, SA…)",
+        "auto_entrepreneur": "Auto-entrepreneur",
+        "commercant": "Commerçant personne physique"
+      },
+      "ice": "ICE",
+      "iceHint": "Identifiant commun de l'entreprise : 15 chiffres.",
+      "rc": "Numéro de registre du commerce (RC)",
+      "if": "Identifiant fiscal (IF)",
+      "aeNumber": "Numéro d'auto-entrepreneur",
+      "tp": "Numéro de taxe professionnelle (TP)",
+      "rcOrTp": "Indiquez le RC ou la taxe professionnelle.",
+      "piecesLead": "Ajoutez de 1 à {max} documents : extrait du registre de commerce (modèle J), attestation d'auto-entrepreneur ou de taxe professionnelle. Pas de copie de carte d'identité : si un document porte votre numéro de CNIE, masquez-le avant l'envoi. Formats acceptés : PDF, JPEG ou PNG, 10 Mo au plus chacun.",
+      "piecesNotice": "Ces documents servent uniquement à vérifier votre activité professionnelle. Seuls nos modérateurs les consultent et chaque consultation est journalisée. Ils sont hébergés hors du Maroc, conservés le temps de la vérification, puis supprimés 6 mois après la fermeture de votre boutique ou le refus de la demande. Vous pouvez demander à y accéder ou à les faire supprimer à tout moment : <link>politique de confidentialité</link>.",
+      "addPiece": "Ajouter un document",
+      "removePiece": "Retirer {name}",
+      "pieceUploading": "Envoi en cours…",
+      "pieceReady": "Document reçu",
+      "pieceRejected": {
+        "bad_type": "Ce fichier n'est ni un PDF, ni une image JPEG ou PNG.",
+        "too_large": "Ce fichier dépasse 10 Mo.",
+        "expired": "L'envoi n'a pas abouti. Réessayez.",
+        "active_content": "Ce PDF contient des éléments actifs (script, pièce jointe). Enregistrez-le à plat ou envoyez une image."
+      },
+      "pieceFailed": "Le document n'a pas pu être envoyé. Réessayez.",
+      "piecesRequired": "Ajoutez au moins un justificatif.",
+      "piecesPending": "Attendez la fin de l'envoi des documents.",
+      "commitment": "Je certifie que ces informations sont exactes et je m'engage à ne proposer que des produits et services conformes à la loi marocaine.",
+      "commitmentRequired": "Cochez l'engagement pour envoyer la demande.",
+      "submit": "Envoyer ma demande",
+      "resubmit": "Envoyer ma demande corrigée",
+      "required": "Ce champ est obligatoire.",
+      "nameLength": "Le nom doit compter de 2 à {max} caractères.",
+      "iceFormat": "L'ICE compte 15 chiffres.",
+      "identifierFormat": "Utilisez des chiffres et des lettres uniquement.",
+      "cityRequired": "Choisissez la ville de la boutique.",
+      "phoneTitle": "Votre numéro",
+      "phone": "Numéro de mobile",
+      "phoneHint": "Un modérateur vous appellera à ce numéro pendant l'examen de la demande. Il sera ensuite vérifié sur votre compte.",
+      "phoneRequired": "Indiquez votre numéro de mobile.",
+      "phoneFormat": "Saisissez un mobile marocain (06 ou 07).",
+      "challenge": "Confirmez que vous n'êtes pas un robot pour envoyer la demande.",
+      "submitted": "Demande envoyée",
+      "submittedBody": "Vous recevrez un e-mail dès qu’elle aura été vérifiée.",
+      "legalFormHint": {
+        "societe": "ICE, RC et identifiant fiscal.",
+        "auto_entrepreneur": "ICE et numéro d'auto-entrepreneur.",
+        "commercant": "ICE, et RC ou taxe professionnelle."
+      }
+    },
+    "pending": {
+      "title": "Demande en cours de vérification",
+      "body": "Nous avons reçu la demande de « {name} » le {date}. Vous recevrez un e-mail dès qu'elle aura été vérifiée."
+    },
+    "rejected": {
+      "title": "Votre demande n'a pas été validée",
+      "reason": "Motif : {reason}",
+      "fix": "Corrigez les informations concernées, puis envoyez à nouveau votre demande."
+    },
+    "dashboard": {
+      "verified": "Boutique vérifiée",
+      "suspended": "Boutique suspendue",
+      "suspendedBody": "Votre boutique est suspendue. Vous avez reçu un e-mail expliquant la décision et comment la contester.",
+      "plan": "Votre offre",
+      "plans": {
+        "none": "Aucune offre",
+        "essentiel": "Essentiel",
+        "business": "Business",
+        "premium": "Premium"
+      },
+      "launchOffer": "Offerte jusqu'à l'ouverture des ventes. Vous serez prévenu {days} jours avant tout paiement.",
+      "launchOfferEnds": "Offerte jusqu'au {date}.",
+      "noPlan": "Sans offre, vous ne pouvez pas publier de nouvelle annonce en tant que professionnel.",
+      "salesClosed": "Les abonnements ouvriront prochainement.",
+      "grace": "Le dernier paiement a échoué : mettez à jour votre moyen de paiement pour garder votre offre.",
+      "active": "Annonces en ligne",
+      "activeCount": "{count} sur {limit}",
+      "activeUnlimited": "{count}, sans limite",
+      "perDay": "Jusqu'à {count} nouvelles annonces par jour",
+      "perDayUnlimited": "Nouvelles annonces sans limite par jour",
+      "photos": "Jusqu'à {count} photos par annonce",
+      "storefront": "Voir ma vitrine",
+      "subscription": "Mon abonnement",
+      "myListings": "Mes annonces",
+      "newListing": "Déposer une annonce",
+      "signInAgain": "Votre compte vient de passer Pro : reconnectez-vous pour publier en tant que professionnel.",
+      "signIn": "Me reconnecter",
+      "grace_title": "Paiement à régulariser",
+      "downgraded": "Boutique sans offre",
+      "quotasTitle": "Vos quotas",
+      "shortcuts": "Raccourcis"
+    },
+    "errors": {
+      "pro_signup_closed": "Les demandes de compte Pro sont fermées pour le moment.",
+      "already_pro": "Votre compte est déjà un compte Pro.",
+      "pro_application_exists": "Une demande est déjà en cours pour ce compte.",
+      "invalid_pieces": "Un des documents n'est plus disponible. Retirez-le et ajoutez-le de nouveau.",
+      "phone_required": "Indiquez le numéro de mobile qu'un modérateur appellera.",
+      "account_suspended": "Votre compte est suspendu : vous ne pouvez pas demander de compte Pro.",
+      "email_not_verified": "Confirmez d'abord votre adresse e-mail."
+    }
+  },
+  "Messaging": {
+    "page": {
+      "title": "Messages",
+      "views": "Dossiers de la messagerie",
+      "inbox": "Boîte de réception",
+      "archived": "Archivées",
+      "loading": "Chargement de vos conversations",
+      "loadFailedTitle": "Vos conversations n'ont pas pu être chargées",
+      "retry": "Réessayer",
+      "more": "Afficher plus de conversations",
+      "emptyTitle": "Aucune conversation pour l'instant",
+      "emptyBody": "Écrivez à un vendeur depuis son annonce : vos échanges apparaîtront ici.",
+      "browse": "Parcourir les annonces",
+      "archivedEmptyTitle": "Aucune conversation archivée",
+      "archivedEmptyBody": "Une conversation archivée revient dans la boîte de réception dès qu'un nouveau message arrive.",
+      "selectTitle": "Choisissez une conversation",
+      "selectBody": "Vos échanges avec les vendeurs et les acheteurs s'affichent ici.",
+      "offline": "Mise à jour en direct interrompue : les nouveaux messages s'afficheront dès le retour de la connexion."
+    },
+    "row": {
+      "you": "Vous :",
+      "unread": "{count, plural, one {# message non lu} other {# messages non lus}}",
+      "hidden": "Message masqué par la modération",
+      "maskedLink": "[lien masqué]",
+      "blocked": "Bloqué",
+      "closed": "Compte fermé",
+      "frozen": "Suspendue",
+      "yesterday": "Hier"
+    },
+    "thread": {
+      "back": "Toutes les conversations",
+      "listing": "Voir l'annonce « {title} »",
+      "older": "Afficher les messages précédents",
+      "start": "Début de la conversation",
+      "loading": "Chargement de la conversation",
+      "loadFailedTitle": "Cette conversation n'a pas pu être chargée",
+      "retry": "Réessayer",
+      "missingTitle": "Conversation introuvable",
+      "missingBody": "Elle a été supprimée de votre messagerie, ou le lien est incomplet.",
+      "today": "Aujourd'hui",
+      "yesterday": "Hier",
+      "mine": "Vous",
+      "seen": "Vu",
+      "sending": "Envoi en cours",
+      "hidden": "Message masqué par la modération",
+      "maskedLink": "lien masqué",
+      "maskedLinkTitle": "Les liens ne sont pas transmis par la messagerie Joutiya.",
+      "system": "Message de Joutiya",
+      "actions": "Actions sur la conversation",
+      "archive": "Archiver",
+      "unarchive": "Désarchiver",
+      "archivedToast": "Conversation archivée",
+      "unarchivedToast": "Conversation remise dans la boîte de réception",
+      "block": "Bloquer {name}",
+      "unblock": "Débloquer {name}",
+      "blockTitle": "Bloquer {name} ?",
+      "blockBody": "Vous ne pourrez plus vous écrire, dans aucune conversation. Vous pourrez annuler le blocage à tout moment depuis cette conversation.",
+      "blockConfirm": "Bloquer",
+      "blockedToast": "Vous avez bloqué {name}",
+      "unblockedToast": "Vous avez débloqué {name}",
+      "delete": "Supprimer de ma messagerie",
+      "deleteTitle": "Supprimer cette conversation ?",
+      "deleteBody": "Elle disparaît de votre messagerie ; {name} la garde dans la sienne. Si un nouveau message arrive, elle réapparaîtra.",
+      "deleteConfirm": "Supprimer",
+      "deletedToast": "Conversation supprimée",
+      "cancel": "Annuler",
+      "blockedByMe": "Vous avez bloqué {name} : vous ne pouvez plus vous écrire.",
+      "blockedMe": "Vous ne pouvez plus écrire dans cette conversation.",
+      "counterpartClosed": "{name} a fermé son compte : vous pouvez relire la conversation, mais plus y écrire.",
+      "frozen": "Cette conversation est suspendue : vous pouvez la lire, mais plus y écrire.",
+      "suspended": "Votre compte est suspendu : vous pouvez lire vos conversations, mais plus envoyer de message."
+    },
+    "composer": {
+      "label": "Votre message",
+      "placeholder": "Écrire un message",
+      "send": "Envoyer",
+      "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}",
+      "reserved": "Retirez les caractères ⟦ et ⟧ : ils ne sont pas acceptés."
+    },
+    "risk": {
+      "title": "Prudence",
+      "payment_kw": "Ce message parle de paiement à l'avance (acompte, virement, mandat…). Ne payez jamais avant d'avoir vu l'article.",
+      "iban": "Ce message contient des coordonnées bancaires. Ne faites jamais de virement à un inconnu avant d'avoir vu l'article.",
+      "external_url": "Un lien a été masqué. Restez sur Joutiya pour échanger et n'ouvrez pas les liens envoyés par des inconnus.",
+      "contact_with_payment_kw": "Ce message propose de continuer ailleurs, avec un paiement : c'est la méthode d'arnaque la plus courante.",
+      "more": "Nos conseils de sécurité"
+    },
+    "errors": {
+      "rate_limited": "Vous envoyez beaucoup de messages. Réessayez {wait}.",
+      "later": "plus tard",
+      "quota_exhausted": "La messagerie est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc).",
+      "account_suspended": "Votre compte est suspendu : vous ne pouvez plus envoyer de message.",
+      "not_found": "Cette conversation n'est plus disponible.",
+      "listing_unavailable": "Cette annonce n'est plus disponible : vous ne pouvez plus écrire à son vendeur.",
+      "invalid_body": "Ce message ne peut pas être envoyé tel quel. Vérifiez-le, puis réessayez."
+    }
+  },
+  "Report": {
+    "trigger": {
+      "listing": "Signaler l'annonce",
+      "user": "Signaler ce profil",
+      "conversation": "Signaler {name}",
+      "message": "Signaler ce message"
+    },
+    "hint": "Contenu illégal ou contraire à nos règles ? Un modérateur examinera votre signalement.",
+    "title": {
+      "listing": "Signaler cette annonce",
+      "user": "Signaler ce profil",
+      "conversation": "Signaler {name}",
+      "message": "Signaler ce message"
+    },
+    "subject": {
+      "listing": "Annonce « {title} »",
+      "user": "Profil de {name}",
+      "conversation": "Profil de {name}, à propos de cette conversation",
+      "message": "Message de {name}"
+    },
+    "reasonLegend": "Pourquoi signalez-vous ce contenu ?",
+    "group": {
+      "illegal": "Contenu illégal",
+      "terms": "Contraire à nos règles"
+    },
+    "groupHint": {
+      "illegal": "Une loi est enfreinte.",
+      "terms": "Nos conditions générales d'utilisation ne sont pas respectées."
+    },
+    "urgent": "Traité dans l'heure",
+    "ground": "Fondement :",
+    "continue": "Continuer",
+    "back": "Retour",
+    "change": "Changer de motif",
+    "reason": "Motif",
+    "emergency": "En cas de danger immédiat, appelez la police (19) ou la Gendarmerie royale (177). Vous pouvez aussi signaler un contenu illicite en ligne sur e-blagh.ma, la plateforme de la Sûreté nationale.",
+    "explanation": "Ce que vous avez constaté",
+    "explanationHint": "Décrivez les faits : ce qui pose problème, où, et pourquoi. {min} caractères au moins.",
+    "explanationPlaceholder": "Ex. : le vendeur demande un acompte par virement avant toute visite.",
+    "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}",
+    "name": "Votre nom",
+    "email": "Votre adresse e-mail",
+    "contactHint": "Pour vous informer de la décision prise.",
+    "contactOptional": "Facultatif pour ce motif : vous pouvez signaler sans vous identifier.",
+    "member": "Vous signalez avec votre compte : la décision vous sera envoyée par e-mail.",
+    "anonymity": "La personne concernée ne connaîtra pas votre identité.",
+    "goodFaith": "Je déclare de bonne foi que les informations de ce signalement sont exactes et complètes.",
+    "host": "Joutiya héberge les contenus de ses utilisateurs sans en être l'auteur. Des signalements manifestement infondés et répétés peuvent entraîner la suspension de vos signalements.",
+    "submit": "Envoyer le signalement",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "challenge": "Cochez la vérification anti-robots, puis envoyez à nouveau le signalement.",
+    "problems": {
+      "reasonId": "Choisissez un motif.",
+      "explanation": {
+        "required": "Décrivez ce que vous avez constaté.",
+        "short": "Ajoutez quelques détails : {min} caractères au moins.",
+        "long": "{max} caractères au maximum.",
+        "invalid": "Ce texte ne peut pas être envoyé tel quel."
+      },
+      "name": {
+        "required": "Indiquez votre nom.",
+        "short": "Le nom doit faire au moins 2 caractères.",
+        "long": "Le nom ne peut pas dépasser 80 caractères.",
+        "invalid": "Indiquez un nom valide."
+      },
+      "email": {
+        "required": "Indiquez votre adresse e-mail.",
+        "invalid": "Entrez une adresse e-mail valide."
+      },
+      "goodFaith": "Cochez cette déclaration pour envoyer le signalement."
+    },
+    "sent": "Signalement envoyé",
+    "duplicate": "Signalement déjà envoyé",
+    "sentBody": "Merci. Notre équipe de modération l'examinera {delay}.",
+    "duplicateBody": "Vous avez déjà signalé ce contenu. Votre signalement est en cours d'examen : nous le traiterons {delay}.",
+    "delay": {
+      "hour": "en priorité, dans l'heure",
+      "hours": "sous {count} heures",
+      "days": "sous {count} jours"
+    },
+    "reference": "Référence",
+    "copy": "Copier la référence",
+    "copied": "Référence copiée",
+    "mailed": "Vous recevrez la décision par e-mail, avec les moyens de la contester.",
+    "notMailed": "Notez cette référence : sans adresse e-mail, nous ne pourrons pas vous informer de la décision.",
+    "signIn": "Se connecter",
+    "signInBody": "Votre session a expiré. Reconnectez-vous pour envoyer ce signalement.",
+    "errors": {
+      "report_not_allowed": "Ce signalement n'est pas accepté : il vise votre propre contenu, ou vos signalements sont suspendus après plusieurs signalements manifestement infondés.",
+      "report_target_invalid": "Ce contenu n'est plus en ligne ou ne peut pas être signalé.",
+      "rate_limited": "Vous avez envoyé beaucoup de signalements. Réessayez {wait}.",
+      "later": "plus tard",
+      "unavailable": "Le signalement est momentanément indisponible. Réessayez dans quelques minutes.",
+      "quota_exhausted": "Le signalement est momentanément indisponible. Réessayez dans quelques minutes.",
+      "turnstile_failed": "La vérification anti-robots a échoué. Cochez à nouveau la case, puis renvoyez le signalement.",
+      "byMail": "Vous pouvez aussi nous écrire :"
+    },
+    "fallback": "Le formulaire de signalement n'a pas pu se charger. Rechargez la page, ou écrivez-nous :",
+    "reload": "Recharger la page",
+    "mail": {
+      "listing": "Signalement de l'annonce {id}",
+      "user": "Signalement du profil {id}",
+      "body": "Adresse de la page : {url}\n\nMotif du signalement :\n"
+    }
+  },
+  "Appeals": {
+    "page": {
+      "title": "Décisions et recours",
+      "intro": "Les décisions de modération qui concernent votre compte, vos annonces ou vos messages, avec leurs motifs. Vous pouvez contester une décision pendant 6 mois : une autre personne que celle qui a décidé la réexamine et vous répond sous 14 jours.",
+      "loading": "Chargement de vos décisions",
+      "loadFailed": "Vos décisions n'ont pas pu être chargées",
+      "retry": "Réessayer",
+      "emptyTitle": "Aucune décision vous concernant",
+      "emptyBody": "Si une mesure de modération touche un jour votre compte ou vos contenus, elle apparaîtra ici avec ses motifs et la possibilité de la contester.",
+      "emptyAction": "Voir mes annonces"
+    },
+    "link": {
+      "title": "Contester une décision",
+      "intro": "Le recours prévu par la décision que nous vous avons envoyée par e-mail. Aucun compte n'est nécessaire.",
+      "invalidTitle": "Ce lien n'est pas valide",
+      "invalidBody": "Il est incomplet ou a été modifié. Ouvrez à nouveau le lien reçu par e-mail, en entier.",
+      "expiredTitle": "Le délai de recours est dépassé",
+      "expiredBody": "Une décision se conteste dans les 6 mois qui suivent sa notification. Vous pouvez toujours saisir le tribunal compétent.",
+      "limitedTitle": "Trop de tentatives",
+      "limitedBody": "Ce lien a été ouvert trop souvent depuis votre connexion. Réessayez dans une heure.",
+      "home": "Revenir à l'accueil",
+      "account": "Voir toutes mes décisions"
+    },
+    "measure": {
+      "remove": {
+        "listing": "Annonce retirée",
+        "message": "Message masqué",
+        "upload": "Photo refusée",
+        "other": "Contenu retiré"
+      },
+      "restrict_visibility": "Visibilité de l'annonce restreinte",
+      "demote": "Annonce moins visible dans les résultats",
+      "warn": "Avertissement",
+      "suspend_account": "Compte suspendu{days, plural, =0 {} one { # jour} other { # jours}}",
+      "ban": "Compte fermé",
+      "restore": "Contenu rétabli",
+      "no_action": "Aucune mesure"
+    },
+    "reporter": {
+      "dismissed": "Votre signalement a été classé sans suite",
+      "actioned": "Une mesure a été prise après votre signalement",
+      "dismissedFacts": "Après examen, le contenu signalé ne nous paraît ni illicite ni contraire à nos conditions générales d'utilisation.",
+      "actionedBody": "Il n'y a rien à contester de votre côté."
+    },
+    "decidedOn": "Décision du {date}",
+    "reference": "Référence : {id}",
+    "facts": "Faits constatés",
+    "details": "Précisions du modérateur",
+    "ground": "Fondement",
+    "origin": "Origine",
+    "origins": {
+      "notice": "Un signalement.",
+      "own_initiative": "Un contrôle de notre équipe, de sa propre initiative.",
+      "authority_order": "L'injonction d'une autorité compétente."
+    },
+    "automation": "Moyens automatisés",
+    "automations": {
+      "full": "Décision prise automatiquement, sans intervention humaine. Un modérateur la réexaminera si vous la contestez.",
+      "detected": "Contenu repéré par un outil automatisé ; un modérateur a pris la décision.",
+      "human": "Aucun : un modérateur a pris la décision."
+    },
+    "legacy": {
+      "listingRejected": "Votre annonce a été refusée lors de la vérification qui précède sa publication.",
+      "photoRejectedNsfw": "Une photo a été refusée à l'envoi par notre contrôle automatique des images."
+    },
+    "status": {
+      "appealable": "Recours possible",
+      "open": "Recours en cours",
+      "upheld": "Décision maintenue",
+      "reversed": "Décision annulée"
+    },
+    "appeal": {
+      "intro": "Vous pouvez contester cette décision jusqu'au {date}. Une autre personne que celle qui a décidé la réexaminera et vous répondra sous 14 jours. Vous pouvez aussi saisir le tribunal compétent.",
+      "reporterIntro": "Vous pouvez contester ce classement jusqu'au {date}. Une autre personne que celle qui a décidé réexaminera votre signalement et vous répondra sous 14 jours.",
+      "start": "Contester la décision",
+      "label": "Pourquoi contestez-vous cette décision ?",
+      "hint": "Expliquez les faits de votre point de vue et ce qui, selon vous, a été mal apprécié. {min} caractères au moins.",
+      "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}",
+      "short": "Expliquez votre recours en {min} caractères au moins.",
+      "submit": "Envoyer mon recours",
+      "cancel": "Annuler",
+      "sent": "Recours envoyé. Nous vous répondrons sous 14 jours.",
+      "timeline": "Suivi du recours",
+      "decided": "Décision",
+      "filed": "Recours déposé",
+      "answer": "Réponse",
+      "answerBy": "Au plus tard le {date}",
+      "upheld": "La décision est maintenue.",
+      "reversed": "La décision est annulée.",
+      "note": "Réponse du modérateur",
+      "expired": "Le délai de recours a expiré le {date}. Vous pouvez toujours saisir le tribunal compétent.",
+      "authority": "Cette mesure exécute l'injonction d'une autorité : elle se conteste devant les juridictions de l'État qui l'a émise.",
+      "superseded": "Cette décision a été remplacée par une décision ultérieure."
+    },
+    "host": "Joutiya héberge les contenus de ses utilisateurs sans en être l'auteur et n'est pas partie aux échanges ni aux transactions entre utilisateurs.",
+    "errors": {
+      "not_found": "Cette décision n'est plus disponible.",
+      "rate_limited": "Trop de tentatives. Réessayez {wait}.",
+      "later": "plus tard",
+      "unavailable": "Le recours est momentanément indisponible. Réessayez dans quelques minutes."
+    }
+  },
+  "Storefront": {
+    "label": "Boutique professionnelle",
+    "verified": "Boutique vérifiée",
+    "verifiedNote": "Joutiya a vérifié les identifiants professionnels de cette boutique (ICE, registre). Les ventes se font directement entre vous et la boutique : Joutiya n'est pas partie à la vente et ne garantit pas les produits. La boutique reste tenue de ses obligations de vendeur professionnel envers les consommateurs (loi n° 31-08 sur la protection du consommateur).",
+    "about": "Présentation",
+    "meta": {
+      "title": "{name}, boutique à {city}",
+      "description": "{name}, boutique vérifiée à {city} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya."
+    }
+  },
+  "Options": {
+    "title": "Mettre en avant « {title} »",
+    "intro": "L'option s'applique dès la commande et se paie avec vos crédits.",
+    "loading": "Chargement des options",
+    "failed": "Les options n'ont pas pu être chargées.",
+    "retry": "Réessayer",
+    "closed": "Les options payantes ne sont pas encore ouvertes sur Joutiya.",
+    "notPromotable": "Cette annonce ne peut pas être mise en avant : elle doit être en ligne et visible.",
+    "choose": "Choisissez une option.",
+    "legend": "Option",
+    "options": {
+      "bump": {
+        "title": "Remontée immédiate",
+        "body": "Votre annonce repasse en tête des résultats, comme si elle venait d'être publiée. La carte porte la mention « Remontée »."
+      },
+      "featured7": {
+        "title": "À la Une pendant 7 jours",
+        "body": "Votre annonce occupe aussi les emplacements À la Une, en tête des résultats et sur l'accueil, avec la mention « À la Une · Sponsorisé »."
+      },
+      "featured30": {
+        "title": "À la Une pendant 30 jours",
+        "body": "Les mêmes emplacements À la Une pendant un mois, avec la mention « À la Une · Sponsorisé »."
+      }
+    },
+    "price": "{count, plural, one {# crédit} other {# crédits}}",
+    "included": "Inclus dans votre offre",
+    "insufficient": "Crédits insuffisants",
+    "featuredRunning": "À la Une jusqu'au {date} : la nouvelle durée s'y ajoute.",
+    "bumpedOn": "Dernière remontée le {date}.",
+    "available": "Crédits disponibles : {count, plural, one {# crédit} other {# crédits}}",
+    "availableDetail": "dont {count, plural, one {# crédit} other {# crédits}} de votre offre, dépensés en premier",
+    "allowanceLeft": "{count, plural, one {# À la Une de 7 jours inclus ce mois-ci} other {# À la Une de 7 jours inclus ce mois-ci}}",
+    "frozen": "Votre porte-monnaie est bloqué après un remboursement. Il se débloque dès que votre solde redevient positif.",
+    "walletLink": "Voir mon porte-monnaie",
+    "consent": {
+      "terms": "J'accepte les CGV et je reconnais avoir pris connaissance de mon droit de rétractation de 14 jours.",
+      "immediate": "Je demande l'exécution immédiate de ma commande et je reconnais que je perdrai mon droit de rétractation une fois le service entièrement exécuté.",
+      "termsLink": "Lire les CGV (nouvel onglet)",
+      "required": "Cochez les deux cases pour commander."
+    },
+    "submit": "Commande avec obligation de paiement",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "success": {
+      "bump": "Annonce remontée en tête des résultats.",
+      "featured": "Annonce À la Une jusqu'au {date}."
+    },
+    "errors": {
+      "sales_closed": "Les options payantes ne sont pas encore ouvertes.",
+      "billing_owner_only": "Seul le titulaire de la boutique peut dépenser ses crédits.",
+      "listing_not_promotable": "Cette annonce n'est plus en ligne : elle ne peut pas être mise en avant.",
+      "bump_too_soon": "Votre annonce est déjà en tête des résultats. Réessayez dans une heure.",
+      "wallet_frozen": "Votre porte-monnaie est bloqué après un remboursement.",
+      "insufficient_credits": "Vos crédits ne suffisent pas pour cette option.",
+      "price_changed": "Le prix de cette option vient de changer. Vérifiez-le, puis commandez à nouveau."
+    },
+    "availableAt": "Disponible à partir de {time} : l'annonce est déjà en tête.",
+    "expiresFirst": "Votre annonce expire le {date}, avant la fin de cet À la Une : renouvelez-la pour en profiter jusqu'au bout."
+  },
+  "Wallet": {
+    "metaTitle": "Porte-monnaie",
+    "title": "Porte-monnaie",
+    "personal": "Vos crédits pour mettre vos annonces en avant.",
+    "shop": "Les crédits de votre boutique, partagés par toutes ses annonces.",
+    "loading": "Chargement du porte-monnaie",
+    "failed": "Le porte-monnaie n'a pas pu être chargé.",
+    "retry": "Réessayer",
+    "unit": "1 crédit = 1 MAD TTC",
+    "balance": "Crédits achetés",
+    "plan": "Crédits de votre offre",
+    "planUntil": "Valables jusqu'au {date}, non cumulables",
+    "planNone": "Aucun crédit d'offre en cours",
+    "allowance": "À la Une inclus",
+    "allowanceHint": "À la Une de 7 jours, ce mois-ci",
+    "spendOrder": "Une option se paie d'abord avec les crédits de votre offre, puis avec vos crédits achetés.",
+    "closed": "Les achats ne sont pas encore ouverts sur Joutiya. Vos crédits apparaîtront ici dès leur ouverture.",
+    "frozen": "Votre porte-monnaie est bloqué après un remboursement : aucune option ne peut être achetée tant que le solde est négatif.",
+    "historyTitle": "Historique",
+    "empty": "Aucun mouvement pour l'instant.",
+    "reasons": {
+      "purchase": "Achat de crédits",
+      "plan_grant": "Crédits de votre offre",
+      "refund": "Remboursement",
+      "refund_reversed": "Remboursement annulé",
+      "admin_adjust": "Ajustement par Joutiya",
+      "option": "Option"
+    },
+    "amount": "{count, plural, one {# crédit} other {# crédits}}",
+    "fromPlan": "dont {count, plural, one {# crédit} other {# crédits}} de votre offre",
+    "fromAllowance": "Payé avec un À la Une inclus",
+    "balanceAfter": "Solde : {count}",
+    "more": "Afficher plus",
+    "available": "Crédits disponibles",
+    "buy": "Acheter des crédits",
+    "paid": "Paiement reçu. Vos crédits apparaissent ici dans quelques instants."
+  },
+  "Packs": {
+    "metaTitle": "Acheter des crédits",
+    "back": "Porte-monnaie",
+    "title": "Acheter des crédits",
+    "personal": "Les crédits arrivent sur votre porte-monnaie.",
+    "shop": "Les crédits arrivent sur le porte-monnaie de votre boutique.",
+    "current": "Solde actuel : {count, plural, one {# crédit} other {# crédits}}.",
+    "loading": "Chargement des packs",
+    "failed": "Les packs n'ont pas pu être chargés.",
+    "retry": "Réessayer",
+    "closed": "L'achat de crédits n'est pas encore ouvert sur Joutiya.",
+    "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard.",
+    "legend": "Choisissez un pack",
+    "credits": "{count, plural, one {<n>#</n> crédit} other {<n>#</n> crédits}}",
+    "bonus": "dont {count, plural, one {# crédit offert} other {# crédits offerts}}",
+    "noBonus": "Sans bonus",
+    "price": "{amount, number} {currency}",
+    "perCredit": "Soit {amount, number} {currency} le crédit",
+    "bestValue": "Meilleur prix au crédit",
+    "currency": {
+      "legend": "Votre carte",
+      "MAD": "Carte marocaine, en dirhams",
+      "EUR": "Carte européenne, en euros"
+    },
+    "notesTitle": "Avant de payer",
+    "notes": {
+      "provider": "Le paiement se fait par carte sur la page sécurisée de notre prestataire RevenueCat, avec Stripe. Cette page peut s'afficher en anglais.",
+      "moroccanCard": "Avec une carte marocaine, activez le paiement en ligne à l'international auprès de votre banque. L'achat compte dans votre dotation e-commerce de {cap, number} MAD par an (Office des Changes).",
+      "credits": "Les crédits ne sont ni transférables ni convertibles en argent. Les crédits non utilisés d'un pack sont remboursables pendant 14 jours après l'achat : écrivez à {email}."
+    },
+    "consent": {
+      "terms": "J'ai lu et j'accepte les",
+      "termsLink": "conditions générales de vente",
+      "required": "Cochez la case pour continuer."
+    },
+    "choose": "Choisissez un pack.",
+    "challenge": "Terminez la vérification anti-robot.",
+    "submit": "Payer {amount, number} {currency}",
+    "submitIdle": "Payer",
+    "errors": {
+      "sales_closed": "L'achat de crédits vient de fermer.",
+      "price_changed": "Les packs ont changé : vérifiez votre choix.",
+      "turnstile_failed": "La vérification anti-robot a échoué. Réessayez.",
+      "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard."
+    }
+  },
+  "Subscription": {
+    "metaTitle": "Mon abonnement",
+    "back": "Espace Pro",
+    "title": "Mon abonnement",
+    "lead": "Choisissez l'offre de votre boutique et gérez son paiement.",
+    "loading": "Chargement de votre abonnement",
+    "failed": "Votre abonnement n'a pas pu être chargé.",
+    "retry": "Réessayer",
+    "current": {
+      "title": "Votre offre",
+      "none": "Aucune offre",
+      "launchOffer": "Essentiel offert",
+      "launchOfferBody": "Offerte jusqu'à l'ouverture des ventes. Vous serez prévenu {days} jours avant la fin.",
+      "launchOfferEnds": "Offerte jusqu'au {date}. Abonnez-vous avant cette date pour garder vos annonces en ligne.",
+      "monthly": "Paiement mensuel",
+      "yearly": "Paiement annuel",
+      "renews": "Prochain paiement le {date}",
+      "ends": "Se termine le {date}, sans renouvellement",
+      "manage": "Gérer l'abonnement",
+      "manageHint": "Changez d'offre ou de carte, ou résiliez, sur la page sécurisée de Stripe.",
+      "invoices": "Mes factures"
+    },
+    "status": {
+      "active": "Active",
+      "cancelled": "Résiliée",
+      "grace": "Paiement à régulariser",
+      "billing_issue": "Paiement à régulariser",
+      "expired": "Terminée",
+      "unpaid": "Offre retirée"
+    },
+    "grace": {
+      "title": "Le dernier paiement a échoué",
+      "body": "Mettez à jour votre carte avant le {date} pour garder votre offre. Après cette date, les annonces au-delà du quota seront mises en pause."
+    },
+    "downgraded": {
+      "title": "Votre boutique n'a plus d'offre",
+      "body": "Vos annonces au-delà du quota sont en pause. Après avoir repris une offre, remettez-les en ligne depuis Mes annonces."
+    },
+    "unpaid": {
+      "title": "Paiement en échec : offre retirée",
+      "body": "Le paiement n'a pas été réglé avant la fin du délai. Réglez la facture depuis « Gérer l'abonnement » pour retrouver votre offre, puis remettez en ligne vos annonces en pause depuis Mes annonces."
+    },
+    "success": {
+      "title": "Paiement reçu",
+      "pending": "Votre offre s'active dans quelques instants.",
+      "slow": "L'activation prend plus de temps que prévu. Rechargez la page dans quelques minutes.",
+      "done": "Votre offre est active."
+    },
+    "closed": "Les abonnements ouvriront prochainement. Votre offre Essentiel reste offerte d'ici là.",
+    "closedSoon": "Les abonnements ouvriront prochainement.",
+    "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard.",
+    "suspended": "Votre boutique est suspendue : son offre ne peut pas changer pour le moment.",
+    "offers": "Les offres",
+    "interval": {
+      "legend": "Rythme de paiement",
+      "monthly": "Mensuel",
+      "yearly": "Annuel",
+      "yearlyHint": "2 mois offerts"
+    },
+    "price": {
+      "monthly": "<n>{amount, number}</n> MAD HT par mois",
+      "yearly": "<n>{amount, number}</n> MAD HT par an"
+    },
+    "perMonth": "Soit {amount, number, ::.00} MAD HT par mois",
+    "features": {
+      "listings": "{count, plural, one {# annonce en ligne} other {# annonces en ligne}}",
+      "unlimited": "Annonces en ligne sans limite",
+      "perDay": "{count, plural, one {# nouvelle annonce par jour} other {# nouvelles annonces par jour}}",
+      "credits": "{count, plural, one {# crédit offert chaque mois} other {# crédits offerts chaque mois}}",
+      "featured": "{count, plural, one {# « À la Une » de 7 jours chaque mois} other {# « À la Une » de 7 jours chaque mois}}",
+      "noCredits": "Pas de crédits mensuels",
+      "noFeatured": "Pas de « À la Une » inclus",
+      "storefront": "Vitrine de la boutique et badge Pro"
+    },
+    "yours": "Votre offre",
+    "notesTitle": "Avant de vous abonner",
+    "notes": {
+      "stripe": "Le paiement se fait par carte sur la page sécurisée de Stripe, en français. La TVA s'ajoute aux prix HT et figure sur chaque facture.",
+      "renewal": "L'abonnement se renouvelle automatiquement. Vous pouvez le résilier à tout moment : il court jusqu'à la fin de la période payée.",
+      "credits": "Les crédits et les « À la Une » du mois ne se cumulent pas : ils sont remis à niveau chaque mois.",
+      "invoices": "Vos factures portent l'ICE et les identifiants de votre boutique."
+    },
+    "consent": {
+      "terms": "J'accepte les",
+      "termsLink": "conditions générales de vente",
+      "renewal": "et le renouvellement automatique, résiliable à tout moment pour la fin de la période.",
+      "required": "Cochez la case pour continuer."
+    },
+    "choose": "Choisissez une offre.",
+    "submit": {
+      "monthly": "S'abonner : {amount, number} MAD HT par mois",
+      "yearly": "S'abonner : {amount, number} MAD HT par an"
+    },
+    "submitIdle": "S'abonner",
+    "errors": {
+      "sales_closed": "Les abonnements viennent de fermer.",
+      "already_subscribed": "Votre boutique a déjà une offre : changez-la avec « Gérer l'abonnement ».",
+      "pro_not_verified": "Votre boutique doit être vérifiée pour s'abonner.",
+      "no_billing_customer": "Aucun paiement à gérer pour l'instant.",
+      "billing_owner_only": "Seul le propriétaire de la boutique gère son abonnement.",
+      "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard."
+    }
+  },
+  "Invoices": {
+    "metaTitle": "Mes factures",
+    "back": "Mon abonnement",
+    "title": "Mes factures",
+    "lead": "Les factures de l'abonnement de votre boutique, émises par Stripe pour Joutiya.",
+    "loading": "Chargement des factures",
+    "failed": "Les factures n'ont pas pu être chargées.",
+    "retry": "Réessayer",
+    "empty": "Aucune facture pour l'instant. La première arrive avec votre premier paiement.",
+    "caption": "Factures de la boutique, de la plus récente à la plus ancienne",
+    "number": "Numéro",
+    "date": "Date",
+    "amount": "Montant TTC",
+    "state": "État",
+    "documents": "Documents",
+    "noNumber": "Sans numéro",
+    "total": "{amount, number} {currency}",
+    "statuses": {
+      "paid": "Payée",
+      "open": "À payer",
+      "uncollectible": "Impayée",
+      "void": "Annulée"
+    },
+    "view": "Voir la facture",
+    "pdf": "Télécharger le PDF",
+    "older": "Les factures plus anciennes sont dans « Gérer l'abonnement »."
+  },
+  "Account": {
+    "data": {
+      "title": "Mes données",
+      "body": "Une copie des données de votre compte, dans un fichier que vous pouvez conserver ou réutiliser ailleurs.",
+      "contents": "Profil, paramètres et consentements, annonces (terminées comprises), favoris, recherches enregistrées, conversations, signalements envoyés et décisions de modération vous concernant.",
+      "download": "Télécharger mes données",
+      "downloaded": "Vos données sont téléchargées",
+      "limit": "Fichier JSON, trois téléchargements par jour."
+    },
+    "close": {
+      "title": "Fermer mon compte",
+      "body": "La fermeture est définitive : un compte fermé ne peut pas être rouvert.",
+      "open": "Fermer mon compte",
+      "dialogTitle": "Fermer votre compte Joutiya ?",
+      "dialogLead": "Voici ce qui se passe, et ce que la loi nous oblige à conserver puis à supprimer.",
+      "now": "Aujourd'hui",
+      "nowBody": "Vous êtes déconnecté et ne pouvez plus vous connecter. Vos annonces sont retirées, vos favoris et vos recherches enregistrées supprimés. Les personnes avec qui vous avez échangé peuvent relire vos conversations, sans pouvoir vous écrire.",
+      "purgeBody": "Votre adresse e-mail, votre téléphone et votre nom affiché sont supprimés. Jusque-là, cette adresse e-mail ne peut pas servir à créer un nouveau compte.",
+      "identityBody": "Votre nom légal, s'il nous a été communiqué, est supprimé. Les signalements et décisions de modération vous concernant sont eux aussi conservés cinq ans, puis supprimés.",
+      "exportFirst": "Si vous souhaitez garder une copie de vos données, téléchargez-la avant de fermer le compte (rubrique « Mes données »).",
+      "confirm": "Je comprends que la fermeture de mon compte est définitive.",
+      "submit": "Fermer définitivement",
+      "cancel": "Annuler",
+      "doneTitle": "Votre compte est fermé",
+      "doneBody": "Un e-mail de confirmation vous a été envoyé. Les données de votre compte seront supprimées le {date}.",
+      "home": "Retour à l'accueil",
+      "reauthTitle": "Reconnectez-vous pour confirmer",
+      "reauthBody": "Par sécurité, la fermeture demande une connexion de moins de dix minutes. Reconnectez-vous, puis revenez ici.",
+      "reauth": "Me reconnecter",
+      "proTitle": "Votre abonnement Pro est en cours",
+      "proBody": "Résiliez d'abord votre abonnement Pro. Une fois la résiliation prise en compte, vous pourrez fermer votre compte.",
+      "walletTitle": "Il vous reste des crédits",
+      "walletBody": "Des crédits achetés sont encore sur votre compte. Utilisez-les ou écrivez-nous pour demander leur remboursement, puis fermez votre compte."
     }
   }
 }

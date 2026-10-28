@@ -1,17 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { requireUser } from "@/lib/auth/guards";
 import { setClaims } from "@/lib/firebase/claims";
-import { createSessionForUid } from "@/lib/firebase/session";
+import { createSessionForUid, revokeSessions } from "@/lib/firebase/session";
 import { sendMail } from "@/lib/mail";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { csrfToken } from "@/lib/security/csrf";
 import type * as Turnstile from "@/lib/security/turnstile";
 import { POST as action } from "@/app/api/auth/action/route";
-import { POST as clientToken } from "@/app/api/auth/client-token/route";
 import { GET as me } from "@/app/api/auth/me/route";
+import { GET as inbox, POST as startConversation } from "@/app/api/conversations/route";
+import { GET as phoneStatus } from "@/app/api/auth/phone/status/route";
+import { GET as unread } from "@/app/api/messages/unread/route";
 import { POST as profile } from "@/app/api/auth/profile/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
-import { CONSENTS, Jar, ORIGIN, PASSWORD, call, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
+import { GET as myListings } from "@/app/api/listings/mine/route";
+import { CONSENTS, Jar, ORIGIN, PASSWORD, actionUrlOf, call, lastMail, oobCodeOf, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
 
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
@@ -20,13 +23,13 @@ vi.mock("@/lib/security/turnstile", async (importOriginal) => ({
 }));
 
 // Guards on a suspended account (§6 "Contrôle d'accès"): the session is refused everywhere except
-// on the routes that opt in (conversations, export, appeal).
+// on the routes that opt in (reading conversations, export, appeal).
 
 async function verifiedAccount() {
   const jar = new Jar();
   const email = uniqueEmail("gs");
   expect((await call(signup, "/api/auth/signup", { jar, body: { email, password: PASSWORD, displayName: "Suspended Soon", locale: "fr", consents: CONSENTS, turnstileToken: "t" } })).status).toBe(202);
-  const verified = await call<SignedInBody>(action, "/api/auth/action", { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(lastMail(sendMail, "verifyEmail", email)!.data.actionUrl) } });
+  const verified = await call<SignedInBody>(action, "/api/auth/action", { jar, body: { mode: "verifyEmail", oobCode: oobCodeOf(await actionUrlOf(lastMail(sendMail, "verifyEmail", email)!)) } });
   expect(verified.status).toBe(200);
   return { jar, uid: verified.body.session.uid };
 }
@@ -44,10 +47,34 @@ function requestWith(jar: Jar): Request {
   return new Request(`${ORIGIN}/api/anything`, { method: "POST", headers: { host: "localhost:3000", origin: ORIGIN, cookie: jar.header() ?? "", "x-csrf-token": jar.get("__Host-csrf") ?? "" } });
 }
 
+/** Revocation has a one-second granularity (auth_time vs tokensValidAfterTime): sessions minted in the same second survive. */
+const nextSecond = () => new Promise((resolve) => setTimeout(resolve, 1100));
+
 beforeEach(() => resetRateLimiters());
 
+describe("revoked session cookie", () => {
+  it("is refused on GET routes too, not only on mutations: /api/listings/mine and /api/auth/phone/status answer 401", async () => {
+    const { jar, uid } = await verifiedAccount();
+    expect((await call(myListings, "/api/listings/mine", { jar })).status).toBe(200);
+    expect((await call(phoneStatus, "/api/auth/phone/status", { jar })).status).toBe(200);
+
+    // The cookie is copied before a logout, password change or ban revokes the account's sessions.
+    await nextSecond();
+    await revokeSessions(uid);
+    const listings = await call<ErrorBody>(myListings, "/api/listings/mine", { jar });
+    expect(listings.status).toBe(401);
+    expect(listings.body.error.code).toBe("unauthenticated");
+    const phone = await call<ErrorBody>(phoneStatus, "/api/auth/phone/status", { jar });
+    expect(phone.status).toBe(401);
+    expect(phone.body.error.code).toBe("unauthenticated");
+    // requireUser checks revocation by default (the explicit `checkRevoked: false` opt-out cannot be
+    // observed here: the Admin SDK always checks revocation against the Auth emulator).
+    await expect(requireUser(requestWith(jar))).rejects.toMatchObject({ status: 401, code: "unauthenticated" });
+  });
+});
+
 describe("suspended account", () => {
-  it("answers 403 account_suspended unless the route allows suspended members", async () => {
+  it("answers 403 account_suspended unless the route allows suspended members (messaging reads do, D9)", async () => {
     const { uid } = await verifiedAccount();
     await setClaims(uid, { role: "individual", st: "suspended" });
     const jar = await jarFor(uid);
@@ -57,9 +84,14 @@ describe("suspended account", () => {
     const refused = await call<ErrorBody>(profile, "/api/auth/profile", { jar, body: { displayName: "Still Me" } });
     expect(refused.status).toBe(403);
     expect(refused.body.error.code).toBe("account_suspended");
-    const token = await call<ErrorBody>(clientToken, "/api/auth/client-token", { jar, body: {} });
-    expect(token.status).toBe(403);
-    expect(token.body.error.code).toBe("account_suspended");
+    // Phase 5 (D2, D9): a suspended member still reads their conversations through the API, never writes.
+    const conversations = await call<{ conversations: unknown[] }>(inbox, "/api/conversations", { jar });
+    expect(conversations.status).toBe(200);
+    expect(conversations.body.conversations).toEqual([]);
+    expect((await call<{ total: number }>(unread, "/api/messages/unread", { jar })).status).toBe(200);
+    const write = await call<ErrorBody>(startConversation, "/api/conversations", { jar, body: { listingId: "abcd2345", text: "Salam", turnstileToken: "t" } });
+    expect(write.status).toBe(403);
+    expect(write.body.error.code).toBe("account_suspended");
 
     await expect(requireUser(requestWith(jar), { mutation: true })).rejects.toMatchObject({ status: 403, code: "account_suspended" });
     const allowed = await requireUser(requestWith(jar), { mutation: true, allowSuspended: true });

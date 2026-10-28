@@ -1,5 +1,5 @@
 {
-  "$comment": "Local ONNX models of the worker (design D7, docs/models.md). Fetched by scripts/fetch-models.ts from the pinned URL, verified by sha256, never committed (.gitignore). Sources: research/libs-media.md sections 3-5.",
+  "$comment": "Local ONNX models of the worker (design D7, docs/models.md). Fetched by scripts/fetch-models.ts from the pinned URL, verified by sha256, never committed (.gitignore). Sources: phase-3/research/libs-media.md sections 3-5 (shared project folder).",
   "version": 1,
   "models": [
     {

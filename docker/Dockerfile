@@ -3,9 +3,10 @@
 # Built for linux/arm64 (Oracle A1). One build serves staging, then production by promotion:
 # no NEXT_PUBLIC_* build argument, every setting is read at runtime.
 
-ARG NODE_IMAGE=node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
+# The pin sits on one literal FROM line: Dependabot cannot read an image named through an ARG.
+FROM node:24.22.0-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS base
 
-FROM ${NODE_IMAGE} AS deps
+FROM base AS deps
 WORKDIR /src
 COPY package.json package-lock.json ./
 # No install scripts: nothing in the tree needs one to build, and it closes a supply-chain path.
@@ -22,17 +23,17 @@ RUN set -eu; keep="dist/worker-standalone/node_modules/onnxruntime-node/bin/napi
       if [ -d "$dir" ] && [ "$dir" != "$keep" ]; then rm -rf "$dir"; fi; \
     done
 
-FROM ${NODE_IMAGE} AS models
+FROM base AS models
 # Local ONNX models of the worker (docs/models.md, models/MANIFEST.json): downloaded from their
 # pinned URLs and verified by sha256 at build time, the only step that needs the network. The web
 # target never sees them.
 WORKDIR /src
 COPY package.json ./
-COPY scripts/fetch-models.ts scripts/
+COPY scripts/fetch-models.ts scripts/env-proxy.ts scripts/
 COPY models/MANIFEST.json models/
 RUN MEDIA_MODELS_DIR=/app/models node scripts/fetch-models.ts
 
-FROM ${NODE_IMAGE} AS runtime
+FROM base AS runtime
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app
@@ -62,7 +63,7 @@ FROM runtime AS worker
 COPY --from=build /src/dist/worker-standalone ./
 COPY --from=build /src/infra/targets.json ./infra/targets.json
 COPY --from=models /app/models ./models
-# MALLOC_ARENA_MAX: glibc fragmentation with sharp/libvips (research/libs-media.md §1.1).
+# MALLOC_ARENA_MAX: glibc fragmentation with sharp/libvips (phase-3/research/libs-media.md §1.1).
 ENV MEDIA_MODELS_DIR=/app/models \
     MALLOC_ARENA_MAX=2
 USER node

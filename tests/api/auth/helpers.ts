@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { vi } from "vitest";
 import type { SessionSummary } from "@/lib/contracts/auth";
-import type { TemplateId, TemplateMail } from "@/lib/mail/types";
+import { generateActionUrl } from "@/lib/auth/links";
+import type { ActionLinkRequest, MailJob, TemplateId } from "@/lib/mail/types";
 
 // Shared plumbing of the auth API tests: a cookie jar, a request builder for route handlers, the
 // captured mails. Every test file mocks "@/lib/mail" and "@/lib/security/turnstile" itself
@@ -96,13 +97,28 @@ export type ErrorBody = { error: { code: string; details?: unknown } };
 export type SignedInBody = { status: string; session: SessionSummary };
 
 /** Mails captured by the "@/lib/mail" mock of the current test file. */
-export function capturedMails(sendMail: unknown): TemplateMail[] {
-  return vi.mocked(sendMail as (mail: TemplateMail) => Promise<void>).mock.calls.map(([mail]) => mail);
+export function capturedMails(sendMail: unknown): MailJob[] {
+  return vi.mocked(sendMail as (mail: MailJob) => Promise<void>).mock.calls.map(([mail]) => mail);
 }
 
-export function lastMail<T extends TemplateId>(sendMail: unknown, template: T, to?: string): TemplateMail<T> | undefined {
-  const mails = capturedMails(sendMail).filter((mail): mail is TemplateMail<T> => mail.template === template && (to === undefined || mail.to === to));
+export function lastMail<T extends TemplateId>(sendMail: unknown, template: T, to?: string): MailJob<T> | undefined {
+  const mails = capturedMails(sendMail).filter((mail): mail is MailJob<T> => mail.template === template && (to === undefined || mail.to === to));
   return mails.at(-1);
+}
+
+/** The link request of a queued action mail: the payload never holds a live link (audit B3-12). */
+export function actionLinkOf(mail: MailJob): ActionLinkRequest {
+  const data = mail.data as { actionUrl?: string; actionLink?: ActionLinkRequest };
+  if (data.actionUrl !== undefined) throw new Error(`${mail.template} was queued with a live action link`);
+  if (!data.actionLink) throw new Error(`${mail.template} has no action link request`);
+  return data.actionLink;
+}
+
+/** The link the worker would put in a queued action mail, generated now against the emulator. */
+export async function actionUrlOf(mail: MailJob): Promise<string> {
+  const url = await generateActionUrl(mail.to, actionLinkOf(mail));
+  if (!url) throw new Error(`no Auth account for ${mail.to}`);
+  return url;
 }
 
 export function oobCodeOf(actionUrl: string): string {
