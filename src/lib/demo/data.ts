@@ -1,6 +1,4 @@
 import { subcategoryById } from "@/config/categories";
-import { DEFAULT_LEGAL } from "@/config/legal";
-import { listingLifetime } from "@/config/pricing";
 import { cityBySlug } from "@/config/regions";
 import type { ListingPhoto } from "@/lib/contracts/media";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
@@ -8,15 +6,16 @@ import type { UserDoc } from "@/lib/db/schemas";
 import { LISTING_ID_ALPHABET, buildSlugId } from "@/lib/listings/ids";
 import { DEMO_ENTRIES, DEMO_SELLERS, type DemoEntry, type DemoSeller } from "./catalog";
 
-// Staging demo data set (scripts/seed-demo.ts): the catalog turned into Firestore documents with
-// stable ids, so a second run overwrites the first and the removal finds everything without a
-// read. Listing ids start with "zx" (load test: "zz", "zy"), seller uids with "demo-", photo ids
+// Example listings (scripts/seed-demo.ts; owner decision of 2026-10-28): the catalog turned into
+// Firestore documents with stable ids, so a second run overwrites the first and the removal finds
+// everything without a read. Each one carries `example: true`: labelled "Annonce exemple" on cards
+// and pages, never contactable (acceptsContact), no paid boost or ad, out of the sitemap. Listing ids start with "zx" (load test: "zz", "zy"), seller uids with "demo-", photo ids
 // with "demo": scripts/launch-check.ts and the purge before launch key on these.
 
 export const DEMO_ID_PREFIX = "zx";
 export const DEMO_UID_PREFIX = "demo-";
-/** Listings boosted "À la Une" for a week, so the featured slots have something to show. */
-export const DEMO_FEATURED: ReadonlySet<string> = new Set(["car-clio", "immo-villa-agadir", "phone-iphone13", "agri-tractor"]);
+/** Examples do not expire like a member's listing (60 days): a re-run of the seed renews them. */
+export const DEMO_LIFETIME_DAYS = 3650;
 
 const DAY_MS = 86_400_000;
 
@@ -84,7 +83,6 @@ export function demoListing(entry: DemoEntry, index: number, now: Date, photos: 
   const id = demoListingId(index);
   // Spread within the day so listings of the same age do not share a timestamp.
   const at = new Date(now.getTime() - entry.days * DAY_MS - ((index * 37) % 600) * 60_000);
-  const { ttlDays } = listingLifetime(DEFAULT_LEGAL);
   return {
     id,
     ownerUid: demoSellerUid(seller.key),
@@ -105,14 +103,16 @@ export function demoListing(entry: DemoEntry, index: number, now: Date, photos: 
     location: { regionCode: city.regionCode, citySlug: city.slug, geo: { lat: city.lat, lng: city.lng } },
     photos: [...photos],
     contact: { messaging: true, showPhone: false, whatsapp: false },
-    boosts: DEMO_FEATURED.has(entry.key) ? { featuredUntil: new Date(now.getTime() + 7 * DAY_MS) } : {},
+    // No "À la Une": a sponsored mention on an example would be false.
+    boosts: {},
     sortAt: at,
     sortSource: "publish",
     // Restricted goods are reviewed by a moderator before publication: shown as reviewed.
     moderation: { state: sub.adultsOnly ? "human_ok" : "auto_ok", score: 0, flags: [], openReports: 0 },
-    adsEligible: !sub.adultsOnly,
+    example: true,
+    adsEligible: false,
     publishedAt: at,
-    expiresAt: new Date(at.getTime() + ttlDays * DAY_MS),
+    expiresAt: new Date(now.getTime() + DEMO_LIFETIME_DAYS * DAY_MS),
     legalHold: [],
     createdAt: at,
     updatedAt: at,

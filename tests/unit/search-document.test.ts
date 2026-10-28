@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import { isIndexable, toSearchDocument, truncateText } from "@/lib/search/document";
-import { SEARCH_DESCRIPTION_MAX, sitemapShardOf } from "@/lib/search/types";
+import { SEARCH_DESCRIPTION_MAX, SITEMAP_SHARDS, sitemapShardOf } from "@/lib/search/types";
 
 // Listing -> search document (design D4, D9): what is indexed (fr + ar labels, criteria, rounded
 // geo, epoch dates) and what never is (owner, pro id, contact settings, exact position).
@@ -156,6 +156,13 @@ describe("toSearchDocument", () => {
     expect(toSearchDocument(listing({ sortSource: "bump" }), NOW)?.isBumped).toBe(true);
     expect(toSearchDocument(listing({ boosts: { featuredUntil: running } }), NOW)?.featuredUntil).toBe(running.getTime());
     expect(toSearchDocument(listing({ boosts: { featuredUntil: new Date(NOW.getTime() - 1) } }), NOW)).not.toHaveProperty("featuredUntil");
+  });
+
+  it("marks an example listing and keeps it out of every sitemap shard", () => {
+    const doc = toSearchDocument(listing({ example: true }), NOW)!;
+    expect(doc.isExample).toBe(true);
+    expect(doc.sitemapShard).toBe(SITEMAP_SHARDS);
+    expect(toSearchDocument(listing(), NOW)).not.toHaveProperty("isExample");
   });
 
   it("indexes a listing without photo", () => {

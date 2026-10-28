@@ -335,6 +335,19 @@ describe("page content", () => {
     }
   });
 
+  it("labels an example listing and offers no contact, favorite or Product markup", async () => {
+    repo.getListing.mockResolvedValue(record("published", { example: true }));
+    const html = await renderPage();
+    expect(html).toContain('data-testid="example-banner"');
+    expect(html).toContain("Annonce exemple");
+    expect(html).toContain('data-testid="example-contact"');
+    expect(html).not.toContain('data-testid="contact-bar"');
+    expect(html).not.toContain("data-favorite=");
+    expect(html).not.toContain('"@type":"Product"');
+    const metadata = await generateMetadata(params(SLUG_ID));
+    expect(metadata.robots).toEqual({ index: false, follow: true });
+  });
+
   it("keeps the page readable with the denormalized seller when the account has no public face", async () => {
     repo.getListing.mockResolvedValue(record());
     repo.getUserRecord.mockResolvedValue(user({ status: "banned" }));
