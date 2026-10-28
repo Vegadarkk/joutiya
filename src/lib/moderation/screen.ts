@@ -3,6 +3,7 @@ import { isPriceOutlier, priceRange } from "@/config/price-ranges";
 import type { ModerationFlag } from "@/lib/contracts/listings";
 import { findContacts } from "@/lib/moderation/contacts";
 import { quotesCreditWithoutApr } from "@/lib/moderation/credit";
+import { rentalReviewReasons } from "./rental";
 import { findPhoneNumbers } from "@/lib/moderation/phones";
 import { containsProhibited } from "@/lib/moderation/prohibited";
 import { NEW_ACCOUNT_DAYS, VOLUME_PER_DAY, decideState, riskScore, sortFlags } from "@/lib/moderation/risk";
@@ -139,6 +140,12 @@ export function screenListing(input: ScreenInput, ctx: ScreenContext): ScreenRes
   if (!subcategoryById(input.subcategoryId)?.priceUnit && quotesCreditWithoutApr(`${input.title ?? ""}\n${input.description ?? ""}`)) {
     flags.add("credit_ad");
     note("instalment quoted without TEG");
+  }
+  // Car rental: with driver, identity paper or blank cheque as a guarantee, old vehicle -> a moderator.
+  const rental = rentalReviewReasons(input, ctx.now ?? new Date());
+  if (rental.length > 0) {
+    flags.add("rental_review");
+    for (const reason of rental) note(reason);
   }
   // Simple rule (documented limit): a second distinct number is treated as a third party's.
   if (phoneKeys.size >= 2) {

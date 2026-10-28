@@ -9,7 +9,7 @@ import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { textLinkClassName } from "@/components/ui/text-link";
-import { subcategoryById } from "@/config/categories";
+import { RENTAL_SUBCATEGORY, subcategoryById } from "@/config/categories";
 import { SITE_NAME } from "@/config/site";
 import { Link } from "@/i18n/navigation";
 import { isApiError } from "@/lib/auth/client";
@@ -154,6 +154,9 @@ export function PublishStep({ stock, nonce, onDone }: { stock: readonly StockLis
   // Real estate in the batch: the agency attests the declared data of those listings (review-step).
   const realEstate = ready.some((listing) => needsRealEstateAttestation(subcategoryById(listing.subcategoryId ?? "")));
   const [declared, setDeclared] = useState(false);
+  // Car rentals in the batch: the agency's licence, registration, insurance and declarations (review-step).
+  const rental = ready.some((listing) => listing.subcategoryId === RENTAL_SUBCATEGORY);
+  const [rentalDeclared, setRentalDeclared] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [results, setResults] = useState<Map<string, PublishResult>>(new Map());
   const [error, setError] = useState<unknown>(null);
@@ -173,7 +176,8 @@ export function PublishStep({ stock, nonce, onDone }: { stock: readonly StockLis
         setProgress({ done: outcome.size, total });
         try {
           const attest = needsRealEstateAttestation(subcategoryById(listing.subcategoryId ?? ""));
-          const response = await publishListing(listing.id, { acceptRules: true, ...(attest ? { realEstateAttestation: true } : {}), ...(pass ? { turnstileToken: pass } : {}) });
+          const rents = listing.subcategoryId === RENTAL_SUBCATEGORY;
+          const response = await publishListing(listing.id, { acceptRules: true, ...(attest ? { realEstateAttestation: true } : {}), ...(rents ? { rentalAttestation: true } : {}), ...(pass ? { turnstileToken: pass } : {}) });
           outcome.set(listing.id, response.status === "published" ? "published" : "pending_review");
         } catch (caught) {
           if (isApiError(caught, "turnstile_required", "turnstile_failed")) {
@@ -235,8 +239,14 @@ export function PublishStep({ stock, nonce, onDone }: { stock: readonly StockLis
               <span className="text-pretty">{t("realEstate", { brand: SITE_NAME })}</span>
             </label>
           ) : null}
+          {rental ? (
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={rentalDeclared} onChange={(event) => setRentalDeclared(event.target.checked)} className="mt-0.5 size-4 shrink-0 accent-structure" />
+              <span className="text-pretty">{t("rental", { brand: SITE_NAME })}</span>
+            </label>
+          ) : null}
           <div className="flex flex-wrap gap-3">
-            <Button disabled={!accepted || (realEstate && !declared) || ready.length === 0 || progress !== null || needToken} loading={progress !== null} onClick={start}>
+            <Button disabled={!accepted || (realEstate && !declared) || (rental && !rentalDeclared) || ready.length === 0 || progress !== null || needToken} loading={progress !== null} onClick={start}>
               <Send aria-hidden="true" />
               {t("send", { count: ready.length })}
             </Button>

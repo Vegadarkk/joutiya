@@ -12,6 +12,8 @@ import { CriteriaSection } from "@/components/listing/criteria-grid";
 import { PROPERTY_TERM_FIELDS, PropertyTerms } from "@/components/listing/property-terms";
 import { VehicleBuyingGuide } from "@/components/listing/vehicle-buying-guide";
 import { VehicleDossier } from "@/components/listing/vehicle-dossier";
+import { RentalGuide } from "@/components/listing/rental-guide";
+import { RentalTerms } from "@/components/listing/rental-terms";
 import { Gallery } from "@/components/listing/gallery";
 import { JsonLd } from "@/components/listing/json-ld";
 import { ExampleBanner, ExampleContactNotice } from "@/components/listing/example-banner";
@@ -24,7 +26,7 @@ import { PayAtSeller } from "@/components/listing/pay-at-seller";
 import { SellerCard } from "@/components/listing/seller-card";
 import { ListingMapBlock } from "@/components/map/listing-map-block";
 import { ReportButton } from "@/components/report/report-button";
-import { VEHICLE_SALE_SUBCATEGORIES, categoryById, subcategoryById } from "@/config/categories";
+import { RENTAL_SUBCATEGORY, VEHICLE_SALE_SUBCATEGORIES, categoryById, subcategoryById } from "@/config/categories";
 import { availablePromos } from "@/config/house-promos";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
@@ -264,6 +266,7 @@ export default async function ListingPage({ params }: { params: Params }) {
           <div className="flex min-w-0 flex-col gap-10 lg:[grid-area:body]">
             <CriteriaSection title={t("criteriaTitle")} subcategoryId={listing.subcategoryId} attributes={listing.attributes} condition={listing.condition} exclude={realEstate ? PROPERTY_TERM_FIELDS : undefined} />
             <VehicleDossier subcategoryId={listing.subcategoryId} attributes={listing.attributes} />
+            <RentalTerms subcategoryId={listing.subcategoryId} attributes={listing.attributes} locale={locale} />
 
             <section aria-labelledby="description-title" className="flex flex-col gap-3">
               <h2 id="description-title" className="text-lg font-semibold">
@@ -286,6 +289,7 @@ export default async function ListingPage({ params }: { params: Params }) {
 
             {VEHICLE_SALE_SUBCATEGORIES.includes(listing.subcategoryId) ? <VehicleBuyingGuide attributes={listing.attributes} sellerType={listing.seller.type} /> : null}
             {guideRubric ? <GuideCategoryLink rubric={guideRubric} locale={locale} /> : null}
+            {listing.subcategoryId === RENTAL_SUBCATEGORY ? <RentalGuide /> : null}
 
             {/* Report link, then the safety tips: a non-interactive block always stands between the ad
                 and the contact or report controls (D6). */}

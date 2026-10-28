@@ -19,7 +19,7 @@ export type Condition = (typeof CONDITIONS)[number];
 export const CRITERION_TYPES = ["select", "multiselect", "number", "boolean", "text"] as const;
 export type CriterionType = (typeof CRITERION_TYPES)[number];
 
-export const CRITERION_UNITS = ["km", "cv", "m2", "an", "go", "nuit", "mois"] as const;
+export const CRITERION_UNITS = ["km", "cv", "m2", "an", "go", "nuit", "mois", "jour", "ans", "mad"] as const;
 export type CriterionUnit = (typeof CRITERION_UNITS)[number];
 
 /** Max length of a free-text criterion (model, brand, breed). */
@@ -37,8 +37,9 @@ export interface Criterion {
   unit?: CriterionUnit;
   step?: number;
   /**
-   * `dossier`: history, papers, warranty and equipment of a vehicle (Concession pack, 2026-10-28):
-   * a folded block of the wizard, its own section on the listing page. Absent = main criteria.
+   * `dossier`: history, papers, warranty and equipment of a vehicle (Concession pack, 2026-10-28);
+   * `rental`: the terms of a car rental (insurance, deposit, driver, handover; rental pack,
+   * 2026-10-28). A folded block of the wizard, its own section on the listing page. Absent = main criteria.
    */
   group?: CriterionGroup;
   /** A dossier criterion offered as a search filter (main criteria always are, text excepted). */
@@ -53,7 +54,7 @@ export interface Criterion {
   showIf?: { id: string; values: readonly string[] };
 }
 
-export const CRITERION_GROUPS = ["dossier"] as const;
+export const CRITERION_GROUPS = ["dossier", "rental"] as const;
 export type CriterionGroup = (typeof CRITERION_GROUPS)[number];
 
 /**
@@ -62,6 +63,7 @@ export type CriterionGroup = (typeof CRITERION_GROUPS)[number];
  */
 export const MAIN_CRITERIA_MAX = 12;
 export const PRO_CRITERIA_MAX = 8;
+/** Cap of each folded group (vehicle dossier, rental terms). */
 export const DOSSIER_CRITERIA_MAX = 12;
 
 /** Price per unit shown next to the amount; the amount itself stays an integer MAD (D4). */
@@ -143,6 +145,23 @@ const FIELDS = {
   "financing": { id: "financing", type: "boolean" },
   "car-equipment": { id: "car-equipment", type: "multiselect", options: ["climatisation", "gps", "camera-recul", "radar-recul", "carplay-android-auto", "regulateur", "toit-ouvrant", "sieges-cuir", "jantes-alu", "transmission-4x4"] },
   "stock-ref": { id: "stock-ref", type: "text", proOnly: true },
+  // Car rental (rental pack, location-voitures/location-voitures.md §2): declared by the agency.
+  "rental-class": { id: "rental-class", type: "select", options: ["economique", "citadine", "compacte", "berline", "suv-4x4", "monospace", "utilitaire", "minibus", "cabriolet", "luxe"] },
+  "seats": { id: "seats", type: "number", min: 2, max: 9 },
+  "min-rental-days": { id: "min-rental-days", type: "number", min: 1, max: 90, unit: "jour" },
+  "mileage-policy": { id: "mileage-policy", type: "select", options: ["illimite", "limite"] },
+  "km-per-day": { id: "km-per-day", type: "number", min: 50, max: 2000, unit: "km", showIf: { id: "mileage-policy", values: ["limite"] } },
+  "rental-insurance": { id: "rental-insurance", type: "select", options: ["rc", "tous-risques-franchise", "tous-risques-sans-franchise"] },
+  "insurance-excess": { id: "insurance-excess", type: "number", min: 0, max: 200000, unit: "mad", showIf: { id: "rental-insurance", values: ["tous-risques-franchise"] } },
+  "rental-deposit": { id: "rental-deposit", type: "number", min: 0, max: 200000, unit: "mad" },
+  "driver-min-age": { id: "driver-min-age", type: "number", min: 18, max: 30, unit: "ans" },
+  "licence-years": { id: "licence-years", type: "number", min: 0, max: 10, unit: "ans" },
+  "vehicle-handover": { id: "vehicle-handover", type: "multiselect", options: ["agence", "aeroport", "livraison", "gare"] },
+  "one-way": { id: "one-way", type: "boolean" },
+  "rental-extras": { id: "rental-extras", type: "multiselect", options: ["siege-bebe", "rehausseur", "conducteur-additionnel", "gps", "wifi"] },
+  "rate-7-days": { id: "rate-7-days", type: "number", min: 1, max: 100000, unit: "mad" },
+  "rate-30-days": { id: "rate-30-days", type: "number", min: 1, max: 100000, unit: "mad" },
+  "fleet-units": { id: "fleet-units", type: "number", min: 1, max: 200 },
   "moto-brand": { id: "moto-brand", type: "select", options: ["yamaha", "honda", "suzuki", "kawasaki", "bmw", "ktm", "ducati", "piaggio", "vespa", "sym", "kymco", "peugeot", "aprilia", "triumph", "harley-davidson", "docker", "becane", "haojue", "lifan", "autre"] },
   "engine-size": { id: "engine-size", type: "select", options: ["moins-50", "50-125", "126-250", "251-500", "501-750", "plus-750"] },
   "bike-type": { id: "bike-type", type: "select", options: ["vtt", "route", "ville", "electrique", "enfant", "bmx", "pliant", "autre"] },
@@ -278,6 +297,25 @@ const VEHICLE_DOSSIER = [
   dossier("financing"),
   dossier("stock-ref"),
 ] as const;
+const rental = (id: CriterionId, options: { filter?: true } = {}): Criterion => ({ ...FIELDS[id], group: "rental", ...options });
+
+/** Car rental by Pro agencies (rental pack): rental terms, availability by dates, fleet storefront. */
+export const RENTAL_SUBCATEGORY = "location-voitures";
+
+const RENTAL_TERMS = [
+  rental("rental-insurance", { filter: true }),
+  rental("insurance-excess"),
+  rental("rental-deposit"),
+  rental("driver-min-age"),
+  rental("licence-years"),
+  rental("vehicle-handover", { filter: true }),
+  rental("one-way", { filter: true }),
+  rental("rental-extras"),
+  rental("rate-7-days"),
+  rental("rate-30-days"),
+  rental("fleet-units"),
+];
+
 const proRequired = (id: CriterionId): Criterion => ({ ...FIELDS[id], required: true, proOnly: true });
 const proOptional = (id: CriterionId): Criterion => ({ ...FIELDS[id], proOnly: true });
 
@@ -286,7 +324,7 @@ export const CATEGORIES: readonly Category[] = [
     id: "vehicules",
     subcategories: [
       { id: "voitures", categoryId: "vehicules", condition: "optional", criteria: [required("car-brand"), required("model"), required("year"), required("mileage"), required("fuel"), required("gearbox"), optional("fiscal-power"), optional("origin"), optional("body-type"), optional("doors"), optional("color"), ...VEHICLE_DOSSIER, dossier("car-equipment")] },
-      { id: "location-voitures", categoryId: "vehicules", priceOptional: true, priceUnit: "day", proOnly: true, criteria: [required("car-brand"), required("model"), optional("year"), required("gearbox"), optional("fuel")] },
+      { id: "location-voitures", categoryId: "vehicules", priceUnit: "day", proOnly: true, criteria: [required("rental-class"), required("car-brand"), required("model"), optional("year"), required("gearbox"), required("fuel"), optional("seats"), optional("min-rental-days"), optional("mileage-policy"), optional("km-per-day"), ...RENTAL_TERMS] },
       { id: "motos-scooters", categoryId: "vehicules", condition: "optional", criteria: [required("moto-brand"), optional("model"), required("year"), optional("mileage"), required("engine-size"), ...VEHICLE_DOSSIER] },
       { id: "velos", categoryId: "vehicules", condition: "required", donationAllowed: true, criteria: [required("bike-type"), optional("bike-size"), optional("brand")] },
       { id: "utilitaires-camions", categoryId: "vehicules", condition: "optional", criteria: [required("utility-type"), required("car-brand"), optional("model"), required("year"), required("mileage"), required("fuel"), optional("gearbox"), ...VEHICLE_DOSSIER] },

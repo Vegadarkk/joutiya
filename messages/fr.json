@@ -574,7 +574,8 @@
       "upload_limit": "Trop de photos ont été envoyées pour cette annonce, photos refusées comprises. Supprimez les photos refusées pour en ajouter d'autres, ou patientez : elles sont effacées automatiquement 7 jours après leur envoi.",
       "quota_exhausted": "Le dépôt et la modification d'annonces sont momentanément suspendus : la limite quotidienne de notre service est atteinte. Votre annonce est conservée ; réessayez après 9 h (heure du Maroc).",
       "adults_only_attestation": "Pour publier dans cette catégorie, confirmez qu'il s'agit d'un objet décoratif vendu uniquement à une personne majeure.",
-      "real_estate_attestation": "Pour publier une annonce immobilière, attestez que ses informations sont exactes et sous votre seule responsabilité."
+      "real_estate_attestation": "Pour publier une annonce immobilière, attestez que ses informations sont exactes et sous votre seule responsabilité.",
+      "rental_attestation": "Pour publier une location, confirmez la déclaration de votre agence (agrément, immatriculation, assurance)."
     },
     "wizard": {
       "title": "Déposer une annonce",
@@ -616,7 +617,9 @@
       "saveLimit": "Cette modification doit être vérifiée par notre équipe, et une annonce en cours de vérification compte parmi vos annonces actives : vous avez atteint le maximum. Mettez en pause ou supprimez une autre annonce, puis enregistrez à nouveau.",
       "saveQuota": "La limite quotidienne de notre service est atteinte : vos dernières modifications ne sont pas encore enregistrées. Gardez cette page ouverte et réessayez après 9 h (heure du Maroc).",
       "dossierTitle": "Historique, garantie et équipements",
-      "dossierHint": "Facultatif : une fiche complète inspire confiance et ressort mieux dans la recherche."
+      "dossierHint": "Facultatif : une fiche complète inspire confiance et ressort mieux dans la recherche.",
+      "rentalTitle": "Conditions de location",
+      "rentalHint": "Assurance, caution, conducteur, remise du véhicule : des conditions claires évitent les mauvaises surprises et ressortent dans la recherche."
     },
     "start": {
       "title": "Déposer une annonce",
@@ -824,7 +827,8 @@
       },
       "sensitiveNote": "Sans l'accord de la personne concernée, retirez ces informations de l'annonce.",
       "adultsOnlyAttestation": "J'atteste qu'il s'agit d'un objet décoratif d'artisanat (koumiya ou poignard décoratif), qui n'est pas une arme de combat, et que je le vendrai uniquement à une personne majeure (18 ans et plus). Mon annonce sera vérifiée par un modérateur avant sa mise en ligne.",
-      "realEstateAttestation": "J'atteste que les informations de mon annonce (titre de propriété, mandat, honoraires, permis, autorisation d'hébergement) sont exactes et que j'ai le droit de proposer ce bien. Je suis seul responsable de ces informations et de la transaction : {brand} ne les vérifie pas (<cgu>CGU</cgu>, art. 7.10 et 19.1)."
+      "realEstateAttestation": "J'atteste que les informations de mon annonce (titre de propriété, mandat, honoraires, permis, autorisation d'hébergement) sont exactes et que j'ai le droit de proposer ce bien. Je suis seul responsable de ces informations et de la transaction : {brand} ne les vérifie pas (<cgu>CGU</cgu>, art. 7.10 et 19.1).",
+      "rentalAttestation": "Je déclare que mon agence détient l'agrément de location de voitures sans chauffeur, que ce véhicule est immatriculé pour la location, dans la limite d'âge de la flotte et assuré, et que les informations, disponibilités et conditions publiées sont exactes. Elles engagent ma seule responsabilité."
     },
     "done": {
       "publishedTitle": "Votre annonce est en ligne",
@@ -886,7 +890,9 @@
       "adults_only_attestation": "Confirmez qu'il s'agit d'un objet décoratif d'artisanat vendu uniquement à une personne majeure.",
       "criterion_pro_only": "Ce champ est réservé aux comptes professionnels.",
       "deposit_max": "Le dépôt de garantie ne peut pas dépasser 2 mois de loyer (loi 67-12).",
-      "real_estate_attestation": "Pour publier une annonce immobilière, attestez que ses informations sont exactes et sous votre seule responsabilité."
+      "real_estate_attestation": "Pour publier une annonce immobilière, attestez que ses informations sont exactes et sous votre seule responsabilité.",
+      "rental_rate_max": "Un tarif longue durée ne peut pas dépasser le prix par jour (ni celui à 7 jours pour le tarif à 30 jours).",
+      "rental_attestation": "Confirmez la déclaration de votre agence pour publier une location."
     },
     "status": {
       "draft": "Brouillon",
@@ -906,7 +912,10 @@
       "an": "an",
       "go": "Go",
       "nuit": "nuits",
-      "mois": "mois"
+      "mois": "mois",
+      "jour": "jours",
+      "ans": "ans",
+      "mad": "DH"
     }
   },
   "Categories": {
@@ -2269,6 +2278,88 @@
     },
     "delivery-year": {
       "label": "Livraison prévue (année)"
+    },
+    "rental-class": {
+      "label": "Catégorie de véhicule",
+      "options": {
+        "economique": "Économique",
+        "citadine": "Citadine",
+        "compacte": "Compacte",
+        "berline": "Berline",
+        "suv-4x4": "SUV et 4x4",
+        "monospace": "Monospace",
+        "utilitaire": "Utilitaire",
+        "minibus": "Minibus",
+        "cabriolet": "Cabriolet",
+        "luxe": "Luxe et prestige"
+      }
+    },
+    "seats": {
+      "label": "Places"
+    },
+    "min-rental-days": {
+      "label": "Durée minimale de location"
+    },
+    "mileage-policy": {
+      "label": "Kilométrage",
+      "options": {
+        "illimite": "Illimité",
+        "limite": "Limité"
+      }
+    },
+    "km-per-day": {
+      "label": "Kilomètres inclus par jour"
+    },
+    "rental-insurance": {
+      "label": "Assurance incluse",
+      "options": {
+        "rc": "Responsabilité civile seule",
+        "tous-risques-franchise": "Tous risques avec franchise",
+        "tous-risques-sans-franchise": "Tous risques sans franchise"
+      }
+    },
+    "insurance-excess": {
+      "label": "Franchise"
+    },
+    "rental-deposit": {
+      "label": "Caution"
+    },
+    "driver-min-age": {
+      "label": "Âge minimum du conducteur"
+    },
+    "licence-years": {
+      "label": "Ancienneté minimale du permis"
+    },
+    "vehicle-handover": {
+      "label": "Remise du véhicule",
+      "options": {
+        "agence": "En agence",
+        "aeroport": "À l'aéroport",
+        "livraison": "Livraison à l'adresse",
+        "gare": "En gare"
+      }
+    },
+    "one-way": {
+      "label": "Restitution dans une autre ville"
+    },
+    "rental-extras": {
+      "label": "Options sur demande",
+      "options": {
+        "siege-bebe": "Siège bébé",
+        "rehausseur": "Rehausseur",
+        "conducteur-additionnel": "Conducteur additionnel",
+        "gps": "GPS",
+        "wifi": "Wi-Fi à bord"
+      }
+    },
+    "rate-7-days": {
+      "label": "Prix par jour dès 7 jours"
+    },
+    "rate-30-days": {
+      "label": "Prix par jour dès 30 jours"
+    },
+    "fleet-units": {
+      "label": "Véhicules identiques dans la flotte"
     }
   },
   "MyListings": {
@@ -2437,7 +2528,10 @@
         "an": "an",
         "go": "Go",
         "nuit": "nuits",
-        "mois": "mois"
+        "mois": "mois",
+        "jour": "jours",
+        "ans": "ans",
+        "mad": "DH"
       }
     },
     "seller": {
@@ -2606,6 +2700,39 @@
       "body": "Joutiya a créé cette annonce pour montrer à quoi ressemble une bonne annonce de ce type : photos nettes, description complète, prix et caractéristiques renseignés. Le vendeur et l'article sont fictifs : on ne peut ni le contacter, ni acheter, ni réserver.",
       "cta": "Déposer une annonce",
       "contact": "Contact désactivé : c'est une annonce exemple."
+    },
+    "rental": {
+      "title": "Conditions de location",
+      "minDays": "Location minimum : {count, plural, one {# jour} other {# jours}}",
+      "unlimited": "Kilométrage illimité",
+      "limited": "{km} km inclus par jour",
+      "insurance": "Assurance",
+      "excess": "Franchise de {amount}",
+      "deposit": "Caution de {amount}",
+      "depositHint": "Demandez à l'agence sous quelle forme (empreinte de carte, espèces) et quand elle est rendue.",
+      "driver": "Conducteur",
+      "age": "{count} ans minimum",
+      "licence": "permis depuis {count, plural, one {# an} other {# ans}}",
+      "handover": "Remise du véhicule",
+      "oneWay": "Restitution possible dans une autre ville",
+      "extras": "Options sur demande",
+      "rates": "Tarifs dégressifs",
+      "rate7": "{amount} par jour dès 7 jours",
+      "rate30": "{amount} par jour dès 30 jours",
+      "fleet": "{count, plural, one {# véhicule de ce modèle} other {# véhicules de ce modèle}} dans la flotte",
+      "declared": "Conditions déclarées par l'agence, sous sa seule responsabilité : seul le contrat écrit de l'agence fait foi."
+    },
+    "rentalGuide": {
+      "title": "Louer un véhicule au Maroc",
+      "steps": {
+        "agency": "Louez auprès d'une agence que vous pouvez voir : adresse, registre de commerce et contrat au nom de la société.",
+        "contract": "Lisez le contrat écrit avant de signer : prix total, kilométrage, assurance, franchise et caution. Il doit vous être remis en copie, en arabe sur demande.",
+        "inspection": "Faites l'état des lieux avec photos au départ et au retour : carrosserie, pneus, niveau de carburant.",
+        "guarantee": "Ne laissez jamais votre passeport ou votre carte d'identité en garantie, et ne signez pas de chèque en blanc.",
+        "licence": "Ayez votre permis valide sur vous (permis international si l'agence le demande) et respectez l'âge et l'ancienneté de permis exigés.",
+        "payment": "{brand} ne loue pas ce véhicule et ne reçoit aucun paiement : la location est un contrat entre vous et l'agence. Ne versez aucun acompte avant d'avoir vu l'agence et le véhicule."
+      },
+      "source": "Conseils indicatifs : les conditions et le contrat de l'agence priment."
     }
   },
   "Profile": {
@@ -4177,7 +4304,8 @@
       "progress": "Publication {done} sur {total}…",
       "outcome": "{published, plural, one {# annonce en ligne} other {# annonces en ligne}}, {pending_review, plural, one {# en vérification} other {# en vérification}}, {incomplete, plural, one {# incomplète} other {# incomplètes}}, {failed, plural, one {# échec} other {# échecs}}.",
       "incomplete": "{count, plural, one {# brouillon à compléter} other {# brouillons à compléter}}",
-      "realEstate": "Pour les annonces immobilières : j'atteste que leurs informations (titre de propriété, mandat, honoraires, permis, autorisation d'hébergement) sont exactes et que j'ai le droit de proposer ces biens. J'en suis seul responsable : {brand} ne les vérifie pas."
+      "realEstate": "Pour les annonces immobilières : j'atteste que leurs informations (titre de propriété, mandat, honoraires, permis, autorisation d'hébergement) sont exactes et que j'ai le droit de proposer ces biens. J'en suis seul responsable : {brand} ne les vérifie pas.",
+      "rental": "Pour les locations de voitures : je déclare que mon agence détient l'agrément de location sans chauffeur et que ces véhicules sont immatriculés pour la location, dans la limite d'âge de la flotte et assurés. Leurs informations, disponibilités et conditions engagent ma seule responsabilité : {brand} ne les vérifie pas."
     },
     "absent": {
       "title": "Véhicules absents du fichier",

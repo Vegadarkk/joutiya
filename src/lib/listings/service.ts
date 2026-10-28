@@ -1,6 +1,6 @@
 import "server-only";
 import { isDeepStrictEqual } from "node:util";
-import { subcategoryAllowsAds, subcategoryById } from "@/config/categories";
+import { RENTAL_SUBCATEGORY, subcategoryAllowsAds, subcategoryById } from "@/config/categories";
 import { listingLifetime, listingQuotas, withinQuota, type ListingQuotas, type Seller } from "@/config/pricing";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { AuthContext } from "@/lib/auth/guards";
@@ -403,6 +403,8 @@ export interface PublishOptions {
   adultsOnlyAttestation?: boolean;
   /** The advertiser attested its declared real-estate data (required in the immobilier category). */
   realEstateAttestation?: boolean;
+  /** The agency ticked the car rental attestation (required in `location-voitures`). */
+  rentalAttestation?: boolean;
   device: Device;
   now?: Date;
 }
@@ -433,6 +435,7 @@ export async function publish(actor: Actor, request: Request, id: string, option
   const subcategory = subcategoryById(listing.subcategoryId ?? "");
   if (subcategory?.adultsOnly && !options.adultsOnlyAttestation) throw new HttpError(422, "adults_only_attestation");
   if (needsRealEstateAttestation(subcategory) && !options.realEstateAttestation) throw new HttpError(422, "real_estate_attestation");
+  if (listing.subcategoryId === RENTAL_SUBCATEGORY && !options.rentalAttestation) throw new HttpError(422, "rental_attestation");
 
   await assertWithinQuota(uid, seller.quotas);
   const turnstilePassed = await escalateOnIp(request, "listing.create.ip", options.device, options.turnstileToken, "listing");

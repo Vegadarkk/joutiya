@@ -40,6 +40,7 @@ export const MODERATION_FLAGS = [
   "volume",
   "restricted_category",
   "credit_ad",
+  "rental_review",
 ] as const;
 export type ModerationFlag = (typeof MODERATION_FLAGS)[number];
 
@@ -151,6 +152,8 @@ export const publishListingSchema = z
     adultsOnlyAttestation: z.literal(true).optional(),
     /** Real estate: the advertiser attests its declared data and bears sole responsibility for them. */
     realEstateAttestation: z.literal(true).optional(),
+    /** Car rental: the agency attests its licence, the vehicle's registration and insurance, and its declarations. */
+    rentalAttestation: z.literal(true).optional(),
   })
   .strict();
 export type PublishListingInput = z.infer<typeof publishListingSchema>;
