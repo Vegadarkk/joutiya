@@ -105,6 +105,16 @@ export const RATE_LIMITS = {
   // account and the seller's other listings for the screening): 60 per day per account, before
   // any read. The 5 publications a day (listing.create.uid) are counted inside, at the transition.
   "listing.publish.uid": { points: 60, duration: DAY, policy: "open", key: "uid" },
+  // The same for a Pro (Concession pack: drafts of an imported stock published in a row). The
+  // plan's listingsPerDay and listing.create.pro.uid still count the publications themselves.
+  "listing.publish.pro.uid": { points: 600, duration: DAY, policy: "open", key: "uid" },
+  // Stock import of a Pro shop (Concession pack, design concession.md §4). A preview reads the
+  // shop's listings (up to 1 000) and writes nothing: 20 per day. An apply: 10 per day, and every
+  // line it writes (a draft, or an edit screened again, ~3 writes) is a point of the rows budget,
+  // 600 per day, besides listing.edit.uid that hand edits keep.
+  "pro.import.preview.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
+  "pro.import.uid": { points: 10, duration: DAY, policy: "open", key: "uid" },
+  "pro.import.rows.uid": { points: 600, duration: DAY, policy: "open", key: "uid" },
   // GET /api/listings/{id} and /mine, points = documents read (a /mine tab reads up to 100, the
   // owner view the listing and its uploads, also when PATCH and the status routes answer with it):
   // 5 000 per day per account, a tenth of the Spark day. Pause and sold (they take a listing down)
@@ -113,6 +123,9 @@ export const RATE_LIMITS = {
   // POST /api/uploads/sign: 30 per hour; bytes declared per day (points = bytes, 200 MiB).
   // Closed: every signed upload costs R2 operations and storage.
   "upload.sign.uid": { points: 30, duration: HOUR, policy: "closed", key: "uid" },
+  // A Pro's photos of an imported stock (Concession pack): 300 signatures an hour, under the same
+  // byte budget (photos are downscaled in the browser first, about 0.5 MiB each).
+  "upload.sign.pro.uid": { points: 300, duration: HOUR, policy: "closed", key: "uid" },
   "upload.bytes.uid": { points: 200 * MIB, duration: DAY, policy: "closed", key: "uid" },
   // KYBC pieces of a Pro application (phase 7): a few documents, resent after a rejection.
   "pro.kybc.sign.uid": { points: 20, duration: DAY, policy: "closed", key: "uid" },

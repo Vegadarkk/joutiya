@@ -82,13 +82,13 @@ const SCREENED_FIELDS: readonly (keyof ListingDoc)[] = ["title", "description", 
 const AUTOMATED_GROUND = "CGU §7 (contrôle avant publication)";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-interface SellerContext {
+export interface SellerContext {
   user: UserRecord;
   seller: Seller;
   quotas: ListingQuotas;
 }
 
-async function sellerOf(auth: AuthContext): Promise<SellerContext> {
+export async function sellerOf(auth: AuthContext): Promise<SellerContext> {
   const user = await getUserRecord(auth.user.uid);
   if (!user) throw new HttpError(403, "forbidden", "account record missing");
   const pricing = await getPricing();
@@ -135,12 +135,22 @@ async function assertWithinQuota(uid: string, quotas: ListingQuotas): Promise<vo
 
 // ---- Drafts ---------------------------------------------------------------------------------
 
-export async function createDraft(actor: Actor, input: CreateListingInput, now = new Date()): Promise<{ id: string }> {
-  const { user, seller } = await sellerOf(actor.auth);
+export interface DraftOptions {
+  /** Drafts cap of the creation (default MAX_DRAFTS; a stock import gives its own, under the plan quota). */
+  maxDrafts?: number;
+  /** Fields written with the draft (a stock import line), checked like a wizard patch. */
+  patch?: ListingPatch;
+  /** The seller already read by the caller (a stock import reads it once). */
+  seller?: SellerContext;
+}
+
+export async function createDraft(actor: Actor, input: CreateListingInput, now = new Date(), options: DraftOptions = {}): Promise<{ id: string }> {
+  const sellerContext = options.seller ?? (await sellerOf(actor.auth));
+  const { user, seller } = sellerContext;
   const { uid, claims } = actor.auth.user;
   const subcategory = input.subcategoryId ? subcategoryById(input.subcategoryId) : undefined;
   const id = newListingId();
-  const doc: ListingDoc = listingSchema.parse({
+  const blank: ListingDoc = listingSchema.parse({
     ownerUid: uid,
     ...(seller.type === "pro" && claims.proId ? { proId: claims.proId } : {}),
     sellerType: seller.type,
@@ -168,8 +178,9 @@ export async function createDraft(actor: Actor, input: CreateListingInput, now =
     purgeAt: draftPurgeAt(now),
     version: 0,
   });
+  const doc = options.patch ? listingSchema.parse(applyPatch(blank, await fieldsOf({ id, ...blank }, options.patch, { uid, quotas: sellerContext.quotas, now }))) : blank;
   try {
-    await createListing(id, doc, { maxDrafts: MAX_DRAFTS });
+    await createListing(id, doc, { maxDrafts: options.maxDrafts ?? MAX_DRAFTS });
   } catch (error) {
     if (error instanceof DraftLimitError) throw new HttpError(409, "draft_limit");
     throw error;
@@ -312,13 +323,22 @@ function rejectedByModerator(listing: Pick<ListingDoc, "moderation">): boolean {
   return listing.moderation.state === "human_rejected";
 }
 
-export async function patchListing(actor: Actor, id: string, patch: ListingPatch, now = new Date()) {
-  const listing = await ownedListing(actor, id);
+export interface PatchOptions {
+  /**
+   * A stock import line (Concession pack): the listing and the seller the import already read, and
+   * no listing.edit.uid (the import's rows budget counts the line). Screened like a hand edit.
+   */
+  imported?: { listing: ListingRecord; seller: SellerContext };
+}
+
+export async function patchListing(actor: Actor, id: string, patch: ListingPatch, now = new Date(), options: PatchOptions = {}) {
+  const listing = options.imported?.listing ?? (await ownedListing(actor, id));
+  if (options.imported) requireOwner(actor.auth, listing);
   if (!EDITABLE_STATUSES.includes(listing.status)) throw new HttpError(409, "conflict", "listing is read-only in this status");
   const { uid } = actor.auth.user;
   // Not a draft autosave: a save may screen again and commits ~3 writes (listing.edit.uid).
-  if (listing.status !== "draft") await enforceLimit("listing.edit.uid", uid);
-  const seller = await sellerOf(actor.auth);
+  if (listing.status !== "draft" && !options.imported) await enforceLimit("listing.edit.uid", uid);
+  const seller = options.imported?.seller ?? (await sellerOf(actor.auth));
   const fields = changedFields(listing, await fieldsOf(listing, patch, { uid, quotas: seller.quotas, now }));
   // Nothing changes: nothing is written. A rejected listing's save reopens it, even an empty one.
   if (Object.keys(fields).length === 0 && listing.status !== "rejected") return ownerListingView(listing);

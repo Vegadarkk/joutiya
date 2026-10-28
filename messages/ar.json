@@ -2867,7 +2867,8 @@
       "grace_title": "دفع يجب تسويته",
       "downgraded": "متجر بدون باقة",
       "quotasTitle": "حصصك",
-      "shortcuts": "اختصارات"
+      "shortcuts": "اختصارات",
+      "stockImport": "استيراد مخزوني"
     },
     "errors": {
       "pro_signup_closed": "طلبات الحساب المهني مغلقة حاليًا.",
@@ -3558,5 +3559,124 @@
     "read": "قراءة الشروط",
     "acknowledge": "فهمت",
     "failed": "تعذّر الحفظ. حاول مرة أخرى."
+  },
+  "StockImport": {
+    "metaTitle": "استيراد مخزوني",
+    "title": "استيراد مخزوني",
+    "lead": "انشر كل سياراتك من جدول بيانات: ملف CSV، سطر لكل مركبة، ومرجع المخزون كمفتاح. أي إرسال جديد يحدّث الإعلانات الموجودة.",
+    "back": "فضاء المحترفين",
+    "notPro": {
+      "title": "استيراد المخزون مخصص للمتاجر المهنية المُتحقق منها",
+      "body": "يُفتح بمجرد التحقق من متجرك ونشره ضمن عرض مهني.",
+      "link": "عرض فضائي المهني"
+    },
+    "file": {
+      "title": "ملفك",
+      "lead": "ملف CSV بترميز UTF-8 أو مُصدَّر من Excel (فاصلة أو فاصلة منقوطة أو جدولة)، {rows} سطر كحد أقصى.",
+      "template": "تحميل النموذج",
+      "pick": "اختيار ملف CSV",
+      "hint": "أو اسحبه إلى هنا. لا يُحفظ أي شيء قبل تأكيدك.",
+      "chosen": "الملف المُحلَّل: {name}. اختر ملفًا آخر للبدء من جديد.",
+      "columnsTitle": "الأعمدة المعترف بها",
+      "columns": "reference (إلزامي وفريد)، categorie (السيارات افتراضيًا، المركبات النفعية والشاحنات، الدراجات النارية)، titre، description، prix، negociable، ville، quartier، etat، ثم المعايير بأسمائها: marque، modele، annee، kilometrage، carburant، boite، puissance fiscale، origine، carrosserie، portes، couleur، premiere main، carnet، non accidente، papiers، garantie، duree garantie، reprise، financement، equipements. تقبل القيم تسميات الموقع بالفرنسية أو العربية، وتُفصل الاختيارات المتعددة بـ « | ». الخلية الفارغة تُبقي القيمة الموجودة في الموقع.",
+      "errors": {
+        "too_large": "يتجاوز هذا الملف 1 ميغابايت: قسّمه إلى عدة ملفات.",
+        "not_csv": "هذا الملف ليس بصيغة CSV. في جدول البيانات، اختر « حفظ باسم » بصيغة CSV."
+      }
+    },
+    "csvErrors": {
+      "empty": "لا يحتوي الملف على أي سطر مركبة تحت العنوان.",
+      "unclosed_quote": "علامة اقتباس مفتوحة في السطر {line} لم تُغلق: صحّح الخلية ثم أعد إرسال الملف.",
+      "too_many_rows": "يتجاوز الملف 300 سطر (السطر {line}): قسّمه إلى عدة ملفات."
+    },
+    "preview": {
+      "title": "التحقق",
+      "lead": "هذا ما سيقوم به الاستيراد، سطرًا بسطر. صحّح الأخطاء في ملفك وأعد إرساله، أو استورد الأسطر الصالحة الآن.",
+      "summary": "ملخص الاستيراد",
+      "ignored": "أعمدة متجاهلة: {columns}.",
+      "errorsOnly": "عرض الأسطر التي تحتاج تصحيحًا فقط",
+      "line": "السطر",
+      "ref": "المرجع",
+      "vehicle": "المركبة",
+      "action": "الإجراء",
+      "changes": "يعدّل: {fields}",
+      "issue": "{column}: {message}",
+      "apply": "استيراد {count, plural, zero {# سطر} one {سطر واحد} two {سطرين} few {# أسطر} many {# سطرًا} other {# سطر}}",
+      "remaining": "مكان لـ{count, plural, zero {# مسودة جديدة} one {مسودة جديدة واحدة} two {مسودتين جديدتين} few {# مسودات جديدة} many {# مسودة جديدة} other {# مسودة جديدة}} ضمن عرضك",
+      "done": "انتهى الاستيراد: {created, plural, zero {# مسودة} one {مسودة واحدة} two {مسودتان} few {# مسودات} many {# مسودة} other {# مسودة}} أُنشئت، {updated, plural, zero {# إعلان} one {إعلان واحد} two {إعلانان} few {# إعلانات} many {# إعلانًا} other {# إعلان}} حُدِّث."
+    },
+    "actions": {
+      "create": "جديد",
+      "update": "تحديث",
+      "unchanged": "دون تغيير",
+      "error": "للتصحيح",
+      "createCount": "{count, plural, zero {# جديد} one {جديد واحد} two {جديدان} few {# جديدة} many {# جديدًا} other {# جديد}}",
+      "updateCount": "{count, plural, zero {# تحديث} one {تحديث واحد} two {تحديثان} few {# تحديثات} many {# تحديثًا} other {# تحديث}}",
+      "unchangedCount": "{count, plural, zero {# دون تغيير} one {واحد دون تغيير} two {اثنان دون تغيير} few {# دون تغيير} many {# دون تغيير} other {# دون تغيير}}",
+      "errorCount": "{count, plural, zero {# للتصحيح} one {واحد للتصحيح} two {اثنان للتصحيح} few {# للتصحيح} many {# للتصحيح} other {# للتصحيح}}"
+    },
+    "fields": {
+      "subcategoryId": "الفئة",
+      "title": "العنوان",
+      "description": "الوصف",
+      "price": "الثمن",
+      "priceNegotiable": "ثمن قابل للتفاوض",
+      "condition": "الحالة",
+      "attributes": "الخصائص",
+      "location": "المدينة"
+    },
+    "codes": {
+      "ref_required": "المرجع ناقص",
+      "ref_invalid": "مرجع غير صالح (حروف وأرقام و - _ . / و40 حرفًا كحد أقصى)",
+      "ref_duplicate": "المرجع موجود سابقًا في الملف",
+      "category_unknown": "فئة غير قابلة للاستيراد (سيارات، مركبات نفعية، دراجات نارية)",
+      "value_unknown": "قيمة غير معروفة",
+      "number_invalid": "رقم غير صالح أو خارج الحدود",
+      "required": "إلزامي",
+      "city_unknown": "مدينة غير معروفة",
+      "price_invalid": "ثمن غير صالح",
+      "too_long": "طويل جدًا",
+      "pro_only": "مخصص للمحترفين",
+      "status_locked": "إعلان مباع أو محذوف، لم يعد قابلًا للتعديل",
+      "quota": "لا مكان متبقٍّ ضمن عرضك",
+      "description_short": "وصف قصير: يجب إكماله قبل النشر",
+      "title_generated": "عنوان مُنشأ من الماركة والطراز والسنة",
+      "column_ignored": "متجاهل، العمود الذي يعتمد عليه لا يفتحه",
+      "failed": "لم يُحفظ، أعد المحاولة"
+    },
+    "photos": {
+      "title": "الصور",
+      "lead": "سمِّ كل صورة باسم المرجع: DUS-041.jpg وDUS-041-2.jpg وDUS-041-3.jpg… تُرتَّب حسب رقمها وتُفحص مثل كل صور الموقع.",
+      "empty": "استورد ملفًا أولًا: تُرتَّب الصور تحت مراجع مخزونك.",
+      "pick": "اختيار الصور",
+      "hint": "اختر أو اسحب كل الصور دفعة واحدة (JPEG وPNG وWebP وHEIC).",
+      "matched": "{photos, plural, zero {# صورة} one {صورة واحدة} two {صورتان} few {# صور} many {# صورة} other {# صورة}} لـ{listings, plural, zero {# إعلان} one {إعلان واحد} two {إعلانين} few {# إعلانات} many {# إعلانًا} other {# إعلان}}",
+      "count": "{count, plural, one {صورة واحدة} other {# صورة}}",
+      "extra": "{count, plural, one {صورة زائدة} other {# صورة زائدة}} ({max} كحد أقصى لكل إعلان)",
+      "unmatched": "{count, plural, one {ملف واحد لا يطابق} other {# ملف لا تطابق}} أي مرجع: {names}",
+      "send": "إرسال {count, plural, zero {# صورة} one {صورة واحدة} two {صورتين} few {# صور} many {# صورة} other {# صورة}}",
+      "clear": "إفراغ الاختيار",
+      "progress": "الصورة {done} من {total}…",
+      "outcome": "{sent, plural, zero {# صورة} one {صورة واحدة} two {صورتان} few {# صور} many {# صورة} other {# صورة}} أُضيفت، {refused, plural, zero {#} one {واحدة} two {اثنتان} few {#} many {#} other {#}} رُفضت عند الفحص، {failed, plural, zero {# إخفاق} one {إخفاق واحد} two {إخفاقان} few {# إخفاقات} many {# إخفاقًا} other {# إخفاق}}."
+    },
+    "publish": {
+      "title": "النشر",
+      "lead": "تُنشر المسودات الكاملة التي تضم صورة واحدة على الأقل، واحدة تلو الأخرى، ضمن حدود عرضك. تبقى المسودات الناقصة كمسودات.",
+      "empty": "لا توجد مسودات مخزون للنشر.",
+      "drafts": "{ready, plural, zero {# مسودة جاهزة} one {مسودة واحدة جاهزة} two {مسودتان جاهزتان} few {# مسودات جاهزة} many {# مسودة جاهزة} other {# مسودة جاهزة}}، {missing, plural, zero {# دون صورة} one {واحدة دون صورة} two {اثنتان دون صورة} few {# دون صورة} many {# دون صورة} other {# دون صورة}}.",
+      "rules": "أؤكد أن هذه الإعلانات تحترم <cgu>شروط الاستخدام</cgu> و<interdits>قائمة المواد الممنوعة</interdits>.",
+      "send": "نشر {count, plural, zero {# مسودة} one {مسودة واحدة} two {مسودتين} few {# مسودات} many {# مسودة} other {# مسودة}}",
+      "progress": "النشر {done} من {total}…",
+      "outcome": "{published, plural, zero {# إعلان منشور} one {إعلان واحد منشور} two {إعلانان منشوران} few {# إعلانات منشورة} many {# إعلانًا منشورًا} other {# إعلان منشور}}، {pending_review, plural, zero {# قيد التحقق} one {واحد قيد التحقق} two {اثنان قيد التحقق} few {# قيد التحقق} many {# قيد التحقق} other {# قيد التحقق}}، {incomplete, plural, zero {# ناقص} one {واحد ناقص} two {اثنان ناقصان} few {# ناقصة} many {# ناقصًا} other {# ناقص}}، {failed, plural, zero {# إخفاق} one {إخفاق واحد} two {إخفاقان} few {# إخفاقات} many {# إخفاقًا} other {# إخفاق}}.",
+      "incomplete": "{count, plural, one {مسودة واحدة يجب إكمالها} other {# مسودة يجب إكمالها}}"
+    },
+    "absent": {
+      "title": "مركبات غائبة عن الملف",
+      "lead": "هذه الإعلانات المنشورة لم تعد في ملفك الأخير. لا يُحذف أي شيء تلقائيًا: ضع علامة « مباع » على ما غادر معرضك.",
+      "empty": "كل إعلاناتك المنشورة موجودة في الملف.",
+      "markOne": "وضع علامة مباع",
+      "markAll": "وضع علامة مباع على الكل ({count})",
+      "done": "مباع"
+    }
   }
 }

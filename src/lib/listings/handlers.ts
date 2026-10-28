@@ -136,7 +136,8 @@ export async function handlePublish(request: Request, params: Params): Promise<R
   const id = await listingIdOf(params);
   const input = await readJson(request, publishListingSchema);
   // Every attempt, before the listing is read; the 5 publications a day are counted inside publish().
-  await enforceLimit("listing.publish.uid", auth.user.uid);
+  // A Pro publishing an imported stock gets the Pro budget (the plan's daily count still applies).
+  await enforceLimit(auth.user.claims.role === "pro" ? "listing.publish.pro.uid" : "listing.publish.uid", auth.user.uid);
   await assertQuotas(DEPOSIT_QUOTAS);
   const device = deviceOf(request);
   const outcome = await publish(actorOf(request, auth), request, id, { turnstileToken: input.turnstileToken, adultsOnlyAttestation: input.adultsOnlyAttestation === true, device });
