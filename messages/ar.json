@@ -2712,7 +2712,8 @@
       "rate7": "{amount} في اليوم ابتداءً من 7 أيام",
       "rate30": "{amount} في اليوم ابتداءً من 30 يومًا",
       "fleet": "{count, plural, zero {# سيارة من هذا الطراز} one {سيارة واحدة من هذا الطراز} two {سيارتان من هذا الطراز} few {# سيارات من هذا الطراز} many {# سيارة من هذا الطراز} other {# سيارة من هذا الطراز}} في الأسطول",
-      "declared": "شروط صرّحت بها الوكالة على مسؤوليتها وحدها: العقد المكتوب للوكالة هو المرجع."
+      "declared": "شروط صرّحت بها الوكالة على مسؤوليتها وحدها: العقد المكتوب للوكالة هو المرجع.",
+      "stockRef": "المرجع"
     },
     "rentalGuide": {
       "title": "كراء سيارة في المغرب",
@@ -3266,6 +3267,7 @@
       "quotasTitle": "حصصك",
       "shortcuts": "اختصارات",
       "stockImport": "استيراد مخزوني",
+      "fleet": "جدول الأسطول",
       "sellerPayment": "الدفع لدى البائع"
     },
     "errors": {
@@ -4204,11 +4206,12 @@
       "title": "ملفك",
       "lead": "ملف CSV بترميز UTF-8 أو مُصدَّر من Excel (فاصلة أو فاصلة منقوطة أو جدولة)، {rows} سطر كحد أقصى.",
       "template": "تحميل النموذج",
+      "templateRental": "نموذج لأسطول الكراء",
       "pick": "اختيار ملف CSV",
       "hint": "أو اسحبه إلى هنا. لا يُحفظ أي شيء قبل تأكيدك.",
       "chosen": "الملف المُحلَّل: {name}. اختر ملفًا آخر للبدء من جديد.",
       "columnsTitle": "الأعمدة المعترف بها",
-      "columns": "reference (إلزامي وفريد)، categorie (السيارات افتراضيًا، المركبات النفعية والشاحنات، الدراجات النارية)، titre، description، prix، negociable، ville، quartier، etat، ثم المعايير بأسمائها: marque، modele، annee، kilometrage، carburant، boite، puissance fiscale، origine، carrosserie، portes، couleur، premiere main، carnet، non accidente، papiers، garantie، duree garantie، reprise، financement، equipements. تقبل القيم تسميات الموقع بالفرنسية أو العربية، وتُفصل الاختيارات المتعددة بـ « | ». الخلية الفارغة تُبقي القيمة الموجودة في الموقع.",
+      "columns": "reference (إلزامي وفريد)، categorie (السيارات افتراضيًا، المركبات النفعية والشاحنات، الدراجات النارية)، titre، description، prix، negociable، ville، quartier، etat، ثم المعايير بأسمائها: marque، modele، annee، kilometrage، carburant، boite، puissance fiscale، origine، carrosserie، portes، couleur، premiere main، carnet، non accidente، papiers، garantie، duree garantie، reprise، financement، equipements. تقبل القيم تسميات الموقع بالفرنسية أو العربية، وتُفصل الاختيارات المتعددة بـ « | ». الخلية الفارغة تُبقي القيمة الموجودة في الموقع. كراء السيارات: categorie « Location de voitures »، ثم gamme وplaces وduree minimum وkilometrage (Illimité أو Limité) وassurance وfranchise وcaution وage minimum وpermis وremise وtarif semaine وtarif mois وunites، وindisponible للأيام المحجوبة: « 2026-11-02/2026-11-05; 2026-12-24 » (« aucune » تحرر كل الأيام).",
       "errors": {
         "too_large": "يتجاوز هذا الملف 1 ميغابايت: قسّمه إلى عدة ملفات.",
         "not_csv": "هذا الملف ليس بصيغة CSV. في جدول البيانات، اختر « حفظ باسم » بصيغة CSV."
@@ -4253,13 +4256,14 @@
       "priceNegotiable": "ثمن قابل للتفاوض",
       "condition": "الحالة",
       "attributes": "الخصائص",
-      "location": "المدينة"
+      "location": "المدينة",
+      "unavailable": "الأيام المحجوبة"
     },
     "codes": {
       "ref_required": "المرجع ناقص",
       "ref_invalid": "مرجع غير صالح (حروف وأرقام و - _ . / و40 حرفًا كحد أقصى)",
       "ref_duplicate": "المرجع موجود سابقًا في الملف",
-      "category_unknown": "فئة غير قابلة للاستيراد (سيارات، مركبات نفعية، دراجات نارية)",
+      "category_unknown": "فئة غير قابلة للاستيراد (سيارات، مركبات نفعية، دراجات نارية، كراء السيارات)",
       "value_unknown": "قيمة غير معروفة",
       "number_invalid": "رقم غير صالح أو خارج الحدود",
       "required": "إلزامي",
@@ -4272,6 +4276,8 @@
       "description_short": "وصف قصير: يجب إكماله قبل النشر",
       "title_generated": "عنوان مُنشأ من الماركة والطراز والسنة",
       "column_ignored": "متجاهل، العمود الذي يعتمد عليه لا يفتحه",
+      "periods_invalid": "فترات غير مقروءة: اكتب 2026-11-02/2026-11-05; 2026-12-24 (365 يومًا على الأكثر، 40 فترة على الأكثر)",
+      "periods_ignored": "تم التجاهل: الأيام المحجوبة خاصة بكراء السيارات فقط",
       "failed": "لم يُحفظ، أعد المحاولة"
     },
     "photos": {
@@ -4443,5 +4449,37 @@
       "body": "اختر المدينة وتواريخك: تعرض الوكالات السيارات المتاحة طوال الفترة.",
       "submit": "ابحث عن سيارة"
     }
+  },
+  "Fleet": {
+    "title": "جدول الأسطول",
+    "back": "الفضاء المهني",
+    "lead": "سياراتك المعروضة للكراء خلال الستين يومًا المقبلة. المس يومًا لحجبه أو تحريره، أو اسحب بالفأرة على فترة كاملة. اليوم المحجوب يعني أنه لا توجد أي سيارة من هذا الإعلان متاحة في ذلك اليوم.",
+    "loading": "جارٍ تحميل الجدول",
+    "retry": "أعد المحاولة",
+    "emptyTitle": "لا توجد سيارة للكراء منشورة",
+    "emptyBody": "انشر سياراتك في « كراء السيارات »: ستظهر هنا، جاهزة للجدولة.",
+    "emptyAction": "نشر سيارة",
+    "city": "مدينة الوكالة",
+    "allCities": "كل المدن",
+    "search": "البحث عن سيارة",
+    "confirm": "كل شيء محيّن",
+    "vehicles": "{count, plural, one {# سيارة معروضة،} other {# سيارة معروضة،}}",
+    "stale": "{count, plural, one {# للتأكيد.} other {# للتأكيد.}}",
+    "allFresh": "التوفرات محيّنة.",
+    "legend": "مفتاح الألوان",
+    "truncated": "أسطولك يضم أكثر من 200 سيارة: الجدول يعرض أول 200 حسب العنوان. صفِّ حسب المدينة أو استعمل « إعلاناتي » للباقي.",
+    "noMatch": "لا توجد سيارة تطابق هذه التصفية.",
+    "gridLabel": "توفر الأسطول، يومًا بيوم",
+    "vehicle": "السيارة",
+    "edited": "معدّلة",
+    "fresh": "محيّنة",
+    "toConfirm": "للتأكيد",
+    "pending": "{count, plural, one {# سيارة معدّلة، لم تُحفظ بعد.} other {# سيارة معدّلة، لم تُحفظ بعد.}}",
+    "tooMany": "على الأكثر {max} فترة لكل سيارة: اجمع الأيام المتقاربة.",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "saved": "تم حفظ الجدول لـ {count, plural, one {# سيارة} other {# سيارة}}.",
+    "confirmed": "تم تأكيد التوفر لـ {count, plural, one {# سيارة} other {# سيارة}}.",
+    "partial": "{count, plural, one {لم تُحفظ # سيارة: أُعيد تحميل الجدول، أعد تعديلها.} other {لم تُحفظ # سيارة: أُعيد تحميل الجدول، أعد تعديلاتها.}}"
   }
 }

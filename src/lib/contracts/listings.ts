@@ -172,6 +172,18 @@ export const rentalAvailabilityInputSchema = z
   .strict();
 export type RentalAvailabilityInput = z.infer<typeof rentalAvailabilityInputSchema>;
 
+/** Vehicles of a fleet planning (rental pack §3) and the most one save may change. */
+export const FLEET_MAX = 200;
+
+/**
+ * PUT /api/pro/fleet: the fleet planning's changes, each like a calendar save (its own `since`
+ * lock). The vehicles left as they are sent unchanged confirm their availability ("Tout est à jour").
+ */
+export const fleetSaveSchema = z
+  .object({ changes: z.array(rentalAvailabilityInputSchema.extend({ id: listingIdSchema })).min(1).max(FLEET_MAX) })
+  .strict();
+export type FleetSaveInput = z.infer<typeof fleetSaveSchema>;
+
 /** Answers. Dates are ISO 8601 strings. */
 
 /** A car rental's declared availability; `updatedAt` null until the agency first saves it. */
@@ -180,6 +192,16 @@ export interface RentalAvailability {
   updatedAt: string | null;
 }
 export type RentalAvailabilityResponse = { rental: RentalAvailability };
+/** GET /api/pro/fleet: the agency's car rentals on offer (published, paused, in review), by title. */
+export interface FleetResponse {
+  vehicles: OwnerListingSummary[];
+  /** More than FLEET_MAX rentals: the planning shows the first ones. */
+  truncated: boolean;
+}
+/** Each change's outcome, in the order sent: its new availability, or why it was not saved. */
+export interface FleetSaveResponse {
+  results: ({ id: string; rental: RentalAvailability } | { id: string; error: "conflict" | "not_found" | "invalid_body" | "failed" })[];
+}
 export interface FieldIssue {
   /** Dotted path in the listing ("title", "attributes.year", "photos"). */
   path: string;

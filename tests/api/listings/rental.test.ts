@@ -12,8 +12,9 @@ import { POST as create } from "@/app/api/listings/route";
 import { PATCH as patch } from "@/app/api/listings/[id]/route";
 import { POST as publish } from "@/app/api/listings/[id]/publish/route";
 import { PUT as putAvailability } from "@/app/api/listings/[id]/availability/route";
+import { GET as getFleet, PUT as putFleet } from "@/app/api/pro/fleet/route";
 import { DEFAULT_PRICING } from "@/config/pricing";
-import type { CreateListingResponse, FieldIssue, RentalAvailabilityResponse } from "@/lib/contracts/listings";
+import type { CreateListingResponse, FieldIssue, FleetResponse, FleetSaveResponse, RentalAvailabilityResponse } from "@/lib/contracts/listings";
 import { getListing } from "@/lib/db/repositories/listings";
 import { getSearchOutbox } from "@/lib/db/repositories/search-outbox";
 import { dayString, moroccoToday } from "@/lib/listings/rental-availability";
@@ -166,5 +167,53 @@ describe("car rental availability", () => {
     await api<ListingBody>(patch, "PATCH", `/api/listings/${bike.body.id}`, { member: owner, body: readyPatch() });
     const refused = await put(owner, bike.body.id, { unavailable: [], since: null });
     expect(refused.status).toBe(409);
+  });
+});
+
+describe("fleet planning", () => {
+  const day = (offset: number) => dayString(moroccoToday(new Date()) + offset);
+  const fleet = (owner: Member) => api<FleetResponse & ErrorBody>(getFleet, "GET", "/api/pro/fleet", { member: owner });
+  const save = (owner: Member, body: unknown) => api<FleetSaveResponse & ErrorBody>(putFleet, "PUT", "/api/pro/fleet", { member: owner, body });
+  const published = async (owner: Member, title: string) => {
+    const id = await rentalDraft(owner, { title });
+    expect((await api<PublishBody>(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: { ...ACCEPT, rentalAttestation: true } })).body.status).toBe("published");
+    return id;
+  };
+
+  it("lists the agency's rentals on offer by title and saves each change with its own lock", async () => {
+    const owner = await agency();
+    const logan = await published(owner, "Dacia Logan diesel à Marrakech");
+    const clio = await published(owner, "Clio 5 essence à Marrakech");
+    await rentalDraft(owner, { title: "Brouillon de location Duster" });
+    const listed = await fleet(owner);
+    expect(listed.status).toBe(200);
+    expect(listed.body.truncated).toBe(false);
+    expect(listed.body.vehicles.map((vehicle) => vehicle.id)).toEqual([clio, logan]);
+    expect(listed.body.vehicles[0]?.rental).toEqual({ unavailable: [], updatedAt: null });
+
+    const saved = await save(owner, {
+      changes: [
+        { id: logan, unavailable: [{ from: day(2), to: day(4) }], since: null },
+        { id: clio, unavailable: [], since: "2026-01-01T00:00:00.000Z" },
+      ],
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.body.results).toEqual([
+      { id: logan, rental: { unavailable: [{ from: day(2), to: day(4) }], updatedAt: expect.any(String) } },
+      { id: clio, error: "conflict" },
+    ]);
+    expect((await getListing(logan))?.rental?.unavailable).toEqual([{ from: day(2), to: day(4) }]);
+    expect((await getListing(clio))?.rental).toBeUndefined();
+
+    // Another agency's rental is not found; its planning stays its own.
+    const stranger = await agency();
+    expect((await save(stranger, { changes: [{ id: logan, unavailable: [], since: null }] })).body.results).toEqual([{ id: logan, error: "not_found" }]);
+    expect((await fleet(stranger)).body.vehicles).toEqual([]);
+  });
+
+  it("is for Pro accounts only", async () => {
+    const someone = await member();
+    expect((await fleet(someone)).status).toBe(403);
+    expect((await save(someone, { changes: [{ id: "abcdefgh", unavailable: [], since: null }] })).status).toBe(403);
   });
 });

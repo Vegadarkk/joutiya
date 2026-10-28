@@ -43,11 +43,11 @@ export function decodeCsv(bytes: ArrayBuffer): string {
   }
 }
 
-function downloadTemplate() {
-  const url = URL.createObjectURL(new Blob([stockTemplateCsv()], { type: "text/csv;charset=utf-8" }));
+function downloadTemplate(kind: "sale" | "rental") {
+  const url = URL.createObjectURL(new Blob([stockTemplateCsv(kind)], { type: "text/csv;charset=utf-8" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = "modele-stock.csv";
+  link.download = kind === "rental" ? "modele-flotte-location.csv" : "modele-stock.csv";
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -139,9 +139,13 @@ export function StockImport({ nonce }: { nonce?: string }) {
     <ol className="flex flex-col gap-10">
       <Step index={1} title={t("file.title")} lead={t("file.lead", { rows: STOCK_IMPORT_MAX_ROWS })}>
         <div className="flex flex-wrap gap-3">
-          <Button variant="outline" onClick={downloadTemplate}>
+          <Button variant="outline" onClick={() => downloadTemplate("sale")}>
             <Download aria-hidden="true" />
             {t("file.template")}
+          </Button>
+          <Button variant="outline" onClick={() => downloadTemplate("rental")}>
+            <Download aria-hidden="true" />
+            {t("file.templateRental")}
           </Button>
         </div>
         <FileDrop accept=".csv,text/csv,.txt,.tsv" label={t("file.pick")} hint={file ? t("file.chosen", { name: file.name }) : t("file.hint")} icon={<FileSpreadsheet aria-hidden="true" className="size-6" />} onFiles={(files) => void pick(files[0])} busy={busy === "preview"} />
@@ -263,5 +267,5 @@ function Preview({ result }: { result: StockImportResponse }) {
   );
 }
 
-const FIELD_KEYS = ["subcategoryId", "title", "description", "price", "priceNegotiable", "condition", "attributes", "location"] as const;
+const FIELD_KEYS = ["subcategoryId", "title", "description", "price", "priceNegotiable", "condition", "attributes", "location", "unavailable"] as const;
 const fieldKey = (field: string) => ((FIELD_KEYS as readonly string[]).includes(field) ? (field as (typeof FIELD_KEYS)[number]) : "attributes");

@@ -2,6 +2,7 @@ import { isDeepStrictEqual } from "node:util";
 import { criterionApplies, subcategoryById } from "@/config/categories";
 import type { ListingAttributes, ListingPatch, ListingStatus } from "@/lib/contracts/listings";
 import { STOCK_WARNING_CODES, type StockListing, type StockRowResult } from "@/lib/contracts/stock-import";
+import type { RentalPeriod } from "@/lib/listings/rental-availability";
 import { refKey, type ImportedFields, type ParsedRow } from "./rows";
 
 // What an import does with each line (design concession/concession.md §4), pure: a reference seen
@@ -9,7 +10,8 @@ import { refKey, type ImportedFields, type ParsedRow } from "./rows";
 // listing with the fields that changed, a line identical to its listing does nothing. Duplicate
 // references and lines with errors are refused; a listing that can no longer be edited (sold,
 // removed) is reported. Published or paused listings missing from the file are listed as
-// "absent": the dealer may mark them sold, never automatically.
+// "absent": the dealer may mark them sold, never automatically. A car rental's blocked periods are
+// not a listing field: they change through the availability service, after the fields.
 
 /** Statuses a stock line may update (the listing service's EDITABLE_STATUSES). */
 export const UPDATABLE_STATUSES: readonly ListingStatus[] = ["draft", "pending_review", "published", "paused", "expired", "rejected"];
@@ -24,6 +26,8 @@ export interface PlannedUpdate {
   row: ParsedRow;
   listingId: string;
   patch: ListingPatch;
+  /** New blocked periods of a car rental (absent: unchanged). */
+  unavailable?: RentalPeriod[];
 }
 
 export interface ImportPlan {
@@ -48,8 +52,8 @@ function mergedAttributes(subcategoryId: string | null, before: ListingAttribute
   return merged;
 }
 
-/** Patch of the fields a line changes on its listing; empty when nothing differs. */
-export function diffFields(row: ParsedRow, entry: Pick<StockEntry, "subcategoryId" | "fields">): { patch: ListingPatch; changes: string[] } {
+/** Patch of the fields a line changes on its listing (and its new blocked periods); empty when nothing differs. */
+export function diffFields(row: ParsedRow, entry: Pick<StockEntry, "subcategoryId" | "fields">): { patch: ListingPatch; changes: string[]; unavailable?: RentalPeriod[] } {
   const patch: ListingPatch = {};
   const changes: string[] = [];
   const next = row.fields;
@@ -71,6 +75,10 @@ export function diffFields(row: ParsedRow, entry: Pick<StockEntry, "subcategoryI
   const attributes = patch.subcategoryId ? next.attributes : mergedAttributes(entry.subcategoryId, before.attributes, next.attributes);
   if (patch.subcategoryId || !isDeepStrictEqual(attributes, before.attributes)) set("attributes", attributes);
   if (next.location && !isDeepStrictEqual(next.location, before.location)) set("location", next.location);
+  if (next.unavailable && !isDeepStrictEqual(next.unavailable, before.unavailable ?? [])) {
+    changes.push("unavailable");
+    return { patch, changes, unavailable: next.unavailable };
+  }
   return { patch, changes };
 }
 
@@ -100,11 +108,11 @@ export function planImport(rows: readonly ParsedRow[], stock: readonly StockEntr
         results.push({ ...base, action: "error", issues: [...issues, { column: "reference", code: "status_locked", value: entry.status }], listingId: entry.id });
         continue;
       }
-      const { patch, changes } = diffFields(candidate, entry);
+      const { patch, changes, unavailable } = diffFields(candidate, entry);
       if (changes.length === 0) {
         results.push({ ...base, action: "unchanged", issues, listingId: entry.id });
       } else {
-        updates.push({ row: candidate, listingId: entry.id, patch });
+        updates.push({ row: candidate, listingId: entry.id, patch, ...(unavailable ? { unavailable } : {}) });
         results.push({ ...base, action: "update", issues, listingId: entry.id, changes });
       }
       continue;

@@ -3,6 +3,9 @@ import {
   LISTING_API,
   type CreateListingInput,
   type CreateListingResponse,
+  type FleetResponse,
+  type FleetSaveInput,
+  type FleetSaveResponse,
   type ListingPatch,
   type ListingResponse,
   type OwnerListBucket,
@@ -64,6 +67,15 @@ export function listingAction(id: string, action: OwnerAction): Promise<ListingR
 /** A car rental's blocked periods (replaced), or the same ones to confirm they are up to date. */
 export function saveAvailability(id: string, input: RentalAvailabilityInput): Promise<RentalAvailabilityResponse> {
   return apiPut<RentalAvailabilityResponse>(LISTING_API.availability(id), input);
+}
+
+/** A car rental agency's fleet planning. */
+export function loadFleet(): Promise<FleetResponse> {
+  return apiGet<FleetResponse>(LISTING_API.fleet);
+}
+
+export function saveFleet(input: FleetSaveInput): Promise<FleetSaveResponse> {
+  return apiPut<FleetSaveResponse>(LISTING_API.fleet, input);
 }
 
 export function signUpload(input: SignUploadInput): Promise<SignUploadResponse> {

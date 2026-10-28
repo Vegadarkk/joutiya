@@ -16,6 +16,7 @@ import { GET as getStock } from "@/app/api/pro/stock/route";
 import { POST as postImport } from "@/app/api/pro/stock/import/route";
 import type { StockImportResponse, StockListResponse } from "@/lib/contracts/stock-import";
 import { getListing } from "@/lib/db/repositories/listings";
+import { dayString, moroccoToday } from "@/lib/listings/rental-availability";
 import { proProfileRef, proProfileToFirestore } from "@/lib/db/repositories/pro-profiles";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { resetServerEnv } from "@/lib/env";
@@ -122,6 +123,27 @@ describe("POST /api/pro/stock/import", () => {
       ["DUS-1", "draft"],
       ["DUS-2", "draft"],
     ]);
+  });
+
+  it("imports a rental fleet with its blocked periods, then changes the periods alone", async () => {
+    const owner = await dealer();
+    const day = (offset: number) => dayString(moroccoToday(new Date()) + offset);
+    const header = "reference;categorie;titre;description;prix;ville;gamme;marque;modele;boite;carburant;kilometrage;indisponible";
+    const rental = (ref: string, periods: string) => `${ref};Location de voitures;Dacia Logan ${ref};${DESCRIPTION};300;Marrakech;Berline;Dacia;Logan;Manuelle;Diesel;Illimité;${periods}`;
+    const applied = await send(owner, "apply", `${header}\n${rental("LOG-1", `${day(3)}/${day(5)}`)}`);
+    expect(applied.body.rows[0]).toMatchObject({ action: "create", issues: [] });
+    const id = applied.body.rows[0]!.listingId!;
+    const created = await getListing(id);
+    expect(created).toMatchObject({ subcategoryId: "location-voitures", attributes: { "stock-ref": "LOG-1", "mileage-policy": "illimite" } });
+    expect(created!.rental?.unavailable).toEqual([{ from: day(3), to: day(5) }]);
+
+    const moved = await send(owner, "apply", `${header}\n${rental("LOG-1", `"${day(10)}; ${day(12)}/${day(13)}"`)}`);
+    expect(moved.body.rows.map((row) => [row.action, row.changes])).toEqual([["update", ["unavailable"]]]);
+    expect((await getListing(id))!.rental?.unavailable).toEqual([
+      { from: day(10), to: day(10) },
+      { from: day(12), to: day(13) },
+    ]);
+    expect((await send(owner, "preview", `${header}\n${rental("LOG-1", `"${day(10)}; ${day(12)}/${day(13)}"`)}`)).body.rows[0]!.action).toBe("unchanged");
   });
 
   it("publishes an imported draft with its photo under the Pro budget, then lists it as absent", async () => {

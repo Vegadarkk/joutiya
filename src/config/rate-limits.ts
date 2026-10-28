@@ -112,9 +112,10 @@ export const RATE_LIMITS = {
   // DELETE /api/listings/{id} and pause / resume / sold / renew (~4 writes and an ISR
   // revalidation each): 120 per day per account (an individual has at most 20 active listings).
   "listing.status.uid": { points: 120, duration: DAY, policy: "open", key: "uid" },
-  // PUT /api/listings/{id}/availability (a car rental's calendar: one read, one write, a re-index
-  // and an ISR revalidation): 300 per hour per account, an agency updating its whole fleet.
-  "rental.availability.uid": { points: 300, duration: HOUR, policy: "open", key: "uid" },
+  // PUT /api/listings/{id}/availability and each vehicle of a PUT /api/pro/fleet (one read, one
+  // write, a re-index and an ISR revalidation per vehicle): 600 per hour per account, an agency
+  // confirming its whole fleet (200 vehicles at most) and still editing it.
+  "rental.availability.uid": { points: 600, duration: HOUR, policy: "open", key: "uid" },
   // POST /api/listings/{id}/publish, every attempt (a refused one still reads the listing, the
   // account and the seller's other listings for the screening): 60 per day per account, before
   // any read. The 5 publications a day (listing.create.uid) are counted inside, at the transition.

@@ -314,6 +314,8 @@ const RENTAL_TERMS = [
   rental("rate-7-days"),
   rental("rate-30-days"),
   rental("fleet-units"),
+  // The agency's own reference: matches a stock file's lines (fleet import, rental pack §3).
+  rental("stock-ref"),
 ];
 
 const proRequired = (id: CriterionId): Criterion => ({ ...FIELDS[id], required: true, proOnly: true });

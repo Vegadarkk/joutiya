@@ -314,6 +314,11 @@ function Dashboard({ me, shop, lifecycle }: { me: ProMeResponse; shop: ProSelfVi
               <Link href="/pro/stock">{t("stockImport")}</Link>
             </Button>
           ) : null}
+          {canPublish && shop.sector !== "real_estate" ? (
+            <Button asChild variant="outline">
+              <Link href="/pro/flotte">{t("fleet")}</Link>
+            </Button>
+          ) : null}
           <Button asChild variant="outline">
             <Link href="/mes-annonces">{t("myListings")}</Link>
           </Button>
