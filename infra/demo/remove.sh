@@ -1,5 +1,5 @@
 #!/bin/bash
-# Removes the staging demo listings (scripts/seed-demo.ts, docs/staging-demo.md), before launch.
+# Removes the example listings from staging (scripts/seed-demo.ts, docs/staging-demo.md).
 # Run as root on joutiya-vm: node scripts/oracle-vm.ts run infra/demo/remove.sh [--apply]
 set -euo pipefail
 id="$(docker ps -q --filter label=com.docker.compose.project=joutiya-staging --filter label=com.docker.compose.service=worker)"

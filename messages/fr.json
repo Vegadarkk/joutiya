@@ -2350,7 +2350,8 @@
     "featured": "À la Une · Sponsorisé",
     "featuredInfo": "Emplacement payé par l'annonceur. Il ne modifie pas le classement des autres résultats.",
     "bumped": "Remontée",
-    "bumpedInfo": "Cette annonce a été remontée par son auteur, contre paiement."
+    "bumpedInfo": "Cette annonce a été remontée par son auteur, contre paiement.",
+    "example": "Exemple"
   },
   "ListingPage": {
     "home": "Accueil",
@@ -2519,6 +2520,12 @@
         "warranty": "Garantie du vendeur : un professionnel doit vous la remettre par écrit, avec sa durée, ce qu'elle couvre et la garantie légale des vices cachés (loi 31-08, art. 66 et 67)."
       },
       "source": "Démarches indicatives, à vérifier auprès de la NARSA (narsa.ma) ou de votre centre d'immatriculation."
+    },
+    "example": {
+      "title": "Annonce exemple",
+      "body": "Joutiya a créé cette annonce pour montrer à quoi ressemble une bonne annonce de ce type : photos nettes, description complète, prix et caractéristiques renseignés. Le vendeur et l'article sont fictifs : on ne peut ni le contacter, ni acheter, ni réserver.",
+      "cta": "Déposer une annonce",
+      "contact": "Contact désactivé : c'est une annonce exemple."
     }
   },
   "Profile": {

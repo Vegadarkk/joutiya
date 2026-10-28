@@ -49,6 +49,15 @@ export function isPubliclyVisible(listing: Pick<ListingRecord, "status" | "moder
 }
 
 /**
+ * Whether a buyer may reach the seller from this listing (message, phone, appointment, payment):
+ * never on an example listing (src/lib/demo), which only shows what a listing of its kind looks like.
+ * Every contact entry point checks it next to the listing's status.
+ */
+export function acceptsContact(listing: Pick<ListingRecord, "example">): boolean {
+  return listing.example !== true;
+}
+
+/**
  * The listing behind a URL segment: null (404) when the id is malformed, the document missing, the
  * listing hidden by a report (D11), or never/no longer public (draft, pending_review, rejected, removed, purged). Throws
  * once Firestore reads are degraded (src/lib/quota/gate.ts): an ISR revalidation then fails and
@@ -143,6 +152,8 @@ export interface PublicListing {
   /** Which contact actions exist; the number itself only comes from POST /api/listings/{id}/phone. */
   contact: { showPhone: boolean; whatsapp: boolean };
   seller: { publicId: string; name: string; type: UserRecord["type"] };
+  /** Example listing (src/lib/demo): labelled, no contact action, not indexed by search engines. */
+  example: boolean;
   /** ISO 8601. */
   publishedAt: string;
   sortAt: string;
@@ -164,6 +175,8 @@ export interface PublicListingCard {
   sellerType: UserRecord["type"];
   /** ISO 8601: the date shown on the card (publication, or renewal). */
   sortAt: string;
+  /** Example listing: "Exemple" label, no favorite action. */
+  example?: true;
 }
 
 function publicPhotos(record: ListingRecord): PublicPhoto[] {
@@ -195,6 +208,7 @@ export function toPublicListing(record: ListingRecord, state: PublicState, slugI
     photos: publicPhotos(record),
     contact: { showPhone: record.contact.showPhone, whatsapp: record.contact.whatsapp },
     seller: { publicId: record.sellerPublicId, name: record.sellerName, type: record.sellerType },
+    example: record.example === true,
     publishedAt: publishedAt.toISOString(),
     sortAt: record.sortAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
@@ -218,6 +232,7 @@ export function toPublicCard(record: ListingRecord): PublicListingCard | null {
     photoCount: photos.length,
     sellerType: record.sellerType,
     sortAt: record.sortAt.toISOString(),
+    ...(record.example ? { example: true as const } : {}),
   };
 }
 

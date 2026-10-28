@@ -300,6 +300,11 @@ export const listingSchema = z
     sortAt: ts,
     sortSource: z.enum(SORT_SOURCES),
     moderation: moderationSchema,
+    /**
+     * Example listing (owner decision of 2026-10-28, src/lib/demo): shows what a good listing of its
+     * kind looks like. Labelled on cards and pages, never contactable, not in the sitemap.
+     */
+    example: z.literal(true).optional(),
     /** Moderated, no open report, not hidden. */
     adsEligible: z.boolean(),
     publishedAt: ts.optional(),

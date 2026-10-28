@@ -117,6 +117,7 @@ describe("toPublicListing", () => {
       photos: [{ id: "photo0001", w: 1600, h: 1200, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj" }],
       contact: { showPhone: true, whatsapp: false },
       seller: { publicId: "abcdefghjk", name: "Salma", type: "individual" },
+      example: false,
       publishedAt: NOW.toISOString(),
       sortAt: NOW.toISOString(),
       updatedAt: NOW.toISOString(),

@@ -1,6 +1,7 @@
-// Staging demo data set: realistic listings in every subcategory and region, from fictitious
-// sellers, with matching photos (src/lib/demo/catalog.ts). Run in the worker container, which has
-// Firestore, the media bucket and Meilisearch with its own access:
+// Example listings: realistic listings in every subcategory and region, from fictitious sellers,
+// with matching photos (src/lib/demo/catalog.ts), each labelled "Annonce exemple" and never
+// contactable (src/lib/demo/data.ts). Run in the worker container, which has Firestore, the media
+// bucket and Meilisearch with its own access:
 //
 //   docker compose exec worker node dist/worker/seed-demo.mjs [--apply]            seed (again)
 //   docker compose exec worker node dist/worker/seed-demo.mjs --remove [--apply]   remove
@@ -8,7 +9,8 @@
 // Dry run by default: prints the counts. The photos are downloaded from images.pexels.com (Pexels
 // License), go through the listing photo pipeline (sharp: metadata dropped, WebP variants, blurhash)
 // and are stored like a member's under listings/{id}/. Writes: ~165 Firestore documents. Removal
-// deletes by id (no read). Refused outside APP_ENV=staging; removed before launch (launch checklist).
+// deletes by id (no read). Staging by default; production only with --production, on the owner's
+// go (launch checklist).
 
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -36,11 +38,17 @@ const FETCH_TIMEOUT_MS = 30_000;
 export interface SeedDemoArgs {
   remove: boolean;
   apply: boolean;
+  /** Required to write to APP_ENV=prod. */
+  production: boolean;
 }
 
 export function parseSeedDemoCli(argv: readonly string[]): SeedDemoArgs {
-  const { values } = parseArgs({ args: [...argv], options: { remove: { type: "boolean", default: false }, apply: { type: "boolean", default: false } }, strict: true });
-  return { remove: values.remove === true, apply: values.apply === true };
+  const { values } = parseArgs({
+    args: [...argv],
+    options: { remove: { type: "boolean", default: false }, apply: { type: "boolean", default: false }, production: { type: "boolean", default: false } },
+    strict: true,
+  });
+  return { remove: values.remove === true, apply: values.apply === true, production: values.production === true };
 }
 
 /** What the seed writes to: Firestore batches, the media bucket and the search engine. */
@@ -140,7 +148,7 @@ export async function removeDemo(target: SeedDemoTarget, now: Date = new Date())
 /** Pexels only, size-capped, with a timeout. */
 export async function downloadPhoto(url: string, fetcher: typeof fetch = fetch): Promise<Buffer> {
   if (new URL(url).host !== "images.pexels.com") throw new Error(`host not allowed: ${url}`);
-  const response = await fetcher(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), headers: { "user-agent": "JoutiyaSeed/1.0 (staging test data)" } });
+  const response = await fetcher(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), headers: { "user-agent": "JoutiyaSeed/1.0 (example listings)" } });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const body = Buffer.from(await response.arrayBuffer());
   if (body.byteLength > MAX_SOURCE_BYTES) throw new Error(`too large (${body.byteLength} bytes)`);
@@ -150,7 +158,8 @@ export async function downloadPhoto(url: string, fetcher: typeof fetch = fetch):
 async function main(): Promise<void> {
   const args = parseSeedDemoCli(process.argv.slice(2));
   const env = serverEnv();
-  if (env.APP_ENV !== "staging") throw new Error(`the demo data set goes to staging only (APP_ENV=${env.APP_ENV})`);
+  const allowed = env.APP_ENV === "staging" || (env.APP_ENV === "prod" && args.production);
+  if (!allowed) throw new Error(`example listings go to staging, or to prod with --production (APP_ENV=${env.APP_ENV})`);
   if (!env.MEILI_URL || !env.MEILI_INDEX_KEY) throw new Error("MEILI_URL and MEILI_INDEX_KEY are required (run it in the worker container)");
   if (!isFirebaseConfigured()) throw new Error("Firebase is not configured");
   const now = new Date();

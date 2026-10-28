@@ -55,6 +55,18 @@ describe("ListingCard title", () => {
   });
 });
 
+describe("example listing", () => {
+  it("carries the Exemple chip and no action", () => {
+    const html = render(<ListingCard listing={card("abcd2345", { example: true })} mediaBaseUrl={MEDIA} locale="fr" action={<button type="button">Favori</button>} />);
+    expect(html).toContain('data-testid="example-chip"');
+    expect(html).toContain(">Exemple<");
+    expect(html).not.toContain("Favori");
+    const plain = render(<ListingCard listing={card("abcd2345")} mediaBaseUrl={MEDIA} locale="fr" action={<button type="button">Favori</button>} />);
+    expect(plain).not.toContain("example-chip");
+    expect(plain).toContain("Favori");
+  });
+});
+
 describe("À la Une band", () => {
   it("turns its cards wide from md so two of them fill the band", () => {
     const html = render(<FeaturedRow cards={[card("aaaa2345", { featured: true }), card("bbbb2345", { featured: true })]} locale="fr" />);
