@@ -2919,7 +2919,8 @@
       "downgraded": "Boutique sans offre",
       "quotasTitle": "Vos quotas",
       "shortcuts": "Raccourcis",
-      "stockImport": "Importer mon stock"
+      "stockImport": "Importer mon stock",
+      "sellerPayment": "Paiement chez le vendeur"
     },
     "errors": {
       "pro_signup_closed": "Les demandes de compte Pro sont fermées pour le moment.",
@@ -3903,6 +3904,90 @@
       "markOne": "Marquer vendu",
       "markAll": "Tout marquer vendu ({count})",
       "done": "Vendu"
+    }
+  },
+  "SellerPayment": {
+    "public": {
+      "cashOnDelivery": "Paiement à la livraison accepté",
+      "button": "Payer chez le vendeur",
+      "short": "Paiement géré par {shop}. {site} ne reçoit pas votre argent.",
+      "title": "Vous quittez {site}",
+      "handledBy": "Le paiement est géré par {shop} (ICE {ice}), sur sa propre page de paiement.",
+      "noGuarantee": "{site} ne reçoit pas votre argent, ne garantit pas la vente et ne peut pas vous rembourser.",
+      "checkHost": "Vérifiez que la page de paiement est bien sur <b>{host}</b>.",
+      "continue": "Continuer vers {host}",
+      "write": "Écrire au vendeur d'abord",
+      "unavailable": "Le paiement en ligne de cette boutique n'est pas disponible pour le moment. Écrivez au vendeur."
+    },
+    "info": {
+      "title": "Informations du vendeur",
+      "lead": "Vente à distance : le vendeur est seul responsable du paiement, de la livraison et du service après-vente.",
+      "name": "Vendeur",
+      "ice": "ICE",
+      "address": "Adresse",
+      "email": "E-mail",
+      "delivery": "Livraison",
+      "returns": "Rétractation et retours",
+      "prices": "Les prix affichés par ce vendeur sont toutes taxes comprises (TTC)."
+    },
+    "settings": {
+      "metaTitle": "Paiement chez le vendeur",
+      "back": "Espace Pro",
+      "title": "Paiement chez le vendeur",
+      "lead": "Ajoutez à vos annonces un bouton qui mène vers votre propre page de paiement, ou indiquez que vous acceptez le paiement à la livraison. L'argent va directement chez vous : {site} ne le reçoit pas et ne prend aucune commission.",
+      "failed": "Impossible de charger vos réglages de paiement.",
+      "retry": "Réessayer",
+      "ineligibleTitle": "Réservé aux boutiques vérifiées avec une offre",
+      "ineligible": "Le paiement chez le vendeur est disponible pour les boutiques vérifiées qui ont une offre en cours (offre de lancement, Pass Boutique ou abonnement).",
+      "suspendedTitle": "Bouton de paiement suspendu",
+      "suspended": "Notre équipe de modération a suspendu le bouton de paiement de votre boutique. Motif : {reason}. Vos annonces restent en ligne.",
+      "status": {
+        "title": "État actuel",
+        "active": "Vos annonces affichent « Payer chez le vendeur » vers <b>{host}</b>.",
+        "none": "Aucun lien de paiement n'est actif.",
+        "withdrawn": "Le domaine <b>{host}</b> n'est plus accepté par {site} : le bouton « Payer chez le vendeur » est masqué. Votre lien reste enregistré et revient dès que le domaine est de nouveau accepté, ou indiquez un autre lien.",
+        "pending": "Nouveau lien vers <b>{host}</b> : actif le {date}.",
+        "review": "Nouveau lien vers <b>{host}</b> : ce site de paiement est vérifié par notre équipe avant activation.",
+        "rejected": "Le lien vers {host} a été refusé : {reason}",
+        "cash": "Vos annonces indiquent « Paiement à la livraison accepté »."
+      },
+      "link": {
+        "title": "Votre lien de paiement",
+        "label": "Adresse de votre page de paiement",
+        "hint": "Page de paiement de votre banque ou d'un prestataire agréé, en https. Un nouveau lien s'active 24 heures après l'enregistrement et vous êtes prévenu par e-mail. Laissez vide pour retirer le bouton.",
+        "problems": {
+          "invalid": "Cette adresse n'est pas valide.",
+          "https": "L'adresse doit commencer par https://.",
+          "credentials": "L'adresse ne doit pas contenir d'identifiant ni de mot de passe.",
+          "port": "L'adresse ne doit pas indiquer de port.",
+          "ip": "Indiquez le nom de domaine de votre prestataire, pas une adresse IP.",
+          "shortener": "Les liens raccourcis ne sont pas acceptés : indiquez l'adresse complète de la page de paiement."
+        }
+      },
+      "cash": {
+        "label": "J'accepte le paiement à la livraison",
+        "hint": "Vos annonces affichent « Paiement à la livraison accepté »."
+      },
+      "info": {
+        "title": "Vos informations de vendeur",
+        "lead": "La loi 31-08 sur la protection du consommateur demande ces informations au vendeur à distance. Elles sont affichées sur votre boutique tant que le paiement chez le vendeur est actif.",
+        "address": "Adresse de votre établissement",
+        "addressHint": "Adresse professionnelle où un acheteur peut vous joindre.",
+        "email": "E-mail de contact",
+        "delivery": "Livraison : frais et délais",
+        "deliveryHint": "Par exemple : livraison partout au Maroc en 2 à 4 jours, 30 MAD, offerte dès 500 MAD.",
+        "returns": "Rétractation et retours",
+        "returnsHint": "L'acheteur dispose d'un délai de rétractation de 7 jours. Indiquez comment il vous renvoie l'article et comment vous le remboursez.",
+        "required": "Ce champ est nécessaire pour activer le paiement chez le vendeur."
+      },
+      "terms": "Mes prix affichés sont TTC. Je suis seul responsable du paiement, de la livraison et du service après-vente ; {site} ne reçoit pas l'argent de mes ventes et ne prend aucune commission.",
+      "termsRequired": "Cochez cette case pour activer le paiement chez le vendeur.",
+      "infoRequired": "Remplissez vos informations de vendeur et cochez l'engagement pour activer le paiement chez le vendeur.",
+      "reauthTitle": "Reconnectez-vous pour changer votre lien",
+      "reauthBody": "Par sécurité, un nouveau lien de paiement demande une connexion de moins de dix minutes. Reconnectez-vous, puis revenez ici.",
+      "reauth": "Me reconnecter",
+      "saved": "Vos réglages sont enregistrés.",
+      "submit": "Enregistrer"
     }
   }
 }

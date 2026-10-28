@@ -98,6 +98,15 @@ export const RATE_LIMITS = {
   // Closed: it leads to a charge. 20 per day per account, 60 per hour per IP.
   "billing.checkout.uid": { points: 20, duration: DAY, policy: "closed", key: "uid" },
   "billing.checkout.ip": { points: 60, duration: HOUR, policy: "closed", key: "ip" },
+  // PUT /api/pro/me/payment (« Payer chez le vendeur »): the owner's settings, 3 reads and 1 write
+  // plus an alert mail when the link changes. 20 per day per account.
+  "pro.payment.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
+  // POST /api/shops/{proId}/payment: a buyer opens a shop's payment page (2 reads, 1 counter
+  // write). Anonymous: 120 per hour per IP.
+  "shop.payment.ip": { points: 120, duration: HOUR, policy: "open", key: "ip" },
+  // Its click counter: one count per IP and listing per day (the key carries the listing id), so a
+  // script cannot inflate a shop's figures or spend the write quota.
+  "shop.payment.click": { points: 1, duration: DAY, policy: "open", key: "ip" },
   // DELETE /api/listings/{id} and pause / resume / sold / renew (~4 writes and an ISR
   // revalidation each): 120 per day per account (an individual has at most 20 active listings).
   "listing.status.uid": { points: 120, duration: DAY, policy: "open", key: "uid" },

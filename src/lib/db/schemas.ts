@@ -334,6 +334,8 @@ export const listingStatsSchema = z
     favorites: z.number().int().min(0),
     contacts: z.number().int().min(0),
     phoneReveals: z.number().int().min(0),
+    /** « Payer chez le vendeur » opened from the listing (aggregate only, no buyer id). */
+    paymentClicks: z.number().int().min(0).optional(),
     flushedAt: ts,
   })
   .strict();

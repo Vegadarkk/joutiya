@@ -8,7 +8,9 @@ import { EmptyState } from "@/components/feedback/empty-state";
 import { Container } from "@/components/layout/container";
 import { AdSlot } from "@/components/ads/ad-slot";
 import { ListingCard } from "@/components/listing/listing-card";
+import { PayAtSeller } from "@/components/listing/pay-at-seller";
 import { formatMemberSince } from "@/components/listing/seller-card";
+import { SellerInfo } from "@/components/pro/seller-info";
 import { ReportButton } from "@/components/report/report-button";
 import { Button } from "@/components/ui/button";
 import { availablePromos } from "@/config/house-promos";
@@ -129,9 +131,10 @@ export default async function StorefrontPage({ params }: { params: Params }) {
             </p>
           </section>
         ) : null}
-        <p className={store.description ? "self-start rounded-md bg-surface-muted p-4 text-sm text-foreground-muted text-pretty" : "max-w-prose text-sm text-foreground-muted text-pretty lg:col-span-2"}>
-          {t("verifiedNote")}
-        </p>
+        <div className={store.description ? "flex flex-col gap-4 self-start" : "flex flex-col gap-4 lg:col-span-2"}>
+          {store.payment ? <PayAtSeller payment={store.payment} className="rounded-lg border border-border bg-surface p-4" /> : null}
+          <p className={store.description ? "rounded-md bg-surface-muted p-4 text-sm text-foreground-muted text-pretty" : "max-w-prose text-sm text-foreground-muted text-pretty"}>{t("verifiedNote")}</p>
+        </div>
       </div>
 
       <section aria-labelledby="storefront-listings" className="flex flex-col gap-6">
@@ -160,6 +163,8 @@ export default async function StorefrontPage({ params }: { params: Params }) {
         )}
         {hidden > 0 ? <p className="text-sm text-foreground-muted">{profile("newest", { shown: seller.listings.length })}</p> : null}
       </section>
+
+      {store.payment ? <SellerInfo payment={store.payment} /> : null}
 
       {/* Profiles stay out of the ad inventory (AF §8 table): house promotion only. */}
       <AdSlot placement="profile-bottom" eligible={false} promos={availablePromos(flags)} seed={store.segment} />

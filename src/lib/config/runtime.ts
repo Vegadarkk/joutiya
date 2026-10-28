@@ -1,12 +1,13 @@
 import "server-only";
 import { DEFAULT_FLAGS, resolveFlagsConfig, type FlagsConfig } from "@/config/flags";
 import { DEFAULT_PRICING, resolvePricingConfig, type PricingConfig } from "@/config/pricing";
+import { DEFAULT_SELLER_PAYMENTS, resolveSellerPaymentsConfig, type SellerPaymentsConfig } from "@/config/seller-payments";
 import { alert } from "@/lib/alert";
 import { db, isFirestoreConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
 import { consume } from "@/lib/quota";
 
-// Firestore `config/flags` and `config/pricing` over their defaults, cached 5 minutes in memory
+// Firestore `config/flags`, `config/pricing` and `config/sellerPayments` over their defaults, cached 5 minutes in memory
 // (§5), same pattern as src/lib/legal/config.ts. Never throws: on an invalid document the
 // resolver's fallback applies (flag by flag for the flags, the whole default pricing for the
 // pricing) and a P1 alert goes out (once an hour: an invalid document silently reopening the Pro
@@ -15,9 +16,14 @@ import { consume } from "@/lib/quota";
 
 const TTL_MS = 5 * 60 * 1000;
 
-function cachedConfig<T>(docId: string, fallback: T, resolve: (stored: unknown) => { config: T; errors: string[] }): () => Promise<T> {
+type CachedConfig<T> = (() => Promise<T>) & {
+  /** Makes the next read go to Firestore (after a save from the back office); the copy stays the fallback of a failed read. */
+  invalidate: () => void;
+};
+
+function cachedConfig<T>(docId: string, fallback: T, resolve: (stored: unknown) => { config: T; errors: string[] }): CachedConfig<T> {
   let cache: { value: T; expires: number } | undefined;
-  return async () => {
+  const read = async () => {
     const now = Date.now();
     if (cache && cache.expires > now) return cache.value;
     try {
@@ -36,7 +42,13 @@ function cachedConfig<T>(docId: string, fallback: T, resolve: (stored: unknown) 
       return cache?.value ?? fallback;
     }
   };
+  return Object.assign(read, {
+    invalidate: () => {
+      if (cache) cache.expires = 0;
+    },
+  });
 }
 
-export const getFlags: () => Promise<FlagsConfig> = cachedConfig("flags", DEFAULT_FLAGS, resolveFlagsConfig);
-export const getPricing: () => Promise<PricingConfig> = cachedConfig("pricing", DEFAULT_PRICING, resolvePricingConfig);
+export const getFlags: CachedConfig<FlagsConfig> = cachedConfig("flags", DEFAULT_FLAGS, resolveFlagsConfig);
+export const getPricing: CachedConfig<PricingConfig> = cachedConfig("pricing", DEFAULT_PRICING, resolvePricingConfig);
+export const getSellerPayments: CachedConfig<SellerPaymentsConfig> = cachedConfig("sellerPayments", DEFAULT_SELLER_PAYMENTS, resolveSellerPaymentsConfig);

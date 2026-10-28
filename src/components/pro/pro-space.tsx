@@ -19,6 +19,7 @@ import type { ProMeResponse, ProSelfView } from "@/lib/contracts/pro";
 import { isolate } from "@/lib/i18n/bidi";
 import { publishesAsPro, type ProState } from "@/lib/pro/lifecycle";
 import { loadProMe } from "@/lib/pro/client";
+import { paymentEligible } from "@/lib/pro/seller-payment-rules";
 import { cn } from "@/lib/utils";
 import { ProApplicationForm } from "./pro-application-form";
 
@@ -316,6 +317,11 @@ function Dashboard({ me, shop, lifecycle }: { me: ProMeResponse; shop: ProSelfVi
           {shop.storefront && !suspended ? (
             <Button asChild variant="outline">
               <Link href={`/boutique/${shop.storefront}`}>{t("storefront")}</Link>
+            </Button>
+          ) : null}
+          {paymentEligible(lifecycle, plan) ? (
+            <Button asChild variant="outline">
+              <Link href="/pro/paiement">{t("sellerPayment")}</Link>
             </Button>
           ) : null}
         </div>

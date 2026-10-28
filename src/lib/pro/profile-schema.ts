@@ -1,5 +1,7 @@
 import { z } from "@/lib/zod";
 import { PRO_PLANS, listingQuotasSchema } from "@/config/pricing";
+import { PAYMENT_URL_MAX } from "@/config/seller-payments";
+import { sellerInfoInputSchema } from "@/lib/contracts/seller-payment";
 import { citySlugSchema, regionCodeSchema } from "@/lib/contracts/listings";
 import { KYBC_MAX_PIECES, KYBC_STATUSES, proLegalSchema } from "./kybc";
 import { PLAN_SOURCES, PRO_STATES } from "./lifecycle";
@@ -23,6 +25,36 @@ const mobileE164 = z.string().regex(/^\+212[67]\d{8}$/);
 /** Outcome of a moderator's call to the applicant's number (phase 7: the WhatsApp check is parked until Meta validates the app). */
 export const PHONE_CHECK_OUTCOMES = ["verified", "unreachable", "mismatch"] as const;
 export type PhoneCheckOutcome = (typeof PHONE_CHECK_OUTCOMES)[number];
+
+const paymentUrl = z.url({ protocol: /^https$/ }).max(PAYMENT_URL_MAX);
+const host = z.string().min(1).max(253);
+
+/** The distance seller's information of law 31-08 (art. 29), shown on the storefront while the button is on. */
+export const sellerInfoSchema = sellerInfoInputSchema;
+export type SellerInfo = z.infer<typeof sellerInfoSchema>;
+
+export const sellerPaymentSchema = z
+  .object({
+    /** Active link (its host must still be allowed when shown). */
+    url: paymentUrl.optional(),
+    /** A new link, active from `pendingFrom` + 24 h once its host is allowed. */
+    pendingUrl: paymentUrl.optional(),
+    pendingFrom: ts.optional(),
+    /** Host of `pendingUrl`, kept for the admin queue (query by host). */
+    pendingHost: host.optional(),
+    /** `pendingHost` is not on the allowlist yet: listed for an admin's review. */
+    hostReview: z.boolean().optional(),
+    /** The last host an admin refused, with the reason shown to the owner. */
+    hostRejected: z.object({ host, reason: z.string().min(1).max(500), at: ts }).strict().optional(),
+    cashOnDelivery: z.boolean(),
+    info: sellerInfoSchema.optional(),
+    /** Cut by a moderator (report « Lien de paiement suspect »): nothing is shown until restored. */
+    suspendedAt: ts.optional(),
+    suspendedReason: z.string().min(1).max(500).optional(),
+    updatedAt: ts,
+  })
+  .strict();
+export type SellerPaymentDoc = z.infer<typeof sellerPaymentSchema>;
 
 export const proProfileSchema = z
   .object({
@@ -74,6 +106,8 @@ export const proProfileSchema = z
     passEndsAt: ts.optional(),
     /** Date of the last notice mailed before the end of the pass (the next one is due from it). */
     passNoticeSentAt: ts.optional(),
+    /** « Payer chez le vendeur » (design phase-7/boutique-temporaire.md §2); absent until the owner sets it. */
+    sellerPayment: sellerPaymentSchema.optional(),
     /** Derived from config/pricing for `plan`. */
     quotas: listingQuotasSchema,
     /**

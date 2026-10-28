@@ -46,7 +46,7 @@ export interface AdminOptions {
 }
 
 /** A back-office request: admin host, Access identity header, session and CSRF of `staff`. */
-export async function adminRequest(handler: Handler, method: "GET" | "POST" | "DELETE", path: string, staff: Staff, body?: unknown, options: AdminOptions = {}): Promise<Response> {
+export async function adminRequest(handler: Handler, method: "GET" | "POST" | "PUT" | "DELETE", path: string, staff: Staff, body?: unknown, options: AdminOptions = {}): Promise<Response> {
   const host = options.host ?? ADMIN_HOST();
   const headers = new Headers({ host, "user-agent": "vitest", "x-forwarded-for": "10.78.0.1", origin: `http://${host}` });
   if (options.accessEmail !== null) headers.set("x-dev-access-email", options.accessEmail ?? staff.email);
@@ -60,7 +60,7 @@ export async function adminRequest(handler: Handler, method: "GET" | "POST" | "D
   return handler(request, { params: Promise.resolve(options.params ?? (proId ? { proId } : {})) });
 }
 
-export async function admin<T>(handler: Handler, method: "GET" | "POST", path: string, staff: Staff, body?: unknown): Promise<{ status: number; body: T }> {
+export async function admin<T>(handler: Handler, method: "GET" | "POST" | "PUT", path: string, staff: Staff, body?: unknown): Promise<{ status: number; body: T }> {
   const response = await adminRequest(handler, method, path, staff, body);
   return { status: response.status, body: (await response.json()) as T };
 }

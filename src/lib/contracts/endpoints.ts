@@ -127,3 +127,13 @@ export const SEARCH_API = {
   /** POST { token } -> 204 + __Host-tsv pass (page challenge of /anti-robot). */
   challengePass: "/api/challenge/pass",
 } as const;
+
+/** « Payer chez le vendeur » (phase 7): owner settings, the public button, the back office (seller-payment.ts re-exports it). */
+export const SELLER_PAYMENT_API = {
+  me: "/api/pro/me/payment",
+  /** POST { listingId? } -> OpenPaymentResponse; 404 payment_unavailable. */
+  open: (proId: string) => `/api/shops/${encodeURIComponent(proId)}/payment`,
+  admin: "/api/admin/seller-payments",
+  adminReview: "/api/admin/seller-payments/review",
+  adminShop: (proId: string) => `/api/admin/pros/${encodeURIComponent(proId)}/payment`,
+} as const;
