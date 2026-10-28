@@ -23,6 +23,7 @@ import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import sodium from "libsodium-wrappers";
 import { validateTargets, type Targets } from "./assert-target.ts";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 export const BUNDLE_FORMAT = "joutiya-github-ci v1";
 export const SSH_HOST = "ssh.joutiya.ma";
@@ -220,6 +221,7 @@ async function sealAction(targets: Targets, repository: string, args: string[], 
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const args = process.argv.slice(2);
   const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   if (!(action === "public-key" || action === "seal" || (action === "apply" && file !== undefined))) {

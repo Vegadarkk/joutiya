@@ -34,6 +34,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateTargets, type Targets } from "./assert-target.ts";
 import { DEPLOYED_ENVS, type DeployedEnv } from "./vm-env.ts";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 export const WIF_SERVICES = ["web", "worker"] as const;
 export type WifService = (typeof WIF_SERVICES)[number];
@@ -826,6 +827,7 @@ async function probe(service: WifService, project: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const args = process.argv.slice(2);
   const [action, env, extra] = args.filter((arg) => !arg.startsWith("--"));
   if (action === "probe") {

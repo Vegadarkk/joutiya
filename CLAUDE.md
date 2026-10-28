@@ -143,6 +143,8 @@ Node 24; `npm ci --ignore-scripts` once.
   deploy-staging: sealed in the cloud, sent by Nav from PC2); `scripts/deploy-prod.ts firestore`
   (production rules), `scripts/stripe-setup.ts` (Stripe objects of the Pro plans). Steps in
   `docs/phase-1.md`, rebuild in `infra/redeploy.md`.
+- In the cloud, run every API script with `NODE_USE_ENV_PROXY=1` (they refuse to start without it
+  when a proxy is set): never reach the network outside the proxy, read-only calls included.
 - Image: `docker build -f docker/Dockerfile --target web` (or `worker`); Compose in `docker/`.
 
 # Compact instructions

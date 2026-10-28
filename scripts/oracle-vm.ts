@@ -75,6 +75,7 @@ import { tunnelTokenErrors, validateTargets, type Targets } from "./assert-targe
 import { LEAF_DAYS, WIF_SERVICES, certificateConfig, credentialConfig, csrFromOutput, derBase64, pemBlock, subjectName, wifLines, type WifService } from "./google-wif.ts";
 import { type Sealed, openSealedLines, parseSealed } from "./seal-env.ts";
 import { DEPLOYED_ENVS, REQUIRED, VM_DIRS, envPayload, envScripts, mergeLines, namesScript, parseMissing, parseNames, planEnv, type DeployedEnv, type EnvDirs, type Source } from "./vm-env.ts";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 
@@ -1359,6 +1360,7 @@ function credentialsFromEnv(): OciCredentials {
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const args = process.argv.slice(2);
   const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);

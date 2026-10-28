@@ -20,6 +20,7 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { validateTargets, type AppEnv, type EnvTargets, type Targets } from "./assert-target.ts";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 export const ZONE_NAME = "joutiya.ma";
 const API = "https://api.cloudflare.com/client/v4";
@@ -476,6 +477,7 @@ async function checkR2(targets: Targets): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const args = process.argv.slice(2);
   const apply = args.includes("--apply");
   const replaceDns = args.includes("--replace-dns");

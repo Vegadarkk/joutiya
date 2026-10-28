@@ -31,6 +31,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { assertTargets, validateTargets, type Targets } from "./assert-target.ts";
 import { DEPLOYED_ENVS, derivedValues, type DeployedEnv } from "./vm-env.ts";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 export interface CreateAdminArgs {
   email: string;
@@ -160,6 +161,7 @@ function readTargets(): unknown {
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const args = parseCli(process.argv.slice(2));
   const { projectId, origin, emulated } = resolveSettings(process.env, readTargets());
   if (!args.apply) {

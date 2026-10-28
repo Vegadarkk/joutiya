@@ -25,6 +25,7 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateTargets, type Targets } from "./assert-target.ts";
 import { DEPLOYED_ENVS, envPayload, planEnv, type DeployedEnv } from "./vm-env.ts";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 export const SEALED_TARGETS = ["app.env", "tunnel.env"] as const;
 export type SealedTarget = (typeof SEALED_TARGETS)[number];
@@ -145,6 +146,7 @@ function appLines(env: DeployedEnv, targets: Targets, args: string[]): string {
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const args = process.argv.slice(2);
   const [kind, env, extra] = args.filter((arg) => !arg.startsWith("--"));
   const to = option(args, "to");

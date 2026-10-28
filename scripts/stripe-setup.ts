@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 import type { PaidPlanId, PlanInterval, PlansConfig } from "../src/config/pricing.ts";
 import { validateTargets, type Targets } from "./assert-target.ts";
 import { registerSrcResolver } from "./search-setup.ts";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 export type SetupEnv = "staging" | "prod";
 type StripeParam = string | number | boolean | null | undefined | readonly StripeParam[] | { readonly [key: string]: StripeParam };
@@ -298,6 +299,7 @@ export async function runSetup(options: SetupOptions): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const cli = parseCli(process.argv.slice(2));
   const raw: unknown = JSON.parse(readFileSync(new URL("../infra/targets.json", import.meta.url), "utf8"));
   const targetErrors = validateTargets(raw);
