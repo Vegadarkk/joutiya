@@ -812,7 +812,9 @@
       "not_allowed": "هذه المعلومة غير مسموح بها في هذه الفئة.",
       "sensitive_required": "حدّد الشخص الذي تتعلق به هذه البيانات الشخصية.",
       "messaging_only": "في هذه الفئة يتم التواصل عبر الرسائل فقط: أوقف عرض الهاتف وواتساب.",
-      "adults_only_attestation": "أكّد أن الأمر يتعلق بقطعة زينة حرفية تُباع لشخص بالغ فقط."
+      "adults_only_attestation": "أكّد أن الأمر يتعلق بقطعة زينة حرفية تُباع لشخص بالغ فقط.",
+      "criterion_pro_only": "هذا الحقل مخصص للحسابات المهنية.",
+      "deposit_max": "لا يمكن أن يتجاوز مبلغ الضمان كراء شهرين (القانون 67.12)."
     },
     "status": {
       "draft": "مسودة",
@@ -2149,6 +2151,52 @@
     },
     "stock-ref": {
       "label": "مرجع المخزون"
+    },
+    "rooms": {
+      "label": "الغرف (المجموع)"
+    },
+    "property-title": {
+      "label": "الوضعية القانونية",
+      "options": {
+        "titre-foncier": "رسم عقاري",
+        "en-cours-immatriculation": "في طور التحفيظ",
+        "melkia-adoul": "ملكية أو عقد عدلي",
+        "autre": "أخرى"
+      }
+    },
+    "tourism-authorization": {
+      "label": "رقم رخصة الإيواء السياحي"
+    },
+    "mandate": {
+      "label": "الوكالة",
+      "options": {
+        "exclusif": "حصرية",
+        "simple": "عادية",
+        "vente-directe": "بدون وكالة (عقار المهني)"
+      }
+    },
+    "agency-reference": {
+      "label": "مرجع الوكالة"
+    },
+    "agency-fees": {
+      "label": "أتعاب الوكالة",
+      "options": {
+        "inclus": "مشمولة في الثمن",
+        "en-sus": "إضافة إلى الثمن، على عاتق الزبون",
+        "sans-frais": "بدون مصاريف على الزبون"
+      }
+    },
+    "agency-fees-amount": {
+      "label": "مبلغ الأتعاب (درهم)"
+    },
+    "off-plan": {
+      "label": "بيع في طور الإنجاز (VEFA)"
+    },
+    "building-permit": {
+      "label": "رقم رخصة البناء"
+    },
+    "delivery-year": {
+      "label": "التسليم المتوقع (السنة)"
     }
   },
   "MyListings": {

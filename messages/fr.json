@@ -822,7 +822,9 @@
       "not_allowed": "Cette information n'est pas autorisée dans cette catégorie.",
       "sensitive_required": "Indiquez à qui se rapportent ces données personnelles.",
       "messaging_only": "Dans cette catégorie, le contact passe uniquement par la messagerie : désactivez le téléphone et WhatsApp.",
-      "adults_only_attestation": "Confirmez qu'il s'agit d'un objet décoratif d'artisanat vendu uniquement à une personne majeure."
+      "adults_only_attestation": "Confirmez qu'il s'agit d'un objet décoratif d'artisanat vendu uniquement à une personne majeure.",
+      "criterion_pro_only": "Ce champ est réservé aux comptes professionnels.",
+      "deposit_max": "Le dépôt de garantie ne peut pas dépasser 2 mois de loyer (loi 67-12)."
     },
     "status": {
       "draft": "Brouillon",
@@ -2159,6 +2161,52 @@
     },
     "stock-ref": {
       "label": "Référence de stock"
+    },
+    "rooms": {
+      "label": "Pièces"
+    },
+    "property-title": {
+      "label": "Statut juridique",
+      "options": {
+        "titre-foncier": "Titre foncier",
+        "en-cours-immatriculation": "En cours d'immatriculation",
+        "melkia-adoul": "Melkia ou acte adoulaire",
+        "autre": "Autre"
+      }
+    },
+    "tourism-authorization": {
+      "label": "N° d'autorisation d'hébergement touristique"
+    },
+    "mandate": {
+      "label": "Mandat",
+      "options": {
+        "exclusif": "Exclusif",
+        "simple": "Simple",
+        "vente-directe": "Sans mandat (bien du professionnel)"
+      }
+    },
+    "agency-reference": {
+      "label": "Référence de l'agence"
+    },
+    "agency-fees": {
+      "label": "Honoraires d'agence",
+      "options": {
+        "inclus": "Inclus dans le prix",
+        "en-sus": "En plus du prix, à la charge du client",
+        "sans-frais": "Sans frais pour le client"
+      }
+    },
+    "agency-fees-amount": {
+      "label": "Montant des honoraires (DH)"
+    },
+    "off-plan": {
+      "label": "Vente sur plan (VEFA)"
+    },
+    "building-permit": {
+      "label": "N° du permis de construire"
+    },
+    "delivery-year": {
+      "label": "Livraison prévue (année)"
     }
   },
   "MyListings": {

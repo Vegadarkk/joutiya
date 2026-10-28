@@ -43,7 +43,11 @@ export interface Criterion {
   group?: CriterionGroup;
   /** A dossier criterion offered as a search filter (main criteria always are, text excepted). */
   filter?: boolean;
-  /** Shown and accepted for Pro sellers only (the dealer's stock reference). */
+  /**
+   * Pro sellers only (dealer's stock reference, real-estate mandate, ONSSA number): hidden from
+   * individuals in the form, refused at publish (`criterion_pro_only`) when an individual sets it;
+   * `required` then binds Pros only.
+   */
   proOnly?: boolean;
   /** Shown and accepted only while criterion `id` holds one of `values` (a warranty's duration). */
   showIf?: { id: string; values: readonly string[] };
@@ -52,8 +56,12 @@ export interface Criterion {
 export const CRITERION_GROUPS = ["dossier"] as const;
 export type CriterionGroup = (typeof CRITERION_GROUPS)[number];
 
-/** Main criteria of a subcategory stay short; the folded dossier has its own cap. */
-export const MAIN_CRITERIA_MAX = 11;
+/**
+ * Main criteria of a subcategory stay short (a property sale needs 12: rooms and title status on
+ * top of Leboncoin's ten); the Pro-only ones and the folded dossier have their own caps.
+ */
+export const MAIN_CRITERIA_MAX = 12;
+export const PRO_CRITERIA_MAX = 8;
 export const DOSSIER_CRITERIA_MAX = 12;
 
 /** Price per unit shown next to the amount; the amount itself stays an integer MAD (D4). */
@@ -85,6 +93,12 @@ export interface Subcategory {
 export interface Category {
   id: string;
   subcategories: readonly Subcategory[];
+  /**
+   * Criteria offered as search filters on the whole category, before a subcategory is chosen
+   * (surface or bedrooms across every real-estate offer). A listing of a subcategory without the
+   * field never matches a filter on it.
+   */
+  sharedFilters?: readonly CriterionId[];
 }
 
 /** Car brands common in Morocco, plus `autre`; the model stays free text. */
@@ -152,6 +166,21 @@ const FIELDS = {
   "room-type": { id: "room-type", type: "select", options: ["chambre-privee", "chambre-partagee"] },
   "flatmates": { id: "flatmates", type: "number", min: 1, max: 10 },
   "guests": { id: "guests", type: "number", min: 1, max: 5000 },
+  // Real estate (Agence pack design, phase-7/agence-immobiliere.md). Moroccan listings count rooms
+  // ("pièces") apart from bedrooms; the title status matters to buyers (melkia is not a land title).
+  "rooms": { id: "rooms", type: "number", min: 1, max: 50 },
+  "property-title": { id: "property-title", type: "select", options: ["titre-foncier", "en-cours-immatriculation", "melkia-adoul", "autre"] },
+  /** Tourist accommodation authorisation (law 80-14): declared by the host, never checked by the site. */
+  "tourism-authorization": { id: "tourism-authorization", type: "text" },
+  /** Pro fields: the mandate, the agency's own reference and its fees next to the price (law 31-08 art. 3). */
+  "mandate": { id: "mandate", type: "select", options: ["exclusif", "simple", "vente-directe"] },
+  "agency-reference": { id: "agency-reference", type: "text" },
+  "agency-fees": { id: "agency-fees", type: "select", options: ["inclus", "en-sus", "sans-frais"] },
+  "agency-fees-amount": { id: "agency-fees-amount", type: "number", min: 0, max: 10000000 },
+  /** Off-plan sale (VEFA, law 44-00): the permit and the planned delivery year come with it. */
+  "off-plan": { id: "off-plan", type: "boolean" },
+  "building-permit": { id: "building-permit", type: "text" },
+  "delivery-year": { id: "delivery-year", type: "number", min: 2020, max: 2045, unit: "an" },
   "min-nights": { id: "min-nights", type: "number", min: 1, max: 90, unit: "nuit" },
   "phone-device-type": { id: "phone-device-type", type: "select", options: ["smartphone", "telephone-basique", "montre-connectee", "ecouteurs", "bracelet", "autre"] },
   "phone-brand": { id: "phone-brand", type: "select", options: ["apple", "samsung", "xiaomi", "huawei", "oppo", "realme", "infinix", "tecno", "honor", "nokia", "google", "oneplus", "vivo", "motorola", "autre"] },
@@ -247,6 +276,8 @@ const VEHICLE_DOSSIER = [
   dossier("financing"),
   dossier("stock-ref"),
 ] as const;
+const proRequired = (id: CriterionId): Criterion => ({ ...FIELDS[id], required: true, proOnly: true });
+const proOptional = (id: CriterionId): Criterion => ({ ...FIELDS[id], proOnly: true });
 
 export const CATEGORIES: readonly Category[] = [
   {
@@ -263,11 +294,12 @@ export const CATEGORIES: readonly Category[] = [
   },
   {
     id: "immobilier",
+    sharedFilters: ["property-type", "surface", "rooms", "bedrooms"],
     subcategories: [
-      { id: "vente", categoryId: "immobilier", criteria: [required("property-type"), required("surface"), optional("bedrooms"), optional("living-rooms"), optional("bathrooms"), optional("floor"), optional("standing"), optional("property-age"), optional("furnished"), optional("amenities")] },
-      { id: "location", categoryId: "immobilier", priceOptional: true, priceUnit: "month", criteria: [required("property-type"), required("surface"), optional("bedrooms"), optional("bathrooms"), required("furnished"), optional("amenities"), optional("deposit"), optional("availability")] },
+      { id: "vente", categoryId: "immobilier", criteria: [required("property-type"), required("surface"), optional("rooms"), optional("bedrooms"), optional("living-rooms"), optional("bathrooms"), optional("floor"), optional("standing"), optional("property-age"), optional("property-title"), optional("furnished"), optional("amenities"), proOptional("off-plan"), proOptional("building-permit"), proOptional("delivery-year"), proRequired("mandate"), proOptional("agency-reference"), proRequired("agency-fees"), proOptional("agency-fees-amount")] },
+      { id: "location", categoryId: "immobilier", priceOptional: true, priceUnit: "month", criteria: [required("property-type"), required("surface"), optional("rooms"), optional("bedrooms"), optional("living-rooms"), optional("bathrooms"), optional("floor"), required("furnished"), optional("amenities"), optional("deposit"), optional("availability"), proRequired("mandate"), proOptional("agency-reference"), proRequired("agency-fees"), proOptional("agency-fees-amount")] },
       { id: "colocation", categoryId: "immobilier", priceUnit: "month", criteria: [required("room-type"), optional("flatmates"), optional("furnished"), optional("amenities"), optional("availability")] },
-      { id: "location-vacances", categoryId: "immobilier", priceUnit: "night", criteria: [required("property-type"), required("guests"), optional("bedrooms"), optional("bathrooms"), optional("amenities"), optional("min-nights")] },
+      { id: "location-vacances", categoryId: "immobilier", priceUnit: "night", criteria: [required("property-type"), required("guests"), optional("surface"), optional("bedrooms"), optional("bathrooms"), optional("amenities"), optional("min-nights"), optional("tourism-authorization"), proOptional("agency-reference")] },
     ],
   },
   {
@@ -423,11 +455,26 @@ function criterionSchema(criterion: Criterion): z.ZodType {
 
 export type CriteriaSchema = ReturnType<typeof buildCriteriaSchema>;
 
-function buildCriteriaSchema(subcategory: Subcategory) {
+/**
+ * Whose criteria: "individual" leaves the Pro-only ones out (an unknown key then), "pro" applies
+ * their `required`, "any" accepts every criterion with the Pro-only ones optional (shape checks
+ * that do not know the seller, such as the screening).
+ */
+export type CriteriaAudience = "individual" | "pro" | "any";
+
+/** The criteria of `subcategory` a seller of `audience` fills in (the form's fields). */
+export function criteriaFor(subcategory: Subcategory, audience: CriteriaAudience): readonly Criterion[] {
+  return audience === "individual" ? subcategory.criteria.filter((criterion) => !criterion.proOnly) : subcategory.criteria;
+}
+
+// Every criterion is a known key whatever the audience: an individual's Pro-only value is refused
+// by the publish readiness (`criterion_pro_only`), not reported as unknown.
+function buildCriteriaSchema(subcategory: Subcategory, audience: CriteriaAudience) {
   const shape: Record<string, z.ZodType> = {};
   for (const criterion of subcategory.criteria) {
     const schema = criterionSchema(criterion);
-    shape[criterion.id] = criterion.required ? schema : schema.optional();
+    const required = criterion.required && (!criterion.proOnly || audience === "pro");
+    shape[criterion.id] = required ? schema : schema.optional();
   }
   return z.object(shape).strict();
 }
@@ -439,12 +486,24 @@ const schemaCache = new Map<string, CriteriaSchema>();
  * select values among the option ids, integers within bounds, texts <= 80 chars. Throws for an
  * unknown subcategory id (check with `subcategoryById` first).
  */
-export function criteriaSchema(subcategoryId: string): CriteriaSchema {
-  const cached = schemaCache.get(subcategoryId);
+export function criteriaSchema(subcategoryId: string, audience: CriteriaAudience = "any"): CriteriaSchema {
+  const key = `${audience}:${subcategoryId}`;
+  const cached = schemaCache.get(key);
   if (cached) return cached;
   const subcategory = subcategoryById(subcategoryId);
   if (!subcategory) throw new RangeError(`unknown subcategory: ${subcategoryId}`);
-  const schema = buildCriteriaSchema(subcategory);
-  schemaCache.set(subcategoryId, schema);
+  const schema = buildCriteriaSchema(subcategory, audience);
+  schemaCache.set(key, schema);
   return schema;
+}
+
+/**
+ * Criteria a search may filter on: the subcategory's, or the category's `sharedFilters` before a
+ * subcategory is chosen. Text criteria are left to the words.
+ */
+export function searchCriteria(categoryId: string | undefined, subcategoryId: string | undefined): readonly Criterion[] {
+  const subcategory = subcategoryId ? subcategoryById(subcategoryId) : undefined;
+  const criteria = subcategory ? subcategory.criteria : (categoryId ? categoryById(categoryId)?.sharedFilters : undefined)?.map(optional) ?? [];
+  // The vehicle dossier stays out of the panel, but for the criteria marked `filter`.
+  return criteria.filter((criterion) => criterion.type !== "text" && (!criterion.group || criterion.filter));
 }

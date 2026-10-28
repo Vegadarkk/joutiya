@@ -56,6 +56,7 @@ What is prohibited on Joutiya (terms of use, "Objets interdits"; the goods below
 - money and data: personal data and contact lists, resold accounts and subscriptions, bank cards or accounts, cheques, payment wallets, currency exchange (collectible coins and banknotes are allowed), crypto-assets, loans, credit, investments, insurance;
 - hacking: account hacking, cracked software, card skimmers, spyware, signal jammers, radio transmitters not approved by the ANRT (ordinary phones and consumer electronics, imported ones included, are allowed);
 - gambling: betting, lotteries, pyramid or Ponzi schemes, crypto "investment" offers with guaranteed returns;
+- land that Moroccan law makes inalienable: the sale of collective (soulaliyate, "أراضي الجموع") land or of a habous property (renting a habous property is allowed);
 - other: drones, plastic bags banned since 2016 (isothermal, freezer, rubbish, agricultural and industrial bags are allowed), regulated services (medical care, legal advice) offered without the required qualification, job offers (the category is not open yet).
 
 Scam signals: advance payment requested before seeing the item (western union, cash plus, wafacash, moneygram, "acompte", "avance", "virement", "تسبيق", "عربون"), price far below market value, seller abroad who ships after payment, request to continue outside Joutiya, fake job offers asking for fees, real estate offered without a visit.
