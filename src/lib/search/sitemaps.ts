@@ -1,5 +1,6 @@
 import "server-only";
 import { CATEGORIES } from "@/config/categories";
+import { GUIDE_RUBRICS } from "@/content/guide/catalog";
 import { CANONICAL_ORIGIN, HREFLANG_LOCALES } from "@/config/site";
 import { serverEnv, type ServerEnv } from "@/lib/env";
 import { alternates } from "@/lib/i18n/metadata";
@@ -11,7 +12,8 @@ import { SITEMAP_SHARDS, SearchUnavailableError, type EngineQuery, type SearchDo
 // XML sitemaps (design D16), production only, served by src/app/sitemaps/[file]/route.ts (ISR, one
 // hour) and reached by verified bots only (Cloudflare WAF rule `sitemaps_verified_bots`):
 // - index.xml (also /sitemap.xml by rewrite): pages.xml + one listings-{k}.xml per non-empty shard;
-// - pages.xml: home and the indexable landing pages (>= SEO_MIN_LISTINGS listings, facet counts);
+// - pages.xml: home, the admin procedures guide and the indexable landing pages (>= SEO_MIN_LISTINGS
+//   listings, facet counts);
 // - listings-{k}.xml: listings with `sitemapShard === k` (documents API, not capped by maxTotalHits),
 //   lastmod = listing updatedAt.
 // Every URL comes in fr and ar, each <url> carrying the whole hreflang cluster (+ x-default), from
@@ -133,6 +135,9 @@ async function listingEntries(shard: number): Promise<string[]> {
   return entries;
 }
 
+/** The admin procedures guide (guide-demarches G1): its home and rubrics, always indexable. */
+const GUIDE_PATHS = ["/demarches", ...GUIDE_RUBRICS.map((rubric) => `/demarches/${rubric}`)];
+
 /** XML of a sitemap file, or null for a 404 (unknown file, empty shard, not production). */
 export async function buildSitemapFile(file: string, env: ServerEnv = serverEnv()): Promise<string | null> {
   if (env.APP_ENV !== "prod") return null;
@@ -142,7 +147,7 @@ export async function buildSitemapFile(file: string, env: ServerEnv = serverEnv(
     case "index":
       return sitemapIndex(["pages.xml", ...(await listingShards()).map((shard) => `listings-${shard}.xml`)]);
     case "pages":
-      return urlset([...urlEntries(""), ...(await indexableLandingPaths()).flatMap((path) => urlEntries(path))]);
+      return urlset([...urlEntries(""), ...GUIDE_PATHS.flatMap((path) => urlEntries(path)), ...(await indexableLandingPaths()).flatMap((path) => urlEntries(path))]);
     case "listings": {
       const entries = await listingEntries(parsed.shard);
       return entries.length > 0 ? urlset(entries) : null;

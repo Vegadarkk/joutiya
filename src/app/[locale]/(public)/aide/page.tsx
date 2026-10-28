@@ -6,7 +6,7 @@ import { DoorMark } from "@/components/feedback/door-mark";
 import { AssistantLauncher } from "@/components/help/assistant-launcher";
 import { HelpSearch, type HelpSearchEntry } from "@/components/help/help-search";
 import { Container } from "@/components/layout/container";
-import { quietLinkClassName } from "@/components/ui/text-link";
+import { quietLinkClassName, textLinkClassName } from "@/components/ui/text-link";
 import { numbersLocale, pageLocale } from "@/i18n/params";
 import { loadHelpArticles } from "@/lib/help/search";
 import { alternates } from "@/lib/i18n/metadata";
@@ -28,8 +28,9 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function HelpHome({ params }: { params: Params }) {
   const locale = pageLocale((await params).locale);
   setRequestLocale(locale);
-  const [t, count, articles] = await Promise.all([
+  const [t, guide, count, articles] = await Promise.all([
     getTranslations({ locale, namespace: "Help" }),
+    getTranslations({ locale, namespace: "Guide" }),
     // Prints a number: Tarifit pages format it as French (no Intl data for "rif").
     getTranslations({ locale: numbersLocale(locale), namespace: "Help" }),
     loadHelpArticles(locale),
@@ -93,6 +94,16 @@ export default async function HelpHome({ params }: { params: Params }) {
               </div>
             </section>
           </HelpSearch>
+          {/* Admin procedures guide (guide-demarches G1): official links by visitor profile. */}
+          <aside aria-labelledby="help-guide" className="arch mt-12 flex flex-col gap-3 border-t-4 border-featured bg-surface-brand px-6 pt-10 pb-6 sm:px-8">
+            <h2 id="help-guide" className="text-xl font-semibold">
+              {guide("helpCardTitle")}
+            </h2>
+            <p className="max-w-2xl text-pretty text-foreground-muted">{guide("helpCardBody")}</p>
+            <Link href="/demarches" className={cn("w-fit font-medium text-link", textLinkClassName)}>
+              {guide("helpCardCta")}
+            </Link>
+          </aside>
         </div>
       </Container>
     </>

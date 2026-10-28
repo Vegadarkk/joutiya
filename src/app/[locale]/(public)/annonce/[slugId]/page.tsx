@@ -17,6 +17,8 @@ import { ExampleBanner, ExampleContactNotice } from "@/components/listing/exampl
 import { ListingStatusBanner } from "@/components/listing/listing-status-banner";
 import { PriceTag } from "@/components/listing/price-tag";
 import { SafetyTips } from "@/components/listing/safety-tips";
+import { GuideCategoryLink } from "@/components/guide/category-link";
+import { rubricForCategory } from "@/content/guide/catalog";
 import { PayAtSeller } from "@/components/listing/pay-at-seller";
 import { SellerCard } from "@/components/listing/seller-card";
 import { ListingMapBlock } from "@/components/map/listing-map-block";
@@ -145,6 +147,7 @@ export default async function ListingPage({ params }: { params: Params }) {
   ]);
   const media = mediaBaseUrl();
   const category = categoryById(listing.categoryId);
+  const guideRubric = rubricForCategory(listing.categoryId);
   const subcategory = subcategoryById(listing.subcategoryId);
   const city = cityBySlug(listing.location.citySlug);
   const region = regionByCode(listing.location.regionCode);
@@ -276,6 +279,7 @@ export default async function ListingPage({ params }: { params: Params }) {
             </section>
 
             {VEHICLE_SALE_SUBCATEGORIES.includes(listing.subcategoryId) ? <VehicleBuyingGuide attributes={listing.attributes} sellerType={listing.seller.type} /> : null}
+            {guideRubric ? <GuideCategoryLink rubric={guideRubric} locale={locale} /> : null}
 
             {/* Report link, then the safety tips: a non-interactive block always stands between the ad
                 and the contact or report controls (D6). */}

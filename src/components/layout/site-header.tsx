@@ -1,4 +1,4 @@
-import { CirclePlus, Search } from "lucide-react";
+import { CirclePlus, ScrollText, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { AccountMenu } from "@/components/auth/account-menu";
@@ -56,6 +56,19 @@ export function SiteHeader({ locale }: { locale: string }) {
         </form>
 
         <div className="ms-auto flex items-center gap-1 *:min-w-11">
+          {/* Admin procedures guide (guide-demarches G1): its own section, an icon from sm to lg. Below
+              sm a signed-in header has no room left at 360 px: phones reach it from the footer. */}
+          <Button asChild variant="ghost" size="icon" className="hidden sm:inline-flex lg:hidden">
+            <Link href="/demarches" aria-label={t("guide")}>
+              <ScrollText aria-hidden="true" />
+            </Link>
+          </Button>
+          <Button asChild variant="ghost" className="hidden lg:inline-flex">
+            <Link href="/demarches">
+              <ScrollText aria-hidden="true" />
+              {t("guide")}
+            </Link>
+          </Button>
           <LocaleSwitcher />
           <Button asChild variant="ghost" size="icon" className="md:hidden">
             <Link href="/deposer" aria-label={t("post")}>

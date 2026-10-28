@@ -49,6 +49,11 @@ export function Footer({ publisher }: { publisher: string }) {
                 {t("help")}
               </Link>
             </li>
+            <li>
+              <Link href="/demarches" className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>
+                {t("guide")}
+              </Link>
+            </li>
             {column("trust").map((page) => (
               <li key={page.slug}>
                 <Link href={`/legal/${page.slug}`} className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>
