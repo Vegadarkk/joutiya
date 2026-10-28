@@ -211,7 +211,7 @@ export function applyReporterOutcome(current: ReporterStats | null | undefined, 
 
 // ---- P0 alert (D12) ---------------------------------------------------------------------------
 
-const TARGET_LABEL: Record<ReportTargetType, string> = { listing: "annonce", user: "profil", message: "message", pro: "boutique" };
+const TARGET_LABEL: Record<ReportTargetType, string> = { listing: "annonce", user: "profil", message: "message", pro: "boutique", review: "avis" };
 
 /** "16/10/2026 18:30" in Paris time (the alert's reader is the publisher's team). */
 export function parisTime(date: Date): string {

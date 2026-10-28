@@ -11,6 +11,7 @@ import { db } from "@/lib/firebase/admin";
 import { HttpError } from "@/lib/http/errors";
 import { consume } from "@/lib/quota";
 import type { RequestIdentity } from "@/lib/rate-limit/keys";
+import { getReview } from "@/lib/reviews/repository";
 import { decodeCursor, encodeCursor, listQueueRecords, listTargetReports, OPEN_STATUSES, type ReportRecord, type ReportStatus } from "./repository";
 import { readPrivateAccount } from "./reporter";
 import { foundedShare, isAbusive, type StrongSignal } from "./rules";
@@ -213,6 +214,19 @@ export type TargetSnapshot =
       hidden: boolean;
       createdAt: string | null;
       sender: "buyer" | "seller" | null;
+    }
+  | {
+      type: "review";
+      id: string;
+      rating: number;
+      text: string;
+      /** published, pending (held for sensitive data), hidden, deleted. */
+      status: string;
+      listingTitle: string;
+      /** The reviewed seller (the author is the owner). */
+      seller: { publicId: string; displayName: string };
+      reply: string | null;
+      createdAt: string;
     }
   | null;
 
@@ -431,6 +445,22 @@ export async function reportTargetView(key: string, staff: TargetViewReader, ide
     ownerUid = target.id;
   } else if (target.type === "message") {
     snapshot = await messageSnapshot(target.id, staff, identity, now);
+  } else if (target.type === "review") {
+    const review = await getReview(target.id);
+    if (review) {
+      ownerUid = review.authorUid;
+      snapshot = {
+        type: "review",
+        id: review.id,
+        rating: review.rating,
+        text: review.text,
+        status: review.status,
+        listingTitle: review.listingTitle,
+        seller: { publicId: review.targetPublicId, displayName: review.targetName },
+        reply: review.reply?.text ?? null,
+        createdAt: review.createdAt.toISOString(),
+      };
+    }
   }
   if (reports.length === 0 && snapshot === null && target.type !== "user") return null;
 

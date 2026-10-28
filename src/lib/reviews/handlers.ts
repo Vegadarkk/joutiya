@@ -10,7 +10,9 @@ import { readJson } from "@/lib/http/json";
 import { json, noContent } from "@/lib/http/route";
 import { isVisibleAccount } from "@/lib/listings/public";
 import { revalidateListingPaths } from "@/lib/listings/revalidate";
+import { logger } from "@/lib/logging/logger";
 import { screenFreeText } from "@/lib/moderation/free-text";
+import { detectSensitive } from "@/lib/moderation/sensitive";
 import { assertQuotas, PUBLIC_READ_QUOTAS } from "@/lib/quota/gate";
 import { requestIdentity } from "@/lib/rate-limit/keys";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
@@ -54,6 +56,26 @@ function reviewErrorToHttp(error: unknown): never {
   }
 }
 
+/**
+ * A review held for sensitive data goes to the moderators' queue as a system report (P1): "no
+ * action" publishes it, "remove" hides it, with the statement of reasons and the appeal of any
+ * decision. The categories only, never the text, are written in the report.
+ */
+async function holdForModerator(review: ReviewRecord): Promise<void> {
+  try {
+    const { createSystemReport } = await import("@/lib/reports");
+    const categories = detectSensitive(review.text);
+    await createSystemReport({
+      target: { type: "review", id: review.id },
+      reasonId: "personal_data",
+      explanation: `Avis retenu avant publication : donnée sensible possible (${categories.join(", ") || "à vérifier"}). « Aucune mesure » le publie, « Avis masqué » le refuse.`,
+      source: "system",
+    });
+  } catch (error) {
+    logger.error({ reviewId: review.id, err: (error as Error).message }, "reviews: held review not queued for a moderator");
+  }
+}
+
 async function reviewIdOf(params: Params): Promise<string> {
   const { id } = await params;
   const parsed = reviewIdSchema.safeParse(id);
@@ -78,6 +100,7 @@ export async function handleCreateReview(request: Request): Promise<Response> {
   const { sensitive } = screened(input.text, "text");
   const review = await createReview({ cid: input.cid, authorUid: user.uid, rating: input.rating, text: input.text, status: sensitive ? "pending" : "published", now: new Date() }).catch(reviewErrorToHttp);
   if (review.status === "published") revalidateListingPaths({ publicId: review.targetPublicId });
+  else await holdForModerator(review);
   const body: ReviewCreated = { id: review.id, status: review.status === "published" ? "published" : "pending" };
   return json(body, { status: 201 });
 }

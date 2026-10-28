@@ -10,13 +10,14 @@ export { REPORT_EXPLANATION_MAX, REPORT_EXPLANATION_MIN, REPORT_PRIORITIES, REPO
 
 /**
  * Target as the browser knows it: listing id, profile publicId, `{cid}/{messageId}` for a message,
- * shop slug for a pro (phase 7). The server resolves it to the owner's uid.
+ * shop slug for a pro (phase 7), review id. The server resolves it to the owner's uid.
  */
 export const reportTargetSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("listing"), id: z.string().regex(/^[A-Za-z0-9]{8}$/) }).strict(),
   z.object({ type: z.literal("user"), id: z.string().regex(/^[a-hj-km-np-z2-9]{10}$/) }).strict(),
   z.object({ type: z.literal("message"), id: z.string().regex(/^[A-Za-z0-9_-]{22}\/[A-Za-z0-9]{20}$/) }).strict(),
   z.object({ type: z.literal("pro"), id: z.string().regex(/^[a-z0-9-]{3,64}$/) }).strict(),
+  z.object({ type: z.literal("review"), id: z.string().regex(/^[A-Za-z0-9_-]{22}$/) }).strict(),
 ]);
 export type ReportTargetInput = z.infer<typeof reportTargetSchema>;
 

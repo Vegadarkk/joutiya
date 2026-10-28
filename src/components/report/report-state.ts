@@ -8,14 +8,14 @@ import type { CreateReportRequest, CreateReportResponse } from "@/lib/contracts/
 // for P0 reasons), the request body, the refusals in the form's words, and the target delay shown
 // on the receipt. No React: the dialog and the tests share them.
 
-/** What the browser reports: a listing id, a profile publicId (also a conversation's other participant), `{cid}/{mid}`. */
+/** What the browser reports: a listing id, a profile publicId (also a conversation's other participant), `{cid}/{mid}`, a review id. */
 export interface ReportTarget {
-  type: "listing" | "user" | "message";
+  type: "listing" | "user" | "message" | "review";
   id: string;
 }
 
 /** Where the notice is sent from: titles and wording follow it (a conversation reports its other participant). */
-export type ReportContext = "listing" | "user" | "conversation" | "message";
+export type ReportContext = "listing" | "user" | "conversation" | "message" | "review";
 
 export interface ReasonGroup {
   ground: "illegal" | "terms";

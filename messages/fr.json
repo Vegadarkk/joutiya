@@ -2559,6 +2559,7 @@
     "verified": "Échange vérifié",
     "verifiedHint": "Seuls les acheteurs qui ont échangé avec ce vendeur par la messagerie du site peuvent donner un avis.",
     "listing": "Annonce :",
+    "exchangeOn": "Échange du",
     "reply": "Réponse de {name}",
     "formerMember": "Ancien membre",
     "more": "Voir plus d'avis",
@@ -3314,20 +3315,23 @@
       "listing": "Signaler l'annonce",
       "user": "Signaler ce profil",
       "conversation": "Signaler {name}",
-      "message": "Signaler ce message"
+      "message": "Signaler ce message",
+      "review": "Signaler l'avis"
     },
     "hint": "Contenu illégal ou contraire à nos règles ? Un modérateur examinera votre signalement.",
     "title": {
       "listing": "Signaler cette annonce",
       "user": "Signaler ce profil",
       "conversation": "Signaler {name}",
-      "message": "Signaler ce message"
+      "message": "Signaler ce message",
+      "review": "Signaler cet avis"
     },
     "subject": {
       "listing": "Annonce « {title} »",
       "user": "Profil de {name}",
       "conversation": "Profil de {name}, à propos de cette conversation",
-      "message": "Message de {name}"
+      "message": "Message de {name}",
+      "review": "Avis de {name}"
     },
     "reasonLegend": "Pourquoi signalez-vous ce contenu ?",
     "group": {
@@ -3412,6 +3416,7 @@
     "mail": {
       "listing": "Signalement de l'annonce {id}",
       "user": "Signalement du profil {id}",
+      "review": "Signalement de l'avis {id}",
       "body": "Adresse de la page : {url}\n\nMotif du signalement :\n"
     }
   },

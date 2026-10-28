@@ -13,6 +13,7 @@ export function targetName(item: Pick<ReportQueueItem, "target">): string {
   const { target } = item;
   if (target.type === "user") return `Compte ${target.publicId ?? target.id}`;
   if (target.type === "message") return target.listingId ? `Message, conversation de l'annonce ${target.listingId}` : "Message";
+  if (target.type === "review") return target.listingId ? `Avis sur un échange, annonce ${target.listingId}` : "Avis";
   return `${TARGET_LABEL[target.type] ?? target.type} ${target.id}`;
 }
 

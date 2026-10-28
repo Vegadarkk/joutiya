@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { Locale } from "@/config/site";
 import type { ReviewView } from "@/lib/contracts/reviews";
 import { fetchSellerReviews } from "@/lib/reviews/client";
-import { ReviewItem, type ReviewItemLabels } from "./review-item";
+import { ReviewItem, type ReviewItemLabels, type ReviewReportContext } from "./review-item";
 
 // The storefront's older reviews, page by page (GET /api/reviews, public and rate limited). The
 // first page is in the HTML; the labels come from the server (no client message namespace on the
@@ -17,7 +17,7 @@ export interface MoreReviewsLabels extends ReviewItemLabels {
   failed: string;
 }
 
-export function MoreReviews({ publicId, next, labels, locale }: { publicId: string; next: string; labels: MoreReviewsLabels; locale: Locale }) {
+export function MoreReviews({ publicId, next, labels, locale, report }: { publicId: string; next: string; labels: MoreReviewsLabels; locale: Locale; report?: ReviewReportContext }) {
   const [reviews, setReviews] = useState<ReviewView[]>([]);
   const [cursor, setCursor] = useState<string | null>(next);
   const [state, setState] = useState<"idle" | "loading" | "failed">("idle");
@@ -38,7 +38,7 @@ export function MoreReviews({ publicId, next, labels, locale }: { publicId: stri
   return (
     <>
       {reviews.map((review) => (
-        <ReviewItem key={review.id} review={review} labels={labels} locale={locale} />
+        <ReviewItem key={review.id} review={review} labels={labels} locale={locale} {...(report ? { report } : {})} />
       ))}
       {cursor ? (
         <div className="flex flex-col items-start gap-2 pt-6">

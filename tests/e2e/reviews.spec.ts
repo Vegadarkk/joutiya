@@ -156,6 +156,22 @@ test.describe("verified reviews", () => {
     await expect(received).toContainText("Votre réponse");
     await expect(received.getByRole("button", { name: "Répondre" })).toHaveCount(0);
 
+    // The seller may also report the review from the storefront (art. 16 DSA).
+    await sellerPage.goto(`/fr/profil/${seller.publicId}#avis`);
+    await sellerPage.getByTestId("review").getByRole("button", { name: "Signaler l'avis" }).click();
+    const notice = sellerPage.getByTestId("report-dialog");
+    await expect(notice.getByRole("heading", { name: "Signaler cet avis" })).toBeVisible({ timeout: 15_000 });
+    await expect(notice).toContainText(`Avis de ${isolate("Youssef Acheteur")}`);
+    await expect(notice.getByTestId("reason-illegal_item")).toHaveCount(0);
+    await notice.getByTestId("reason-fake_review").click();
+    await notice.getByRole("button", { name: "Continuer" }).click();
+    await expect(notice.getByTestId("report-reason")).toHaveText("Avis faux ou sans rapport avec l'échange");
+    await notice.getByLabel(/Ce que vous avez constaté/).fill(`Je n'ai jamais rencontré cet acheteur, l'avis décrit une autre vente. ${stamp}`);
+    await notice.getByRole("checkbox", { name: /Je déclare de bonne foi/ }).check();
+    await notice.getByRole("button", { name: "Envoyer le signalement" }).click();
+    await expect(notice.getByRole("heading", { name: "Signalement envoyé" })).toBeVisible({ timeout: 15_000 });
+    await notice.getByRole("button", { name: "Fermer" }).first().click();
+
     // The buyer sees the reply and deletes the review.
     await buyerPage.goto("/fr/mes-avis");
     await buyerPage.getByRole("tab", { name: "Donnés" }).click();

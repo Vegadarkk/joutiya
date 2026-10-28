@@ -28,6 +28,9 @@ import { hideMessage, publishRevoked, unhideMessage } from "@/lib/messaging";
 import { consume } from "@/lib/quota";
 import { adsEligibleOf, closeReportsTx, openReportsForTarget, recordReporterOutcomes, targetKey, unhideTarget, type TargetRef } from "@/lib/reports";
 import { splitMessageId } from "@/lib/reports/target-key";
+import { reviewDocRef } from "@/lib/reports/targets";
+import { getReview } from "@/lib/reviews/repository";
+import { setReviewVisibility } from "@/lib/reviews/moderation";
 import { notifySearchIndex } from "@/lib/search/queue";
 import type { DecideResponse } from "./contracts";
 import { markAiDecision, type AiReviewOutcome } from "./hooks";
@@ -69,7 +72,7 @@ import {
 
 // One decision on one target (design D13): it closes every open report of that target (read in
 // the transaction: a report that lands meanwhile retries it), applies the measure (listing removed
-// or hidden or shown again, message hidden or restored, account sanction of the ladder D14) and
+// or hidden or shown again, message or review hidden or restored, account sanction of the ladder D14) and
 // writes the statement of reasons (moderationDecisions, art. 17), in one transaction. An account
 // sanction decided with a content decision is a decision of its own (its own statement and appeal).
 // The Auth side of a sanction runs before the transaction and is undone if it fails; listings of a
@@ -140,8 +143,11 @@ type AccountPlan =
 
 interface Subject {
   ownerUid: string;
+  /** Listing title (listing), the reviewed seller's name (review), else null. */
   title: string | null;
   message: { cid: string; mid: string } | null;
+  /** Review id of a review target. */
+  review: string | null;
 }
 
 type ListingEffect = "removed" | "restricted" | "shown" | "unremoved" | null;
@@ -155,6 +161,8 @@ interface Committed {
   listing: { record: ListingRecord; search: boolean; effect: ListingEffect } | null;
   /** The message's `hidden` flag when decided. */
   messageHidden: boolean | null;
+  /** The review's status when decided. */
+  reviewStatus: string | null;
   until: Date | null;
 }
 
@@ -176,7 +184,7 @@ async function readSubject(target: DecisionTarget): Promise<Subject> {
     case "listing": {
       const listing = await getListing(target.id);
       if (!listing || listing.status === "draft" || listing.status === "purged") throw notFound();
-      return { ownerUid: listing.ownerUid, title: listing.title, message: null };
+      return { ownerUid: listing.ownerUid, title: listing.title, message: null, review: null };
     }
     case "message": {
       const ids = splitMessageId(target.id);
@@ -185,10 +193,16 @@ async function readSubject(target: DecisionTarget): Promise<Subject> {
       void consume("firestore.reads", 1);
       const sender: unknown = snapshot.get("senderUid");
       if (!snapshot.exists || typeof sender !== "string" || snapshot.get("type") === "system") throw notFound();
-      return { ownerUid: sender, title: null, message: ids };
+      return { ownerUid: sender, title: null, message: ids, review: null };
     }
     case "user":
-      return { ownerUid: target.id, title: null, message: null };
+      return { ownerUid: target.id, title: null, message: null, review: null };
+    case "review": {
+      // A review its author deleted meanwhile stays decidable: its open reports are closed.
+      const review = await getReview(target.id);
+      if (!review) throw notFound();
+      return { ownerUid: review.authorUid, title: review.targetName, message: null, review: review.id };
+    }
   }
 }
 
@@ -428,9 +442,10 @@ async function applyTx(tx: Transaction, run: TxInput): Promise<Committed> {
   const hider = hiderId && isRestoring(template.action) ? ((await readReportsTx(tx, [hiderId]))[0] ?? null) : null;
   const messageSnap = subject.message ? await tx.get(messageRef(subject.message.cid, subject.message.mid)) : null;
   const conversationSnap = subject.message ? await tx.get(conversationRef(subject.message.cid)) : null;
+  const reviewSnap = subject.review ? await tx.get(reviewDocRef(subject.review)) : null;
   const needsAccount = target.type === "user" || plan !== null;
   const accountDocs = needsAccount ? accountDocsFrom(...(await Promise.all([tx.get(userRef(ownerUid)), tx.get(privateRef(ownerUid)), tx.get(suspensionRef(ownerUid))]))) : null;
-  void consume("firestore.reads", (subject.message ? 2 : 0) + (needsAccount ? 3 : 0));
+  void consume("firestore.reads", (subject.message ? 2 : 0) + (subject.review ? 1 : 0) + (needsAccount ? 3 : 0));
 
   // ---- Checks.
   if (run.superseded && (!superseded || superseded.appeal?.status !== "open" || superseded.supersededBy)) throw conflict("the appeal is not open any more");
@@ -439,6 +454,7 @@ async function applyTx(tx: Transaction, run: TxInput): Promise<Committed> {
   }
   if (target.type === "listing" && !listing) throw notFound();
   if (subject.message && !messageSnap?.exists) throw notFound();
+  if (subject.review && !reviewSnap?.exists) throw notFound();
 
   const closedIds = [...open.map((report) => report.id), ...referenced.map((report) => report.id)];
   const mainId = run.mainRef.id;
@@ -462,6 +478,19 @@ async function applyTx(tx: Transaction, run: TxInput): Promise<Committed> {
     const legalHold = withoutReportHolds(Array.isArray(current) ? (current as string[]) : [], closedIds);
     if (legalHold) {
       tx.update(conversationRef(subject.message.cid), { legalHold });
+      void consume("firestore.writes", 1);
+    }
+  }
+
+  // ---- Review: its report holds (the status change follows the commit, with the seller's aggregates).
+  const reviewStatus = reviewSnap ? String(reviewSnap.get("status")) : null;
+  if (subject.review && reviewSnap) {
+    const unchanged = template.action === "remove" ? reviewStatus === "hidden" || reviewStatus === "deleted" : reviewStatus === "published" || reviewStatus === "deleted";
+    if (closedIds.length === 0 && !superseded && unchanged) throw conflict("nothing to decide on this review");
+    const current: unknown = reviewSnap.get("legalHold");
+    const legalHold = withoutReportHolds(Array.isArray(current) ? (current as string[]) : [], closedIds);
+    if (legalHold) {
+      tx.update(reviewDocRef(subject.review), { legalHold });
       void consume("firestore.writes", 1);
     }
   }
@@ -548,7 +577,7 @@ async function applyTx(tx: Transaction, run: TxInput): Promise<Committed> {
     void consume("firestore.writes", 1);
   }
 
-  return { open, closedIds, main, sanction, listing: listingResult, messageHidden, until };
+  return { open, closedIds, main, sanction, listing: listingResult, messageHidden, reviewStatus, until };
 }
 
 /** Runs one after-commit step; a failure is logged (the decision stands) and reported as false. */
@@ -589,6 +618,15 @@ async function afterCommit(run: AfterInput): Promise<void> {
     const { cid, mid } = subject.message;
     if (template.action === "remove") await step("message hide", context, () => hideMessage(cid, mid, `decision:${mainId}`));
     else if (isRestoring(template.action) && committed.messageHidden) restored = (await step("message restore", context, () => unhideMessage(cid, mid))) === true;
+  }
+  if (subject.review) {
+    const id = subject.review;
+    if (template.action === "remove") await step("review hide", context, () => setReviewVisibility(id, false, now, `decision:${mainId}`));
+    // Restore and no_action publish a hidden review or one held for a moderator; only the hidden one was "restored".
+    else if (isRestoring(template.action) && (committed.reviewStatus === "hidden" || committed.reviewStatus === "pending")) {
+      const shown = await step("review publish", context, () => setReviewVisibility(id, true, now));
+      restored = shown === true && committed.reviewStatus === "hidden";
+    }
   }
   if (target.type === "user" && !reversal && (isRestoring(template.action) || template.action === "warn")) {
     const shown = await step("account restore", context, () => unhideTarget({ type: "user", id: target.id }, now));
@@ -752,7 +790,7 @@ export interface BulkDismissResult {
   reason?: "not_p3" | "no_open_report" | "failed";
 }
 
-const NO_ACTION_TEMPLATE: Record<DecisionTargetType, string> = { listing: "listing.no_action", message: "message.no_action", user: "user.no_action" };
+const NO_ACTION_TEMPLATE: Record<DecisionTargetType, string> = { listing: "listing.no_action", message: "message.no_action", user: "user.no_action", review: "review.no_action" };
 
 /** Bulk dismissal of low-priority reports (D24): targets whose open reports are all P3, one decision each. */
 export async function bulkDismiss(actor: DecisionActor, targets: readonly DecisionTarget[], options: { manifestlyUnfounded?: boolean; ip?: string; now?: Date } = {}): Promise<BulkDismissResult[]> {

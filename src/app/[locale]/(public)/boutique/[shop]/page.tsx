@@ -167,9 +167,16 @@ export default async function StorefrontPage({ params }: { params: Params }) {
         {hidden > 0 ? <p className="text-sm text-foreground-muted">{profile("newest", { shown: seller.listings.length })}</p> : null}
       </section>
 
-      {store.payment ? <SellerInfo payment={store.payment} /> : null}
+{store.payment ? <SellerInfo payment={store.payment} /> : null}
 
-      <SellerReviews rating={seller.rating} page={seller.reviews} publicId={seller.publicId} sellerName={store.name} locale={locale} />
+      <SellerReviews
+        rating={seller.rating}
+        page={seller.reviews}
+        publicId={seller.publicId}
+        sellerName={store.name}
+        locale={locale}
+        report={{ email: legal.dsaContactEmail, url: `${CANONICAL_ORIGIN}${storefrontPath(locale, store.segment)}#avis` }}
+      />
 
       {/* Profiles stay out of the ad inventory (AF §8 table): house promotion only. */}
       <AdSlot placement="profile-bottom" eligible={false} promos={availablePromos(flags)} seed={store.segment} />
