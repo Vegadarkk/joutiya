@@ -180,6 +180,6 @@ export function screenListing(input: ScreenInput, ctx: ScreenContext): ScreenRes
 
   const sorted = sortFlags(flags);
   const { score } = riskScore(sorted, { previousRejections: input.seller.previousRejections });
-  const state = decideState(score, sorted, { reviewAt: ctx.ai.risk.reviewAt, categoryId: input.categoryId });
+  const state = decideState(score, sorted, { reviewAt: ctx.ai.risk.reviewAt });
   return { state, score, flags: sorted, blockers, evidence };
 }

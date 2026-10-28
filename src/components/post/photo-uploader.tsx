@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
-import { Camera, ChevronLeft, ChevronRight, ImagePlus, RefreshCw, RotateCcw, Star, X } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, Crop, ImagePlus, RefreshCw, RotateCcw, ScanFace, Star, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Badge } from "@/components/ui/badge";
@@ -11,11 +11,14 @@ import { blurhashDataUrl } from "@/lib/listings/client/blurhash";
 import { ACCEPTED_INPUT_TYPES } from "@/lib/listings/client/prepare-image";
 import { isPhotoBusy, usedSlots, type PhotoItem } from "@/lib/listings/client/store";
 import { cn } from "@/lib/utils";
+import { PhotoCropDialog } from "./photo-crop-dialog";
 
 // Step 5: tiles with progress, cancel, retry, remove, drag or button reorder (first = cover),
 // rejected state with its reason; files can also be dropped on the add tile. The file input
 // accepts camera capture on phones (OS camera app: no getUserMedia, which Permissions-Policy
-// denies). Moves are announced to screen readers and keep the focus on the moved photo.
+// denies). Moves are announced to screen readers and keep the focus on the moved photo. A ready
+// photo where the local check found a face says so and offers a crop (PhotoCropDialog); kept as
+// is, it sends the listing to a moderator before publication (CGU §7).
 
 interface PhotoUploaderProps {
   photos: PhotoItem[];
@@ -27,6 +30,10 @@ interface PhotoUploaderProps {
   onMove: (key: string, to: number) => void;
   /** A live listing keeps at least one photo (the API refuses to remove the last one). */
   keepOne?: boolean;
+  /** Uploads a cropped copy in place of the photo (faces found); absent: no crop offered. */
+  onCrop?: (key: string, file: File) => void;
+  /** Published large variant of a ready photo: the crop source once the local file is gone. */
+  largeUrlOf?: (item: PhotoItem) => string | null;
 }
 
 type FocusTarget = { key: string; action: "back" | "forward" | "cover" };
@@ -35,7 +42,7 @@ function hasFiles(event: DragEvent): boolean {
   return Array.from(event.dataTransfer?.types ?? []).includes("Files");
 }
 
-export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onRefresh, onMove, keepOne = false }: PhotoUploaderProps) {
+export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onRefresh, onMove, keepOne = false, onCrop, largeUrlOf }: PhotoUploaderProps) {
   const t = useNumbersTranslations("Listing.photos");
   const errors = useTranslations("Listing.errors");
   const picker = useRef<HTMLInputElement>(null);
@@ -52,6 +59,10 @@ export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onR
   const readyCount = photos.filter((item) => item.status === "ready").length;
   // The upload cap counts refused photos too: the tile says it briefly, the banner what to do.
   const uploadLimited = photos.some((item) => item.status === "failed" && item.errorCode === "upload_limit");
+  const [cropKey, setCropKey] = useState<string | null>(null);
+  const cropIndex = photos.findIndex((item) => item.key === cropKey);
+  const cropItem = photos[cropIndex];
+  const withFaces = photos.filter((item) => hasFaces(item)).length;
 
   // The moved tile changed place in the DOM: give the focus back to the control that moved it.
   useEffect(() => {
@@ -101,6 +112,11 @@ export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onR
         <span>{room > 0 ? t("tooMany", { count: room }) : t("full")}</span>
       </div>
       {uploadLimited ? <ErrorBanner tone="warning" title={errors("upload_limit")} /> : null}
+      {withFaces > 0 ? (
+        <ErrorBanner tone="warning" title={t("faces.title", { count: withFaces })}>
+          {t(onCrop ? "faces.body" : "faces.bodyNoCrop", { count: withFaces })}
+        </ErrorBanner>
+      ) : null}
 
       <ul ref={list} aria-label={t("list")} className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {photos.map((item, index) => (
@@ -140,6 +156,7 @@ export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onR
               onRetry={onRetry}
               onRefresh={onRefresh}
               onMove={move}
+              onCrop={onCrop ? setCropKey : undefined}
             />
           </li>
         ))}
@@ -183,10 +200,37 @@ export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onR
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
+      {onCrop ? (
+        <PhotoCropDialog
+          open={Boolean(cropItem)}
+          onOpenChange={(open) => {
+            if (!open) setCropKey(null);
+          }}
+          sources={cropItem ? cropSources(cropItem, largeUrlOf) : []}
+          index={cropIndex + 1}
+          onCropped={(file) => {
+            if (cropItem) onCrop(cropItem.key, file);
+          }}
+        />
+      ) : null}
 
       {photos.length === 0 ? <ErrorBanner tone="info" title={t("noPhotoWarning")} /> : <p className="text-sm text-foreground-muted">{t("reorderHelp")}</p>}
     </div>
   );
+}
+
+/** A ready photo, not being replaced, where the local check found a face. */
+function hasFaces(item: PhotoItem): boolean {
+  return item.status === "ready" && !item.removing && (item.faces ?? 0) > 0;
+}
+
+/** The local file first (full resolution, no network), then the published large variant. */
+function cropSources(item: PhotoItem, largeUrlOf?: (item: PhotoItem) => string | null): string[] {
+  const sources: string[] = [];
+  if (item.previewUrl?.startsWith("blob:")) sources.push(item.previewUrl);
+  const large = largeUrlOf?.(item);
+  if (large) sources.push(large);
+  return sources;
 }
 
 interface PhotoTileProps {
@@ -200,9 +244,10 @@ interface PhotoTileProps {
   canRetry: boolean;
   onRefresh: (key: string) => void;
   onMove: (key: string, to: number, action: FocusTarget["action"]) => void;
+  onCrop?: (key: string) => void;
 }
 
-function PhotoTile({ item, index, total, canRemove, onRemove, onRetry, canRetry, onRefresh, onMove }: PhotoTileProps) {
+function PhotoTile({ item, index, total, canRemove, onRemove, onRetry, canRetry, onRefresh, onMove, onCrop }: PhotoTileProps) {
   const t = useNumbersTranslations("Listing.photos");
   const errors = useTranslations("Listing.errors");
   const n = index + 1;
@@ -210,6 +255,7 @@ function PhotoTile({ item, index, total, canRemove, onRemove, onRetry, canRetry,
   const ready = item.status === "ready" && !item.removing;
   const placeholder = blurhashDataUrl(item.blurhash);
   const percent = Math.round(item.progress * 100);
+  const faces = hasFaces(item);
   const failureMessage =
     item.errorCode === "remove_failed"
       ? t("removeFailed")
@@ -247,6 +293,12 @@ function PhotoTile({ item, index, total, canRemove, onRemove, onRetry, canRetry,
             <Star className="size-3" aria-hidden="true" />
             {t("cover")}
           </Badge>
+        ) : null}
+        {faces && !busy ? (
+          <span className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 bg-bab-950/75 px-2.5 py-1.5 text-xs font-medium text-cream-100" data-testid="photo-face">
+            <ScanFace className="size-3.5 shrink-0 text-gold-300" aria-hidden="true" />
+            {t("faces.tile")}
+          </span>
         ) : null}
         {busy || item.removing ? (
           <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-bab-950/65 px-3 py-2 text-xs text-cream-100">
@@ -306,7 +358,11 @@ function PhotoTile({ item, index, total, canRemove, onRemove, onRetry, canRetry,
             ) : null}
           </span>
         )}
-        {(item.status === "failed" || item.status === "rejected") && item.file && !item.errorCode?.startsWith("remove") ? (
+        {faces && onCrop && !failureMessage ? (
+          <TileButton label={t("faces.crop", { index: n })} onClick={() => onCrop(item.key)}>
+            <Crop className="size-4" aria-hidden="true" />
+          </TileButton>
+        ) : (item.status === "failed" || item.status === "rejected") && item.file && !item.errorCode?.startsWith("remove") ? (
           <TileButton label={t("retry", { index: n })} disabled={!canRetry} onClick={() => onRetry(item.key)}>
             <RotateCcw className="size-4" aria-hidden="true" />
           </TileButton>

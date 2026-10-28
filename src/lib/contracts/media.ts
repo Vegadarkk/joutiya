@@ -95,5 +95,6 @@ export interface SignUploadResponse {
 
 export type UploadStatusResponse =
   | { status: "processing" }
-  | { status: "ready"; photo: ListingPhoto }
+  /** `faces`: faces the local check found (absent: none or unchecked); the wizard proposes a crop. */
+  | { status: "ready"; photo: ListingPhoto; faces?: number }
   | { status: "rejected"; rejectReason: UploadRejectReason };

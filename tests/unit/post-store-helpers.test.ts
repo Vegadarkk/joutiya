@@ -209,6 +209,12 @@ describe("photo tiles", () => {
     expect(items[1]!.previewUrl).toBeNull();
   });
 
+  it("keeps the face count of a ready photo on its tile and in the photos the review counts", () => {
+    const items = photoItemsFromListing(listing({ photos: [{ id: "photo0001", status: "ready", w: 800, h: 600, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", faces: 1 }] }), null);
+    expect(items[0]!.faces).toBe(1);
+    expect(ownerPhotosOf(items)[0]).toMatchObject({ id: "photo0001", faces: 1 });
+  });
+
   it("sends ready and processing photos in tile order, never uploads in progress or failed", () => {
     const items = [tile("b", "processing"), tile("a", "ready"), tile("c", "uploading"), tile("d", "failed"), tile("e", "timeout"), tile("f", "rejected"), tile("g", "preparing", null)];
     expect(photoOrder(items)).toEqual(["b", "a", "e"]);

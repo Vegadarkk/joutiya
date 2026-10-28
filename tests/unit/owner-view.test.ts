@@ -91,15 +91,30 @@ describe("mergePhotos", () => {
     for (const status of ["draft", "rejected", "sold", "removed"] as const) expect(mergePhotos(listing(status), uploads)).toEqual(hidden);
     expect(mergePhotos(listing("published", { legalHold: ["requisition-1"] }), uploads)).toEqual(hidden);
   });
+
+  it("tells the wizard how many faces the check found on an attached photo (crop proposal)", () => {
+    const withFace = [upload("attached0001", "ready", 0, { checks: { nsfw: 0.01, faces: 2 } })];
+    expect(mergePhotos(listing("draft"), withFace)).toEqual([{ id: "attached0001", status: "ready", w: 800, h: 600, blurhash: BLUR, faces: 2 }]);
+    const noFace = [upload("attached0001", "ready", 0, { checks: { nsfw: 0.01, faces: 0 } })];
+    expect(mergePhotos(listing("draft"), noFace)).toEqual([{ id: "attached0001", status: "ready", w: 800, h: 600, blurhash: BLUR }]);
+  });
 });
 
 describe("ownerListingView", () => {
-  it("reads only the pending statuses where no ready upload can wait for a save", async () => {
+  it("reads only the pending statuses on a listing the wizard does not edit", async () => {
     vi.mocked(listUploadsByTarget).mockResolvedValue(uploads.filter((item) => item.status !== "ready"));
-    for (const record of [listing("draft"), listing("rejected"), listing("sold"), listing("published", { legalHold: ["requisition-1"] })]) {
+    for (const record of [listing("sold"), listing("removed"), listing("published", { legalHold: ["requisition-1"] })]) {
       vi.mocked(listUploadsByTarget).mockClear();
       await ownerListingView(record);
       expect(listUploadsByTarget).toHaveBeenCalledWith("abcdefgh", ["signed", "processing", "rejected"]);
+    }
+  });
+
+  it("reads every status on a draft: the attached photos' face counts drive the crop proposal", async () => {
+    for (const record of [listing("draft"), listing("rejected")]) {
+      vi.mocked(listUploadsByTarget).mockClear();
+      await ownerListingView(record);
+      expect(listUploadsByTarget).toHaveBeenCalledWith("abcdefgh", undefined);
     }
   });
 

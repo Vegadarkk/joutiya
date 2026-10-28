@@ -701,7 +701,25 @@
       "movedCover": "Photo placée en couverture.",
       "dropHint": "ou déposez-les ici",
       "progressLabel": "Envoi de la photo {index}",
-      "uploadLimit": "Trop de photos envoyées pour cette annonce."
+      "uploadLimit": "Trop de photos envoyées pour cette annonce.",
+      "faces": {
+        "title": "Visage détecté sur {count, plural, one {# photo} other {# photos}}",
+        "body": "Recadrez chaque photo concernée pour ne garder que l'objet (bouton de recadrage sous la photo). Si vous la gardez telle quelle, un modérateur vérifiera l'annonce avant sa publication.",
+        "bodyNoCrop": "Si vous la gardez telle quelle, un modérateur vérifiera l'annonce avant sa publication. Vous pouvez aussi la retirer et ajouter une photo sans visage.",
+        "tile": "Visage détecté",
+        "crop": "Recadrer la photo {index}"
+      },
+      "crop": {
+        "title": "Recadrer la photo {index}",
+        "description": "Gardez l'objet dans le cadre et laissez les visages en dehors. La photo recadrée remplace l'originale.",
+        "imageAlt": "Photo {index} à recadrer",
+        "frameLabel": "Zone conservée",
+        "keys": "Faites glisser le cadre ou ses coins. Au clavier : flèches pour déplacer le cadre, Maj + flèches pour le redimensionner.",
+        "unavailable": "Cette photo ne peut pas être recadrée ici. Retirez-la et ajoutez une version sans visage.",
+        "failed": "Le recadrage a échoué. Réessayez, ou retirez la photo.",
+        "cancel": "Annuler",
+        "confirm": "Recadrer"
+      }
     },
     "review": {
       "title": "Vérifiez votre annonce",

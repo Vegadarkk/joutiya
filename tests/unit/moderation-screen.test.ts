@@ -157,11 +157,11 @@ describe("screenListing: soft flags and state", () => {
     expect(sensitive.evidence).toEqual(["sensitive health vocabulary near a person marker in description"]);
   });
 
-  it("weighs a face in the score, and reviews it only in a sensitive category", () => {
+  it("sends a photo kept with a face to a moderator, in every category (the wizard proposed a crop)", () => {
     const car = screenListing(cleanListing({ photos: [{ checks: { faces: 2 } }] }), ctx);
-    expect(car).toMatchObject({ state: "auto_ok", score: 15, flags: ["face"], evidence: ["face on photo 1"] });
+    expect(car).toMatchObject({ state: "needs_review", score: 0, flags: ["face"], evidence: ["face on photo 1"] });
     const baby = screenListing(cleanListing({ categoryId: "famille", subcategoryId: "equipement-bebe", attributes: { "baby-type": "poussette" }, price: 800, photos: [{}, { checks: { faces: 1 } }] }), ctx);
-    expect(baby).toMatchObject({ state: "needs_review", score: 15, flags: ["face"], evidence: ["face on photo 2"] });
+    expect(baby).toMatchObject({ state: "needs_review", flags: ["face"], evidence: ["face on photo 2"] });
   });
 
   it("flags nudity in the review band and above (a rejected photo should not reach the screen)", () => {

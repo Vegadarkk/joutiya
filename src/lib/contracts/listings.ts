@@ -168,6 +168,8 @@ export interface OwnerPhoto {
   h?: number;
   blurhash?: string;
   rejectReason?: UploadRejectReason;
+  /** Faces found on a ready photo (absent: none or unchecked): the wizard proposes a crop. */
+  faces?: number;
 }
 
 export interface OwnerListingSummary {

@@ -44,11 +44,13 @@ export function maxPhotosOf(listing: Pick<ListingRecord, "sellerType">): number 
 }
 
 /** Public part of an upload document (MEDIA_API answers). `signed` reads as processing. */
-export function toStatusResponse(upload: Pick<UploadRecord, "id" | "status" | "width" | "height" | "blurhash" | "hash" | "variants" | "rejectReason">): UploadStatusResponse {
+export function toStatusResponse(upload: Pick<UploadRecord, "id" | "status" | "width" | "height" | "blurhash" | "hash" | "variants" | "rejectReason"> & { checks?: UploadRecord["checks"] }): UploadStatusResponse {
   if (upload.status === "rejected") return { status: "rejected", rejectReason: upload.rejectReason ?? "expired" };
   if (upload.status !== "ready") return { status: "processing" };
   const photo = listingPhotoSchema.safeParse({ id: upload.id, w: upload.width, h: upload.height, blurhash: upload.blurhash, ...(upload.hash ? { hash: upload.hash } : {}), ...(upload.variants?.length ? { variants: upload.variants } : {}) });
-  return photo.success ? { status: "ready", photo: photo.data } : { status: "processing" };
+  if (!photo.success) return { status: "processing" };
+  const faces = upload.checks?.faces ?? 0;
+  return { status: "ready", photo: photo.data, ...(faces > 0 ? { faces } : {}) };
 }
 
 /**
