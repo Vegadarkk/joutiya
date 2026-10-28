@@ -114,6 +114,11 @@ if grep -qvE '^(127\.0\.0\.1|\[::1\]):22$' <<< "$listeners"; then
   fi
 fi
 
+# Container logs (journald driver, docker/compose.yml): kept on disk 30 days at most (spec §7,
+# technical logs), within 2 GB.
+install -D -m 0644 -o root -g root "$SRC/infra/vm/journald.conf.d/joutiya.conf" /etc/systemd/journald.conf.d/10-joutiya.conf
+systemctl restart systemd-journald
+
 # Containers never reach the instance metadata service (169.254.169.254): it serves the cloud-init
 # user data, which holds the SSH tunnel token.
 install -m 0644 -o root -g root "$SRC/infra/vm/joutiya-docker-firewall.service" /etc/systemd/system/
