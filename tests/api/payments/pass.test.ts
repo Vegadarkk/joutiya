@@ -327,8 +327,9 @@ describe("pass end", () => {
     const owner = await member();
     const listing = await published(owner);
     const now = Date.now();
-    const proId = await shop(owner, { lifecycle: "active", plan: "essentiel", planSource: "pass", quotas: DEFAULT_PRICING.pro.essentiel, passEndsAt: new Date(now + 6 * DAY_MS) });
+    const proId = await shop(owner, { lifecycle: "active", plan: "essentiel", planSource: "pass", quotas: DEFAULT_PRICING.pro.essentiel, passEndsAt: new Date(now + 6 * DAY_MS), name: "Ruche de Sefrou" });
 
+    // Its own name: the other tests' passes get their notices in the same runs.
     // Sales closed: the shop could not renew, so the pass goes on and nothing is sent.
     flags.salesEnabled = false;
     expect((await proPlansNightly(new Date(now + 7 * DAY_MS))).pass).toEqual({ noticed: 0, ended: 0, failed: 0 });
@@ -337,7 +338,7 @@ describe("pass end", () => {
 
     let run = await proPlansNightly(new Date(now));
     expect(run.pass.noticed).toBeGreaterThanOrEqual(1);
-    const mails = () => vi.mocked(sendMail).mock.calls.map(([input]) => input).filter((input) => input.template === "passNotice" && "shopName" in input.data && input.data.shopName === "Miel d'Imouzzer");
+    const mails = () => vi.mocked(sendMail).mock.calls.map(([input]) => input).filter((input) => input.template === "passNotice" && "shopName" in input.data && input.data.shopName === "Ruche de Sefrou");
     expect(mails()).toMatchObject([{ template: "passNotice", data: { kind: "ending", freeListings: 0 } }]);
     expect((await getProProfile(proId))?.passNoticeSentAt).toBeInstanceOf(Date);
     // Same night again: no second mail.
