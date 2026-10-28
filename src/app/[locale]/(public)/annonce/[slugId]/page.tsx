@@ -14,6 +14,8 @@ import { JsonLd } from "@/components/listing/json-ld";
 import { ListingStatusBanner } from "@/components/listing/listing-status-banner";
 import { PriceTag } from "@/components/listing/price-tag";
 import { SafetyTips } from "@/components/listing/safety-tips";
+import { GuideCategoryLink } from "@/components/guide/category-link";
+import { rubricForCategory } from "@/content/guide/catalog";
 import { SellerCard } from "@/components/listing/seller-card";
 import { ListingMapBlock } from "@/components/map/listing-map-block";
 import { ReportButton } from "@/components/report/report-button";
@@ -124,6 +126,7 @@ export default async function ListingPage({ params }: { params: Params }) {
   ]);
   const media = mediaBaseUrl();
   const category = categoryById(listing.categoryId);
+  const guideRubric = rubricForCategory(listing.categoryId);
   const subcategory = subcategoryById(listing.subcategoryId);
   const city = cityBySlug(listing.location.citySlug);
   const region = regionByCode(listing.location.regionCode);
@@ -249,6 +252,7 @@ export default async function ListingPage({ params }: { params: Params }) {
             </section>
 
             <SafetyTips />
+            {guideRubric ? <GuideCategoryLink rubric={guideRubric} locale={locale} /> : null}
             <AdSlot slot="listing-bottom" className="lg:hidden" />
             <ReportButton target={{ type: "listing", id: listing.id }} subject={listing.title} ownerPublicId={listing.seller.publicId} email={legal.dsaContactEmail} url={canonicalUrl} />
           </div>
