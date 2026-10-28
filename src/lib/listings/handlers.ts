@@ -140,7 +140,7 @@ export async function handlePublish(request: Request, params: Params): Promise<R
   await enforceLimit(auth.user.claims.role === "pro" ? "listing.publish.pro.uid" : "listing.publish.uid", auth.user.uid);
   await assertQuotas(DEPOSIT_QUOTAS);
   const device = deviceOf(request);
-  const outcome = await publish(actorOf(request, auth), request, id, { turnstileToken: input.turnstileToken, adultsOnlyAttestation: input.adultsOnlyAttestation === true, realEstateAttestation: input.realEstateAttestation === true, device });
+  const outcome = await publish(actorOf(request, auth), request, id, { turnstileToken: input.turnstileToken, adultsOnlyAttestation: input.adultsOnlyAttestation === true, realEstateAttestation: input.realEstateAttestation === true, rentalAttestation: input.rentalAttestation === true, device });
   const response = applyDevice(jsonResponse(outcome.response), device);
   return outcome.turnstilePassed ? applyTurnstilePass(response, device) : response;
 }

@@ -33,6 +33,7 @@ interface Fixture {
   published: { id: string; slugId: string; title: string };
   sold: { id: string; slugId: string; title: string };
   car: { id: string; slugId: string; title: string };
+  rental: { id: string; slugId: string; title: string };
 }
 
 /** Writes both WebP variants of a photo where the dev storage route serves them. */
@@ -154,7 +155,43 @@ async function seed(): Promise<Fixture> {
       },
       price: 189000,
     });
-  return { publicId, name, published, sold, car };
+  // A car rental by a Pro agency with its declared terms (rental pack), by the car's seller.
+  const rentalId = randomId(8);
+  const rental = { id: rentalId, slugId: `dacia-logan-marrakech-${rentalId}`, title: "Dacia Logan ou similaire à Marrakech" };
+  const rentalPhotoId = `e2ephotor${randomId(6)}`;
+  // A rental has no condition.
+  const { condition: _condition, ...rentalBase } = listingDoc({ uid: carUid, publicId: carPublicId, name: "Karim Test", ...rental, status: "published", photos: [{ id: rentalPhotoId, ...(await storePhoto(rentalId, rentalPhotoId, { r: 34, g: 94, b: 74 })), blurhash: BLURHASH }] });
+  await firestore
+    .collection("listings")
+    .doc(rentalId)
+    .set({
+      ...rentalBase,
+      sellerType: "pro",
+      subcategoryId: "location-voitures",
+      description: "Berline diesel climatisée, kilométrage illimité, remise à l'aéroport Marrakech Menara.",
+      attributes: {
+        "rental-class": "berline",
+        "car-brand": "dacia",
+        model: "Logan",
+        gearbox: "manuelle",
+        fuel: "diesel",
+        seats: 5,
+        "min-rental-days": 2,
+        "mileage-policy": "illimite",
+        "rental-insurance": "tous-risques-franchise",
+        "insurance-excess": 5000,
+        "rental-deposit": 4000,
+        "driver-min-age": 21,
+        "licence-years": 2,
+        "vehicle-handover": ["agence", "aeroport"],
+        "rate-7-days": 260,
+        "fleet-units": 6,
+      },
+      price: 300,
+      priceNegotiable: false,
+      location: { regionCode: "07", citySlug: "marrakech", geo: { lat: 31.63, lng: -8.01 } },
+    });
+  return { publicId, name, published, sold, car, rental };
 }
 
 /** Collects CSP violations reported by the page itself. */
@@ -239,6 +276,27 @@ test.describe("listing page", () => {
     await page.goto(`/fr/annonce/${fixture.published.slugId}`);
     await expect(page.getByTestId("vehicle-buying-guide")).toHaveCount(0);
     await expect(page.getByTestId("vehicle-dossier")).toHaveCount(0);
+  });
+
+  test("shows a car rental's declared terms and the renter's guide", { tag: "@mobile" }, async ({ page }) => {
+    await page.goto(`/fr/annonce/${fixture.rental.slugId}`);
+    const terms = page.getByTestId("rental-terms");
+    await expect(terms.getByRole("heading", { name: "Conditions de location" })).toBeVisible();
+    await expect(terms.getByTestId("rental-mileage")).toContainText("Kilométrage illimité");
+    await expect(terms.getByTestId("rental-insurance")).toContainText("Tous risques avec franchise");
+    await expect(terms.getByTestId("rental-deposit")).toContainText(/Caution de 4\s000 DH/);
+    await expect(terms).toContainText("sous sa seule responsabilité");
+    // The terms stay out of the main criteria.
+    await expect(page.getByTestId("criteria-grid")).toContainText("Berline");
+    await expect(page.getByTestId("criteria-grid")).not.toContainText("Caution");
+    const guide = page.getByTestId("rental-guide");
+    await expect(guide.getByRole("heading", { name: "Louer un véhicule au Maroc" })).toBeVisible();
+    await expect(guide).toContainText("chèque en blanc");
+    await expect(page.getByTestId("vehicle-buying-guide")).toHaveCount(0);
+    await page.screenshot({ path: "test-results/rental-fr.png", fullPage: true });
+    await page.goto(`/ar/annonce/${fixture.rental.slugId}`);
+    await expect(page.getByTestId("rental-terms").getByRole("heading", { name: "شروط الكراء" })).toBeVisible();
+    await page.screenshot({ path: "test-results/rental-ar.png", fullPage: true });
   });
 
   test("publishes Product structured data without any contact data", async ({ page }) => {

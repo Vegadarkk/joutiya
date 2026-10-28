@@ -62,6 +62,8 @@ export type ErrorCode =
   | "adults_only_attestation"
   /** Publish a real-estate listing without the advertiser's attestation of its declared data (422). */
   | "real_estate_attestation"
+  /** Publish a car rental without the agency's attestation (422). */
+  | "rental_attestation"
   // Search and discovery (phase 4). Messages: Listing.errors.<code>.
   /** Search engine missing or unreachable (503). */
   | "search_unavailable"

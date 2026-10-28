@@ -8,7 +8,7 @@ import { InlineError } from "@/components/feedback/inline-error";
 import { FormMessage } from "@/components/auth/form-message";
 import { TurnstileWidget, type TurnstileHandle } from "@/components/auth/turnstile-widget";
 import { Badge } from "@/components/ui/badge";
-import { criterionById, subcategoryById } from "@/config/categories";
+import { RENTAL_SUBCATEGORY, criterionById, subcategoryById } from "@/config/categories";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import { SITE_NAME, type Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
@@ -80,11 +80,14 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
   const region = city ? regionByCode(city.regionCode) : undefined;
   const cover = photos.find((item) => item.status === "ready" && item.previewUrl) ?? photos.find((item) => item.previewUrl);
   const readyCount = photos.filter((item) => item.status === "ready").length;
-  // Adults-only subcategory (decorative koumiyas): the seller's attestation, sent with the publication.
+  // The seller's attestation, sent with the publication: adults-only subcategory (decorative
+  // koumiyas), car rental (the agency's licence, registration, insurance and declarations).
   const adultsOnly = Boolean(subcategory?.adultsOnly);
+  const rental = listing.subcategoryId === RENTAL_SUBCATEGORY;
+  const attestation = adultsOnly ? "adultsOnly" : rental ? "rental" : null;
   // Real estate: the advertiser attests its declared data (title, mandate, fees, authorisation).
   const realEstate = needsRealEstateAttestation(subcategory);
-  const attestationMissing = (adultsOnly && !attested) || (realEstate && !declared);
+  const attestationMissing = (attestation !== null && !attested) || (realEstate && !declared);
 
   useEffect(() => onBusy(publishing), [publishing, onBusy]);
 
@@ -102,7 +105,7 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
     try {
       // The server publishes what it holds: pending edits first. The indicator shows a failed save.
       if (!(await save({ reopen: listing.status === "rejected" }))) return;
-      const result = await publishListing(listingId, { acceptRules: true, ...(adultsOnly ? { adultsOnlyAttestation: true } : {}), ...(realEstate ? { realEstateAttestation: true } : {}), ...(token ? { turnstileToken: token } : {}) });
+      const result = await publishListing(listingId, { acceptRules: true, ...(adultsOnly ? { adultsOnlyAttestation: true } : {}), ...(rental ? { rentalAttestation: true } : {}), ...(realEstate ? { realEstateAttestation: true } : {}), ...(token ? { turnstileToken: token } : {}) });
       setBlockers([]);
       onPublished(result);
     } catch (error) {
@@ -317,7 +320,7 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
             </label>
             {attempted && !accepted ? <InlineError className="ps-8">{t("validation.accept_rules")}</InlineError> : null}
           </div>
-          {adultsOnly ? (
+          {attestation ? (
             <div className="flex flex-col gap-1.5">
               <label htmlFor={adultsId} className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
                 <input
@@ -329,9 +332,9 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
                   onChange={(event) => setAttested(event.target.checked)}
                   className="mt-1 size-5 shrink-0 cursor-pointer rounded-sm border-border-strong accent-primary"
                 />
-                <span className="text-pretty">{t("review.adultsOnlyAttestation")}</span>
+                <span className="text-pretty">{t(attestation === "rental" ? "review.rentalAttestation" : "review.adultsOnlyAttestation")}</span>
               </label>
-              {attempted && !attested ? <InlineError className="ps-8">{t("validation.adults_only_attestation")}</InlineError> : null}
+              {attempted && !attested ? <InlineError className="ps-8">{t(attestation === "rental" ? "validation.rental_attestation" : "validation.adults_only_attestation")}</InlineError> : null}
             </div>
           ) : null}
           {realEstate ? (

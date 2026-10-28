@@ -1,12 +1,12 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
-import { ChevronDown, ClipboardCheck } from "lucide-react";
+import { CarFront, ChevronDown, ClipboardCheck, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { InlineError } from "@/components/feedback/inline-error";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { CONDITIONS, CRITERION_TEXT_MAX, criteriaFor, criterionApplies, type Condition, type Criterion, type Subcategory } from "@/config/categories";
+import { CONDITIONS, CRITERION_GROUPS, CRITERION_TEXT_MAX, criteriaFor, criterionApplies, type Condition, type Criterion, type CriterionGroup, type Subcategory } from "@/config/categories";
 import type { ListingAttributes } from "@/lib/contracts/listings";
 import { cn } from "@/lib/utils";
 import { ChipCheckboxGroup, ChipRadioGroup } from "./controls/chips";
@@ -18,7 +18,7 @@ import { useCriteriaLabels } from "./labels";
 // select -> chips (few options) or native select; multiselect -> chips; number -> numeric input
 // with its unit; boolean -> switch; text -> input. `condition` (core field) comes first when the
 // subcategory defines it. Labels: Criteria.<field>.label / .options.<opt>; units: Listing.units.
-// Vehicle dossier criteria (`group: "dossier"`) fold under their own heading, open once one is
+// Grouped criteria (vehicle dossier, rental terms) fold under their own heading, open once one is
 // filled or in error; Pro-only criteria are offered to Pro listings only, dependent ones (a
 // warranty's duration) once the criterion they depend on opens them.
 
@@ -37,6 +37,12 @@ interface CriteriaFieldsProps {
   pro?: boolean;
 }
 
+/** Heading of each folded group: icon and wizard messages `<group>Title` / `<group>Hint`. */
+const GROUPS: Record<CriterionGroup, { icon: LucideIcon; title: "dossierTitle" | "rentalTitle"; hint: "dossierHint" | "rentalHint" }> = {
+  dossier: { icon: ClipboardCheck, title: "dossierTitle", hint: "dossierHint" },
+  rental: { icon: CarFront, title: "rentalTitle", hint: "rentalHint" },
+};
+
 /** Chips read faster than a select up to this many options; brands and sizes get the native picker. */
 const CHIP_MAX_OPTIONS = 8;
 
@@ -49,9 +55,7 @@ export function CriteriaFields({ subcategory, attributes, condition, errors = {}
   const optionLabel = labels.option;
   const shown = criteriaFor(subcategory, pro ? "pro" : "individual").filter((criterion) => criterionApplies(criterion, attributes));
   const main = shown.filter((criterion) => !criterion.group);
-  const dossier = shown.filter((criterion) => criterion.group === "dossier");
-  const dossierActive = dossier.some((criterion) => attributes[criterion.id] !== undefined || errors[`attributes.${criterion.id}`]);
-  const [dossierOpen, setDossierOpen] = useState(dossierActive);
+  const groups = CRITERION_GROUPS.map((group) => ({ group, criteria: shown.filter((criterion) => criterion.group === group) })).filter((entry) => entry.criteria.length > 0);
 
   const renderField = (criterion: Criterion) => (
     <CriterionField
@@ -86,25 +90,44 @@ export function CriteriaFields({ subcategory, attributes, condition, errors = {}
         </GroupField>
       ) : null}
       {main.map(renderField)}
-      {dossier.length > 0 ? (
-        <details
-          data-testid="criteria-dossier"
-          open={dossierOpen || dossierActive}
-          onToggle={(event) => setDossierOpen(event.currentTarget.open)}
-          className="group rounded-lg border border-border bg-surface-muted/50 open:bg-transparent"
-        >
-          <summary className="flex cursor-pointer list-none items-start gap-3 rounded-lg px-4 py-3.5 select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
-            <ClipboardCheck className="mt-0.5 size-5 shrink-0 text-structure" aria-hidden="true" />
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="font-medium text-foreground">{w("dossierTitle")}</span>
-              <span className="text-sm text-foreground-muted text-pretty">{w("dossierHint")}</span>
-            </span>
-            <ChevronDown className="mt-0.5 size-5 shrink-0 text-foreground-muted transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
-          </summary>
-          <div className="flex flex-col gap-5 border-t border-border px-4 pt-5 pb-4">{dossier.map(renderField)}</div>
-        </details>
-      ) : null}
+      {groups.map(({ group, criteria }) => (
+        <FoldedGroup key={group} group={group} active={criteria.some((criterion) => attributes[criterion.id] !== undefined || Boolean(errors[`attributes.${criterion.id}`]))} title={w(GROUPS[group].title)} hint={w(GROUPS[group].hint)}>
+          {criteria.map(renderField)}
+        </FoldedGroup>
+      ))}
     </div>
+  );
+}
+
+interface FoldedGroupProps {
+  group: CriterionGroup;
+  /** A criterion of the group is filled or in error: the block stays open. */
+  active: boolean;
+  title: string;
+  hint: string;
+  children: ReactNode;
+}
+
+function FoldedGroup({ group, active, title, hint, children }: FoldedGroupProps) {
+  const [open, setOpen] = useState(active);
+  const Icon = GROUPS[group].icon;
+  return (
+    <details
+      data-testid={`criteria-${group}`}
+      open={open || active}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+      className="group rounded-lg border border-border bg-surface-muted/50 open:bg-transparent"
+    >
+      <summary className="flex cursor-pointer list-none items-start gap-3 rounded-lg px-4 py-3.5 select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+        <Icon className="mt-0.5 size-5 shrink-0 text-structure" aria-hidden="true" />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="font-medium text-foreground">{title}</span>
+          <span className="text-sm text-foreground-muted text-pretty">{hint}</span>
+        </span>
+        <ChevronDown className="mt-0.5 size-5 shrink-0 text-foreground-muted transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+      </summary>
+      <div className="flex flex-col gap-5 border-t border-border px-4 pt-5 pb-4">{children}</div>
+    </details>
   );
 }
 
