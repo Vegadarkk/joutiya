@@ -5,9 +5,9 @@ import { logger } from "@/lib/logging/logger";
 import { isValkeyConfigured, valkey } from "@/lib/valkey/clients";
 import { RelayEmailChannel } from "./relay";
 import { TelegramChannel } from "./telegram";
-import type { Alert, AlertChannel } from "./types";
+import type { Alert, AlertChannel, ChannelOutcome } from "./types";
 
-export type { Alert, Severity } from "./types";
+export type { Alert, ChannelOutcome, Severity } from "./types";
 
 let channels: AlertChannel[] | undefined;
 
@@ -18,6 +18,11 @@ function configuredChannels(): AlertChannel[] {
   if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID) channels.push(new TelegramChannel(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID));
   if (env.ALERT_RELAY_URL && env.ALERT_RELAY_SECRET) channels.push(new RelayEmailChannel(env.ALERT_RELAY_URL, env.ALERT_RELAY_SECRET));
   return channels;
+}
+
+/** Names of the configured channels (the drill's dry run). */
+export function alertChannelNames(): string[] {
+  return configuredChannels().map((channel) => channel.name);
 }
 
 /** Tests: replaces the configured channels (undefined reads the environment again). */
@@ -53,20 +58,31 @@ async function isRepeat(title: string, now = Date.now()): Promise<boolean> {
  * Returns false when the same title already went out within the hour (nothing sent).
  */
 export async function alert(event: Alert): Promise<boolean> {
-  const env = serverEnv().APP_ENV;
   if (await isRepeat(event.title)) {
     logger.info({ alert: { severity: event.severity, title: event.title } }, "alert repeated within the hour: not sent again");
     return false;
   }
   logger.warn({ alert: { severity: event.severity, title: event.title } }, "alert");
+  await deliver(event);
+  return true;
+}
+
+/**
+ * Sends on every configured channel, without the hourly dedupe, and logs each outcome. Never
+ * throws. alert() and the P0 drill (scripts/alert-drill.ts) both go through it.
+ */
+export async function deliver(event: Alert): Promise<ChannelOutcome[]> {
+  const env = serverEnv().APP_ENV;
   const channels = configuredChannels();
   const results = await Promise.allSettled(channels.map((channel) => channel.send(event, env)));
-  results.forEach((result, index) => {
+  return results.map((result, index): ChannelOutcome => {
+    const channel = channels[index]!.name;
     if (result.status === "rejected") {
-      logger.error({ channel: channels[index]?.name, err: String(result.reason) }, "alert channel failed");
-    } else {
-      logger.info({ channel: channels[index]?.name, alert: { severity: event.severity } }, "alert channel sent");
+      logger.error({ channel, err: String(result.reason) }, "alert channel failed");
+      return { channel, status: "failed", error: String(result.reason) };
     }
+    const status = result.value === "off" ? "off" : "sent";
+    logger.info({ channel, alert: { severity: event.severity } }, status === "off" ? "alert channel off" : "alert channel sent");
+    return { channel, status };
   });
-  return true;
 }

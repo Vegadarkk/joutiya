@@ -84,3 +84,19 @@ describe("alert delivery log", () => {
     expect(logger.error).toHaveBeenCalledWith({ channel: "relay", err: "Error: down" }, "alert channel failed");
   });
 });
+
+describe("deliver", () => {
+  it("reports each channel's outcome, an e-mail relay switched off included", async () => {
+    const { deliver } = await import("@/lib/alert");
+    const off = vi.fn(async () => "off" as const);
+    const broken = vi.fn(async () => {
+      throw new Error("down");
+    });
+    setAlertChannels([{ name: "telegram", send }, { name: "email", send: off }, { name: "other", send: broken }]);
+    expect(await deliver(event("Exercice"))).toEqual([
+      { channel: "telegram", status: "sent" },
+      { channel: "email", status: "off" },
+      { channel: "other", status: "failed", error: "Error: down" },
+    ]);
+  });
+});
