@@ -1,6 +1,8 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { DEFAULT_AI, type AiConfig } from "@/config/ai";
+import { subcategoryById } from "@/config/categories";
+import { isVariantCriterion, withVariantAnswers } from "@/lib/contracts/catalog";
 import type { FieldIssue, ModerationFlag } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UploadRecord } from "@/lib/db/repositories/uploads";
@@ -83,7 +85,8 @@ export async function screen(facts: ScreeningInput, selfId?: string): Promise<Sc
   const input: ScreenInput = {
     title: listing.title,
     description: listing.description,
-    attributes: listing.attributes,
+    // A criterion a variant axis takes over (the size of clothes) is answered by the axis.
+    attributes: withVariantAnswers(listing.attributes, listing.variants, subcategoryById(listing.subcategoryId ?? "")?.criteria.map((criterion) => criterion.id) ?? []),
     categoryId: listing.categoryId ?? "",
     subcategoryId: listing.subcategoryId ?? "",
     price: listing.price,
@@ -91,6 +94,7 @@ export async function screen(facts: ScreeningInput, selfId?: string): Promise<Sc
     contact: { showPhone: listing.contact.showPhone, whatsapp: listing.contact.whatsapp },
     sensitiveDeclaration: listing.moderation.sensitiveDeclaration ? { kind: listing.moderation.sensitiveDeclaration.kind } : null,
     ...(listing.location?.district ? { district: listing.location.district } : {}),
+    ...(listing.variants ? { variantAxes: listing.variants.axes.filter((axis) => !isVariantCriterion(axis.id)) } : {}),
     photos: listing.photos.map((photo) => ({ checks: checks.get(photo.id) })),
     seller: facts.seller,
     duplicates,

@@ -64,6 +64,10 @@ export interface SearchDocument {
   rentUnavailableDays?: number[];
   /** Car rental: epoch ms until which the availability counts as up to date (last save + 14 days). */
   rentFreshUntil?: number;
+  /** Pro catalogue: declared stock 0 everywhere (decision 1: online, out of the default results). */
+  soldOut?: true;
+  /** Combinations at different prices: `price` is the lowest (« à partir de »). */
+  priceFrom?: true;
   /** Rounded city (later district) centroid. */
   _geo: { lat: number; lng: number };
   version: number;

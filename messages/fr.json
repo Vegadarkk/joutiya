@@ -894,7 +894,13 @@
       "deposit_max": "Le dépôt de garantie ne peut pas dépasser 2 mois de loyer (loi 67-12).",
       "real_estate_attestation": "Pour publier une annonce immobilière, attestez que ses informations sont exactes et sous votre seule responsabilité.",
       "rental_rate_max": "Un tarif longue durée ne peut pas dépasser le prix par jour (ni celui à 7 jours pour le tarif à 30 jours).",
-      "rental_attestation": "Confirmez la déclaration de votre agence pour publier une location."
+      "rental_attestation": "Confirmez la déclaration de votre agence pour publier une location.",
+      "variants_pro_only": "Les variantes (tailles, couleurs, contenances) sont réservées aux boutiques Pro.",
+      "variants_donation": "Un don ne peut pas avoir de variantes.",
+      "variants_axis_invalid": "Ce critère ne s'applique pas à cette sous-catégorie : choisissez un autre axe de variante.",
+      "stock_pro_only": "Le suivi du stock est réservé aux boutiques Pro.",
+      "stock_with_variants": "Avec des variantes, le stock se saisit pour chaque combinaison.",
+      "no_variants": "Cette annonce n'a pas de variantes."
     },
     "status": {
       "draft": "Brouillon",

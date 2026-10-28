@@ -17,6 +17,7 @@ import {
   regionCodeSchema,
   slugIdSchema,
 } from "@/lib/contracts/listings";
+import { listingVariantsSchema, stockSchema, variantItemSchema } from "@/lib/contracts/catalog";
 import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, UPLOAD_DOC_DECLARED_TYPES, UPLOAD_REJECT_REASONS, UPLOAD_STATUSES, listingPhotoSchema, uploadIdSchema } from "@/lib/contracts/media";
 import { ROLES } from "@/lib/firebase/claims";
 import { DAY_PATTERN, RENTAL_PERIODS_MAX } from "@/lib/listings/rental-availability";
@@ -275,6 +276,13 @@ export const moderationSchema = z
   .strict();
 export type ListingModeration = z.infer<typeof moderationSchema>;
 
+/** Points of `priceLog`: a change a day for a month on 6 prices, beyond any real use. */
+export const PRICE_LOG_MAX = 200;
+export const priceLogEntrySchema = z
+  .object({ at: ts, price: z.number().int().min(0).max(PRICE_MAX).nullable(), key: variantItemSchema.shape.key.optional() })
+  .strict();
+export type PriceLogEntry = z.infer<typeof priceLogEntrySchema>;
+
 /**
  * listings/{listingId}: §5 `Listing` plus `slugId`; the id is the document id. A draft (D2) is the
  * same document with `status: "draft"`: the fields the wizard fills step by step (category, texts,
@@ -306,6 +314,15 @@ export const listingSchema = z
     location: listingLocationSchema.optional(),
     /** Order = display order; <= quotas.photosPerListing. */
     photos: z.array(listingPhotoSchema).max(50),
+    /** Pro catalogue (lot 4, catalogue-boutique.md §2-3): variants, or the declared stock without them. */
+    variants: listingVariantsSchema.optional(),
+    stock: stockSchema.optional(),
+    /**
+     * Prices of the last 31 days, a point per change once published (`key`: a combination's own
+     * price; absent: the listing's): the struck-out price of a promotion is their lowest (art. 54
+     * of law 31-08). The point in force when the window opens is kept too.
+     */
+    priceLog: z.array(priceLogEntrySchema).max(PRICE_LOG_MAX).optional(),
     /** The number is never here; `showPhone` requires `badges.phoneVerified` at publish. */
     contact: z.object({ messaging: z.literal(true), showPhone: z.boolean(), whatsapp: z.boolean() }).strict(),
     boosts: z.object({ bumpedAt: ts.optional(), featuredUntil: ts.optional(), dailyBumpUntil: ts.optional(), highlightUntil: ts.optional() }).strict(),

@@ -88,7 +88,7 @@ describe("rental dates filter", () => {
 
   it("keeps rentals free on every day, pick-up and return included, whose minimum fits", () => {
     const from = dayNumber(DATES.from);
-    const filter = buildFilter({ subcategory: "location-voitures", dates: DATES }, NOW) as { and: FilterExpr[] };
+    const filter = buildFilter({ subcategory: "location-voitures", dates: DATES, includeSoldOut: true }, NOW) as { and: FilterExpr[] };
     expect(filter.and.at(-1)).toEqual({
       and: [
         { not: { field: "rentUnavailableDays", op: "in", values: [from, from + 1, from + 2, from + 3] } },
@@ -96,7 +96,7 @@ describe("rental dates filter", () => {
       ],
     });
     // Past dates (a stale link) do not filter.
-    expect(buildFilter({ subcategory: "location-voitures", dates: { from: "2026-10-01", to: "2026-10-03" } }, NOW)).toEqual({
+    expect(buildFilter({ subcategory: "location-voitures", dates: { from: "2026-10-01", to: "2026-10-03" }, includeSoldOut: true }, NOW)).toEqual({
       and: [
         { field: "categoryId", op: "eq", value: "vehicules" },
         { field: "subcategoryId", op: "eq", value: "location-voitures" },

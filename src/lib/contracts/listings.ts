@@ -1,6 +1,7 @@
 import { z } from "@/lib/zod";
 import { CONDITIONS, categoryById, subcategoryById } from "@/config/categories";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
+import { listingVariantsSchema, stockSchema, type ListingVariants } from "@/lib/contracts/catalog";
 import { MAX_PHOTOS_PRO, uploadIdSchema, type ListingPhoto, type UploadRejectReason, type UploadStatus } from "@/lib/contracts/media";
 import { LISTING_ID_PATTERN, SLUG_ID_MAX, SLUG_ID_PATTERN } from "@/lib/listings/ids";
 import { DAY_PATTERN, RENTAL_PERIODS_MAX, type RentalPeriod } from "@/lib/listings/rental-availability";
@@ -140,6 +141,10 @@ export const listingPatchSchema = z
     photos: z.array(uploadIdSchema).max(MAX_PHOTOS_PRO).optional(),
     contact: listingContactInputSchema.optional(),
     sensitiveDeclaration: z.object({ kind: z.enum(SENSITIVE_DECLARATION_KINDS) }).strict().nullable().optional(),
+    /** Pro listings only (catalogue §2); null removes them. With variants the stock is per combination. */
+    variants: listingVariantsSchema.nullable().optional(),
+    /** Declared stock of a Pro listing without variants; null: not tracked. */
+    stock: stockSchema.nullable().optional(),
   })
   .strict()
   .superRefine(checkTree);
@@ -266,6 +271,9 @@ export interface OwnerListing {
   photos: OwnerPhoto[];
   contact: { showPhone: boolean; whatsapp: boolean };
   sensitiveDeclaration: { kind: SensitiveDeclarationKind; at: string } | null;
+  /** Pro catalogue (lot 4): variants, or the stock of a listing without them. */
+  variants: ListingVariants | null;
+  stock: number | null;
   moderation: { state: ModerationState; flags: ModerationFlag[] };
   version: number;
   createdAt: string;

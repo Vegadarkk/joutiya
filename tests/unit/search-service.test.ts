@@ -52,8 +52,19 @@ beforeEach(() => {
   engine.search.mockReset();
 });
 
+const AVAILABLE = { not: { field: "soldOut", op: "eq", value: true } } as const;
+
 describe("buildFilter", () => {
-  const filter = (params: SearchParams) => buildFilter(params, NOW);
+  // The clauses of each parameter, sold-out listings included (their default exclusion is below).
+  const filter = (params: SearchParams) => buildFilter({ ...params, includeSoldOut: true }, NOW);
+
+  it("leaves sold-out listings out unless asked (owner decision 1)", () => {
+    expect(buildFilter({}, NOW)).toEqual(AVAILABLE);
+    expect(buildFilter({ category: "mode" }, NOW)).toEqual({ and: [{ field: "categoryId", op: "eq", value: "mode" }, AVAILABLE] });
+    expect(buildFilter({ includeSoldOut: true }, NOW)).toBeUndefined();
+    expect(parseSearchParams(new URLSearchParams("epuises=1"))).toEqual({ includeSoldOut: true });
+    expect(searchPath({ category: "mode", includeSoldOut: true })).toBe("/recherche?categorie=mode&epuises=1");
+  });
 
   it("is undefined for a blank search and unwrapped for a single clause", () => {
     expect(filter({})).toBeUndefined();
@@ -195,7 +206,7 @@ describe("runSearch", () => {
   it("sends the results and the À la Une pool in one engine call on page 1", async () => {
     const pool = ["f1", "f2", "f3", "f4"].map((id) => card(id, { featuredUntil: NOW.getTime() + 60_000 }));
     script([result([card("a1"), card("a2")], { facetDistribution: { categoryId: { loisirs: 2, mode: 0 }, subcategoryId: { velos: 2 } } }), result(pool)]);
-    const response = await runSearch({ q: "Vélo Rouge", category: "loisirs", priceMax: 500 }, { now: NOW, seed: "s1" });
+    const response = await runSearch({ q: "Vélo Rouge", category: "loisirs", priceMax: 500, includeSoldOut: true }, { now: NOW, seed: "s1" });
 
     expect(engine.search).toHaveBeenCalledTimes(1);
     const [main, featured] = queriesOf(0);
@@ -318,7 +329,7 @@ describe("runSearch", () => {
       result([]),
       result([], { totalHits: 9, totalPages: 0, facetDistribution: { district: { maarif: 1, gauthier: 8, oasis: 0 } } }),
     ]);
-    const response = await runSearch({ q: "studio", city: "casablanca", district: "maarif" }, { now: NOW, extraFilter: extra });
+    const response = await runSearch({ q: "studio", city: "casablanca", district: "maarif", includeSoldOut: true }, { now: NOW, extraFilter: extra });
     expect(engine.search).toHaveBeenCalledTimes(1);
     const [main, featured, districts] = queriesOf(0);
     expect(main?.facets).toEqual(["categoryId", "subcategoryId"]);
@@ -343,10 +354,10 @@ describe("runSearch", () => {
     await runSearch({ category: "mode" }, { featured: false, facets: false, extraFilter: extra });
     const [main] = queriesOf(0);
     expect(main).not.toHaveProperty("facets");
-    expect(main?.filter).toEqual({ and: [{ field: "categoryId", op: "eq", value: "mode" }, extra] });
+    expect(main?.filter).toEqual({ and: [{ and: [{ field: "categoryId", op: "eq", value: "mode" }, AVAILABLE] }, extra] });
 
     script([result([])]);
-    await runSearch({}, { featured: false, extraFilter: extra });
+    await runSearch({ includeSoldOut: true }, { featured: false, extraFilter: extra });
     expect(queriesOf(1)[0]?.filter).toEqual(extra);
   });
 

@@ -44,6 +44,8 @@ export interface ScreenInput {
   sensitiveDeclaration?: { kind: SensitiveDeclarationKind } | null;
   /** Free-text district of the location (rendered on the public page), screened like the texts. */
   district?: string;
+  /** Free axes of a Pro listing's variants (« Contenance : 500 g »), screened like the texts. */
+  variantAxes?: readonly { label?: string; values: readonly string[] }[];
   photos: ScreenPhoto[];
   seller: ScreenSeller;
   duplicates?: ScreenDuplicates;
