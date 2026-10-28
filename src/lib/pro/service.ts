@@ -2,7 +2,7 @@ import "server-only";
 import { launchOfferOpen, listingQuotas } from "@/config/pricing";
 import type { AuthContext } from "@/lib/auth/guards";
 import { getFlags, getPricing } from "@/lib/config/runtime";
-import type { ProAgencyInput, ProAgencyResponse, ProApplyInput, ProMeResponse } from "@/lib/contracts/pro";
+import type { ProAgencyInput, ProAgencyResponse, ProApplyInput, ProMeResponse, ProRentalInput, ProRentalResponse } from "@/lib/contracts/pro";
 import { db } from "@/lib/firebase/admin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { countActive } from "@/lib/db/repositories/listings";
@@ -160,6 +160,7 @@ export async function proSelf(auth: AuthContext): Promise<ProMeResponse> {
       storefront: storefrontShown(profile.lifecycle, profile.plan) ? `${profile.slug}-${profile.proId}` : null,
       sector: profile.sector ?? "general",
       feeSchedule: profile.agency?.feeSchedule ?? "",
+      rental: profile.rental ?? null,
     },
   };
 }
@@ -170,11 +171,7 @@ export async function proSelf(auth: AuthContext): Promise<ProMeResponse> {
  * suspended), from the session claims; the storefront is revalidated when shown.
  */
 export async function updateAgency(auth: AuthContext, input: ProAgencyInput, now = new Date()): Promise<ProAgencyResponse> {
-  const { proId, proRole } = auth.user.claims;
-  if (!proId) throw new HttpError(409, "pro_not_verified");
-  if (proRole !== "owner") throw new HttpError(403, "forbidden");
-  const profile = await getProProfile(proId);
-  if (!profile || profile.ownerUid !== auth.user.uid || !publishesAsPro(profile.lifecycle)) throw new HttpError(409, "pro_not_verified");
+  const profile = await ownedPublishingShop(auth);
   const feeSchedule = input.sector === "real_estate" ? input.feeSchedule : "";
   // The listing text rules, sensitive data refused outright (as a member's storefront bio).
   const issue = feeSchedule ? firstStrictIssue(feeSchedule) : null;
@@ -188,4 +185,33 @@ export async function updateAgency(auth: AuthContext, input: ProAgencyInput, now
   void consume("firestore.writes", 1);
   if (storefrontShown(profile.lifecycle, profile.plan)) revalidateListingPaths({ shopSegment: `${profile.slug}-${profile.proId}` });
   return { sector: input.sector, feeSchedule };
+}
+
+/** The owner's shop, verified and publishing (not suspended), from the session claims; else 409/403. */
+async function ownedPublishingShop(auth: AuthContext): Promise<ProProfileRecord> {
+  const { proId, proRole } = auth.user.claims;
+  if (!proId) throw new HttpError(409, "pro_not_verified");
+  if (proRole !== "owner") throw new HttpError(403, "forbidden");
+  const profile = await getProProfile(proId);
+  if (!profile || profile.ownerUid !== auth.user.uid || !publishesAsPro(profile.lifecycle)) throw new HttpError(409, "pro_not_verified");
+  return profile;
+}
+
+/**
+ * PUT /api/pro/me/rental (rental pack §5): the car rental agency's settings, replaced whole. The
+ * branch addresses and the hours pass the storefront text screen (no contact detail, prohibited
+ * term or sensitive data); the storefront is revalidated when shown.
+ */
+export async function updateRentalAgency(auth: AuthContext, input: ProRentalInput, now = new Date()): Promise<ProRentalResponse> {
+  const profile = await ownedPublishingShop(auth);
+  const texts: [string, string][] = [["hours", input.hours], ...input.branches.map((branch, index): [string, string] => [`branches.${index}.address`, branch.address])];
+  for (const [field, text] of texts) {
+    const issue = text ? firstStrictIssue(text) : null;
+    if (issue) throw new HttpError(422, "invalid_text", "rental settings refused by the text screen", { details: { field, issue } });
+  }
+  await proProfileRef(profile.proId).update({ rental: input, updatedAt: Timestamp.fromDate(now) });
+  void consume("firestore.reads", 1);
+  void consume("firestore.writes", 1);
+  if (storefrontShown(profile.lifecycle, profile.plan)) revalidateListingPaths({ shopSegment: `${profile.slug}-${profile.proId}` });
+  return { rental: input };
 }

@@ -1,7 +1,7 @@
 import { ApiError, apiDelete, apiGet, apiPost, apiPut, uploadToPresignedUrl, type UploadProgress } from "@/lib/auth/client";
 import { KYBC_DECLARED_TYPES, MAX_UPLOAD_BYTES, type KybcDeclaredType } from "@/lib/contracts/media";
 import { STOCK_API, type StockImportMode, type StockImportResponse, type StockListResponse } from "@/lib/contracts/stock-import";
-import { PRO_API, type KybcCompleteResponse, type KybcSignResponse, type ProAgencyInput, type ProAgencyResponse, type ProApplyInput, type ProApplyResponse, type ProMeResponse } from "@/lib/contracts/pro";
+import { PRO_API, type KybcCompleteResponse, type KybcSignResponse, type ProAgencyInput, type ProAgencyResponse, type ProRentalInput, type ProRentalResponse, type ProApplyInput, type ProApplyResponse, type ProMeResponse } from "@/lib/contracts/pro";
 
 // Browser side of /api/pro/** (phase 7 design §4): the Pro area state, one KYBC piece end to end
 // (sign, PUT to the presigned URL with progress, complete), the application and the stock import.
@@ -9,6 +9,7 @@ import { PRO_API, type KybcCompleteResponse, type KybcSignResponse, type ProAgen
 export const loadProMe = () => apiGet<ProMeResponse>(PRO_API.me);
 
 export const saveProAgency = (input: ProAgencyInput) => apiPut<ProAgencyResponse>(PRO_API.agency, input);
+export const saveRentalAgency = (input: ProRentalInput) => apiPut<ProRentalResponse>(PRO_API.rental, input);
 
 export const submitProApplication = (input: ProApplyInput) => apiPost<ProApplyResponse>(PRO_API.apply, input);
 

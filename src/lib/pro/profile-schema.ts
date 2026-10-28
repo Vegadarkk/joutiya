@@ -1,5 +1,6 @@
 import { z } from "@/lib/zod";
 import { PRO_PLANS, listingQuotasSchema } from "@/config/pricing";
+import { AIRPORT_IDS } from "@/config/airports";
 import { PAYMENT_URL_MAX } from "@/config/seller-payments";
 import { sellerInfoInputSchema } from "@/lib/contracts/seller-payment";
 import { citySlugSchema, regionCodeSchema } from "@/lib/contracts/listings";
@@ -17,11 +18,43 @@ export const PRO_NAME_MAX = 80;
 export const PRO_DESCRIPTION_MAX = 2000;
 export const PRO_SLUG_MAX = 60;
 
-/** Business sector (Agence pack design §3): "real_estate" makes the storefront an agency's; absent reads "general". */
-export const PRO_SECTORS = ["general", "real_estate"] as const;
+/**
+ * Business sector (Agence pack design §3): "real_estate" makes the storefront an agency's,
+ * "car_rental" a car rental agency's with its fleet (rental pack §5); absent reads "general".
+ */
+export const PRO_SECTORS = ["general", "real_estate", "car_rental"] as const;
 export type ProSector = (typeof PRO_SECTORS)[number];
 /** The agency's fee schedule shown on its storefront (free text, no contact details). */
 export const AGENCY_FEE_SCHEDULE_MAX = 500;
+
+/** Car rental agency settings (rental pack §5): branches, free-text lengths, payments on site. */
+export const RENTAL_BRANCHES_MAX = 5;
+export const RENTAL_ADDRESS_MAX = 160;
+export const RENTAL_HOURS_MAX = 200;
+export const RENTAL_PAYMENTS = ["cash", "card", "transfer"] as const;
+export type RentalPayment = (typeof RENTAL_PAYMENTS)[number];
+/** Ministry of Transport licence reference as the agency writes it: 3 to 40 Latin letters, digits, spaces and . / - _, one digit at least. */
+export const RENTAL_AGREMENT_PATTERN = /^(?=.*\d)[A-Za-z0-9][A-Za-z0-9 ./_-]{1,38}[A-Za-z0-9]$/;
+
+const unique = <T>(items: readonly T[]) => new Set(items).size === items.length;
+
+/**
+ * The car rental agency's settings (decision 3: the licence reference is required to publish a
+ * rental, shown « déclarée par l'agence »). Branch addresses are the agency's professional ones.
+ */
+export const rentalAgencySchema = z
+  .object({
+    agrementRef: z.string().trim().regex(RENTAL_AGREMENT_PATTERN),
+    branches: z
+      .array(z.object({ citySlug: citySlugSchema, address: z.string().trim().min(5).max(RENTAL_ADDRESS_MAX) }).strict())
+      .max(RENTAL_BRANCHES_MAX)
+      .refine((branches) => unique(branches.map((branch) => `${branch.citySlug}|${branch.address.toLowerCase()}`)), "duplicate branch"),
+    hours: z.string().trim().max(RENTAL_HOURS_MAX),
+    payments: z.array(z.enum(RENTAL_PAYMENTS)).max(RENTAL_PAYMENTS.length).refine(unique, "duplicate payment"),
+    airports: z.array(z.enum(AIRPORT_IDS)).max(AIRPORT_IDS.length).refine(unique, "duplicate airport"),
+  })
+  .strict();
+export type RentalAgency = z.infer<typeof rentalAgencySchema>;
 
 const uid = z.string().min(1).max(128);
 const ts = z.date();
@@ -103,6 +136,8 @@ export const proProfileSchema = z
     sector: z.enum(PRO_SECTORS).optional(),
     /** Real-estate agency details (sector "real_estate"), set by the owner (PUT /api/pro/me/agency). */
     agency: z.object({ feeSchedule: z.string().trim().max(AGENCY_FEE_SCHEDULE_MAX) }).strict().optional(),
+    /** Car rental agency settings, set by the owner (PUT /api/pro/me/rental). */
+    rental: rentalAgencySchema.optional(),
     lifecycle: z.enum(PRO_STATES),
     /** Copy of subscriptions/pro_{proId}, or the launch offer's plan. */
     plan: z.enum(PRO_PLANS),

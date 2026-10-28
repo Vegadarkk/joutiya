@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
-import { Building2, Store } from "lucide-react";
+import { Building2, CarFront, Store } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { FormMessage } from "@/components/auth/form-message";
@@ -15,10 +15,11 @@ import { AGENCY_FEE_SCHEDULE_MAX, PRO_SECTORS, type ProSector } from "@/lib/pro/
 import { cn } from "@/lib/utils";
 
 // The shop's sector in the Pro area (Agence pack design §3): a real-estate agency gets an agency
-// storefront (listings per transaction, fee schedule) and the mandate and fees on its listings.
+// storefront (listings per transaction, fee schedule) and the mandate and fees on its listings; a
+// car rental agency its fleet storefront (rental pack §5), set up from /pro/location.
 // The fee schedule follows the storefront text screen (free-text.ts), live here and again on the server.
 
-const ICONS = { general: Store, real_estate: Building2 } as const;
+const ICONS = { general: Store, real_estate: Building2, car_rental: CarFront } as const;
 
 export function AgencySettings({ shop }: { shop: Pick<ProSelfView, "sector" | "feeSchedule"> }) {
   const t = useTranslations("Pro.agency");
@@ -61,7 +62,7 @@ export function AgencySettings({ shop }: { shop: Pick<ProSelfView, "sector" | "f
         <p className="text-sm text-foreground-muted text-pretty">{t("lead")}</p>
       </header>
       <form onSubmit={(event) => void onSubmit(event)} noValidate className="flex flex-col gap-5">
-        <fieldset className="grid gap-2 sm:grid-cols-2">
+        <fieldset className="grid gap-2 md:grid-cols-3">
           <legend className="sr-only">{t("title")}</legend>
           {PRO_SECTORS.map((value) => {
             const Icon = ICONS[value];

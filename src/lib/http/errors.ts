@@ -64,6 +64,8 @@ export type ErrorCode =
   | "real_estate_attestation"
   /** Publish a car rental without the agency's attestation (422). */
   | "rental_attestation"
+  /** Publish a car rental before the agency's settings hold its licence reference (422, rental pack decision 3). */
+  | "rental_agrement_missing"
   // Search and discovery (phase 4). Messages: Listing.errors.<code>.
   /** Search engine missing or unreachable (503). */
   | "search_unavailable"
