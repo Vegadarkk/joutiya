@@ -7,8 +7,15 @@ import { DEFAULT_FLAGS, flagsConfigSchema, resolveFlagsConfig } from "@/config/f
 
 describe("config/flags", () => {
   it("keeps sales off and Pro applications open by default", () => {
-    expect(DEFAULT_FLAGS).toEqual({ salesEnabled: false, proSignupEnabled: true, paymentInstallmentsEnabled: false });
+    expect(DEFAULT_FLAGS).toEqual({ salesEnabled: false, proSignupEnabled: true, paymentInstallmentsEnabled: false, adsMode: "off", adsCmpEea: false });
     expect(flagsConfigSchema.safeParse(DEFAULT_FLAGS).success).toBe(true);
+  });
+
+  it("reads the ad mode as one of three values, the defaults for anything else (phase 6, D8)", () => {
+    expect(resolveFlagsConfig({ adsMode: "test", adsCmpEea: true }).config).toMatchObject({ adsMode: "test", adsCmpEea: true });
+    const invalid = resolveFlagsConfig({ adsMode: "on" });
+    expect(invalid.config.adsMode).toBe("off");
+    expect(invalid.errors).toHaveLength(1);
   });
 
   it("applies a stored override over the defaults", () => {

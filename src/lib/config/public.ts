@@ -1,4 +1,5 @@
 import "server-only";
+import { DEFAULT_FLAGS, type FlagsConfig } from "@/config/flags";
 import { MAX_PHOTOS_INDIVIDUAL, MAX_UPLOAD_BYTES } from "@/lib/contracts/media";
 import { serverEnv, type ServerEnv } from "@/lib/env";
 import { isPhoneVerificationConfigured } from "@/lib/phone-verify/config";
@@ -13,8 +14,11 @@ const UPLOAD_LIMITS = { maxBytes: MAX_UPLOAD_BYTES, maxPhotos: MAX_PHOTOS_INDIVI
 /** OSM data (ODbL) through Protomaps: shown on every map (D10). */
 export const MAP_ATTRIBUTION = "© OpenStreetMap contributors · Protomaps";
 
-/** The browser's configuration, built from the server environment at request time. */
-export function publicConfig(env: ServerEnv = serverEnv()): PublicConfig {
+/**
+ * The browser's configuration, built from the server environment at request time; the ad flags
+ * come from config/flags (getFlags), the defaults (ads off) when the caller has none.
+ */
+export function publicConfig(env: ServerEnv = serverEnv(), flags: Pick<FlagsConfig, "adsMode" | "adsCmpEea"> = DEFAULT_FLAGS): PublicConfig {
   const { FIREBASE_API_KEY: apiKey, FIREBASE_PROJECT_ID: projectId, FIREBASE_APP_ID: appId } = env;
   const emulator = env.APP_ENV === "dev" && env.FIREBASE_AUTH_EMULATOR_HOST ? `http://${env.FIREBASE_AUTH_EMULATOR_HOST}` : undefined;
   const firebase =
@@ -39,5 +43,6 @@ export function publicConfig(env: ServerEnv = serverEnv()): PublicConfig {
     upload: { ...UPLOAD_LIMITS },
     map: env.MAP_PMTILES_URL ? { pmtilesUrl: env.MAP_PMTILES_URL, attribution: MAP_ATTRIBUTION } : null,
     phoneVerification: isPhoneVerificationConfigured(env),
+    ads: { mode: flags.adsMode, cmpEea: flags.adsCmpEea, client: env.ADSENSE_CLIENT_ID ?? null },
   };
 }

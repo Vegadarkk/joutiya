@@ -1,4 +1,5 @@
 import { useTranslations } from "next-intl";
+import { ConsentLink } from "@/components/consent/consent-link";
 import { Link } from "@/i18n/navigation";
 import { LEGAL_PAGES } from "@/config/legal-pages";
 import { Container } from "@/components/layout/container";
@@ -33,6 +34,9 @@ export function Footer({ publisher }: { publisher: string }) {
                 </Link>
               </li>
             ))}
+            <li>
+              <ConsentLink className="text-foreground-muted hover:text-foreground" />
+            </li>
           </ul>
         </nav>
         <nav aria-labelledby="footer-trust">

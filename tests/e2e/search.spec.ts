@@ -243,7 +243,8 @@ test.describe("search page", () => {
   test("reads right to left in Arabic", { tag: "@mobile" }, async ({ page }) => {
     await page.goto(`/ar/recherche?q=${WORD}`);
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByTestId("results-grid")).toBeVisible();
+    // By role: the copy React streams in a hidden container before swapping it in is not counted.
+    await expect(page.getByRole("region", { name: "النتائج" }).getByTestId("results-grid")).toBeVisible();
   });
 });
 

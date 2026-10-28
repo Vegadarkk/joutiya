@@ -3398,5 +3398,24 @@
       "walletTitle": "Il vous reste des crédits",
       "walletBody": "Des crédits achetés sont encore sur votre compte. Utilisez-les ou écrivez-nous pour demander leur remboursement, puis fermez votre compte."
     }
+  },
+  "Consent": {
+    "bannerTitle": "Publicité et cookies",
+    "bannerBody": "Avec votre accord, Google LLC (États-Unis) dépose des cookies pour afficher des publicités et mesurer leur diffusion. Accepter, c'est consentir expressément au transfert de ces données aux États-Unis (loi 09-08, art. 44). Refuser ne vous empêche pas d'utiliser {brand}.",
+    "acceptAll": "Tout accepter",
+    "refuseAll": "Tout refuser",
+    "customize": "Personnaliser",
+    "panelTitle": "Gérer mes cookies",
+    "panelIntro": "Choisissez ce que vous autorisez. Vous pouvez changer d'avis à tout moment avec le lien « Gérer mes cookies » en bas de chaque page.",
+    "adsLabel": "Publicité",
+    "adsHint": "Google AdSense affiche des publicités et mesure leur diffusion. Données transférées à Google LLC, aux États-Unis.",
+    "persoLabel": "Publicité personnalisée",
+    "persoHint": "Les publicités tiennent compte de vos centres d'intérêt. Nécessite d'autoriser la publicité.",
+    "necessaryTitle": "Cookies nécessaires, toujours actifs",
+    "necessaryBody": "Connexion, sécurité, langue et protection anti-robot : ils servent uniquement au fonctionnement du site. <link>Voir la liste des cookies</link>",
+    "noTrackers": "{brand} n'utilise aujourd'hui aucun cookie publicitaire ni de mesure d'audience. Vous n'avez donc rien à accepter.",
+    "save": "Enregistrer mes choix",
+    "close": "Fermer",
+    "footerLink": "Gérer mes cookies"
   }
 }
