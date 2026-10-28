@@ -169,6 +169,8 @@ describe("getSeller", () => {
       badges: { emailVerified: true, phoneVerified: true, proCertified: false },
       citySlug: "casablanca",
       publishedCount: 7,
+      bio: null,
+      bannerKey: "zellige",
     });
     expect(repo.where).toHaveBeenCalledWith("ownerUid", "==", "uid-secret-1");
     expect(repo.where).toHaveBeenCalledWith("status", "==", "published");

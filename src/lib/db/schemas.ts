@@ -1,6 +1,7 @@
 import { z } from "@/lib/zod";
 import { CONDITIONS } from "@/config/categories";
 import { LOCALES } from "@/config/site";
+import { BANNER_KEYS, BIO_MAX } from "@/config/storefront";
 import {
   DESCRIPTION_MAX,
   LISTING_STATUSES,
@@ -73,6 +74,8 @@ export const userSchema = z
     proId: z.string().max(64).optional(),
     regionCode: z.string().regex(/^(0[1-9]|1[0-2])$/).optional(),
     citySlug: z.string().max(64).optional(),
+    /** Storefront of /profil (vitrine-avis §1): "about" text and house banner, both optional. */
+    storefront: z.object({ bio: z.string().max(BIO_MAX).optional(), bannerKey: z.enum(BANNER_KEYS).optional() }).strict().optional(),
     badges: z.object({ emailVerified: z.boolean(), phoneVerified: z.boolean(), proCertified: z.boolean() }).strict(),
     stats: z
       .object({ activeListings: z.number().int().min(0), responseRate: z.number().min(0).max(1), medianReplyMin: z.number().min(0), ratingAvg: z.number().min(0).max(5).optional(), ratingCount: z.number().int().min(0) })
