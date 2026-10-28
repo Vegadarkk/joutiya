@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Button } from "@/components/ui/button";
+import { OwnerAvailability } from "@/components/rental/owner-availability";
 import { quietLinkClassName } from "@/components/ui/text-link";
 import { Link, getPathname } from "@/i18n/navigation";
 import type { OwnerListingSummary } from "@/lib/contracts/listings";
@@ -100,6 +101,7 @@ export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, bu
         </div>
         {listing.status === "pending_review" ? <p className="text-xs text-foreground-muted text-pretty">{t("pending.body")}</p> : null}
         {listing.status === "rejected" ? <p className="text-xs text-danger text-pretty">{t("rejected.body")}</p> : null}
+        {listing.rental ? <OwnerAvailability listingId={listing.id} title={title} rental={listing.rental} now={now} /> : null}
       </div>
       {primary ? (
         <div className="col-span-2 mt-3 flex min-w-0 sm:col-span-1 sm:col-start-2 sm:mt-2">

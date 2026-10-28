@@ -19,6 +19,7 @@ import {
 } from "@/lib/contracts/listings";
 import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, UPLOAD_DOC_DECLARED_TYPES, UPLOAD_REJECT_REASONS, UPLOAD_STATUSES, listingPhotoSchema, uploadIdSchema } from "@/lib/contracts/media";
 import { ROLES } from "@/lib/firebase/claims";
+import { DAY_PATTERN, RENTAL_PERIODS_MAX } from "@/lib/listings/rental-availability";
 import { SAVED_SEARCH_ALERTS, SAVED_SEARCH_NAME_MAX } from "@/lib/contracts/search";
 import { storedSearchParamsSchema } from "@/lib/search/params";
 import { MESSAGE_RISK_FLAGS, MESSAGE_TEXT_MAX } from "@/lib/contracts/messaging";
@@ -316,6 +317,17 @@ export const listingSchema = z
      * kind looks like. Labelled on cards and pages, never contactable, not in the sitemap.
      */
     example: z.literal(true).optional(),
+    /**
+     * Car rentals (rental pack §3): blocked periods, merged and sorted, past ones dropped at each
+     * save; `updatedAt` = the agency's last save or confirmation (freshness, 14 days).
+     */
+    rental: z
+      .object({
+        unavailable: z.array(z.object({ from: z.string().regex(DAY_PATTERN), to: z.string().regex(DAY_PATTERN) }).strict()).max(RENTAL_PERIODS_MAX),
+        updatedAt: ts,
+      })
+      .strict()
+      .optional(),
     /** Moderated, no open report, not hidden. */
     adsEligible: z.boolean(),
     publishedAt: ts.optional(),

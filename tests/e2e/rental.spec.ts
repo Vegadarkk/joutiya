@@ -151,6 +151,33 @@ test.describe("Car rental", () => {
       await expect(shown.getByTestId("rental-insurance")).toContainText("Tous risques sans franchise");
       await expect(shown.getByTestId("rental-rates")).toContainText(/260\s+DH par jour dès 7 jours/u);
       await expect(page.getByTestId("rental-guide")).toBeVisible();
+      await expect(page.getByTestId("rental-availability-freshness")).toHaveText("Disponibilité à confirmer avec l'agence.");
+
+      // The agency blocks three days from "Mes annonces"; the page shows them, now up to date.
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Casablanca" }).format(new Date());
+      const day = (offset: number) => new Date(Date.parse(`${today}T00:00:00Z`) + offset * 86_400_000).toISOString().slice(0, 10);
+      // Days 3 to 5 may fall in next month: the dialog shows this month and the next one.
+      await page.goto("/fr/mes-annonces");
+      // The title sits in bidi isolates inside the accessible name.
+      await page.getByRole("button", { name: /^Disponibilités de « / }).click();
+      const dialog = page.getByTestId("availability-dialog");
+      await dialog.locator(`button[data-day="${day(3)}"]`).click();
+      await expect(dialog.getByText("Touchez maintenant le dernier jour de la période.")).toBeVisible();
+      await dialog.locator(`button[data-day="${day(5)}"]`).click();
+      await expect(dialog.getByText("1 période bloquée.")).toBeVisible();
+      await expect(dialog.locator(`button[data-day="${day(4)}"]`)).toHaveAttribute("aria-pressed", "true");
+      await page.screenshot({ path: "test-results/rental-availability-dialog.png" });
+      await dialog.getByRole("button", { name: "Enregistrer" }).click();
+      await expect(page.getByText("Disponibilités enregistrées.")).toBeVisible();
+      await expect(page.getByTestId("owner-availability")).toContainText("Disponibilités à jour");
+
+      await page.goto(`/fr/annonce/${answer.slugId}`);
+      const calendar = page.getByTestId("rental-availability");
+      await expect(calendar.getByTestId("rental-availability-freshness")).toContainText("Déclarées par l'agence, mises à jour le");
+      await expect(calendar.locator(`[data-day="${day(4)}"]`)).toHaveAttribute("data-state", "blocked");
+      await expect(calendar.locator(`[data-day="${day(6)}"]`)).toHaveAttribute("data-state", "free");
+      await calendar.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: "test-results/rental-availability-page.png", fullPage: true });
     }
   });
 });

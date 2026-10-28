@@ -4,6 +4,7 @@ import type { ListingPhoto } from "@/lib/contracts/media";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UserDoc } from "@/lib/db/schemas";
 import { LISTING_ID_ALPHABET, buildSlugId } from "@/lib/listings/ids";
+import { dayString, moroccoToday } from "@/lib/listings/rental-availability";
 import { DEMO_ENTRIES, DEMO_SELLERS, type DemoEntry, type DemoSeller } from "./catalog";
 
 // Example listings (scripts/seed-demo.ts; owner decision of 2026-10-28): the catalog turned into
@@ -110,6 +111,8 @@ export function demoListing(entry: DemoEntry, index: number, now: Date, photos: 
     // Restricted goods are reviewed by a moderator before publication: shown as reviewed.
     moderation: { state: sub.adultsOnly ? "human_ok" : "auto_ok", score: 0, flags: [], openReports: 0 },
     example: true,
+    // Rentals: periods counted from the seed day, confirmed on that day (fresh for 14 days).
+    ...(entry.rentalBlocked ? { rental: { unavailable: entry.rentalBlocked.map(([from, to]) => ({ from: dayString(moroccoToday(now) + from), to: dayString(moroccoToday(now) + to) })), updatedAt: now } } : {}),
     adsEligible: false,
     publishedAt: at,
     expiresAt: new Date(now.getTime() + DEMO_LIFETIME_DAYS * DAY_MS),
