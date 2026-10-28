@@ -49,6 +49,8 @@ const schema = z.object({
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   RELEASE: optional,
   CSP_REPORT_ONLY: flag,
+  /** Staging only: requests carrying it in x-joutiya-loadtest skip the app's rate limits (load test, phase 6 D17). */
+  LOADTEST_BYPASS_SECRET: optional,
   QUEUE_REDIS_URL: optional,
   RATE_LIMIT_REDIS_URL: optional,
   TELEGRAM_BOT_TOKEN: optional,
@@ -97,6 +99,13 @@ const schema = z.object({
    * byte accounting before the r2.storage gauge, so the 8 GB alert reflects the account total.
    */
   R2_STORAGE_BASELINE_BYTES: integer(4_140_000_000),
+  /** AdSense publisher id (ca-pub- and 16 digits, public; phase 6 D8): unset = no ad unit, no ads.txt. */
+  ADSENSE_CLIENT_ID: optional.refine((value) => value === undefined || /^ca-pub-\d{16}$/.test(value), "ADSENSE_CLIENT_ID must be ca-pub- followed by 16 digits"),
+  /** AdSense ad unit ids, one per slot format (phase 6, D6); an unset format shows house promotions only. */
+  AD_SLOT_LEADERBOARD: optional,
+  AD_SLOT_HALFPAGE: optional,
+  AD_SLOT_RECTANGLE: optional,
+  AD_SLOT_BANNER: optional,
   /** Morocco PMTiles archive for the interactive map (D10); unset = static SVG map only. */
   MAP_PMTILES_URL: optionalUrl,
   /** Worker only: directory holding the local ONNX models (nudity, faces; docs/models.md). */
@@ -270,6 +279,9 @@ export function parseEnv(source: Record<string, string | undefined>): ParsedEnv 
     }
     // §6: report-only is a staging tool; production enforces its CSP.
     if (env.APP_ENV === "prod" && env.CSP_REPORT_ONLY) errors.push("CSP_REPORT_ONLY must not be set in prod");
+    // The load test bypass exists for staging only, and a short secret could be guessed.
+    if (env.APP_ENV === "prod" && env.LOADTEST_BYPASS_SECRET) errors.push("LOADTEST_BYPASS_SECRET must not be set in prod");
+    if (env.LOADTEST_BYPASS_SECRET && !/^[A-Za-z0-9]{32,128}$/.test(env.LOADTEST_BYPASS_SECRET)) errors.push("LOADTEST_BYPASS_SECRET must be 32 to 128 letters and digits");
     // A leftover phase 1 name would be silently ignored: refuse it so the rename is not missed.
     for (const name of legacy) errors.push(`${name} is no longer read: use ${name.replace("NEXT_PUBLIC_", "")} (runtime configuration)`);
   } else if (legacy.length > 0) {

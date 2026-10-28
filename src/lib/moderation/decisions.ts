@@ -146,6 +146,7 @@ export const FLAG_LABELS: Record<ModerationFlag, string> = {
   new_account: "Compte récent",
   volume: "Volume élevé",
   restricted_category: "Catégorie réservée aux majeurs",
+  credit_ad: "Mensualité sans TEG",
 };
 
 export const DECISION_TEXT_MAX = 500;

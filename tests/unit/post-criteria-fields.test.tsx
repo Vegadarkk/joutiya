@@ -13,23 +13,27 @@ const criteriaMessages = (locale: Locale): CriteriaMessages => (locale === "ar" 
 
 const noop = () => undefined;
 
-function render(subcategory: Subcategory, attributes: ListingAttributes = {}, locale: Locale = "fr", errors?: Record<string, string>) {
+function render(subcategory: Subcategory, attributes: ListingAttributes = {}, locale: Locale = "fr", errors?: Record<string, string>, pro = false) {
   return renderToStaticMarkup(
     <NextIntlClientProvider locale={locale} messages={locale === "ar" ? ar : fr}>
-      <CriteriaFields subcategory={subcategory} attributes={attributes} condition={null} errors={errors} onAttribute={noop} onCondition={noop} />
+      <CriteriaFields subcategory={subcategory} attributes={attributes} condition={null} errors={errors} onAttribute={noop} onCondition={noop} pro={pro} />
     </NextIntlClientProvider>,
   );
 }
 
 const voitures = subcategoryById("voitures")!;
+/** React escapes the apostrophe of "Carnet d'entretien" in its HTML. */
+const escaped = (label: string) => label.replaceAll("'", "&#x27;");
+/** Opens every dependent criterion and the Pro-only ones: the whole car form. */
+const ALL_OPEN: ListingAttributes = { "vehicle-warranty": "vendeur" };
 const location = subcategoryById("location")!;
 
 describe("CriteriaFields", () => {
   it("renders every criterion of a car with its French label", () => {
-    const html = render(voitures);
+    const html = render(voitures, ALL_OPEN, "fr", undefined, true);
     const messages = criteriaMessages("fr");
     for (const criterion of voitures.criteria) {
-      expect(html, criterion.id).toContain(messages[criterion.id]!.label);
+      expect(html, criterion.id).toContain(escaped(messages[criterion.id]!.label));
     }
     // Condition first (the subcategory shows it), with every condition option.
     expect(html.indexOf(fr.Listing.fields.condition)).toBeLessThan(html.indexOf(messages["car-brand"]!.label));
@@ -77,9 +81,26 @@ describe("CriteriaFields", () => {
   });
 
   it("renders the Arabic labels", () => {
-    const html = render(voitures, {}, "ar");
+    const html = render(voitures, ALL_OPEN, "ar", undefined, true);
     const messages = criteriaMessages("ar");
     for (const criterion of voitures.criteria) expect(html, criterion.id).toContain(messages[criterion.id]!.label);
     expect(html).toContain(`>${ar.Listing.units.km}<`);
+  });
+
+  it("folds the vehicle dossier, open once a dossier field is filled", () => {
+    const closed = render(voitures);
+    expect(closed).toContain(fr.Listing.wizard.dossierTitle);
+    expect(closed).toMatch(/<details data-testid="criteria-dossier"(?![^>]*open="")/);
+    expect(render(voitures, { "trade-in": true })).toMatch(/<details data-testid="criteria-dossier"[^>]*open=""/);
+    // The main criteria come before the dossier.
+    expect(closed.indexOf(criteriaMessages("fr")["gearbox"]!.label)).toBeLessThan(closed.indexOf(fr.Listing.wizard.dossierTitle));
+  });
+
+  it("offers the stock reference to Pros only and the warranty's duration with a warranty only", () => {
+    const messages = criteriaMessages("fr");
+    expect(render(voitures)).not.toContain(messages["stock-ref"]!.label);
+    expect(render(voitures, {}, "fr", undefined, true)).toContain(messages["stock-ref"]!.label);
+    expect(render(voitures, { "vehicle-warranty": "aucune" })).not.toContain(messages["warranty-months"]!.label);
+    expect(render(voitures, { "vehicle-warranty": "constructeur" })).toContain(messages["warranty-months"]!.label);
   });
 });

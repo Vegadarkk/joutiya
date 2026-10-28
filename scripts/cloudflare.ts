@@ -4,7 +4,8 @@
 //
 //   node --env-file=<owner env file> scripts/cloudflare.ts <part>... [--apply] [--replace-dns]
 //   node --env-file=<owner env file> scripts/cloudflare.ts zone --check
-//   parts: zone (settings and rules), tunnel:staging, tunnel:prod, tunnel:ssh, access, r2
+//   node --env-file=<owner env file> scripts/cloudflare.ts loadtest --on|--off [--apply]
+//   parts: zone (settings and rules), tunnel:staging, tunnel:prod, tunnel:ssh, access, r2, loadtest
 // zone --check reads the live settings and rules, compares them with the files and exits 1 on any
 // drift (a missing transform rule lets a client forge X-Verified-Bot); zone --apply runs it after
 // its writes.
@@ -14,12 +15,17 @@
 // for access: ACCESS_OWNER_EMAIL, ACCESS_CI_TOKEN_ID, ACCESS_PROBE_TOKEN_ID.
 // r2 only checks: Nav applies r2-buckets.json in the dashboard (bucket settings need account-wide
 // R2 rights), and this part sends its CORS preflights, which need no token.
+// loadtest --on puts a temporary skip rule first in the WAF custom rules (load test of staging,
+// D17: no edge rate limit, managed rules, Browser Integrity Check or Security Level for requests
+// to staging carrying x-joutiya-loadtest = JOUTIYA_LOADTEST_BYPASS_SECRET, never printed);
+// loadtest --off puts waf-rules.json back. zone --check reports the rule as drift while it is on.
 // An existing A, AAAA or CNAME record on a tunnel hostname is only replaced with --replace-dns, and
 // a hostname guarded by Access gets its DNS record only once its Access application exists.
 
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { validateTargets, type AppEnv, type EnvTargets, type Targets } from "./assert-target.ts";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 export const ZONE_NAME = "joutiya.ma";
 const API = "https://api.cloudflare.com/client/v4";
@@ -79,6 +85,37 @@ export const GOOGLE_IDP = "${ACCESS_GOOGLE_IDP_ID}";
  * production site is public: it needs no such path.
  */
 export const WEBHOOK_BYPASS = "staging.joutiya.ma/api/webhooks/*";
+export const LOADTEST_RULE_REF = "loadtest_skip";
+export const LOADTEST_HOST = "staging.joutiya.ma";
+export const LOADTEST_HEADER = "x-joutiya-loadtest";
+
+/** The temporary skip rule of the load test. The secret is checked first: it goes into an expression. */
+export function loadtestRule(secret: string): Rule {
+  if (!/^[A-Za-z0-9]{32,128}$/.test(secret)) throw new Error("JOUTIYA_LOADTEST_BYPASS_SECRET must be 32 to 128 letters and digits");
+  return {
+    ref: LOADTEST_RULE_REF,
+    description: "Load test of staging (temporary, D17): no edge rate limit, managed rules, Browser Integrity Check or Security Level",
+    expression: `http.host eq "${LOADTEST_HOST}" and any(http.request.headers["${LOADTEST_HEADER}"][*] eq "${secret}")`,
+    action: "skip",
+    action_parameters: { phases: ["http_ratelimit", "http_request_firewall_managed"], products: ["bic", "securityLevel"] },
+    logging: { enabled: true },
+  };
+}
+
+/** waf-rules.json with the load test rule first (secret set) or as committed (null). */
+export function loadtestRuleset(base: Ruleset, secret: string | null): Ruleset {
+  if (secret === null) return base;
+  const rules = [loadtestRule(secret), ...base.rules.filter((rule) => rule.ref !== LOADTEST_RULE_REF)];
+  const limit = FREE_LIMITS[base.phase] ?? 0;
+  if (rules.length > limit) throw new Error(`${base.phase}: ${rules.length} rules with the load test rule, Free allows ${limit}`);
+  return { ...base, rules };
+}
+
+/** A value to print, with every occurrence of the secret masked. */
+export function redact<T>(value: T, secret: string): T {
+  return JSON.parse(JSON.stringify(value).split(secret).join("***")) as T;
+}
+
 export interface DnsRecord {
   id: string;
   type: string;
@@ -299,6 +336,20 @@ async function verifyZone(api: CloudflareApi, targets: Targets): Promise<void> {
   console.log("zone settings and rules match infra/cloudflare");
 }
 
+async function applyLoadtest(api: CloudflareApi, targets: Targets, on: boolean): Promise<void> {
+  const { zoneId } = await checkZone(api, targets);
+  const secret = on ? (process.env.JOUTIYA_LOADTEST_BYPASS_SECRET?.trim() ?? "") : null;
+  if (secret === "") throw new Error("JOUTIYA_LOADTEST_BYPASS_SECRET is not set");
+  const { phase, description, rules } = loadtestRuleset(readEdgeFile<Ruleset>("waf-rules.json"), secret);
+  const request: ApiRequest = { method: "PUT", path: `/zones/${zoneId}/rulesets/phases/${phase}/entrypoint`, body: { description, rules } };
+  await api.write(request, secret === null ? request.body : redact(request.body, secret));
+  if (!api.apply) return;
+  const live = await api.call<{ rules?: Rule[] }>({ method: "GET", path: `/zones/${zoneId}/rulesets/phases/${phase}/entrypoint` });
+  const refs = (live.rules ?? []).map((rule) => rule.ref);
+  if (refs.includes(LOADTEST_RULE_REF) !== on) throw new Error(`${phase}: the load test rule is ${on ? "missing" : "still there"} (rules ${refs.join(", ")})`);
+  console.log(on ? "load test rule on: turn it off after the run (loadtest --off --apply)" : "load test rule off: the WAF rules match waf-rules.json");
+}
+
 async function applyTunnel(api: CloudflareApi, targets: Targets, name: TunnelName, replaceDns: boolean): Promise<void> {
   const { accountId, zoneId } = await checkZone(api, targets);
   const tunnelId = name === "ssh" ? targets.shared.cloudflare.sshTunnelId : targets.environments[name].cloudflare.tunnelId;
@@ -476,15 +527,18 @@ async function checkR2(targets: Targets): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const args = process.argv.slice(2);
   const apply = args.includes("--apply");
   const replaceDns = args.includes("--replace-dns");
   const check = args.includes("--check");
   const parts = args.filter((arg) => !arg.startsWith("--"));
-  const known = ["zone", "access", "r2", ...TUNNELS.map((name) => `tunnel:${name}`)];
+  const known = ["zone", "access", "r2", "loadtest", ...TUNNELS.map((name) => `tunnel:${name}`)];
   const unknown = parts.filter((part) => !known.includes(part));
   if (parts.length === 0 || unknown.length > 0) throw new Error(`usage: scripts/cloudflare.ts <${known.join("|")}>... [--apply] [--replace-dns] | zone --check`);
   if (check && (apply || parts.join() !== "zone")) throw new Error("--check reads the zone only: scripts/cloudflare.ts zone --check");
+  const on = args.includes("--on");
+  if (parts.includes("loadtest") && (parts.length !== 1 || on === args.includes("--off"))) throw new Error("usage: scripts/cloudflare.ts loadtest --on|--off [--apply]");
 
   const edgeErrors = validateEdge();
   if (edgeErrors.length > 0) throw new Error(edgeErrors.join("\n"));
@@ -504,6 +558,7 @@ async function main(): Promise<void> {
       if (apply) await verifyZone(api, targets);
     }
     else if (part === "access") await applyAccess(api, targets);
+    else if (part === "loadtest") await applyLoadtest(api, targets, on);
     else if (part === "r2") await checkR2(targets);
     else await applyTunnel(api, targets, part.slice("tunnel:".length) as TunnelName, replaceDns);
   }

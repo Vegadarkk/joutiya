@@ -15,7 +15,8 @@ vi.mock("@/lib/quota", () => ({
   setGauge: vi.fn(async () => null),
 }));
 const firebase = { configured: true, db: vi.fn() };
-vi.mock("@/lib/firebase/admin", () => ({ isFirestoreConfigured: () => firebase.configured, isFirebaseConfigured: () => firebase.configured, db: () => firebase.db() }));
+const listUsers = vi.fn(async () => ({ users: [] }));
+vi.mock("@/lib/firebase/admin", () => ({ isFirestoreConfigured: () => firebase.configured, isFirebaseConfigured: () => firebase.configured, db: () => firebase.db(), auth: () => ({ listUsers }) }));
 const storage = { store: null as unknown, missing: false };
 class FakeStorageNotConfigured extends Error {}
 vi.mock("@/lib/storage", () => ({

@@ -4,7 +4,6 @@ import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it } from "vitest";
 import ar from "../../messages/ar.json";
 import fr from "../../messages/fr.json";
-import { AdSlot } from "@/components/listing/ad-slot";
 import { Breadcrumb, SEARCH_QUERY, searchHref } from "@/components/listing/breadcrumb";
 import { CriteriaGrid, CriteriaSection } from "@/components/listing/criteria-grid";
 import { ListingCard } from "@/components/listing/listing-card";
@@ -71,9 +70,10 @@ describe("CriteriaGrid", () => {
       />,
     );
     const labels = [...html.matchAll(/<dt[^>]*>([^<]*)<\/dt>/g)].map((match) => match[1]);
-    expect(labels).toEqual(["État", "Marque", "Modèle", "Année-modèle", "Kilométrage", "Carburant", "Boîte de vitesses", "Première main"]);
+    // "Première main" belongs to the vehicle dossier (its own section, vehicle-dossier.tsx).
+    expect(labels).toEqual(["État", "Marque", "Modèle", "Année-modèle", "Kilométrage", "Carburant", "Boîte de vitesses"]);
     const values = [...html.matchAll(/<dd[^>]*>([^<]*)<\/dd>/g)].map((match) => match[1]);
-    expect(values).toEqual(["Très bon état", "Dacia", "Logan", "2019", `120${NNBSP}000 km`, "Diesel", "Manuelle", "Oui"]);
+    expect(values).toEqual(["Très bon état", "Dacia", "Logan", "2019", `120${NNBSP}000 km`, "Diesel", "Manuelle"]);
   });
 
   it("joins multiselect options, renders surfaces in m² and skips empty values", () => {
@@ -169,6 +169,8 @@ const seller: PublicSeller = {
   badges: { emailVerified: true, phoneVerified: true, proCertified: false },
   citySlug: "casablanca",
   publishedCount: 2,
+  bio: null,
+  bannerKey: "zellige",
 };
 
 describe("SellerCard", () => {
@@ -245,18 +247,6 @@ describe("ReportButton", () => {
     expect(listing).not.toContain("mailto:");
     expect(text(render(<ReportButton target={{ type: "user", id: "abcdefghjk" }} {...props} />))).toContain(fr.Report.trigger.user);
     expect(text(render(<ReportButton target={{ type: "user", id: "abcdefghjk" }} {...props} />, "ar"))).toContain(ar.Report.trigger.user);
-  });
-});
-
-describe("AdSlot", () => {
-  it("reserves the height of the future ad and fills it with a house promotion", () => {
-    const aside = render(<AdSlot slot="listing-aside" />);
-    expect(aside).toContain('data-ad-slot="listing-aside"');
-    expect(aside).toContain("min-h-[250px]");
-    expect(aside).toContain(`aria-label="${fr.ListingPage.ad.label}"`);
-    expect(aside).toContain('href="/fr/deposer"');
-    expect(render(<AdSlot slot="profile-bottom" />)).toContain("min-h-[100px]");
-    expect(aside).not.toContain("<script");
   });
 });
 

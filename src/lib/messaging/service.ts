@@ -30,6 +30,7 @@ import {
   setParticipantState,
   setUserBlock,
   unreadCounts,
+  type ConversationExtension,
   type ConversationRecord,
   type NewMessageInput,
 } from "./repository";
@@ -101,10 +102,17 @@ async function afterMessage(input: { cid: string; messageId: string; senderUid: 
   }
 }
 
-async function append(actor: MessagingActor, cid: string, original: string, analysis: MessageAnalysis, now: Date): Promise<{ messageId: string; conversation: ConversationRecord }> {
+async function append(
+  actor: MessagingActor,
+  cid: string,
+  original: string,
+  analysis: MessageAnalysis,
+  now: Date,
+  extend?: ConversationExtension,
+): Promise<{ messageId: string; conversation: ConversationRecord }> {
   let result: Awaited<ReturnType<typeof appendMessage>>;
   try {
-    result = await appendMessage(cid, messageInput(actor.uid, original, analysis, now));
+    result = await appendMessage(cid, messageInput(actor.uid, original, analysis, now), extend);
   } catch (error) {
     accessError(error);
   }
@@ -196,6 +204,16 @@ export async function sendMessage(actor: MessagingActor, cid: string, text: stri
   const analysis = analyze(text);
   const { messageId } = await append(actor, cid, text, analysis, now);
   return { messageId, flags: analysis.flags };
+}
+
+/**
+ * An appointment step (src/lib/appointments): a system message whose text and conversation fields
+ * `extend` sets inside the append transaction (same access checks as a message), then what follows
+ * every message (the other participant's badge, live events, digest mail).
+ */
+export async function appendAppointmentStep(actor: MessagingActor, cid: string, extend: ConversationExtension, now = new Date()): Promise<string> {
+  const { messageId } = await append(actor, cid, "", { text: "", flags: [], masked: false }, now, extend);
+  return messageId;
 }
 
 /** Read receipt (D7); the badge forgets the conversation either way. Live receipt when something changed. */

@@ -1,4 +1,5 @@
 import type { Locale } from "@/config/site";
+import type { AppointmentKind } from "@/lib/contracts/appointments";
 
 // Mail adapter (§2 "Adapters": MailTransport). Resend in production, Brevo as the security
 // fallback, an in-memory mailbox in development (DEV_MAILBOX). The web app only enqueues; the
@@ -39,10 +40,15 @@ export type TemplateId =
   | "proRejected"
   // Pro plans (phase 7, lot 4b): the end of the launch offer, notices then downgrade (design D3).
   | "launchOfferNotice"
+  | "passNotice"
   // Messaging (phase 5, L5): the grouped new-messages mail (design D21).
   | "newMessages"
+  // Appointments in messaging (28 Oct): reminder the day before and 2 hours before a confirmed slot.
+  | "appointmentReminder"
   // Account closure (phase 5, L7, D26): confirmation with what is kept and until when.
-  | "accountClosed";
+  | "accountClosed"
+  // Legal (phase 6, D11): the CGU changed since the member accepted them (DSA art. 14 § 2).
+  | "cguChanged";
 
 /**
  * Statement of reasons (art. 17 DSA, design D8) carried by the hold and rejection mails. The
@@ -161,13 +167,28 @@ export interface TemplateData {
    * the free quota (`freeListings`, null = unlimited) were paused.
    */
   launchOfferNotice: { displayName: string; shopName: string; plan: "essentiel" | "business"; kind: "ending" | "ended"; endsAt: string; freeListings: number | null; paused: number };
+  /** Pass Boutique (2026-10-28): notices at J-7 and J-1 (`ending`), then the downgrade (`ended`). */
+  passNotice: { displayName: string; shopName: string; kind: "ending" | "ended"; endsAt: string; freeListings: number | null; paused: number };
   /**
    * Grouped new-messages mail (bulk, D21): the unread total and up to 3 conversations (listing
    * title, the other member's display name). Never the text of a message.
    */
   newMessages: { displayName: string; count: number; conversations: { listingTitle: string; counterpartName: string }[] };
+  /** A confirmed appointment approaches: `startsAt` ISO, `place` with its links masked (URL_MARKER). */
+  appointmentReminder: {
+    displayName: string;
+    counterpartName: string;
+    listingTitle: string;
+    kind: AppointmentKind;
+    startsAt: string;
+    minutes: number;
+    place: string | null;
+    cid: string;
+  };
   /** The account is closed: closure date and the purge of the account data (ISO). */
   accountClosed: { displayName: string; closedAt: string; purgeAt: string };
+  /** `effective`: ISO day (LEGAL_VERSIONS.cgu). */
+  cguChanged: { displayName: string; version: string; effective: string };
 }
 
 /** One saved search of the digest: its results page, the count of new listings and the newest few. */

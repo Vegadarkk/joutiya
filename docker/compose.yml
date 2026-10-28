@@ -13,9 +13,12 @@ x-service: &service
   init: true
   security_opt: ["no-new-privileges:true"]
   cap_drop: [ALL]
+  # journald, not json-file: a container's logs outlive its recreation by a deploy (json-file logs
+  # die with the container). Retention, 30 days and 2 GB, in infra/vm/journald.conf.d/joutiya.conf.
+  # `docker logs` still reads them.
   logging:
-    driver: json-file
-    options: { max-size: "10m", max-file: "3" }
+    driver: journald
+    options: { tag: "{{.Name}}" }
 
 x-valkey-health: &valkey-health
   test: ["CMD-SHELL", "valkey-cli -a \"$$VALKEY_PASSWORD\" --no-auth-warning ping | grep -q PONG"]

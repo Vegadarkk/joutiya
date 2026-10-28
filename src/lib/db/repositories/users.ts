@@ -2,6 +2,7 @@ import "server-only";
 import { randomInt } from "node:crypto";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import type { Locale } from "@/config/site";
+import { MARKETING_CONSENT_VERSION } from "@/lib/contracts/auth";
 import type { z } from "@/lib/zod";
 import { db } from "@/lib/firebase/admin";
 import { HttpError } from "@/lib/http/errors";
@@ -81,6 +82,7 @@ export async function createAccountDocuments(input: CreateAccountInput): Promise
       cgu: { version: input.consents.cguVersion, at: now },
       transfers: { version: input.consents.transfersVersion, at: now },
       marketing: input.consents.marketing,
+      ...(input.consents.marketing ? { marketingConsent: { version: MARKETING_CONSENT_VERSION, at: now } } : {}),
     },
     strikes: { level: 0 },
     reporter: { recent: [], total: 0 },
@@ -155,6 +157,62 @@ export async function updateDisplayName(uid: string, displayName: string, now = 
 
 export async function updateLocale(uid: string, locale: Locale, now = new Date()): Promise<void> {
   await userRef(uid).update({ locale, updatedAt: now });
+  void consume("firestore.writes", 1);
+}
+
+export interface StorefrontPatch {
+  /** null clears the field. */
+  bio?: string | null;
+  bannerKey?: string | null;
+  /** The city shown on the profile, with its region; null shows none. */
+  city?: { citySlug: string; regionCode: string } | null;
+}
+
+/** Storefront settings of /profil (vitrine-avis §1): one write, dotted paths, null deletes. */
+export async function updateStorefront(uid: string, patch: StorefrontPatch, now = new Date()): Promise<void> {
+  const update: Record<string, unknown> = { updatedAt: now };
+  if (patch.bio !== undefined) update["storefront.bio"] = patch.bio === null ? FieldValue.delete() : patch.bio;
+  if (patch.bannerKey !== undefined) update["storefront.bannerKey"] = patch.bannerKey === null ? FieldValue.delete() : patch.bannerKey;
+  if (patch.city !== undefined) {
+    update.citySlug = patch.city === null ? FieldValue.delete() : patch.city.citySlug;
+    update.regionCode = patch.city === null ? FieldValue.delete() : patch.city.regionCode;
+  }
+  await userRef(uid).update(update);
+  void consume("firestore.writes", 1);
+}
+
+/** Renewed transfers consent (art. 44 loi 09-08): only consents.transfers changes (a dotted path in update()). */
+export async function updateTransfersConsent(uid: string, version: string, now = new Date()): Promise<void> {
+  await privateRef(uid).update({ "consents.transfers": { version, at: now } });
+  void consume("firestore.writes", 1);
+}
+
+export async function updateCguConsent(uid: string, version: string, now = new Date()): Promise<void> {
+  await privateRef(uid).update({ "consents.cgu": { version, at: now } });
+  void consume("firestore.writes", 1);
+}
+
+/** system/cguNotice: the CGU version the cgu-notice job works on and the last account it visited. */
+export interface CguNoticeCursor {
+  version: string;
+  lastUid: string | null;
+  done: boolean;
+}
+
+export async function readCguNoticeCursor(): Promise<CguNoticeCursor | null> {
+  const snapshot = await db().collection(COLLECTIONS.system).doc("cguNotice").get();
+  void consume("firestore.reads", 1);
+  const version: unknown = snapshot.get("version");
+  if (typeof version !== "string") return null;
+  const lastUid: unknown = snapshot.get("lastUid");
+  return { version, lastUid: typeof lastUid === "string" && lastUid ? lastUid : null, done: snapshot.get("done") === true };
+}
+
+export async function writeCguNoticeCursor(cursor: CguNoticeCursor, now = new Date()): Promise<void> {
+  await db()
+    .collection(COLLECTIONS.system)
+    .doc("cguNotice")
+    .set({ version: cursor.version, lastUid: cursor.lastUid ?? "", done: cursor.done, updatedAt: Timestamp.fromDate(now) });
   void consume("firestore.writes", 1);
 }
 

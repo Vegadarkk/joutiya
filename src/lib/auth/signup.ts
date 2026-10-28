@@ -1,7 +1,7 @@
 import "server-only";
 import mailchecker from "mailchecker";
 import type { Locale } from "@/config/site";
-import { CGU_VERSION, TRANSFERS_CONSENT_VERSION, signupSchema, verifyResendSchema, type SignupInput, type SignupResponse, type VerifyResendResponse } from "@/lib/contracts/auth";
+import { CGU_VERSION, signupSchema, verifyResendSchema, type SignupInput, type SignupResponse, type VerifyResendResponse } from "@/lib/contracts/auth";
 import { createAccountDocuments, emailNormHash, findUidByEmail, getUser, isEmailTaken } from "@/lib/db/repositories/users";
 import { auth } from "@/lib/firebase/admin";
 import { readJson } from "@/lib/http/json";
@@ -14,6 +14,7 @@ import { pepperedHash } from "@/lib/security/hash";
 import { displayNameFor, errorCode, userByEmail } from "./accounts";
 import { anonymous, beginAnonymous, checkTurnstile, deviceIdOf, respond, uniformDuration, type AnonymousFlow } from "./anonymous";
 import { sendSignupExistingMail, sendVerificationMail } from "./mails";
+import { transfersConsentVersion } from "./consent-version";
 import { deleteOrphanRecord, recordState } from "./orphan";
 import { assertPasswordPolicy } from "./password-policy";
 
@@ -86,7 +87,7 @@ async function signup(request: Request): Promise<Response> {
       email: input.email,
       displayName: input.displayName,
       locale: input.locale,
-      consents: { cguVersion: CGU_VERSION, transfersVersion: TRANSFERS_CONSENT_VERSION, marketing: input.consents.marketing },
+      consents: { cguVersion: CGU_VERSION, transfersVersion: transfersConsentVersion(), marketing: input.consents.marketing },
       provider: "password",
       ...(deviceId ? { signupDeviceHash: pepperedHash("did", deviceId) } : {}),
     });

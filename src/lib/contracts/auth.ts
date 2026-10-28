@@ -1,4 +1,5 @@
 import { z } from "@/lib/zod";
+import { LEGAL_VERSIONS } from "@/config/legal-versions";
 import { LOCALES } from "@/config/site";
 import { PASSWORD_MAX, PASSWORD_MIN } from "./endpoints";
 
@@ -7,8 +8,11 @@ import { PASSWORD_MAX, PASSWORD_MIN } from "./endpoints";
 // Objects are strict: unknown fields are refused (§6 injection).
 
 /** Version strings recorded with the consents (users/{uid}/private.consents). */
-export const CGU_VERSION = "2026-10";
-export const TRANSFERS_CONSENT_VERSION = "2026-10";
+export const CGU_VERSION = LEGAL_VERSIONS.cgu.version;
+/** 2026-10-19: the text names each provider, its role and region (audit C2-04); older consents are asked again. */
+export const TRANSFERS_CONSENT_VERSION = "2026-10-19";
+/** Version of the opt-in text for information e-mails (SignUp.consents.marketing). */
+export const MARKETING_CONSENT_VERSION = "2026-10";
 
 export { AUTH_API, PASSWORD_MAX, PASSWORD_MIN } from "./endpoints";
 
@@ -107,6 +111,12 @@ export type VerifyResendInput = z.infer<typeof verifyResendSchema>;
 
 export const profileSchema = z.object({ displayName: displayNameSchema.optional(), locale: localeSchema.optional() }).strict();
 
+/** POST /api/auth/consents: the renewed transfers consent of the re-consent panel (design D12). */
+export const transfersConsentSchema = z.object({ transfers: z.literal(true) }).strict();
+/** POST /api/auth/consents: the current CGU acknowledged from the change notice (design D11). */
+export const cguConsentSchema = z.object({ cgu: z.literal(true) }).strict();
+export const consentsRequestSchema = z.union([transfersConsentSchema, cguConsentSchema]);
+
 /** Moroccan mobile only (06, 07): national or international format, as typed by the user. */
 export const phoneStartSchema = z.object({ phone: z.string().trim().min(9).max(20) }).strict();
 
@@ -122,6 +132,8 @@ export interface SessionSummary {
   phoneVerified: boolean;
   locale: (typeof LOCALES)[number] | null;
   providers: ("password" | "google.com")[];
+  /** The CGU changed since this member accepted them: the notice shows until acknowledged (D11). */
+  cguUpdate: { version: string; effective: string } | null;
 }
 
 export type SignupResponse = { status: "verification_sent" };
@@ -135,5 +147,6 @@ export type VerifyResendResponse = { status: "verification_sent" };
 export type ResetConfirmResponse = { status: "password_reset" };
 export type PasswordChangeResponse = { status: "changed"; session: SessionSummary };
 export type ProfileResponse = { session: SessionSummary };
+export type ConsentsResponse = { status: "recorded"; version: string };
 export type SessionResponse = { status: "signed_in"; session: SessionSummary };
 export type MeResponse = { session: SessionSummary | null };

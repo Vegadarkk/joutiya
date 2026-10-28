@@ -9,11 +9,15 @@ import type { ProPlan } from "@/config/pricing";
 // Essentiel quotas and storefront for free, without monthly credits (`planSource: "launch_offer"`).
 // When the offer ends (30 days' notice after sales open), a Pro without a subscription is
 // downgraded like a Pro whose subscription expired.
+//
+// Pass Boutique (owner decision 2026-10-28): a one-off payment gives a plan for a fixed time
+// (`planSource: "pass"`, end in `passEndsAt`); at its end the shop is downgraded at once, without
+// grace (nothing failed). A subscription taken during a pass replaces it (`subscription_active`).
 
 export const PRO_STATES = ["pending_verification", "verified", "active", "grace", "downgraded", "rejected", "suspended"] as const;
 export type ProState = (typeof PRO_STATES)[number];
 
-export const PLAN_SOURCES = ["launch_offer", "subscription", "none"] as const;
+export const PLAN_SOURCES = ["launch_offer", "subscription", "pass", "none"] as const;
 export type PlanSource = (typeof PLAN_SOURCES)[number];
 
 export type PaidPlan = Exclude<ProPlan, "none">;
@@ -43,6 +47,10 @@ export type ProEvent =
   | { type: "grace_ended" }
   /** `config/pricing.launchOffer.endsAt` passed and the Pro has no subscription. */
   | { type: "launch_offer_ended" }
+  /** A Pass Boutique was paid (Stripe Checkout in payment mode). */
+  | { type: "pass_purchased"; plan: PaidPlan }
+  /** `passEndsAt` passed without another pass or a subscription. */
+  | { type: "pass_ended" }
   | { type: "suspended" }
   /** Suspension lifted (appeal granted or term over): back to the state held before. */
   | { type: "reinstated" };
@@ -158,6 +166,16 @@ function apply(current: ProLifecycleView, event: ProEvent, ctx: ProTransitionCon
       return downgrade(ctx);
     case "launch_offer_ended":
       if (from !== "verified" || current.planSource !== "launch_offer") return null;
+      return downgrade(ctx);
+    case "pass_purchased":
+      // A running subscription is never doubled by a pass (the checkout refuses it).
+      if (from !== "verified" && from !== "downgraded" && !(from === "active" && current.planSource === "pass")) return null;
+      return {
+        patch: { lifecycle: "active", plan: event.plan, planSource: "pass", graceUntil: null },
+        effects: { ...NO_EFFECTS, storefrontVisible: true, reindexListings: true, pauseOverQuota: from === "active" },
+      };
+    case "pass_ended":
+      if (from !== "active" || current.planSource !== "pass") return null;
       return downgrade(ctx);
     case "suspended":
       if (from === "suspended") return null;

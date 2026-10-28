@@ -12,6 +12,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { fileURLToPath } from "node:url";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 interface ManifestModel {
   name: string;
@@ -81,6 +82,7 @@ async function download(model: ManifestModel, target: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const checkOnly = process.argv.includes("--check");
   const dir = path.resolve(process.env.MEDIA_MODELS_DIR || "models");
   const manifest = await readManifest();

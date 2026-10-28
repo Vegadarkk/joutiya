@@ -1,6 +1,7 @@
 import { z } from "@/lib/zod";
 import { CONDITIONS } from "@/config/categories";
 import { LOCALES } from "@/config/site";
+import { BANNER_KEYS, BIO_MAX } from "@/config/storefront";
 import {
   DESCRIPTION_MAX,
   LISTING_STATUSES,
@@ -20,6 +21,16 @@ import { ROLES } from "@/lib/firebase/claims";
 import { SAVED_SEARCH_ALERTS, SAVED_SEARCH_NAME_MAX } from "@/lib/contracts/search";
 import { storedSearchParamsSchema } from "@/lib/search/params";
 import { MESSAGE_RISK_FLAGS, MESSAGE_TEXT_MAX } from "@/lib/contracts/messaging";
+import {
+  APPOINTMENT_CANCEL_REASONS,
+  APPOINTMENT_EVENTS,
+  APPOINTMENT_KINDS,
+  APPOINTMENT_PLACE_MAX,
+  APPOINTMENT_SLOTS_MAX,
+  APPOINTMENT_STATUSES,
+  appointmentIdSchema,
+  slotSchema,
+} from "@/lib/contracts/appointments";
 import { REPORT_PRIORITIES, REPORT_REASON_IDS, REPORT_TARGET_TYPES } from "@/config/report-reasons";
 import type { LedgerReason } from "@/lib/payments/wallet";
 
@@ -63,6 +74,8 @@ export const userSchema = z
     proId: z.string().max(64).optional(),
     regionCode: z.string().regex(/^(0[1-9]|1[0-2])$/).optional(),
     citySlug: z.string().max(64).optional(),
+    /** Storefront of /profil (vitrine-avis §1): "about" text and house banner, both optional. */
+    storefront: z.object({ bio: z.string().max(BIO_MAX).optional(), bannerKey: z.enum(BANNER_KEYS).optional() }).strict().optional(),
     badges: z.object({ emailVerified: z.boolean(), phoneVerified: z.boolean(), proCertified: z.boolean() }).strict(),
     stats: z
       .object({ activeListings: z.number().int().min(0), responseRate: z.number().min(0).max(1), medianReplyMin: z.number().min(0), ratingAvg: z.number().min(0).max(5).optional(), ratingCount: z.number().int().min(0) })
@@ -94,6 +107,8 @@ export const userPrivateSchema = z
         /** Art. 44 loi 09-08: express consent to data transfers outside Morocco. */
         transfers: consentSchema,
         marketing: z.boolean(),
+        /** Proof of the opt-in to information e-mails (text version and date); absent when refused or before 2026-10-28. */
+        marketingConsent: consentSchema.optional(),
       })
       .strict(),
     strikes: z.object({ level: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), lastAt: ts.optional(), suspendedUntil: ts.optional() }).strict(),
@@ -504,6 +519,41 @@ export type SavedSearchDoc = z.infer<typeof savedSearchSchema>;
 const hold = z.array(z.string().min(1).max(64)).max(50);
 const participantsSchema = z.tuple([uid, uid]);
 
+const storedSlotSchema = z.object({ start: ts, minutes: slotSchema.shape.minutes }).strict();
+
+/** Conversation.appointment: the conversation's current appointment (architecture §5, 28 Oct). */
+export const appointmentSchema = z
+  .object({
+    id: appointmentIdSchema,
+    kind: z.enum(APPOINTMENT_KINDS),
+    proposedBy: uid,
+    /** Sorted by start, no overlap (src/lib/appointments/rules.ts). */
+    slots: z.array(storedSlotSchema).min(1).max(APPOINTMENT_SLOTS_MAX),
+    /** Links masked like a message (URL_MARKER). */
+    place: z.string().max(APPOINTMENT_PLACE_MAX + 40).optional(),
+    status: z.enum(APPOINTMENT_STATUSES),
+    chosen: storedSlotSchema.optional(),
+    cancelledBy: uid.optional(),
+    reason: z.enum(APPOINTMENT_CANCEL_REASONS).optional(),
+    createdAt: ts,
+    updatedAt: ts,
+  })
+  .strict();
+export type AppointmentDoc = z.infer<typeof appointmentSchema>;
+export type StoredSlot = z.infer<typeof storedSlotSchema>;
+
+/** Message.appointment: the step an appointment system message shows. */
+export const appointmentEventSchema = z
+  .object({
+    id: appointmentIdSchema,
+    event: z.enum(APPOINTMENT_EVENTS),
+    kind: z.enum(APPOINTMENT_KINDS),
+    slot: storedSlotSchema.optional(),
+    reason: z.enum(APPOINTMENT_CANCEL_REASONS).optional(),
+  })
+  .strict();
+export type AppointmentEventDoc = z.infer<typeof appointmentEventSchema>;
+
 /** conversations/{cid}: one per (listing, buyer); cid derived on the server (D1). Served to participants by the API (D2). */
 export const conversationSchema = z
   .object({
@@ -546,6 +596,10 @@ export const conversationSchema = z
     legalHold: hold,
     /** Adults-only listing: when the buyer confirmed being 18 or older (first message). */
     buyerAdultConfirmedAt: ts.optional(),
+    /** The current appointment (proposed, confirmed or ended); the thread keeps every step. */
+    appointment: appointmentSchema.optional(),
+    /** Due time of the confirmed appointment's next reminder (job appointment-reminders). */
+    appointmentRemindAt: ts.optional(),
   })
   .strict();
 export type ConversationDoc = z.infer<typeof conversationSchema>;
@@ -561,6 +615,8 @@ export const messageSchema = z
     text: z.string().max(MESSAGE_TEXT_MAX + 200),
     risk: z.object({ flags: z.array(z.enum(MESSAGE_RISK_FLAGS)).min(1).max(4), warned: z.boolean() }).strict().optional(),
     hidden: z.boolean().optional(),
+    /** Appointment system message: its text is the appointmentMarker of the event. */
+    appointment: appointmentEventSchema.optional(),
     createdAt: ts,
     readAt: ts.optional(),
   })
@@ -805,6 +861,17 @@ export const billingAccountSchema = z
       })
       .strict()
       .optional(),
+    /** The last Pass Boutique checkout; an open session is expired before another opens. */
+    lastPassCheckout: z
+      .object({
+        passId: z.string().regex(/^[a-z0-9_]{1,40}$/),
+        consentVersion: z.string().min(1).max(20),
+        at: ts,
+        idempotencyKey: z.string().max(200).optional(),
+        sessionId: z.string().regex(/^cs_[A-Za-z0-9_]{1,200}$/).optional(),
+      })
+      .strict()
+      .optional(),
     /** A refund left the wallet negative: the account waits on an admin. */
     flaggedAt: ts.optional(),
     createdAt: ts,
@@ -873,8 +940,8 @@ export const billingEventSchema = z
     customerId: z.string().min(1).max(255).optional(),
     subscriptionId: z.string().min(1).max(255).optional(),
     objectId: z.string().min(1).max(255).optional(),
-    /** RevenueCat: a pack's purchase or refund, or a Pro plan's change (synced). */
-    kind: z.enum(["pack", "subscription"]).optional(),
+    /** RevenueCat: a pack's purchase or refund, or a Pro plan's change (synced). Stripe: "pass" for a Pass Boutique's Checkout Session. */
+    kind: z.enum(["pack", "subscription", "pass"]).optional(),
     productId: z.string().min(1).max(100).optional(),
     transactionId: z.string().min(1).max(255).optional(),
     cancelReason: z.string().min(1).max(64).optional(),
@@ -950,6 +1017,8 @@ export const COLLECTIONS = {
   moderationDecisions: "moderationDecisions",
   /** system/backup (cursor state of backup-firestore), free-form documents. */
   system: "system",
+  /** config/{legal,ai,flags,...}: runtime settings (back office, scripts), read through src/lib/config. */
+  config: "config",
   // Phase 4 (subcollections of users/{uid})
   favorites: "favorites",
   savedSearches: "savedSearches",

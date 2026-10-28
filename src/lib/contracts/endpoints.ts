@@ -25,6 +25,8 @@ export const AUTH_API = {
   phoneStart: "/api/auth/phone/start",
   phoneStatus: "/api/auth/phone/status",
   profile: "/api/auth/profile",
+  /** Renewed transfers consent (art. 44 loi 09-08) of the re-consent panel. */
+  consents: "/api/auth/consents",
   staffLogin: "/api/admin/auth/login",
   staffLogout: "/api/admin/auth/logout",
 } as const;
@@ -35,6 +37,8 @@ export const ACCOUNT_API = {
   close: "/api/account/close",
   /** GET with the X-CSRF-Token header -> the AccountExport JSON file (attachment, no-store). */
   export: "/api/account/export",
+  /** GET -> StorefrontSettings; POST StorefrontInput -> StorefrontSettings (vitrine-avis §1). */
+  storefront: "/api/account/storefront",
 } as const;
 
 export const LISTING_API = {
@@ -67,6 +71,8 @@ export const MESSAGING_API = {
   read: (cid: string) => `/api/conversations/${cid}/read`,
   /** POST { archived } | { hidden: true } | { blocked }. */
   state: (cid: string) => `/api/conversations/${cid}/state`,
+  /** POST AppointmentAction -> 201 AppointmentResponse (contracts/appointments.ts). */
+  appointment: (cid: string) => `/api/conversations/${cid}/appointment`,
   /** GET { total } (Valkey). */
   unread: "/api/messages/unread",
   /** GET text/event-stream of MessagingEvent (session cookie; one per tab, D2). */

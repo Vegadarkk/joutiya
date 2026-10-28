@@ -2,7 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import type { UpdateRequest, UserRecord } from "firebase-admin/auth";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from "jose";
-import { CGU_VERSION, TRANSFERS_CONSENT_VERSION, displayNameSchema, googleSchema, type GoogleInput, type GoogleResponse } from "@/lib/contracts/auth";
+import { CGU_VERSION, displayNameSchema, googleSchema, type GoogleInput, type GoogleResponse } from "@/lib/contracts/auth";
 import { createAccountDocuments, findUidByEmail, isEmailTaken, linkProvider, unlinkProvider } from "@/lib/db/repositories/users";
 import { serverEnv } from "@/lib/env";
 import { auth } from "@/lib/firebase/admin";
@@ -18,6 +18,7 @@ import { gisNonce } from "@/lib/security/device";
 import { safeEqual } from "@/lib/security/hash";
 import { errorCode, localPart, userByEmail } from "./accounts";
 import { activateMember } from "./activation";
+import { transfersConsentVersion } from "./consent-version";
 import { deleteOrphanRecord, recordState } from "./orphan";
 import { anonymous, beginAnonymous, checkTurnstile, finish, respond, type AnonymousFlow } from "./anonymous";
 import { signedIn } from "./respond";
@@ -185,7 +186,7 @@ async function signUp(flow: AnonymousFlow, input: GoogleInput & { consents: NonN
       email: identity.email,
       displayName,
       locale: input.locale,
-      consents: { cguVersion: CGU_VERSION, transfersVersion: TRANSFERS_CONSENT_VERSION, marketing: input.consents.marketing },
+      consents: { cguVersion: CGU_VERSION, transfersVersion: transfersConsentVersion(), marketing: input.consents.marketing },
       provider: PROVIDER,
       activated: true,
     });

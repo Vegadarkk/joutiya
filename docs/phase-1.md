@@ -120,11 +120,10 @@ Après la validation du .MA par le registre, et avant le 12 novembre (Cloudflare
 En attendant, le staging de la VM se construit sur la VM elle-même, comme sur le PC2 : `node scripts/oracle-vm.ts build-staging [--commit=<sha>] --apply` récupère un commit de `main` depuis le dépôt public, construit les images et démarre le staging dès que tous ses secrets sont en place. Ces images n'ont pas de trace de la CI : `promote` les refuse, la production attend donc cette étape.
 
 1. Nav prépare un jeton GitHub à grain fin `joutiya-claude-actions` : dépôt `joutiya` seul, permissions **Secrets** et **Variables** en lecture et écriture, 90 jours. Vous cliquez sur **Generate token** et l'enregistrez dans l'environnement cloud sous `JOUTIYA_GITHUB_ACTIONS_TOKEN`.
-2. Claude, dans une nouvelle session :
-   - crée la clé de `deploy-staging` : la clé privée va dans le secret GitHub `STAGING_DEPLOY_SSH_KEY`, la clé publique sur la VM (`oracle-vm.ts sync --deploy-staging-key`) ;
-   - met `STAGING_ACCESS_CLIENT_ID` et `STAGING_ACCESS_CLIENT_SECRET` (jeton `joutiya-ci`) ;
-   - met la variable `VM_SSH_KNOWN_HOSTS`, avec la clé d'hôte lue sur la console série ;
-   - puis met `STAGING_DEPLOY_ENABLED` à `true`.
+2. Le réseau de la session cloud refuse l'API des secrets et variables d'Actions : Claude prépare et chiffre, Nav envoie depuis le PC2 avec le même jeton, rangé aussi dans le fichier du PC2 (`scripts/github-ci.ts`). Chaque secret est chiffré pour la clé publique du dépôt : seul GitHub peut le relire, et le paquet peut passer par le chat.
+   - Nav : `node --env-file=<fichier du PC2> scripts/github-ci.ts public-key` affiche la clé publique du dépôt (publique) et les noms des secrets et variables ;
+   - Claude : `node scripts/github-ci.ts seal --public-key=<fichier> --host-key="<ligne host key de la console série>" --out=<paquet> --enable --apply` crée la clé de `deploy-staging` et renouvelle le secret du jeton `joutiya-ci`, puis pose la clé publique sur la VM (`oracle-vm.ts sync --deploy-staging-key=<paquet>.pub --apply`) ;
+   - Nav : `node --env-file=<fichier du PC2> scripts/github-ci.ts apply <paquet> --apply` pose `STAGING_DEPLOY_SSH_KEY`, `STAGING_ACCESS_CLIENT_ID`, `STAGING_ACCESS_CLIENT_SECRET`, `VM_SSH_KNOWN_HOSTS`, puis `STAGING_DEPLOY_ENABLED` à `true`.
 3. Claude lance *Deploy staging* sur `main`. Ensuite, chaque fusion sur `main` construit l'image et la déploie en staging toute seule.
 
 Les variables `FIREBASE_STAGING_WIF_PROVIDER` et `FIREBASE_STAGING_DEPLOYER` (rien de secret, les valeurs que `setup staging` affiche) sont posées depuis le 16 octobre (Nav), et l'étape 9 a créé le fournisseur et le compte qu'elles désignent. Le job des règles et des index Firestore du staging ne dépend donc pas de la VM : il tourne à chaque fusion sur `main`.
@@ -172,7 +171,7 @@ Garde-fous : au plus 20 e-mails relayés par jour UTC, dont les 5 derniers gard�
 ## 12. Mise en production et contrôles
 
 1. Claude vérifie que le dernier *Deploy staging* est vert, et que `https://staging.joutiya.ma` affiche l'accueil et les pages légales.
-2. Claude promeut la version du staging par Run Command (`node scripts/oracle-vm.ts promote --apply`, qui vide ensuite le cache Cloudflare) : seules les images déjà en service en staging peuvent passer, désignées par leur identifiant exact, chargées depuis l'archive que la CI a construite (son empreinte est publiée sur le commit, contrôle « Release images ») et seulement pour un commit de `main`. Retour arrière : `rollback --apply`. La production n'a aucun accès SSH : seul le staging en garde un, pour la CI. Un déploiement, en staging comme en production, n'attend que web et worker : une recherche en panne répond 503 sans faire revenir la version précédente.
+2. Claude promeut la version du staging par Run Command (`node scripts/oracle-vm.ts promote --tag=vX.Y.Z --apply`, qui vide ensuite le cache Cloudflare ; tag de release annoté, `docs/lancement/mise-en-production.md`) : seules les images déjà en service en staging peuvent passer, et seulement si elles sont celles du commit du tag, désignées par leur identifiant exact, chargées depuis l'archive que la CI a construite (son empreinte est publiée sur le commit, contrôle « Release images ») et seulement pour un commit de `main`. Retour arrière : `rollback --apply`. La production n'a aucun accès SSH : seul le staging en garde un, pour la CI. Un déploiement, en staging comme en production, n'attend que web et worker : une recherche en panne répond 503 sans faire revenir la version précédente.
 3. Contrôles de fin de phase :
    - `https://joutiya.ma/api/health` répond `ok` ;
    - un balayage de tous les ports de l'IP publique de la VM n'en trouve aucun ouvert ;
@@ -283,7 +282,7 @@ Toutes les échéances du projet sont dans `joutiya/echeances.md`, dans les fich
   Un rappel part 30 jours avant l'échéance : Claude le pose avec les certificats.
 - **Autorité des certificats** (PC2, `~/.joutiya/wif-ca`) : 10 ans, jusqu'au 13 octobre 2036. Gardez le dossier `~/.joutiya` du PC2 (autorité et connexion gcloud). S'il est perdu ou si l'autorité expire, Nav en crée une nouvelle (`ca --new`) et refait `setup staging --apply` et `setup prod --apply`, puis Claude refait les certificats de la VM comme ci-dessus.
 - **Jeton Cloudflare `joutiya-edge`** : jusqu'au 15 novembre 2026. Oublié, Claude ne peut plus régler Cloudflare par API (DNS, tunnels, cache) ; le site continue de tourner. Nav prépare un jeton aux mêmes droits, vous le rangez sous `JOUTIYA_CLOUDFLARE_API_TOKEN`.
-- **Jeton GitHub `joutiya-claude-actions`** (étape 8) : 90 jours à partir de sa création. Oublié, Claude ne peut plus changer les secrets et variables de la CI ; les déploiements continuent.
+- **Jeton GitHub `joutiya-claude-actions`** (étape 8) : jusqu'au 25 janvier 2027. Oublié, plus aucun changement des secrets et variables de la CI ; les déploiements continuent. Nav prépare un jeton aux mêmes droits ; vous le rangez sous le même nom, dans l'environnement cloud et dans le fichier du PC2.
 
 ## Fin de la phase 1
 

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
+import { appointmentEventOf, type AppointmentEvent } from "@/lib/contracts/appointments";
 import { HIDDEN_MARKER, URL_MARKER, type ConversationView } from "@/lib/contracts/messaging";
 import { cn } from "@/lib/utils";
 import { formatRowTime } from "./format";
@@ -22,8 +23,10 @@ import { useMessages } from "./messages-provider";
 // end is off screen or the last page is in.
 
 /** The last message as one line: moderation and masked links in words ("Vous :" is set apart). */
-export function previewText(row: Pick<ConversationView, "lastMessage">, labels: { hidden: string; maskedLink: string }): string {
+export function previewText(row: Pick<ConversationView, "lastMessage">, labels: { hidden: string; maskedLink: string; appointment?: (event: AppointmentEvent) => string }): string {
   const { preview } = row.lastMessage;
+  const step = appointmentEventOf(preview);
+  if (step && labels.appointment) return labels.appointment(step);
   return preview === HIDDEN_MARKER ? labels.hidden : preview.split(URL_MARKER).join(labels.maskedLink).replace(/\s+/g, " ").trim();
 }
 
@@ -37,7 +40,8 @@ function ConversationRow({ row, selected, archived, now }: { row: ConversationVi
   const risk = useTranslations("Messaging.risk");
   const locale = useLocale() as Locale;
   const unread = row.unread > 0;
-  const preview = previewText(row, { hidden: t("hidden"), maskedLink: t("maskedLink") });
+  const appointment = useTranslations("Appointments.preview");
+  const preview = previewText(row, { hidden: t("hidden"), maskedLink: t("maskedLink"), appointment: (event) => appointment(event) });
   return (
     <li>
       <Link

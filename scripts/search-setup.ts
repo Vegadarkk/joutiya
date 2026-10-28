@@ -17,6 +17,7 @@ import { registerHooks } from "node:module";
 import { dirname, resolve as resolvePath } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 export interface KeySpec {
   uid: string;
@@ -128,6 +129,7 @@ function fail(what: string, result: { status: number; body: unknown }): never {
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const { values: args } = parseArgs({ options: { url: { type: "string" }, "write-env": { type: "string" }, apply: { type: "boolean", default: false } } });
   const url = (args.url ?? process.env.MEILI_URL ?? "").replace(/\/+$/, "");
   const masterKey = process.env.MEILI_MASTER_KEY ?? "";

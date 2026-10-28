@@ -14,20 +14,23 @@
 // 2. products joutiya_essentiel and joutiya_business;
 // 3. one MAD price per plan and interval (lookup key joutiya_{plan}_{interval}_mad, amount excluding
 //    tax from DEFAULT_PRICING): a changed amount gets a new price that takes the lookup key over;
+//    the Pass Boutique gets its product joutiya_pass_boutique and one one-time MAD price per pass
+//    (lookup key joutiya_pass_{id}_mad, owner decision 2026-10-28);
 // 4. the Customer Portal configuration: card, invoices, cancellation at period end, plan switch
 //    between the four prices, upgrades invoiced at once and downgrades at period end (a plan's
 //    monthly grant cannot be taken twice by switching back and forth);
 // 5. the webhook endpoint {site}/api/webhooks/stripe with the events the handler reads, at the
 //    app's API version. Its signing secret, returned once, goes to --secret-file (created, mode
 //    600) as STRIPE_WEBHOOK_SECRET=..., never to the terminal.
-// Then it prints the ids to set in config/pricing.plans. The VAT tax rate waits for the owner's
+// Then it prints the ids to set in config/pricing.plans and config/pricing.passes. The VAT tax rate waits for the owner's
 // tax decision (phase 7 tax cards): nothing is created for it here.
 
 import { existsSync, writeFileSync, readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { PaidPlanId, PlanInterval, PlansConfig } from "../src/config/pricing.ts";
+import type { PaidPlanId, PassConfig, PlanInterval, PlansConfig } from "../src/config/pricing.ts";
 import { validateTargets, type Targets } from "./assert-target.ts";
 import { registerSrcResolver } from "./search-setup.ts";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 export type SetupEnv = "staging" | "prod";
 type StripeParam = string | number | boolean | null | undefined | readonly StripeParam[] | { readonly [key: string]: StripeParam };
@@ -46,6 +49,36 @@ export const PRODUCTS: Record<PaidPlanId, { id: string; name: string; descriptio
   essentiel: { id: "joutiya_essentiel", name: "Joutiya Pro Essentiel", description: "Offre Pro Essentiel : annonces en ligne, crédits chaque mois, vitrine et badge Pro." },
   business: { id: "joutiya_business", name: "Joutiya Pro Business", description: "Offre Pro Business : annonces en ligne, crédits et « À la Une » chaque mois, vitrine et badge Pro." },
 };
+
+export const PASS_PRODUCT = { id: "joutiya_pass_boutique", name: "Joutiya Pass Boutique", description: "Pass Boutique : annonces en ligne, vitrine et badge Pro pour une durée fixe, en un seul paiement, sans renouvellement." };
+
+export interface DesiredPassPrice {
+  passId: string;
+  days: number;
+  lookupKey: string;
+  unitAmount: number;
+}
+
+export function desiredPassPrices(passes: readonly Pick<PassConfig, "id" | "days" | "priceMinor">[]): DesiredPassPrice[] {
+  return passes.map((pass) => ({ passId: pass.id, days: pass.days, lookupKey: `joutiya_pass_${pass.id}_mad`, unitAmount: pass.priceMinor }));
+}
+
+export function passPriceMatches(price: StripePrice, wanted: DesiredPassPrice): boolean {
+  return price.product === PASS_PRODUCT.id && price.currency === "mad" && price.unit_amount === wanted.unitAmount && price.recurring === null;
+}
+
+export function passPriceParams(wanted: DesiredPassPrice): Record<string, StripeParam> {
+  return {
+    product: PASS_PRODUCT.id,
+    currency: "mad",
+    unit_amount: wanted.unitAmount,
+    tax_behavior: "exclusive",
+    lookup_key: wanted.lookupKey,
+    transfer_lookup_key: true,
+    nickname: `${PASS_PRODUCT.name} (${wanted.days} jours)`,
+    metadata: { joutiya: "pass", passId: wanted.passId },
+  };
+}
 
 export interface DesiredPrice {
   plan: PaidPlanId;
@@ -190,6 +223,8 @@ export interface SetupOptions extends Cli {
   key: string;
   accountId: string;
   plans: Pick<PlansConfig, PaidPlanId>;
+  /** config/pricing.passes (none: no pass product or price). */
+  passes?: readonly Pick<PassConfig, "id" | "days" | "priceMinor">[];
   write?: (line: string) => void;
   writeSecret?: (file: string, content: string) => void;
   fileExists?: (file: string) => boolean;
@@ -200,12 +235,15 @@ export async function runSetup(options: SetupOptions): Promise<void> {
   const write = options.write ?? ((line: string) => console.log(line));
   const writeSecret = options.writeSecret ?? ((file: string, content: string) => writeFileSync(file, content, { flag: "wx", mode: 0o600 }));
   const desired = desiredPrices(options.plans);
+  const desiredPasses = desiredPassPrices(options.passes ?? []);
 
   if (!key) {
     if (apply) throw new Error(`${KEY_VARIABLE} is not set`);
     write(`Offline plan for ${env} (${KEY_VARIABLE} not set, nothing read):`);
     for (const plan of PLANS) write(`  product ${PRODUCTS[plan].id}: ${PRODUCTS[plan].name}`);
     for (const price of desired) write(`  price ${price.lookupKey}: ${price.unitAmount / 100} MAD excl. tax per ${price.interval === "monthly" ? "month" : "year"}`);
+    if (desiredPasses.length > 0) write(`  product ${PASS_PRODUCT.id}: ${PASS_PRODUCT.name}`);
+    for (const price of desiredPasses) write(`  price ${price.lookupKey}: ${price.unitAmount / 100} MAD excl. tax, once, ${price.days} days`);
     write(`  portal configuration "${PORTAL_TAG}": return ${portalParams(env, {}).default_return_url as string}`);
     write(`  webhook ${webhookUrl(env)}: ${WEBHOOK_EVENTS.join(", ")} (API ${STRIPE_API_VERSION})`);
     return;
@@ -245,9 +283,16 @@ export async function runSetup(options: SetupOptions): Promise<void> {
     else if (found.status === 404) await run(`create product ${id}`, "POST", "/v1/products", { id, name, description, metadata: { joutiya: "pro-plan", plan } });
     else throw failure(`GET product ${id}`, found);
   }
+  if (desiredPasses.length > 0) {
+    const { id, name, description } = PASS_PRODUCT;
+    const found = await stripe<{ id?: string }>("GET", `/v1/products/${id}`);
+    if (found.status === 200) write(`= product ${id}`);
+    else if (found.status === 404) await run(`create product ${id}`, "POST", "/v1/products", { id, name, description, metadata: { joutiya: "pass" } });
+    else throw failure(`GET product ${id}`, found);
+  }
 
   // 3. Prices (active ones carrying the lookup keys).
-  const listed = await stripe<{ data?: StripePrice[] }>("GET", "/v1/prices", { lookup_keys: desired.map((price) => price.lookupKey), limit: 10 });
+  const listed = await stripe<{ data?: StripePrice[] }>("GET", "/v1/prices", { lookup_keys: [...desired, ...desiredPasses].map((price) => price.lookupKey), limit: 10 });
   if (listed.status !== 200) throw failure("GET prices", listed);
   const ids: Record<string, string> = {};
   for (const wanted of desired) {
@@ -260,13 +305,23 @@ export async function runSetup(options: SetupOptions): Promise<void> {
     const created = await run<{ id: string }>(`create price ${wanted.lookupKey} (${wanted.unitAmount / 100} MAD)${current ? `, replacing ${current.id}` : ""}`, "POST", "/v1/prices", priceParams(wanted), `stripe-setup-${env}-${wanted.lookupKey}-${wanted.unitAmount}`);
     if (created) ids[wanted.lookupKey] = created.id;
   }
+  for (const wanted of desiredPasses) {
+    const current = listed.body.data?.find((price) => price.lookup_key === wanted.lookupKey);
+    if (current && passPriceMatches(current, wanted)) {
+      ids[wanted.lookupKey] = current.id;
+      write(`= price ${wanted.lookupKey} ${current.id}`);
+      continue;
+    }
+    const created = await run<{ id: string }>(`create price ${wanted.lookupKey} (${wanted.unitAmount / 100} MAD, once)${current ? `, replacing ${current.id}` : ""}`, "POST", "/v1/prices", passPriceParams(wanted), `stripe-setup-${env}-${wanted.lookupKey}-${wanted.unitAmount}`);
+    if (created) ids[wanted.lookupKey] = created.id;
+  }
 
   // 4. Customer Portal configuration (ours carries metadata.joutiya).
   const configurations = await stripe<{ data?: { id: string; metadata?: Record<string, string> }[] }>("GET", "/v1/billing_portal/configurations", { active: true, limit: 100 });
   if (configurations.status !== 200) throw failure("GET portal configurations", configurations);
   const ours = configurations.body.data?.find((configuration) => configuration.metadata?.joutiya === PORTAL_TAG);
   let portalId = ours?.id ?? null;
-  if (apply && Object.keys(ids).length < desired.length) throw new Error("a price is missing: the portal configuration needs the four prices");
+  if (apply && desired.some((price) => !ids[price.lookupKey])) throw new Error("a price is missing: the portal configuration needs the four prices");
   if (ours) await run(`update portal configuration ${ours.id}`, "POST", `/v1/billing_portal/configurations/${ours.id}`, portalParams(env, ids));
   else portalId = (await run<{ id: string }>("create portal configuration", "POST", "/v1/billing_portal/configurations", portalParams(env, ids), `stripe-setup-${env}-portal`))?.id ?? null;
 
@@ -294,10 +349,15 @@ export async function runSetup(options: SetupOptions): Promise<void> {
   const stripePrices = (plan: PaidPlanId) => Object.fromEntries(INTERVALS.map((interval) => [interval, ids[`joutiya_${plan}_${interval}_mad`] ?? "<created by --apply>"]));
   write(`\nconfig/pricing.plans of ${env}:`);
   write(JSON.stringify({ essentiel: { stripePrices: stripePrices("essentiel") }, business: { stripePrices: stripePrices("business") }, stripePortalConfiguration: portalId ?? "<created by --apply>" }, null, 2));
+  if (desiredPasses.length > 0) {
+    write(`\nconfig/pricing.passes of ${env} (stripePrice of each):`);
+    write(JSON.stringify(Object.fromEntries(desiredPasses.map((price) => [price.passId, { stripePrice: ids[price.lookupKey] ?? "<created by --apply>" }])), null, 2));
+  }
   if (!apply) write("\nDry run: nothing sent. Add --apply to send.");
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const cli = parseCli(process.argv.slice(2));
   const raw: unknown = JSON.parse(readFileSync(new URL("../infra/targets.json", import.meta.url), "utf8"));
   const targetErrors = validateTargets(raw);
@@ -306,7 +366,7 @@ async function main(): Promise<void> {
   if (!accountId) throw new Error("shared.stripe.accountId must be recorded in infra/targets.json first");
   registerSrcResolver();
   const { DEFAULT_PRICING } = await import("../src/config/pricing.ts");
-  await runSetup({ ...cli, key: process.env[KEY_VARIABLE] ?? "", accountId, plans: DEFAULT_PRICING.plans });
+  await runSetup({ ...cli, key: process.env[KEY_VARIABLE] ?? "", accountId, plans: DEFAULT_PRICING.plans, passes: DEFAULT_PRICING.passes });
 }
 
 const self = fileURLToPath(import.meta.url);

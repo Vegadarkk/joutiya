@@ -85,6 +85,10 @@
   --foreground-muted: #4a5a5b;
   --border: #dde4e2;
   --border-strong: #b9c6c3;
+  /* Boundary of form controls (fields, idle chips, switch track), WCAG 1.4.11 >= 3:1: 3.87 on
+     background and surface, 3.60 on surface-muted, 3.21 on surface-brand. --border and
+     --border-strong (1.29, 1.76) are for decoration only. */
+  --border-control: #788482;
   --primary: var(--color-ochre-600);
   --primary-hover: var(--color-ochre-700);
   --primary-foreground: #ffffff;
@@ -115,6 +119,8 @@
   --foreground-muted: #a9bcb9;
   --border: #21403f;
   --border-strong: #2f5856;
+  /* 4.43 on background, 3.99 on surface, 3.53 on surface-muted, 3.21 on surface-brand. */
+  --border-control: #5f8986;
   --primary: var(--color-ochre-400);
   --primary-hover: var(--color-ochre-300);
   --primary-foreground: var(--color-bab-950);
@@ -144,6 +150,7 @@
   --color-foreground-muted: var(--foreground-muted);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
+  --color-border-control: var(--border-control);
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);

@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Direction } from "radix-ui";
 import { ThemeSync } from "./theme";
+import { ConsentProvider } from "@/components/consent/consent-provider";
 import { DeferredToaster } from "@/components/ui/deferred-toaster";
 import { SentryClient } from "@/components/observability/sentry-client";
 import { InitialSessionContext } from "@/lib/auth/client";
@@ -31,10 +32,12 @@ export function Providers({
     <Direction.Provider dir={dir}>
       <PublicConfigProvider value={config}>
         <InitialSessionContext.Provider value={initialSession}>
-          <ThemeSync />
-          <SentryClient />
-          {children}
-          <DeferredToaster dir={dir} />
+          <ConsentProvider>
+            <ThemeSync />
+            <SentryClient />
+            {children}
+            <DeferredToaster dir={dir} />
+          </ConsentProvider>
         </InitialSessionContext.Provider>
       </PublicConfigProvider>
     </Direction.Provider>

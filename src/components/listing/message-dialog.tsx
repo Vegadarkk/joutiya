@@ -9,7 +9,7 @@ import { TurnstileWidget, type TurnstileHandle } from "@/components/auth/turnsti
 import { InlineError } from "@/components/feedback/inline-error";
 import { Textarea } from "@/components/post/controls/textarea";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { ApiError, refreshSession } from "@/lib/auth/client";
 import { MESSAGE_TEXT_MAX } from "@/lib/contracts/endpoints";
 import { isolate } from "@/lib/i18n/bidi";
@@ -179,7 +179,14 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
             <p className="flex items-start gap-2 text-sm text-foreground-muted text-pretty">
               <LockKeyhole className="mt-0.5 size-4 shrink-0 text-structure dark:text-gold-300" aria-hidden="true" />
               <span>
-                {t("privacy")} {t("safety")}
+                {t("privacy")} {t("safety")}{" "}
+                {t.rich("scanned", {
+                  link: (chunks) => (
+                    <Link href="/legal/confidentialite#finalites-3" target="_blank" rel="noopener" className="font-medium text-link underline underline-offset-2">
+                      {chunks}
+                    </Link>
+                  ),
+                })}
               </span>
             </p>
 

@@ -2,6 +2,7 @@ import { z } from "@/lib/zod";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
 import { MESSAGE_TEXT_MAX } from "@/lib/contracts/endpoints";
 import { listingIdSchema } from "@/lib/contracts/listings";
+import type { AppointmentEventView, AppointmentView } from "@/lib/contracts/appointments";
 
 // Messaging contracts shared by the browser and the route handlers (design D1-D7). Messages are plain
 // text; the server masks URLs before storage and the reader renders the markers below as chips.
@@ -114,6 +115,8 @@ export interface ConversationView {
   frozen: boolean;
   /** The other participant closed the account (L7): read-only, the history stays. */
   counterpartClosed: boolean;
+  /** The current appointment (src/lib/contracts/appointments.ts), active or ended; null when none. */
+  appointment?: AppointmentView | null;
   updatedAt: number;
 }
 
@@ -124,6 +127,8 @@ export interface MessageView {
   text: string;
   flags: MessageRiskFlag[];
   hidden: boolean;
+  /** Appointment system message: the step it shows. */
+  appointment?: AppointmentEventView;
   createdAt: number;
   readAt: number | null;
 }

@@ -28,6 +28,7 @@ const config = (phoneVerification: boolean): PublicConfig => ({
   upload: { maxBytes: 10 * 1024 * 1024, maxPhotos: 10 },
   map: null,
   phoneVerification,
+  ads: { mode: "off", cmpEea: false, client: null, units: { leaderboard: null, halfpage: null, rectangle: null, banner: null } },
 });
 
 const session = (phoneVerified: boolean): SessionSummary => ({
@@ -41,12 +42,14 @@ const session = (phoneVerified: boolean): SessionSummary => ({
   phoneVerified,
   locale: "fr",
   providers: ["password"],
+  cguUpdate: null,
 });
 
 const listing: OwnerListing = {
   id: "l1",
   slugId: null,
   status: "draft",
+  sellerType: "individual",
   pausedReason: null,
   categoryId: null,
   subcategoryId: null,

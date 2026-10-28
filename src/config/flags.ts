@@ -14,6 +14,13 @@ export const flagsConfigSchema = z
     proSignupEnabled: z.boolean(),
     /** "Paiement en plusieurs fois" stays informative until a licensed lender partners (§8). */
     paymentInstallmentsEnabled: z.boolean(),
+    /**
+     * AdSense (phase 6, D8): "off" = no ad script, no ad host in the CSP and no cookie banner (no
+     * non-exempt tracker exists); "test" = test ads (`data-adtest`); "live" = real ads.
+     */
+    adsMode: z.enum(["off", "test", "live"]),
+    /** Google's certified consent message runs for EEA/UK/CH visitors (D5); until then they get house promotions. */
+    adsCmpEea: z.boolean(),
   })
   .strict();
 export type FlagsConfig = z.infer<typeof flagsConfigSchema>;
@@ -22,6 +29,8 @@ export const DEFAULT_FLAGS: FlagsConfig = {
   salesEnabled: false,
   proSignupEnabled: true,
   paymentInstallmentsEnabled: false,
+  adsMode: "off",
+  adsCmpEea: false,
 };
 
 /** Editing metadata an admin's write may carry next to the flags: ignored, never an error. */
@@ -45,7 +54,7 @@ export function resolveFlagsConfig(stored: unknown): { config: FlagsConfig; erro
       continue;
     }
     const parsed = field.safeParse(value);
-    if (parsed.success) config[key as keyof FlagsConfig] = parsed.data as boolean;
+    if (parsed.success) (config as Record<string, unknown>)[key] = parsed.data;
     else errors.push(`${key}: ${parsed.error.issues[0]?.message ?? "invalid"}`);
   }
   return { config, errors };

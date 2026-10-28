@@ -1,5 +1,5 @@
 import type { Job } from "bullmq";
-import { backupFirestore } from "./backup-firestore";
+import { backupFirestore, backupFreshness } from "./backup-firestore";
 import { expireListings } from "./expire-listings";
 import { liftSuspensions } from "./lift-suspensions";
 import { sendExpiryReminders } from "./listing-expiry-reminders";
@@ -16,8 +16,10 @@ import { reconcileBilling } from "@/lib/payments/reconcile";
 import { updateBillingThresholds } from "@/lib/payments/thresholds";
 import { sweepExpiredBoosts } from "./expire-boosts";
 import { sendSavedSearchAlerts } from "./saved-search-alerts";
+import { sendCguNotices } from "./cgu-notice";
 import { exportAuditLogs } from "./audit-export";
 import { sendMessageDigests } from "./message-digest";
+import { sendAppointmentReminders } from "./appointment-reminders";
 import { sweepReportSla } from "./report-sla-sweep";
 import { checkGuideLinks } from "./guide-links";
 
@@ -32,12 +34,14 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "purge-quarantine": () => purgeQuarantine(),
   "r2-storage-gauge": () => r2StorageGauge(),
   "backup-firestore": () => backupFirestore(),
+  "backup-freshness": () => backupFreshness(),
   "expire-listings": () => expireListings(),
   "listing-expiry-reminders": () => sendExpiryReminders(),
   "retention-purge": () => retentionPurge(),
   "reconcile-search": () => reconcileSearch(),
   "expire-boosts": () => sweepExpiredBoosts(),
   "saved-search-alerts": () => sendSavedSearchAlerts(),
+  "cgu-notice": () => sendCguNotices(),
   "purge-connection-logs": () => purgeConnectionLogs(),
   "pro-effects-sync": () => proEffectsSync(),
   "pro-plans": () => proPlansNightly(),
@@ -45,6 +49,7 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "billing-thresholds": () => updateBillingThresholds(),
   "lift-suspensions": () => liftSuspensions(),
   "message-digest": () => sendMessageDigests(),
+  "appointment-reminders": () => sendAppointmentReminders(),
   "report-sla-sweep": () => sweepReportSla(),
   "audit-export": () => exportAuditLogs(),
   "guide-links": () => checkGuideLinks(),
@@ -71,6 +76,8 @@ export const SCHEDULES = {
   "purge-connection-logs-nightly": { pattern: "15 3 * * *", job: "purge-connection-logs" },
   // 03:30 UTC (D17): encrypted Firestore backup, after retention-purge (03:00) and the R2 gauge (03:10).
   "backup-firestore-nightly": { pattern: "30 3 * * *", job: "backup-firestore" },
+  // D20: the last completed backup must be under 26 h old (one read).
+  "backup-freshness-daily": { pattern: "5 9 * * *", job: "backup-freshness" },
   // Phase 7. 03:50 UTC: Pro claims and listings retag a verification left pending (effects.ts).
   "pro-effects-sync-nightly": { pattern: "50 3 * * *", job: "pro-effects-sync" },
   // Phase 4. 04:05 UTC: À la Une ended since the last sweep -> searchOutbox (safety net of the
@@ -87,10 +94,14 @@ export const SCHEDULES = {
   "billing-thresholds-nightly": { pattern: "20 5 * * *", job: "billing-thresholds" },
   // 07:00 UTC (08:00 in Morocco): one digest e-mail per user for the saved searches with alerts.
   "saved-search-alerts-daily": { pattern: "0 7 * * *", job: "saved-search-alerts" },
+  // CGU change notice (phase 6, D11): after the digests, bulk.
+  "cgu-notice-daily": { pattern: "40 9 * * *", job: "cgu-notice" },
   // Phase 5 (D14). Every hour at :35: suspensions past `until` lifted (claim, status, listings).
   "lift-suspensions-hourly": { pattern: "35 * * * *", job: "lift-suspensions" },
   // Phase 5 (D21). Every 10 minutes from :01: grouped new-messages mails due (30 min after the first unread).
   "message-digest-10min": { pattern: "1-59/10 * * * *", job: "message-digest" },
+  // Appointments (28 Oct). Every 10 minutes from :04: reminders due (the day before, 2 hours before).
+  "appointment-reminders-10min": { pattern: "4-59/10 * * * *", job: "appointment-reminders" },
   // Phase 5 (D12). Every 10 minutes from :07: open P0 reports past their 1-hour target -> one more P0 alert.
   "report-sla-sweep-10min": { pattern: "7-59/10 * * * *", job: "report-sla-sweep" },
   // Phase 5 (D23). 03:22 UTC: yesterday's auditLogs -> age-encrypted NDJSON in the private bucket, before the backup (03:30).

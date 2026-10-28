@@ -36,7 +36,25 @@ export interface Criterion {
   max?: number;
   unit?: CriterionUnit;
   step?: number;
+  /**
+   * `dossier`: history, papers, warranty and equipment of a vehicle (Concession pack, 2026-10-28):
+   * a folded block of the wizard, its own section on the listing page. Absent = main criteria.
+   */
+  group?: CriterionGroup;
+  /** A dossier criterion offered as a search filter (main criteria always are, text excepted). */
+  filter?: boolean;
+  /** Shown and accepted for Pro sellers only (the dealer's stock reference). */
+  proOnly?: boolean;
+  /** Shown and accepted only while criterion `id` holds one of `values` (a warranty's duration). */
+  showIf?: { id: string; values: readonly string[] };
 }
+
+export const CRITERION_GROUPS = ["dossier"] as const;
+export type CriterionGroup = (typeof CRITERION_GROUPS)[number];
+
+/** Main criteria of a subcategory stay short; the folded dossier has its own cap. */
+export const MAIN_CRITERIA_MAX = 11;
+export const DOSSIER_CRITERIA_MAX = 12;
 
 /** Price per unit shown next to the amount; the amount itself stays an integer MAD (D4). */
 export const PRICE_UNITS = ["night", "month", "day"] as const;
@@ -84,7 +102,7 @@ export type CarBrand = (typeof CAR_BRANDS)[number];
 
 const YEAR_MAX = new Date().getUTCFullYear() + 1;
 
-type FieldDef = Omit<Criterion, "required">;
+type FieldDef = Omit<Criterion, "required" | "group" | "filter">;
 
 /** One definition per field id, shared by every subcategory that lists it (same label, same options). */
 const FIELDS = {
@@ -98,6 +116,17 @@ const FIELDS = {
   "origin": { id: "origin", type: "select", options: ["ww-maroc", "dedouanee", "importee-neuve", "pas-dedouanee"] },
   "first-hand": { id: "first-hand", type: "boolean" },
   "doors": { id: "doors", type: "select", options: ["2", "3", "4", "5"] },
+  // Vehicle dossier (Concession pack, design concession/concession.md §2).
+  "body-type": { id: "body-type", type: "select", options: ["citadine", "compacte", "berline", "break", "suv-4x4", "coupe", "cabriolet", "monospace", "pick-up"] },
+  "service-history": { id: "service-history", type: "select", options: ["complet", "partiel", "aucun"] },
+  "no-accident": { id: "no-accident", type: "boolean" },
+  "vehicle-papers": { id: "vehicle-papers", type: "multiselect", options: ["carte-grise", "visite-technique", "libre-de-gage", "factures-entretien", "double-cles"] },
+  "vehicle-warranty": { id: "vehicle-warranty", type: "select", options: ["constructeur", "vendeur", "aucune"] },
+  "warranty-months": { id: "warranty-months", type: "number", min: 1, max: 120, unit: "mois", showIf: { id: "vehicle-warranty", values: ["constructeur", "vendeur"] } },
+  "trade-in": { id: "trade-in", type: "boolean" },
+  "financing": { id: "financing", type: "boolean" },
+  "car-equipment": { id: "car-equipment", type: "multiselect", options: ["climatisation", "gps", "camera-recul", "radar-recul", "carplay-android-auto", "regulateur", "toit-ouvrant", "sieges-cuir", "jantes-alu", "transmission-4x4"] },
+  "stock-ref": { id: "stock-ref", type: "text", proOnly: true },
   "moto-brand": { id: "moto-brand", type: "select", options: ["yamaha", "honda", "suzuki", "kawasaki", "bmw", "ktm", "ducati", "piaggio", "vespa", "sym", "kymco", "peugeot", "aprilia", "triumph", "harley-davidson", "docker", "becane", "haojue", "lifan", "autre"] },
   "engine-size": { id: "engine-size", type: "select", options: ["moins-50", "50-125", "126-250", "251-500", "501-750", "plus-750"] },
   "bike-type": { id: "bike-type", type: "select", options: ["vtt", "route", "ville", "electrique", "enfant", "bmx", "pliant", "autre"] },
@@ -201,16 +230,33 @@ export const CRITERION_IDS = Object.keys(FIELDS) as CriterionId[];
 
 const required = (id: CriterionId): Criterion => ({ ...FIELDS[id], required: true });
 const optional = (id: CriterionId): Criterion => ({ ...FIELDS[id] });
+const dossier = (id: CriterionId, options: { filter?: true } = {}): Criterion => ({ ...FIELDS[id], group: "dossier", ...options });
+
+/** Motor vehicles for sale (Concession pack): dossier, buying guide, test drive, dealer storefront. */
+export const VEHICLE_SALE_SUBCATEGORIES: readonly string[] = ["voitures", "utilitaires-camions", "motos-scooters"];
+
+/** Dossier shared by the motor vehicles sold (cars, vans and trucks, motorbikes). */
+const VEHICLE_DOSSIER = [
+  dossier("first-hand", { filter: true }),
+  dossier("service-history", { filter: true }),
+  dossier("no-accident"),
+  dossier("vehicle-papers"),
+  dossier("vehicle-warranty", { filter: true }),
+  dossier("warranty-months"),
+  dossier("trade-in", { filter: true }),
+  dossier("financing"),
+  dossier("stock-ref"),
+] as const;
 
 export const CATEGORIES: readonly Category[] = [
   {
     id: "vehicules",
     subcategories: [
-      { id: "voitures", categoryId: "vehicules", condition: "optional", criteria: [required("car-brand"), required("model"), required("year"), required("mileage"), required("fuel"), required("gearbox"), optional("fiscal-power"), optional("origin"), optional("first-hand"), optional("doors")] },
+      { id: "voitures", categoryId: "vehicules", condition: "optional", criteria: [required("car-brand"), required("model"), required("year"), required("mileage"), required("fuel"), required("gearbox"), optional("fiscal-power"), optional("origin"), optional("body-type"), optional("doors"), optional("color"), ...VEHICLE_DOSSIER, dossier("car-equipment")] },
       { id: "location-voitures", categoryId: "vehicules", priceOptional: true, priceUnit: "day", proOnly: true, criteria: [required("car-brand"), required("model"), optional("year"), required("gearbox"), optional("fuel")] },
-      { id: "motos-scooters", categoryId: "vehicules", condition: "optional", criteria: [required("moto-brand"), optional("model"), required("year"), optional("mileage"), required("engine-size")] },
+      { id: "motos-scooters", categoryId: "vehicules", condition: "optional", criteria: [required("moto-brand"), optional("model"), required("year"), optional("mileage"), required("engine-size"), ...VEHICLE_DOSSIER] },
       { id: "velos", categoryId: "vehicules", condition: "required", donationAllowed: true, criteria: [required("bike-type"), optional("bike-size"), optional("brand")] },
-      { id: "utilitaires-camions", categoryId: "vehicules", condition: "optional", criteria: [required("utility-type"), required("car-brand"), optional("model"), required("year"), required("mileage"), required("fuel"), optional("gearbox")] },
+      { id: "utilitaires-camions", categoryId: "vehicules", condition: "optional", criteria: [required("utility-type"), required("car-brand"), optional("model"), required("year"), required("mileage"), required("fuel"), optional("gearbox"), ...VEHICLE_DOSSIER] },
       { id: "bateaux", categoryId: "vehicules", condition: "optional", criteria: [required("boat-type"), optional("year"), optional("engine-power")] },
       { id: "pieces-accessoires", categoryId: "vehicules", condition: "required", criteria: [required("part-type"), required("vehicle-kind"), optional("car-brand")] },
     ],
@@ -335,6 +381,13 @@ export function subcategoryById(id: string): Subcategory | undefined {
  */
 export function subcategoryAllowsAds(id: string | undefined): boolean {
   return !(id && subcategoryById(id)?.adultsOnly);
+}
+
+/** False when the criterion depends on another one whose value does not open it. */
+export function criterionApplies(criterion: Pick<Criterion, "showIf">, attributes: Readonly<Record<string, unknown>>): boolean {
+  if (!criterion.showIf) return true;
+  const value = attributes[criterion.showIf.id];
+  return typeof value === "string" && criterion.showIf.values.includes(value);
 }
 
 export function criterionById(id: string): FieldDef | undefined {

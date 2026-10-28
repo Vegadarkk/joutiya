@@ -91,6 +91,11 @@ export function partKey(date: string, mode: BackupMode, collection: string, part
   return `backups/${date}/${mode}/${collection}${part === null ? "" : `-${part}`}.ndjson.gz.age`;
 }
 
+/** `backups/{YYYY-MM-DD}/auth/users[-{part}].ndjson.gz.age`: Firebase Auth accounts (D20), not Firestore documents. */
+export function authPartKey(date: string, part: number | null): string {
+  return `backups/${date}/auth/users${part === null ? "" : `-${part}`}.ndjson.gz.age`;
+}
+
 export function manifestKey(date: string): string {
   return `backups/${date}/manifest.json.age`;
 }

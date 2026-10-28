@@ -16,12 +16,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export default async function MyListingsPage({ params }: { params: Promise<{ locale: string }> }) {
   const locale = pageLocale((await params).locale);
   setRequestLocale(locale);
+  const t = await getTranslations({ locale, namespace: "MyListings" });
   return (
     // Tarifit: the account pages are French until a native review (see FrenchOnlyNotice).
     <Container lang={locale === "rif" ? "fr" : undefined} className="max-w-3xl py-10 lg:py-14">
       <FrenchOnlyNotice className="mb-8" />
       {/* useSearchParams (the selected tab) needs a Suspense boundary (design §8). */}
-      <Suspense fallback={<PageSkeleton />}>
+      <Suspense fallback={<PageSkeleton label={t("loading")} />}>
         <MyListingsView />
       </Suspense>
     </Container>

@@ -14,7 +14,6 @@ export default defineConfig({
   retries: 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
-    ...devices["Desktop Chrome"],
     baseURL,
     trace: "retain-on-failure",
     launchOptions: executablePath ? { executablePath } : {},
@@ -22,6 +21,12 @@ export default defineConfig({
     // the page itself; tests/e2e/welcome.spec.ts starts from an empty device.
     storageState: { cookies: [], origins: [{ origin: baseURL, localStorage: [{ name: "welcome", value: "seen" }, { name: "door", value: "opened" }] }] },
   },
+  // Desktop runs every spec; the phone runs only the tests tagged @mobile (home, listing page,
+  // search, posting wizard, accessibility scan), so CI time grows by those tests alone.
+  projects: [
+    { name: "desktop", use: { ...devices["Desktop Chrome"] } },
+    { name: "mobile", use: { ...devices["Pixel 7"] }, grep: /@mobile/ },
+  ],
   webServer: {
     command: "node scripts/start-standalone.ts",
     url: `${baseURL}/api/health`,

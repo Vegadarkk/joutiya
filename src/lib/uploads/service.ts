@@ -86,7 +86,7 @@ export const uploadContentRef = (id: string) => `${COLLECTIONS.uploads}/${id}`;
 
 /**
  * POST /api/uploads/sign: the caller's editable listing, room for one more photo, storage and
- * Firestore writes not degraded, 30 signatures an hour and 200 MiB declared a day; then the
+ * Firestore writes not degraded, 30 signatures an hour (300 for a Pro) and 200 MiB declared a day; then the
  * `signed` document and a presigned PUT bound to the declared type (and length, where the adapter
  * signs it), 5 minutes.
  */
@@ -94,7 +94,8 @@ export async function signUpload(uploader: Uploader, input: SignUploadInput, now
   const { uid } = uploader.auth.user;
   const objects = store();
   if (await isStorageFull()) throw new HttpError(503, "storage_full", undefined, { headers: { "Retry-After": "3600" } });
-  await enforceLimit("upload.sign.uid", uid);
+  // A Pro's stock import uploads hundreds of photos (Concession pack): the Pro hourly budget.
+  await enforceLimit(uploader.auth.user.claims.role === "pro" ? "upload.sign.pro.uid" : "upload.sign.uid", uid);
   // Deposit suspended (src/lib/quota/gate.ts): before the listing read and the upload document.
   await assertQuotas(DEPOSIT_QUOTAS);
 

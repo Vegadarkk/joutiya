@@ -2,6 +2,7 @@ import { criteriaSchema, subcategoryById } from "@/config/categories";
 import { isPriceOutlier, priceRange } from "@/config/price-ranges";
 import type { ModerationFlag } from "@/lib/contracts/listings";
 import { findContacts } from "@/lib/moderation/contacts";
+import { quotesCreditWithoutApr } from "@/lib/moderation/credit";
 import { findPhoneNumbers } from "@/lib/moderation/phones";
 import { containsProhibited } from "@/lib/moderation/prohibited";
 import { NEW_ACCOUNT_DAYS, VOLUME_PER_DAY, decideState, riskScore, sortFlags } from "@/lib/moderation/risk";
@@ -133,6 +134,12 @@ export function screenListing(input: ScreenInput, ctx: ScreenContext): ScreenRes
       for (const hit of sensitive) note(`sensitive ${hit.evidence} in ${field.path}`);
     }
   }
+  // Credit advertising (loi 31-08 art. 76): an instalment without the TEG goes to a moderator. Rent per
+  // month or night is not credit: rentals are skipped.
+  if (!subcategoryById(input.subcategoryId)?.priceUnit && quotesCreditWithoutApr(`${input.title ?? ""}\n${input.description ?? ""}`)) {
+    flags.add("credit_ad");
+    note("instalment quoted without TEG");
+  }
   // Simple rule (documented limit): a second distinct number is treated as a third party's.
   if (phoneKeys.size >= 2) {
     flags.add("third_party_phone");
@@ -180,6 +187,6 @@ export function screenListing(input: ScreenInput, ctx: ScreenContext): ScreenRes
 
   const sorted = sortFlags(flags);
   const { score } = riskScore(sorted, { previousRejections: input.seller.previousRejections });
-  const state = decideState(score, sorted, { reviewAt: ctx.ai.risk.reviewAt, categoryId: input.categoryId });
+  const state = decideState(score, sorted, { reviewAt: ctx.ai.risk.reviewAt });
   return { state, score, flags: sorted, blockers, evidence };
 }

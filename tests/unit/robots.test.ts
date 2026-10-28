@@ -33,6 +33,19 @@ describe("robots.txt", () => {
     }
   });
 
+  it("lets AdSense's crawler read the search results, never the API or private pages (phase 6, D9)", async () => {
+    const result = await robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const adsense = rules.find((rule) => rule.userAgent === "Mediapartners-Google");
+    expect(adsense?.allow).toBe("/");
+    const disallow = (adsense?.disallow ?? []) as string[];
+    expect(disallow).toContain("/api/");
+    expect(disallow).toContain("/fr/connexion$");
+    const blocked = (path: string) => disallow.some((rule) => (rule.endsWith("$") ? path === rule.slice(0, -1) : path.startsWith(rule)));
+    expect(blocked("/fr/recherche?q=velo")).toBe(false);
+    expect(blocked("/fr/recherches")).toBe(true);
+  });
+
   it("closes everything outside production and on the admin host, without a sitemap", async () => {
     vi.stubEnv("APP_ENV", "staging");
     expect(await robots()).toEqual({ rules: { userAgent: "*", disallow: "/" } });

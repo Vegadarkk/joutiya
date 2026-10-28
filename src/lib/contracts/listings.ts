@@ -39,6 +39,7 @@ export const MODERATION_FLAGS = [
   "new_account",
   "volume",
   "restricted_category",
+  "credit_ad",
 ] as const;
 export type ModerationFlag = (typeof MODERATION_FLAGS)[number];
 
@@ -168,6 +169,8 @@ export interface OwnerPhoto {
   h?: number;
   blurhash?: string;
   rejectReason?: UploadRejectReason;
+  /** Faces found on a ready photo (absent: none or unchecked): the wizard proposes a crop. */
+  faces?: number;
 }
 
 export interface OwnerListingSummary {
@@ -195,6 +198,8 @@ export interface OwnerListing {
   id: string;
   slugId: string | null;
   status: ListingStatus;
+  /** Pro-only criteria (stock reference) are offered to Pro listings only. */
+  sellerType: "individual" | "pro";
   pausedReason: "owner" | "quota" | "moderation" | null;
   categoryId: string | null;
   subcategoryId: string | null;

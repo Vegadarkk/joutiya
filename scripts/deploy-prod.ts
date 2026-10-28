@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { validateTargets, type Targets } from "./assert-target.ts";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 
@@ -42,6 +43,7 @@ async function firestore(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const action = process.argv[2];
   if (action === "firestore") await firestore();
   else throw new Error("usage: scripts/deploy-prod.ts firestore");

@@ -117,8 +117,8 @@
     "provisionalTitle": "Version provisoire",
     "provisionalBody": "Ce texte sera finalisé avant l'ouverture du site. Il décrit déjà les règles qui s'appliqueront.",
     "frenchPrevails": "Les textes légaux font foi en français.",
-    "updated": "Mise à jour : {date}",
-    "contents": "Sommaire"
+    "contents": "Sommaire",
+    "frenchOnly": "Ce texte n'existe qu'en français pour le moment. Il fait foi."
   },
   "Help": {
     "metaTitle": "Centre d'aide",
@@ -225,6 +225,10 @@
     "retry": "Réessayer",
     "back": "Revenir à l'accueil"
   },
+  "Toaster": {
+    "region": "Notifications",
+    "close": "Fermer la notification"
+  },
   "Auth": {
     "common": {
       "email": "Adresse e-mail",
@@ -304,10 +308,41 @@
     },
     "consents": {
       "cgu": "J'ai lu et j'accepte les <link>conditions générales d'utilisation</link> de Joutiya.",
-      "transfers": "J'autorise expressément Joutiya à transférer mes données personnelles hors du Maroc, vers ses prestataires d'hébergement et d'envoi d'e-mails situés dans l'Union européenne et aux États-Unis (article 44 de la loi 09-08). Sans cet accord, le compte ne peut pas être créé.",
+      "transfers": "J'autorise expressément Joutiya à transférer mes données personnelles hors du Maroc, vers l'Union européenne et les États-Unis, aux prestataires listés ci-dessous et pour le rôle indiqué (article 44 de la loi 09-08).",
+      "transfersRequired": "Sans cet accord, le compte ne peut pas être créé.",
+      "transfersDetails": "Voir les prestataires et leur rôle",
+      "transfersEu": "Dans l'Union européenne",
+      "transfersUs": "Aux États-Unis",
+      "transfersNote": "Avant tout envoi à une intelligence artificielle, les numéros, les e-mails et les noms sont masqués. Les garanties de chaque transfert sont décrites dans la <link>politique de confidentialité</link>.",
+      "roles": {
+        "oracle": "Le serveur qui fait fonctionner le site, la recherche et les tâches automatiques, à Paris.",
+        "firestore": "La base de données, à Paris.",
+        "r2": "Le stockage des photos et des sauvegardes.",
+        "sentry": "Le suivi des erreurs techniques.",
+        "brevo": "L'envoi de secours des e-mails de sécurité, en France.",
+        "googleAuth": "La connexion et la gestion des comptes.",
+        "adsense": "La publicité, quand elle sera activée, et seulement avec votre accord donné à part.",
+        "cloudflare": "La diffusion et la protection du site, la vérification anti-robot (Turnstile) et l'IA de secours du contrôle des annonces (Workers AI), sur son réseau mondial.",
+        "anthropic": "L'aide au contrôle des annonces, au tri des signalements et à l'examen des recours, et l'Assistant Joutiya.",
+        "openai": "Le contrôle de secours des contenus.",
+        "meta": "La vérification de votre numéro de téléphone par WhatsApp.",
+        "resend": "L'envoi des e-mails.",
+        "stripe": "Les paiements, à l'ouverture des ventes.",
+        "revenuecat": "Les abonnements Pro, à l'ouverture des ventes."
+      },
       "marketing": "Je souhaite recevoir par e-mail les nouveautés et les offres de Joutiya. Facultatif, et révocable à tout moment.",
       "privacy": "Le traitement de vos données est décrit dans la <link>politique de confidentialité</link>.",
       "legend": "Consentements"
+    },
+    "reconsent": {
+      "title": "Confirmez votre accord pour continuer",
+      "lead": "Nous avons précisé la liste des prestataires qui reçoivent vos données hors du Maroc, avec le rôle et le lieu de chacun. Votre accord précédent portait sur un texte moins précis : pour continuer à utiliser votre compte, donnez-le à nouveau.",
+      "submit": "Accepter et continuer",
+      "accepted": "Votre accord est enregistré.",
+      "refuseTitle": "Vous ne souhaitez pas donner cet accord ?",
+      "refuseBody": "Sans cet accord, votre compte ne peut pas être utilisé : il fonctionne avec ces prestataires. Vous pouvez vous déconnecter, ou supprimer votre compte et télécharger vos données depuis <settings>vos paramètres</settings>. Pour toute question, écrivez à <mail>{dpo}</mail>.",
+      "signOut": "Se déconnecter",
+      "signedOut": "Vous êtes déconnecté."
     },
     "forgot": {
       "title": "Mot de passe oublié",
@@ -361,6 +396,29 @@
         "locale": "Langue de l'interface",
         "save": "Enregistrer",
         "saved": "Profil enregistré"
+      },
+      "storefront": {
+        "title": "Ma vitrine",
+        "body": "Votre page publique : une bannière, quelques mots sur vous et la ville affichée. Vos annonces s'y ajoutent d'elles-mêmes.",
+        "banner": "Bannière",
+        "banners": {
+          "zellige": "Zellige vert",
+          "zellige-ochre": "Zellige ocre",
+          "arcades": "Arcades",
+          "losanges": "Losanges dorés",
+          "dunes": "Dunes",
+          "nuit": "Nuit étoilée"
+        },
+        "bio": "Présentation",
+        "bioHint": "Ce que vous vendez, quand vous êtes disponible pour une rencontre… Sans numéro ni lien : les acheteurs vous écrivent par la messagerie.",
+        "bioCount": "{count} sur {max} caractères",
+        "cityHint": "Facultatif. Seule la ville apparaît, jamais votre adresse.",
+        "cityRemove": "Ne plus afficher de ville",
+        "save": "Enregistrer la vitrine",
+        "saved": "Vitrine enregistrée",
+        "view": "Voir ma vitrine",
+        "loading": "Chargement de la vitrine",
+        "retry": "Réessayer"
       },
       "password": {
         "title": "Mot de passe",
@@ -488,7 +546,8 @@
       "unavailable": "Le service est momentanément indisponible. Réessayez dans quelques minutes.",
       "internal": "Une erreur technique est survenue. Réessayez.",
       "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez.",
-      "quota_exhausted": "Cette action est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc)."
+      "quota_exhausted": "Cette action est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc).",
+      "invalid_text": "Le texte contient un élément refusé. Corrigez-le puis réessayez."
     }
   },
   "Listing": {
@@ -552,7 +611,9 @@
       "unsavedLeftBody": "Vous avez quitté l'annonce sans enregistrer vos dernières modifications.",
       "held": "Ce champ sera enregistré dès qu'il sera complet.",
       "saveLimit": "Cette modification doit être vérifiée par notre équipe, et une annonce en cours de vérification compte parmi vos annonces actives : vous avez atteint le maximum. Mettez en pause ou supprimez une autre annonce, puis enregistrez à nouveau.",
-      "saveQuota": "La limite quotidienne de notre service est atteinte : vos dernières modifications ne sont pas encore enregistrées. Gardez cette page ouverte et réessayez après 9 h (heure du Maroc)."
+      "saveQuota": "La limite quotidienne de notre service est atteinte : vos dernières modifications ne sont pas encore enregistrées. Gardez cette page ouverte et réessayez après 9 h (heure du Maroc).",
+      "dossierTitle": "Historique, garantie et équipements",
+      "dossierHint": "Facultatif : une fiche complète inspire confiance et ressort mieux dans la recherche."
     },
     "start": {
       "title": "Déposer une annonce",
@@ -699,7 +760,25 @@
       "movedCover": "Photo placée en couverture.",
       "dropHint": "ou déposez-les ici",
       "progressLabel": "Envoi de la photo {index}",
-      "uploadLimit": "Trop de photos envoyées pour cette annonce."
+      "uploadLimit": "Trop de photos envoyées pour cette annonce.",
+      "faces": {
+        "title": "Visage détecté sur {count, plural, one {# photo} other {# photos}}",
+        "body": "Recadrez chaque photo concernée pour ne garder que l'objet (bouton de recadrage sous la photo). Si vous la gardez telle quelle, un modérateur vérifiera l'annonce avant sa publication.",
+        "bodyNoCrop": "Si vous la gardez telle quelle, un modérateur vérifiera l'annonce avant sa publication. Vous pouvez aussi la retirer et ajouter une photo sans visage.",
+        "tile": "Visage détecté",
+        "crop": "Recadrer la photo {index}"
+      },
+      "crop": {
+        "title": "Recadrer la photo {index}",
+        "description": "Gardez l'objet dans le cadre et laissez les visages en dehors. La photo recadrée remplace l'originale.",
+        "imageAlt": "Photo {index} à recadrer",
+        "frameLabel": "Zone conservée",
+        "keys": "Faites glisser le cadre ou ses coins. Au clavier : flèches pour déplacer le cadre, Maj + flèches pour le redimensionner.",
+        "unavailable": "Cette photo ne peut pas être recadrée ici. Retirez-la et ajoutez une version sans visage.",
+        "failed": "Le recadrage a échoué. Réessayez, ou retirez la photo.",
+        "cancel": "Annuler",
+        "confirm": "Recadrer"
+      }
     },
     "review": {
       "title": "Vérifiez votre annonce",
@@ -2067,6 +2146,76 @@
         "good": "Bon état",
         "for_parts": "Pour pièces"
       }
+    },
+    "body-type": {
+      "label": "Carrosserie",
+      "options": {
+        "citadine": "Citadine",
+        "compacte": "Compacte",
+        "berline": "Berline",
+        "break": "Break",
+        "suv-4x4": "SUV / 4x4",
+        "coupe": "Coupé",
+        "cabriolet": "Cabriolet",
+        "monospace": "Monospace",
+        "pick-up": "Pick-up"
+      }
+    },
+    "service-history": {
+      "label": "Carnet d'entretien",
+      "options": {
+        "complet": "Complet",
+        "partiel": "Partiel",
+        "aucun": "Aucun"
+      }
+    },
+    "no-accident": {
+      "label": "Non accidenté"
+    },
+    "vehicle-papers": {
+      "label": "Papiers disponibles",
+      "options": {
+        "carte-grise": "Carte grise au nom du vendeur",
+        "visite-technique": "Visite technique valide",
+        "libre-de-gage": "Libre de gage (mainlevée faite)",
+        "factures-entretien": "Factures d'entretien",
+        "double-cles": "Double des clés"
+      }
+    },
+    "vehicle-warranty": {
+      "label": "Garantie",
+      "options": {
+        "constructeur": "Garantie constructeur",
+        "vendeur": "Garantie du vendeur",
+        "aucune": "Sans garantie"
+      }
+    },
+    "warranty-months": {
+      "label": "Durée de la garantie"
+    },
+    "trade-in": {
+      "label": "Reprise de votre véhicule possible"
+    },
+    "financing": {
+      "label": "Financement possible"
+    },
+    "car-equipment": {
+      "label": "Équipements",
+      "options": {
+        "climatisation": "Climatisation",
+        "gps": "GPS",
+        "camera-recul": "Caméra de recul",
+        "radar-recul": "Radar de recul",
+        "carplay-android-auto": "CarPlay / Android Auto",
+        "regulateur": "Régulateur de vitesse",
+        "toit-ouvrant": "Toit ouvrant",
+        "sieges-cuir": "Sièges cuir",
+        "jantes-alu": "Jantes alu",
+        "transmission-4x4": "Transmission 4x4"
+      }
+    },
+    "stock-ref": {
+      "label": "Référence de stock"
     }
   },
   "MyListings": {
@@ -2277,6 +2426,7 @@
         "placeholder": "Bonjour, l'article est-il toujours disponible ?",
         "privacy": "Le vendeur voit votre nom affiché, jamais votre e-mail ni votre numéro.",
         "safety": "Ne payez jamais à l'avance : voyez l'article avant de payer.",
+        "scanned": "Pour vous protéger des arnaques, les messages sont analysés automatiquement, sans IA. <link>En savoir plus</link>",
         "send": "Envoyer le message",
         "cancel": "Annuler",
         "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}",
@@ -2323,16 +2473,37 @@
       },
       "browse": "Voir d'autres annonces"
     },
-    "ad": {
-      "label": "Espace promotionnel",
-      "title": "Un objet qui dort chez vous ?",
-      "body": "Déposez une annonce gratuitement, en quelques minutes.",
-      "cta": "Déposer une annonce"
-    },
     "cityDistrict": "{city}, {district}",
     "adultsOnly": {
       "title": "Réservé aux personnes majeures.",
       "body": "Objet décoratif d'artisanat, vendu uniquement aux personnes de 18 ans et plus."
+    },
+    "dossier": {
+      "title": "Dossier du véhicule",
+      "stockRef": "Réf.",
+      "months": "{count, plural, one {# mois} other {# mois}}",
+      "tradeIn": "Reprise possible",
+      "tradeInDetail": "Le vendeur peut reprendre votre véhicule actuel.",
+      "financing": "Financement possible",
+      "financingDetail": "Demandez l'offre écrite au vendeur ou à son organisme de crédit.",
+      "history": "Entretien suivi",
+      "declared": "Informations déclarées par le vendeur : vérifiez-les sur place et sur les papiers avant de payer."
+    },
+    "buyingGuide": {
+      "title": "Acheter ce véhicule au Maroc",
+      "customs": "Véhicule pas encore dédouané : le dédouanement reste à faire et peut coûter cher. Renseignez-vous auprès de la Douane avant de vous engager.",
+      "steps": {
+        "owner": "Vérifiez que le nom sur la carte grise est celui du vendeur, ou qu'un professionnel vous montre son mandat.",
+        "mutation": "La vente se déclare sur le portail de mutation de la NARSA : contrat de vente signé et légalisé, dossier déposé dans les 30 jours qui suivent.",
+        "pledge": "Un véhicule gagé ou acheté à crédit doit avoir sa mainlevée avant la mutation : demandez-la avant de payer.",
+        "inspection": "Pour la mutation, la visite technique doit être valide et les vignettes payées.",
+        "payment": "{brand} ne vend pas ce véhicule et ne reçoit aucun paiement : la vente est un contrat entre vous et le vendeur. Payez au moment de la remise des papiers, jamais d'avance."
+      },
+      "notes": {
+        "financing": "Financement : toute offre de crédit doit vous être remise par écrit avec le taux effectif global (TEG), et vous avez 7 jours pour réfléchir (loi 31-08).",
+        "warranty": "Garantie du vendeur : un professionnel doit vous la remettre par écrit, avec sa durée, ce qu'elle couvre et la garantie légale des vices cachés (loi 31-08, art. 66 et 67)."
+      },
+      "source": "Démarches indicatives, à vérifier auprès de la NARSA (narsa.ma) ou de votre centre d'immatriculation."
     }
   },
   "Profile": {
@@ -2348,7 +2519,24 @@
     "meta": {
       "title": "Annonces de {name}",
       "description": "{name}, membre depuis {date} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya."
+    },
+    "about": "À propos",
+    "seeAll": "Voir toutes ses annonces dans la recherche",
+    "shelf": {
+      "sort": "Trier",
+      "recent": "Plus récentes",
+      "priceAsc": "Prix croissant",
+      "priceDesc": "Prix décroissant",
+      "filter": "Filtrer par catégorie",
+      "all": "Toutes"
     }
+  },
+  "FreeText": {
+    "phone_in_text": "Retirez le numéro de téléphone : les acheteurs vous contactent par la messagerie.",
+    "email_in_text": "Retirez l'adresse e-mail : les acheteurs vous contactent par la messagerie.",
+    "url_in_text": "Retirez le lien : les liens ne sont pas affichés.",
+    "prohibited": "Ce texte mentionne un objet interdit à la vente.",
+    "sensitive": "Retirez les informations personnelles sensibles (santé, religion, opinions, origine…)."
   },
   "Seo": {
     "breadcrumb": "Fil d'Ariane",
@@ -2763,7 +2951,8 @@
       "grace_title": "Paiement à régulariser",
       "downgraded": "Boutique sans offre",
       "quotasTitle": "Vos quotas",
-      "shortcuts": "Raccourcis"
+      "shortcuts": "Raccourcis",
+      "stockImport": "Importer mon stock"
     },
     "errors": {
       "pro_signup_closed": "Les demandes de compte Pro sont fermées pour le moment.",
@@ -2870,6 +3059,140 @@
       "not_found": "Cette conversation n'est plus disponible.",
       "listing_unavailable": "Cette annonce n'est plus disponible : vous ne pouvez plus écrire à son vendeur.",
       "invalid_body": "Ce message ne peut pas être envoyé tel quel. Vérifiez-le, puis réessayez."
+    }
+  },
+  "Appointments": {
+    "propose": "Proposer un rendez-vous",
+    "proposedToast": "Créneaux envoyés à {name}",
+    "kind": {
+      "meeting": "Rencontre",
+      "visit": "Visite",
+      "test_drive": "Essai",
+      "pickup": "Retrait"
+    },
+    "kindPhrase": {
+      "meeting": "un rendez-vous",
+      "visit": "une visite",
+      "test_drive": "un essai",
+      "pickup": "un retrait"
+    },
+    "confirmedTitle": {
+      "meeting": "Rendez-vous confirmé",
+      "visit": "Visite confirmée",
+      "test_drive": "Essai confirmé",
+      "pickup": "Retrait confirmé"
+    },
+    "duration": {
+      "m15": "15 min",
+      "m30": "30 min",
+      "m45": "45 min",
+      "m60": "1 h",
+      "m90": "1 h 30",
+      "m120": "2 h"
+    },
+    "reasons": {
+      "unavailable": "Je ne suis plus disponible",
+      "sold": "L'article n'est plus disponible",
+      "other": "Autre raison"
+    },
+    "picker": {
+      "kind": "Type de rendez-vous",
+      "day": "Jour",
+      "timeZone": "Heure du Maroc",
+      "otherDay": "Autre date",
+      "duration": "Durée de chaque créneau",
+      "times": "Heures libres le {day}",
+      "picked": "Créneaux proposés",
+      "count": "{count} sur {max}",
+      "empty": "Choisissez un jour, puis une ou plusieurs heures : jusqu'à 5 créneaux, sur un ou plusieurs jours.",
+      "remove": "Retirer le créneau du {time}",
+      "place": "Lieu (facultatif)",
+      "placePlaceholder": "Ex. : parking du Morocco Mall, agence de Maârif",
+      "placeHint": "Préférez un lieu public ou fréquenté. Les liens sont masqués.",
+      "safety": "Retrouvez-vous dans un lieu public et ne versez jamais d'acompte. {site} n'intervient pas dans la transaction.",
+      "cancel": "Annuler",
+      "submit": "Proposer {count, plural, one {# créneau} other {# créneaux}}",
+      "pickOne": "Choisissez au moins un créneau.",
+      "reserved": "Retirez les caractères ⟦ et ⟧ du lieu : ils ne sont pas acceptés.",
+      "problems": {
+        "too_soon": "Un créneau commence dans moins d'une heure : choisissez-en un plus tard.",
+        "too_far": "Un créneau est à plus de 60 jours : choisissez une date plus proche.",
+        "overlap": "Deux créneaux se chevauchent : retirez-en un ou réduisez la durée.",
+        "duplicate": "Ce créneau est déjà proposé."
+      }
+    },
+    "dialog": {
+      "title": "Proposer des créneaux",
+      "rescheduleTitle": "Proposer d'autres créneaux",
+      "lead": "{name} choisira celui qui lui convient. Vous serez prévenu dans la conversation.",
+      "close": "Fermer"
+    },
+    "card": {
+      "maskedLink": "[lien masqué]",
+      "icsTitle": "{kind} avec {name} ({site})",
+      "safety": "Retrouvez-vous dans un lieu public et ne versez jamais d'acompte. {site} n'intervient pas dans la transaction.",
+      "addToCalendar": "Ajouter à mon agenda",
+      "reschedule": "Reporter",
+      "cancel": "Annuler",
+      "cancelTitle": "Annuler ce rendez-vous ?",
+      "cancelBody": "{name} en sera informé dans la conversation.",
+      "reason": "Motif (facultatif)",
+      "keep": "Garder le rendez-vous",
+      "cancelConfirm": "Annuler le rendez-vous",
+      "cancelledToast": "Rendez-vous annulé",
+      "proposedMine": "Vous avez proposé {count, plural, one {# créneau} other {# créneaux}} pour {kind}",
+      "waiting": "En attente de la réponse de {name}",
+      "change": "Modifier les créneaux",
+      "withdraw": "Retirer ma proposition",
+      "withdrawnToast": "Proposition retirée",
+      "proposedTheirs": "{name} vous propose {kind} : {count, plural, one {# créneau} other {# créneaux au choix}}",
+      "pick": "Choisissez un créneau",
+      "confirm": "Confirmer ce créneau",
+      "confirmedToast": "Rendez-vous confirmé",
+      "counter": "Proposer d'autres créneaux",
+      "decline": "Aucun ne me convient",
+      "declinedToast": "Vous avez refusé les créneaux"
+    },
+    "event": {
+      "when": "{day} à {time}",
+      "proposed": {
+        "mine": "Vous avez proposé {kind}",
+        "theirs": "{name} propose {kind}"
+      },
+      "rescheduled": {
+        "mine": "Vous avez proposé de nouveaux créneaux",
+        "theirs": "{name} propose de nouveaux créneaux"
+      },
+      "confirmed": {
+        "mine": "Vous avez confirmé {kind} : {when}",
+        "theirs": "{name} a confirmé {kind} : {when}"
+      },
+      "declined": {
+        "mine": "Vous avez refusé les créneaux proposés",
+        "theirs": "{name} a refusé les créneaux proposés"
+      },
+      "withdrawn": {
+        "mine": "Vous avez retiré votre proposition",
+        "theirs": "{name} a retiré sa proposition"
+      },
+      "cancelled": {
+        "mine": "Vous avez annulé le rendez-vous du {when}",
+        "theirs": "{name} a annulé le rendez-vous du {when}"
+      },
+      "reminder": "Rappel : {kind} le {when}"
+    },
+    "preview": {
+      "proposed": "Rendez-vous proposé",
+      "rescheduled": "Nouveaux créneaux proposés",
+      "confirmed": "Rendez-vous confirmé",
+      "declined": "Créneaux refusés",
+      "withdrawn": "Proposition retirée",
+      "cancelled": "Rendez-vous annulé",
+      "reminder": "Rappel de rendez-vous"
+    },
+    "errors": {
+      "appointment_changed": "Ce rendez-vous a changé entre-temps : voici sa dernière version.",
+      "appointment_slot_past": "Ce créneau est déjà passé. Choisissez-en un autre ou proposez d'autres créneaux."
     }
   },
   "Report": {
@@ -3332,7 +3655,48 @@
       "pro_not_verified": "Votre boutique doit être vérifiée pour s'abonner.",
       "no_billing_customer": "Aucun paiement à gérer pour l'instant.",
       "billing_owner_only": "Seul le propriétaire de la boutique gère son abonnement.",
-      "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard."
+      "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard.",
+      "pass_max_ahead": "Votre pass court déjà loin : vous pourrez le prolonger plus tard.",
+      "launch_offer_running": "Votre offre Essentiel est encore offerte : le pass sera disponible à la fin de l'offre.",
+      "pass_other_plan": "Votre pass en cours est d'une autre offre : prolongez-le, ou prenez ce pass à sa fin."
+    },
+    "pass": {
+      "title": "Pass Boutique",
+      "lead": "Votre boutique en ligne pour {days} jours, en un seul paiement. Pas d'abonnement, pas de renouvellement : idéal pour écouler un stock ou vendre une saison.",
+      "price": "<n>{amount, number}</n> MAD HT pour {days} jours",
+      "features": {
+        "listings": "{count, plural, one {# annonce en ligne} other {# annonces en ligne}}",
+        "credits": "{count, plural, one {# crédit offert pendant le pass} other {# crédits offerts pendant le pass}}",
+        "storefront": "Boutique en ligne et badge Pro",
+        "noRenewal": "Aucun renouvellement automatique"
+      },
+      "current": "Pass Boutique",
+      "currentEnds": "Actif jusqu'au {date}, sans renouvellement.",
+      "extendHint": "Un nouveau pass prolonge le vôtre de {days} jours à partir du {date}.",
+      "notes": {
+        "once": "Paiement unique par carte sur la page sécurisée de Stripe. La TVA s'ajoute au prix HT et figure sur la facture.",
+        "credits": "Les crédits offerts servent pendant le pass. Une prolongation ajoute les siens à ceux qui restent ; ils ne sont pas reportés après la fin du pass.",
+        "end": "À la fin du pass, vos annonces au-delà du quota gratuit sont mises en pause, sans être supprimées. Vous êtes prévenu 7 jours et 1 jour avant.",
+        "subscribe": "Vous pouvez aussi vous abonner pendant le pass : pris au moins 2 jours avant sa fin, l'abonnement n'est facturé qu'à la fin du pass ; pris plus tard, il est facturé tout de suite."
+      },
+      "consent": {
+        "terms": "J'accepte les",
+        "termsLink": "conditions générales de vente",
+        "once": "du Pass Boutique : paiement unique, sans renouvellement ni remboursement au prorata."
+      },
+      "submit": "Payer {amount, number} MAD HT",
+      "submitExtend": "Prolonger de {days} jours : {amount, number} MAD HT",
+      "blocked": {
+        "subscribed": "Votre boutique a déjà un abonnement : le Pass Boutique n'est pas nécessaire.",
+        "launchOffer": "Votre offre Essentiel est encore offerte : le pass sera disponible à la fin de l'offre.",
+        "maxAhead": "Votre pass court déjà loin : vous pourrez le prolonger plus tard.",
+        "unavailable": "Le Pass Boutique n'est pas disponible pour le moment.",
+        "otherPlan": "Votre pass en cours est d'une autre offre : ce pass sera disponible à sa fin."
+      },
+      "success": {
+        "pending": "Votre pass s'active dans quelques instants.",
+        "done": "Votre pass est actif jusqu'au {date}."
+      }
     }
   },
   "Invoices": {
@@ -3395,6 +3759,183 @@
       "proBody": "Résiliez d'abord votre abonnement Pro. Une fois la résiliation prise en compte, vous pourrez fermer votre compte.",
       "walletTitle": "Il vous reste des crédits",
       "walletBody": "Des crédits achetés sont encore sur votre compte. Utilisez-les ou écrivez-nous pour demander leur remboursement, puis fermez votre compte."
+    }
+  },
+  "Consent": {
+    "bannerTitle": "Publicité et cookies",
+    "bannerBody": "Avec votre accord, Google LLC (États-Unis) dépose des cookies pour afficher des publicités et mesurer leur diffusion. Accepter, c'est consentir expressément au transfert de ces données aux États-Unis (loi 09-08, art. 44). Refuser ne vous empêche pas d'utiliser {brand}.",
+    "acceptAll": "Tout accepter",
+    "refuseAll": "Tout refuser",
+    "customize": "Personnaliser",
+    "panelTitle": "Gérer mes cookies",
+    "panelIntro": "Choisissez ce que vous autorisez. Vous pouvez changer d'avis à tout moment avec le lien « Gérer mes cookies » en bas de chaque page.",
+    "adsLabel": "Publicité",
+    "adsHint": "Google AdSense affiche des publicités et mesure leur diffusion. Données transférées à Google LLC, aux États-Unis.",
+    "persoLabel": "Publicité personnalisée",
+    "persoHint": "Les publicités tiennent compte de vos centres d'intérêt. Nécessite d'autoriser la publicité.",
+    "necessaryTitle": "Cookies nécessaires, toujours actifs",
+    "necessaryBody": "Connexion, sécurité, langue et protection anti-robot : ils servent uniquement au fonctionnement du site. <link>Voir la liste des cookies</link>",
+    "noTrackers": "{brand} n'utilise aujourd'hui aucun cookie publicitaire ni de mesure d'audience. Vous n'avez donc rien à accepter.",
+    "save": "Enregistrer mes choix",
+    "close": "Fermer",
+    "footerLink": "Gérer mes cookies"
+  },
+  "Ads": {
+    "label": "Publicité",
+    "promoLabel": "À découvrir sur {brand}",
+    "promos": {
+      "post": {
+        "title": "Un objet qui dort chez vous ?",
+        "body": "Déposez une annonce gratuitement, en quelques minutes.",
+        "cta": "Déposer une annonce"
+      },
+      "alert": {
+        "title": "Ne ratez plus la bonne affaire",
+        "body": "Enregistrez une recherche : vous êtes prévenu dès qu'une annonce y répond.",
+        "cta": "Lancer une recherche"
+      },
+      "safety": {
+        "title": "Achetez et vendez en confiance",
+        "body": "Nos conseils pour repérer une arnaque et se rencontrer en sécurité.",
+        "cta": "Lire les conseils"
+      },
+      "pro": {
+        "title": "Vous vendez souvent ?",
+        "body": "Ouvrez une boutique Pro : une vitrine à votre nom et des annonces marquées Pro.",
+        "cta": "Découvrir l'espace Pro"
+      },
+      "boost": {
+        "title": "Vendez plus vite",
+        "body": "Mettez votre annonce À la Une : elle passe en tête des résultats et sur l'accueil.",
+        "cta": "Mettre À la Une"
+      }
+    }
+  },
+  "CguNotice": {
+    "titleUpcoming": "Nos conditions générales d'utilisation changent le {date}",
+    "titleChanged": "Nos conditions générales d'utilisation ont changé le {date}",
+    "body": "Prenez un moment pour lire la nouvelle version. Si vous ne l'acceptez pas, vous pouvez fermer votre compte depuis vos paramètres.",
+    "read": "Lire les CGU",
+    "acknowledge": "J'ai compris",
+    "failed": "L'enregistrement a échoué. Réessayez."
+  },
+  "StockImport": {
+    "metaTitle": "Importer mon stock",
+    "title": "Importer mon stock",
+    "lead": "Mettez en ligne tout votre parc depuis un tableur : un fichier CSV, une ligne par véhicule, la référence de stock comme clé. Un nouvel envoi met à jour les annonces existantes.",
+    "back": "Espace Pro",
+    "notPro": {
+      "title": "L'import de stock est réservé aux boutiques Pro vérifiées",
+      "body": "Il s'ouvre dès que votre boutique est vérifiée et publie sous une offre Pro.",
+      "link": "Voir mon espace Pro"
+    },
+    "file": {
+      "title": "Votre fichier",
+      "lead": "CSV en UTF-8 ou exporté d'Excel (virgule, point-virgule ou tabulation), {rows} lignes au plus.",
+      "template": "Télécharger le modèle",
+      "pick": "Choisir un fichier CSV",
+      "hint": "Ou glissez-le ici. Rien n'est enregistré avant votre confirmation.",
+      "chosen": "Fichier analysé : {name}. Choisissez-en un autre pour recommencer.",
+      "columnsTitle": "Colonnes reconnues",
+      "columns": "reference (obligatoire, unique), categorie (Voitures par défaut, Utilitaires & camions, Motos & scooters), titre, description, prix, negociable, ville, quartier, etat, puis les critères par leur nom : marque, modele, annee, kilometrage, carburant, boite, puissance fiscale, origine, carrosserie, portes, couleur, premiere main, carnet, non accidente, papiers, garantie, duree garantie, reprise, financement, equipements. Les valeurs acceptent le libellé du site (« Diesel », « Caméra de recul ») ; plusieurs choix se séparent par « | ». Une cellule vide garde la valeur déjà sur le site.",
+      "errors": {
+        "too_large": "Ce fichier dépasse 1 Mo : découpez-le en plusieurs fichiers.",
+        "not_csv": "Ce fichier n'est pas un CSV. Dans votre tableur, choisissez « Enregistrer sous », format CSV."
+      }
+    },
+    "csvErrors": {
+      "empty": "Le fichier ne contient aucune ligne de véhicule sous l'en-tête.",
+      "unclosed_quote": "Un guillemet ouvert ligne {line} n'est jamais fermé : corrigez la cellule puis renvoyez le fichier.",
+      "too_many_rows": "Le fichier dépasse 300 lignes (ligne {line}) : découpez-le en plusieurs fichiers."
+    },
+    "preview": {
+      "title": "Vérifier",
+      "lead": "Voici ce que l'import fera, ligne par ligne. Corrigez les erreurs dans votre fichier et renvoyez-le, ou importez les lignes valides maintenant.",
+      "summary": "Résumé de l'import",
+      "ignored": "Colonnes ignorées : {columns}.",
+      "errorsOnly": "Afficher seulement les lignes à corriger",
+      "line": "Ligne",
+      "ref": "Référence",
+      "vehicle": "Véhicule",
+      "action": "Action",
+      "changes": "Modifie : {fields}",
+      "issue": "{column} : {message}",
+      "apply": "Importer {count, plural, one {# ligne} other {# lignes}}",
+      "remaining": "Place pour {count, plural, one {# nouveau brouillon} other {# nouveaux brouillons}} sous votre offre",
+      "done": "Import terminé : {created, plural, one {# brouillon créé} other {# brouillons créés}}, {updated, plural, one {# annonce mise à jour} other {# annonces mises à jour}}."
+    },
+    "actions": {
+      "create": "Nouveau",
+      "update": "Mise à jour",
+      "unchanged": "Inchangé",
+      "error": "À corriger",
+      "createCount": "{count, plural, one {# nouvelle} other {# nouvelles}}",
+      "updateCount": "{count, plural, one {# mise à jour} other {# mises à jour}}",
+      "unchangedCount": "{count, plural, one {# inchangée} other {# inchangées}}",
+      "errorCount": "{count, plural, one {# à corriger} other {# à corriger}}"
+    },
+    "fields": {
+      "subcategoryId": "catégorie",
+      "title": "titre",
+      "description": "description",
+      "price": "prix",
+      "priceNegotiable": "prix négociable",
+      "condition": "état",
+      "attributes": "caractéristiques",
+      "location": "ville"
+    },
+    "codes": {
+      "ref_required": "référence manquante",
+      "ref_invalid": "référence invalide (lettres, chiffres, - _ . /, 40 caractères au plus)",
+      "ref_duplicate": "référence déjà présente plus haut dans le fichier",
+      "category_unknown": "catégorie non importable (voitures, utilitaires, motos)",
+      "value_unknown": "valeur non reconnue",
+      "number_invalid": "nombre invalide ou hors limites",
+      "required": "obligatoire",
+      "city_unknown": "ville inconnue",
+      "price_invalid": "prix invalide",
+      "too_long": "trop long",
+      "pro_only": "réservé aux Pros",
+      "status_locked": "annonce vendue ou retirée, plus modifiable",
+      "quota": "plus de place sous votre offre",
+      "description_short": "description courte : à compléter avant publication",
+      "title_generated": "titre créé à partir de la marque, du modèle et de l'année",
+      "column_ignored": "ignoré, la colonne dont il dépend ne l'ouvre pas",
+      "failed": "non enregistré, réessayez"
+    },
+    "photos": {
+      "title": "Photos",
+      "lead": "Nommez chaque photo d'après la référence : DUS-041.jpg, DUS-041-2.jpg, DUS-041-3.jpg… Elles sont rangées dans l'ordre de leur numéro et vérifiées comme toutes les photos du site.",
+      "empty": "Importez d'abord un fichier : les photos se rangent sous les références de votre stock.",
+      "pick": "Choisir les photos",
+      "hint": "Sélectionnez ou glissez toutes les photos d'un coup (JPEG, PNG, WebP, HEIC).",
+      "matched": "{photos, plural, one {# photo reconnue} other {# photos reconnues}} pour {listings, plural, one {# annonce} other {# annonces}}",
+      "count": "{count, plural, one {# photo} other {# photos}}",
+      "extra": "{count, plural, one {# photo de trop} other {# photos de trop}} ({max} au plus par annonce)",
+      "unmatched": "{count, plural, one {# fichier ne correspond} other {# fichiers ne correspondent}} à aucune référence : {names}",
+      "send": "Envoyer {count, plural, one {# photo} other {# photos}}",
+      "clear": "Vider la sélection",
+      "progress": "Photo {done} sur {total}…",
+      "outcome": "{sent, plural, one {# photo ajoutée} other {# photos ajoutées}}, {refused, plural, one {# refusée} other {# refusées}} par la vérification, {failed, plural, one {# échec} other {# échecs}}."
+    },
+    "publish": {
+      "title": "Publier",
+      "lead": "Les brouillons complets, avec au moins une photo, sont publiés un par un sous les limites de votre offre. Ceux qui manquent d'une information restent en brouillon.",
+      "empty": "Aucun brouillon de stock à publier.",
+      "drafts": "{ready, plural, one {# brouillon prêt} other {# brouillons prêts}}, {missing, plural, one {# sans photo} other {# sans photo}}.",
+      "rules": "Je confirme que ces annonces respectent les <cgu>conditions d'utilisation</cgu> et la <interdits>liste des objets interdits</interdits>.",
+      "send": "Publier {count, plural, one {# brouillon} other {# brouillons}}",
+      "progress": "Publication {done} sur {total}…",
+      "outcome": "{published, plural, one {# annonce en ligne} other {# annonces en ligne}}, {pending_review, plural, one {# en vérification} other {# en vérification}}, {incomplete, plural, one {# incomplète} other {# incomplètes}}, {failed, plural, one {# échec} other {# échecs}}.",
+      "incomplete": "{count, plural, one {# brouillon à compléter} other {# brouillons à compléter}}"
+    },
+    "absent": {
+      "title": "Véhicules absents du fichier",
+      "lead": "Ces annonces en ligne n'apparaissent plus dans votre dernier fichier. Rien n'est retiré automatiquement : marquez comme vendus ceux qui ont quitté votre parc.",
+      "empty": "Toutes vos annonces en ligne figurent dans le fichier.",
+      "markOne": "Marquer vendu",
+      "markAll": "Tout marquer vendu ({count})",
+      "done": "Vendu"
     }
   }
 }

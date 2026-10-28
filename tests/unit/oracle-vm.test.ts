@@ -15,6 +15,7 @@ import {
   SHAPE,
   SMALL_SHAPE_CONFIG,
   bootstrapLines,
+  cpuScript,
   buildUserData,
   deployScript,
   deployStagingKey,
@@ -24,6 +25,7 @@ import {
   parseStatus,
   pickImage,
   promoteCommand,
+  tagProblem,
   rebuildDetails,
   recordedTarballs,
   buildStagingScript,
@@ -254,6 +256,18 @@ describe("production releases", () => {
     expect(() => promoteCommand({ release: "0123456789ab", web: "", worker: id("b") })).toThrow(/image IDs/);
   });
 
+  it("promotes only staging's release under an annotated release tag on that commit", () => {
+    const commit = "0123456789abcdef0123456789abcdef01234567";
+    expect(tagProblem("v1.0.0", "tag", commit, "0123456789ab")).toBeNull();
+    expect(tagProblem("v1.0.0-rc.2", "tag", commit, "0123456789ab")).toBeNull();
+    expect(tagProblem("1.0.0", "tag", commit, "0123456789ab")).toMatch(/vX\.Y\.Z/);
+    expect(tagProblem("v1.0.0-beta", "tag", commit, "0123456789ab")).toMatch(/vX\.Y\.Z/);
+    expect(tagProblem("v1.0.0", "commit", commit, "0123456789ab")).toMatch(/not annotated/);
+    expect(tagProblem("v1.0.0", "", "", "0123456789ab")).toMatch(/not on origin/);
+    expect(tagProblem("v1.0.0", "tag", commit, "fedcba987654")).toMatch(/staging runs fedcba987654/);
+    expect(tagProblem("v1.0.0", "tag", commit, "")).toMatch(/staging runs no release/);
+  });
+
   it("sends the forced command of production one request it cannot be tricked by", () => {
     expect(deployScript("status")).toBe("SSH_ORIGINAL_COMMAND='status' /usr/local/sbin/joutiya-deploy prod");
     expect(deployScript(promoteCommand({ release: "0123456789ab", web: id("a"), worker: id("b") }))).toContain(`'promote 0123456789ab ${id("a")} ${id("b")}'`);
@@ -336,5 +350,20 @@ describe("build-staging", () => {
     expect(script).toContain("/etc/joutiya/staging/app.env");
     expect(script.indexOf("the start waits for")).toBeLessThan(script.indexOf("joutiya-deploy staging"));
     expect(() => buildStagingScript("main; rm -rf /")).toThrow("--commit");
+  });
+});
+
+describe("cpuScript", () => {
+  it("samples every 5 s for the minutes asked, 1 to 15", () => {
+    expect(cpuScript(8)).toContain("$(seq 96)");
+    for (const minutes of [0, 16, 2.5, Number.NaN]) expect(() => cpuScript(minutes)).toThrow(/1 to 15/);
+  });
+
+  it("prints the busy share of each CPU from /proc/stat", () => {
+    const script = cpuScript(1).replace("$(seq 12)", "$(seq 1)").replace("sleep 5", "sleep 1");
+    const result = spawnSync("bash", ["-euo", "pipefail", "-c", script], { encoding: "utf8" });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toMatch(/^cpu +avg +[\d.]+ %  peak +[\d.]+ %  \(1 samples\)$/m);
+    expect(result.stdout).toMatch(/^cpu0 /m);
   });
 });

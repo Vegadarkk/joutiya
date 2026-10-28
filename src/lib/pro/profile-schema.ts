@@ -70,6 +70,10 @@ export const proProfileSchema = z
     downgradedAt: ts.optional(),
     suspendedFrom: z.enum(PRO_STATES).optional(),
     launchOfferNoticeSentAt: ts.optional(),
+    /** End of the Pass Boutique (`planSource: "pass"`); kept after the end as the last pass bought. */
+    passEndsAt: ts.optional(),
+    /** Date of the last notice mailed before the end of the pass (the next one is due from it). */
+    passNoticeSentAt: ts.optional(),
     /** Derived from config/pricing for `plan`. */
     quotas: listingQuotasSchema,
     /**

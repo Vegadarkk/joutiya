@@ -19,6 +19,7 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
   phoneVerified: { displayName: "Nadia", phone: "+212 6 00 00 00 00" },
   phoneRemoved: { displayName: "Nadia", phone: "+212 6 00 00 00 00" },
   accountClosed: { displayName: "Nadia", closedAt: "2026-10-20T09:30:00.000Z", purgeAt: "2027-10-20T09:30:00.000Z" },
+  cguChanged: { displayName: "Nadia", version: "1.1", effective: "2026-12-01" },
   listingPublished: { displayName: "Nadia", title: "Vélo de ville", url: `${SITE}/fr/annonce/velo-de-ville-casablanca-abcd2345`, expiresAt: "2026-12-15T09:30:00.000Z" },
   listingPendingReview: { displayName: "Nadia", title: "Vélo de ville", listingId: "abcd2345", statement: { measure: "hold", facts: ["new_account", "dup_text"], ground: "CGU §7", automated: true, redress: "dsa@joutiya.ma" } },
   listingRejected: { displayName: "Nadia", title: "Vélo de ville", listingId: "abcd2345", statement: { measure: "reject", facts: ["prohibited_kw"], ground: "CGU §7.2", automated: true, redress: "dsa@joutiya.ma" } },
@@ -72,8 +73,19 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
   },
   proApproved: { displayName: "Nadia", shopName: "Atlas Vélos", launchOffer: true, noticeDays: 30 },
   launchOfferNotice: { displayName: "Nadia", shopName: "Atlas Vélos", plan: "essentiel", kind: "ending", endsAt: "2027-03-01T00:00:00.000Z", freeListings: 0, paused: 0 },
+  passNotice: { displayName: "Nadia", shopName: "Atlas Vélos", kind: "ended", endsAt: "2027-03-01T00:00:00.000Z", freeListings: 0, paused: 2 },
   proRejected: { displayName: "Nadia", shopName: "Atlas Vélos", reason: "L'ICE ne correspond pas au registre du commerce.", contact: "dsa@joutiya.ma" },
   newMessages: { displayName: "Nadia", count: 4, conversations: [{ listingTitle: "Vélo de ville", counterpartName: "Karim" }] },
+  appointmentReminder: {
+    displayName: "Nadia",
+    counterpartName: "Karim",
+    listingTitle: "Dacia Logan 2019",
+    kind: "test_drive",
+    startsAt: "2026-11-05T13:30:00.000Z",
+    minutes: 30,
+    place: "Parking du Morocco Mall",
+    cid: "AbCdEfGhIjKlMnOpQrStUv",
+  },
 };
 
 /** Every URL a template receives must appear in both bodies. */

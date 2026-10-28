@@ -30,7 +30,7 @@ export const LAUNCH_OFFER_MAX_MAILS = 50;
 export const LAUNCH_OFFER_RESEND_SHARE = 0.6;
 
 /** Mails this run may send: the per-run cap, and what is left under the share of both Resend quotas. */
-async function mailBudget(): Promise<number> {
+export async function mailBudget(): Promise<number> {
   const [daily, monthly] = await Promise.all([headroom("resend.daily", LAUNCH_OFFER_RESEND_SHARE), headroom("resend.monthly", LAUNCH_OFFER_RESEND_SHARE)]);
   return Math.min(LAUNCH_OFFER_MAX_MAILS, daily ?? LAUNCH_OFFER_MAX_MAILS, monthly ?? LAUNCH_OFFER_MAX_MAILS);
 }

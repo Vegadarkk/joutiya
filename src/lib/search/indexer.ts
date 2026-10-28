@@ -211,6 +211,10 @@ export interface RebuildResult {
 export async function rebuildFromFirestore(now: Date = new Date()): Promise<RebuildResult> {
   const engine = searchEngine();
   await engine.ensureReady();
+  // Ids indexed before the Firestore pass: a listing indexed meanwhile (a concurrent rebuild of
+  // another e2e project, the live indexer) is not among them, so it is never dropped as stale.
+  const before: string[] = [];
+  for await (const versions of engine.versions()) for (const { id } of versions) before.push(id);
   const kept = new Set<string>();
   let skipped = 0;
   for await (const page of publishedListingPages()) {
@@ -223,8 +227,7 @@ export async function rebuildFromFirestore(now: Date = new Date()): Promise<Rebu
     if (documents.length > 0) await engine.upsert(documents);
     for (const document of documents) kept.add(document.id);
   }
-  const stale: string[] = [];
-  for await (const versions of engine.versions()) for (const { id } of versions) if (!kept.has(id)) stale.push(id);
+  const stale = before.filter((id) => !kept.has(id));
   if (stale.length > 0) await engine.remove(stale);
   logger.info({ indexed: kept.size, removed: stale.length, skipped }, "search index rebuilt from Firestore");
   return { indexed: kept.size, removed: stale.length, skipped };

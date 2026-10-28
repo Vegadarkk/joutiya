@@ -98,12 +98,18 @@ export type ErrorCode =
   // Pro subscriptions (phase 7, design §7). Messages: Subscription.errors.<code>.
   /** The shop already has a plan: changes go through the Stripe portal (409). */
   | "already_subscribed"
+  /** Pass Boutique: bought now it would end beyond `maxAheadDays`, or the free launch offer still runs. */
+  | "pass_max_ahead"
+  | "launch_offer_running"
+  | "pass_other_plan"
   /** The shop's KYBC is not verified, or the shop is suspended (409). */
   | "pro_not_verified"
   /** No Stripe customer yet: nothing to manage before a first plan (409). */
   | "no_billing_customer"
   /** A webhook whose signature does not match (400, Stripe's expected answer). */
   | "invalid_signature"
+  /** A stock import file that is no CSV (empty, unclosed quote, over 300 lines; 400; details: { reason, line }). Messages: StockImport.errors. */
+  | "invalid_csv"
     /** Firestore daily quota degraded (src/lib/quota/gate.ts): deposit or sign-up suspended until the reset. */
   | "quota_exhausted"
   // Messaging, reports, appeals, assistant (phase 5). Messages: Messaging.errors / Report.errors.
@@ -115,6 +121,10 @@ export type ErrorCode =
   | "self_conversation"
   /** First message about an adults-only listing without the buyer's 18+ confirmation (422). */
   | "adult_confirmation_required"
+  /** The appointment changed since the caller saw it (answered, withdrawn, replaced; 409). */
+  | "appointment_changed"
+  /** The chosen slot has started or passed (409). */
+  | "appointment_slot_past"
   /** Reporter abusive (art. 23) or target not reportable by this account (403). */
   | "report_not_allowed"
   /** The reported target does not exist or is not visible to the reporter (404 semantics, 422). */
@@ -138,7 +148,12 @@ export type ErrorCode =
   | "pro_subscription_active"
   /** Purchased credits are left in the wallet (409). */
   | "wallet_not_empty"
+  // Back office (phase 6, D13).
+  /** config/legal without a mention art. 1-1 LCEN requires (422; details: { missing }). */
+  | "legal_incomplete"
   | "unavailable"
+  /** 422: a short free text (storefront bio, review) refused by the text screen; details: { field, issue }. */
+  | "invalid_text"
   | "internal";
 
 export class HttpError extends Error {

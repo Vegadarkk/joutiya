@@ -196,8 +196,14 @@ test.beforeAll(async ({ request }) => {
   expect(rebuilt.status()).toBe(200);
 });
 
+/**
+ * The results inside #main: React reveals streamed content a moment after the load event, and until
+ * then a hidden copy of it waits at the end of <body>.
+ */
+const results = (page: Page) => page.locator("#main");
+
 test.describe("search page", () => {
-  test("finds the run's listings by word under a nonce CSP, without violations", async ({ page }) => {
+  test("finds the run's listings by word under a nonce CSP, without violations", { tag: "@mobile" }, async ({ page }) => {
     const violations = await watchCsp(page);
     const response = await page.goto(`/fr/recherche?q=${WORD}`);
     expect(response?.status()).toBe(200);
@@ -207,8 +213,8 @@ test.describe("search page", () => {
     // https: are fallbacks for CSP 1 browsers, ignored next to a nonce and 'strict-dynamic').
     expect(scriptSrc).toContain("'nonce-");
     expect(scriptSrc).toContain("'strict-dynamic'");
-    await expect(page.getByTestId("search-count")).toHaveText("3 annonces");
-    const grid = page.getByTestId("results-grid");
+    await expect(results(page).getByTestId("search-count")).toHaveText("3 annonces");
+    const grid = results(page).getByTestId("results-grid");
     for (const listing of Object.values(listings)) await expect(grid.getByRole("link", { name: new RegExp(listing.title) })).toBeVisible();
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
     expect(violations).toEqual([]);
@@ -216,8 +222,8 @@ test.describe("search page", () => {
 
   test("filters on category and city from the URL", async ({ page }) => {
     await page.goto(`/fr/recherche?q=${WORD}&categorie=vehicules&ville=casablanca`);
-    await expect(page.getByTestId("search-count")).toHaveText("2 annonces");
-    await expect(page.getByTestId("results-grid").getByRole("link", { name: new RegExp(listings.flat.title) })).toHaveCount(0);
+    await expect(results(page).getByTestId("search-count")).toHaveText("2 annonces");
+    await expect(results(page).getByTestId("results-grid").getByRole("link", { name: new RegExp(listings.flat.title) })).toHaveCount(0);
   });
 
   test("sorts by price and keeps the canonical parameters", async ({ request }) => {
@@ -240,10 +246,11 @@ test.describe("search page", () => {
     expect(body.hits.map((hit) => hit.id)).toEqual([listings.flat.id]);
   });
 
-  test("reads right to left in Arabic", async ({ page }) => {
+  test("reads right to left in Arabic", { tag: "@mobile" }, async ({ page }) => {
     await page.goto(`/ar/recherche?q=${WORD}`);
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page.getByTestId("results-grid")).toBeVisible();
+    // By role: the copy React streams in a hidden container before swapping it in is not counted.
+    await expect(page.getByRole("region", { name: "النتائج" }).getByTestId("results-grid")).toBeVisible();
   });
 });
 
@@ -291,7 +298,7 @@ test.describe("home and crawler files", () => {
 test.describe("favorites and saved searches", () => {
   test("a visitor is sent to sign in by the heart", async ({ page }) => {
     await page.goto(`/fr/recherche?q=${WORD}`);
-    await page.getByTestId("results-grid").getByTestId("favorite-button").first().click();
+    await results(page).getByTestId("results-grid").getByTestId("favorite-button").first().click();
     await expect(page).toHaveURL(/\/fr\/connexion\?next=/);
   });
 
@@ -300,7 +307,7 @@ test.describe("favorites and saved searches", () => {
     await signUpAndIn(page, request, email);
 
     await page.goto(`/fr/recherche?q=${WORD}&categorie=vehicules`);
-    const card = page.getByTestId("results-grid").getByRole("listitem").filter({ hasText: listings.bike.title });
+    const card = results(page).getByTestId("results-grid").getByRole("listitem").filter({ hasText: listings.bike.title });
     const heart = card.getByTestId("favorite-button");
     await expect(heart).toHaveAttribute("aria-pressed", "false");
     await heart.click();

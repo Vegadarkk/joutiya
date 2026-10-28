@@ -18,7 +18,7 @@ export class RelayEmailChannel implements AlertChannel {
     private readonly fetchImpl: typeof fetch = fetch,
   ) {}
 
-  async send(alert: Alert, env: string): Promise<void> {
+  async send(alert: Alert, env: string): Promise<void | "off"> {
     const body = JSON.stringify({ ...alert, env });
     const timestamp = String(Math.floor(Date.now() / 1000));
     const signature = createHmac("sha256", this.secret).update(`${timestamp}.${body}`).digest("hex");
@@ -32,7 +32,7 @@ export class RelayEmailChannel implements AlertChannel {
     // already carried the alert, so this is a warning, not a channel failure to retry.
     if (response.status === 503) {
       logger.warn("alert relay: e-mail channel off on the Worker");
-      return;
+      return "off";
     }
     // 204 covers both a sent mail and a repeat of the same title within the hour (Resend idempotency).
     if (!response.ok) throw new Error(`alert relay: HTTP ${response.status}`);

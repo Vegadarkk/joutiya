@@ -44,6 +44,7 @@ const session: SessionSummary = {
   phoneVerified: false,
   locale: "fr",
   providers: ["password"],
+  cguUpdate: null,
 };
 
 describe("LocaleSwitcher", () => {

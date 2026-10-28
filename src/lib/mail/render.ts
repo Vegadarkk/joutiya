@@ -3,6 +3,7 @@ import { LOCALES } from "@/config/site";
 import { serverEnv } from "@/lib/env";
 import { mailLocale, type BuiltMail, type TemplateContext } from "./templates/layout";
 import { accountClosed } from "./templates/accountClosed";
+import { cguChanged } from "./templates/cguChanged";
 import { appealOutcome } from "./templates/appealOutcome";
 import { appealReceived } from "./templates/appealReceived";
 import { contentRestored } from "./templates/contentRestored";
@@ -20,12 +21,14 @@ import { passwordChanged } from "./templates/passwordChanged";
 import { phoneRemoved } from "./templates/phoneRemoved";
 import { phoneVerified } from "./templates/phoneVerified";
 import { launchOfferNotice } from "./templates/launchOfferNotice";
+import { passNotice } from "./templates/passNotice";
 import { proApproved } from "./templates/proApproved";
 import { proRejected } from "./templates/proRejected";
 import { reportReceived } from "./templates/reportReceived";
 import { resetPassword } from "./templates/resetPassword";
 import { savedSearchAlert } from "./templates/savedSearchAlert";
 import { newMessages } from "./templates/newMessages";
+import { appointmentReminder } from "./templates/appointmentReminder";
 import { signupExisting } from "./templates/signupExisting";
 import { staffInvite } from "./templates/staffInvite";
 import { verifyEmail } from "./templates/verifyEmail";
@@ -59,8 +62,11 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   proApproved,
   proRejected,
   launchOfferNotice,
+  passNotice,
   newMessages,
+  appointmentReminder,
   accountClosed,
+  cguChanged,
 };
 
 export const TEMPLATE_IDS = Object.keys(TEMPLATES) as TemplateId[];

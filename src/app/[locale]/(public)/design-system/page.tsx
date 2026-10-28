@@ -118,7 +118,7 @@ export default async function DesignSystemPage({ params }: { params: Promise<{ l
       </Section>
 
       <Section title="Chargement">
-        <ListingGridSkeleton count={4} />
+        <ListingGridSkeleton label="Chargement des annonces" count={4} />
       </Section>
 
       <Section title="État vide">

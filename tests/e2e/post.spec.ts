@@ -1,8 +1,10 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { getFirestore } from "firebase-admin/firestore";
 import sharp from "sharp";
 import { isolate } from "../../src/lib/i18n/bidi";
 import { stubGoogleScript } from "./gsi-stub";
+import { firebase } from "./helpers";
 
 // The sign-up page renders the Google button (stub client id): never the real script.
 test.beforeEach(({ page }) => stubGoogleScript(page));
@@ -121,7 +123,7 @@ const next = (page: Page) => page.getByRole("button", { name: "Continuer" }).cli
 test.describe("posting wizard", () => {
   test.setTimeout(180_000);
 
-  test("walks the nine steps, publishes and shows the listing with a WebP photo without EXIF", async ({ page, request }) => {
+  test("walks the nine steps, publishes and shows the listing with a WebP photo without EXIF", { tag: "@mobile" }, async ({ page, request }) => {
     const id = runId();
     const email = `e2e-post-${id}@test.joutiya.ma`;
     const title = `Vélo de ville ${id}`;
@@ -258,6 +260,58 @@ test.describe("posting wizard", () => {
     const answer = (await (await published).json()) as { status: string; flags: string[] };
     expect(answer).toMatchObject({ status: "pending_review", flags: expect.arrayContaining(["restricted_category"]) });
     await expect(page.getByRole("heading", { level: 1, name: "Votre annonce est en cours de vérification" })).toBeVisible();
+  });
+
+  test("proposes to crop a photo where a face was found, and the cropped copy replaces it", async ({ page, request }) => {
+    const id = runId();
+    await signUpAndIn(page, request, `e2e-post-face-${id}@test.joutiya.ma`);
+    await verifyPhone(page, request);
+
+    await page.goto("/fr/deposer");
+    await page.getByRole("radio", { name: "Véhicules" }).click();
+    await page.getByRole("radio", { name: "Vélos" }).click();
+    await expect(page).toHaveURL(/\/fr\/deposer\/[a-z0-9]+\/criteres$/);
+    const listingId = new URL(page.url()).pathname.split("/")[3]!;
+    await page.getByRole("radiogroup", { name: /État/ }).getByRole("radio", { name: "Très bon état" }).click();
+    await page.getByRole("radiogroup", { name: /Type de vélo/ }).getByRole("radio", { name: "Ville" }).click();
+    await next(page);
+    await page.getByRole("textbox", { name: /Titre de l'annonce/ }).fill(`Vélo avec cycliste ${id}`);
+    await next(page);
+    await page.getByRole("textbox", { name: /^Description/ }).fill(`Vélo de ville ${id}, photographié avec son propriétaire, pneus neufs et freins réglés.`);
+    await next(page);
+    await page.locator('input[type="file"][multiple]').setInputFiles({ name: "velo.jpg", mimeType: "image/jpeg", buffer: await photoWithExif() });
+    await expect(page.getByText("Couverture", { exact: true })).toBeVisible({ timeout: 60_000 });
+
+    // The dev classifier is a stub (no model files): the face the local check would find is written
+    // on the upload record, as the pipeline records it.
+    const uploads = getFirestore(firebase()).collection("uploads");
+    const ready = await uploads.where("targetId", "==", listingId).where("status", "==", "ready").get();
+    expect(ready.size).toBe(1);
+    const original = ready.docs[0]!;
+    await original.ref.update({ "checks.faces": 1 });
+    await page.reload();
+    await expect(page.getByTestId("photo-face")).toHaveCount(1, { timeout: 15_000 });
+    await expect(page.getByText("Visage détecté sur 1 photo")).toBeVisible();
+
+    // The published large variant is the crop source after the reload (no local file any more).
+    await page.getByRole("button", { name: "Recadrer la photo 1" }).click();
+    const dialog = page.getByTestId("photo-crop-dialog");
+    const frame = dialog.getByTestId("photo-crop-frame");
+    await expect(frame).toBeVisible({ timeout: 15_000 });
+    await frame.focus();
+    await page.keyboard.press("Shift+ArrowLeft");
+    await dialog.getByRole("button", { name: "Recadrer", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+
+    // The copy uploads next to the original, which goes once the copy is ready.
+    await expect(page.getByTestId("photo-face")).toHaveCount(0, { timeout: 60_000 });
+    await expect(page.getByText("1 / 10 photos")).toBeVisible();
+    await expect(page.getByRole("img", { name: "Photo 1" })).toBeVisible();
+    await expect
+      .poll(async () => ((await getFirestore(firebase()).collection("listings").doc(listingId).get()).get("photos") as { id: string }[]).map((photo) => photo.id), { timeout: 20_000 })
+      .toEqual([expect.not.stringMatching(original.id)]);
+    const listingPhotos = (await getFirestore(firebase()).collection("listings").doc(listingId).get()).get("photos") as { id: string; w: number }[];
+    expect(listingPhotos[0]!.w).toBeLessThan(original.get("width") as number);
   });
 
   test("an unknown step is a 404", async ({ page, request }) => {

@@ -5,9 +5,12 @@ import { useTranslations } from "next-intl";
 import type { UseFormRegisterReturn } from "react-hook-form";
 import { InlineError } from "@/components/feedback/inline-error";
 import { Link } from "@/i18n/navigation";
+import { usePublicConfig } from "@/lib/config/client";
 
 // Sign-up consents (§7): CGU, the express consent to transfers outside Morocco (art. 44 loi
-// 09-08), both required, and the optional marketing opt-in, unchecked by default.
+// 09-08), both required, and the optional marketing opt-in, unchecked by default. The transfers
+// box names each provider, its role and region (design D12); the re-consent panel of the account
+// pages reuses it.
 
 type ConsentName = "cgu" | "transfers" | "marketing";
 
@@ -18,42 +21,106 @@ interface ConsentFieldsProps {
   autoFocus?: boolean;
 }
 
+function legalLink(slug: "cgu" | "confidentialite") {
+  return function LegalLink(chunks: ReactNode) {
+    return (
+      <Link href={`/legal/${slug}`} target="_blank" rel="noopener" className="font-medium text-link underline underline-offset-2">
+        {chunks}
+      </Link>
+    );
+  };
+}
+
 export function ConsentFields({ fields, errors = {}, autoFocus }: ConsentFieldsProps) {
   const t = useTranslations("Auth.consents");
-  const legal = (slug: "cgu" | "confidentialite") =>
-    function LegalLink(chunks: ReactNode) {
-      return (
-        <Link href={`/legal/${slug}`} target="_blank" rel="noopener" className="font-medium text-link underline underline-offset-2">
-          {chunks}
-        </Link>
-      );
-    };
   return (
     <fieldset className="flex flex-col gap-4">
       <legend className="sr-only">{t("legend")}</legend>
       <ConsentBox field={fields.cgu} error={errors.cgu} required autoFocus={autoFocus}>
-        {t.rich("cgu", { link: legal("cgu") })}
+        {t.rich("cgu", { link: legalLink("cgu") })}
       </ConsentBox>
-      <ConsentBox field={fields.transfers} error={errors.transfers} required>
-        {t("transfers")}
+      <ConsentBox field={fields.transfers} error={errors.transfers} required details={<TransfersDetails />}>
+        {t("transfers")} {t("transfersRequired")}
       </ConsentBox>
       <ConsentBox field={fields.marketing}>{t("marketing")}</ConsentBox>
-      <p className="text-xs text-foreground-muted">{t.rich("privacy", { link: legal("confidentialite") })}</p>
+      <p className="text-xs text-foreground-muted">{t.rich("privacy", { link: legalLink("confidentialite") })}</p>
     </fieldset>
   );
 }
 
-function ConsentBox({
+/**
+ * Recipients of the transfers consent, by region (privacy policy §6.2 and §7.2). Brand names stay
+ * in code, identical in every language; roles are translated. A change here is a new text: bump
+ * TRANSFERS_CONSENT_VERSION so that members are asked again. Meta is listed only while phone
+ * verification is live (design D24); its own version suffix asks members again then.
+ */
+export const TRANSFER_PROVIDERS = {
+  eu: [
+    ["Oracle Cloud", "oracle"],
+    ["Google Firestore", "firestore"],
+    ["Cloudflare R2", "r2"],
+    ["Sentry", "sentry"],
+    ["Brevo", "brevo"],
+  ],
+  us: [
+    ["Google (Firebase Authentication)", "googleAuth"],
+    ["Google (AdSense)", "adsense"],
+    ["Cloudflare", "cloudflare"],
+    ["Anthropic (Claude)", "anthropic"],
+    ["OpenAI", "openai"],
+    ["Meta (WhatsApp)", "meta"],
+    ["Resend", "resend"],
+    ["Stripe", "stripe"],
+    ["RevenueCat", "revenuecat"],
+  ],
+} as const;
+
+/** The provider list under the transfers box; `open` on the re-consent panel, whose subject it is. */
+export function TransfersDetails({ open }: { open?: boolean }) {
+  const t = useTranslations("Auth.consents");
+  // Unknown until the config loads: Meta stays out, as in the version the server records then.
+  const whatsapp = usePublicConfig()?.phoneVerification === true;
+  return (
+    <details open={open} className="rounded-md bg-surface-muted px-4 py-3 text-sm">
+      <summary className="cursor-pointer font-medium text-link underline-offset-2 hover:underline">{t("transfersDetails")}</summary>
+      <div className="mt-4 flex flex-col gap-5">
+        {(["eu", "us"] as const).map((region) => (
+          <div key={region} className="flex flex-col gap-2">
+            <p className="font-semibold">{t(region === "eu" ? "transfersEu" : "transfersUs")}</p>
+            <dl className="flex flex-col gap-2">
+              {TRANSFER_PROVIDERS[region]
+                .filter(([, role]) => whatsapp || role !== "meta")
+                .map(([name, role]) => (
+                  <div key={role}>
+                    <dt dir="ltr" className="w-fit font-medium">
+                      {name}
+                    </dt>
+                    <dd className="text-foreground-muted text-pretty">{t(`roles.${role}`)}</dd>
+                  </div>
+                ))}
+            </dl>
+          </div>
+        ))}
+        <p className="text-xs text-foreground-muted text-pretty">{t.rich("transfersNote", { link: legalLink("confidentialite") })}</p>
+      </div>
+    </details>
+  );
+}
+
+export function ConsentBox({
   field,
   error,
   required,
   autoFocus,
+  details,
   children,
 }: {
   field: UseFormRegisterReturn;
   error?: ReactNode;
   required?: boolean;
   autoFocus?: boolean;
+  /** Shown under the label, outside it: a click there must not tick the box. */
+  details?: ReactNode;
   children: ReactNode;
 }) {
   const id = useId();
@@ -78,6 +145,7 @@ function ConsentBox({
           {error}
         </InlineError>
       ) : null}
+      {details ? <div className="ps-8">{details}</div> : null}
     </div>
   );
 }

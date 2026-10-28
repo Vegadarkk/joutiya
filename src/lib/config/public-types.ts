@@ -26,6 +26,18 @@ export interface PublicMapConfig {
   attribution: string;
 }
 
+/** Advertising and consent (phase 6, D2 and D8): flags from config/flags, publisher id from the environment. */
+export interface PublicAdsConfig {
+  /** "off": no ad script and no cookie banner; "test": test ads; "live": real ads. */
+  mode: "off" | "test" | "live";
+  /** Google's consent message handles EEA/UK/CH visitors (D5). */
+  cmpEea: boolean;
+  /** AdSense publisher id (ca-pub-…), null while unset. */
+  client: string | null;
+  /** Ad unit id per slot format (src/config/ads.ts), null while unset. */
+  units: Record<"leaderboard" | "halfpage" | "rectangle" | "banner", string | null>;
+}
+
 export interface PublicConfig {
   env: "dev" | "staging" | "prod";
   siteUrl: string;
@@ -40,4 +52,5 @@ export interface PublicConfig {
   map: PublicMapConfig | null;
   /** True when a WhatsApp phone check can be started (§9); false hides the verification calls to action. */
   phoneVerification: boolean;
+  ads: PublicAdsConfig;
 }

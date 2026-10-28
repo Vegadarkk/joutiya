@@ -212,7 +212,7 @@ async function publish(upload: UploadRecord, listing: ListingRecord, processed: 
   await recordMediaBytes(storedBytes, ctx.now());
   await deleteQuietly(ctx.store, "quarantine", [upload.quarantineKey], upload.id);
   logger.info({ uploadId: upload.id, listingId: listing.id, bytes: storedBytes, attached: outcome.attached }, "upload ready");
-  return { status: "ready", photo };
+  return { status: "ready", photo, ...((checks?.faces ?? 0) > 0 ? { faces: checks!.faces } : {}) };
 }
 
 /**

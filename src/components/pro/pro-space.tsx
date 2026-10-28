@@ -305,6 +305,11 @@ function Dashboard({ me, shop, lifecycle }: { me: ProMeResponse; shop: ProSelfVi
               <Link href="/deposer">{t("newListing")}</Link>
             </Button>
           ) : null}
+          {canPublish ? (
+            <Button asChild variant="outline">
+              <Link href="/pro/stock">{t("stockImport")}</Link>
+            </Button>
+          ) : null}
           <Button asChild variant="outline">
             <Link href="/mes-annonces">{t("myListings")}</Link>
           </Button>

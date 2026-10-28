@@ -1,0 +1,83 @@
+name: Release
+
+# A release tag (D21, docs/lancement/mise-en-production.md): `vX.Y.Z`, or `vX.Y.Z-rc.N` for a
+# candidate, annotated, on a commit of main that deploy-staging already built and sent to staging.
+# This workflow checks the tag and publishes a GitHub Release (generated notes, the tarball digest
+# the CI recorded). It deploys nothing: production is promoted afterwards by
+# `node scripts/oracle-vm.ts promote --tag=vX.Y.Z --apply`, which also requires staging to run that
+# very commit, then `scripts/launch-check.ts` gates the opening. Pushing a tag and promoting wait
+# for the owner's go.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Check the tag and publish the release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # The GitHub Release.
+      contents: write
+      # The "Release images" check run of deploy-staging on the tag's commit.
+      checks: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Check the tag
+        id: tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [[ "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)(-rc\.[1-9][0-9]*)?$ ]] || fail "$TAG: vX.Y.Z or vX.Y.Z-rc.N expected"
+          version="${BASH_REMATCH[1]}"
+          prerelease="${BASH_REMATCH[2]:+true}"
+          # The tag object itself, as pushed (a checkout may only keep the commit).
+          git fetch --quiet --force origin "refs/tags/$TAG:refs/tags/$TAG" main
+          [[ "$(git cat-file -t "refs/tags/$TAG")" == "tag" ]] || fail "$TAG is not annotated: delete it and create it with git tag -a"
+          sha="$(git rev-parse "refs/tags/$TAG^{commit}")"
+          git merge-base --is-ancestor "$sha" origin/main || fail "$TAG points at $sha, which is not a commit of main"
+          package="$(git show "$sha:package.json" | node -e 'let s="";process.stdin.on("data",(c)=>s+=c).on("end",()=>process.stdout.write(JSON.parse(s).version))')"
+          [[ "$package" == "$version" ]] || fail "package.json says $package at $sha, the tag says $version"
+          {
+            echo "sha=$sha"
+            echo "release=${sha:0:12}"
+            echo "prerelease=${prerelease:-false}"
+          } >> "$GITHUB_OUTPUT"
+      - name: Check that staging received this commit
+        id: images
+        env:
+          SHA: ${{ steps.tag.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Written by deploy-staging with this repository's token only (oracle-vm.ts recordedTarballs).
+          digest="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?check_name=Release%20images&filter=all&per_page=100" \
+            --jq '[.check_runs[] | select(.app.slug == "github-actions" and .conclusion == "success") | (.output.summary // "") | capture("tarball (?<d>sha256:[0-9a-f]{64})").d] | last // ""')"
+          [[ -n "$digest" ]] || { echo "::error::no \"Release images\" record on $SHA: deploy-staging has not sent this commit to staging"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: Publish the GitHub Release
+        env:
+          TAG: ${{ github.ref_name }}
+          RELEASE: ${{ steps.tag.outputs.release }}
+          DIGEST: ${{ steps.images.outputs.digest }}
+          PRERELEASE: ${{ steps.tag.outputs.prerelease }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="$(printf 'Release `%s`: images of web and worker from the tarball `%s` (check run "Release images").\n\nProduction: `node scripts/oracle-vm.ts promote --tag=%s --apply`, then `node scripts/launch-check.ts --tag=%s`.' "$RELEASE" "$DIGEST" "$TAG" "$TAG")"
+          flags=(--verify-tag --generate-notes --title "$TAG" --notes "$notes")
+          [[ "$PRERELEASE" == "true" ]] && flags+=(--prerelease)
+          gh release create "$TAG" "${flags[@]}"

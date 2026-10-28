@@ -1,18 +1,21 @@
 import { useTranslations } from "next-intl";
-import { criterionById, subcategoryById, type Condition, type Criterion } from "@/config/categories";
+import { criterionById, subcategoryById, type Condition, type Criterion, type CriterionGroup } from "@/config/categories";
 import type { ListingAttributes } from "@/lib/contracts/listings";
 import { groupDigits } from "@/lib/listings/client/format";
 import { cn } from "@/lib/utils";
 
 // Criteria of a listing, from the declarative category config (design §2): the subcategory's
 // fields in config order, the core `condition` first, values that were not filled skipped. Labels
-// come from the Criteria namespace (`Criteria.<field>.label`, `.options.<option>`).
+// come from the Criteria namespace (`Criteria.<field>.label`, `.options.<option>`). The vehicle
+// dossier (`group: "dossier"`) has its own section (vehicle-dossier.tsx): `group` picks the rows.
 
 export interface CriteriaGridProps {
   subcategoryId: string;
   attributes: ListingAttributes;
   condition: Condition | null;
   className?: string;
+  /** Rows of this criteria group; absent = the main criteria (and `condition`). */
+  group?: CriterionGroup;
 }
 
 export interface CriterionRow {
@@ -30,7 +33,7 @@ function formatNumber(value: number, criterion: Pick<Criterion, "unit">): string
   return value < 0 ? `-${digits}` : digits;
 }
 
-export function useCriteriaRows({ subcategoryId, attributes, condition }: Omit<CriteriaGridProps, "className">): CriterionRow[] {
+export function useCriteriaRows({ subcategoryId, attributes, condition, group }: Omit<CriteriaGridProps, "className">): CriterionRow[] {
   const t = useTranslations("Criteria");
   const page = useTranslations("ListingPage.criteria");
   type Key = Parameters<typeof t.has>[0];
@@ -39,8 +42,9 @@ export function useCriteriaRows({ subcategoryId, attributes, condition }: Omit<C
 
   const rows: CriterionRow[] = [];
   const subcategory = subcategoryById(subcategoryId);
-  if (condition && subcategory?.condition) rows.push({ id: "condition", label: label("condition"), value: option("condition", condition) });
+  if (condition && subcategory?.condition && !group) rows.push({ id: "condition", label: label("condition"), value: option("condition", condition) });
   for (const field of subcategory?.criteria ?? []) {
+    if (field.group !== group) continue;
     const value = attributes[field.id];
     if (value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) continue;
     const def = criterionById(field.id) ?? field;
