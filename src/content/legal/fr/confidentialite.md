@@ -59,6 +59,7 @@ Pour signaler un contenu, utilisez le bouton « Signaler » présent sur chaque 
 - **Téléphone :** votre numéro, si vous le faites vérifier<!--if:whatsappEnabled--> (§3.13)<!--endif-->.
 - **Annonces :** titre, description, prix, catégorie et critères, photos, ville, quartier si vous l'indiquez, position sur la carte arrondie à environ 1 km, et vos choix de contact (messagerie, affichage du numéro, WhatsApp).
 - **Messages :** le contenu de vos conversations avec les autres utilisateurs.
+- **Avis :** la note, le texte et votre déclaration d'échange, pour un avis que vous laissez à un vendeur ; la réponse d'un vendeur à un avis (§3.7).
 - **Signalements et recours :** le contenu visé, le motif, votre explication, votre déclaration de bonne foi, et votre nom et votre e-mail si vous les donnez.
 - **Compte Pro :** nom et forme de l'entreprise, identifiants légaux selon la forme (ICE, registre du commerce, identifiant fiscal, numéro d'auto-entrepreneur ou de taxe professionnelle), ville, description, logo, site web, téléphone public, pièces justificatives et engagement de conformité.
 - **Achats, à l'ouverture des ventes :** options achetées, crédits, abonnements, données de facturation. Les données de votre carte sont saisies directement chez notre prestataire de paiement.
@@ -116,6 +117,7 @@ Chaque traitement repose sur l'une des bases prévues par l'article 6 du RGPD. L
 | Vous envoyer les e-mails liés au service | Exécution du contrat ; obligation légale pour les décisions de modération |
 | Vous envoyer des e-mails d'information | Consentement |
 | Gérer vos favoris, recherches sauvegardées et alertes | Exécution du contrat |
+| Publier les avis et les réponses des vendeurs | Exécution du contrat ; intérêt légitime : l'information des acheteurs et la loyauté des avis (art. L111-7-2 du Code de la consommation) |
 | Vérifier les comptes Pro | Exécution du contrat et intérêt légitime : l'exactitude de la mention « Pro » et la confiance des acheteurs |
 | Gérer les achats et les factures, à l'ouverture des ventes | Exécution du contrat ; obligation légale pour les factures et la comptabilité |
 | Afficher de la publicité Google | Consentement |
@@ -172,9 +174,11 @@ Nous ne vous envoyons des e-mails d'information (nouveautés, conseils) que si v
 
 Nos e-mails ne contiennent ni pixel de suivi d'ouverture ni lien de suivi des clics. Si une adresse renvoie une erreur ou signale un e-mail comme indésirable, nous en gardons une empreinte pour ne plus lui écrire.
 
-### 3.7 Les favoris et les alertes de recherche {#finalites-7}
+### 3.7 Les favoris, les alertes de recherche et les avis {#finalites-7}
 
 Vous pouvez enregistrer des annonces en favoris et sauvegarder jusqu'à 10 recherches. Si vous activez une alerte, nous vous envoyons au plus un e-mail par jour avec les nouvelles annonces. Vous pouvez supprimer un favori, une recherche ou une alerte à tout moment.
+
+Après un échange par la messagerie, l'acheteur peut noter le vendeur (voir [Avis utilisateurs](/legal/avis-utilisateurs)). Nous vérifions à partir de la conversation que l'échange a eu lieu. Le texte passe par des contrôles automatiques, et un avis qui semble contenir une donnée sensible est examiné par un modérateur avant publication. Un avis publié est public : il montre le pseudonyme de son auteur, la note, le texte, la date de l'avis et celle de l'échange, et le titre de l'annonce, sur le profil ou la boutique du vendeur, qui peut y répondre une fois. L'auteur peut supprimer son avis à tout moment. S'il ferme son compte, ses avis restent affichés et son nom est remplacé par « Ancien membre ».
 
 ### 3.8 Les comptes Pro et leur vérification {#finalites-8}
 
@@ -289,6 +293,7 @@ Si une annonce contient des données qui vous concernent sans votre accord, util
 | Données de connexion : adresse IP, type d'événement, « User-Agent » (200 caractères au plus), date et heure de l'inscription et de chaque connexion | 1 an | Obligation légale (décret n° 2021-1362) |
 | Données de création de contenu : adresse IP, opération, identifiant du contenu | 1 an | Obligation légale (loi n° 2004-575 du 21 juin 2004 pour la confiance dans l'économie numérique) |
 | Messages | 12 mois après la dernière activité de la conversation | Litiges, lutte contre les arnaques |
+| Avis et réponses des vendeurs | Affichés tant que le profil du vendeur est en ligne ; effacés 12 mois après leur suppression ou leur retrait | Information des acheteurs, recours |
 | Copies des pièces de vérification d'un compte Pro | 6 mois après la fin de la relation | Vérification des professionnels (diligence volontaire inspirée de l'article 30 du règlement sur les services numériques) |
 | Signalements et décisions de modération | 5 ans | Preuve, recours, contentieux |
 | Propositions de l'IA de modération | 12 mois ; 5 ans si elles fondent une décision de modération | Preuve, amélioration des contrôles |
@@ -365,6 +370,7 @@ Quand une information laisse soupçonner une infraction qui menace la vie ou la 
 - Vos annonces et votre profil public sont visibles par tous (§3.1 et §3.2).
 - Votre numéro n'est affiché qu'aux membres connectés qui le demandent, dans la limite d'un quota, et seulement si vous avez choisi de l'afficher.
 - Vos messages ne sont lus que par votre interlocuteur, sauf dans les cas décrits au §3.3.
+- Vos avis publiés, et les réponses des vendeurs, sont visibles par tous (§3.7).
 - La personne visée par une décision de modération reçoit l'exposé des motifs ; l'auteur d'un signalement est informé de la suite donnée.
 
 ## 7. Transferts hors de l'Union européenne et du Maroc {#transferts}
