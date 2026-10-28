@@ -100,14 +100,15 @@ test.describe("real-estate agency", () => {
     const shopName = `Atlas Immobilier ${randomId(4)}`;
     const { segment, slugId } = await seedAgency(email, shopName);
 
-    // The claims changed and the sessions were revoked: sign in again.
+    // The claims changed: drop the old session (a cookie issued in the same second as the
+    // revocation still passes the check) and sign in again for a token carrying the shop.
+    await page.context().clearCookies();
     await page.goto("/fr/pro");
-    if (page.url().includes("/connexion")) {
-      await page.getByLabel("Adresse e-mail").fill(email);
-      await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
-      await waitForTurnstile(page);
-      await page.getByRole("button", { name: "Se connecter" }).click();
-    }
+    await expect(page).toHaveURL(/\/connexion/);
+    await page.getByLabel("Adresse e-mail").fill(email);
+    await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+    await waitForTurnstile(page);
+    await page.getByRole("button", { name: "Se connecter" }).click();
     const settings = page.getByTestId("agency-settings");
     await expect(settings).toBeVisible({ timeout: 15_000 });
     await settings.getByRole("radio", { name: /Agence immobilière/ }).check();
