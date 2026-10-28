@@ -123,3 +123,17 @@ export async function purgeProProfile(proId: string, now: Date): Promise<ProProf
   if (purged) void consume("firestore.writes", 2);
   return purged;
 }
+
+/** Shops whose new payment link waits for an admin's review of its host. */
+export async function listPaymentHostReview(limit: number): Promise<ProProfileRecord[]> {
+  const snapshot = await db().collection(COLLECTIONS.proProfiles).where("sellerPayment.hostReview", "==", true).limit(limit).get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  return snapshot.docs.map(proProfileFromSnapshot).filter((record): record is ProProfileRecord => record !== null);
+}
+
+/** Shops whose pending payment link is on `host`. */
+export async function listPendingPaymentHost(host: string, limit: number): Promise<ProProfileRecord[]> {
+  const snapshot = await db().collection(COLLECTIONS.proProfiles).where("sellerPayment.pendingHost", "==", host).limit(limit).get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  return snapshot.docs.map(proProfileFromSnapshot).filter((record): record is ProProfileRecord => record !== null);
+}
