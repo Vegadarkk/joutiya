@@ -115,6 +115,10 @@ export type ErrorCode =
   | "self_conversation"
   /** First message about an adults-only listing without the buyer's 18+ confirmation (422). */
   | "adult_confirmation_required"
+  /** The appointment changed since the caller saw it (answered, withdrawn, replaced; 409). */
+  | "appointment_changed"
+  /** The chosen slot has started or passed (409). */
+  | "appointment_slot_past"
   /** Reporter abusive (art. 23) or target not reportable by this account (403). */
   | "report_not_allowed"
   /** The reported target does not exist or is not visible to the reporter (404 semantics, 422). */

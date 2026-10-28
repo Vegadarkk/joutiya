@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { SendHorizontal } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { InlineError } from "@/components/feedback/inline-error";
@@ -31,9 +31,11 @@ export interface ComposerProps {
   onSend: (text: string) => Promise<boolean>;
   error?: string | null;
   onTyping?: () => void;
+  /** Before the field: the thread's appointment button. */
+  leading?: ReactNode;
 }
 
-export function Composer({ onSend, error, onTyping }: ComposerProps) {
+export function Composer({ onSend, error, onTyping, leading }: ComposerProps) {
   const t = useTranslations("Messaging.composer");
   const id = useId();
   const field = useRef<HTMLTextAreaElement>(null);
@@ -87,6 +89,7 @@ export function Composer({ onSend, error, onTyping }: ComposerProps) {
         </InlineError>
       ) : null}
       <div className="flex items-end gap-2">
+        {leading}
         <label htmlFor={`${id}-text`} className="sr-only">
           {t("label")}
         </label>

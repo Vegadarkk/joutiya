@@ -20,6 +20,16 @@ import { ROLES } from "@/lib/firebase/claims";
 import { SAVED_SEARCH_ALERTS, SAVED_SEARCH_NAME_MAX } from "@/lib/contracts/search";
 import { storedSearchParamsSchema } from "@/lib/search/params";
 import { MESSAGE_RISK_FLAGS, MESSAGE_TEXT_MAX } from "@/lib/contracts/messaging";
+import {
+  APPOINTMENT_CANCEL_REASONS,
+  APPOINTMENT_EVENTS,
+  APPOINTMENT_KINDS,
+  APPOINTMENT_PLACE_MAX,
+  APPOINTMENT_SLOTS_MAX,
+  APPOINTMENT_STATUSES,
+  appointmentIdSchema,
+  slotSchema,
+} from "@/lib/contracts/appointments";
 import { REPORT_PRIORITIES, REPORT_REASON_IDS, REPORT_TARGET_TYPES } from "@/config/report-reasons";
 import type { LedgerReason } from "@/lib/payments/wallet";
 
@@ -506,6 +516,41 @@ export type SavedSearchDoc = z.infer<typeof savedSearchSchema>;
 const hold = z.array(z.string().min(1).max(64)).max(50);
 const participantsSchema = z.tuple([uid, uid]);
 
+const storedSlotSchema = z.object({ start: ts, minutes: slotSchema.shape.minutes }).strict();
+
+/** Conversation.appointment: the conversation's current appointment (architecture §5, 28 Oct). */
+export const appointmentSchema = z
+  .object({
+    id: appointmentIdSchema,
+    kind: z.enum(APPOINTMENT_KINDS),
+    proposedBy: uid,
+    /** Sorted by start, no overlap (src/lib/appointments/rules.ts). */
+    slots: z.array(storedSlotSchema).min(1).max(APPOINTMENT_SLOTS_MAX),
+    /** Links masked like a message (URL_MARKER). */
+    place: z.string().max(APPOINTMENT_PLACE_MAX + 40).optional(),
+    status: z.enum(APPOINTMENT_STATUSES),
+    chosen: storedSlotSchema.optional(),
+    cancelledBy: uid.optional(),
+    reason: z.enum(APPOINTMENT_CANCEL_REASONS).optional(),
+    createdAt: ts,
+    updatedAt: ts,
+  })
+  .strict();
+export type AppointmentDoc = z.infer<typeof appointmentSchema>;
+export type StoredSlot = z.infer<typeof storedSlotSchema>;
+
+/** Message.appointment: the step an appointment system message shows. */
+export const appointmentEventSchema = z
+  .object({
+    id: appointmentIdSchema,
+    event: z.enum(APPOINTMENT_EVENTS),
+    kind: z.enum(APPOINTMENT_KINDS),
+    slot: storedSlotSchema.optional(),
+    reason: z.enum(APPOINTMENT_CANCEL_REASONS).optional(),
+  })
+  .strict();
+export type AppointmentEventDoc = z.infer<typeof appointmentEventSchema>;
+
 /** conversations/{cid}: one per (listing, buyer); cid derived on the server (D1). Served to participants by the API (D2). */
 export const conversationSchema = z
   .object({
@@ -548,6 +593,10 @@ export const conversationSchema = z
     legalHold: hold,
     /** Adults-only listing: when the buyer confirmed being 18 or older (first message). */
     buyerAdultConfirmedAt: ts.optional(),
+    /** The current appointment (proposed, confirmed or ended); the thread keeps every step. */
+    appointment: appointmentSchema.optional(),
+    /** Due time of the confirmed appointment's next reminder (job appointment-reminders). */
+    appointmentRemindAt: ts.optional(),
   })
   .strict();
 export type ConversationDoc = z.infer<typeof conversationSchema>;
@@ -563,6 +612,8 @@ export const messageSchema = z
     text: z.string().max(MESSAGE_TEXT_MAX + 200),
     risk: z.object({ flags: z.array(z.enum(MESSAGE_RISK_FLAGS)).min(1).max(4), warned: z.boolean() }).strict().optional(),
     hidden: z.boolean().optional(),
+    /** Appointment system message: its text is the appointmentMarker of the event. */
+    appointment: appointmentEventSchema.optional(),
     createdAt: ts,
     readAt: ts.optional(),
   })

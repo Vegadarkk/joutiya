@@ -192,6 +192,8 @@ export const RATE_LIMITS = {
   "message.send.hour.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
   "message.send.day.uid": { points: 400, duration: DAY, policy: "open", key: "uid" },
   "message.send.thread": { points: 60, duration: HOUR, policy: "open", key: "uid+cid" },
+  // Appointment steps (propose, confirm, decline, withdraw, cancel), on top of the send limiters.
+  "appointment.uid": { points: 30, duration: HOUR, policy: "open", key: "uid" },
   "conversation.new.uid": { points: 50, duration: DAY, policy: "open", key: "uid" },
   "conversation.new.young.uid": { points: 10, duration: DAY, policy: "open", key: "uid" },
   // Read, archive, hide, block calls of the inbox, and the unread badge.

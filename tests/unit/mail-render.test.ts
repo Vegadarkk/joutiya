@@ -75,6 +75,16 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
   launchOfferNotice: { displayName: "Nadia", shopName: "Atlas Vélos", plan: "essentiel", kind: "ending", endsAt: "2027-03-01T00:00:00.000Z", freeListings: 0, paused: 0 },
   proRejected: { displayName: "Nadia", shopName: "Atlas Vélos", reason: "L'ICE ne correspond pas au registre du commerce.", contact: "dsa@joutiya.ma" },
   newMessages: { displayName: "Nadia", count: 4, conversations: [{ listingTitle: "Vélo de ville", counterpartName: "Karim" }] },
+  appointmentReminder: {
+    displayName: "Nadia",
+    counterpartName: "Karim",
+    listingTitle: "Dacia Logan 2019",
+    kind: "test_drive",
+    startsAt: "2026-11-05T13:30:00.000Z",
+    minutes: 30,
+    place: "Parking du Morocco Mall",
+    cid: "AbCdEfGhIjKlMnOpQrStUv",
+  },
 };
 
 /** Every URL a template receives must appear in both bodies. */
