@@ -37,6 +37,8 @@ describe("adRequest", () => {
   it("sends no request without a choice or after a refusal (house promotion instead)", () => {
     expect(adRequest("rectangle", visitor({ choice: null }))).toBeNull();
     expect(adRequest("rectangle", visitor({ choice: { ads: false, perso: false, t: 1 } }))).toBeNull();
+    // Google's message covers EEA visitors, but a refusal in our own panel still wins.
+    expect(adRequest("rectangle", visitor({ country: "FR", ads: { ...ADS, cmpEea: true }, choice: { ads: false, perso: false, t: 1 } }))).toBeNull();
   });
 
   it("keeps EEA/UK/CH visitors, and unknown ones, on house promotions until Google's message covers them", () => {

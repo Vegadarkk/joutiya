@@ -36,12 +36,15 @@ export function AdUnit({ placement, format, media, hide, eligible, labels, class
   const [request, setRequest] = useState<AdRequest | null>(null);
   // Outcome of one request: a new request starts without one.
   const [outcome, setOutcome] = useState<{ of: AdRequest; filled: boolean } | null>(null);
+  const boxRef = useRef<HTMLElement>(null);
   const insRef = useRef<HTMLModElement>(null);
   const { width, height } = AD_FORMATS[format];
 
   useEffect(() => {
     if (!eligible || !ready) return;
     if (media && !window.matchMedia(media).matches) return;
+    // Never a clipped unit (AdSense policy): the box must hold the unit's full width.
+    if ((boxRef.current?.clientWidth ?? 0) < width) return;
     let active = true;
     loadPublicConfig()
       .then(async (config) => (adsConfigured(config.ads, config.env) ? adRequest(format, { ads: config.ads, env: config.env, choice, country: await visitorCountry() }) : null))
@@ -52,17 +55,20 @@ export function AdUnit({ placement, format, media, hide, eligible, labels, class
     return () => {
       active = false;
     };
-  }, [eligible, ready, choice, format, media]);
+  }, [eligible, ready, choice, format, media, width]);
+
+  // A page that stops being eligible (search filters re-render in place) drops its ad at once.
+  const live = eligible ? request : null;
 
   useEffect(() => {
     const ins = insRef.current;
-    if (!request || !ins) return;
+    if (!live || !ins) return;
     let settled = false;
     const settle = (filled: boolean) => {
       if (settled) return;
       settled = true;
       window.clearTimeout(timer);
-      setOutcome({ of: request, filled });
+      setOutcome({ of: live, filled });
     };
     const observer = new MutationObserver(() => {
       const status = ins.getAttribute("data-ad-status");
@@ -70,7 +76,7 @@ export function AdUnit({ placement, format, media, hide, eligible, labels, class
     });
     observer.observe(ins, { attributes: true, attributeFilter: ["data-ad-status"] });
     const timer = window.setTimeout(() => settle(false), AD_FILL_TIMEOUT_MS);
-    loadAdsense(request.client, request.npa).then(
+    loadAdsense(live.client, live.npa).then(
       () => settled || requestAd(),
       () => settle(false),
     );
@@ -79,14 +85,15 @@ export function AdUnit({ placement, format, media, hide, eligible, labels, class
       observer.disconnect();
       window.clearTimeout(timer);
     };
-  }, [request]);
+  }, [live]);
 
-  const current = outcome?.of === request ? outcome : null;
-  const ad = request !== null && current?.filled !== false;
+  const current = outcome?.of === live ? outcome : null;
+  const ad = live !== null && current?.filled !== false;
   const state = !ad ? "promo" : current?.filled ? "filled" : "pending";
 
   return (
     <aside
+      ref={boxRef}
       data-ad-slot={placement}
       data-ad-state={state}
       data-ad-eligible={eligible || undefined}
@@ -100,13 +107,15 @@ export function AdUnit({ placement, format, media, hide, eligible, labels, class
       <div className="flex min-h-0 flex-1 items-center justify-center">
         {ad ? (
           <ins
+            // A new request (personalisation or mode changed) needs a fresh unit: AdSense fills an <ins> once.
+            key={`${live.unit}:${live.npa}:${live.test}`}
             ref={insRef}
             className="adsbygoogle"
             style={{ display: "inline-block", width, height }}
-            data-ad-client={request.client}
-            data-ad-slot={request.unit}
+            data-ad-client={live.client}
+            data-ad-slot={live.unit}
             data-full-width-responsive="false"
-            data-adtest={request.test ? "on" : undefined}
+            data-adtest={live.test ? "on" : undefined}
           />
         ) : (
           children

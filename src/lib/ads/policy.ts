@@ -32,12 +32,15 @@ export function adsConfigured(ads: PublicAdsConfig, env: PublicConfig["env"]): b
 /**
  * The ad request of a slot, or null for the house promotion. Live ads run only in production.
  * EEA/UK/CH visitors get ads only once Google's certified consent message covers them
- * (`cmpEea`); everyone else needs `ads` accepted in our banner, and a refusal sends no request.
+ * (`cmpEea`) and have not refused in our panel; everyone else needs `ads` accepted in our banner. A
+ * refusal sends no request.
  */
 export function adRequest(format: AdFormat, { ads, env, choice, country }: AdVisitor): AdRequest | null {
   const unit = ads.units[format];
   if (!unit || !ads.client || !adsConfigured(ads, env)) return null;
   const test = ads.mode === "test";
+  // A refusal in our panel holds everywhere, Google's message or not.
+  if (choice && !choice.ads) return null;
   if (isEeaUkCh(country)) return ads.cmpEea ? { client: ads.client, unit, test, npa: undefined } : null;
   if (!choice?.ads) return null;
   return { client: ads.client, unit, test, npa: choice.perso ? 0 : 1 };
