@@ -68,6 +68,21 @@ beforeEach(() => {
 afterEach(() => resetServerEnv());
 
 describe("enforceSearchLimit", () => {
+  it("lets the staging load test through without counting, with its secret only", async () => {
+    const secret = "Lt".repeat(20);
+    process.env.APP_ENV = "staging";
+    process.env.LOADTEST_BYPASS_SECRET = secret;
+    resetServerEnv();
+    try {
+      const who = client();
+      for (let i = 0; i < RATE_LIMITS["search.device.minute"].points + 5; i += 1) await enforceSearchLimit(request(who, { "x-joutiya-loadtest": secret }));
+      expect(vi.mocked(consumeLimit)).not.toHaveBeenCalled();
+      expect(mocks.verify).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.LOADTEST_BYPASS_SECRET;
+    }
+  });
+
   it("lets a client through within its device and IP budgets", async () => {
     const who = client();
     for (let i = 0; i < RATE_LIMITS["search.device.minute"].points; i += 1) await expect(enforceSearchLimit(request(who))).resolves.toEqual({ passGranted: false });

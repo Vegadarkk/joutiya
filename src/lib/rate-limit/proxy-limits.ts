@@ -7,6 +7,7 @@ import { hasChallengePass } from "@/lib/security/challenge-pass";
 import { SESSION_COOKIE } from "@/lib/security/cookies";
 import { consumeLimit, type LimitOutcome } from "./limiter";
 import { requestIdentity } from "./keys";
+import { isLoadTestRequest } from "./loadtest";
 
 // Page-view limits of the server-rendered pages (§6 table, design D14), checked in proxy.ts. The
 // proxy bundle has its own module instances, so these limiters use their own valkey-ratelimit
@@ -51,7 +52,8 @@ function retryAfter(outcomes: LimitOutcome[]): number | null {
 
 /** Consumes the page-view limiters of this request and says what the proxy answers. */
 export async function checkPageLimits(request: Request): Promise<PageLimitDecision> {
-  if (request.headers.get(VERIFIED_BOT_HEADER) === "1") return { kind: "allow" };
+  // Verified bots (Cloudflare header) and the staging load test (loadtest.ts) are exempt.
+  if (request.headers.get(VERIFIED_BOT_HEADER) === "1" || isLoadTestRequest(request.headers)) return { kind: "allow" };
   const identity = requestIdentity(request.headers);
   const session = readCookie(request.headers, SESSION_COOKIE);
   // A signed-in member counts on the session bucket instead of the visitor's device bucket.

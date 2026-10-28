@@ -1,0 +1,82 @@
+name: Load test
+
+# k6 against staging (D17, docs/lancement/charge-procedure.md): on demand only, 7 minutes of load
+# (load/k6.js). Before a run: the data set is seeded (scripts/seed-loadtest.ts), the temporary
+# Cloudflare rule is on (scripts/cloudflare.ts loadtest --on) and staging has LOADTEST_BYPASS_SECRET;
+# after it, all three are undone. At most two runs a day (Firestore reads of the ISR misses).
+#
+# Staging is behind Cloudflare Access: k6 sends the service token "joutiya-scan" in single-header
+# mode (header name in the variable ACCESS_TOKEN_HEADER, JSON value in the secret
+# STAGING_SCAN_ACCESS_TOKEN, shared with the security scan). The secret LOADTEST_BYPASS_SECRET goes
+# in the x-joutiya-loadtest header. Inert until the variable LOAD_TEST_ENABLED=true. The summary
+# artifact holds counts and latencies only.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: load-test
+  cancel-in-progress: false
+
+jobs:
+  k6:
+    name: k6 (staging)
+    if: vars.LOAD_TEST_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      K6_VERSION: v2.3.0
+      K6_SHA256: 39c3117b6af817592dcd0ce4242105c0a7af10948c2a425306f0be8f7a8a8ab1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Check the settings
+        env:
+          HEADER: ${{ vars.ACCESS_TOKEN_HEADER }}
+          HAS_TOKEN: ${{ secrets.STAGING_SCAN_ACCESS_TOKEN != '' }}
+          HAS_SECRET: ${{ secrets.LOADTEST_BYPASS_SECRET != '' }}
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [[ "$HEADER" =~ ^[A-Za-z0-9-]+$ ]] || fail "ACCESS_TOKEN_HEADER is not set"
+          [[ "$HAS_TOKEN" == "true" ]] || fail "STAGING_SCAN_ACCESS_TOKEN is not set"
+          [[ "$HAS_SECRET" == "true" ]] || fail "LOADTEST_BYPASS_SECRET is not set"
+      - run: npm ci --ignore-scripts
+      - name: URL list
+        run: |
+          npx esbuild scripts/load-urls.ts --bundle --platform=node --format=esm --outfile="$RUNNER_TEMP/load-urls.mjs" --log-level=warning
+          node "$RUNNER_TEMP/load-urls.mjs" > load/urls.json
+          jq -r '"\(.pages | length) pages, \(.searches | length) searches"' load/urls.json
+      - name: Install k6
+        run: |
+          curl -sSLf -o "$RUNNER_TEMP/k6.tgz" "https://github.com/grafana/k6/releases/download/$K6_VERSION/k6-$K6_VERSION-linux-amd64.tar.gz"
+          echo "$K6_SHA256  $RUNNER_TEMP/k6.tgz" | sha256sum -c --quiet
+          tar -xzf "$RUNNER_TEMP/k6.tgz" -C "$RUNNER_TEMP" --strip-components=1 "k6-$K6_VERSION-linux-amd64/k6"
+          "$RUNNER_TEMP/k6" version
+      - name: Run
+        timeout-minutes: 10
+        env:
+          TARGET: https://staging.joutiya.ma
+          ACCESS_HEADER: ${{ vars.ACCESS_TOKEN_HEADER }}
+          ACCESS_TOKEN: ${{ secrets.STAGING_SCAN_ACCESS_TOKEN }}
+          LOADTEST_SECRET: ${{ secrets.LOADTEST_BYPASS_SECRET }}
+          SUMMARY: ${{ runner.temp }}/k6-summary.json
+        run: |
+          # Exit code 99: a threshold failed (the summary still says which).
+          "$RUNNER_TEMP/k6" run --quiet --summary-mode=compact --no-usage-report load/k6.js
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: k6-summary
+          path: ${{ runner.temp }}/k6-summary.json
+          retention-days: 90
+          if-no-files-found: warn

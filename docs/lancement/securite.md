@@ -1,0 +1,49 @@
+# Audit de sécurité : procédure (D18)
+
+Trois volets avant le lancement, puis un contrôle passif chaque semaine. Le rapport final va dans
+`docs/lancement/audit-securite.md` (créé seulement avec un vrai rapport : le contrôle de lancement
+le cherche).
+
+## 1. Scan ZAP (`.github/workflows/security-scan.yml`)
+
+- **Baseline (passif)** du staging chaque lundi à 04:17 UTC et à la demande : ZAP parcourt le site
+  et lit les réponses sans rien attaquer (3 minutes d'exploration).
+- **Full scan (actif)** du staging, une fois avant v1.0.0, à la demande (mode `full`) : ZAP envoie de
+  vraies charges d'attaque (injections, XSS…). Le staging peut recevoir des formulaires remplis de
+  charges : à lancer hors des recettes en cours.
+- **Baseline de la production** après le lancement (cible `prod`, passif seulement).
+
+Règles : `.zap/rules.tsv`. Une alerte `FAIL` fait échouer le workflow (en-têtes de sécurité, CSP,
+cookies, injections SQL, XSS, injection de commande, traversée de répertoire). `10010` reste en
+avertissement (`jt_consent` est lisible par le script de la page, voulu) et `10202` est ignorée
+(la protection CSRF passe par un en-tête, pas par un champ de formulaire).
+
+Réglages (une fois) :
+- jeton Access `joutiya-scan` en mode single header (le même que le test de charge,
+  `docs/lancement/charge-procedure.md`), variable `ACCESS_TOKEN_HEADER`, secret
+  `STAGING_SCAN_ACCESS_TOKEN` ;
+- variable `SCAN_REPORT_AGE_RECIPIENT` : ta clé publique [age](https://age-encryption.org)
+  (`age-keygen -o cle-zap.txt` sur PC2 ; la ligne `# public key: age1…` donne la valeur) ;
+- variable `SECURITY_SCAN_ENABLED=true`.
+
+Le dépôt, ses journaux et ses artefacts sont publics jusqu'au lancement : le journal ne montre que
+le nombre d'alertes par niveau ; les rapports (JSON, HTML, sortie console) sont chiffrés pour ta
+clé avant l'envoi. Lecture : télécharger l'artefact `zap-…`, puis
+`age -d -i cle-zap.txt zap-reports.tar.age | tar -x`.
+
+## 2. Revue manuelle
+
+Contre l'architecture §6 : liste OWASP, rôles (visiteur, particulier, pro, admin), limites de débit
+(recherche, inscription, messagerie, dépôt), envois de fichiers, webhooks de paiement (phase 7),
+CSP des pages publiques et privées, CORS, Access sur `admin` et `staging`. Faite par une revue Opus
+du code, ses constats corrigés ou justifiés un par un dans le rapport.
+
+## 3. HTTP Observatory
+
+Note A ou A+ exigée, vérifiée par `scripts/launch-check.ts` sur la production
+(`docs/lancement/mise-en-production.md`).
+
+## Rapport `audit-securite.md`
+
+Date et commit, résultats des scans (nombre d'alertes par niveau, alertes FAIL corrigées), constats
+de la revue avec leur suite, note Observatory, risques acceptés et pourquoi.
