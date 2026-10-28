@@ -4,6 +4,8 @@ import { DEFAULT_PRICING, planOfEntitlement, resolvePricingConfig } from "@/conf
 import { resetServerEnv } from "@/lib/env";
 import { invoiceViews } from "@/lib/payments/invoices";
 import { noticeDue } from "@/lib/payments/launch-offer";
+import { passPurchaseEffect } from "@/lib/payments/pass";
+import { passEndAfter, passNoticeDue, runningPassEnd } from "@/lib/payments/pass-rules";
 import { invoiceFields } from "@/lib/payments/plans";
 import { listCustomerSubscriptions, postStripeReceipt, RevenueCatApiError, type RevenueCatSubscription } from "@/lib/payments/revenuecat-api";
 import { formEncode, stripeRequest, StripeApiError, verifyStripeSignature } from "@/lib/payments/stripe-api";
@@ -166,6 +168,13 @@ describe("lifecycle event of a subscription", () => {
     expect(lifecycleEventFor(view({ lifecycle: "grace", planSource: "subscription", graceUntil: at("2026-10-19T00:00:00Z") }), "billing_issue", "essentiel", now)).toEqual({ type: "grace_ended" });
   });
 
+  it("lets a subscription replace a pass, and an old subscription's failure never touch a pass", () => {
+    const onPass = view({ lifecycle: "active", planSource: "pass" });
+    expect(lifecycleEventFor(onPass, "active", "essentiel", now)).toEqual({ type: "subscription_active", plan: "essentiel" });
+    expect(lifecycleEventFor(onPass, "billing_issue", "essentiel", now)).toBeNull();
+    expect(lifecycleEventFor(onPass, "expired", "essentiel", now)).toBeNull();
+  });
+
   it("downgrades an expired subscription, never the launch offer, and leaves a suspended or unverified shop alone", () => {
     expect(lifecycleEventFor(view({ lifecycle: "active", planSource: "subscription" }), "expired", "essentiel", now)).toEqual({ type: "subscription_expired" });
     expect(lifecycleEventFor(view({ lifecycle: "verified" }), "expired", "essentiel", now)).toBeNull();
@@ -307,5 +316,47 @@ describe("launch offer notices", () => {
     expect(noticeDue({ ...offer, noticeDays: 5 }, undefined, before(6))).toBeNull();
     expect(noticeDue({ ...offer, noticeDays: 5 }, undefined, before(4))).toBe(5);
     expect(noticeDue({ ...offer, noticeDays: 0 }, undefined, before(0.5))).toBeNull();
+  });
+});
+
+describe("Pass Boutique rules", () => {
+  const now = at("2026-11-01T10:00:00Z");
+  const pass = { plan: "essentiel" as const, days: 30, maxAheadDays: 90 };
+
+  it("reads a running pass only on planSource pass and before its end", () => {
+    expect(runningPassEnd({ planSource: "pass", passEndsAt: at("2026-11-10T00:00:00Z") }, now)).toEqual(at("2026-11-10T00:00:00Z"));
+    expect(runningPassEnd({ planSource: "pass", passEndsAt: at("2026-10-30T00:00:00Z") }, now)).toBeNull();
+    expect(runningPassEnd({ planSource: "subscription", passEndsAt: at("2026-11-10T00:00:00Z") }, now)).toBeNull();
+    expect(runningPassEnd({ planSource: "none" }, now)).toBeNull();
+  });
+
+  it("starts now or at the end of the running pass, within maxAheadDays", () => {
+    expect(passEndAfter(null, pass, now)).toEqual(at("2026-12-01T10:00:00Z"));
+    expect(passEndAfter(at("2026-11-10T00:00:00Z"), pass, now)).toEqual(at("2026-12-10T00:00:00Z"));
+    // 61 days left + 30 > 90.
+    expect(passEndAfter(at("2027-01-01T10:00:00Z"), pass, now)).toBeNull();
+    expect(passEndAfter(at("2026-12-31T10:00:00Z"), pass, now)).toEqual(at("2027-01-30T10:00:00Z"));
+  });
+
+  it("sends one notice at J-7 and J-1, none before, after the end or twice", () => {
+    const end = at("2026-11-20T00:00:00Z");
+    expect(passNoticeDue(end, undefined, at("2026-11-12T00:00:00Z"))).toBeNull();
+    expect(passNoticeDue(end, undefined, at("2026-11-13T00:00:00Z"))).toBe(7);
+    expect(passNoticeDue(end, at("2026-11-13T00:00:00Z"), at("2026-11-15T00:00:00Z"))).toBeNull();
+    expect(passNoticeDue(end, at("2026-11-13T00:00:00Z"), at("2026-11-19T01:00:00Z"))).toBe(1);
+    expect(passNoticeDue(end, at("2026-11-19T01:00:00Z"), at("2026-11-19T12:00:00Z"))).toBeNull();
+    expect(passNoticeDue(end, undefined, end)).toBeNull();
+    // A pass bought 2 days before its end: the J-1 notice only.
+    expect(passNoticeDue(end, undefined, at("2026-11-19T06:00:00Z"))).toBe(1);
+  });
+
+  it("applies a paid pass to a verified, downgraded or pass shop only, extending a running one", () => {
+    expect(passPurchaseEffect({ lifecycle: "verified", planSource: "launch_offer" }, pass, now)).toEqual({ endsAt: at("2026-12-01T10:00:00Z"), event: { type: "pass_purchased", plan: "essentiel" } });
+    expect(passPurchaseEffect({ lifecycle: "downgraded", planSource: "none", passEndsAt: at("2026-10-01T00:00:00Z") }, pass, now)).toEqual({ endsAt: at("2026-12-01T10:00:00Z"), event: { type: "pass_purchased", plan: "essentiel" } });
+    expect(passPurchaseEffect({ lifecycle: "active", planSource: "pass", passEndsAt: at("2026-11-10T00:00:00Z") }, pass, now)).toEqual({ endsAt: at("2026-12-10T00:00:00Z"), event: null });
+    // Paid twice at once: the second pass still counts, beyond the checkout's limit.
+    expect(passPurchaseEffect({ lifecycle: "active", planSource: "pass", passEndsAt: at("2027-01-20T00:00:00Z") }, pass, now)?.endsAt).toEqual(at("2027-02-19T00:00:00Z"));
+    for (const lifecycle of ["suspended", "grace", "pending_verification", "rejected"] as const) expect(passPurchaseEffect({ lifecycle, planSource: "none" }, pass, now)).toBeNull();
+    expect(passPurchaseEffect({ lifecycle: "active", planSource: "subscription" }, pass, now)).toBeNull();
   });
 });

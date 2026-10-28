@@ -1,6 +1,6 @@
 import "server-only";
 import { requireUser } from "@/lib/auth/guards";
-import { billingPortalSchema, buyOptionSchema, checkoutPackSchema, checkoutPlanSchema, LEDGER_PAGE_SIZE, type LedgerEntryView, type WalletResponse } from "@/lib/contracts/payments";
+import { billingPortalSchema, buyOptionSchema, checkoutPackSchema, checkoutPassSchema, checkoutPlanSchema, LEDGER_PAGE_SIZE, type LedgerEntryView, type WalletResponse } from "@/lib/contracts/payments";
 import { OPTION_IDS, type OptionId } from "@/config/pricing";
 import { getWallet, listLedger, type LedgerRecord } from "@/lib/db/repositories/wallets";
 import { getFlags } from "@/lib/config/runtime";
@@ -17,6 +17,7 @@ import { verifyTurnstile } from "@/lib/security/turnstile";
 import { buyOption, listingOptions, memberBillingAccount, walletSummary } from "./options";
 import { packsView, startPackCheckout } from "./packs";
 import { shopInvoices } from "./invoices";
+import { startPassCheckout } from "./pass";
 import { openBillingPortal, startPlanCheckout, subscriptionPage } from "./plans";
 import { StripeApiError } from "./stripe-api";
 
@@ -148,6 +149,15 @@ export async function handlePlanCheckout(request: Request): Promise<Response> {
   await enforceLimit("billing.checkout.uid", auth.user.uid);
   await enforceLimit("billing.checkout.ip", requestIdentity(request.headers).ip);
   return json(await viaStripe(() => startPlanCheckout(auth, input, input.locale)));
+}
+
+/** POST /api/billing/pass: the Stripe Checkout of a Pass Boutique (owner decision 2026-10-28). */
+export async function handlePassCheckout(request: Request): Promise<Response> {
+  const auth = await requireUser(request, { mutation: true });
+  const input = await readJson(request, checkoutPassSchema);
+  await enforceLimit("billing.checkout.uid", auth.user.uid);
+  await enforceLimit("billing.checkout.ip", requestIdentity(request.headers).ip);
+  return json(await viaStripe(() => startPassCheckout(auth, input, input.locale)));
 }
 
 /** POST /api/billing/portal: the Stripe Customer Portal of the shop. */

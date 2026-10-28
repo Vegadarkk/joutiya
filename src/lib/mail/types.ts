@@ -39,6 +39,7 @@ export type TemplateId =
   | "proRejected"
   // Pro plans (phase 7, lot 4b): the end of the launch offer, notices then downgrade (design D3).
   | "launchOfferNotice"
+  | "passNotice"
   // Messaging (phase 5, L5): the grouped new-messages mail (design D21).
   | "newMessages"
   // Account closure (phase 5, L7, D26): confirmation with what is kept and until when.
@@ -163,6 +164,8 @@ export interface TemplateData {
    * the free quota (`freeListings`, null = unlimited) were paused.
    */
   launchOfferNotice: { displayName: string; shopName: string; plan: "essentiel" | "business"; kind: "ending" | "ended"; endsAt: string; freeListings: number | null; paused: number };
+  /** Pass Boutique (2026-10-28): notices at J-7 and J-1 (`ending`), then the downgrade (`ended`). */
+  passNotice: { displayName: string; shopName: string; kind: "ending" | "ended"; endsAt: string; freeListings: number | null; paused: number };
   /**
    * Grouped new-messages mail (bulk, D21): the unread total and up to 3 conversations (listing
    * title, the other member's display name). Never the text of a message.

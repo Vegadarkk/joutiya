@@ -21,6 +21,7 @@ import { passwordChanged } from "./templates/passwordChanged";
 import { phoneRemoved } from "./templates/phoneRemoved";
 import { phoneVerified } from "./templates/phoneVerified";
 import { launchOfferNotice } from "./templates/launchOfferNotice";
+import { passNotice } from "./templates/passNotice";
 import { proApproved } from "./templates/proApproved";
 import { proRejected } from "./templates/proRejected";
 import { reportReceived } from "./templates/reportReceived";
@@ -60,6 +61,7 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   proApproved,
   proRejected,
   launchOfferNotice,
+  passNotice,
   newMessages,
   accountClosed,
   cguChanged,

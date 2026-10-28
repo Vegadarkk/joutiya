@@ -35,6 +35,8 @@ export const loadSubscription = () => apiGet<SubscriptionResponse>(PAYMENTS_API.
 /** Answers Stripe's Checkout page of the plan; `locale` is the page to come back to. */
 export const checkoutPlan = (plan: PaidPlanId, interval: PlanInterval, locale: Locale) => apiPost<BillingRedirectResponse>(PAYMENTS_API.checkout, { plan, interval, acceptTerms: true, locale });
 
+export const checkoutPass = (pass: string, locale: Locale) => apiPost<BillingRedirectResponse>(PAYMENTS_API.pass, { pass, acceptTerms: true, locale });
+
 export const openBillingPortal = (locale: Locale) => apiPost<BillingRedirectResponse>(PAYMENTS_API.portal, { locale });
 
 export const loadInvoices = () => apiGet<InvoicesResponse>(PAYMENTS_API.invoices);

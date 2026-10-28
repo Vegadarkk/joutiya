@@ -3347,7 +3347,46 @@
       "pro_not_verified": "Votre boutique doit être vérifiée pour s'abonner.",
       "no_billing_customer": "Aucun paiement à gérer pour l'instant.",
       "billing_owner_only": "Seul le propriétaire de la boutique gère son abonnement.",
-      "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard."
+      "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard.",
+      "pass_max_ahead": "Votre pass court déjà loin : vous pourrez le prolonger plus tard.",
+      "launch_offer_running": "Votre offre Essentiel est encore offerte : le pass sera disponible à la fin de l'offre."
+    },
+    "pass": {
+      "title": "Pass Boutique",
+      "lead": "Votre boutique en ligne pour {days} jours, en un seul paiement. Pas d'abonnement, pas de renouvellement : idéal pour écouler un stock ou vendre une saison.",
+      "price": "<n>{amount, number}</n> MAD HT pour {days} jours",
+      "features": {
+        "listings": "{count, plural, one {# annonce en ligne} other {# annonces en ligne}}",
+        "credits": "{count, plural, one {# crédit offert pendant le pass} other {# crédits offerts pendant le pass}}",
+        "storefront": "Boutique en ligne et badge Pro",
+        "noRenewal": "Aucun renouvellement automatique"
+      },
+      "current": "Pass Boutique",
+      "currentEnds": "Actif jusqu'au {date}, sans renouvellement.",
+      "extendHint": "Un nouveau pass prolonge le vôtre de {days} jours à partir du {date}.",
+      "notes": {
+        "once": "Paiement unique par carte sur la page sécurisée de Stripe. La TVA s'ajoute au prix HT et figure sur la facture.",
+        "credits": "Les crédits offerts servent pendant le pass et ne sont pas reportés après sa fin.",
+        "end": "À la fin du pass, vos annonces au-delà du quota gratuit sont mises en pause, sans être supprimées. Vous êtes prévenu 7 jours et 1 jour avant.",
+        "subscribe": "Vous pouvez aussi vous abonner pendant le pass : l'abonnement n'est facturé qu'à la fin du pass."
+      },
+      "consent": {
+        "terms": "J'accepte les",
+        "termsLink": "conditions générales de vente",
+        "once": "du Pass Boutique : paiement unique, sans renouvellement ni remboursement au prorata."
+      },
+      "submit": "Payer {amount, number} MAD HT",
+      "submitExtend": "Prolonger de {days} jours : {amount, number} MAD HT",
+      "blocked": {
+        "subscribed": "Votre boutique a déjà un abonnement : le Pass Boutique n'est pas nécessaire.",
+        "launchOffer": "Votre offre Essentiel est encore offerte : le pass sera disponible à la fin de l'offre.",
+        "maxAhead": "Votre pass court déjà loin : vous pourrez le prolonger plus tard.",
+        "unavailable": "Le Pass Boutique n'est pas disponible pour le moment."
+      },
+      "success": {
+        "pending": "Votre pass s'active dans quelques instants.",
+        "done": "Votre pass est actif jusqu'au {date}."
+      }
     }
   },
   "Invoices": {

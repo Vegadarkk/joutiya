@@ -1,9 +1,9 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { PAID_PLANS, type PricingConfig } from "@/config/pricing";
+import { launchOfferOpen, PAID_PLANS, type PricingConfig } from "@/config/pricing";
 import type { Locale } from "@/config/site";
 import type { AuthContext } from "@/lib/auth/guards";
-import { PLAN_CONSENT_VERSION, type BillingRedirectResponse, type CheckoutPlanInput, type PlanOffer, type SubscriptionResponse } from "@/lib/contracts/payments";
+import { PASS_CONSENT_VERSION, PLAN_CONSENT_VERSION, type BillingRedirectResponse, type CheckoutPlanInput, type PassOffer, type PlanOffer, type SubscriptionResponse } from "@/lib/contracts/payments";
 import { getBillingAccount, getBillingAccountTx, getSubscription, setBillingAccountTx } from "@/lib/db/repositories/billing";
 import { getProProfile, type ProProfileRecord } from "@/lib/db/repositories/pro-profiles";
 import type { BillingAccountDoc } from "@/lib/db/schemas";
@@ -13,6 +13,7 @@ import { db } from "@/lib/firebase/admin";
 import { HttpError, notFound, unavailable } from "@/lib/http/errors";
 import { logger } from "@/lib/logging/logger";
 import type { ProLegal } from "@/lib/pro/kybc";
+import { passEndAfter, runningPassEnd } from "./pass-rules";
 import { isStripeConfigured, stripeRequest } from "./stripe-api";
 
 // Pro plans (phase 7 design §7): the plan page, the Stripe Checkout of a plan and the Customer
@@ -57,9 +58,24 @@ function planOffers(pricing: PricingConfig): PlanOffer[] {
   });
 }
 
-export async function subscriptionPage(auth: AuthContext): Promise<SubscriptionResponse> {
+function passOffers(pricing: PricingConfig, profile: ProProfileRecord, now: Date): PassOffer[] {
+  const running = runningPassEnd(profile, now);
+  return pricing.passes.map((pass) => ({
+    id: pass.id,
+    plan: pass.plan,
+    days: pass.days,
+    priceMinor: pass.priceMinor,
+    credits: pass.credits,
+    activeListings: pricing.pro[pass.plan].activeListings,
+    available: Boolean(pass.stripePrice),
+    withinLimit: passEndAfter(running, pass, now) !== null,
+  }));
+}
+
+export async function subscriptionPage(auth: AuthContext, now = new Date()): Promise<SubscriptionResponse> {
   const { proId, accountId } = shopOf(auth);
   const [flags, pricing, profile, subscription] = await Promise.all([getFlags(), getPricing(), ownProfile(auth, proId), getSubscription(accountId)]);
+  const passEnd = runningPassEnd(profile, now);
   return {
     salesOpen: flags.salesEnabled,
     available: isStripeConfigured(),
@@ -69,11 +85,15 @@ export async function subscriptionPage(auth: AuthContext): Promise<SubscriptionR
     graceUntil: profile.graceUntil?.toISOString() ?? null,
     launchOfferEndsAt: pricing.launchOffer.active ? pricing.launchOffer.endsAt : null,
     launchOfferNoticeDays: pricing.launchOffer.noticeDays,
+    launchOfferOpen: profile.planSource === "launch_offer" && launchOfferOpen(pricing.launchOffer, now),
     subscription: subscription
       ? { plan: subscription.plan, interval: subscription.interval, status: subscription.status, periodEnd: subscription.periodEnd?.toISOString() ?? null, willRenew: subscription.willRenew }
       : null,
+    passEndsAt: passEnd?.toISOString() ?? null,
     plans: planOffers(pricing),
+    passes: passOffers(pricing, profile, now),
     consentVersion: PLAN_CONSENT_VERSION,
+    passConsentVersion: PASS_CONSENT_VERSION,
   };
 }
 
@@ -89,12 +109,12 @@ export function invoiceFields(legal: ProLegal): { name: string; value: string }[
   return fields.slice(0, 4);
 }
 
-function pageUrl(locale: Locale, query = ""): string {
+export function pageUrl(locale: Locale, query = ""): string {
   return `${serverEnv().SITE_URL.replace(/\/+$/, "")}/${locale}/pro/abonnement${query}`;
 }
 
 /** Creates the shop's Stripe Customer once, or brings its name and identifiers up to date. */
-async function stripeCustomer(account: BillingAccountDoc & { id: string }, profile: ProProfileRecord, email: string | undefined): Promise<string> {
+export async function stripeCustomer(account: BillingAccountDoc & { id: string }, profile: ProProfileRecord, email: string | undefined): Promise<string> {
   const params = {
     name: profile.name,
     ...(email ? { email } : {}),
@@ -116,7 +136,9 @@ async function stripeCustomer(account: BillingAccountDoc & { id: string }, profi
 }
 
 /** A Checkout Session stays payable this long (Stripe's default expiry). */
-const SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000;
+export const SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000;
+/** Stripe Checkout refuses a `trial_end` less than 48 hours ahead. */
+const TRIAL_MIN_MS = 48 * 60 * 60 * 1000;
 
 /**
  * The previous checkout's session is expired before another opens, so that two plans are never
@@ -144,7 +166,11 @@ export async function startPlanCheckout(auth: AuthContext, input: CheckoutPlanIn
   if (current && current.status !== "expired") throw new HttpError(409, "already_subscribed");
   // The same plan asked again the same day, from the same page, reopens the same session (Stripe
   // keeps an idempotent answer 24 hours); any other parameters make another key.
-  const idempotencyKey = `checkout_${accountId}_${input.plan}_${input.interval}_${locale}_${price}_${now.toISOString().slice(0, 10)}`;
+  // A shop on a Pass Boutique starts paying when its pass ends: the days already paid run as a
+  // trial (Stripe asks for a trial end at least 48 hours ahead; a pass ending sooner is not carried).
+  const passEnd = runningPassEnd(profile, now);
+  const trialEnd = passEnd && passEnd.getTime() - now.getTime() >= TRIAL_MIN_MS ? Math.floor(passEnd.getTime() / 1_000) : undefined;
+  const idempotencyKey = `checkout_${accountId}_${input.plan}_${input.interval}_${locale}_${price}_${now.toISOString().slice(0, 10)}${trialEnd ? `_t${trialEnd}` : ""}`;
   const previous = existing?.lastPlanCheckout;
   if (previous?.sessionId && previous.idempotencyKey !== idempotencyKey && now.getTime() - previous.at.getTime() < SESSION_LIFETIME_MS) await closeSession(previous.sessionId);
 
@@ -176,7 +202,7 @@ export async function startPlanCheckout(auth: AuthContext, input: CheckoutPlanIn
       success_url: pageUrl(locale, "?abonnement=ok"),
       cancel_url: pageUrl(locale),
       metadata,
-      subscription_data: { metadata },
+      subscription_data: { metadata, ...(trialEnd ? { trial_end: trialEnd } : {}) },
     },
     { idempotencyKey },
   );
