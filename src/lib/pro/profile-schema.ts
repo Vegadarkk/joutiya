@@ -77,7 +77,7 @@ export const proProfileSchema = z
       .object({
         status: z.enum(KYBC_STATUSES),
         iceFormatOk: z.boolean(),
-        registryCheck: z.object({ source: z.enum(["ompic", "directinfo"]), at: ts, by: uid }).strict().optional(),
+        registryCheck: z.object({ source: z.enum(["ompic", "directinfo", "odco"]), at: ts, by: uid }).strict().optional(),
         /** Pieces in the private bucket (uploads purpose `kyb`), purged 6 months after the relationship ends. */
         uploadIds: z.array(z.string().min(1).max(64)).max(KYBC_MAX_PIECES),
         complianceCommitmentAt: ts.optional(),

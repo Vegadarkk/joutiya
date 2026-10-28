@@ -24,11 +24,11 @@ const dateTime = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeSty
 const date = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeZone: "Africa/Casablanca" });
 
 const PIECE_TYPE: Record<string, string> = { "application/pdf": "PDF", "image/jpeg": "Image JPEG", "image/png": "Image PNG" };
-const REGISTRY_LABEL: Record<string, string> = { ompic: "OMPIC", directinfo: "DirectInfo" };
+const REGISTRY_LABEL: Record<string, string> = { ompic: "OMPIC", directinfo: "DirectInfo", odco: "ODCo" };
 
 /** Points the moderator checks before validating (design §4); the CNIE line follows audit C2-03. */
 const CHECKLIST = [
-  "Le nom, l'ICE et le RC (ou le n° d'auto-entrepreneur, la TP) correspondent au registre consulté.",
+  "Le nom, l'ICE et le RC (ou le n° d'auto-entrepreneur, la TP, le n° de coopérative) correspondent au registre consulté.",
   "Le justificatif est lisible, récent et au nom de la boutique ou du demandeur.",
   "L'activité déclarée est cohérente avec les annonces du compte.",
   "Un justificatif laisse voir un numéro de CNIE : refusez avec le motif « envoyez une copie où le numéro de CNIE est masqué ».",
