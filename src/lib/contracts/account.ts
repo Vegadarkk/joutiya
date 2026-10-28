@@ -27,7 +27,7 @@ export const ACCOUNT_EXPORT_FORMAT = "joutiya.account-export";
 export const ACCOUNT_EXPORT_VERSION = 1;
 
 /** Lists of the export, each read up to its limit (Firestore Spark: 50 000 reads a day for the whole site). */
-export const EXPORT_SECTIONS = ["listings", "favorites", "savedSearches", "conversations", "messages", "reportsFiled", "decisions", "blockedAccounts"] as const;
+export const EXPORT_SECTIONS = ["listings", "favorites", "savedSearches", "conversations", "messages", "reportsFiled", "decisions", "blockedAccounts", "reviewsGiven", "reviewsReceived"] as const;
 export type ExportSection = (typeof EXPORT_SECTIONS)[number];
 
 export interface ExportListing {
@@ -172,6 +172,23 @@ export interface AccountExport {
   reportsFiled: ExportReport[];
   decisions: ExportDecision[];
   blockedAccounts: { publicId: string; displayName: string }[];
+  /** Verified reviews (vitrine-avis §2): the ones the account wrote, and the ones about it (published or hidden). */
+  reviewsGiven: ExportReview[];
+  reviewsReceived: ExportReview[];
+}
+
+export interface ExportReview {
+  listingId: string;
+  listingTitle: string;
+  /** The seller for a review given, the buyer's display name (empty once closed) for one received. */
+  counterpartName: string;
+  rating: number;
+  text: string;
+  status: string;
+  reply: { text: string; at: string } | null;
+  experienceAt: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**

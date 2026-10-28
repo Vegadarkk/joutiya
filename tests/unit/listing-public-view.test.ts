@@ -171,6 +171,7 @@ describe("getSeller", () => {
       publishedCount: 7,
       bio: null,
       bannerKey: "zellige",
+      rating: { count: 0, average: null, histogram: [0, 0, 0, 0, 0] },
     });
     expect(repo.where).toHaveBeenCalledWith("ownerUid", "==", "uid-secret-1");
     expect(repo.where).toHaveBeenCalledWith("status", "==", "published");

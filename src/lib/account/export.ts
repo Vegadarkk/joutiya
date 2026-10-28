@@ -10,6 +10,7 @@ import {
   type ExportDecision,
   type ExportListing,
   type ExportReport,
+  type ExportReview,
   type ExportSection,
 } from "@/lib/contracts/account";
 import { LISTING_STATUSES } from "@/lib/contracts/listings";
@@ -17,7 +18,7 @@ import { listDecisionsForUser, type ModerationDecisionRecord } from "@/lib/db/re
 import { fromSnapshot as listingFromSnapshot } from "@/lib/db/repositories/listings";
 import { proProfileFromSnapshot } from "@/lib/db/repositories/pro-profiles";
 import { timestampsToDates } from "@/lib/db/repositories/timestamps";
-import { COLLECTIONS, moderationDecisionSchema, reportSchema, userPrivateSchema, userSchema, type ModerationDecisionDoc, type ReportDoc } from "@/lib/db/schemas";
+import { COLLECTIONS, moderationDecisionSchema, reportSchema, reviewSchema, userPrivateSchema, userSchema, type ModerationDecisionDoc, type ReportDoc, type ReviewDoc } from "@/lib/db/schemas";
 import { listFavoritesPage } from "@/lib/favorites/repository";
 import { db } from "@/lib/firebase/admin";
 import { getLegalConfig } from "@/lib/legal/config";
@@ -154,6 +155,34 @@ function appealOf(appeal: Appeal): ExportReport["appeal"] {
   return { status: appeal.status, text: appeal.text ?? null, openedAt: appeal.openedAt.toISOString(), closedAt: iso(appeal.closedAt), note: appeal.status === "open" ? null : (appeal.note ?? null) };
 }
 
+/**
+ * Reviews written by the account (every stored status) or about it (published or hidden: a pending
+ * one is not shown to the seller yet, a deleted one is its author's), newest first.
+ */
+async function readReviews(uid: string, side: "given" | "received"): Promise<{ reviews: ExportReview[]; more: boolean }> {
+  const limit = side === "given" ? EXPORT_LIMITS.reviewsGiven : EXPORT_LIMITS.reviewsReceived;
+  const snapshot = await db().collection(COLLECTIONS.reviews).where(side === "given" ? "authorUid" : "targetUid", "==", uid).orderBy("createdAt", "desc").limit(limit).get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  const records = snapshot.docs
+    .map((doc) => parse<ReviewDoc>(reviewSchema, doc))
+    .filter((review): review is ReviewDoc => review !== null && (side === "given" ? review.authorUid === uid : review.targetUid === uid && (review.status === "published" || review.status === "hidden")));
+  return {
+    reviews: records.map((review) => ({
+      listingId: review.listingId,
+      listingTitle: review.listingTitle,
+      counterpartName: side === "given" ? review.targetName : review.authorName,
+      rating: review.rating,
+      text: review.text,
+      status: review.status,
+      reply: review.reply ? { text: review.reply.text, at: review.reply.at.toISOString() } : null,
+      experienceAt: review.experienceAt.toISOString(),
+      createdAt: review.createdAt.toISOString(),
+      updatedAt: review.updatedAt.toISOString(),
+    })),
+    more: snapshot.size >= limit,
+  };
+}
+
 async function readReportsFiled(uid: string): Promise<{ reports: ExportReport[]; more: boolean }> {
   const snapshot = await db().collection(COLLECTIONS.reports).where("reporter.uid", "==", uid).orderBy("createdAt", "desc").limit(EXPORT_LIMITS.reportsFiled + 1).get();
   void consume("firestore.reads", Math.max(1, snapshot.size));
@@ -284,13 +313,15 @@ export async function buildAccountExport(uid: string, now = new Date()): Promise
     }
   }
 
-  const [listings, favorites, savedSearches, conversations, reportsFiled, decisions] = await Promise.all([
+  const [listings, favorites, savedSearches, conversations, reportsFiled, decisions, reviewsGiven, reviewsReceived] = await Promise.all([
     readListings(uid),
     listFavoritesPage(uid, EXPORT_LIMITS.favorites),
     listSavedSearches(uid),
     readConversations(uid),
     readReportsFiled(uid),
     listDecisionsForUser(uid, EXPORT_LIMITS.decisions + 1),
+    readReviews(uid, "given"),
+    readReviews(uid, "received"),
   ]);
   const blockedUids: unknown = blocksSnap?.get("uids");
   const blocked = Array.isArray(blockedUids) ? blockedUids.filter((id): id is string => typeof id === "string" && id.length > 0 && !id.includes("/")) : [];
@@ -307,6 +338,8 @@ export async function buildAccountExport(uid: string, now = new Date()): Promise
   cut("reportsFiled", reportsFiled.more);
   cut("decisions", decisions.length > EXPORT_LIMITS.decisions);
   cut("blockedAccounts", blocked.length > EXPORT_LIMITS.blockedAccounts);
+  cut("reviewsGiven", reviewsGiven.more);
+  cut("reviewsReceived", reviewsReceived.more);
 
   const locale = localeOf(user?.locale);
   const legal = await getLegalConfig();
@@ -378,6 +411,8 @@ export async function buildAccountExport(uid: string, now = new Date()): Promise
     reportsFiled: reportsFiled.reports,
     decisions: decisions.slice(0, EXPORT_LIMITS.decisions).filter((decision) => decision.affectedUid === uid).map(decisionOf),
     blockedAccounts,
+    reviewsGiven: reviewsGiven.reviews,
+    reviewsReceived: reviewsReceived.reviews,
   };
 }
 

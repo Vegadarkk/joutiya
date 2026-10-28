@@ -118,6 +118,8 @@ export interface ConversationView {
   /** The current appointment (src/lib/contracts/appointments.ts), active or ended; null when none. */
   appointment?: AppointmentView | null;
   updatedAt: number;
+  /** What the buyer's review window needs (vitrine-avis §2, `reviewWindow`): epoch ms or null. */
+  review: { sellerRepliedAt: number | null; reviewedAt: number | null };
 }
 
 export interface MessageView {

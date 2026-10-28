@@ -1,6 +1,7 @@
 import { z } from "@/lib/zod";
 import { CONDITIONS } from "@/config/categories";
 import { LOCALES } from "@/config/site";
+import { REVIEW_REPLY_MAX, REVIEW_STATUSES, REVIEW_TEXT_MAX } from "@/config/reviews";
 import { BANNER_KEYS, BIO_MAX } from "@/config/storefront";
 import {
   DESCRIPTION_MAX,
@@ -78,7 +79,17 @@ export const userSchema = z
     storefront: z.object({ bio: z.string().max(BIO_MAX).optional(), bannerKey: z.enum(BANNER_KEYS).optional() }).strict().optional(),
     badges: z.object({ emailVerified: z.boolean(), phoneVerified: z.boolean(), proCertified: z.boolean() }).strict(),
     stats: z
-      .object({ activeListings: z.number().int().min(0), responseRate: z.number().min(0).max(1), medianReplyMin: z.number().min(0), ratingAvg: z.number().min(0).max(5).optional(), ratingCount: z.number().int().min(0) })
+      .object({
+        activeListings: z.number().int().min(0),
+        responseRate: z.number().min(0).max(1),
+        medianReplyMin: z.number().min(0),
+        ratingAvg: z.number().min(0).max(5).optional(),
+        ratingCount: z.number().int().min(0),
+        /** Sum of the published ratings: the average is recomputed from it, never drifts (vitrine-avis §3). */
+        ratingSum: z.number().int().min(0).optional(),
+        /** Published ratings by stars, index 0 = 1 star (storefront bars). */
+        ratingHistogram: z.array(z.number().int().min(0)).length(5).optional(),
+      })
       .strict(),
     status: userStatusSchema,
     /** "pending" until the e-mail is verified and the role claim set; purge-unactivated deletes pending accounts after 24 h. */
@@ -602,6 +613,10 @@ export const conversationSchema = z
     appointment: appointmentSchema.optional(),
     /** Due time of the confirmed appointment's next reminder (job appointment-reminders). */
     appointmentRemindAt: ts.optional(),
+    /** The buyer reviewed the seller from this conversation (once, even if the review is deleted later). */
+    reviewedAt: ts.optional(),
+    /** The seller's first message: the exchange is reciprocal, a review opens 24 h later (vitrine-avis §2). */
+    sellerRepliedAt: ts.optional(),
   })
   .strict();
 export type ConversationDoc = z.infer<typeof conversationSchema>;
@@ -995,6 +1010,39 @@ export const subscriptionSchema = z
   .strict();
 export type SubscriptionDoc = z.infer<typeof subscriptionSchema>;
 
+/** reviews/{conversationId}: a buyer's review of the seller (vitrine-avis §2-3), one per conversation. */
+export const reviewSchema = z
+  .object({
+    conversationId: z.string().min(1).max(200),
+    listingId: listingIdSchema,
+    listingTitle: z.string().max(TITLE_MAX),
+    authorUid: uid,
+    authorPublicId: publicIdSchema,
+    /** Display name at the time of writing; empty once the author's account is closed ("Ancien membre"). */
+    authorName: z.string().max(80),
+    targetUid: uid,
+    targetPublicId: publicIdSchema,
+    /** The seller's display name at the time of writing ("Mes avis" of the author). */
+    targetName: z.string().max(80),
+    rating: z.number().int().min(1).max(5),
+    text: z.string().min(1).max(REVIEW_TEXT_MAX),
+    exchangeConfirmed: z.literal(true),
+    verified: z.literal(true),
+    /** The seller's first reply: the date of the exchange shown with the review (D111-17 C. conso). */
+    experienceAt: ts,
+    status: z.enum(REVIEW_STATUSES),
+    reply: z.object({ text: z.string().min(1).max(REVIEW_REPLY_MAX), at: ts }).strict().optional(),
+    /** moderationDecisions id that hid the review. */
+    hiddenBy: z.string().max(128).optional(),
+    createdAt: ts,
+    updatedAt: ts,
+    /** Deleted or hidden + 12 months. */
+    purgeAt: ts.optional(),
+    legalHold: hold,
+  })
+  .strict();
+export type ReviewDoc = z.infer<typeof reviewSchema>;
+
 export const COLLECTIONS = {
   users: "users",
   userPrivate: "private",
@@ -1044,4 +1092,6 @@ export const COLLECTIONS = {
   aiDecisions: "aiDecisions",
   authorityRequests: "authorityRequests",
   suspensions: "suspensions",
+  // Storefront and reviews (vitrine-avis)
+  reviews: "reviews",
 } as const;

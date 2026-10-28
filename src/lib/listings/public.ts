@@ -1,8 +1,10 @@
 import "server-only";
 import type { Condition } from "@/config/categories";
+import { REVIEWS_PAGE } from "@/config/reviews";
 import { DEFAULT_BANNER, type BannerKey } from "@/config/storefront";
 import type { ListingAttributes, ListingStatus } from "@/lib/contracts/listings";
 import type { PhotoVariant } from "@/lib/contracts/photo-variants";
+import type { RatingSummary, ReviewPage } from "@/lib/contracts/reviews";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { getListing, listPublishedByOwner, type ListingRecord } from "@/lib/db/repositories/listings";
 import { findUserByPublicId, getUserRecord, type UserRecord } from "@/lib/db/repositories/profiles";
@@ -15,6 +17,8 @@ import { aggregationReads, consume } from "@/lib/quota";
 import { assertQuotas, PUBLIC_READ_QUOTAS } from "@/lib/quota/gate";
 import { storefrontShown } from "@/lib/pro/lifecycle";
 import { PRO_ID_PATTERN } from "@/lib/pro/profile-schema";
+import { sellerReviews } from "@/lib/reviews/seller";
+import { ratingSummary } from "@/lib/reviews/views";
 import { buildSlugId, parseSlugId } from "./ids";
 
 // Public reads (design §4 public.ts): the listing page by its `{slug}-{id}` segment and the
@@ -235,6 +239,8 @@ export interface PublicSeller {
   /** Storefront (vitrine-avis §1): the "about" text, if any, and the house banner. */
   bio: string | null;
   bannerKey: BannerKey;
+  /** Verified reviews (vitrine-avis §2): published ratings only; none shown while suspended. */
+  rating: RatingSummary;
 }
 
 /**
@@ -259,6 +265,7 @@ function toSeller(user: UserRecord, publishedCount: number): PublicSeller {
     publishedCount,
     bio: user.storefront?.bio ?? null,
     bannerKey: user.storefront?.bannerKey ?? DEFAULT_BANNER,
+    rating: user.status === "suspended" ? ratingSummary({ ...user.stats, ratingCount: 0 }) : ratingSummary(user.stats),
   };
 }
 
@@ -273,7 +280,11 @@ export async function getSeller(ownerUid: string): Promise<PublicSeller | null> 
 export interface PublicProfileView extends PublicSeller {
   /** Published listings as cards, newest first (at most `limit`). */
   listings: PublicListingCard[];
+  /** The newest published reviews (no query while the seller has none). */
+  reviews: ReviewPage;
 }
+
+const NO_REVIEWS: ReviewPage = { reviews: [], next: null };
 
 /**
  * The profile page: the seller header and the cards of the published listings, or null (404).
@@ -284,11 +295,16 @@ export async function getPublicProfile(publicId: string, limit = 24): Promise<Pu
   await assertQuotas(PUBLIC_READ_QUOTAS);
   const user = await findUserByPublicId(publicId);
   if (!user || !isVisibleAccount(user)) return null;
-  if (user.status === "suspended") return { ...toSeller(user, 0), listings: [] };
-  return publishedView(user, limit);
+  if (user.status === "suspended") return { ...toSeller(user, 0), listings: [], reviews: NO_REVIEWS };
+  return profileView(user, limit);
 }
 
-async function publishedView(user: UserRecord, limit: number): Promise<PublicProfileView> {
+async function profileView(user: UserRecord, limit: number): Promise<PublicProfileView> {
+  const [view, reviews] = await Promise.all([publishedView(user, limit), user.stats.ratingCount > 0 ? sellerReviews(user.uid, REVIEWS_PAGE) : NO_REVIEWS]);
+  return { ...view, reviews };
+}
+
+async function publishedView(user: UserRecord, limit: number): Promise<Omit<PublicProfileView, "reviews">> {
   const fetched = await listPublishedByOwner(user.uid, limit);
   // Listings hidden by a report (D11) are not shown, nor counted when the page shows them all.
   const records = fetched.filter((listing) => !listing.moderation.hiddenBy);
@@ -331,7 +347,7 @@ export async function getPublicStorefront(proId: string, limit = 24): Promise<Pu
     name: profile.name,
     description: profile.description,
     citySlug: profile.citySlug,
-    seller: await publishedView(user, limit),
+    seller: await profileView(user, limit),
   };
 }
 

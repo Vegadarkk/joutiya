@@ -42,6 +42,7 @@ export const PRIVATE_SEGMENTS: readonly string[] = [
   "mes-annonces",
   "messages",
   "favoris",
+  "mes-avis",
   "recherches",
   "porte-monnaie",
   "factures",

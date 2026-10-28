@@ -114,7 +114,7 @@ export async function getConversation(cid: string): Promise<ConversationRecord |
 }
 
 /** uid -> blocked uids, from userBlocks snapshots (missing document: nobody). */
-function blocksOf(snapshots: readonly DocumentSnapshot[]): Map<string, string[]> {
+export function blocksOf(snapshots: readonly DocumentSnapshot[]): Map<string, string[]> {
   const out = new Map<string, string[]>();
   for (const snapshot of snapshots) {
     const parsed = userBlocksSchema.safeParse(timestampsToDates(snapshot.data() ?? {}));
@@ -247,6 +247,8 @@ export async function appendMessage(cid: string, given: NewMessageInput, extend?
       purgeAt: conversationPurgeAt(input.now),
       ...Object.fromEntries(Object.entries(extra).filter(([, value]) => value !== null)),
     });
+    // The seller's first message makes the exchange reciprocal: it opens the buyer's review (vitrine-avis §2).
+    const sellerReplies = input.senderUid === conversation.sellerUid && !conversation.sellerRepliedAt;
     tx.set(messageRef, toFirestore(message));
     if (evidence) tx.set(evidenceRef(cid, messageRef.id), toFirestore(evidence));
     tx.update(
@@ -260,6 +262,7 @@ export async function appendMessage(cid: string, given: NewMessageInput, extend?
         updatedAt: next.updatedAt,
         purgeAt: next.purgeAt,
         ...Object.fromEntries(Object.keys(extra).map((key) => [key, cleared.includes(key) ? FieldValue.delete() : next[key as keyof typeof extra]])),
+        ...(sellerReplies ? { sellerRepliedAt: input.now } : {}),
       }),
     );
     return { conversation, recipientUid, writes: evidence ? 3 : 2 };

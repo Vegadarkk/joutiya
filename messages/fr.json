@@ -457,6 +457,7 @@
       "verifications": "Vérifications",
       "signOut": "Déconnexion",
       "favorites": "Mes favoris",
+      "reviews": "Mes avis",
       "savedSearches": "Mes recherches",
       "decisions": "Décisions et recours",
       "help": "Aide",
@@ -514,7 +515,8 @@
       "internal": "Une erreur technique est survenue. Réessayez.",
       "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez.",
       "quota_exhausted": "Cette action est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc).",
-      "invalid_text": "Le texte contient un élément refusé. Corrigez-le puis réessayez."
+      "invalid_text": "Le texte contient un élément refusé. Corrigez-le puis réessayez.",
+      "review_unavailable": "Vous ne pouvez plus donner d'avis sur cette conversation."
     }
   },
   "Listing": {
@@ -2546,6 +2548,92 @@
       "all": "Toutes"
     }
   },
+  "Reviews": {
+    "title": "Avis",
+    "titleCount": "Avis ({count})",
+    "count": "{count, plural, one {# avis vérifié} other {# avis vérifiés}}",
+    "average": "Note moyenne : {average} sur 5",
+    "stars": "{count, plural, one {# étoile sur 5} other {# étoiles sur 5}}",
+    "spread": "Répartition des notes",
+    "spreadRow": "{stars, plural, one {# étoile} other {# étoiles}} : {count, plural, one {# avis} other {# avis}}",
+    "verified": "Échange vérifié",
+    "verifiedHint": "Seuls les acheteurs qui ont échangé avec ce vendeur par la messagerie du site peuvent donner un avis.",
+    "listing": "Annonce :",
+    "reply": "Réponse de {name}",
+    "formerMember": "Ancien membre",
+    "more": "Voir plus d'avis",
+    "failed": "Les avis suivants n'ont pas pu être chargés. Réessayez.",
+    "emptyTitle": "Pas encore d'avis",
+    "emptyBody": "Les acheteurs qui échangent avec {name} par la messagerie pourront donner leur avis ici.",
+    "dialog": {
+      "title": "Votre avis sur {name}",
+      "listing": "Annonce : {title}",
+      "rating": "Votre note",
+      "ratingHint": "Choisissez de 1 à 5 étoiles",
+      "words": {
+        "1": "Très décevant",
+        "2": "Décevant",
+        "3": "Correct",
+        "4": "Bien",
+        "5": "Excellent"
+      },
+      "text": "Votre avis",
+      "textHint": "Racontez l'échange : ponctualité, état de l'article, communication. Restez factuel et courtois.",
+      "count": "{count} / {max}",
+      "confirm": "Nous avons conclu un échange ou une rencontre",
+      "confirmHint": "Un avis porte sur un échange réel. Un faux avis est retiré et peut entraîner la suspension du compte.",
+      "public": "Votre nom affiché et votre avis seront visibles sur la vitrine du vendeur, qui pourra y répondre une fois. Vous pourrez supprimer votre avis à tout moment depuis « Mes avis ».",
+      "submit": "Publier mon avis",
+      "cancel": "Annuler",
+      "close": "Fermer",
+      "problems": {
+        "rating": "Choisissez une note.",
+        "short": "Encore {count, plural, one {# caractère} other {# caractères}} au minimum.",
+        "confirm": "Cochez cette case pour confirmer l'échange."
+      },
+      "publishedTitle": "Merci, votre avis est publié",
+      "publishedBody": "Il apparaît sur la vitrine de {name}.",
+      "pendingTitle": "Merci, votre avis sera publié après vérification",
+      "pendingBody": "Il contient peut-être des informations personnelles : un modérateur le relit avant sa publication.",
+      "viewStorefront": "Voir la vitrine"
+    },
+    "mine": {
+      "title": "Mes avis",
+      "intro": "Les avis que vos acheteurs vous ont laissés, et ceux que vous avez donnés aux vendeurs.",
+      "tabs": {
+        "label": "Avis reçus ou donnés",
+        "received": "Reçus",
+        "given": "Donnés"
+      },
+      "loading": "Chargement de vos avis",
+      "retry": "Réessayer",
+      "emptyReceived": "Vous n'avez pas encore reçu d'avis",
+      "emptyReceivedBody": "Après un échange par la messagerie, vos acheteurs pourront noter la transaction.",
+      "emptyGiven": "Vous n'avez pas encore donné d'avis",
+      "emptyGivenBody": "Dans une conversation avec un vendeur, un bandeau vous invite à donner votre avis 24 heures après sa réponse.",
+      "toMessages": "Ouvrir mes messages",
+      "from": "De {name}",
+      "fromFormer": "D'un ancien membre",
+      "to": "Pour {name}",
+      "status": {
+        "pending": "En attente de vérification",
+        "hidden": "Masqué par la modération"
+      },
+      "yourReply": "Votre réponse",
+      "theirReply": "Réponse de {name}",
+      "reply": "Répondre",
+      "replyLabel": "Votre réponse publique",
+      "replyHint": "Une seule réponse, affichée sous l'avis. Restez courtois et ne donnez pas de coordonnées.",
+      "replySubmit": "Publier la réponse",
+      "replied": "Réponse publiée",
+      "delete": "Supprimer mon avis",
+      "deleteTitle": "Supprimer votre avis ?",
+      "deleteBody": "Il disparaît de la vitrine de {name}. Vous ne pourrez pas en donner un autre pour cette conversation.",
+      "deleteConfirm": "Supprimer",
+      "deleted": "Avis supprimé",
+      "cancel": "Annuler"
+    }
+  },
   "FreeText": {
     "phone_in_text": "Retirez le numéro de téléphone : les acheteurs vous contactent par la messagerie.",
     "email_in_text": "Retirez l'adresse e-mail : les acheteurs vous contactent par la messagerie.",
@@ -3054,6 +3142,13 @@
       "counterpartClosed": "{name} a fermé son compte : vous pouvez relire la conversation, mais plus y écrire.",
       "frozen": "Cette conversation est suspendue : vous pouvez la lire, mais plus y écrire.",
       "suspended": "Votre compte est suspendu : vous pouvez lire vos conversations, mais plus envoyer de message."
+    },
+    "review": {
+      "label": "Donner votre avis",
+      "title": "Comment s'est passé votre échange avec {name} ?",
+      "body": "Votre avis aide les autres acheteurs.",
+      "action": "Donner mon avis",
+      "later": "Plus tard"
     },
     "composer": {
       "label": "Votre message",
