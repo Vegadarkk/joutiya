@@ -231,7 +231,15 @@ describe("page content", () => {
     expect(html).toContain('data-testid="contact-bar"');
     expect(html).toContain('data-testid="safety-tips"');
     expect(html).toContain('data-testid="map-block" data-city="casablanca" data-seed="abcd2345" class="w-full max-w-[35rem]"');
-    expect(html).toContain('data-ad-slot="listing-aside"');
+    // Report link, safety tips, then the ad slot: never an ad right after a contact or report control (D6).
+    const report = html.indexOf(fr.Report.trigger.listing.replace(/'/g, "&#x27;"));
+    const tips = html.indexOf('data-testid="safety-tips"');
+    const ad = html.indexOf('data-ad-slot="listing-bottom"');
+    expect(report).toBeGreaterThan(0);
+    expect(tips).toBeGreaterThan(report);
+    expect(ad).toBeGreaterThan(tips);
+    expect(html.match(/data-ad-slot=/g)).toHaveLength(1);
+    expect(html).toContain('data-ad-eligible="true"');
     expect(html).toContain(fr.Report.trigger.listing.replace(/'/g, "&#x27;"));
     expect(html).not.toContain('data-testid="listing-status"');
   });
@@ -321,6 +329,9 @@ describe("page content", () => {
       expect(html).toContain(`data-state="${status}"`);
       expect(html, status).not.toContain('data-testid="contact-bar"');
       expect(html).toContain('data-testid="seller-card"');
+      // Still a house promotion, never an ad: only a published listing carries ads.
+      expect(html).toContain('data-ad-slot="listing-bottom"');
+      expect(html, status).not.toContain("data-ad-eligible");
     }
   });
 

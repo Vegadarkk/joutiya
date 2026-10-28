@@ -102,6 +102,11 @@ export function useConsent(): ConsentState {
   return context;
 }
 
+/** The consent state, or null outside ConsentProvider (components rendered alone in tests). */
+export function useOptionalConsent(): ConsentState | null {
+  return useContext(ConsentContext);
+}
+
 /** The ad settings for the panel: from the seeded configuration, or fetched once it opens. */
 export function useAdsConfig(): PublicAdsConfig | null {
   return usePublicConfig()?.ads ?? null;

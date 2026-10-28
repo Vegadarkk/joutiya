@@ -63,7 +63,7 @@ describe("publicConfig", () => {
       map: { pmtilesUrl: "https://media-staging.joutiya.ma/maps/morocco.pmtiles", attribution: "© OpenStreetMap contributors · Protomaps" },
       // The app secret is set but not the display number or the phone number id: no challenge can start.
       phoneVerification: false,
-      ads: { mode: "off", cmpEea: false, client: null },
+      ads: { mode: "off", cmpEea: false, client: null, units: { leaderboard: null, halfpage: null, rectangle: null, banner: null } },
     });
     const json = JSON.stringify(config);
     for (const [name, value] of Object.entries(secrets)) {
@@ -74,8 +74,13 @@ describe("publicConfig", () => {
   });
 
   it("hands the ad flags and the AdSense publisher id to the browser (phase 6, D8)", () => {
-    const env = parseEnv({ ADSENSE_CLIENT_ID: "ca-pub-1234567890123456" }).env;
-    expect(publicConfig(env, { adsMode: "test", adsCmpEea: true }).ads).toEqual({ mode: "test", cmpEea: true, client: "ca-pub-1234567890123456" });
+    const env = parseEnv({ ADSENSE_CLIENT_ID: "ca-pub-1234567890123456", AD_SLOT_RECTANGLE: "1234567890" }).env;
+    expect(publicConfig(env, { adsMode: "test", adsCmpEea: true }).ads).toEqual({
+      mode: "test",
+      cmpEea: true,
+      client: "ca-pub-1234567890123456",
+      units: { leaderboard: null, halfpage: null, rectangle: "1234567890", banner: null },
+    });
     expect(parseEnv({ ADSENSE_CLIENT_ID: "pub-1234" }).errors.join(" ")).toContain("ADSENSE_CLIENT_ID");
   });
 
@@ -92,7 +97,7 @@ describe("publicConfig", () => {
       upload: { maxBytes: 10 * 1024 * 1024, maxPhotos: 10 },
       map: null,
       phoneVerification: false,
-      ads: { mode: "off", cmpEea: false, client: null },
+      ads: { mode: "off", cmpEea: false, client: null, units: { leaderboard: null, halfpage: null, rectangle: null, banner: null } },
     });
     // Outside dev the media host is null until MEDIA_BASE_URL exists: no bucket name leaks.
     const staging = publicConfig(parseEnv({ APP_ENV: "staging", SITE_URL: "https://staging.joutiya.ma", R2_BUCKET_MEDIA: "joutiya-staging-media" }).env);
@@ -152,7 +157,7 @@ describe("GET /api/config", () => {
     expect(response.headers.get("content-type")).toMatch(/^application\/json/);
     expect(response.headers.get("cache-control")).toBe("public, max-age=300");
     const body = (await response.json()) as Record<string, unknown>;
-    expect(body).toMatchObject({ turnstileSiteKey: "0x4AAAAAAA-site", sentry: { dsn: DSN }, ads: { mode: "off", cmpEea: false, client: null } });
+    expect(body).toMatchObject({ turnstileSiteKey: "0x4AAAAAAA-site", sentry: { dsn: DSN }, ads: { mode: "off", cmpEea: false, client: null, units: { leaderboard: null, halfpage: null, rectangle: null, banner: null } } });
     expect(JSON.stringify(body)).not.toContain("0x4AAAAAAA-secret");
   });
 });

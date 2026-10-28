@@ -18,7 +18,11 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
   // the category landing pages (/c/...) are the crawlable entry points.
   const searchPaths = LOCALES.map((locale) => `/${locale}/recherche`);
   return {
-    rules: { userAgent: "*", allow: "/", disallow: ["/api/", ...privatePaths, ...searchPaths] },
+    rules: [
+      { userAgent: "*", allow: "/", disallow: ["/api/", ...privatePaths, ...searchPaths] },
+      // AdSense's crawler reads the pages that carry ads, search results included (phase 6, D9).
+      { userAgent: "Mediapartners-Google", allow: "/", disallow: ["/api/", ...privatePaths] },
+    ],
     sitemap: `${CANONICAL_ORIGIN}/sitemap.xml`,
   };
 }

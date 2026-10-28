@@ -43,6 +43,11 @@ export function publicConfig(env: ServerEnv = serverEnv(), flags: Pick<FlagsConf
     upload: { ...UPLOAD_LIMITS },
     map: env.MAP_PMTILES_URL ? { pmtilesUrl: env.MAP_PMTILES_URL, attribution: MAP_ATTRIBUTION } : null,
     phoneVerification: isPhoneVerificationConfigured(env),
-    ads: { mode: flags.adsMode, cmpEea: flags.adsCmpEea, client: env.ADSENSE_CLIENT_ID ?? null },
+    ads: {
+      mode: flags.adsMode,
+      cmpEea: flags.adsCmpEea,
+      client: env.ADSENSE_CLIENT_ID ?? null,
+      units: { leaderboard: env.AD_SLOT_LEADERBOARD ?? null, halfpage: env.AD_SLOT_HALFPAGE ?? null, rectangle: env.AD_SLOT_RECTANGLE ?? null, banner: env.AD_SLOT_BANNER ?? null },
+    },
   };
 }

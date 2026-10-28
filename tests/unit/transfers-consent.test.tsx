@@ -57,7 +57,7 @@ const publicConfig = (phoneVerification: boolean): PublicConfig => ({
   upload: { maxBytes: 10 * 1024 * 1024, maxPhotos: 10 },
   map: null,
   phoneVerification,
-  ads: { mode: "off", cmpEea: false, client: null },
+  ads: { mode: "off", cmpEea: false, client: null, units: { leaderboard: null, halfpage: null, rectangle: null, banner: null } },
 });
 
 const consent = (version?: string) => ({ consents: { cgu: { version: "2026-10", at: new Date() }, transfers: version === undefined ? undefined : { version, at: new Date() }, marketing: false } }) as never;
