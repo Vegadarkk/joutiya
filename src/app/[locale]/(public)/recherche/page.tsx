@@ -8,6 +8,7 @@ import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Container } from "@/components/layout/container";
 import { SaveSearchButton } from "@/components/saved-searches/save-search-button";
 import { ActiveFilterChips } from "@/components/search/active-filter-chips";
+import { RentalDatesBar } from "@/components/rental/rental-dates-bar";
 import { FeaturedRow, withoutFeatured } from "@/components/search/featured-row";
 import { FiltersSheet } from "@/components/search/filters-sheet";
 import { Pagination } from "@/components/search/pagination";
@@ -20,7 +21,7 @@ import { SearchError } from "@/components/search/search-error";
 import { PendingBar, PendingRegion, SearchNavigationProvider } from "@/components/search/search-navigation";
 import { SortSelect } from "@/components/search/sort-select";
 import { infeedPositions } from "@/config/ads";
-import { subcategoryAllowsAds } from "@/config/categories";
+import { RENTAL_SUBCATEGORY, subcategoryAllowsAds } from "@/config/categories";
 import { availablePromos, type HousePromo } from "@/config/house-promos";
 import type { Locale } from "@/config/site";
 import { PUBLIC_CLIENT_NAMESPACES, SEARCH_PAGE_CLIENT_NAMESPACES, pickMessages } from "@/i18n/client-messages";
@@ -90,6 +91,7 @@ function Results({ response, locale, toolbarAction, renderAction, promos }: Resu
         <PendingBar className="absolute inset-x-0 bottom-0" />
       </div>
       <ActiveFilterChips params={params} locale={locale} />
+      {params.subcategory === RENTAL_SUBCATEGORY ? <RentalDatesBar key={searchPath(params)} params={params} /> : null}
       {response.approximate ? (
         <ErrorBanner tone="info" title={t("approximate.title")}>
           {t("approximate.body")}

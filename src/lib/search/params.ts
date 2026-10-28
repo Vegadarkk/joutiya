@@ -1,5 +1,6 @@
-import { CONDITIONS, categoryById, criterionById, searchCriteria, subcategoryById, type Condition } from "@/config/categories";
+import { CONDITIONS, RENTAL_SUBCATEGORY, categoryById, criterionById, searchCriteria, subcategoryById, type Condition } from "@/config/categories";
 import { cityBySlug, regionByCode } from "@/config/regions";
+import { DAY_PATTERN, dayNumber } from "@/lib/listings/rental-availability";
 import { z } from "@/lib/zod";
 
 // Search parameters (phase 4, design §2): the one whitelist shared by the search page, /api/search,
@@ -25,6 +26,9 @@ export const SELLER_TYPES_FILTER = ["individual", "pro"] as const;
 export type SellerTypeFilter = (typeof SELLER_TYPES_FILTER)[number];
 /** Upper bound of price filters, MAD (PRICE_MAX of listings). */
 export const SEARCH_PRICE_MAX = 100_000_000;
+/** Car rental dates (rental pack §4): at most 60 days of rental, a start within 180 days. */
+export const RENTAL_SEARCH_DAYS_MAX = 60;
+export const RENTAL_SEARCH_AHEAD_DAYS = 180;
 
 /** URL parameter names. `breadcrumb.tsx` links use the same names. */
 export const SEARCH_QUERY_KEYS = {
@@ -43,6 +47,8 @@ export const SEARCH_QUERY_KEYS = {
   donation: "don",
   withPhoto: "photo",
   conditions: "etat",
+  rentFrom: "du",
+  rentTo: "au",
   sort: "tri",
   page: "page",
 } as const;
@@ -86,10 +92,34 @@ export interface SearchParams {
   conditions?: Condition[];
   /** Only for criteria of `subcategory` (select, multiselect, number, boolean). */
   criteria?: Record<string, CriterionFilter>;
+  /**
+   * Car rentals only: pick-up and return days ("YYYY-MM-DD", Morocco), 1 to 60 days apart. The
+   * search keeps listings free on every day from pick-up to return (rental pack §4); a start in the
+   * past or beyond 180 days is ignored by the search service, not by the parser (no clock here).
+   */
+  dates?: RentalDates;
   /** Absent = default: relevance with a query, recent without. */
   sort?: SearchSort;
   /** 1-based; absent = 1. */
   page?: number;
+}
+
+export interface RentalDates {
+  from: string;
+  to: string;
+}
+
+/** Rental days of a period: the return day minus the pick-up day, at least one. */
+export function rentalDuration(dates: RentalDates): number {
+  return Math.max(1, dayNumber(dates.to) - dayNumber(dates.from));
+}
+
+function validDates(from: string | undefined, to: string | undefined): RentalDates | undefined {
+  if (!from || !to) return undefined;
+  const start = dayNumber(from);
+  const end = dayNumber(to);
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start || end - start > RENTAL_SEARCH_DAYS_MAX) return undefined;
+  return { from, to };
 }
 
 const PUBLIC_ID = /^[a-hj-km-np-z2-9]{10}$/;
@@ -178,6 +208,8 @@ export function parseSearchParams(source: Source): SearchParams {
   if (read(source, k.withPhoto) === "1") params.withPhoto = true;
   const conditions = list(read(source, k.conditions)).filter((value): value is Condition => (CONDITIONS as readonly string[]).includes(value));
   if (conditions.length) params.conditions = conditions;
+  const dates = validDates(read(source, k.rentFrom), read(source, k.rentTo));
+  if (dates) params.dates = dates;
   const sortParam = read(source, k.sort);
   const sort = SEARCH_SORTS.find((value) => SORT_PARAM[value] === sortParam);
   if (sort) params.sort = sort;
@@ -274,14 +306,20 @@ export function canonicalSearchParams(input: SearchParams): SearchParams {
     if (Object.keys(criteria).length) params.criteria = criteria;
     else delete params.criteria;
   }
+  if (params.dates) {
+    const dates = params.subcategory === RENTAL_SUBCATEGORY ? validDates(params.dates.from, params.dates.to) : undefined;
+    if (dates) params.dates = dates;
+    else delete params.dates;
+  }
   if (params.sort === "distance" && !params.city) delete params.sort;
   if (params.sort && params.sort === defaultSort(params)) delete params.sort;
   if (params.page !== undefined && (params.page <= 1 || params.page > SEARCH_MAX_PAGE)) delete params.page;
   return params;
 }
 
-/** Relevance when the visitor typed words, newest first otherwise (Leboncoin's default). */
-export function defaultSort(params: Pick<SearchParams, "q">): SearchSort {
+/** Relevance when the visitor typed words, newest first otherwise (Leboncoin's default); car rentals by dates: cheapest day first. */
+export function defaultSort(params: Pick<SearchParams, "q" | "dates">): SearchSort {
+  if (params.dates) return "price_asc";
   return params.q ? "relevance" : "recent";
 }
 
@@ -316,6 +354,10 @@ export function searchParamsToQuery(input: SearchParams): URLSearchParams {
       if (filter.min !== undefined) query.set(`${CRITERION_PARAM_PREFIX}${id}-min`, String(filter.min));
       if (filter.max !== undefined) query.set(`${CRITERION_PARAM_PREFIX}${id}-max`, String(filter.max));
     }
+  }
+  if (params.dates) {
+    query.set(k.rentFrom, params.dates.from);
+    query.set(k.rentTo, params.dates.to);
   }
   if (params.sort) query.set(k.sort, SORT_PARAM[params.sort]);
   if (params.page) query.set(k.page, String(params.page));
@@ -376,6 +418,7 @@ export const storedSearchParamsSchema = z
         ]),
       )
       .optional(),
+    dates: z.object({ from: z.string().regex(DAY_PATTERN), to: z.string().regex(DAY_PATTERN) }).strict().optional(),
     sort: z.enum(SEARCH_SORTS).optional(),
   })
   .strict();

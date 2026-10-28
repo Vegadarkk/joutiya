@@ -16,6 +16,7 @@ export interface ContractSetup {
 const casablanca = cityBySlug("casablanca");
 if (!casablanca) throw new Error("casablanca missing");
 const CASA = { lat: casablanca.lat, lng: casablanca.lng };
+const RENTAL_TEXT = "Véhicules مركبات Location de voitures كراء السيارات";
 
 export function engineContract(name: string, setup: () => Promise<ContractSetup>): void {
   describe(`${name} engine contract`, () => {
@@ -170,6 +171,31 @@ export function engineContract(name: string, setup: () => Promise<ContractSetup>
         expect(await filtered({ field: "a_amenities", op: "eq", value: "parking" })).toEqual(["i1"]);
         expect(await filtered({ field: "a_furnished", op: "eq", value: true })).toEqual(["i2"]);
         expect(await filtered({ field: "a_head_count", op: "lt", value: 2 })).toEqual(["a1"]);
+      });
+
+      it("filters car rentals free on every asked day, by minimum rental and freshness", async () => {
+        const rental = (id: string, extra: Partial<SearchDocument>, minDays?: number) => ({
+          ...searchDoc({ id, title: `Dacia Logan ${id}`, categoryId: "vehicules", subcategoryId: "location-voitures", categoryText: RENTAL_TEXT, citySlug: "casablanca", price: 250, sellerType: "pro", daysAgo: 1, attributes: minDays ? { "min-rental-days": minDays } : {} }),
+          ...extra,
+        });
+        await engine.upsert([rental("r1", { rentUnavailableDays: [20_400, 20_401], rentFreshUntil: NOW + 86_400_000 }, 3), rental("r2", { rentFreshUntil: NOW - 86_400_000 })]);
+        try {
+          const scope: FilterExpr = { field: "subcategoryId", op: "eq", value: "location-voitures" };
+          const free = (days: number[], duration: number): FilterExpr => ({
+            and: [
+              scope,
+              { not: { field: "rentUnavailableDays", op: "in", values: days } },
+              { or: [{ field: "a_min_rental_days", op: "lte", value: duration }, { not: { field: "a_min_rental_days", op: "exists" } }] },
+            ],
+          });
+          expect(await filtered(free([20_401, 20_402, 20_403], 3))).toEqual(["r2"]);
+          expect(await filtered(free([20_402, 20_403, 20_404], 2))).toEqual(["r2"]);
+          expect(await filtered(free([20_402, 20_403, 20_404, 20_405], 3))).toEqual(["r1", "r2"]);
+          expect(await filtered({ and: [scope, { field: "rentFreshUntil", op: "gt", value: NOW }] })).toEqual(["r1"]);
+          expect(await filtered({ and: [scope, { not: { field: "rentFreshUntil", op: "gt", value: NOW } }] })).toEqual(["r2"]);
+        } finally {
+          await engine.remove(["r1", "r2"]);
+        }
       });
 
       it("treats string equality as case-insensitive", async () => {

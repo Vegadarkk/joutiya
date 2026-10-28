@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetServerEnv } from "@/lib/env";
 import type { TemplateMail } from "@/lib/mail/types";
 import type { AlertSearchRecord, DailySearchPage } from "@/lib/saved-searches/repository";
+import type * as SearchService from "@/lib/search/service";
 import type { SearchCard, SearchResponse } from "@/lib/search/types";
 
 // saved-search-alerts (07:00 UTC, design D19): one bulk digest per account with news, at most 40
@@ -53,7 +54,7 @@ vi.mock("@/lib/saved-searches/repository", () => ({
   }),
 }));
 
-vi.mock("@/lib/search/service", () => ({ runSearch: vi.fn() }));
+vi.mock("@/lib/search/service", async (importOriginal) => ({ activeRentalDates: (await importOriginal<typeof SearchService>()).activeRentalDates, runSearch: vi.fn() }));
 
 const repository = await import("@/lib/saved-searches/repository");
 const { runSearch } = await import("@/lib/search/service");
@@ -184,6 +185,15 @@ describe("sendSavedSearchAlerts", () => {
     // The same listings are never sent twice.
     vi.mocked(deliverMail).mockClear();
     expect((await sendSavedSearchAlerts(NOW)).mails).toBe(0);
+  });
+
+  it("skips a car rental search whose pick-up day has passed", async () => {
+    const rental = (id: string, from: string) => search("loueur", id, { params: { category: "vehicules", subcategory: "location-voitures", district: id, dates: { from, to: "2026-10-30" } } });
+    store = [rental("r1", "2026-10-15"), rental("r2", "2026-10-16")];
+    news(["r1", "r2"]);
+    expect(await sendSavedSearchAlerts(NOW)).toMatchObject({ searches: 2, mails: 1 });
+    expect(runSearch).toHaveBeenCalledTimes(1);
+    expect(digestOf("loueur")?.data.searches.map((section) => section.name)).toEqual(["Recherche r2"]);
   });
 
   it("keeps an account whole when its searches straddle two pages", async () => {

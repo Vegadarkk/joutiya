@@ -8,8 +8,9 @@ import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
 import { useNumbersTranslations } from "@/i18n/numbers";
-import { intlLocale } from "@/lib/listings/client/format";
+import { formatPrice, intlLocale } from "@/lib/listings/client/format";
 import type { PublicListingCard } from "@/lib/listings/public";
+import type { SearchCard } from "@/lib/search/types";
 import { cn } from "@/lib/utils";
 import { PriceTag } from "./price-tag";
 import { blurhashPlaceholder, photoSources } from "./photo";
@@ -29,7 +30,8 @@ type FactKey = "surface" | "rooms" | "bedrooms";
 export const LISTING_CARD_SIZES = "(min-width: 1024px) 18rem, (min-width: 640px) 33vw, 50vw";
 
 export interface ListingCardProps {
-  listing: PublicListingCard;
+  /** `rental`: a car rental in a search by dates (estimated total, freshness). */
+  listing: PublicListingCard & Pick<SearchCard, "rental">;
   mediaBaseUrl: string | null;
   locale: Locale;
   /** Heading level of the title inside the surrounding page. */
@@ -77,6 +79,12 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
         </p>
       ) : null}
       <PriceTag price={listing.price} isDonation={listing.isDonation} negotiable={listing.priceNegotiable} unit={unit} locale={locale} />
+      {listing.rental ? (
+        <p data-testid="card-rental" className="flex flex-col text-xs tabular-nums">
+          {listing.rental.total !== null ? <span className="font-medium">{t("rentalTotal", { days: listing.rental.days, total: formatPrice(listing.rental.total, locale) })}</span> : null}
+          {listing.rental.fresh ? null : <span className="text-warning">{t("rentalToConfirm")}</span>}
+        </p>
+      ) : null}
       <p className="flex min-w-0 flex-wrap gap-x-2 text-xs text-foreground-muted">
         {city ? <span className="truncate">{cityName(city, locale)}</span> : null}
         <time dateTime={listing.sortAt}>{formatCardDate(listing.sortAt, locale)}</time>

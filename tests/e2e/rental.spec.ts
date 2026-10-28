@@ -178,6 +178,21 @@ test.describe("Car rental", () => {
       await expect(calendar.locator(`[data-day="${day(6)}"]`)).toHaveAttribute("data-state", "free");
       await calendar.scrollIntoViewIfNeeded();
       await page.screenshot({ path: "test-results/rental-availability-page.png", fullPage: true });
+
+      // Search by dates (rental pack §4): hidden over a blocked day, found with its estimate after.
+      const word = title.split(" ").at(-1)!;
+      const found = async (from: number, to: number) => {
+        const body = (await (await request.get(`/api/search?sous-categorie=location-voitures&q=${word}&du=${day(from)}&au=${day(to)}`)).json()) as { hits: { id: string }[] };
+        return body.hits.length;
+      };
+      await expect
+        .poll(async () => ((await request.post("/api/dev/search/rebuild")).ok() ? found(6, 9) : -1), { timeout: 20_000, message: "rental indexed" })
+        .toBe(1);
+      expect(await found(4, 6)).toBe(0);
+      await page.goto(`/fr/recherche?sous-categorie=location-voitures&q=${word}&du=${day(6)}&au=${day(9)}`);
+      await expect(page.locator("#main").getByTestId("rental-dates-bar")).toBeVisible();
+      await expect(page.locator("#main").getByTestId("card-rental")).toContainText("pour 3 jours");
+      await page.screenshot({ path: "test-results/rental-search-dates.png", fullPage: true });
     }
   });
 });
