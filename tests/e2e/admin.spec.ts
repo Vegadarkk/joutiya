@@ -300,12 +300,50 @@ test("a revoked session is sent to the sign-in page on a client-side navigation,
   await context.close();
 });
 
+test("an admin edits a legal mention: the legal page shows it and the audit log records the change", async ({ page }) => {
+  const receipt = `D-E2E-${randomId(6).toUpperCase()}`;
+  await signIn(page, EMAIL, PASSWORD);
+  await page.getByRole("link", { name: "Mentions légales" }).click();
+  await expect(page).toHaveURL(`${admin}/parametres/legal`);
+  await expect(page.getByRole("heading", { name: "Mentions légales", level: 1 })).toBeVisible();
+  const field = page.getByLabel("Récépissé CNDP");
+  const previous = await field.inputValue();
+  await expect(page.getByRole("button", { name: "Enregistrer" })).toBeDisabled();
+  await field.fill(receipt);
+  await page.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(page.getByText("Mentions légales enregistrées.", { exact: false })).toBeVisible();
+  try {
+    // ISR: the save revalidates the page, regenerated on a following visit.
+    await expect
+      .poll(
+        async () => {
+          await page.goto("/fr/legal/mentions-legales");
+          return page.locator("#main").getByText(`récépissé n° ${receipt}`, { exact: false }).count();
+        },
+        { timeout: 20_000 },
+      )
+      .toBe(1);
+    const entries = await getFirestore(firebase()).collection("auditLogs").where("action", "==", "legal.updated").get();
+    expect(entries.docs.some((entry) => String(entry.get("reason")).includes(`cndpReceiptNo: "${previous}" → "${receipt}"`))).toBe(true);
+  } finally {
+    await page.goto(`${admin}/parametres/legal`);
+    const restore = page.getByLabel("Récépissé CNDP");
+    // A failed first save left nothing to restore: keep its error as the test's failure.
+    if ((await restore.inputValue()) !== previous) {
+      await restore.fill(previous);
+      await page.getByRole("button", { name: "Enregistrer" }).click();
+      await expect(page.getByText("Aucun changement.")).toBeVisible();
+    }
+  }
+});
+
 test("the admin host exposes no public API, and its own API needs a session", async ({ request }) => {
   // Node does not resolve *.localhost: same server, admin Host header.
   const headers = { host: "admin.localhost:3100" };
   expect((await request.get("/api/search", { headers })).status()).toBe(404);
   expect((await request.get("/api/health", { headers })).status()).toBe(200);
   expect((await request.get("/api/admin/staff", { headers })).status()).toBe(401);
+  expect((await request.get("/api/admin/legal", { headers })).status()).toBe(401);
   // Back-office routes do not exist on the public host.
   expect((await request.get("/api/admin/staff")).status()).toBe(404);
 });

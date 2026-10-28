@@ -2279,6 +2279,7 @@
         "placeholder": "Bonjour, l'article est-il toujours disponible ?",
         "privacy": "Le vendeur voit votre nom affiché, jamais votre e-mail ni votre numéro.",
         "safety": "Ne payez jamais à l'avance : voyez l'article avant de payer.",
+        "scanned": "Pour vous protéger des arnaques, les messages sont analysés automatiquement, sans IA. <link>En savoir plus</link>",
         "send": "Envoyer le message",
         "cancel": "Annuler",
         "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}",

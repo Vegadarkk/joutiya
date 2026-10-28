@@ -94,6 +94,8 @@ export const userPrivateSchema = z
         /** Art. 44 loi 09-08: express consent to data transfers outside Morocco. */
         transfers: consentSchema,
         marketing: z.boolean(),
+        /** Proof of the opt-in to information e-mails (text version and date); absent when refused or before 2026-10-28. */
+        marketingConsent: consentSchema.optional(),
       })
       .strict(),
     strikes: z.object({ level: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), lastAt: ts.optional(), suspendedUntil: ts.optional() }).strict(),
