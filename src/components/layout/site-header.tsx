@@ -56,8 +56,9 @@ export function SiteHeader({ locale }: { locale: string }) {
         </form>
 
         <div className="ms-auto flex items-center gap-1 *:min-w-11">
-          {/* Admin procedures guide (guide-demarches G1): its own section, an icon below lg. */}
-          <Button asChild variant="ghost" size="icon" className="lg:hidden">
+          {/* Admin procedures guide (guide-demarches G1): its own section, an icon from sm to lg. Below
+              sm a signed-in header has no room left at 360 px: phones reach it from the footer. */}
+          <Button asChild variant="ghost" size="icon" className="hidden sm:inline-flex lg:hidden">
             <Link href="/demarches" aria-label={t("guide")}>
               <ScrollText aria-hidden="true" />
             </Link>
