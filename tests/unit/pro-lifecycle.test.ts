@@ -33,6 +33,8 @@ const ALL_EVENTS: ProEvent[] = [
   { type: "subscription_expired" },
   { type: "grace_ended" },
   { type: "launch_offer_ended" },
+  { type: "pass_purchased", plan: "essentiel" },
+  { type: "pass_ended" },
   { type: "suspended" },
   { type: "reinstated" },
 ];
@@ -157,6 +159,45 @@ describe("helpers", () => {
     expect(storefrontShown("verified", "none")).toBe(false);
     expect(storefrontShown("downgraded", "none")).toBe(false);
     expect(storefrontShown("suspended", "business")).toBe(false);
+  });
+});
+
+describe("Pass Boutique", () => {
+  it("activates the pass's plan from a verified or downgraded shop, and keeps an active pass", () => {
+    for (const from of ["verified", "downgraded"] as const) {
+      const { patch, effects } = transition(pro(from), { type: "pass_purchased", plan: "essentiel" }, ctx);
+      expect(patch).toEqual({ lifecycle: "active", plan: "essentiel", planSource: "pass", graceUntil: null });
+      expect(effects).toMatchObject({ storefrontVisible: true, reindexListings: true, pauseOverQuota: false });
+    }
+    expect(transition(pro("active", { plan: "essentiel", planSource: "pass" }), { type: "pass_purchased", plan: "essentiel" }, ctx).patch.planSource).toBe("pass");
+  });
+
+  it("never doubles a subscription, and waits for a suspended or unverified shop", () => {
+    for (const view of [pro("active", { plan: "essentiel", planSource: "subscription" }), pro("grace", { plan: "essentiel", planSource: "subscription" }), pro("suspended", { suspendedFrom: "active" }), pro("pending_verification"), pro("rejected")]) {
+      expect(() => transition(view, { type: "pass_purchased", plan: "essentiel" }, ctx)).toThrow(IllegalProTransitionError);
+    }
+  });
+
+  it("downgrades at the end of a pass without grace, and only a pass", () => {
+    const { patch, effects } = transition(pro("active", { plan: "essentiel", planSource: "pass" }), { type: "pass_ended" }, ctx);
+    expect(patch).toEqual({ lifecycle: "downgraded", plan: "none", planSource: "none", graceUntil: null, downgradedAt: NOW });
+    expect(effects).toMatchObject({ pauseOverQuota: true, storefrontVisible: false });
+    expect(() => transition(pro("active", { plan: "essentiel", planSource: "subscription" }), { type: "pass_ended" }, ctx)).toThrow(IllegalProTransitionError);
+    expect(() => transition(pro("verified", { plan: "essentiel", planSource: "launch_offer" }), { type: "pass_ended" }, ctx)).toThrow(IllegalProTransitionError);
+  });
+
+  it("shows the storefront during a pass", () => {
+    expect(storefrontShown("active", "essentiel")).toBe(true);
+  });
+
+  it("sells a 30-day Essentiel pass at 249 MAD HT by default and refuses a pass longer than its limit", () => {
+    expect(DEFAULT_PRICING.passes).toEqual([{ id: "boutique30", plan: "essentiel", days: 30, priceMinor: 24_900, credits: 30, maxAheadDays: 90 }]);
+    expect(resolvePricingConfig({ passes: [{ ...DEFAULT_PRICING.passes[0], days: 120, maxAheadDays: 90 }] }).errors.length).toBeGreaterThan(0);
+    expect(resolvePricingConfig({ passes: [DEFAULT_PRICING.passes[0], DEFAULT_PRICING.passes[0]] }).errors.length).toBeGreaterThan(0);
+    expect(resolvePricingConfig({ passes: [{ ...DEFAULT_PRICING.passes[0], stripePrice: "prod_1" }] }).errors.length).toBeGreaterThan(0);
+    expect(resolvePricingConfig({ passes: [{ ...DEFAULT_PRICING.passes[0], stripePrice: "price_1" }] }).config.passes[0]?.stripePrice).toBe("price_1");
+    // A stored config/pricing written before passes existed keeps the default pass.
+    expect(resolvePricingConfig({ graceDays: 7 }).config.passes).toEqual(DEFAULT_PRICING.passes);
   });
 });
 

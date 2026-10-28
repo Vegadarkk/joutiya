@@ -28,13 +28,13 @@ export function initialOf(name: string): string {
   return letter.toLocaleUpperCase();
 }
 
-export function SellerAvatar({ name, size = "md", className }: { name: string; size?: "md" | "lg"; className?: string }) {
+export function SellerAvatar({ name, size = "md", className }: { name: string; size?: "md" | "lg" | "xl"; className?: string }) {
   return (
     <span
       aria-hidden="true"
       className={cn(
         "threshold flex shrink-0 items-center justify-center rounded-arch bg-structure pt-1 font-semibold text-structure-foreground",
-        size === "lg" ? "h-20 w-16 text-3xl" : "h-14 w-11 text-xl",
+        size === "xl" ? "h-28 w-22 text-4xl" : size === "lg" ? "h-20 w-16 text-3xl" : "h-14 w-11 text-xl",
         className,
       )}
     >

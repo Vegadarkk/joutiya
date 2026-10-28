@@ -157,6 +157,21 @@ export const checkoutPlanSchema = z
   .strict();
 export type CheckoutPlanInput = z.infer<typeof checkoutPlanSchema>;
 
+/** Version of the Pass Boutique consent text (Subscription.pass.consent in messages/*.json). */
+export const PASS_CONSENT_VERSION = "2026-10";
+/** Lifecycle states of a shop that may buy a pass (an active one only on a pass of the same plan). */
+export const PASS_BUYER_STATES: ReadonlySet<string> = new Set(["verified", "active", "downgraded"]);
+
+export const checkoutPassSchema = z
+  .object({
+    pass: z.string().regex(/^[a-z0-9_]{1,40}$/),
+    /** "J'accepte les CGV du Pass Boutique : paiement unique, sans renouvellement, sans remboursement au prorata." */
+    acceptTerms: z.literal(true),
+    locale: z.enum(LOCALES).default("fr"),
+  })
+  .strict();
+export type CheckoutPassInput = z.infer<typeof checkoutPassSchema>;
+
 export const billingPortalSchema = z.object({ locale: z.enum(LOCALES).default("fr") }).strict();
 
 export interface PlanOffer {
@@ -168,6 +183,22 @@ export interface PlanOffer {
   activeListings: number | null;
   /** Both Stripe Prices exist on this deployment. */
   available: boolean;
+}
+
+export interface PassOffer {
+  id: string;
+  plan: PaidPlanId;
+  days: number;
+  /** Price excluding tax, MAD centimes, paid once. */
+  priceMinor: number;
+  credits: number;
+  activeListings: number | null;
+  /** The Stripe Price exists on this deployment. */
+  available: boolean;
+  /** Bought now, the pass would end within `maxAheadDays` of today (else the checkout answers 409 pass_max_ahead). */
+  withinLimit: boolean;
+  /** The shop runs a pass of another plan (the checkout answers 409 pass_other_plan). */
+  otherPlan: boolean;
 }
 
 export interface SubscriptionView {
@@ -185,15 +216,21 @@ export interface SubscriptionResponse {
   available: boolean;
   lifecycle: string;
   plan: string;
-  planSource: "launch_offer" | "subscription" | "none";
+  planSource: "launch_offer" | "subscription" | "pass" | "none";
+  /** End of the running Pass Boutique (planSource "pass"), else null. */
+  passEndsAt: string | null;
   graceUntil: string | null;
   /** End of the launch offer, when set by an admin. */
   launchOfferEndsAt: string | null;
   /** Days of notice before the launch offer ends (`config/pricing.launchOffer.noticeDays`). */
   launchOfferNoticeDays: number;
+  /** The shop is on the launch offer and it is still open (a pass cannot be bought then). */
+  launchOfferOpen: boolean;
   subscription: SubscriptionView | null;
   plans: PlanOffer[];
+  passes: PassOffer[];
   consentVersion: string;
+  passConsentVersion: string;
 }
 
 /** POST /api/billing/checkout and /api/billing/portal: the Stripe page to open. */
@@ -225,6 +262,7 @@ export const PAYMENTS_API = {
   packs: "/api/wallet/packs",
   subscription: "/api/billing/subscription",
   checkout: "/api/billing/checkout",
+  pass: "/api/billing/pass",
   portal: "/api/billing/portal",
   invoices: "/api/billing/invoices",
   options: (listingId: string) => `/api/listings/${listingId}/options`,

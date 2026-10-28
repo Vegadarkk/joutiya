@@ -84,7 +84,8 @@ export function lifecycleEventFor(profile: ProLifecycleView, status: Subscriptio
   if (lifecycle !== "verified" && lifecycle !== "active" && lifecycle !== "grace" && lifecycle !== "downgraded") return null;
   if (PAID.has(status)) return lifecycle === "active" && profile.plan === plan && profile.planSource === "subscription" ? null : { type: "subscription_active", plan };
   if (status === "grace" || status === "billing_issue") {
-    if (lifecycle === "active") return { type: "billing_issue" };
+    // A failed renewal touches the plan it pays for only (not a pass bought after it ended).
+    if (lifecycle === "active") return profile.planSource === "subscription" ? { type: "billing_issue" } : null;
     return lifecycle === "grace" && profile.graceUntil !== undefined && profile.graceUntil.getTime() <= now.getTime() ? { type: "grace_ended" } : null;
   }
   return (lifecycle === "active" || lifecycle === "grace") && profile.planSource === "subscription" ? { type: "subscription_expired" } : null;
@@ -121,7 +122,7 @@ async function subscriptionsOf(appUserId: string, deps: SyncDeps): Promise<Reven
 }
 
 /** Ledger ids keep to the characters the wallet page's cursor accepts. */
-const ledgerKey = (value: string) => value.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 120);
+export const ledgerKey = (value: string) => value.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 120);
 
 /** Brings the shop's subscription, lifecycle, grant and listings in line with RevenueCat. */
 export async function syncShopSubscription(accountId: string, deps: SyncDeps = {}): Promise<SyncOutcome> {
@@ -230,7 +231,7 @@ export async function startGrace(proId: string, now = new Date()): Promise<boole
   const pricing = await getPricing();
   const moved = await db().runTransaction(async (tx) => {
     const profile = await getProProfile(proId, tx);
-    if (!profile || profile.lifecycle !== "active") return false;
+    if (!profile || profile.lifecycle !== "active" || profile.planSource !== "subscription") return false;
     const { patch } = transition(profile, { type: "billing_issue" }, { now, graceDays: pricing.graceDays });
     tx.set(proProfileRef(proId), proProfileToFirestore(profileAfter(profile, patch, pricing, now)));
     return true;

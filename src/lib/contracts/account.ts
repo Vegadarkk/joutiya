@@ -1,4 +1,6 @@
 import type { Locale } from "@/config/site";
+import { BANNER_KEYS, BIO_MAX, type BannerKey } from "@/config/storefront";
+import { citySlugSchema } from "@/lib/contracts/listings";
 import { z } from "@/lib/zod";
 
 // Account closure and personal data export (phase 5 design D26, lot L7; AF §5 UserPrivate, §6
@@ -127,6 +129,7 @@ export interface AccountExport {
     type: "individual" | "pro";
     regionCode: string | null;
     citySlug: string | null;
+    storefront: { bio: string | null; bannerKey: string | null };
     locale: Locale;
     status: string;
     badges: { emailVerified: boolean; phoneVerified: boolean; proCertified: boolean };
@@ -169,4 +172,25 @@ export interface AccountExport {
   reportsFiled: ExportReport[];
   decisions: ExportDecision[];
   blockedAccounts: { publicId: string; displayName: string }[];
+}
+
+/**
+ * POST /api/account/storefront (vitrine-avis §1): each field optional, null (or an empty bio)
+ * clears it. The bio is screened again on the server (src/lib/moderation/free-text.ts).
+ */
+export const storefrontSchema = z
+  .object({
+    bio: z.string().trim().max(BIO_MAX).nullable().optional(),
+    bannerKey: z.enum(BANNER_KEYS).nullable().optional(),
+    citySlug: citySlugSchema.nullable().optional(),
+  })
+  .strict();
+export type StorefrontInput = z.infer<typeof storefrontSchema>;
+
+/** What the storefront settings show and the profile page renders. */
+export interface StorefrontSettings {
+  publicId: string;
+  bio: string;
+  bannerKey: BannerKey;
+  citySlug: string | null;
 }

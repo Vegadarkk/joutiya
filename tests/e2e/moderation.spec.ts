@@ -2,6 +2,7 @@ import { createHmac, randomBytes } from "node:crypto";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { ownClientIp } from "./helpers";
 
 // Notice and appeal (phase 5 lot U2, art. 16 and 20 DSA) against the production build and the
 // Firebase emulators (npm run test:e2e). A member reports a listing from its page and reads the
@@ -37,6 +38,7 @@ async function waitForMail(request: APIRequestContext, to: string, template: str
 }
 
 async function signUpAndIn(page: Page, request: APIRequestContext, email: string, name: string): Promise<void> {
+  await ownClientIp(page);
   await page.goto("/fr/inscription");
   // Hydrated first (the widget turns ready client side): a consent ticked earlier is unticked when the form registers its fields.
   await expect(page.locator("[data-turnstile]").first()).toHaveAttribute("data-turnstile", "ready", { timeout: 20_000 });

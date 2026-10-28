@@ -7,6 +7,7 @@ import { getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import sharp from "sharp";
 import { isolate } from "../../src/lib/i18n/bidi";
+import { ownClientIp } from "./helpers";
 
 // Messaging (phase 5 lot U1) against the production build and the Firebase emulators
 // (npm run test:e2e): two fresh accounts sign up through the UI; a published listing is written
@@ -50,6 +51,7 @@ async function waitForMail(request: APIRequestContext, to: string, template: str
 }
 
 async function signUpAndIn(page: Page, request: APIRequestContext, email: string, name: string): Promise<void> {
+  await ownClientIp(page);
   await page.goto("/fr/inscription");
   // Hydrated first (the widget turns ready client side): a consent ticked earlier is unticked when the form registers its fields.
   await expect(page.locator("[data-turnstile]").first()).toHaveAttribute("data-turnstile", "ready", { timeout: 20_000 });

@@ -22,6 +22,7 @@ import { FormMessage, useApiErrorMessage, useFieldMessage } from "./form-message
 import { PasswordField } from "./password-field";
 import { Section } from "./settings-section";
 import { AccountClosedView, CloseAccountSection, DataSection } from "@/components/account/account-sections";
+import { StorefrontSection } from "@/components/account/storefront-section";
 import type { CloseAccountResponse } from "@/lib/contracts/account";
 
 // /parametres. The layout already requires a member; the data comes from GET /api/auth/me (or the
@@ -65,6 +66,7 @@ export function SettingsView() {
       ) : (
         <div className="flex flex-col divide-y divide-border">
           <ProfileSection key={`${session.uid}-${session.displayName}-${session.locale}`} session={session} />
+          <StorefrontSection />
           <PasswordSection email={session.email} displayName={session.displayName} hasPassword={session.providers.includes("password")} />
           <VerificationSection session={session} />
           <MethodsSection session={session} />

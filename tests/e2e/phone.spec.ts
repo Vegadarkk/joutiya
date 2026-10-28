@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { stubGoogleScript } from "./gsi-stub";
+import { ownClientIp } from "./helpers";
 
 // The sign-up page renders the Google button (stub client id): never the real script.
 test.beforeEach(({ page }) => stubGoogleScript(page));
@@ -62,6 +63,7 @@ async function waitForTurnstile(page: Page): Promise<void> {
 
 /** Signs up and signs in through the e-mail confirmation link. */
 async function signUpAndIn(page: Page, request: APIRequestContext, email: string): Promise<void> {
+  await ownClientIp(page);
   await page.goto("/fr/inscription");
   // Hydrated first (the widget turns ready client side): a consent ticked earlier is unticked when the form registers its fields.
   await waitForTurnstile(page);

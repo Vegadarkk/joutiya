@@ -46,8 +46,23 @@ export async function waitForMail(request: APIRequestContext, to: string, templa
   return found!;
 }
 
+/**
+ * Gives the page its own client address (`cf-connecting-ip`, read by the app when not deployed): the
+ * suite signs up more accounts than `signup.ip` allows one address per hour. App requests only: a
+ * custom header on Turnstile's cross-origin requests would fail their CORS preflight.
+ */
+export async function ownClientIp(page: Page): Promise<void> {
+  const [a, b, c] = randomBytes(3);
+  const ip = `10.${a}.${b}.${(c! % 254) + 1}`;
+  await page.route(
+    (url) => url.hostname === "localhost" || url.hostname.endsWith(".localhost"),
+    (route) => route.continue({ headers: { ...route.request().headers(), "cf-connecting-ip": ip } }),
+  );
+}
+
 /** Signs up a fresh individual through the French form and confirms the e-mail: the page is signed in. */
 export async function signUpAndIn(page: Page, request: APIRequestContext, email: string, displayName = "Amina Test"): Promise<void> {
+  await ownClientIp(page);
   await page.goto("/fr/inscription");
   // Hydrated first (the widget turns ready client side): a consent ticked earlier is unticked when the form registers its fields.
   await expect(page.locator("[data-turnstile]").first()).toHaveAttribute("data-turnstile", "ready", { timeout: 20_000 });
