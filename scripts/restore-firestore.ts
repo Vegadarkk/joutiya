@@ -32,6 +32,7 @@ import { applyRestore, checkRestore, directorySource, planRestore, type BackupSo
 import { APP_ENVS, validateTargets, type Targets } from "./assert-target.ts";
 import { keylessEnv, mintCredentials } from "./google-wif.ts";
 import { DEPLOYED_ENVS, R2_KEYS, r2Endpoint, type DeployedEnv } from "./vm-env.ts";
+import { requireEnvProxy } from "./env-proxy.ts";
 
 const USAGE =
   "usage: scripts/restore-firestore.ts --identity <age key file> (--from <dir> | --from-bucket <staging|prod>) --project <id> [--collections a,b] [--until YYYY-MM-DD] [--apply] [--allow-production] [--allow-unverified] [--allow-over-quota]";
@@ -175,6 +176,7 @@ async function readIdentity(path: string): Promise<{ identity: string; recipient
 }
 
 async function main(): Promise<void> {
+  requireEnvProxy();
   const args = parseCli(process.argv.slice(2));
   const targets = readTargets();
   const emulated = Boolean(process.env.FIRESTORE_EMULATOR_HOST);

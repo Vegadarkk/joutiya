@@ -29,7 +29,7 @@ FROM base AS models
 # target never sees them.
 WORKDIR /src
 COPY package.json ./
-COPY scripts/fetch-models.ts scripts/
+COPY scripts/fetch-models.ts scripts/env-proxy.ts scripts/
 COPY models/MANIFEST.json models/
 RUN MEDIA_MODELS_DIR=/app/models node scripts/fetch-models.ts
 
