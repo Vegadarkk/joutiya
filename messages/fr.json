@@ -307,7 +307,7 @@
       "submit": "Accepter et continuer",
       "accepted": "Votre accord est enregistré.",
       "refuseTitle": "Vous ne souhaitez pas donner cet accord ?",
-      "refuseBody": "Sans cet accord, votre compte ne peut pas être utilisé : il fonctionne avec ces prestataires. Vous pouvez vous déconnecter, et demander la suppression de votre compte en écrivant à <mail>{dpo}</mail>.",
+      "refuseBody": "Sans cet accord, votre compte ne peut pas être utilisé : il fonctionne avec ces prestataires. Vous pouvez vous déconnecter, ou supprimer votre compte et télécharger vos données depuis <settings>vos paramètres</settings>. Pour toute question, écrivez à <mail>{dpo}</mail>.",
       "signOut": "Se déconnecter",
       "signedOut": "Vous êtes déconnecté."
     },

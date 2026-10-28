@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import type { z } from "@/lib/zod";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { apiPost, signOut } from "@/lib/auth/client";
 import { AUTH_API, transfersConsentSchema, type ConsentsResponse } from "@/lib/contracts/auth";
 import { ConsentBox, TransfersDetails } from "./consent-fields";
@@ -17,7 +17,8 @@ import { FormMessage, useFieldMessage } from "./form-message";
 // Blocking re-consent panel (design D12), rendered by (account)/layout.tsx in place of the page
 // while the member's transfers consent is not the current version (transfersConsentVersion). Accepting records it and
 // refreshes the route, which then renders the page. Without it the account cannot be used: the
-// panel offers the sign-out and the address to ask for the account's deletion.
+// panel offers the sign-out and the settings page (exempt from the gate), where the member can
+// still close the account and download their data.
 
 type ReconsentForm = z.input<typeof transfersConsentSchema>;
 type ReconsentInput = z.output<typeof transfersConsentSchema>;
@@ -48,11 +49,23 @@ export function TransfersReconsent({ dpo }: { dpo: string }) {
   }
 
   async function onSignOut() {
-    await signOut();
+    setServerError(undefined);
+    try {
+      await signOut();
+    } catch (error) {
+      setServerError(error);
+      return;
+    }
     toast.success(t("signedOut"));
     router.replace("/");
     router.refresh();
   }
+
+  const settings = (chunks: ReactNode) => (
+    <Link href="/parametres" className="font-medium text-link underline underline-offset-2">
+      {chunks}
+    </Link>
+  );
 
   const mail = (chunks: ReactNode) =>
     dpo.includes("@") ? (
@@ -82,7 +95,7 @@ export function TransfersReconsent({ dpo }: { dpo: string }) {
         <h2 id={refuseId} className="text-lg font-semibold text-balance">
           {t("refuseTitle")}
         </h2>
-        <p className="text-sm text-foreground-muted text-pretty">{t.rich("refuseBody", { dpo, mail })}</p>
+        <p className="text-sm text-foreground-muted text-pretty">{t.rich("refuseBody", { dpo, mail, settings })}</p>
         <Button type="button" variant="outline" onClick={() => void onSignOut()} className="w-fit">
           <LogOut aria-hidden="true" />
           {t("signOut")}

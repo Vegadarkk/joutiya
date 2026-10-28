@@ -75,6 +75,8 @@ describe("needsTransfersReconsent", () => {
     expect(transfersConsentVersion(live)).toBe(`${TRANSFERS_CONSENT_VERSION}+wa`);
     expect(needsTransfersReconsent(consent(TRANSFERS_CONSENT_VERSION), transfersConsentVersion(live))).toBe(true);
     expect(needsTransfersReconsent(consent(`${TRANSFERS_CONSENT_VERSION}+wa`), transfersConsentVersion(live))).toBe(false);
+    // The WhatsApp text covers the shorter list: WhatsApp going off asks no one again.
+    expect(needsTransfersReconsent(consent(`${TRANSFERS_CONSENT_VERSION}+wa`), TRANSFERS_CONSENT_VERSION)).toBe(false);
   });
 
   it("leaves an account without private document alone (nothing to renew)", () => {
@@ -92,7 +94,7 @@ describe("POST /api/auth/consents contract", () => {
   });
 
   it("is rate limited per account and fails closed", () => {
-    expect(RATE_LIMITS["consents.uid"]).toMatchObject({ key: "uid", policy: "closed" });
+    expect(RATE_LIMITS["consents.uid"]).toMatchObject({ key: "uid", policy: "open" });
   });
 });
 
@@ -154,6 +156,8 @@ describe("TransfersReconsent", () => {
     expect(html).toContain(fr.Auth.reconsent.submit);
     expect(html).toContain(fr.Auth.reconsent.signOut);
     expect(html).toContain('href="mailto:dpo@joutiya.ma"');
+    // Closing the account and downloading the data stay open on the settings page (exempt from the gate).
+    expect(html).toMatch(/<a [^>]*href="\/fr\/parametres"[^>]*>vos paramètres<\/a>/);
     // The sign-up sentence does not apply to an existing account.
     expect(html).not.toContain(fr.Auth.consents.transfersRequired);
   });

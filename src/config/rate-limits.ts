@@ -64,7 +64,8 @@ export const RATE_LIMITS = {
   "account.close.uid": { points: 5, duration: HOUR, policy: "closed", key: "uid" },
   "account.export.uid": { points: 3, duration: DAY, policy: "closed", key: "uid" },
   // POST /api/auth/consents (re-consent panel, one write and one audit entry): 10 per hour per account.
-  "consents.uid": { points: 10, duration: HOUR, policy: "closed", key: "uid" },
+  // Open: a Valkey outage must not lock members out of the account area behind the panel.
+  "consents.uid": { points: 10, duration: HOUR, policy: "open", key: "uid" },
   // --- Listings and media (phase 3, design §4) ---------------------------------------------
   // Draft autosave (PATCH /api/listings/{id}): coalesced client-side, never per keystroke.
   "listing.draft.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
