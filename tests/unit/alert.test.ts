@@ -41,7 +41,7 @@ describe("RelayEmailChannel", () => {
 
   it("treats 503 (e-mail off on the Worker) as a warning and 429 (daily cap) as a failure", async () => {
     const off = vi.fn(async () => new Response(null, { status: 503 }));
-    await expect(new RelayEmailChannel("https://probe.example/alert", "s3cret", off as unknown as typeof fetch).send(ALERT, "prod")).resolves.toBeUndefined();
+    await expect(new RelayEmailChannel("https://probe.example/alert", "s3cret", off as unknown as typeof fetch).send(ALERT, "prod")).resolves.toBe("off");
     const capped = vi.fn(async () => new Response(null, { status: 429 }));
     await expect(new RelayEmailChannel("https://probe.example/alert", "s3cret", capped as unknown as typeof fetch).send(ALERT, "prod")).rejects.toThrow("HTTP 429");
   });

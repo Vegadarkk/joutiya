@@ -10,7 +10,15 @@ export interface Alert {
 
 export interface AlertChannel {
   readonly name: string;
-  send(alert: Alert, env: string): Promise<void>;
+  /** Resolves "off" when the channel is switched off on its far side (nothing delivered, no error). */
+  send(alert: Alert, env: string): Promise<void | "off">;
+}
+
+/** What one channel did with an alert. */
+export interface ChannelOutcome {
+  channel: string;
+  status: "sent" | "off" | "failed";
+  error?: string;
 }
 
 const ICON: Record<Severity, string> = { P0: "🚨", P1: "🔴", P2: "🟠", info: "ℹ️" };
