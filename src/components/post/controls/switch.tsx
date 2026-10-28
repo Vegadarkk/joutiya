@@ -50,8 +50,9 @@ export const SwitchField = forwardRef<HTMLButtonElement, SwitchFieldProps>(funct
         disabled={disabled}
         aria-describedby={hint ? hintId : undefined}
         className={cn(
-          "relative mt-0.5 inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border border-transparent bg-border-strong",
-          "transition-colors duration-150 ease-door data-[state=checked]:bg-structure disabled:cursor-not-allowed",
+          "relative mt-0.5 inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border border-transparent bg-border-control",
+          // Dark structure (bab-800) is a surface tone: a lighter track keeps the dark thumb visible (6.3:1).
+          "transition-colors duration-150 ease-door data-[state=checked]:bg-structure dark:data-[state=checked]:bg-bab-300 disabled:cursor-not-allowed",
           // 44 px touch target without growing the visual control.
           "before:absolute before:-inset-y-2.5 before:-inset-x-1 before:content-['']",
         )}

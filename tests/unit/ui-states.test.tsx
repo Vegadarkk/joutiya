@@ -129,7 +129,7 @@ describe("Toaster", () => {
   });
 
   it("hands the motion to every toast, on the reading side", () => {
-    renderToStaticMarkup(<Toaster dir="rtl" />);
+    render(<Toaster dir="rtl" />);
     const props = sonnerProps.current as { position: string; toastOptions: { className: string } };
     expect(props.position).toBe("top-left");
     expect(props.toastOptions.className.split(" ")).toEqual(expect.arrayContaining(["font-sans", ...toastMotionClassName.split(" ")]));

@@ -6,8 +6,9 @@ import type { SessionUser } from "@/lib/firebase/session";
 // What the browser learns about its own session (§6): claims from the cookie, profile from
 // users/{uid}, providers from the private document. Nothing of anyone else.
 
-export async function sessionSummary(user: SessionUser): Promise<SessionSummary> {
-  const [profile, account] = await Promise.all([getUser(user.uid), getUserPrivate(user.uid)]);
+/** `readPrivate`: a render passes its per-request cached reader (current-user.ts renderUserPrivate). */
+export async function sessionSummary(user: SessionUser, readPrivate: typeof getUserPrivate = getUserPrivate): Promise<SessionSummary> {
+  const [profile, account] = await Promise.all([getUser(user.uid), readPrivate(user.uid)]);
   return {
     uid: user.uid,
     email: user.email ?? account?.email ?? null,

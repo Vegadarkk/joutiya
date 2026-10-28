@@ -6,7 +6,7 @@ import { hasLocale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import { RootShell } from "@/components/layout/root-shell";
-import { currentUser } from "@/lib/auth/current-user";
+import { currentUser, renderUserPrivate } from "@/lib/auth/current-user";
 import { sessionSummary } from "@/lib/auth/summary";
 import { publicConfig } from "@/lib/config/public";
 import type { SessionSummary } from "@/lib/contracts/auth";
@@ -26,7 +26,7 @@ async function initialSession(): Promise<SessionSummary | null | undefined> {
   const user = await currentUser();
   if (!user) return null;
   try {
-    return await sessionSummary(user);
+    return await sessionSummary(user, renderUserPrivate);
   } catch {
     return undefined;
   }

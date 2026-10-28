@@ -9,6 +9,7 @@ import { legalValues, mentionsText } from "@/content/legal/mentions";
 import { LegalPage } from "@/components/legal/legal-page";
 import { getLegalConfig } from "@/lib/legal/config";
 import { alternates } from "@/lib/i18n/metadata";
+import { isPhoneVerificationConfigured } from "@/lib/phone-verify/config";
 
 // The 12 legal pages (§7). ISR: config/legal is editable without a redeploy and cached 5 minutes
 // server side, so the pages follow it within 5 minutes.
@@ -38,5 +39,5 @@ export default async function LegalRoute({ params }: { params: Params }) {
   setRequestLocale(locale);
   const [config, t] = await Promise.all([getLegalConfig(), getTranslations({ locale, namespace: "Footer.links" })]);
   const text = page.slug === "mentions-legales" ? mentionsText(config, MENTIONS_UPDATED) : LEGAL_TEXTS[page.slug];
-  return <LegalPage locale={locale} title={t(page.key)} text={text} values={legalValues(config)} />;
+  return <LegalPage locale={locale} title={t(page.key)} text={text} values={legalValues(config, { whatsapp: isPhoneVerificationConfigured() })} />;
 }

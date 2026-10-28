@@ -45,7 +45,8 @@ test.describe("public pages", () => {
     ["ar", "ar-MA", "rtl"],
     ["rif", "rif-Latn", "ltr"],
   ] as const) {
-    test(`/${locale} renders with lang and dir, under a hash CSP, without violations`, async ({ page }) => {
+    // French and Arabic (RTL) at phone width too; Tarifit waits for its review (audit C3-02).
+    test(`/${locale} renders with lang and dir, under a hash CSP, without violations`, { tag: locale === "rif" ? [] : ["@mobile"] }, async ({ page }) => {
       const violations = await watchCsp(page);
       const response = await page.goto(`/${locale}`);
       expect(response?.status()).toBe(200);

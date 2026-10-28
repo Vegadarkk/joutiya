@@ -73,9 +73,7 @@ export function FavoritesGrid({
   return (
     <>
       {refilling ? (
-        <div aria-label={t("loading")}>
-          <ListingGridSkeleton count={4} />
-        </div>
+        <ListingGridSkeleton label={t("loading")} count={4} />
       ) : list.favorites.length > 0 ? (
         <ul className={RESULTS_GRID_CLASS} data-testid="favorites-grid">
           {list.favorites.map((favorite) => (
@@ -211,9 +209,7 @@ export function FavoritesView() {
       </header>
 
       {view.kind === "loading" ? (
-        <div aria-label={t("loading")}>
-          <ListingGridSkeleton count={8} />
-        </div>
+        <ListingGridSkeleton label={t("loading")} count={8} />
       ) : view.kind === "failed" ? (
         <FormMessage
           error={view.error}

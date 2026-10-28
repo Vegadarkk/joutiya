@@ -138,7 +138,7 @@ test.beforeAll(async () => {
 });
 
 test.describe("listing page", () => {
-  test("renders the listing under a hash CSP, without violations, with its photos, criteria, seller and map", async ({ page }) => {
+  test("renders the listing under a hash CSP, without violations, with its photos, criteria, seller and map", { tag: "@mobile" }, async ({ page }) => {
     const violations = await watchCsp(page);
     const { slugId, title } = fixture.published;
     const response = await page.goto(`/fr/annonce/${slugId}`);
@@ -305,7 +305,7 @@ test.describe("listing page", () => {
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
   });
 
-  test("reads right to left in Arabic with the Arabic currency", async ({ page }) => {
+  test("reads right to left in Arabic with the Arabic currency", { tag: "@mobile" }, async ({ page }) => {
     await page.goto(`/ar/annonce/${fixture.published.slugId}`);
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(page.getByTestId("price-tag").first()).toContainText("درهم");
@@ -313,7 +313,9 @@ test.describe("listing page", () => {
   });
 });
 
-test.describe("listing page on a phone", () => {
+test.describe("listing page on a phone", { tag: "@mobile" }, () => {
+  // Mobile project only, at the narrowest common width (Pixel 7 is 412 px wide).
+  test.skip(({ isMobile }) => !isMobile, "phone layout");
   test.use({ viewport: { width: 360, height: 780 } });
 
   test("keeps the contact actions in a bar at the bottom and never scrolls sideways", async ({ page }) => {

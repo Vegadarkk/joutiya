@@ -206,8 +206,26 @@ test.describe("my listings", () => {
     await expect(page.getByText("1 brouillon sur 5 possibles")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("link", { name: `Reprendre « ${isolate(draft.title)} »` })).toHaveAttribute("href", `/fr/deposer/${draft.id}`);
 
-    // On a 360 px phone nothing scrolls sideways, and a link to the last tab shows it in full.
-    await page.setViewportSize({ width: 360, height: 780 });
+    // The server agrees: the deleted listing is no longer the owner's to edit.
+    const gone = await page.request.get(`/api/listings/${published.id}`);
+    expect([200, 404]).toContain(gone.status());
+    if (gone.status() === 200) expect(((await gone.json()) as { listing: { status: string } }).listing.status).toBe("removed");
+  });
+});
+
+test.describe("my listings on a phone", { tag: "@mobile" }, () => {
+  test.setTimeout(120_000);
+  // Mobile project only, at the narrowest common width (Pixel 7 is 412 px wide).
+  test.skip(({ isMobile }) => !isMobile, "phone layout");
+  test.use({ viewport: { width: 360, height: 780 } });
+
+  test("never scrolls sideways, and a link to the last tab shows it in full", async ({ page, request }) => {
+    const email = `e2e-mine-phone-${Date.now().toString(36)}${randomId(4)}@test.joutiya.ma`;
+    await signUpAndIn(page, request, email);
+    const me = (await (await page.request.get("/api/auth/me")).json()) as { session: Owner | null };
+    expect(me.session?.uid).toBeTruthy();
+    const { draft } = await seedListings(me.session!);
+
     await page.goto("/fr/mes-annonces?onglet=ended");
     const ended = page.getByRole("tab", { name: /Terminées/ });
     await expect(ended).toHaveAttribute("aria-selected", "true");
@@ -223,10 +241,5 @@ test.describe("my listings", () => {
     await page.getByRole("tab", { name: /Brouillons/ }).click();
     await expect(page.getByRole("link", { name: `Reprendre « ${isolate(draft.title)} »` })).toBeVisible({ timeout: 15_000 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-
-    // The server agrees: the deleted listing is no longer the owner's to edit.
-    const gone = await page.request.get(`/api/listings/${published.id}`);
-    expect([200, 404]).toContain(gone.status());
-    if (gone.status() === 200) expect(((await gone.json()) as { listing: { status: string } }).listing.status).toBe("removed");
   });
 });

@@ -1,7 +1,9 @@
 import "server-only";
+import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { accessIdentity } from "@/lib/auth/guards";
+import { getUserPrivate } from "@/lib/db/repositories/users";
 import type { StaffRole } from "@/lib/db/repositories/staff";
 import { isMember, isStaff } from "@/lib/firebase/claims";
 import { verifySession, type SessionUser } from "@/lib/firebase/session";
@@ -25,6 +27,12 @@ export async function currentMember(): Promise<SessionUser | null> {
   const user = await currentUser();
   return user && isMember(user.claims) ? user : null;
 }
+
+/**
+ * users/{uid}/private/account, read once per render: the private layout's session summary and the
+ * account layout's consent gate share the read (React cache is scoped to the request).
+ */
+export const renderUserPrivate = cache(getUserPrivate);
 
 export interface PageStaff extends SessionUser {
   role: StaffRole;

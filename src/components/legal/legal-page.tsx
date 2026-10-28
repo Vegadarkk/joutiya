@@ -1,7 +1,7 @@
 import { useTranslations } from "next-intl";
 import { Container } from "@/components/layout/container";
 import { quietLinkClassName } from "@/components/ui/text-link";
-import { fill, type Block, type LegalText, type LegalValues } from "@/content/legal/fr";
+import { fill, type Block, type LegalText, type LegalValues, type Optional } from "@/content/legal/fr";
 import type { Locale } from "@/config/site";
 import { numbersLocale } from "@/i18n/params";
 import { cn } from "@/lib/utils";
@@ -24,11 +24,21 @@ function render(text: string, values: LegalValues): string {
   return frenchSpacing(fill(text, values));
 }
 
+/** The text of a paragraph or list item, or null for an optional one whose value is empty. */
+function shown(item: string | Optional, values: LegalValues): string | null {
+  if (typeof item === "string") return item;
+  return values[item.ifSet] ? item.text : null;
+}
+
 function BlockView({ block, values }: { block: Block; values: LegalValues }) {
-  if (typeof block === "string") return <p>{render(block, values)}</p>;
+  if (typeof block === "string" || !("list" in block)) {
+    const text = shown(block, values);
+    return text === null ? null : <p>{render(text, values)}</p>;
+  }
+  const items = block.list.map((item) => shown(item, values)).filter((item) => item !== null);
   return (
     <ul className="flex list-disc flex-col gap-1.5 ps-5 marker:text-featured">
-      {block.list.map((item) => (
+      {items.map((item) => (
         <li key={item}>{render(item, values)}</li>
       ))}
     </ul>
