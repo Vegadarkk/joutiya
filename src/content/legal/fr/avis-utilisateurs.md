@@ -81,7 +81,7 @@ La note moyenne est calculée sur les seuls avis publiés, sans pondération, av
 
 ### 4.5 Réponse du vendeur {#affichage-5}
 
-Le vendeur noté peut répondre une fois à chaque avis, publiquement, en 1 000 caractères au plus. Sa réponse passe par les mêmes contrôles que l'avis (§3.1) et s'affiche sous l'avis.
+Le vendeur noté peut répondre une fois à chaque avis, publiquement, en 1 000 caractères au plus. Sa réponse passe par le contrôle automatique de l'avis (§3.1), à une différence près : une réponse qui semble contenir une donnée sensible est refusée aussitôt, avec le motif, au lieu d'être mise en attente. Elle s'affiche sous l'avis.
 
 ## 5. Signalement et retrait {#signalement}
 
@@ -121,11 +121,11 @@ Vous pouvez supprimer votre avis à tout moment depuis « Mes avis ». Un avis n
 
 ### 6.2 Durée d'affichage {#delais-2}
 
-Un avis publié reste affiché tant que le profil du vendeur est en ligne, sauf si son auteur le supprime ou si une décision de modération le retire. Si l'auteur ferme son compte, l'avis reste affiché et son nom est remplacé par « Ancien membre ».
+Un avis publié reste affiché tant que le profil du vendeur est en ligne, sauf si son auteur le supprime ou si une décision de modération le retire. Si le vendeur ferme son compte, les avis qu'il a reçus sont masqués. Si l'auteur ferme son compte, ses avis restent affichés et son nom est remplacé par « Ancien membre ».
 
 ### 6.3 Conservation {#delais-3}
 
-Un avis supprimé par son auteur ou retiré par la modération est effacé 12 mois plus tard, sauf procédure en cours, recours ou demande d'une autorité. Les signalements et les décisions de modération, avec leurs motifs, sont conservés 5 ans (CGU, [§10.2](/legal/cgu#decisions-2)).
+Un avis supprimé par son auteur, retiré par la modération ou masqué à la fermeture du compte du vendeur est effacé 12 mois plus tard, sauf procédure en cours, recours ou demande d'une autorité. Les signalements et les décisions de modération, avec leurs motifs, sont conservés 5 ans (CGU, [§10.2](/legal/cgu#decisions-2)).
 
 ## 7. Rôle de {brand} {#role}
 

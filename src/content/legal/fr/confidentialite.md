@@ -178,7 +178,7 @@ Nos e-mails ne contiennent ni pixel de suivi d'ouverture ni lien de suivi des cl
 
 Vous pouvez enregistrer des annonces en favoris et sauvegarder jusqu'à 10 recherches. Si vous activez une alerte, nous vous envoyons au plus un e-mail par jour avec les nouvelles annonces. Vous pouvez supprimer un favori, une recherche ou une alerte à tout moment.
 
-Après un échange par la messagerie, l'acheteur peut noter le vendeur (voir [Avis utilisateurs](/legal/avis-utilisateurs)). Nous vérifions à partir de la conversation que l'échange a eu lieu. Le texte passe par des contrôles automatiques, et un avis qui semble contenir une donnée sensible est examiné par un modérateur avant publication. Un avis publié est public : il montre le pseudonyme de son auteur, la note, le texte, la date de l'avis et celle de l'échange, et le titre de l'annonce, sur le profil ou la boutique du vendeur, qui peut y répondre une fois. L'auteur peut supprimer son avis à tout moment. S'il ferme son compte, ses avis restent affichés et son nom est remplacé par « Ancien membre ».
+Après un échange par la messagerie, l'acheteur peut noter le vendeur (voir [Avis utilisateurs](/legal/avis-utilisateurs)). Nous vérifions à partir de la conversation que l'échange a eu lieu. Le texte passe par des contrôles automatiques, et un avis qui semble contenir une donnée sensible est examiné par un modérateur avant publication. Un avis publié est public : il montre le pseudonyme de son auteur, la note, le texte, la date de l'avis et celle de l'échange, et le titre de l'annonce, sur le profil ou la boutique du vendeur, qui peut y répondre une fois. L'auteur peut supprimer son avis à tout moment. S'il ferme son compte, ses avis restent affichés et son nom est remplacé par « Ancien membre ». Si le vendeur ferme son compte, les avis qu'il a reçus sont masqués.
 
 ### 3.8 Les comptes Pro et leur vérification {#finalites-8}
 
@@ -293,7 +293,7 @@ Si une annonce contient des données qui vous concernent sans votre accord, util
 | Données de connexion : adresse IP, type d'événement, « User-Agent » (200 caractères au plus), date et heure de l'inscription et de chaque connexion | 1 an | Obligation légale (décret n° 2021-1362) |
 | Données de création de contenu : adresse IP, opération, identifiant du contenu | 1 an | Obligation légale (loi n° 2004-575 du 21 juin 2004 pour la confiance dans l'économie numérique) |
 | Messages | 12 mois après la dernière activité de la conversation | Litiges, lutte contre les arnaques |
-| Avis et réponses des vendeurs | Affichés tant que le profil du vendeur est en ligne ; effacés 12 mois après leur suppression ou leur retrait | Information des acheteurs, recours |
+| Avis et réponses des vendeurs | Affichés tant que le profil du vendeur est en ligne ; effacés 12 mois après leur suppression, leur retrait ou la fermeture du compte du vendeur | Information des acheteurs, recours |
 | Copies des pièces de vérification d'un compte Pro | 6 mois après la fin de la relation | Vérification des professionnels (diligence volontaire inspirée de l'article 30 du règlement sur les services numériques) |
 | Signalements et décisions de modération | 5 ans | Preuve, recours, contentieux |
 | Propositions de l'IA de modération | 12 mois ; 5 ans si elles fondent une décision de modération | Preuve, amélioration des contrôles |
