@@ -1,4 +1,5 @@
 import "server-only";
+import { FieldPath } from "firebase-admin/firestore";
 import { db } from "@/lib/firebase/admin";
 import { consume } from "@/lib/quota";
 import { COLLECTIONS, publicIdSchema, userSchema, type UserDoc } from "../schemas";
@@ -30,4 +31,18 @@ export async function getUserRecord(uid: string): Promise<UserRecord | null> {
   if (!data) return null;
   const parsed = userSchema.safeParse(timestampsToDates(data));
   return parsed.success ? { uid: snapshot.id, ...parsed.data } : null;
+}
+
+/** A page of users/{uid} in document id order, after `afterUid` (jobs that visit every account). */
+export async function listUserRecordsAfter(afterUid: string | null, limit: number): Promise<{ users: UserRecord[]; read: number; lastUid: string | null }> {
+  let query = db().collection(COLLECTIONS.users).orderBy(FieldPath.documentId()).limit(limit);
+  if (afterUid) query = query.startAfter(afterUid);
+  const snapshot = await query.get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  const users: UserRecord[] = [];
+  for (const doc of snapshot.docs) {
+    const parsed = userSchema.safeParse(timestampsToDates(doc.data()));
+    if (parsed.success) users.push({ uid: doc.id, ...parsed.data });
+  }
+  return { users, read: snapshot.size, lastUid: snapshot.docs.at(-1)?.id ?? null };
 }

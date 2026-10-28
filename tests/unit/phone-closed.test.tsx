@@ -42,6 +42,7 @@ const session = (phoneVerified: boolean): SessionSummary => ({
   phoneVerified,
   locale: "fr",
   providers: ["password"],
+  cguUpdate: null,
 });
 
 const listing: OwnerListing = {

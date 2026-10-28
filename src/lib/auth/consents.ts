@@ -1,8 +1,8 @@
 import "server-only";
 import { audit } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/guards";
-import { transfersConsentSchema, type ConsentsResponse } from "@/lib/contracts/auth";
-import { updateTransfersConsent } from "@/lib/db/repositories/users";
+import { CGU_VERSION, consentsRequestSchema, type ConsentsResponse } from "@/lib/contracts/auth";
+import { updateCguConsent, updateTransfersConsent } from "@/lib/db/repositories/users";
 import type { UserPrivateDoc } from "@/lib/db/schemas";
 import { readJson } from "@/lib/http/json";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
@@ -25,22 +25,24 @@ export function needsTransfersReconsent(account: Pick<UserPrivateDoc, "consents"
 }
 
 /**
- * POST /api/auth/consents `{ transfers: true }`: only consents.transfers changes, the uid comes from
- * the session. A suspended member may renew it too: it opens nothing the suspension closes.
+ * POST /api/auth/consents `{ transfers: true }` (re-consent panel) or `{ cgu: true }` (CGU change
+ * notice, D11): only that consent changes, the uid comes from the session. A suspended member may
+ * renew it too: it opens nothing the suspension closes.
  */
 export async function handleConsents(request: Request): Promise<Response> {
   const context = await requireUser(request, { mutation: true, allowSuspended: true });
-  await readJson(request, transfersConsentSchema);
+  const choice = await readJson(request, consentsRequestSchema);
   const { uid } = context.user;
   await enforceLimit("consents.uid", uid);
   const now = new Date();
-  const version = transfersConsentVersion();
-  await updateTransfersConsent(uid, version, now);
+  const cgu = "cgu" in choice;
+  const version = cgu ? CGU_VERSION : transfersConsentVersion();
+  await (cgu ? updateCguConsent : updateTransfersConsent)(uid, version, now);
   // The uid and the version are the proof: no IP, no e-mail in the entry.
   await audit({
     actorUid: uid,
     actorRole: context.user.claims.role ?? "individual",
-    action: "consent.transfers",
+    action: cgu ? "consent.cgu" : "consent.transfers",
     target: { type: "user", id: uid },
     automated: false,
     reason: `version ${version}`,

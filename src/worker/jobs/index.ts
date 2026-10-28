@@ -16,6 +16,7 @@ import { reconcileBilling } from "@/lib/payments/reconcile";
 import { updateBillingThresholds } from "@/lib/payments/thresholds";
 import { sweepExpiredBoosts } from "./expire-boosts";
 import { sendSavedSearchAlerts } from "./saved-search-alerts";
+import { sendCguNotices } from "./cgu-notice";
 import { exportAuditLogs } from "./audit-export";
 import { sendMessageDigests } from "./message-digest";
 import { sweepReportSla } from "./report-sla-sweep";
@@ -37,6 +38,7 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "reconcile-search": () => reconcileSearch(),
   "expire-boosts": () => sweepExpiredBoosts(),
   "saved-search-alerts": () => sendSavedSearchAlerts(),
+  "cgu-notice": () => sendCguNotices(),
   "purge-connection-logs": () => purgeConnectionLogs(),
   "pro-effects-sync": () => proEffectsSync(),
   "pro-plans": () => proPlansNightly(),
@@ -85,6 +87,8 @@ export const SCHEDULES = {
   "billing-thresholds-nightly": { pattern: "20 5 * * *", job: "billing-thresholds" },
   // 07:00 UTC (08:00 in Morocco): one digest e-mail per user for the saved searches with alerts.
   "saved-search-alerts-daily": { pattern: "0 7 * * *", job: "saved-search-alerts" },
+  // CGU change notice (phase 6, D11): after the digests, bulk.
+  "cgu-notice-daily": { pattern: "40 9 * * *", job: "cgu-notice" },
   // Phase 5 (D14). Every hour at :35: suspensions past `until` lifted (claim, status, listings).
   "lift-suspensions-hourly": { pattern: "35 * * * *", job: "lift-suspensions" },
   // Phase 5 (D21). Every 10 minutes from :01: grouped new-messages mails due (30 min after the first unread).

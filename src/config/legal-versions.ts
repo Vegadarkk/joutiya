@@ -9,10 +9,16 @@ export interface LegalVersion {
   version: string;
   /** ISO date, Africa/Casablanca. */
   effective: string;
+  /**
+   * CGU only: earlier recorded versions this text replaces without notice (same text). Members who
+   * accepted one of them get neither the banner nor the e-mail of a CGU change.
+   */
+  replaces?: readonly string[];
 }
 
 export const LEGAL_VERSIONS: Record<LegalSlug, LegalVersion> = {
-  cgu: { version: "1.0", effective: "2026-10-28" },
+  // "2026-10": the version sign-up recorded before the texts were versioned (same text).
+  cgu: { version: "1.0", effective: "2026-10-28", replaces: ["2026-10"] },
   "referencement-et-classement": { version: "1.0", effective: "2026-10-28" },
   cgv: { version: "0.1", effective: "2026-10-20" },
   confidentialite: { version: "1.0", effective: "2026-10-28" },
@@ -33,3 +39,9 @@ export const ARABIC_LEGAL_PAGES: ReadonlySet<LegalSlug> = new Set(
 
 /** Pages still provisional (D11): the CGV until the sales gate (phase 7). */
 export const PROVISIONAL_LEGAL_PAGES: ReadonlySet<LegalSlug> = new Set<LegalSlug>(["cgv"]);
+
+/** True when a recorded CGU acceptance covers the current CGU (no change notice due). */
+export function cguAccepted(stored: string | undefined): boolean {
+  const current = LEGAL_VERSIONS.cgu;
+  return stored === current.version || (stored !== undefined && (current.replaces ?? []).includes(stored));
+}
