@@ -353,7 +353,7 @@ describe("FiltersSheet", () => {
 
 describe("CriteriaFilters", () => {
   it("renders option lists, ranges with units and yes-only switches", () => {
-    const html = render(<CriteriaFilters subcategoryId="voitures" value={url("sous-categorie=voitures&f-fuel=diesel").criteria} onChange={() => undefined} />);
+    const html = render(<CriteriaFilters categoryId="vehicules" subcategoryId="voitures" value={url("sous-categorie=voitures&f-fuel=diesel").criteria} onChange={() => undefined} />);
     // 63 brands: a checklist; 5 fuels: chips.
     expect(html).toMatch(/<input type="checkbox"[^>]* name="car-brand-dacia"/);
     expect(html).toMatch(/role="checkbox" aria-checked="true"[^>]*>.*Diesel/);
@@ -362,7 +362,7 @@ describe("CriteriaFilters", () => {
     expect(html).toContain('role="switch"');
     expect(text(html)).toContain(fr.Criteria["first-hand"].label);
     expect(html).not.toContain(fr.Criteria.model.label);
-    expect(render(<CriteriaFilters subcategoryId="autres" value={undefined} onChange={() => undefined} />)).toBe("");
+    expect(render(<CriteriaFilters categoryId="divers" subcategoryId="autres" value={undefined} onChange={() => undefined} />)).toBe("");
   });
 });
 

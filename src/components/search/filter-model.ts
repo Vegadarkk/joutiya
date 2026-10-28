@@ -1,4 +1,4 @@
-import { CATEGORIES, categoryById, criterionById, subcategoryById, type Condition, type CriterionUnit } from "@/config/categories";
+import { CATEGORIES, categoryById, criterionById, searchCriteria, subcategoryById, type Condition, type CriterionUnit } from "@/config/categories";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { formatPrice, groupDigits } from "@/lib/listings/client/format";
@@ -330,10 +330,8 @@ export function conditionApplies(params: Pick<SearchParams, "subcategory">): boo
 }
 
 /** Criteria the search can filter on (text criteria are searched as words, never filtered). */
-export function filterableCriteria(subcategoryId: string | undefined) {
-  const sub = subcategoryId ? subcategoryById(subcategoryId) : undefined;
-  // The vehicle dossier stays out of the panel, but for the criteria marked `filter`.
-  return (sub?.criteria ?? []).filter((criterion) => criterion.type !== "text" && (!criterion.group || criterion.filter));
+export function filterableCriteria(categoryId: string | undefined, subcategoryId: string | undefined) {
+  return searchCriteria(categoryId, subcategoryId);
 }
 
 /** Sets or clears one criterion filter; undefined when none remains. */

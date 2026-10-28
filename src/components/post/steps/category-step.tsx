@@ -29,7 +29,7 @@ export function CategoryStep({ onNext }: { onNext: () => void }) {
 
   return (
     <form id={STEP_FORM_ID} onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-      <CategoryPicker categoryId={picked} subcategoryId={listing.subcategoryId} onCategory={setPicked} onSubcategory={onSubcategory} />
+      <CategoryPicker categoryId={picked} subcategoryId={listing.subcategoryId} onCategory={setPicked} onSubcategory={onSubcategory} isPro={listing.sellerType === "pro"} />
       {attempted && !listing.subcategoryId ? <InlineError>{picked ? t("validation.subcategory_required") : t("validation.category_required")}</InlineError> : null}
       {listing.subcategoryId && picked ? <p className="text-sm text-foreground-muted">{t("category.resetWarning")}</p> : null}
     </form>

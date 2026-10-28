@@ -202,8 +202,8 @@ describe("widenings", () => {
 
 describe("criteria helpers", () => {
   it("lists the filterable criteria of a subcategory (no text criteria)", () => {
-    expect(filterableCriteria("voitures").map((criterion) => criterion.id)).toEqual(["car-brand", "year", "mileage", "fuel", "gearbox", "fiscal-power", "origin", "body-type", "doors", "color", "first-hand", "service-history", "vehicle-warranty", "trade-in"]);
-    expect(filterableCriteria(undefined)).toEqual([]);
+    expect(filterableCriteria("vehicules", "voitures").map((criterion) => criterion.id)).toEqual(["car-brand", "year", "mileage", "fuel", "gearbox", "fiscal-power", "origin", "body-type", "doors", "color", "first-hand", "service-history", "vehicle-warranty", "trade-in"]);
+    expect(filterableCriteria(undefined, undefined)).toEqual([]);
   });
 
   it("sets and clears one criterion, undefined once empty", () => {

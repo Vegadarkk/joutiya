@@ -65,6 +65,8 @@ async function waitForTurnstile(page: Page): Promise<void> {
 async function signUpAndIn(page: Page, request: APIRequestContext, email: string): Promise<void> {
   await ownClientIp(page);
   await page.goto("/fr/inscription");
+  // Hydrated first (the widget turns ready client side): a consent ticked earlier is unticked when the form registers its fields.
+  await waitForTurnstile(page);
   await page.getByLabel("Nom affiché").fill("Karim Test");
   await page.getByLabel("Adresse e-mail").fill(email);
   await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);

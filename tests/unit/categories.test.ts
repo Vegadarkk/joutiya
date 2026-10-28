@@ -13,11 +13,14 @@ import {
   CRITERION_UNITS,
   DOSSIER_CRITERIA_MAX,
   MAIN_CRITERIA_MAX,
+  PRO_CRITERIA_MAX,
   PRICE_UNITS,
   SUBCATEGORY_IDS,
   categoryById,
+  criteriaFor,
   criteriaSchema,
   criterionById,
+  searchCriteria,
   subcategoryById,
 } from "@/config/categories";
 
@@ -65,11 +68,13 @@ describe("category tree", () => {
     }
   });
 
-  it("keeps the criteria small (main ones and the folded dossier capped) and every field used by a subcategory", () => {
+  it("keeps the criteria small (main ones, Pro-only ones and the folded dossier capped) and every field used by a subcategory", () => {
     const used = new Set<string>();
     for (const category of CATEGORIES) {
       for (const subcategory of category.subcategories) {
-        expect(subcategory.criteria.filter((criterion) => !criterion.group).length, subcategory.id).toBeLessThanOrEqual(MAIN_CRITERIA_MAX);
+        const main = subcategory.criteria.filter((criterion) => !criterion.group);
+        expect(main.filter((criterion) => !criterion.proOnly).length, subcategory.id).toBeLessThanOrEqual(MAIN_CRITERIA_MAX);
+        expect(main.filter((criterion) => criterion.proOnly).length, subcategory.id).toBeLessThanOrEqual(PRO_CRITERIA_MAX);
         expect(subcategory.criteria.filter((criterion) => criterion.group === "dossier").length, subcategory.id).toBeLessThanOrEqual(DOSSIER_CRITERIA_MAX);
         for (const criterion of subcategory.criteria) used.add(criterion.id);
         if (subcategory.priceUnit) expect(PRICE_UNITS).toContain(subcategory.priceUnit);
@@ -137,6 +142,43 @@ describe("criteriaSchema", () => {
     expect(sale.safeParse({ ...flat, amenities: "parking" }).success).toBe(false);
     expect(criteriaSchema("autres").safeParse({}).success).toBe(true);
     expect(criteriaSchema("autres").safeParse({ brand: "x" }).success).toBe(false);
+  });
+
+  it("binds the Pro-only criteria to Pros: hidden from individuals, required for Pros, optional when the seller is unknown", () => {
+    // An individual's Pro-only value is a known key here; the publish readiness refuses it (criterion_pro_only).
+    const flat = { "property-type": "appartement", surface: 90 };
+    const agency = { ...flat, mandate: "exclusif", "agency-fees": "en-sus", "agency-fees-amount": 25000, "agency-reference": "CASA-118" };
+    expect(criteriaSchema("vente", "individual").safeParse(flat).success).toBe(true);
+    expect(criteriaSchema("vente", "individual").safeParse({ ...flat, mandate: "exclusif" }).success).toBe(true);
+    expect(criteriaSchema("vente", "pro").safeParse(flat).success).toBe(false);
+    expect(criteriaSchema("vente", "pro").safeParse(agency).success).toBe(true);
+    expect(criteriaSchema("vente", "pro").safeParse({ ...agency, mandate: "verbal" }).success).toBe(false);
+    expect(criteriaSchema("vente").safeParse(flat).success).toBe(true);
+    expect(criteriaSchema("vente").safeParse(agency).success).toBe(true);
+    expect(criteriaSchema("vente", "pro")).not.toBe(criteriaSchema("vente", "individual"));
+    const sale = subcategoryById("vente")!;
+    expect(criteriaFor(sale, "individual").some((criterion) => criterion.proOnly)).toBe(false);
+    expect(criteriaFor(sale, "pro").map((criterion) => criterion.id)).toEqual(expect.arrayContaining(["mandate", "agency-fees", "off-plan"]));
+  });
+});
+
+describe("searchCriteria", () => {
+  it("offers a subcategory's criteria, or the category's shared filters before one is chosen, never free text", () => {
+    expect(searchCriteria("immobilier", undefined).map((criterion) => criterion.id)).toEqual(["property-type", "surface", "rooms", "bedrooms"]);
+    expect(searchCriteria("immobilier", undefined).some((criterion) => criterion.required)).toBe(false);
+    expect(searchCriteria("immobilier", "location").map((criterion) => criterion.id)).toContain("deposit");
+    expect(searchCriteria("immobilier", "vente").map((criterion) => criterion.id)).not.toContain("agency-reference");
+    expect(searchCriteria("vehicules", undefined)).toEqual([]);
+    expect(searchCriteria(undefined, undefined)).toEqual([]);
+  });
+
+  it("names shared filters that exist and belong to at least one subcategory of their category", () => {
+    for (const category of CATEGORIES) {
+      for (const id of category.sharedFilters ?? []) {
+        expect(criterionById(id), id).toBeDefined();
+        expect(category.subcategories.some((subcategory) => subcategory.criteria.some((criterion) => criterion.id === id)), id).toBe(true);
+      }
+    }
   });
 });
 

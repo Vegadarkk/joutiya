@@ -169,3 +169,33 @@ describe("assessReadiness", () => {
     expect(codes(ready({ contact: { messaging: true, showPhone: false, whatsapp: true } })).has("contact.showPhone")).toBe(false);
   });
 });
+
+describe("assessReadiness: real estate (Agence pack)", () => {
+  const flat = (overrides: Partial<ListingDoc> = {}) =>
+    ready({ title: "Appartement 3 chambres à Maarif", description: "Appartement lumineux de 95 m², 3 chambres, cuisine équipée, proche du tramway et des écoles.", categoryId: "immobilier", subcategoryId: "vente", attributes: { "property-type": "appartement", surface: 95, rooms: 5, "property-title": "titre-foncier" }, condition: undefined, price: 1_250_000, ...overrides });
+  const agency = { mandate: "exclusif", "agency-fees": "en-sus", "agency-fees-amount": 25_000 };
+
+  it("refuses the Pro-only fields from an individual and requires the mandate and fees from a Pro", () => {
+    expect(assessReadiness(flat(), INDIVIDUAL)).toEqual([]);
+    expect(codes(flat({ attributes: { "property-type": "appartement", surface: 95, mandate: "exclusif" } })).get("attributes.mandate")).toEqual(["criterion_pro_only"]);
+    const pro = codes(flat({ sellerType: "pro" }), PRO);
+    expect(pro.get("attributes.mandate")).toEqual(["criterion_required"]);
+    expect(pro.get("attributes.agency-fees")).toEqual(["criterion_required"]);
+    expect(assessReadiness(flat({ sellerType: "pro", attributes: { "property-type": "appartement", surface: 95, ...agency } }), PRO)).toEqual([]);
+  });
+
+  it("caps a lease deposit at two months' rent (law 67-12 art. 20)", () => {
+    const lease = (deposit: number) => flat({ subcategoryId: "location", price: 6000, attributes: { "property-type": "appartement", surface: 95, furnished: false, deposit } });
+    expect(assessReadiness(lease(12_000), INDIVIDUAL)).toEqual([]);
+    expect(codes(lease(12_001)).get("attributes.deposit")).toEqual(["deposit_max"]);
+    expect(assessReadiness(flat({ subcategoryId: "location", price: null, attributes: { "property-type": "appartement", surface: 95, furnished: false, deposit: 50_000 } }), INDIVIDUAL)).toEqual([]);
+  });
+
+  it("asks an off-plan sale for its building permit and delivery year (VEFA)", () => {
+    const offPlan = (extra: Record<string, unknown>) => flat({ sellerType: "pro", attributes: { "property-type": "appartement", surface: 95, ...agency, "off-plan": true, ...extra } as ListingDoc["attributes"] });
+    const missing = codes(offPlan({}), PRO);
+    expect(missing.get("attributes.building-permit")).toEqual(["criterion_required"]);
+    expect(missing.get("attributes.delivery-year")).toEqual(["criterion_required"]);
+    expect(assessReadiness(offPlan({ "building-permit": "PC 2026/1184", "delivery-year": 2028 }), PRO)).toEqual([]);
+  });
+});
