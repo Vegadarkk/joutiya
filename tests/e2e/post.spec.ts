@@ -121,7 +121,7 @@ const next = (page: Page) => page.getByRole("button", { name: "Continuer" }).cli
 test.describe("posting wizard", () => {
   test.setTimeout(180_000);
 
-  test("walks the nine steps, publishes and shows the listing with a WebP photo without EXIF", async ({ page, request }) => {
+  test("walks the nine steps, publishes and shows the listing with a WebP photo without EXIF", { tag: "@mobile" }, async ({ page, request }) => {
     const id = runId();
     const email = `e2e-post-${id}@test.joutiya.ma`;
     const title = `Vélo de ville ${id}`;

@@ -197,7 +197,7 @@ test.beforeAll(async ({ request }) => {
 });
 
 test.describe("search page", () => {
-  test("finds the run's listings by word under a nonce CSP, without violations", async ({ page }) => {
+  test("finds the run's listings by word under a nonce CSP, without violations", { tag: "@mobile" }, async ({ page }) => {
     const violations = await watchCsp(page);
     const response = await page.goto(`/fr/recherche?q=${WORD}`);
     expect(response?.status()).toBe(200);
@@ -240,7 +240,7 @@ test.describe("search page", () => {
     expect(body.hits.map((hit) => hit.id)).toEqual([listings.flat.id]);
   });
 
-  test("reads right to left in Arabic", async ({ page }) => {
+  test("reads right to left in Arabic", { tag: "@mobile" }, async ({ page }) => {
     await page.goto(`/ar/recherche?q=${WORD}`);
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(page.getByTestId("results-grid")).toBeVisible();
