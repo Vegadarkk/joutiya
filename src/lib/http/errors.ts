@@ -101,6 +101,7 @@ export type ErrorCode =
   /** Pass Boutique: bought now it would end beyond `maxAheadDays`, or the free launch offer still runs. */
   | "pass_max_ahead"
   | "launch_offer_running"
+  | "pass_other_plan"
   /** The shop's KYBC is not verified, or the shop is suspended (409). */
   | "pro_not_verified"
   /** No Stripe customer yet: nothing to manage before a first plan (409). */

@@ -122,7 +122,7 @@ async function subscriptionsOf(appUserId: string, deps: SyncDeps): Promise<Reven
 }
 
 /** Ledger ids keep to the characters the wallet page's cursor accepts. */
-const ledgerKey = (value: string) => value.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 120);
+export const ledgerKey = (value: string) => value.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 120);
 
 /** Brings the shop's subscription, lifecycle, grant and listings in line with RevenueCat. */
 export async function syncShopSubscription(accountId: string, deps: SyncDeps = {}): Promise<SyncOutcome> {

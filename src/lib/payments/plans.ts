@@ -69,6 +69,7 @@ function passOffers(pricing: PricingConfig, profile: ProProfileRecord, now: Date
     activeListings: pricing.pro[pass.plan].activeListings,
     available: Boolean(pass.stripePrice),
     withinLimit: passEndAfter(running, pass, now) !== null,
+    otherPlan: profile.lifecycle === "active" && profile.planSource === "pass" && profile.plan !== pass.plan,
   }));
 }
 
@@ -144,11 +145,16 @@ const TRIAL_MIN_MS = 48 * 60 * 60 * 1000;
  * The previous checkout's session is expired before another opens, so that two plans are never
  * paid; one already paid but not synced yet answers 409 (the plan arrives with its webhook).
  */
-async function closeSession(sessionId: string): Promise<void> {
+/** Expires a Checkout Session still payable; answers its status as read before. */
+export async function expireOpenSession(sessionId: string): Promise<unknown> {
   const path = `/v1/checkout/sessions/${encodeURIComponent(sessionId)}`;
   const session = await stripeRequest<{ status?: unknown }>("GET", path);
-  if (session.status === "complete") throw new HttpError(409, "already_subscribed");
   if (session.status === "open") await stripeRequest("POST", `${path}/expire`);
+  return session.status;
+}
+
+async function closeSession(sessionId: string): Promise<void> {
+  if ((await expireOpenSession(sessionId)) === "complete") throw new HttpError(409, "already_subscribed");
 }
 
 /** Opens the Stripe Checkout of a plan for the owner's shop. */
@@ -173,6 +179,9 @@ export async function startPlanCheckout(auth: AuthContext, input: CheckoutPlanIn
   const idempotencyKey = `checkout_${accountId}_${input.plan}_${input.interval}_${locale}_${price}_${now.toISOString().slice(0, 10)}${trialEnd ? `_t${trialEnd}` : ""}`;
   const previous = existing?.lastPlanCheckout;
   if (previous?.sessionId && previous.idempotencyKey !== idempotencyKey && now.getTime() - previous.at.getTime() < SESSION_LIFETIME_MS) await closeSession(previous.sessionId);
+  // A pass page still payable is closed too: paid after the plan, it would not apply.
+  const passPage = existing?.lastPassCheckout;
+  if (passPage?.sessionId && now.getTime() - passPage.at.getTime() < SESSION_LIFETIME_MS) await expireOpenSession(passPage.sessionId);
 
   const account = await db().runTransaction(async (tx) => {
     const before = await getBillingAccountTx(tx, accountId);

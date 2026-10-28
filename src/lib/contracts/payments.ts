@@ -159,6 +159,8 @@ export type CheckoutPlanInput = z.infer<typeof checkoutPlanSchema>;
 
 /** Version of the Pass Boutique consent text (Subscription.pass.consent in messages/*.json). */
 export const PASS_CONSENT_VERSION = "2026-10";
+/** Lifecycle states of a shop that may buy a pass (an active one only on a pass of the same plan). */
+export const PASS_BUYER_STATES: ReadonlySet<string> = new Set(["verified", "active", "downgraded"]);
 
 export const checkoutPassSchema = z
   .object({
@@ -195,6 +197,8 @@ export interface PassOffer {
   available: boolean;
   /** Bought now, the pass would end within `maxAheadDays` of today (else the checkout answers 409 pass_max_ahead). */
   withinLimit: boolean;
+  /** The shop runs a pass of another plan (the checkout answers 409 pass_other_plan). */
+  otherPlan: boolean;
 }
 
 export interface SubscriptionView {

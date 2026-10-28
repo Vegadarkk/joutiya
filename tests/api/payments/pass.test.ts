@@ -181,7 +181,7 @@ describe("pass checkout", () => {
     const proId = await shop(owner);
     const before = await page(owner);
     expect(before).toMatchObject({ planSource: "none", passEndsAt: null, passConsentVersion: "2026-10" });
-    expect(before.passes).toEqual([{ id: "boutique30", plan: "essentiel", days: 30, priceMinor: 24_900, credits: 30, activeListings: 50, available: true, withinLimit: true }]);
+    expect(before.passes).toEqual([{ id: "boutique30", plan: "essentiel", days: 30, priceMinor: 24_900, credits: 30, activeListings: 50, available: true, withinLimit: true, otherPlan: false }]);
 
     const opened = await buyPass(owner);
     expect(opened.status).toBe(200);
@@ -196,7 +196,7 @@ describe("pass checkout", () => {
       invoice_creation: { enabled: true },
       metadata: { accountId: `pro_${proId}`, app_user_id: account!.rcAppUserId, kind: "pass", passId: "boutique30" },
     });
-    expect(session.params.success_url).toMatch(/\/fr\/pro\/abonnement\?pass=ok$/);
+    expect(session.params.success_url).toMatch(/\/fr\/pro\/abonnement\?pass=0$/);
     expect(account?.lastPassCheckout).toMatchObject({ passId: "boutique30", consentVersion: "2026-10", sessionId: expect.stringMatching(/^cs_test_/) });
   });
 
@@ -225,6 +225,25 @@ describe("pass checkout", () => {
     const pending = await member();
     await shop(pending, { lifecycle: "pending_verification", kybc: { status: "submitted", iceFormatOk: true, uploadIds: [] } });
     expect(code((await buyPass(pending)).body)).toBe("pro_not_verified");
+
+    // A shop on another plan's pass extends that one, never mixes two plans.
+    const onBusiness = await member();
+    await shop(onBusiness, { lifecycle: "active", plan: "business", planSource: "pass", quotas: DEFAULT_PRICING.pro.business, passEndsAt: new Date(Date.now() + 10 * DAY_MS) });
+    expect((await page(onBusiness)).passes[0]?.otherPlan).toBe(true);
+    expect(code((await buyPass(onBusiness)).body)).toBe("pass_other_plan");
+  });
+
+  it("closes a plan page still payable, so that it cannot bill over the pass days", async () => {
+    const owner = await member();
+    const proId = await shop(owner);
+    expect((await api(checkout, "POST", "/api/billing/checkout", { member: owner, body: { plan: "essentiel", interval: "monthly", acceptTerms: true, locale: "fr" } })).status).toBe(200);
+    const planSession = (await getBillingAccount(`pro_${proId}`))!.lastPlanCheckout!.sessionId!;
+    expect((await buyPass(owner)).status).toBe(200);
+    expect(stripe.calls.some((call) => call.method === "POST" && call.path === `/v1/checkout/sessions/${planSession}/expire`)).toBe(true);
+    // And the reverse: a plan page opened during the pass closes the pass page still payable.
+    const passSession = (await getBillingAccount(`pro_${proId}`))!.lastPassCheckout!.sessionId!;
+    expect((await api(checkout, "POST", "/api/billing/checkout", { member: owner, body: { plan: "business", interval: "monthly", acceptTerms: true, locale: "fr" } })).status).toBe(200);
+    expect(stripe.calls.some((call) => call.method === "POST" && call.path === `/v1/checkout/sessions/${passSession}/expire`)).toBe(true);
   });
 });
 
@@ -232,7 +251,8 @@ describe("pass webhook", () => {
   it("activates the shop once for 30 days with its plan credits, and extends a running pass", async () => {
     const owner = await member();
     const proId = await shop(owner);
-    expect((await buyPass(owner)).status).toBe(200);
+    const opened = await buyPass(owner);
+    expect(opened.status).toBe(200);
     const first = await pay(proId);
 
     const profile = await getProProfile(proId);
@@ -248,10 +268,13 @@ describe("pass webhook", () => {
     await stripeDeliver("checkout.session.completed", { id: first, object: "checkout.session", mode: "payment", metadata: stripe.sessions[first]!.metadata });
     expect((await getProProfile(proId))?.passEndsAt?.getTime()).toBe(profile?.passEndsAt?.getTime());
 
-    // A second pass starts at the end of the first.
-    expect((await buyPass(owner)).status).toBe(200);
+    // A second pass starts at the end of the first, on another Stripe page, and adds its credits.
+    const second = await buyPass(owner);
+    expect(second.status).toBe(200);
+    expect(second.body.url).not.toBe(opened.body.url);
     await pay(proId);
     expect(daysFromNow((await getProProfile(proId))?.passEndsAt)).toBe(60);
+    expect(await getWallet(`pro_${proId}`)).toMatchObject({ planCredits: 60 });
     // A third one would end 90 days ahead: still allowed; a fourth, beyond: refused.
     expect((await buyPass(owner)).status).toBe(200);
     await pay(proId);
@@ -305,6 +328,12 @@ describe("pass end", () => {
     const listing = await published(owner);
     const now = Date.now();
     const proId = await shop(owner, { lifecycle: "active", plan: "essentiel", planSource: "pass", quotas: DEFAULT_PRICING.pro.essentiel, passEndsAt: new Date(now + 6 * DAY_MS) });
+
+    // Sales closed: the shop could not renew, so the pass goes on and nothing is sent.
+    flags.salesEnabled = false;
+    expect((await proPlansNightly(new Date(now + 7 * DAY_MS))).pass).toEqual({ noticed: 0, ended: 0, failed: 0 });
+    expect((await getProProfile(proId))?.lifecycle).toBe("active");
+    flags.salesEnabled = true;
 
     let run = await proPlansNightly(new Date(now));
     expect(run.pass.noticed).toBeGreaterThanOrEqual(1);

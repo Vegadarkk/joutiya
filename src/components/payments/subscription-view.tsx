@@ -17,16 +17,16 @@ import { getPathname, Link } from "@/i18n/navigation";
 import { useNumbersTranslations } from "@/i18n/numbers";
 import { numbersLocale } from "@/i18n/params";
 import { isApiError } from "@/lib/auth/client";
-import type { PlanOffer, SubscriptionResponse } from "@/lib/contracts/payments";
+import { PASS_BUYER_STATES, type PlanOffer, type SubscriptionResponse } from "@/lib/contracts/payments";
 import { checkoutPlan, loadSubscription, openBillingPortal } from "@/lib/payments/client";
 import { cn } from "@/lib/utils";
-import { PASS_BEFORE_KEY, PassOffer, passBlock } from "./pass-offer";
+import { PassOffer, passBlock } from "./pass-offer";
 
 // /pro/abonnement (phase 7 design §7): the shop's plan and the two offers, drawn as the doors of
 // the brand. A shop without a running plan picks an offer and a payment rhythm, accepts the terms
 // and pays on Stripe's page; a running plan is changed, paid or cancelled in Stripe's portal. Back
 // from Stripe (`?abonnement=ok`) the page reloads until RevenueCat's event has activated the plan.
-// Below the plans, the Pass Boutique (one payment, no renewal; `?pass=ok` on its return).
+// Below the plans, the Pass Boutique (one payment, no renewal; `?pass=<end seen before>` on its return).
 
 type State = { kind: "loading" } | { kind: "failed"; error: unknown } | { kind: "ready"; data: SubscriptionResponse };
 
@@ -41,16 +41,8 @@ const INTERVALS: readonly PlanInterval[] = ["monthly", "yearly"];
 /** Price in major units, for ICU's number format (up to 2 decimals). */
 const major = (minor: number) => Math.round(minor) / 100;
 const running = (data: SubscriptionResponse) => data.subscription !== null && data.subscription.status !== "expired";
-/** Lifecycle states of a shop that may see the Pass Boutique (src/lib/payments/pass.ts). */
-const PASS_STATES: ReadonlySet<string> = new Set(["verified", "active", "downgraded"]);
-
-function passBefore(): string | null {
-  try {
-    return sessionStorage.getItem(PASS_BEFORE_KEY);
-  } catch {
-    return null;
-  }
-}
+/** The pass now ends elsewhere than `before` (ms, 0 without a pass): the payment is in. */
+const passMoved = (data: SubscriptionResponse, before: number) => data.planSource === "pass" && data.passEndsAt !== null && Date.parse(data.passEndsAt) !== before;
 
 export function SubscriptionView() {
   const t = useNumbersTranslations("Subscription");
@@ -67,7 +59,10 @@ export function SubscriptionView() {
   const activated = useRef(false);
   const search = useSearchParams();
   const paidPlan = search.get("abonnement") === "ok";
-  const paidPass = search.get("pass") === "ok";
+  // Back from a pass: the end the checkout saw (0 without a pass); the new one is any other.
+  const passReturn = search.get("pass");
+  const passBefore = passReturn !== null && /^\d{1,15}$/.test(passReturn) ? Number(passReturn) : null;
+  const paidPass = passBefore !== null;
   const [waited, setWaited] = useState(false);
 
   const date = useCallback((iso: string) => new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeZone: "Africa/Casablanca" }).format(new Date(iso)), [locale]);
@@ -76,12 +71,12 @@ export function SubscriptionView() {
   const fetchPlan = useCallback(async () => {
     try {
       const data = await loadSubscription();
-      if (paidPass ? data.planSource === "pass" && data.passEndsAt !== null && data.passEndsAt !== passBefore() : running(data)) activated.current = true;
+      if (passBefore !== null ? passMoved(data, passBefore) : running(data)) activated.current = true;
       setState({ kind: "ready", data });
     } catch (error) {
       setState({ kind: "failed", error });
     }
-  }, [paidPass]);
+  }, [passBefore]);
 
   const started = useRef(false);
   useEffect(() => {
@@ -154,8 +149,8 @@ export function SubscriptionView() {
   const shownStatus = unpaid ? "unpaid" : data.lifecycle === "grace" && data.subscription?.status === "active" ? "grace" : (data.subscription?.status ?? "expired");
   const current = live && !unpaid ? data.subscription!.plan : data.planSource === "launch_offer" ? data.plan : null;
   const onPass = data.planSource === "pass" && data.passEndsAt !== null && data.lifecycle === "active";
-  const passActive = onPass && (!paidPass || data.passEndsAt !== passBefore());
-  const showPasses = PASS_STATES.has(data.lifecycle) && data.passes.length > 0;
+  const passActive = onPass && (passBefore === null || passMoved(data, passBefore));
+  const showPasses = PASS_BUYER_STATES.has(data.lifecycle) && data.passes.length > 0;
 
   async function subscribe() {
     setAttempted(true);

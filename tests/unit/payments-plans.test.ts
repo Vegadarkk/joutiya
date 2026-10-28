@@ -351,12 +351,14 @@ describe("Pass Boutique rules", () => {
   });
 
   it("applies a paid pass to a verified, downgraded or pass shop only, extending a running one", () => {
-    expect(passPurchaseEffect({ lifecycle: "verified", planSource: "launch_offer" }, pass, now)).toEqual({ endsAt: at("2026-12-01T10:00:00Z"), event: { type: "pass_purchased", plan: "essentiel" } });
-    expect(passPurchaseEffect({ lifecycle: "downgraded", planSource: "none", passEndsAt: at("2026-10-01T00:00:00Z") }, pass, now)).toEqual({ endsAt: at("2026-12-01T10:00:00Z"), event: { type: "pass_purchased", plan: "essentiel" } });
-    expect(passPurchaseEffect({ lifecycle: "active", planSource: "pass", passEndsAt: at("2026-11-10T00:00:00Z") }, pass, now)).toEqual({ endsAt: at("2026-12-10T00:00:00Z"), event: null });
+    expect(passPurchaseEffect({ plan: "essentiel", lifecycle: "verified", planSource: "launch_offer" }, pass, now)).toEqual({ endsAt: at("2026-12-01T10:00:00Z"), event: { type: "pass_purchased", plan: "essentiel" } });
+    expect(passPurchaseEffect({ plan: "essentiel", lifecycle: "downgraded", planSource: "none", passEndsAt: at("2026-10-01T00:00:00Z") }, pass, now)).toEqual({ endsAt: at("2026-12-01T10:00:00Z"), event: { type: "pass_purchased", plan: "essentiel" } });
+    expect(passPurchaseEffect({ plan: "essentiel", lifecycle: "active", planSource: "pass", passEndsAt: at("2026-11-10T00:00:00Z") }, pass, now)).toEqual({ endsAt: at("2026-12-10T00:00:00Z"), event: null });
     // Paid twice at once: the second pass still counts, beyond the checkout's limit.
-    expect(passPurchaseEffect({ lifecycle: "active", planSource: "pass", passEndsAt: at("2027-01-20T00:00:00Z") }, pass, now)?.endsAt).toEqual(at("2027-02-19T00:00:00Z"));
-    for (const lifecycle of ["suspended", "grace", "pending_verification", "rejected"] as const) expect(passPurchaseEffect({ lifecycle, planSource: "none" }, pass, now)).toBeNull();
-    expect(passPurchaseEffect({ lifecycle: "active", planSource: "subscription" }, pass, now)).toBeNull();
+    expect(passPurchaseEffect({ plan: "essentiel", lifecycle: "active", planSource: "pass", passEndsAt: at("2027-01-20T00:00:00Z") }, pass, now)?.endsAt).toEqual(at("2027-02-19T00:00:00Z"));
+    for (const lifecycle of ["suspended", "grace", "pending_verification", "rejected"] as const) expect(passPurchaseEffect({ plan: "essentiel", lifecycle, planSource: "none" }, pass, now)).toBeNull();
+    expect(passPurchaseEffect({ plan: "essentiel", lifecycle: "active", planSource: "subscription" }, pass, now)).toBeNull();
+    // Another plan's pass over a running one: left to an admin.
+    expect(passPurchaseEffect({ plan: "business", lifecycle: "active", planSource: "pass", passEndsAt: at("2026-11-10T00:00:00Z") }, pass, now)).toBeNull();
   });
 });

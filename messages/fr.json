@@ -3349,7 +3349,8 @@
       "billing_owner_only": "Seul le propriétaire de la boutique gère son abonnement.",
       "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard.",
       "pass_max_ahead": "Votre pass court déjà loin : vous pourrez le prolonger plus tard.",
-      "launch_offer_running": "Votre offre Essentiel est encore offerte : le pass sera disponible à la fin de l'offre."
+      "launch_offer_running": "Votre offre Essentiel est encore offerte : le pass sera disponible à la fin de l'offre.",
+      "pass_other_plan": "Votre pass en cours est d'une autre offre : prolongez-le, ou prenez ce pass à sa fin."
     },
     "pass": {
       "title": "Pass Boutique",
@@ -3366,9 +3367,9 @@
       "extendHint": "Un nouveau pass prolonge le vôtre de {days} jours à partir du {date}.",
       "notes": {
         "once": "Paiement unique par carte sur la page sécurisée de Stripe. La TVA s'ajoute au prix HT et figure sur la facture.",
-        "credits": "Les crédits offerts servent pendant le pass et ne sont pas reportés après sa fin.",
+        "credits": "Les crédits offerts servent pendant le pass. Une prolongation ajoute les siens à ceux qui restent ; ils ne sont pas reportés après la fin du pass.",
         "end": "À la fin du pass, vos annonces au-delà du quota gratuit sont mises en pause, sans être supprimées. Vous êtes prévenu 7 jours et 1 jour avant.",
-        "subscribe": "Vous pouvez aussi vous abonner pendant le pass : l'abonnement n'est facturé qu'à la fin du pass."
+        "subscribe": "Vous pouvez aussi vous abonner pendant le pass : pris au moins 2 jours avant sa fin, l'abonnement n'est facturé qu'à la fin du pass ; pris plus tard, il est facturé tout de suite."
       },
       "consent": {
         "terms": "J'accepte les",
@@ -3381,7 +3382,8 @@
         "subscribed": "Votre boutique a déjà un abonnement : le Pass Boutique n'est pas nécessaire.",
         "launchOffer": "Votre offre Essentiel est encore offerte : le pass sera disponible à la fin de l'offre.",
         "maxAhead": "Votre pass court déjà loin : vous pourrez le prolonger plus tard.",
-        "unavailable": "Le Pass Boutique n'est pas disponible pour le moment."
+        "unavailable": "Le Pass Boutique n'est pas disponible pour le moment.",
+        "otherPlan": "Votre pass en cours est d'une autre offre : ce pass sera disponible à sa fin."
       },
       "success": {
         "pending": "Votre pass s'active dans quelques instants.",

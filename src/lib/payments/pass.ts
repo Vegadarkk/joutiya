@@ -5,7 +5,7 @@ import type { Locale } from "@/config/site";
 import { alert } from "@/lib/alert";
 import { audit } from "@/lib/audit";
 import type { AuthContext } from "@/lib/auth/guards";
-import { PASS_CONSENT_VERSION, type BillingRedirectResponse, type CheckoutPassInput } from "@/lib/contracts/payments";
+import { PASS_BUYER_STATES, PASS_CONSENT_VERSION, type BillingRedirectResponse, type CheckoutPassInput } from "@/lib/contracts/payments";
 import { getBillingAccount, getBillingAccountTx, getSubscription, setBillingAccountTx, type BillingAccountRecord } from "@/lib/db/repositories/billing";
 import { getProProfile, listPassProfiles, markPassNotice, proProfileRef, proProfileToFirestore, type ProProfileRecord } from "@/lib/db/repositories/pro-profiles";
 import { getLedgerEntryTx, getWalletTx, recordWalletOperationTx, walletStateAt } from "@/lib/db/repositories/wallets";
@@ -21,9 +21,9 @@ import { transition, type ProEvent } from "@/lib/pro/lifecycle";
 import { pauseListingsOverQuota } from "@/lib/pro/quota";
 import { mailBudget } from "./launch-offer";
 import { passEndAfter, passNoticeDue, runningPassEnd } from "./pass-rules";
-import { ownShop, pageUrl, SESSION_LIFETIME_MS, stripeCustomer } from "./plans";
+import { expireOpenSession, ownShop, pageUrl, SESSION_LIFETIME_MS, stripeCustomer } from "./plans";
 import { isStripeConfigured, stripeRequest } from "./stripe-api";
-import { profileAfter } from "./subscriptions";
+import { ledgerKey, profileAfter } from "./subscriptions";
 import { grantPlanPeriod } from "./wallet";
 
 // Pass Boutique (owner decision 2026-10-28, design phase-7/boutique-temporaire.md §1): a plan's
@@ -34,12 +34,10 @@ import { grantPlanPeriod } from "./wallet";
 // - Webhook: `checkout.session.completed` of a pass (metadata kind "pass") re-reads the session
 //   from Stripe, then in one transaction extends `passEndsAt` (from the running pass's end, or now),
 //   moves the shop to `active` with `planSource: "pass"` and grants the pass's plan credits until
-//   that end. The ledger entry `pass_{session}` makes a replay a no-op. RevenueCat is not involved.
-// - Nightly (pro-plans job): notices at J-7 and J-1, then `pass_ended` (downgraded, no grace), its
-//   listings over the free quota paused and a last mail.
-
-/** Lifecycle states that may buy a pass (an active shop only when it runs on a pass). */
-const PASS_BUYERS: ReadonlySet<string> = new Set(["verified", "active", "downgraded"]);
+//   that end (added to the credits left when it extends a running pass). The ledger entry
+//   `pass_{session}` makes a replay a no-op. RevenueCat is not involved.
+// - Nightly (pro-plans job, sales open only): notices at J-7 and J-1, then `pass_ended` (downgraded,
+//   no grace), its listings over the free quota paused and a last mail.
 
 /** Opens the Stripe Checkout of a Pass Boutique for the owner's shop. */
 export async function startPassCheckout(auth: AuthContext, input: CheckoutPassInput, locale: Locale, now = new Date()): Promise<BillingRedirectResponse> {
@@ -50,16 +48,24 @@ export async function startPassCheckout(auth: AuthContext, input: CheckoutPassIn
   if (!pass) throw notFound();
   if (!pass.stripePrice) throw unavailable(`no Stripe price for pass ${pass.id}`);
   const { proId, accountId, profile } = await ownShop(auth);
-  if (!PASS_BUYERS.has(profile.lifecycle)) throw new HttpError(409, "pro_not_verified");
+  if (!PASS_BUYER_STATES.has(profile.lifecycle)) throw new HttpError(409, "pro_not_verified");
   if (profile.planSource === "launch_offer" && launchOfferOpen(pricing.launchOffer, now)) throw new HttpError(409, "launch_offer_running");
   const [current, existing] = await Promise.all([getSubscription(accountId), getBillingAccount(accountId)]);
   if ((current && current.status !== "expired") || (profile.lifecycle === "active" && profile.planSource !== "pass")) throw new HttpError(409, "already_subscribed");
-  if (!passEndAfter(runningPassEnd(profile, now), pass, now)) throw new HttpError(409, "pass_max_ahead");
+  // One plan per pass: a shop on the Essentiel pass does not buy the Business one over it.
+  if (profile.lifecycle === "active" && profile.plan !== pass.plan) throw new HttpError(409, "pass_other_plan");
+  const running = runningPassEnd(profile, now);
+  if (!passEndAfter(running, pass, now)) throw new HttpError(409, "pass_max_ahead");
 
-  const idempotencyKey = `pass_${accountId}_${pass.id}_${locale}_${pass.stripePrice}_${now.toISOString().slice(0, 10)}`;
+  // The end of the running pass is in the key: once a pass is paid, the next one is another page.
+  const idempotencyKey = `pass_${accountId}_${pass.id}_${locale}_${pass.stripePrice}_${now.toISOString().slice(0, 10)}_e${running?.getTime() ?? 0}`;
+  const recent = (at: Date) => now.getTime() - at.getTime() < SESSION_LIFETIME_MS;
   const previous = existing?.lastPassCheckout;
-  // Another pass page still payable is closed first, so that one click pays one pass.
-  if (previous?.sessionId && previous.idempotencyKey !== idempotencyKey && now.getTime() - previous.at.getTime() < SESSION_LIFETIME_MS) await expireIfOpen(previous.sessionId);
+  // Another pass page still payable is closed first, so that one click pays one pass, and so is a
+  // plan page opened before (without the pass days as a trial, it would bill at once over them).
+  if (previous?.sessionId && previous.idempotencyKey !== idempotencyKey && recent(previous.at)) await expireOpenSession(previous.sessionId);
+  const plan = existing?.lastPlanCheckout;
+  if (plan?.sessionId && recent(plan.at)) await expireOpenSession(plan.sessionId);
 
   const account = await db().runTransaction(async (tx) => {
     const before = await getBillingAccountTx(tx, accountId);
@@ -88,7 +94,8 @@ export async function startPassCheckout(auth: AuthContext, input: CheckoutPassIn
       customer_update: { address: "auto" },
       invoice_creation: { enabled: true, invoice_data: { metadata } },
       payment_intent_data: { metadata },
-      success_url: pageUrl(locale, "?pass=ok"),
+      // The end seen now: back from Stripe, the page waits for another one.
+      success_url: pageUrl(locale, `?pass=${running?.getTime() ?? 0}`),
       cancel_url: pageUrl(locale),
       metadata,
     },
@@ -106,15 +113,9 @@ export async function startPassCheckout(auth: AuthContext, input: CheckoutPassIn
   return { url: session.url };
 }
 
-async function expireIfOpen(sessionId: string): Promise<void> {
-  const path = `/v1/checkout/sessions/${encodeURIComponent(sessionId)}`;
-  const session = await stripeRequest<{ status?: unknown }>("GET", path);
-  if (session.status === "open") await stripeRequest("POST", `${path}/expire`);
-}
-
 /** What a paid pass session does to the shop (pure: the webhook's transaction applies it). */
-export function passPurchaseEffect(profile: Pick<ProProfileRecord, "lifecycle" | "planSource" | "passEndsAt">, pass: Pick<PassConfig, "plan" | "days" | "maxAheadDays">, now: Date): { endsAt: Date; event: ProEvent | null } | null {
-  const applies = profile.lifecycle === "verified" || profile.lifecycle === "downgraded" || (profile.lifecycle === "active" && profile.planSource === "pass");
+export function passPurchaseEffect(profile: Pick<ProProfileRecord, "lifecycle" | "plan" | "planSource" | "passEndsAt">, pass: Pick<PassConfig, "plan" | "days" | "maxAheadDays">, now: Date): { endsAt: Date; event: ProEvent | null } | null {
+  const applies = profile.lifecycle === "verified" || profile.lifecycle === "downgraded" || (profile.lifecycle === "active" && profile.planSource === "pass" && profile.plan === pass.plan);
   if (!applies) return null;
   // Paid: the days are given even past `maxAheadDays` (two pages paid at once), the limit is the checkout's.
   const endsAt = passEndAfter(runningPassEnd(profile, now), { days: pass.days, maxAheadDays: Number.MAX_SAFE_INTEGER }, now)!;
@@ -131,9 +132,6 @@ interface StripeSession {
 }
 
 export type PassOutcome = "updated" | "unchanged" | "no_shop" | "unknown_pass" | "not_applied";
-
-/** Ledger ids keep to the characters the wallet page's cursor accepts. */
-const ledgerKey = (value: string) => value.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 120);
 
 /** Applies a completed pass Checkout Session (re-read from Stripe) to the shop of `account`. */
 export async function applyPassSession(account: BillingAccountRecord, sessionId: string, deps: { stripe?: typeof stripeRequest; now?: () => Date } = {}): Promise<PassOutcome> {
@@ -160,8 +158,14 @@ export async function applyPassSession(account: BillingAccountRecord, sessionId:
     const wallet = await getWalletTx(tx, account.id);
     const state = walletStateAt(wallet, now);
     const effect = passPurchaseEffect(profile, pass, now);
-    // Not applicable (suspended, under a subscription, not verified): recorded once, left to an admin.
-    const grant = effect ? { credits: pass.credits, featured: pricing.plans[pass.plan].featured } : { credits: state.planCredits, featured: state.featuredAllowance };
+    // Not applicable (suspended, under a subscription, not verified, another plan's pass): recorded
+    // once, left to an admin. An extension adds its credits to those left; a first pass starts anew.
+    const featured = pricing.plans[pass.plan].featured;
+    const grant = !effect
+      ? { credits: state.planCredits, featured: state.featuredAllowance }
+      : effect.event
+        ? { credits: pass.credits, featured }
+        : { credits: state.planCredits + pass.credits, featured: state.featuredAllowance + featured };
     const { wallet: nextState, ledger } = grantPlanPeriod(state, grant);
     recordWalletOperationTx(tx, account.id, entryId, { before: wallet, state: nextState, ledger, entry: { refs: { orderId: sessionId }, actorUid: "system", at: now }, now, ...(effect ? { resetsAt: effect.endsAt } : {}) });
     if (!effect) return { outcome: "not_applied" as const, lifecycle: profile.lifecycle };
@@ -202,10 +206,15 @@ const MAX_PAGES = 50;
 /** Nightly: notices before the end of each running pass, then the downgrade of the ended ones. */
 export async function runPassExpiry(now = new Date()): Promise<PassExpiryRun> {
   const run: PassExpiryRun = { noticed: 0, ended: 0, failed: 0 };
-  const pricing = await getPricing();
+  const [pricing, flags] = await Promise.all([getPricing(), getFlags()]);
+  // A shop must be able to buy another pass or subscribe before it loses its pass.
+  if (!flags.salesEnabled) {
+    logger.warn("pass expiry skipped while sales are closed: running passes go on");
+    return run;
+  }
   let budget = await mailBudget();
   let after: string | null = null;
-  pages: for (let page = 0; page < MAX_PAGES; page += 1) {
+  for (let page = 0; page < MAX_PAGES; page += 1) {
     const { profiles, next } = await listPassProfiles(after, PAGE);
     for (const profile of profiles) {
       // A suspended shop waits for its reinstatement (back to active, its pass ends then).
@@ -213,14 +222,14 @@ export async function runPassExpiry(now = new Date()): Promise<PassExpiryRun> {
       const ended = now.getTime() >= profile.passEndsAt.getTime();
       const due = ended ? null : passNoticeDue(profile.passEndsAt, profile.passNoticeSentAt, now);
       if (!ended && due === null) continue;
-      if (budget <= 0) {
-        run.deferred = true;
-        break pages;
-      }
-      budget -= 1;
+      // The mail quota delays the notices, never the end of a pass (its last mail is then skipped).
+      const mail = budget > 0;
+      if (mail) budget -= 1;
+      else run.deferred = true;
+      if (!mail && !ended) continue;
       try {
         if (ended) {
-          if (await endPass(profile.proId, pricing, now)) run.ended += 1;
+          if (await endPass(profile.proId, pricing, now, mail)) run.ended += 1;
         } else {
           await notify(profile, { kind: "ending", endsAt: profile.passEndsAt.toISOString(), freeListings: pricing.pro.none.activeListings, paused: 0 }, `ending-${due}-${profile.passEndsAt.getTime()}`);
           await markPassNotice(profile.proId, now);
@@ -234,13 +243,13 @@ export async function runPassExpiry(now = new Date()): Promise<PassExpiryRun> {
     if (!next) break;
     after = next;
   }
-  if (run.deferred) logger.warn({ ...run }, "pass expiry: mail budget used up, the other shops wait for the next night");
+  if (run.deferred) logger.warn({ ...run }, "pass expiry: mail budget used up, the other notices wait for the next night");
   else if (run.noticed + run.ended + run.failed > 0) logger.info({ ...run }, "pass expiry done");
   return run;
 }
 
 /** Downgrades one shop whose pass ended (re-read in the transaction); false when it moved meanwhile. */
-async function endPass(proId: string, pricing: PricingConfig, now: Date): Promise<boolean> {
+async function endPass(proId: string, pricing: PricingConfig, now: Date, mail: boolean): Promise<boolean> {
   const ended = await db().runTransaction(async (tx) => {
     const profile = await getProProfile(proId, tx);
     if (!profile || profile.lifecycle !== "active" || profile.planSource !== "pass" || !profile.passEndsAt || profile.passEndsAt.getTime() > now.getTime()) return null;
@@ -257,6 +266,10 @@ async function endPass(proId: string, pricing: PricingConfig, now: Date): Promis
     paused = await pauseListingsOverQuota(ended.ownerUid, pricing.pro.none.activeListings, now);
   } catch (error) {
     logger.error({ proId, err: (error as Error).message }, "quota pause failed");
+  }
+  if (!mail) {
+    logger.warn({ proId }, "pass end mail skipped: mail budget used up");
+    return true;
   }
   try {
     await notify(ended, { kind: "ended", endsAt: ended.passEndsAt!.toISOString(), freeListings: pricing.pro.none.activeListings, paused: paused.length }, `ended-${ended.passEndsAt!.getTime()}`);

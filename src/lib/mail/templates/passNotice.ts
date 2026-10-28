@@ -27,7 +27,7 @@ const COPY: Record<MailLocale, Copy> = {
     title: (ended) => (ended ? "Pass Boutique terminé" : "Fin de votre Pass Boutique"),
     ending: (shop, day) => [
       `Le Pass Boutique de « ${shop} » se termine le ${day}. Il ne se renouvelle pas tout seul.`,
-      "Pour garder votre boutique en ligne, prenez un nouveau pass ou un abonnement avant cette date depuis votre espace Pro. Les jours qui restent sur votre pass ne sont pas perdus : un nouveau pass commence à la fin de celui-ci, et un abonnement n'est facturé qu'à cette date.",
+      "Pour garder votre boutique en ligne, prenez un nouveau pass ou un abonnement avant cette date depuis votre espace Pro. Les jours qui restent sur votre pass ne sont pas perdus : un nouveau pass commence à la fin de celui-ci, et un abonnement pris au moins 2 jours avant cette date n'est facturé qu'à cette date.",
     ],
     without: (free) =>
       free === null
@@ -49,7 +49,7 @@ const COPY: Record<MailLocale, Copy> = {
     title: (ended) => (ended ? "انتهى عرض المتجر المؤقت" : "نهاية عرض المتجر المؤقت"),
     ending: (shop, day) => [
       `ينتهي عرض المتجر المؤقت الخاص بـ«${shop}» في ${day}، ولا يتجدد تلقائيًا.`,
-      "للإبقاء على متجرك منشورًا، خذ عرضًا مؤقتًا جديدًا أو اشتراكًا قبل هذا التاريخ من فضائك المهني. الأيام المتبقية لا تضيع: يبدأ العرض الجديد عند نهاية الحالي، ولا يُفوتَر الاشتراك إلا في ذلك التاريخ.",
+      "للإبقاء على متجرك منشورًا، خذ عرضًا مؤقتًا جديدًا أو اشتراكًا قبل هذا التاريخ من فضائك المهني. الأيام المتبقية لا تضيع: يبدأ العرض الجديد عند نهاية الحالي، والاشتراك المأخوذ قبل هذا التاريخ بيومين على الأقل لا يُفوتَر إلا فيه.",
     ],
     without: (free) =>
       free === null

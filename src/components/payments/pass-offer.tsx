@@ -17,22 +17,21 @@ import { cn } from "@/lib/utils";
 // The Pass Boutique on /pro/abonnement (owner decision 2026-10-28): one payment for `days` of the
 // plan, no renewal. Drawn as a ticket beside the doors of the plans: dashed edge, the gold of the
 // brand on the price. The shop's owner accepts the terms and pays on Stripe's page; back from it
-// (`?pass=ok`) the plan page reloads until the webhook has moved the end of the pass.
+// (`?pass=<end seen before, ms>`) the plan page reloads until the webhook has moved the end of the pass.
 
 /** Codes the section explains in its own words (Subscription.errors). */
-const PASS_ERRORS = ["sales_closed", "already_subscribed", "pro_not_verified", "pass_max_ahead", "launch_offer_running", "billing_owner_only", "unavailable"] as const;
-/** Session key holding the pass end seen before Stripe's page, to know when the new one is in. */
-export const PASS_BEFORE_KEY = "joutiya.pass.before";
+const PASS_ERRORS = ["sales_closed", "already_subscribed", "pro_not_verified", "pass_max_ahead", "pass_other_plan", "launch_offer_running", "billing_owner_only", "unavailable"] as const;
 
 const major = (minor: number) => Math.round(minor) / 100;
 
-export type PassBlock = "subscribed" | "launchOffer" | "maxAhead" | "unavailable" | null;
+export type PassBlock = "subscribed" | "launchOffer" | "otherPlan" | "maxAhead" | "unavailable" | null;
 
-/** Why the shop cannot buy `offer` now, or null (shown as a sentence, the button hidden). */
+/** Why the shop cannot buy `offer` now, or null (shown as a sentence while sales are open, the button hidden). */
 export function passBlock(data: SubscriptionResponse, offer: Offer, live: boolean): PassBlock {
   if (live || (data.lifecycle === "active" && data.planSource === "subscription")) return "subscribed";
   if (data.launchOfferOpen) return "launchOffer";
-  if (!data.available || !offer.available) return "unavailable";
+  if (!data.salesOpen || !data.available || !offer.available) return "unavailable";
+  if (offer.otherPlan) return "otherPlan";
   if (!offer.withinLimit) return "maxAhead";
   return null;
 }
@@ -55,16 +54,11 @@ export function PassOffer({ data, offer, block, locale, date, onReload }: { data
     setFailure(undefined);
     try {
       const { url } = await checkoutPass(offer.id, locale);
-      try {
-        sessionStorage.setItem(PASS_BEFORE_KEY, data.passEndsAt ?? "none");
-      } catch {
-        // Private mode: the page polls a little longer on its return.
-      }
       window.location.assign(url);
     } catch (error) {
       setPending(false);
       setFailure(error);
-      if (isApiError(error, "sales_closed", "already_subscribed", "pro_not_verified", "pass_max_ahead", "launch_offer_running")) onReload();
+      if (isApiError(error, "sales_closed", "already_subscribed", "pro_not_verified", "pass_max_ahead", "pass_other_plan", "launch_offer_running")) onReload();
     }
   }
 
