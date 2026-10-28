@@ -22,7 +22,7 @@ export type { ErrorBody };
 
 type RouteContext = { params: Promise<Record<string, string | string[] | undefined>> };
 export type Handler = (request: NextRequest, context: RouteContext) => Promise<Response>;
-export type Method = "GET" | "POST" | "PATCH" | "DELETE";
+export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const THIRTY_DAYS_AGO = () => new Date(Date.now() - 30 * DAY_MS);
@@ -89,6 +89,8 @@ export interface ApiOptions {
   csrf?: boolean;
   headers?: Record<string, string>;
   ip?: string;
+  /** Route params when the path is not a /api/listings/{id} one. */
+  params?: Record<string, string>;
 }
 
 export interface ApiResult<T> {
@@ -109,7 +111,7 @@ export async function api<T = Record<string, unknown>>(handler: Handler, method:
   if (csrf && options.csrf !== false) headers.set("x-csrf-token", csrf);
   for (const [name, value] of Object.entries(options.headers ?? {})) headers.set(name, value);
   const id = /^\/api\/listings\/([^/?]+)/.exec(path)?.[1];
-  const params = id && id !== "mine" ? { id } : {};
+  const params = options.params ?? (id && id !== "mine" ? { id } : {});
   const request = new NextRequest(`${ORIGIN}${path}`, { method, headers, ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }) });
   const response = await handler(request, { params: Promise.resolve(params) });
   options.member?.jar.absorb(response);
