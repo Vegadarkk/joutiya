@@ -14,7 +14,8 @@ function host(entry: { name: string; address: string; phone: string }, region?: 
   return `${name} : ${entry.address}, téléphone ${entry.phone}`;
 }
 
-export function legalValues(config: LegalConfig): LegalValues {
+/** `whatsapp`: phone verification is live (isPhoneVerificationConfigured), so Meta is named. */
+export function legalValues(config: LegalConfig, { whatsapp = false }: { whatsapp?: boolean } = {}): LegalValues {
   return {
     publisher: config.companyName,
     address: config.hqAddress,
@@ -30,6 +31,7 @@ export function legalValues(config: LegalConfig): LegalValues {
     cndp: config.cndpReceiptNo ? `récépissé n° ${config.cndpReceiptNo}` : "",
     vat: vatMention(config),
     mediator: config.consumerMediator.name ? `${config.consumerMediator.name} (${config.consumerMediator.url})` : "désigné avant l'ouverture des ventes",
+    whatsapp: whatsapp ? "WhatsApp" : "",
   };
 }
 

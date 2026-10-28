@@ -10,7 +10,11 @@ import { ConsentFields, TRANSFER_PROVIDERS, TransfersDetails } from "@/component
 import { TransfersReconsent } from "@/components/auth/transfers-reconsent";
 import { RATE_LIMITS } from "@/config/rate-limits";
 import { LEGAL_TEXTS } from "@/content/legal/fr";
+import { transfersConsentVersion } from "@/lib/auth/consent-version";
 import { needsTransfersReconsent } from "@/lib/auth/consents";
+import { PublicConfigProvider } from "@/lib/config/client";
+import type { PublicConfig } from "@/lib/config/public-types";
+import type { ServerEnv } from "@/lib/env";
 import { AUTH_API } from "@/lib/contracts/endpoints";
 import { TRANSFERS_CONSENT_VERSION, transfersConsentSchema } from "@/lib/contracts/auth";
 
@@ -42,6 +46,19 @@ function render(node: ReactNode, locale: "fr" | "ar" = "fr"): string {
   );
 }
 
+const publicConfig = (phoneVerification: boolean): PublicConfig => ({
+  env: "staging",
+  siteUrl: "https://staging.joutiya.ma",
+  firebase: null,
+  turnstileSiteKey: null,
+  googleClientId: null,
+  sentry: null,
+  mediaBaseUrl: null,
+  upload: { maxBytes: 10 * 1024 * 1024, maxPhotos: 10 },
+  map: null,
+  phoneVerification,
+});
+
 const consent = (version?: string) => ({ consents: { cgu: { version: "2026-10", at: new Date() }, transfers: version === undefined ? undefined : { version, at: new Date() }, marketing: false } }) as never;
 
 describe("needsTransfersReconsent", () => {
@@ -50,6 +67,14 @@ describe("needsTransfersReconsent", () => {
     expect(needsTransfersReconsent(consent("2026-10"))).toBe(true);
     expect(needsTransfersReconsent(consent(undefined))).toBe(true);
     expect(needsTransfersReconsent(consent(TRANSFERS_CONSENT_VERSION))).toBe(false);
+  });
+
+  it("records a version of its own while WhatsApp is live, so turning it on asks everyone again (D24)", () => {
+    const live = { APP_ENV: "staging", WHATSAPP_DISPLAY_NUMBER: "212600000000", WHATSAPP_APP_SECRET: "s", WHATSAPP_PHONE_NUMBER_ID: "1" } as ServerEnv;
+    expect(transfersConsentVersion({ APP_ENV: "staging" } as ServerEnv)).toBe(TRANSFERS_CONSENT_VERSION);
+    expect(transfersConsentVersion(live)).toBe(`${TRANSFERS_CONSENT_VERSION}+wa`);
+    expect(needsTransfersReconsent(consent(TRANSFERS_CONSENT_VERSION), transfersConsentVersion(live))).toBe(true);
+    expect(needsTransfersReconsent(consent(`${TRANSFERS_CONSENT_VERSION}+wa`), transfersConsentVersion(live))).toBe(false);
   });
 
   it("leaves an account without private document alone (nothing to renew)", () => {
@@ -91,7 +116,7 @@ describe("transfers consent text", () => {
 
   it("lists each provider with its role, in French and Arabic", () => {
     for (const locale of ["fr", "ar"] as const) {
-      const html = render(<TransfersDetails />, locale);
+      const html = render(<PublicConfigProvider value={publicConfig(true)}><TransfersDetails /></PublicConfigProvider>, locale);
       const messages = locale === "ar" ? ar : fr;
       expect(html).toContain(`<summary`);
       expect(html).not.toMatch(/<details[^>]* open/);
@@ -99,6 +124,14 @@ describe("transfers consent text", () => {
         expect(html).toContain(`>${name}</dt>`);
         expect(html).toContain(messages.Auth.consents.roles[role].replace(/'/g, "&#x27;"));
       }
+    }
+  });
+
+  it("leaves Meta out while WhatsApp phone verification is off or not yet known (D24)", () => {
+    for (const html of [render(<PublicConfigProvider value={publicConfig(false)}><TransfersDetails /></PublicConfigProvider>), render(<TransfersDetails />)]) {
+      expect(html).not.toContain("Meta");
+      expect(html).not.toContain(fr.Auth.consents.roles.meta.replace(/'/g, "&#x27;"));
+      expect(html).toContain(">Resend</dt>");
     }
   });
 

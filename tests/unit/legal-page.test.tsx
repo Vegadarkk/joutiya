@@ -63,3 +63,27 @@ describe("LegalPage optional blocks", () => {
     expect(await privacyPage("D-123/2027")).toContain("<p>Déclaration auprès de la CNDP\u00a0: récépissé n° D-123/2027.</p>");
   });
 });
+
+// WhatsApp phone verification is parked (D24): Meta is named only once it is live.
+
+async function page(text: keyof typeof LEGAL_TEXTS, whatsapp: boolean): Promise<string> {
+  return renderToStaticMarkup(
+    <NextIntlClientProvider locale="fr" messages={await loadMessages("fr")} timeZone="Africa/Casablanca">
+      <LegalPage locale="fr" title="Page" text={LEGAL_TEXTS[text]} values={legalValues(DEFAULT_LEGAL, { whatsapp })} />
+    </NextIntlClientProvider>,
+  );
+}
+
+describe("LegalPage WhatsApp mentions", () => {
+  it("leaves Meta out of the processors and the phone badge out of the safety tools while WhatsApp is off", async () => {
+    expect(await page("confidentialite", false)).not.toMatch(/Meta|WhatsApp/);
+    const safety = await page("confiance-et-securite", false);
+    expect(safety).not.toContain("téléphone vérifié");
+    expect(safety).toContain("<p>Le badge «\u00a0Certifié\u00a0» signale un professionnel vérifié.");
+  });
+
+  it("names them once phone verification is live", async () => {
+    expect(await page("confidentialite", true)).toContain("<li>Meta\u00a0: vérification du téléphone par WhatsApp\u00a0;</li>");
+    expect(await page("confiance-et-securite", true)).toContain("<p>Le badge «\u00a0téléphone vérifié\u00a0» indique un numéro confirmé par WhatsApp.</p>");
+  });
+});

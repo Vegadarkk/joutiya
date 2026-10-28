@@ -62,7 +62,7 @@ describe("legal pages", () => {
     const values = legalValues(DEFAULT_LEGAL);
     const known = new Set(Object.keys(values));
     for (const text of Object.values(LEGAL_TEXTS)) {
-      const strings = [text.intro ?? "", ...text.sections.flatMap((section) => section.blocks.flatMap((block) => (typeof block === "string" ? [block] : "list" in block ? block.list : [block.text])))];
+      const strings = [text.intro ?? "", ...text.sections.flatMap((section) => section.blocks.flatMap((block) => (typeof block === "string" ? [block] : "list" in block ? block.list.map((item) => (typeof item === "string" ? item : item.text)) : [block.text])))];
       for (const value of strings) {
         for (const [, key] of value.matchAll(/\{(\w+)\}/g)) expect(known, `unknown placeholder {${key}}`).toContain(key);
       }
@@ -73,7 +73,8 @@ describe("legal pages", () => {
     const known = new Set(Object.keys(legalValues(DEFAULT_LEGAL)));
     for (const text of Object.values(LEGAL_TEXTS)) {
       for (const block of text.sections.flatMap((section) => section.blocks)) {
-        if (typeof block === "object" && "ifSet" in block) expect(known).toContain(block.ifSet);
+        const optional = typeof block === "string" ? [] : "list" in block ? block.list.filter((item) => typeof item !== "string") : [block];
+        for (const item of optional) expect(known).toContain(item.ifSet);
       }
     }
   });
@@ -84,6 +85,17 @@ describe("legal pages", () => {
     const rights = LEGAL_TEXTS.confidentialite.sections.find((section) => section.id === "droits");
     expect(rights?.blocks).toContainEqual({ text: "Déclaration auprès de la CNDP : {cndp}.", ifSet: "cndp" });
     expect(JSON.stringify(LEGAL_TEXTS)).not.toMatch(/CNDP[^"]*en cours/);
+  });
+
+  it("names Meta and WhatsApp only through optional mentions (D24)", () => {
+    expect(legalValues(DEFAULT_LEGAL).whatsapp).toBe("");
+    expect(legalValues(DEFAULT_LEGAL, { whatsapp: true }).whatsapp).toBe("WhatsApp");
+    const mandatory = Object.values(LEGAL_TEXTS).flatMap((text) => [
+      text.intro ?? "",
+      ...text.sections.flatMap((section) => section.blocks.flatMap((block) => (typeof block === "string" ? [block] : "list" in block ? block.list.filter((item) => typeof item === "string") : []))),
+    ]);
+    // The scam warning about moving a chat to WhatsApp is advice, not a processor: it stays.
+    expect(mandatory.filter((text) => /Meta|WhatsApp/.test(text))).toEqual(["un message vous invite à poursuivre la discussion sur WhatsApp pour un paiement en ligne ;"]);
   });
 
   it("lists every cookie the app sets and promises no consent control that does not exist yet (C2-08)", () => {

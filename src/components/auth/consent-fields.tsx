@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import type { UseFormRegisterReturn } from "react-hook-form";
 import { InlineError } from "@/components/feedback/inline-error";
 import { Link } from "@/i18n/navigation";
+import { usePublicConfig } from "@/lib/config/client";
 
 // Sign-up consents (§7): CGU, the express consent to transfers outside Morocco (art. 44 loi
 // 09-08), both required, and the optional marketing opt-in, unchecked by default. The transfers
@@ -50,7 +51,8 @@ export function ConsentFields({ fields, errors = {}, autoFocus }: ConsentFieldsP
 /**
  * Recipients of the transfers consent, by region (privacy policy §6.2 and §7.2). Brand names stay
  * in code, identical in every language; roles are translated. A change here is a new text: bump
- * TRANSFERS_CONSENT_VERSION so that members are asked again.
+ * TRANSFERS_CONSENT_VERSION so that members are asked again. Meta is listed only while phone
+ * verification is live (design D24); its own version suffix asks members again then.
  */
 export const TRANSFER_PROVIDERS = {
   eu: [
@@ -76,6 +78,8 @@ export const TRANSFER_PROVIDERS = {
 /** The provider list under the transfers box; `open` on the re-consent panel, whose subject it is. */
 export function TransfersDetails({ open }: { open?: boolean }) {
   const t = useTranslations("Auth.consents");
+  // Unknown until the config loads: Meta stays out, as in the version the server records then.
+  const whatsapp = usePublicConfig()?.phoneVerification === true;
   return (
     <details open={open} className="rounded-md bg-surface-muted px-4 py-3 text-sm">
       <summary className="cursor-pointer font-medium text-link underline-offset-2 hover:underline">{t("transfersDetails")}</summary>
@@ -84,14 +88,16 @@ export function TransfersDetails({ open }: { open?: boolean }) {
           <div key={region} className="flex flex-col gap-2">
             <p className="font-semibold">{t(region === "eu" ? "transfersEu" : "transfersUs")}</p>
             <dl className="flex flex-col gap-2">
-              {TRANSFER_PROVIDERS[region].map(([name, role]) => (
-                <div key={role}>
-                  <dt dir="ltr" className="w-fit font-medium">
-                    {name}
-                  </dt>
-                  <dd className="text-foreground-muted text-pretty">{t(`roles.${role}`)}</dd>
-                </div>
-              ))}
+              {TRANSFER_PROVIDERS[region]
+                .filter(([, role]) => whatsapp || role !== "meta")
+                .map(([name, role]) => (
+                  <div key={role}>
+                    <dt dir="ltr" className="w-fit font-medium">
+                      {name}
+                    </dt>
+                    <dd className="text-foreground-muted text-pretty">{t(`roles.${role}`)}</dd>
+                  </div>
+                ))}
             </dl>
           </div>
         ))}

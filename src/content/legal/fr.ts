@@ -5,8 +5,14 @@
 
 import type { LegalSlug } from "@/config/legal-pages";
 
-/** A paragraph, a list, or a paragraph rendered only when the value `ifSet` names is not empty (an optional mention). */
-export type Block = string | { list: string[] } | { text: string; ifSet: keyof LegalValues };
+/** A paragraph or list item rendered only when the value `ifSet` names is not empty (an optional mention). */
+export interface Optional {
+  text: string;
+  ifSet: keyof LegalValues;
+}
+
+/** A paragraph, a list (whose items may be optional), or an optional paragraph. */
+export type Block = string | { list: (string | Optional)[] } | Optional;
 
 export interface LegalSection {
   id: string;
@@ -313,7 +319,7 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
               "Google : connexion et gestion des comptes ; publicité AdSense quand elle sera activée, avec un accord séparé ;",
               "Cloudflare : diffusion et protection du site, vérification anti-robot et IA de secours, sur son réseau mondial ;",
               "Anthropic : aide au contrôle des annonces, au tri des signalements et à l'examen des recours, Assistant Joutiya ; OpenAI : contrôle de secours. Les numéros, e-mails et noms sont masqués avant tout envoi à une IA ;",
-              "Meta : vérification du téléphone par WhatsApp ;",
+              { text: "Meta : vérification du téléphone par {whatsapp} ;", ifSet: "whatsapp" },
               "Resend : envoi des e-mails ;",
               "Stripe et RevenueCat : paiements et abonnements Pro, à l'ouverture des ventes.",
             ],
@@ -459,7 +465,8 @@ export const LEGAL_TEXTS: Record<Exclude<LegalSlug, "mentions-legales">, LegalTe
         id: "outils",
         heading: "Vos outils",
         blocks: [
-          "Le badge « téléphone vérifié » indique un numéro confirmé par WhatsApp. Le badge « Certifié » signale un professionnel vérifié. Vous pouvez signaler une annonce, un profil ou un message, et bloquer un utilisateur depuis la conversation.",
+          { text: "Le badge « téléphone vérifié » indique un numéro confirmé par {whatsapp}.", ifSet: "whatsapp" },
+          "Le badge « Certifié » signale un professionnel vérifié. Vous pouvez signaler une annonce, un profil ou un message, et bloquer un utilisateur depuis la conversation.",
           "En cas d'escroquerie, portez plainte dans un commissariat de police, auprès d'une brigade de la Gendarmerie royale ou du procureur du Roi. Vous pouvez aussi signaler une escroquerie ou un contenu illicite en ligne sur e-blagh.ma, la plateforme de la Sûreté nationale. En cas de danger immédiat, appelez le 19 (police) ou le 177 (Gendarmerie royale).",
         ],
       },
@@ -646,6 +653,8 @@ export interface LegalValues {
   vat: string;
   /** Consumer mediator, or when it will be named. */
   mediator: string;
+  /** "WhatsApp" while phone verification is live, else empty: Meta is then never named (design D24). */
+  whatsapp: string;
 }
 
 export function fill(text: string, values: LegalValues): string {

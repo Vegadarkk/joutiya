@@ -15,7 +15,7 @@ import { ConsentBox, TransfersDetails } from "./consent-fields";
 import { FormMessage, useFieldMessage } from "./form-message";
 
 // Blocking re-consent panel (design D12), rendered by (account)/layout.tsx in place of the page
-// while the member's transfers consent is not TRANSFERS_CONSENT_VERSION. Accepting records it and
+// while the member's transfers consent is not the current version (transfersConsentVersion). Accepting records it and
 // refreshes the route, which then renders the page. Without it the account cannot be used: the
 // panel offers the sign-out and the address to ask for the account's deletion.
 
