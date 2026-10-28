@@ -7,6 +7,7 @@ import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { Container } from "@/components/layout/container";
 import { AdSlot } from "@/components/ads/ad-slot";
+import { AgencyTransactions, FeeSchedule } from "@/components/listing/agency-storefront";
 import { ListingCard } from "@/components/listing/listing-card";
 import { PayAtSeller } from "@/components/listing/pay-at-seller";
 import { formatMemberSince } from "@/components/listing/seller-card";
@@ -23,13 +24,15 @@ import { isolate } from "@/lib/i18n/bidi";
 import { alternates } from "@/lib/i18n/metadata";
 import { getLegalConfig } from "@/lib/legal/config";
 import { getPublicStorefront, parseStorefrontSegment, storefrontPath } from "@/lib/listings/public";
+import { shopSubcategoryCounts } from "@/lib/search/storefront";
 import { mediaBaseUrl } from "@/lib/storage/keys";
 
 // Storefront of a verified Pro shop (phase 7 design §4): /boutique/{slug}-{proId}. ISR like the
 // profile page; a shop whose storefront is not shown (pending, rejected, downgraded, suspended)
 // or an unknown one is a 404, an outdated slug redirects to the current one. The listings are the
 // owner's published ones; a change reaches the page within `revalidate` (the listing page itself
-// is revalidated at once).
+// is revalidated at once). A real-estate agency's storefront (Agence pack design §3) adds its
+// listings per transaction and its fee schedule.
 
 export const revalidate = 300;
 export const dynamicParams = true;
@@ -88,6 +91,11 @@ export default async function StorefrontPage({ params }: { params: Params }) {
   const { seller } = store;
   const hidden = seller.publishedCount - seller.listings.length;
   const initial = Array.from(store.name.trim())[0]?.toLocaleUpperCase() ?? "?";
+  const agency = store.sector === "real_estate";
+  const counts = agency && seller.publishedCount > 0 ? await shopSubcategoryCounts(seller.publicId, "immobilier") : null;
+  const aside = (
+    <p className="rounded-md bg-surface-muted p-4 text-sm text-foreground-muted text-pretty">{agency ? t("agency.verifiedNote") : t("verifiedNote")}</p>
+  );
 
   return (
     <Container className="flex flex-col gap-10 py-8 lg:gap-12 lg:py-12">
@@ -97,7 +105,7 @@ export default async function StorefrontPage({ params }: { params: Params }) {
           {initial}
         </span>
         <div className="flex min-w-0 flex-col items-center gap-2 sm:items-start">
-          <p className="text-sm text-structure-foreground/80">{t("label")}</p>
+          <p className="text-sm text-structure-foreground/80">{agency ? t("agency.label") : t("label")}</p>
           <h1 dir="auto" className="text-3xl font-semibold text-balance break-words sm:text-4xl">
             {store.name}
           </h1>
@@ -116,9 +124,11 @@ export default async function StorefrontPage({ params }: { params: Params }) {
         </div>
         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-sm bg-featured px-3 py-1 text-sm font-medium text-featured-foreground sm:ms-auto sm:self-start">
           <BadgeCheck className="size-4" aria-hidden="true" />
-          {t("verified")}
+          {agency ? t("agency.verified") : t("verified")}
         </span>
       </header>
+
+      {counts ? <AgencyTransactions counts={counts} shopPublicId={seller.publicId} /> : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-10">
         {store.description ? (
@@ -131,9 +141,10 @@ export default async function StorefrontPage({ params }: { params: Params }) {
             </p>
           </section>
         ) : null}
-        <div className={store.description ? "flex flex-col gap-4 self-start" : "flex flex-col gap-4 lg:col-span-2"}>
+        <div className={store.description ? "flex flex-col gap-4 self-start" : "flex max-w-prose flex-col gap-4 lg:col-span-2"}>
+          <FeeSchedule text={store.feeSchedule} />
           {store.payment ? <PayAtSeller payment={store.payment} className="rounded-lg border border-border bg-surface p-4" /> : null}
-          <p className={store.description ? "rounded-md bg-surface-muted p-4 text-sm text-foreground-muted text-pretty" : "max-w-prose text-sm text-foreground-muted text-pretty"}>{t("verifiedNote")}</p>
+          {aside}
         </div>
       </div>
 

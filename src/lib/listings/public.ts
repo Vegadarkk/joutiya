@@ -14,7 +14,8 @@ import { db } from "@/lib/firebase/admin";
 import { aggregationReads, consume } from "@/lib/quota";
 import { assertQuotas, PUBLIC_READ_QUOTAS } from "@/lib/quota/gate";
 import { storefrontShown } from "@/lib/pro/lifecycle";
-import { PRO_ID_PATTERN } from "@/lib/pro/profile-schema";
+import { PRO_ID_PATTERN, type ProSector } from "@/lib/pro/profile-schema";
+import { cardFactsField, cardFactsOf, type CardFacts } from "./card-facts";
 import { buildSlugId, parseSlugId } from "./ids";
 
 // Public reads (design §4 public.ts): the listing page by its `{slug}-{id}` segment and the
@@ -164,6 +165,8 @@ export interface PublicListingCard {
   sellerType: UserRecord["type"];
   /** ISO 8601: the date shown on the card (publication, or renewal). */
   sortAt: string;
+  /** Key numbers under the title and the exclusive mandate (card-facts.ts); absent = none. */
+  facts?: CardFacts;
 }
 
 function publicPhotos(record: ListingRecord): PublicPhoto[] {
@@ -218,6 +221,7 @@ export function toPublicCard(record: ListingRecord): PublicListingCard | null {
     photoCount: photos.length,
     sellerType: record.sellerType,
     sortAt: record.sortAt.toISOString(),
+    ...cardFactsField(cardFactsOf(record.subcategoryId, (id) => record.attributes[id])),
   };
 }
 
@@ -305,6 +309,10 @@ export interface PublicStorefront {
   name: string;
   description: string;
   citySlug: string;
+  /** "real_estate": an agency's storefront (Agence pack design §3). */
+  sector: ProSector;
+  /** The agency's fee schedule ("" when none). */
+  feeSchedule: string;
   /** « Payer chez le vendeur » and the seller information, when the shop has turned them on. */
   payment: PublicShopPayment | null;
   /** The owner's public face and listings, as on /profil. */
@@ -331,6 +339,8 @@ export async function getPublicStorefront(proId: string, limit = 24): Promise<Pu
     name: profile.name,
     description: profile.description,
     citySlug: profile.citySlug,
+    sector: profile.sector ?? "general",
+    feeSchedule: profile.sector === "real_estate" ? (profile.agency?.feeSchedule ?? "") : "",
     seller: await publishedView(user, limit),
   };
 }

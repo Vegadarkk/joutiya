@@ -1,4 +1,5 @@
-import type { CardDocument, SearchCard } from "./types";
+import { cardFactsField, cardFactsOf } from "@/lib/listings/card-facts";
+import { attributeField, type CardDocument, type SearchCard } from "./types";
 
 // Engine hit -> results card (design D22): the one card shape of every engine-backed list (search,
 // /c pages, home, favorites). Whitelists the fields, so nothing the index adds later leaks to clients.
@@ -24,5 +25,6 @@ export function toSearchCard(doc: CardDocument, now: Date, featured = false): Se
     sortAt: new Date(Number.isFinite(doc.sortAt) ? doc.sortAt : now.getTime()).toISOString(),
     bumped: doc.isBumped === true,
     featured: featured && typeof doc.featuredUntil === "number" && doc.featuredUntil > now.getTime(),
+    ...cardFactsField(cardFactsOf(doc.subcategoryId, (id) => (doc as Record<string, unknown>)[attributeField(id)])),
   };
 }

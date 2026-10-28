@@ -46,18 +46,21 @@ export interface MessageDialogProps {
   sellerName?: string;
   /** Adults-only listing: the buyer confirms being 18 or older before the first message. */
   adultsOnly?: boolean;
+  /** "visit": a visit request (real estate), with its draft, then the thread on the slots. */
+  intent?: "message" | "visit";
   /** The session ended meanwhile: the bar shows its sign-in prompt. */
   onSignedOut: () => void;
 }
 
-export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sellerName, adultsOnly = false, onSignedOut }: MessageDialogProps) {
+export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sellerName, adultsOnly = false, intent = "message", onSignedOut }: MessageDialogProps) {
   const t = useTranslations("ListingPage.contact.compose");
   const generic = useApiErrorMessage();
   const locale = useLocale();
   const router = useRouter();
   const counterId = useId();
   const turnstile = useRef<TurnstileHandle>(null);
-  const [text, setText] = useState("");
+  const visit = intent === "visit";
+  const [text, setText] = useState(() => (visit ? t("visitDraft") : ""));
   const [token, setToken] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<"empty" | "reserved" | null>(null);
@@ -89,7 +92,7 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
     setError(null);
     try {
       const { cid } = await startConversation({ listingId, text: text.trim(), turnstileToken: token, ...(adultsOnly ? { adultConfirmed: true as const } : {}) });
-      router.push(`/messages/${cid}`);
+      router.push(visit ? `/messages/${cid}?rdv=visit` : `/messages/${cid}`);
     } catch (caught) {
       setPending(false);
       // A token is single use: a fresh one for the next attempt, whatever went wrong.
@@ -118,7 +121,9 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
         >
           <form onSubmit={(event) => void onSubmit(event)} noValidate className="flex flex-col gap-5 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
             <div className="flex flex-col gap-1.5">
-              <Dialog.Title className="text-xl font-semibold text-balance">{sellerName ? t("title", { name: isolate(sellerName) }) : t("titleFallback")}</Dialog.Title>
+              <Dialog.Title className="text-xl font-semibold text-balance">
+                {visit ? (sellerName ? t("visitTitle", { name: isolate(sellerName) }) : t("visitTitleFallback")) : sellerName ? t("title", { name: isolate(sellerName) }) : t("titleFallback")}
+              </Dialog.Title>
               {listingTitle ? <Dialog.Description className="text-foreground-muted text-pretty">{t("about", { title: isolate(listingTitle) })}</Dialog.Description> : null}
             </div>
 
@@ -179,7 +184,7 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
             <p className="flex items-start gap-2 text-sm text-foreground-muted text-pretty">
               <LockKeyhole className="mt-0.5 size-4 shrink-0 text-structure dark:text-gold-300" aria-hidden="true" />
               <span>
-                {t("privacy")} {t("safety")}{" "}
+                {t("privacy")} {visit ? t("visitSafety") : t("safety")}{" "}
                 {t.rich("scanned", {
                   link: (chunks) => (
                     <Link href="/legal/confidentialite#finalites-3" target="_blank" rel="noopener" className="font-medium text-link underline underline-offset-2">

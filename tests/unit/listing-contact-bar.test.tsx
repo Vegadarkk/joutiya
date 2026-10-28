@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it } from "vitest";
 import fr from "../../messages/fr.json";
-import { ContactBar, isWhatsappUrl, messageStep, REVEAL_ERROR_KEYS, revealFailure, type ContactBarProps } from "@/components/listing/contact-bar";
+import { ContactBar, isWhatsappUrl, messageStep, REVEAL_ERROR_KEYS, revealFailure, threadHref, type ContactBarProps } from "@/components/listing/contact-bar";
 import { ApiError, InitialSessionContext, type ApiErrorCode } from "@/lib/auth/client";
 import type { SessionSummary } from "@/lib/contracts/auth";
 
@@ -115,6 +115,21 @@ describe("ContactBar", () => {
     expect(html).not.toContain("aria-haspopup");
     const other = { ...own, publicId: "zzzzzzzzzz" } as SessionSummary;
     expect(render({}, other)).toContain(fr.ListingPage.contact.showPhone);
+  });
+});
+
+describe("visit request (real estate)", () => {
+  it("adds a visit button next to the message one, on desktop and in the phone bar", () => {
+    expect(render()).not.toContain('data-testid="visit-button"');
+    const html = render({ visit: true });
+    expect(html.match(/data-testid="visit-button"/g)).toHaveLength(2);
+    expect(html).toContain(fr.ListingPage.contact.visit);
+    expect(html).toContain(fr.ListingPage.contact.visitShort);
+  });
+
+  it("opens the conversation on the visit slots", () => {
+    expect(threadHref("c123", "visit")).toBe("/messages/c123?rdv=visit");
+    expect(threadHref("c123", "message")).toBe("/messages/c123");
   });
 });
 

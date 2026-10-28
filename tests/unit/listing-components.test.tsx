@@ -9,6 +9,7 @@ import { CriteriaGrid, CriteriaSection } from "@/components/listing/criteria-gri
 import { ListingCard } from "@/components/listing/listing-card";
 import { ListingStatusBanner } from "@/components/listing/listing-status-banner";
 import { PriceTag } from "@/components/listing/price-tag";
+import { PROPERTY_TERM_FIELDS, PropertyTerms } from "@/components/listing/property-terms";
 import { SafetyTips } from "@/components/listing/safety-tips";
 import { formatMemberSince, initialOf, SellerCard } from "@/components/listing/seller-card";
 import { ReportButton, reportMailto } from "@/components/report/report-button";
@@ -281,5 +282,40 @@ describe("SafetyTips", () => {
     expect(text(html)).toContain(fr.ListingPage.safety.host);
     expect(html).toContain('href="/fr/legal/confiance-et-securite"');
     expect(text(render(<SafetyTips />, "ar"))).toContain(ar.ListingPage.safety.title);
+  });
+
+  it("warns against deposits before a visit on a property", () => {
+    const html = text(render(<SafetyTips variant="realEstate" />));
+    expect(html).toContain(fr.ListingPage.safety.tips.noDeposit);
+    expect(html).toContain(fr.ListingPage.safety.tips.checkTitle);
+    expect(html).not.toContain(fr.ListingPage.safety.tips.meetPublic);
+  });
+});
+
+describe("PropertyTerms", () => {
+  it("shows the mandate, the reference and the fees next to the price, the exclusivity first", () => {
+    const html = render(<PropertyTerms attributes={{ mandate: "exclusif", "agency-reference": "CASA-118", "agency-fees": "en-sus", "agency-fees-amount": 25000 }} locale="fr" />);
+    const shown = text(html);
+    expect(shown).toContain(fr.ListingPage.terms.exclusive);
+    expect(shown).toContain(fr.ListingPage.terms.mandates.exclusif);
+    expect(shown).toMatch(/25\s000 DH en plus du prix, à la charge du client/);
+    expect(html).toMatch(/<dd dir="auto"[^>]*>CASA-118<\/dd>/);
+  });
+
+  it("states included or no fees, an off-plan delivery and a declared tourist authorisation", () => {
+    expect(text(render(<PropertyTerms attributes={{ mandate: "simple", "agency-fees": "inclus" }} locale="fr" />))).toContain(fr.ListingPage.terms.feesIncluded);
+    expect(text(render(<PropertyTerms attributes={{ mandate: "vente-directe", "agency-fees": "sans-frais", "off-plan": true, "delivery-year": 2028, "building-permit": "PC 1184" }} locale="fr" />))).toMatch(/Sans frais pour le client.*Livraison prévue en 2028.*PC 1184/);
+    const holiday = text(render(<PropertyTerms attributes={{ "tourism-authorization": "TNG-2026-44" }} locale="ar" />, "ar"));
+    expect(holiday).toContain("TNG-2026-44");
+    expect(holiday).toContain("حسب تصريح المعلن");
+    expect(render(<PropertyTerms attributes={{ surface: 90 }} locale="fr" />)).toBe("");
+  });
+
+  it("takes its fields out of the criteria grid when asked", () => {
+    const attributes = { "property-type": "appartement", surface: 90, mandate: "exclusif", "agency-fees": "inclus" };
+    expect(text(render(<CriteriaGrid subcategoryId="vente" attributes={attributes} condition={null} />))).toContain(fr.Criteria.mandate.label);
+    const grid = text(render(<CriteriaGrid subcategoryId="vente" attributes={attributes} condition={null} exclude={PROPERTY_TERM_FIELDS} />));
+    expect(grid).not.toContain(fr.Criteria.mandate.label);
+    expect(grid).toContain(fr.Criteria.surface.label);
   });
 });
