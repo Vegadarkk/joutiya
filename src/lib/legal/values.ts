@@ -1,0 +1,92 @@
+import { publisherIdentity, vatMention, type LegalConfig } from "@/config/legal";
+import type { LegalVersion } from "@/config/legal-versions";
+import { SITE_NAME } from "@/config/site";
+import type { TemplateScope } from "./template";
+
+// Values of the legal templates (phase 6, D11): config/legal plus the computed conditions the
+// sources test (README of the markers in src/lib/legal/template.ts). An empty value is never
+// replaced by an invented text: the templates carry their own "to be filled" variants.
+
+const LANGUAGE_NAMES = {
+  fr: { fr: "français", ar: "arabe", en: "anglais" },
+  ar: { fr: "الفرنسية", ar: "العربية", en: "الإنجليزية" },
+} as const;
+
+export interface LegalSwitches {
+  /** WhatsApp phone verification is live (isPhoneVerificationConfigured): Meta is named (D24). */
+  whatsapp: boolean;
+  /** Ads can run (`adsMode` not "off"): the cookie policy lists the AdSense cookies. */
+  ads: boolean;
+  /** Google's consent message covers EEA/UK/CH visitors (`adsCmpEea`). */
+  adsCmpEea: boolean;
+}
+
+function hostState(entry: { name: string; address: string; phone: string }) {
+  const complete = Boolean(entry.name && entry.address && entry.phone);
+  return { complete, partial: Boolean(entry.name) && !complete, noName: !entry.name };
+}
+
+export function legalScope(config: LegalConfig, switches: LegalSwitches, version: LegalVersion, language: "fr" | "ar"): TemplateScope {
+  const date = new Intl.DateTimeFormat(language === "ar" ? "ar-MA" : "fr-MA", { dateStyle: "long", timeZone: "Africa/Casablanca" }).format(new Date(`${version.effective}T12:00:00Z`));
+  const languages = config.dsaContactLanguages.map((code) => LANGUAGE_NAMES[language][code]).join(language === "ar" ? "، " : ", ");
+  const host = hostState(config.host);
+  return {
+    brand: SITE_NAME,
+    version: version.version,
+    effectiveDate: date,
+    // Publisher.
+    publisher: config.companyName,
+    publisherIdentity: publisherIdentity(config),
+    companyName: config.companyName,
+    entrepreneurName: config.entrepreneurName,
+    legalForm: config.legalForm,
+    shareCapital: config.shareCapital,
+    siren: config.siren,
+    siret: config.siret,
+    registry: config.registry === "RCS" && config.rcsCity ? "RCS" : "RNE",
+    rcsCity: config.rcsCity,
+    vatRegime: config.vatRegime,
+    vatNumber: config.vatNumber,
+    vat: vatMention(config),
+    address: config.hqAddress,
+    phone: config.phone,
+    email: config.email,
+    publicationDirector: config.publicationDirector,
+    // Hosts (LCEN art. 1-1).
+    hostName: config.host.name,
+    hostAddress: config.host.address,
+    hostPhone: config.host.phone,
+    hostComplete: host.complete,
+    hostPartial: host.partial,
+    hostMissing: host.noName,
+    dataHosts: config.dataHosts.map((entry) => ({
+      ...hostState(entry),
+      label: entry.region ? `${entry.name}, ${entry.region}` : entry.name,
+      address: entry.address,
+      phone: entry.phone,
+    })),
+    // Contacts (aliases kept from the provisional texts).
+    dsaEmail: config.dsaContactEmail,
+    dsaContactEmail: config.dsaContactEmail,
+    languages,
+    dsaContactLanguages: languages,
+    abuseEmail: config.abuseEmail,
+    dpo: config.dpoContact,
+    dpoContact: config.dpoContact,
+    consumerMediator: { name: config.consumerMediator.name, url: config.consumerMediator.url },
+    mediator: config.consumerMediator.name
+      ? `${config.consumerMediator.name} (${config.consumerMediator.url})`
+      : language === "ar"
+        ? "يُعيَّن قبل فتح المبيعات"
+        : "désigné avant l'ouverture des ventes",
+    // CNDP (Z10): nothing is printed until a receipt exists.
+    cndpReceiptNo: config.cndpReceiptNo,
+    cndpCookiesReceiptNo: "",
+    // Service.
+    ttlDays: String(config.listingTtlDays),
+    purgeMonths: String(config.listingPurgeMonths),
+    whatsappEnabled: switches.whatsapp,
+    ads: switches.ads,
+    adsCmpEea: switches.adsCmpEea,
+  };
+}
