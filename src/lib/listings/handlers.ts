@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "@/lib/zod";
 import { requireUser, type AuthContext } from "@/lib/auth/guards";
 import { applyDevice, applyTurnstilePass, deviceOf, jsonResponse } from "@/lib/auth/respond";
-import { OWNER_LIST_BUCKETS, createListingSchema, listingPatchSchema, publishListingSchema, rentalAvailabilityInputSchema, type CreateListingResponse, type ListingResponse, type OwnerListingsResponse, type RentalAvailabilityResponse } from "@/lib/contracts/listings";
+import { FLEET_MAX, OWNER_LIST_BUCKETS, createListingSchema, fleetSaveSchema, listingPatchSchema, publishListingSchema, rentalAvailabilityInputSchema, type CreateListingResponse, type ListingResponse, type OwnerListingsResponse, type RentalAvailabilityResponse } from "@/lib/contracts/listings";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
 import { getListing, listOwnerListings } from "@/lib/db/repositories/listings";
 import { getFlags } from "@/lib/config/runtime";
@@ -13,6 +13,7 @@ import { assertQuotas, DEPOSIT_QUOTAS } from "@/lib/quota/gate";
 import { requestIdentity } from "@/lib/rate-limit/keys";
 import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
 import { setRentalAvailability } from "./availability";
+import { listFleet, saveFleet } from "./fleet";
 import { isListingId } from "./ids";
 import { ownerListingView, toOwnerSummary } from "./owner-view";
 import { revealPhone } from "./phone-reveal";
@@ -166,4 +167,25 @@ export async function handleAvailability(request: Request, params: Params): Prom
   await assertQuotas(DEPOSIT_QUOTAS);
   const body: RentalAvailabilityResponse = { rental: await setRentalAvailability(auth, id, input) };
   return json(body);
+}
+
+/** GET /api/pro/fleet: a car rental agency's fleet planning, charged in documents read. */
+export async function handleFleet(request: Request): Promise<Response> {
+  const auth = await requireUser(request);
+  await enforceLimit("listing.owner.read.uid", auth.user.uid);
+  const body = await listFleet(auth);
+  await chargeOwnerRead(auth.user.uid, body.vehicles.length);
+  return json(body);
+}
+
+/** A fleet save: up to 2 KiB per vehicle (its id, lock and 40 merged periods). */
+const FLEET_SAVE_MAX_BYTES = FLEET_MAX * 2048;
+
+/** PUT /api/pro/fleet: the planning's changes, each counted like one calendar save. */
+export async function handleFleetSave(request: Request): Promise<Response> {
+  const auth = await requireUser(request, { mutation: true });
+  const input = await readJson(request, fleetSaveSchema, FLEET_SAVE_MAX_BYTES);
+  await enforceLimit("rental.availability.uid", auth.user.uid, input.changes.length);
+  await assertQuotas(DEPOSIT_QUOTAS);
+  return json(await saveFleet(auth, input));
 }

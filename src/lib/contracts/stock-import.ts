@@ -54,11 +54,13 @@ export const STOCK_ROW_CODES = [
   "description_short",
   "title_generated",
   "column_ignored",
+  "periods_invalid",
+  "periods_ignored",
   "failed",
 ] as const;
 export type StockRowCode = (typeof STOCK_ROW_CODES)[number];
 
-export const STOCK_WARNING_CODES: readonly StockRowCode[] = ["description_short", "title_generated", "column_ignored"];
+export const STOCK_WARNING_CODES: readonly StockRowCode[] = ["description_short", "title_generated", "column_ignored", "periods_ignored"];
 
 export interface StockRowIssue {
   /** Header as written in the file (or the field when no column applies). */

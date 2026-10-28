@@ -68,13 +68,26 @@ export function RentalTerms({ subcategoryId, attributes, locale, className }: Re
   if (fleet !== undefined && fleet > 1) highlights.push({ id: "fleet", icon: CarFront, title: r("fleet", { count: fleet }) });
   const extras = list(attributes["rental-extras"]);
 
-  if (highlights.length === 0 && extras.length === 0) return null;
+  // The agency's own reference, to quote in a booking request (fleet imported from a stock file).
+  const stockRef = typeof attributes["stock-ref"] === "string" ? attributes["stock-ref"] : undefined;
+
+  if (highlights.length === 0 && extras.length === 0 && !stockRef) return null;
 
   return (
     <section data-testid="rental-terms" aria-labelledby="rental-terms-title" className={cn("flex flex-col gap-5", className)}>
-      <h2 id="rental-terms-title" className="text-lg font-semibold">
-        {r("title")}
-      </h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 id="rental-terms-title" className="text-lg font-semibold">
+          {r("title")}
+        </h2>
+        {stockRef ? (
+          <p className="text-sm text-foreground-muted" data-testid="rental-stock-ref">
+            {r("stockRef")}{" "}
+            <span dir="auto" className="font-medium text-foreground">
+              {stockRef}
+            </span>
+          </p>
+        ) : null}
+      </div>
       {highlights.length > 0 ? (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {highlights.map(({ id, icon: Icon, title, detail }) => (

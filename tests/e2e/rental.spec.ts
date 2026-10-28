@@ -193,6 +193,24 @@ test.describe("Car rental", () => {
       await expect(page.locator("#main").getByTestId("rental-dates-bar")).toBeVisible();
       await expect(page.locator("#main").getByTestId("card-rental")).toContainText("pour 3 jours");
       await page.screenshot({ path: "test-results/rental-search-dates.png", fullPage: true });
+
+      // Fleet planning (rental pack §3): the blocked days as a bar, a day added, then confirmed.
+      await page.goto("/fr/pro/flotte");
+      const row = page.getByTestId("fleet-row").filter({ hasText: title });
+      await expect(row.locator(`button[data-day="${day(4)}"]`)).toHaveAttribute("data-state", "blocked");
+      await row.locator(`button[data-day="${day(10)}"]`).click();
+      await expect(row.locator(`button[data-day="${day(10)}"]`)).toHaveAttribute("aria-pressed", "true");
+      await expect(page.getByTestId("fleet-savebar")).toContainText("1 véhicule modifié");
+      await page.screenshot({ path: "test-results/rental-fleet.png", fullPage: true });
+      await page.getByTestId("fleet-savebar").getByRole("button", { name: "Enregistrer" }).click();
+      await expect(page.getByText("Planning enregistré pour 1 véhicule.")).toBeVisible();
+      await expect(page.getByTestId("fleet-savebar")).toBeHidden();
+      await page.getByTestId("fleet-confirm").click();
+      await expect(page.getByText("Disponibilités confirmées pour 1 véhicule.")).toBeVisible();
+      await page.reload();
+      await expect(page.getByTestId("fleet-row").filter({ hasText: title }).locator(`button[data-day="${day(10)}"]`)).toHaveAttribute("data-state", "blocked");
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.screenshot({ path: "test-results/rental-fleet-mobile.png" });
     }
   });
 });

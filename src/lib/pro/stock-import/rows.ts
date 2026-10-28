@@ -1,7 +1,8 @@
-import { CATEGORIES, CONDITIONS, CRITERION_TEXT_MAX, criteriaSchema, criterionApplies, subcategoryById, type Condition, type Criterion, type Subcategory } from "@/config/categories";
+import { CATEGORIES, CONDITIONS, CRITERION_TEXT_MAX, RENTAL_SUBCATEGORY, criteriaSchema, criterionApplies, subcategoryById, type Condition, type Criterion, type Subcategory } from "@/config/categories";
 import { CITIES, type City } from "@/config/regions";
 import { DESCRIPTION_MAX, DESCRIPTION_MIN, DISTRICT_MAX, PRICE_MAX, TITLE_MAX, TITLE_MIN, type ListingAttributes } from "@/lib/contracts/listings";
 import { refKey, type StockRowIssue } from "@/lib/contracts/stock-import";
+import { DAY_PATTERN, moroccoToday, normalizePeriods, type RentalPeriod } from "@/lib/listings/rental-availability";
 import { normalizeText } from "@/lib/text/normalize";
 import ar from "../../../../messages/ar.json";
 import fr from "../../../../messages/fr.json";
@@ -13,9 +14,10 @@ import type { CsvTable } from "./csv";
 // French or Arabic label, numbers their usual spellings ("41 000", "41.000 km"), booleans
 // oui/non/1/0/x. The category column takes a subcategory id or name and defaults to cars; the
 // brand column follows it (car brand, motorbike brand or free brand). A line comes out with the
-// fields it sets, its issues and, without errors, is ready to become a draft or an update.
+// fields it sets, its issues and, without errors, is ready to become a draft or an update. A car
+// rental line may carry its blocked periods (`indisponible`: "2026-11-02/2026-11-05; 2026-12-24").
 
-export type CoreField = "ref" | "category" | "title" | "description" | "price" | "negotiable" | "city" | "district" | "condition";
+export type CoreField = "ref" | "category" | "title" | "description" | "price" | "negotiable" | "city" | "district" | "condition" | "unavailable";
 
 /** Criterion holding the stock reference (Pro-only). */
 export const STOCK_REF = "stock-ref";
@@ -39,6 +41,7 @@ const CORE_ALIASES: Record<CoreField, readonly string[]> = {
   city: ["ville", "city", "المدينة"],
   district: ["quartier", "district", "الحي"],
   condition: ["etat", "état", "condition", "الحالة"],
+  unavailable: ["indisponible", "indisponibilite", "indisponibilités", "indisponibilites", "jours bloques", "jours bloqués", "periodes bloquees", "périodes bloquées", "unavailable", "غير متاح"],
 };
 
 /** Short names dealers use, on top of the criterion labels. */
@@ -65,6 +68,21 @@ const CRITERION_ALIASES: Record<string, readonly string[]> = {
   "car-equipment": ["equipements", "équipements", "options", "equipement"],
   "engine-size": ["cylindree", "cylindrée"],
   "utility-type": ["type utilitaire", "type de vehicule", "type de véhicule"],
+  // Car rental (rental pack): the words agencies use in their fleet sheets.
+  "rental-class": ["gamme", "categorie vehicule", "catégorie véhicule"],
+  "mileage-policy": ["politique kilometrique", "politique kilométrique"],
+  "km-per-day": ["km par jour", "km inclus", "kilometres par jour", "kilomètres par jour"],
+  "vehicle-handover": ["remise", "livraison"],
+  seats: ["places", "nombre de places"],
+  "min-rental-days": ["duree minimum", "durée minimum", "jours minimum", "location minimum"],
+  "rental-insurance": ["assurance"],
+  "insurance-excess": ["franchise"],
+  "rental-deposit": ["caution", "depot de garantie", "dépôt de garantie"],
+  "driver-min-age": ["age minimum", "âge minimum", "age conducteur", "âge conducteur"],
+  "licence-years": ["permis", "anciennete permis", "ancienneté permis"],
+  "rate-7-days": ["tarif semaine", "prix semaine", "tarif 7 jours"],
+  "rate-30-days": ["tarif mois", "prix mois", "tarif 30 jours"],
+  "fleet-units": ["unites", "unités", "nombre de vehicules", "nombre de véhicules"],
 };
 
 /** Normalized header -> core field or criterion id (`@brand` for the brand). */
@@ -98,7 +116,7 @@ const SUBCATEGORY_INDEX: Map<string, string> = (() => {
       if (arabic) index.set(key(arabic), sub.id);
     }
   }
-  for (const [word, id] of Object.entries({ voiture: "voitures", auto: "voitures", vp: "voitures", utilitaire: "utilitaires-camions", utilitaires: "utilitaires-camions", camion: "utilitaires-camions", camions: "utilitaires-camions", moto: "motos-scooters", motos: "motos-scooters", scooter: "motos-scooters" })) index.set(key(word), id);
+  for (const [word, id] of Object.entries({ voiture: "voitures", auto: "voitures", vp: "voitures", utilitaire: "utilitaires-camions", utilitaires: "utilitaires-camions", camion: "utilitaires-camions", camions: "utilitaires-camions", moto: "motos-scooters", motos: "motos-scooters", scooter: "motos-scooters", "location voiture": RENTAL_SUBCATEGORY, "location voitures": RENTAL_SUBCATEGORY, "location auto": RENTAL_SUBCATEGORY, "location de voiture": RENTAL_SUBCATEGORY })) index.set(key(word), id);
   return index;
 })();
 
@@ -150,6 +168,8 @@ export interface ImportedFields {
   condition: Condition | null;
   attributes: ListingAttributes;
   location: { regionCode: string; citySlug: string; district?: string } | null;
+  /** Car rentals: the blocked periods of the line (undefined: the file leaves them as they are). */
+  unavailable?: RentalPeriod[];
 }
 
 export interface ParsedRow {
@@ -215,8 +235,28 @@ function generatedTitle(subcategory: Subcategory, attributes: ListingAttributes)
   return parts.join(" ").slice(0, TITLE_MAX);
 }
 
-/** One line: reads every mapped cell, then checks it against its subcategory's criteria. */
-export function parseRow(record: { line: number; cells: readonly string[] }, header: readonly string[], columns: ColumnMap, options: { pro: boolean }): ParsedRow {
+/** A cell meaning "no blocked day". */
+const NO_PERIOD_WORDS = new Set(["aucune", "aucun", "libre", "-", "0", "none", "لا"].map(key));
+const PERIOD = /^(\d{4}-\d{2}-\d{2})(?:\s*(?:\/|au|à|->|→|\.\.)\s*(\d{4}-\d{2}-\d{2}))?$/iu;
+
+/** "2026-11-02/2026-11-05; 2026-12-24" -> merged periods from `today`; undefined when unreadable. */
+export function parsePeriods(raw: string, today: number): RentalPeriod[] | undefined {
+  if (NO_PERIOD_WORDS.has(key(raw))) return [];
+  const periods: RentalPeriod[] = [];
+  for (const part of raw.split(/\s*[;,|\n]\s*/).filter(Boolean)) {
+    const match = PERIOD.exec(part.trim());
+    if (!match || !DAY_PATTERN.test(match[1]!) || (match[2] !== undefined && !DAY_PATTERN.test(match[2]))) return undefined;
+    periods.push({ from: match[1]!, to: match[2] ?? match[1]! });
+  }
+  const normalized = normalizePeriods(periods, today);
+  return "periods" in normalized ? normalized.periods : undefined;
+}
+
+/**
+ * One line: reads every mapped cell, then checks it against its subcategory's criteria. `today`
+ * (Morocco day number, default now) bounds the blocked periods of a car rental.
+ */
+export function parseRow(record: { line: number; cells: readonly string[] }, header: readonly string[], columns: ColumnMap, options: { pro: boolean; today?: number }): ParsedRow {
   const issues: StockRowIssue[] = [];
   const cells = new Map<string, { raw: string; column: string }>();
   for (const [index, target] of columns.targets) {
@@ -242,7 +282,8 @@ export function parseRow(record: { line: number; cells: readonly string[] }, hea
     if (ref && REF_PATTERN.test(ref) && options.pro) attributes[STOCK_REF] = ref;
     for (const criterion of subcategory.criteria) {
       if (criterion.id === STOCK_REF) continue;
-      const cell = cells.get(criterion.id) ?? (criterion === brandCriterion(subcategory) ? cells.get(BRAND) : undefined);
+      // "Kilométrage" is the mileage of a car for sale and the mileage policy of a rental.
+      const cell = cells.get(criterion.id) ?? (criterion === brandCriterion(subcategory) ? cells.get(BRAND) : criterion.id === "mileage-policy" ? cells.get("mileage") : undefined);
       if (!cell) continue;
       if (criterion.proOnly && !options.pro) {
         issues.push({ column: cell.column, code: "pro_only" });
@@ -315,11 +356,18 @@ export function parseRow(record: { line: number; cells: readonly string[] }, hea
     }
   }
 
+  let unavailable: RentalPeriod[] | undefined;
+  const unavailableCell = core("unavailable");
+  if (unavailableCell && subcategory?.id === RENTAL_SUBCATEGORY) {
+    unavailable = parsePeriods(unavailableCell.raw, options.today ?? moroccoToday(Date.now()));
+    if (!unavailable) issues.push({ column: unavailableCell.column, code: "periods_invalid", value: cut(unavailableCell.raw) });
+  } else if (unavailableCell && subcategory) issues.push({ column: unavailableCell.column, code: "periods_ignored" });
+
   return {
     line: record.line,
     ref,
     subcategoryId: subcategory?.id ?? null,
-    fields: { title, description: description.slice(0, DESCRIPTION_MAX), price, priceNegotiable: negotiable ?? false, condition, attributes, location },
+    fields: { title, description: description.slice(0, DESCRIPTION_MAX), price, priceNegotiable: negotiable ?? false, condition, attributes, location, ...(unavailable ? { unavailable } : {}) },
     issues,
   };
 }
@@ -345,7 +393,7 @@ function readCriterion(criterion: Criterion, raw: string): ListingAttributes[str
 }
 
 /** Every line of a parsed file. */
-export function parseRows(table: CsvTable, options: { pro: boolean }): { rows: ParsedRow[]; ignoredColumns: string[] } {
+export function parseRows(table: CsvTable, options: { pro: boolean; today?: number }): { rows: ParsedRow[]; ignoredColumns: string[] } {
   const columns = mapColumns(table.header);
   return { rows: table.records.map((record) => parseRow(record, table.header, columns, options)), ignoredColumns: columns.ignored };
 }

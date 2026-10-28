@@ -2722,7 +2722,8 @@
       "rate7": "{amount} par jour dès 7 jours",
       "rate30": "{amount} par jour dès 30 jours",
       "fleet": "{count, plural, one {# véhicule de ce modèle} other {# véhicules de ce modèle}} dans la flotte",
-      "declared": "Conditions déclarées par l'agence, sous sa seule responsabilité : seul le contrat écrit de l'agence fait foi."
+      "declared": "Conditions déclarées par l'agence, sous sa seule responsabilité : seul le contrat écrit de l'agence fait foi.",
+      "stockRef": "Réf."
     },
     "rentalGuide": {
       "title": "Louer un véhicule au Maroc",
@@ -3276,6 +3277,7 @@
       "quotasTitle": "Vos quotas",
       "shortcuts": "Raccourcis",
       "stockImport": "Importer mon stock",
+      "fleet": "Planning de flotte",
       "sellerPayment": "Paiement chez le vendeur"
     },
     "errors": {
@@ -4214,11 +4216,12 @@
       "title": "Votre fichier",
       "lead": "CSV en UTF-8 ou exporté d'Excel (virgule, point-virgule ou tabulation), {rows} lignes au plus.",
       "template": "Télécharger le modèle",
+      "templateRental": "Modèle pour une flotte de location",
       "pick": "Choisir un fichier CSV",
       "hint": "Ou glissez-le ici. Rien n'est enregistré avant votre confirmation.",
       "chosen": "Fichier analysé : {name}. Choisissez-en un autre pour recommencer.",
       "columnsTitle": "Colonnes reconnues",
-      "columns": "reference (obligatoire, unique), categorie (Voitures par défaut, Utilitaires & camions, Motos & scooters), titre, description, prix, negociable, ville, quartier, etat, puis les critères par leur nom : marque, modele, annee, kilometrage, carburant, boite, puissance fiscale, origine, carrosserie, portes, couleur, premiere main, carnet, non accidente, papiers, garantie, duree garantie, reprise, financement, equipements. Les valeurs acceptent le libellé du site (« Diesel », « Caméra de recul ») ; plusieurs choix se séparent par « | ». Une cellule vide garde la valeur déjà sur le site.",
+      "columns": "reference (obligatoire, unique), categorie (Voitures par défaut, Utilitaires & camions, Motos & scooters), titre, description, prix, negociable, ville, quartier, etat, puis les critères par leur nom : marque, modele, annee, kilometrage, carburant, boite, puissance fiscale, origine, carrosserie, portes, couleur, premiere main, carnet, non accidente, papiers, garantie, duree garantie, reprise, financement, equipements. Les valeurs acceptent le libellé du site (« Diesel », « Caméra de recul ») ; plusieurs choix se séparent par « | ». Une cellule vide garde la valeur déjà sur le site. Location de voitures : categorie « Location de voitures », puis gamme, places, duree minimum, kilometrage (Illimité ou Limité), assurance, franchise, caution, age minimum, permis, remise, tarif semaine, tarif mois, unites, et indisponible pour les jours bloqués : « 2026-11-02/2026-11-05; 2026-12-24 » (« aucune » libère tous les jours).",
       "errors": {
         "too_large": "Ce fichier dépasse 1 Mo : découpez-le en plusieurs fichiers.",
         "not_csv": "Ce fichier n'est pas un CSV. Dans votre tableur, choisissez « Enregistrer sous », format CSV."
@@ -4263,13 +4266,14 @@
       "priceNegotiable": "prix négociable",
       "condition": "état",
       "attributes": "caractéristiques",
-      "location": "ville"
+      "location": "ville",
+      "unavailable": "jours bloqués"
     },
     "codes": {
       "ref_required": "référence manquante",
       "ref_invalid": "référence invalide (lettres, chiffres, - _ . /, 40 caractères au plus)",
       "ref_duplicate": "référence déjà présente plus haut dans le fichier",
-      "category_unknown": "catégorie non importable (voitures, utilitaires, motos)",
+      "category_unknown": "catégorie non importable (voitures, utilitaires, motos, location de voitures)",
       "value_unknown": "valeur non reconnue",
       "number_invalid": "nombre invalide ou hors limites",
       "required": "obligatoire",
@@ -4282,6 +4286,8 @@
       "description_short": "description courte : à compléter avant publication",
       "title_generated": "titre créé à partir de la marque, du modèle et de l'année",
       "column_ignored": "ignoré, la colonne dont il dépend ne l'ouvre pas",
+      "periods_invalid": "périodes illisibles : écrivez 2026-11-02/2026-11-05; 2026-12-24 (365 jours au plus, 40 périodes au plus)",
+      "periods_ignored": "ignoré : seules les locations de voitures ont des jours bloqués",
       "failed": "non enregistré, réessayez"
     },
     "photos": {
@@ -4453,5 +4459,37 @@
       "body": "Choisissez la ville et vos dates : les agences affichent les véhicules libres sur toute la période.",
       "submit": "Trouver une voiture"
     }
+  },
+  "Fleet": {
+    "title": "Planning de flotte",
+    "back": "Espace Pro",
+    "lead": "Vos voitures de location sur les 60 prochains jours. Touchez un jour pour le bloquer ou le libérer, ou glissez à la souris pour une période entière. Un jour bloqué veut dire qu'aucun véhicule de l'annonce n'est libre ce jour-là.",
+    "loading": "Chargement du planning",
+    "retry": "Réessayer",
+    "emptyTitle": "Aucune voiture de location en ligne",
+    "emptyBody": "Publiez vos véhicules dans « Location de voitures » : ils apparaîtront ici, prêts à être planifiés.",
+    "emptyAction": "Publier une voiture",
+    "city": "Ville de l'agence",
+    "allCities": "Toutes les villes",
+    "search": "Rechercher un véhicule",
+    "confirm": "Tout est à jour",
+    "vehicles": "{count, plural, one {# véhicule affiché,} other {# véhicules affichés,}}",
+    "stale": "{count, plural, one {# à confirmer.} other {# à confirmer.}}",
+    "allFresh": "disponibilités à jour.",
+    "legend": "Légende",
+    "truncated": "Votre flotte compte plus de 200 voitures : le planning montre les 200 premières par titre. Filtrez par ville ou utilisez « Mes annonces » pour les autres.",
+    "noMatch": "Aucun véhicule ne correspond à ce filtre.",
+    "gridLabel": "Disponibilités de la flotte, jour par jour",
+    "vehicle": "Véhicule",
+    "edited": "modifié",
+    "fresh": "à jour",
+    "toConfirm": "à confirmer",
+    "pending": "{count, plural, one {# véhicule modifié, pas encore enregistré.} other {# véhicules modifiés, pas encore enregistrés.}}",
+    "tooMany": "Au plus {max} périodes par véhicule : regroupez des jours proches.",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "saved": "Planning enregistré pour {count, plural, one {# véhicule} other {# véhicules}}.",
+    "confirmed": "Disponibilités confirmées pour {count, plural, one {# véhicule} other {# véhicules}}.",
+    "partial": "{count, plural, one {# véhicule n'a pas été enregistré : le planning est rechargé, refaites sa modification.} other {# véhicules n'ont pas été enregistrés : le planning est rechargé, refaites leurs modifications.}}"
   }
 }
