@@ -24,6 +24,7 @@ import {
   parseStatus,
   pickImage,
   promoteCommand,
+  tagProblem,
   rebuildDetails,
   recordedTarballs,
   buildStagingScript,
@@ -252,6 +253,18 @@ describe("production releases", () => {
     expect(() => promoteCommand({ release: "", web: id("a"), worker: id("b") })).toThrow(/no valid release/);
     expect(() => promoteCommand({ release: "0123456789ab; rm -rf /", web: id("a"), worker: id("b") })).toThrow(/no valid release/);
     expect(() => promoteCommand({ release: "0123456789ab", web: "", worker: id("b") })).toThrow(/image IDs/);
+  });
+
+  it("promotes only staging's release under an annotated release tag on that commit", () => {
+    const commit = "0123456789abcdef0123456789abcdef01234567";
+    expect(tagProblem("v1.0.0", "tag", commit, "0123456789ab")).toBeNull();
+    expect(tagProblem("v1.0.0-rc.2", "tag", commit, "0123456789ab")).toBeNull();
+    expect(tagProblem("1.0.0", "tag", commit, "0123456789ab")).toMatch(/vX\.Y\.Z/);
+    expect(tagProblem("v1.0.0-beta", "tag", commit, "0123456789ab")).toMatch(/vX\.Y\.Z/);
+    expect(tagProblem("v1.0.0", "commit", commit, "0123456789ab")).toMatch(/not annotated/);
+    expect(tagProblem("v1.0.0", "", "", "0123456789ab")).toMatch(/not on origin/);
+    expect(tagProblem("v1.0.0", "tag", commit, "fedcba987654")).toMatch(/staging runs fedcba987654/);
+    expect(tagProblem("v1.0.0", "tag", commit, "")).toMatch(/staging runs no release/);
   });
 
   it("sends the forced command of production one request it cannot be tricked by", () => {
