@@ -2,8 +2,9 @@ import { randomInt } from "node:crypto";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Car rental listings (rental pack, design location-voitures/location-voitures.md §2) against the
-// Firebase emulators: Pro agencies only, the agency's attestation at every publication, the day
-// price and long-term rates, and the moderator review of a rental "with driver".
+// Firebase emulators: Pro agencies only, the licence reference in the agency's settings and its
+// attestation at every publication, the day price and long-term rates, and the moderator review
+// of a rental "with driver".
 
 vi.mock("@/lib/search/queue", () => ({ notifySearchIndex: vi.fn(async () => undefined) }));
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
@@ -13,8 +14,11 @@ import { PATCH as patch } from "@/app/api/listings/[id]/route";
 import { POST as publish } from "@/app/api/listings/[id]/publish/route";
 import { PUT as putAvailability } from "@/app/api/listings/[id]/availability/route";
 import { GET as getFleet, PUT as putFleet } from "@/app/api/pro/fleet/route";
+import { GET as getMe } from "@/app/api/pro/me/route";
+import { PUT as putRental } from "@/app/api/pro/me/rental/route";
 import { DEFAULT_PRICING } from "@/config/pricing";
 import type { CreateListingResponse, FieldIssue, FleetResponse, FleetSaveResponse, RentalAvailabilityResponse } from "@/lib/contracts/listings";
+import type { ProMeResponse, ProRentalResponse } from "@/lib/contracts/pro";
 import { getListing } from "@/lib/db/repositories/listings";
 import { getSearchOutbox } from "@/lib/db/repositories/search-outbox";
 import { dayString, moroccoToday } from "@/lib/listings/rental-availability";
@@ -36,8 +40,16 @@ const newProId = () => Array.from({ length: 8 }, () => PRO_ID_ALPHABET[randomInt
 const ACCEPT = { acceptRules: true };
 const codesOf = (issues: FieldIssue[]) => issues.map((issue) => `${issue.path}:${issue.code}`);
 
-/** A verified rental agency on the launch offer, signed in as its owner. */
-async function agency(): Promise<Member> {
+const SETTINGS = {
+  agrementRef: "AGR 123/2025",
+  branches: [{ citySlug: "marrakech", address: "Avenue Mohammed VI, Guéliz" }],
+  hours: "Tous les jours de 8 h à 21 h",
+  payments: ["cash", "card"],
+  airports: ["rak"],
+};
+
+/** A verified rental agency on the launch offer, signed in as its owner; `settings: false` before it filled its settings. */
+async function agency({ settings = true }: { settings?: boolean } = {}): Promise<Member> {
   const owner = await member({ displayName: "Océan Rent" });
   const proId = newProId();
   const now = new Date();
@@ -57,6 +69,8 @@ async function agency(): Promise<Member> {
       plan: "essentiel",
       planSource: "launch_offer",
       quotas: DEFAULT_PRICING.pro.essentiel,
+      sector: "car_rental",
+      ...(settings ? { rental: { ...SETTINGS, payments: ["cash", "card"] as const, airports: ["rak"] as const } } : {}),
       createdAt: now,
       updatedAt: now,
     }),
@@ -104,6 +118,19 @@ describe("car rental publication", () => {
     const result = await api<PublishBody>(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: { ...ACCEPT, rentalAttestation: true } });
     expect(result.status).toBe(200);
     expect(result.body.status).toBe("published");
+  });
+
+  it("needs the licence reference in the agency's settings first", async () => {
+    const owner = await agency({ settings: false });
+    const id = await rentalDraft(owner);
+    const missing = await api<ErrorBody>(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: { ...ACCEPT, rentalAttestation: true } });
+    expect(missing.status).toBe(422);
+    expect(missing.body.error.code).toBe("rental_agrement_missing");
+
+    const saved = await api<ProRentalResponse>(putRental, "PUT", "/api/pro/me/rental", { member: owner, body: SETTINGS });
+    expect(saved.status).toBe(200);
+    expect(saved.body.rental).toEqual(SETTINGS);
+    expect((await api<PublishBody>(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: { ...ACCEPT, rentalAttestation: true } })).body.status).toBe("published");
   });
 
   it("refuses a long-term rate above the day price, and holds a rental with driver for a moderator", async () => {
@@ -213,7 +240,39 @@ describe("fleet planning", () => {
 
   it("is for Pro accounts only", async () => {
     const someone = await member();
+    expect((await api<ErrorBody>(putRental, "PUT", "/api/pro/me/rental", { member: someone, body: SETTINGS })).status).toBe(409);
     expect((await fleet(someone)).status).toBe(403);
     expect((await save(someone, { changes: [{ id: "abcdefgh", unavailable: [], since: null }] })).status).toBe(403);
+  });
+});
+
+describe("car rental agency settings", () => {
+  const put = (owner: Member, body: unknown) => api<ProRentalResponse & ErrorBody>(putRental, "PUT", "/api/pro/me/rental", { member: owner, body });
+
+  it("replaces the settings, read back in the Pro area", async () => {
+    const owner = await agency({ settings: false });
+    const next = { ...SETTINGS, branches: [...SETTINGS.branches, { citySlug: "agadir", address: "Boulevard du 20 Août, Founty" }], airports: ["rak", "aga"] };
+    expect((await put(owner, next)).status).toBe(200);
+    const me = await api<ProMeResponse>(getMe, "GET", "/api/pro/me", { member: owner });
+    expect(me.body.shop).toMatchObject({ sector: "car_rental", rental: next });
+    expect((await put(owner, { ...next, branches: [], hours: "", payments: [], airports: [] })).body.rental).toMatchObject({ branches: [], airports: [] });
+  });
+
+  it("refuses a malformed reference, unknown airports, duplicates and contact details in the texts", async () => {
+    const owner = await agency({ settings: false });
+    for (const body of [
+      { ...SETTINGS, agrementRef: "AB" },
+      { ...SETTINGS, agrementRef: "sans chiffre" },
+      { ...SETTINGS, airports: ["cdg"] },
+      { ...SETTINGS, payments: ["cash", "cash"] },
+      { ...SETTINGS, branches: [SETTINGS.branches[0], SETTINGS.branches[0]] },
+      { ...SETTINGS, extra: true },
+    ]) {
+      expect((await put(owner, body)).status, JSON.stringify(body)).toBe(400);
+    }
+    const phone = await put(owner, { ...SETTINGS, hours: "Appelez le 0612345678" });
+    expect(phone.status).toBe(422);
+    expect(phone.body.error.code).toBe("invalid_text");
+    expect((await put(owner, { ...SETTINGS, branches: [{ citySlug: "marrakech", address: "contact@agence.ma, Guéliz" }] })).status).toBe(422);
   });
 });

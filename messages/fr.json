@@ -575,7 +575,8 @@
       "quota_exhausted": "Le dépôt et la modification d'annonces sont momentanément suspendus : la limite quotidienne de notre service est atteinte. Votre annonce est conservée ; réessayez après 9 h (heure du Maroc).",
       "adults_only_attestation": "Pour publier dans cette catégorie, confirmez qu'il s'agit d'un objet décoratif vendu uniquement à une personne majeure.",
       "real_estate_attestation": "Pour publier une annonce immobilière, attestez que ses informations sont exactes et sous votre seule responsabilité.",
-      "rental_attestation": "Pour publier une location, confirmez la déclaration de votre agence (agrément, immatriculation, assurance)."
+      "rental_attestation": "Pour publier une location, confirmez la déclaration de votre agence (agrément, immatriculation, assurance).",
+      "rental_agrement_missing": "Pour publier une location, renseignez d'abord le numéro d'agrément de votre agence dans l'espace Pro (Mon agence de location)."
     },
     "wizard": {
       "title": "Déposer une annonce",
@@ -3278,7 +3279,8 @@
       "shortcuts": "Raccourcis",
       "stockImport": "Importer mon stock",
       "fleet": "Planning de flotte",
-      "sellerPayment": "Paiement chez le vendeur"
+      "sellerPayment": "Paiement chez le vendeur",
+      "rentalAgency": "Mon agence de location"
     },
     "errors": {
       "pro_signup_closed": "Les demandes de compte Pro sont fermées pour le moment.",
@@ -3291,14 +3293,16 @@
     },
     "agency": {
       "title": "Secteur d'activité",
-      "lead": "Une agence immobilière a une vitrine dédiée : ses biens par transaction et son barème d'honoraires.",
+      "lead": "Une agence immobilière ou de location de voitures a une vitrine dédiée : ses biens par transaction, ou sa flotte filtrable par dates.",
       "sectors": {
         "general": "Commerce et services",
-        "real_estate": "Agence immobilière"
+        "real_estate": "Agence immobilière",
+        "car_rental": "Location de voitures"
       },
       "sectorHints": {
         "general": "Vitrine de boutique classique.",
-        "real_estate": "Vitrine d'agence, mandat et honoraires sur vos annonces."
+        "real_estate": "Vitrine d'agence, mandat et honoraires sur vos annonces.",
+        "car_rental": "Vitrine de flotte par catégorie, disponibilités par dates."
       },
       "feeSchedule": "Barème des honoraires",
       "feeScheduleHint": "Affiché sur votre vitrine, {max} caractères au plus. Pas de téléphone, d'e-mail ni de lien : les clients vous écrivent par la messagerie.",
@@ -3789,6 +3793,55 @@
       },
       "onVehicles": "{count, plural, one {# véhicule} other {# véhicules}}",
       "servicesNote": "Services déclarés par la boutique sur ses annonces : leurs conditions se voient avec elle. Une offre de crédit doit être écrite et indiquer le prêteur et le taux (TEG)."
+    },
+    "rental": {
+      "label": "Agence de location de voitures",
+      "verifiedNote": "Les identifiants professionnels de cette agence (ICE, registre du commerce) ont été vérifiés. La location se conclut directement entre vous et l'agence, par son contrat écrit : le site n'est partie à aucune location et ne perçoit ni acompte, ni caution. Ne versez rien avant d'avoir vu le véhicule et le contrat.",
+      "agencyTitle": "L'agence",
+      "agrement": "Agrément n°",
+      "agrementDeclared": "Numéro déclaré par l'agence, sous sa seule responsabilité.",
+      "hours": "Horaires",
+      "payments": "Paiement à l'agence",
+      "paymentOptions": {
+        "cash": "Espèces",
+        "card": "Carte bancaire",
+        "transfer": "Virement"
+      },
+      "airports": "Remise dans les aéroports",
+      "branchesTitle": "Les agences",
+      "branchesNote": "Adresses professionnelles déclarées par l'agence.",
+      "conditionsTitle": "Conditions de l'agence",
+      "conditionsNote": "Résumé des conditions déclarées sur ses annonces : chaque véhicule a les siennes sur son annonce, et le contrat de l'agence prévaut.",
+      "driver": "Conducteur",
+      "age": "dès {age} ans",
+      "licence": "permis depuis {count, plural, one {# an} other {# ans}}",
+      "deposit": "Caution de {amount}",
+      "depositRange": "Caution de {min} à {max}",
+      "depositHint": "Selon le véhicule. Versée à l'agence au départ, jamais sur le site.",
+      "insurance": "Assurance incluse",
+      "handover": "Remise du véhicule",
+      "oneWay": "retour dans une autre ville possible",
+      "otherListings": "{count, plural, one {# autre annonce} other {# autres annonces}}"
+    },
+    "fleet": {
+      "fleetTitle": "La flotte",
+      "fleetCount": "{count, plural, one {# véhicule en location} other {# véhicules en location}}",
+      "filterLead": "Vos dates de location : la flotte montre d'abord les véhicules libres sur toute la période.",
+      "city": "Agence",
+      "allCities": "Toutes les agences",
+      "reset": "Effacer",
+      "freeCount": "Libres à ces dates : {count, plural, one {# véhicule} other {# véhicules}}",
+      "noneFree": "Aucun véhicule libre à ces dates : essayez d'autres jours ou comparez avec les autres agences.",
+      "noMatch": "Aucun véhicule dans cette agence.",
+      "otherClass": "Autres véhicules",
+      "truncated": "Les {shown} véhicules les moins chers sont affichés : retrouvez toute la flotte dans la recherche.",
+      "seeInSearch": "Voir la flotte dans la recherche",
+      "compare": "Comparer avec les autres agences",
+      "fleetNote": "Disponibilités déclarées par l'agence, sans engagement : la réservation se confirme avec elle. Totaux estimés hors caution, tarif dégressif appliqué.",
+      "seats": "{count} places",
+      "free": "Libre à vos dates",
+      "blocked": "Indisponible à vos dates",
+      "minDays": "Location de {count, plural, one {# jour} other {# jours}} minimum"
     }
   },
   "Options": {
@@ -4458,7 +4511,8 @@
       "title": "Louer une voiture",
       "body": "Choisissez la ville et vos dates : les agences affichent les véhicules libres sur toute la période.",
       "submit": "Trouver une voiture"
-    }
+    },
+    "airport": "{city} ({code})"
   },
   "Fleet": {
     "title": "Planning de flotte",
@@ -4491,5 +4545,71 @@
     "saved": "Planning enregistré pour {count, plural, one {# véhicule} other {# véhicules}}.",
     "confirmed": "Disponibilités confirmées pour {count, plural, one {# véhicule} other {# véhicules}}.",
     "partial": "{count, plural, one {# véhicule n'a pas été enregistré : le planning est rechargé, refaites sa modification.} other {# véhicules n'ont pas été enregistrés : le planning est rechargé, refaites leurs modifications.}}"
+  },
+  "RentalAgency": {
+    "title": "Mon agence de location",
+    "back": "Retour à l'espace Pro",
+    "lead": "Ces informations s'affichent sur votre vitrine. Le numéro d'agrément est obligatoire pour publier une location.",
+    "loading": "Chargement des réglages",
+    "loadFailed": "Les réglages n'ont pas pu être chargés.",
+    "retry": "Réessayer",
+    "notVerified": "Ces réglages sont réservés aux boutiques Pro vérifiées.",
+    "sectorTitle": "Votre secteur n'est pas « Location de voitures »",
+    "sectorBody": "Vous pouvez enregistrer ces réglages, mais votre vitrine ne montrera votre flotte qu'une fois ce secteur choisi.",
+    "sectorAction": "Changer de secteur",
+    "agrementTitle": "Agrément",
+    "agrementLead": "Le numéro de la décision d'agrément délivrée par le ministère du Transport. Il s'affiche sur votre vitrine comme « déclaré par l'agence » : vous en restez seul responsable.",
+    "agrement": "Numéro d'agrément",
+    "agrementHint": "Tel qu'il figure sur votre décision d'agrément.",
+    "agrementPlaceholder": "Exemple : 123/2025",
+    "agrementRequired": "Renseignez votre numéro d'agrément.",
+    "agrementInvalid": "De 3 à 40 caractères : lettres latines, chiffres, espaces et . / - _, avec au moins un chiffre.",
+    "branchesTitle": "Vos agences",
+    "branchesLead": "{max} au plus, chacune avec son adresse professionnelle (jamais une adresse personnelle). Elles s'affichent sur votre vitrine.",
+    "branch": "Agence {index}",
+    "removeBranch": "Retirer l'agence {index}",
+    "remove": "Retirer",
+    "address": "Adresse de l'agence",
+    "addressHint": "Rue, quartier ou zone : pas de téléphone ni d'e-mail.",
+    "addressPlaceholder": "Exemple : 12 avenue Mohammed V, Guéliz",
+    "addressShort": "L'adresse compte au moins 5 caractères.",
+    "addressRequired": "Renseignez l'adresse ou retirez cette agence.",
+    "cityRequired": "Choisissez la ville de l'agence.",
+    "addBranch": "Ajouter une agence",
+    "serviceTitle": "Accueil des clients",
+    "hours": "Horaires d'ouverture",
+    "hoursHint": "{max} caractères au plus. Pas de téléphone, d'e-mail ni de lien : les clients vous écrivent par la messagerie.",
+    "hoursPlaceholder": "Exemple : tous les jours de 8 h à 21 h, remise à l'aéroport 24 h/24 sur rendez-vous",
+    "payments": "Paiements acceptés à l'agence",
+    "paymentOptions": {
+      "cash": "Espèces",
+      "card": "Carte bancaire",
+      "transfer": "Virement"
+    },
+    "airports": "Aéroports desservis",
+    "airportsHint": "Ceux où vous remettez et reprenez les véhicules.",
+    "failed": "L'enregistrement a échoué.",
+    "save": "Enregistrer",
+    "saved": "Réglages enregistrés. Votre vitrine est mise à jour.",
+    "upToDate": "Réglages à jour.",
+    "setup": {
+      "title": "Mettre votre agence en ligne",
+      "lead": "Trois étapes pour une vitrine de location prête à recevoir des demandes.",
+      "readyTitle": "Votre agence est en ligne",
+      "ready": "Les locataires voient vos véhicules libres à leurs dates. Confirmez votre planning au moins tous les 14 jours.",
+      "progress": "{done} sur {total}",
+      "step1": "Agrément et agences",
+      "step1Hint": "Le numéro d'agrément, obligatoire pour publier, vos adresses et vos horaires.",
+      "step1Action": "Mes réglages",
+      "step2": "Vos véhicules",
+      "step2Hint": "Une annonce par modèle, ou toute la flotte d'un coup par import CSV.",
+      "step2Action": "Déposer un véhicule",
+      "step2Import": "Importer ma flotte",
+      "step3": "Votre planning",
+      "step3Hint": "Bloquez les jours loués et confirmez vos disponibilités au moins tous les 14 jours.",
+      "step3Action": "Mon planning",
+      "doneLabel": "Étape {index} faite :",
+      "todoLabel": "Étape {index} à faire :"
+    }
   }
 }

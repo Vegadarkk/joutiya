@@ -16,7 +16,7 @@ import { db } from "@/lib/firebase/admin";
 import { aggregationReads, consume } from "@/lib/quota";
 import { assertQuotas, PUBLIC_READ_QUOTAS } from "@/lib/quota/gate";
 import { storefrontShown } from "@/lib/pro/lifecycle";
-import { PRO_ID_PATTERN, type ProSector } from "@/lib/pro/profile-schema";
+import { PRO_ID_PATTERN, type ProSector, type RentalAgency } from "@/lib/pro/profile-schema";
 import { sellerReviews } from "@/lib/reviews/seller";
 import { ratingSummary } from "@/lib/reviews/views";
 import { rentalAvailabilityOf } from "./availability";
@@ -348,6 +348,8 @@ export interface PublicStorefront {
   sector: ProSector;
   /** The agency's fee schedule ("" when none). */
   feeSchedule: string;
+  /** A car rental agency's settings (sector "car_rental", rental pack §5), null until saved. */
+  rental: RentalAgency | null;
   /** « Payer chez le vendeur » and the seller information, when the shop has turned them on. */
   payment: PublicShopPayment | null;
   /** The owner's public face and listings, as on /profil. */
@@ -376,6 +378,7 @@ export async function getPublicStorefront(proId: string, limit = 24): Promise<Pu
     citySlug: profile.citySlug,
     sector: profile.sector ?? "general",
     feeSchedule: profile.sector === "real_estate" ? (profile.agency?.feeSchedule ?? "") : "",
+    rental: profile.sector === "car_rental" ? (profile.rental ?? null) : null,
     seller: await profileView(user, limit),
   };
 }

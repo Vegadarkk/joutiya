@@ -21,6 +21,7 @@ import { publishesAsPro, type ProState } from "@/lib/pro/lifecycle";
 import { loadProMe } from "@/lib/pro/client";
 import { paymentEligible } from "@/lib/pro/seller-payment-rules";
 import { cn } from "@/lib/utils";
+import { RentalSetup } from "@/components/rental/rental-setup";
 import { AgencySettings } from "./agency-settings";
 import { ProApplicationForm } from "./pro-application-form";
 
@@ -297,6 +298,8 @@ function Dashboard({ me, shop, lifecycle }: { me: ProMeResponse; shop: ProSelfVi
         </div>
       )}
 
+      {canPublish && shop.sector === "car_rental" ? <RentalSetup shop={shop} /> : null}
+
       {suspended ? null : <AgencySettings shop={shop} />}
 
       <section className="flex flex-col gap-3" aria-labelledby="pro-shortcuts">
@@ -317,6 +320,11 @@ function Dashboard({ me, shop, lifecycle }: { me: ProMeResponse; shop: ProSelfVi
           {canPublish && shop.sector !== "real_estate" ? (
             <Button asChild variant="outline">
               <Link href="/pro/flotte">{t("fleet")}</Link>
+            </Button>
+          ) : null}
+          {canPublish && shop.sector === "car_rental" ? (
+            <Button asChild variant="outline">
+              <Link href="/pro/location">{t("rentalAgency")}</Link>
             </Button>
           ) : null}
           <Button asChild variant="outline">

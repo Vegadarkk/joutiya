@@ -87,6 +87,8 @@ export interface SellerContext {
   user: UserRecord;
   seller: Seller;
   quotas: ListingQuotas;
+  /** A car rental agency's licence reference (rental pack decision 3), when its settings hold one. */
+  rentalAgrementRef?: string;
 }
 
 export async function sellerOf(auth: AuthContext): Promise<SellerContext> {
@@ -100,7 +102,8 @@ export async function sellerOf(auth: AuthContext): Promise<SellerContext> {
   const profile = proId ? await getProProfile(proId) : null;
   const plan = profile && profile.ownerUid === user.uid && publishesAsPro(profile.lifecycle) ? profile.plan : "none";
   const seller: Seller = { type: "pro", plan };
-  return { user, seller, quotas: listingQuotas(seller, pricing) };
+  const agrementRef = profile && profile.ownerUid === user.uid ? profile.rental?.agrementRef : undefined;
+  return { user, seller, quotas: listingQuotas(seller, pricing), ...(agrementRef ? { rentalAgrementRef: agrementRef } : {}) };
 }
 
 async function lifetime(): Promise<Lifetime> {
@@ -435,6 +438,7 @@ export async function publish(actor: Actor, request: Request, id: string, option
   const subcategory = subcategoryById(listing.subcategoryId ?? "");
   if (subcategory?.adultsOnly && !options.adultsOnlyAttestation) throw new HttpError(422, "adults_only_attestation");
   if (needsRealEstateAttestation(subcategory) && !options.realEstateAttestation) throw new HttpError(422, "real_estate_attestation");
+  if (listing.subcategoryId === RENTAL_SUBCATEGORY && !seller.rentalAgrementRef) throw new HttpError(422, "rental_agrement_missing");
   if (listing.subcategoryId === RENTAL_SUBCATEGORY && !options.rentalAttestation) throw new HttpError(422, "rental_attestation");
 
   await assertWithinQuota(uid, seller.quotas);

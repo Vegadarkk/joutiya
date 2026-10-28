@@ -6,8 +6,10 @@ import { PASSWORD, firebase, randomId, signUpAndIn } from "./helpers";
 
 // Car rental listing by a Pro agency (rental pack, design location-voitures/location-voitures.md §2)
 // against the production build and the emulators: a verified agency (seeded, the application is
-// covered by pro.spec.ts) posts a car through the wizard, fills the folded rental terms, is held
-// back by the day price rule and the attestation, then publishes and sees its terms on the page.
+// covered by pro.spec.ts) fills its agency settings from the start-up checklist, posts a car
+// through the wizard, fills the folded rental terms, is held back by the day price rule and the
+// attestation, then publishes, sees its terms on the page, plans its fleet and finds it on its
+// storefront filtered by dates.
 process.env.FIREBASE_AUTH_EMULATOR_HOST ??= "127.0.0.1:9099";
 
 /** Auth emulator admin REST (firebase-admin/auth does not load under the Playwright loader here). */
@@ -22,7 +24,8 @@ async function authEmulator<T>(action: string, body: unknown): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function seedAgency(email: string): Promise<void> {
+/** A verified car rental agency without its settings yet; returns its storefront segment. */
+async function seedAgency(email: string): Promise<string> {
   const app = firebase();
   const { users } = await authEmulator<{ users: { localId: string }[] }>("lookup", { email: [email] });
   const uid = users[0]!.localId;
@@ -46,11 +49,13 @@ async function seedAgency(email: string): Promise<void> {
       plan: "essentiel",
       planSource: "launch_offer",
       quotas: { activeListings: 50, photosPerListing: 20, listingsPerDay: 25 },
+      sector: "car_rental",
       createdAt: now,
       updatedAt: now,
     });
   await getFirestore(app).collection("users").doc(uid).update({ type: "pro", proId, updatedAt: now });
   await authEmulator("update", { localId: uid, customAttributes: JSON.stringify({ role: "pro", proId, proRole: "owner", v: 2 }) });
+  return `ocean-rent-${proId}-${proId}`;
 }
 
 /** A fresh session carries the new claims (the old one was minted before them). */
@@ -78,8 +83,28 @@ test.describe("Car rental", () => {
     const email = `rental-${randomId(10)}@joutiya.test`;
     const title = `Dacia Logan ou similaire ${randomId(4)}`;
     await signUpAndIn(page, request, email, "Océan Rent");
-    await seedAgency(email);
+    const storefront = await seedAgency(email);
     await signInAgain(page, email);
+
+    // Turnkey set-up (rental pack §5): the checklist leads to the settings and the licence reference.
+    await page.goto("/fr/pro");
+    const setup = page.getByTestId("rental-setup");
+    await expect(setup.getByTestId("rental-setup-progress")).toHaveText("0 sur 3");
+    await page.screenshot({ path: "test-results/rental-setup.png", fullPage: true });
+    await setup.getByRole("link", { name: "Mes réglages" }).click();
+    await expect(page).toHaveURL(/\/fr\/pro\/location$/);
+    const settings = page.getByTestId("rental-agency-settings");
+    await settings.getByLabel(/^Numéro d'agrément/).fill("AG");
+    await expect(settings.getByText(/^De 3 à 40 caractères/)).toBeVisible();
+    await settings.getByLabel(/^Numéro d'agrément/).fill("AGR 123/2025");
+    await settings.getByTestId("rental-branch").first().getByLabel("Adresse de l'agence").fill("Avenue Mohammed VI, Guéliz");
+    await settings.getByRole("checkbox", { name: "Espèces" }).check();
+    await settings.getByRole("checkbox", { name: "Marrakech (RAK)" }).check();
+    await settings.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(page.getByText("Réglages enregistrés. Votre vitrine est mise à jour.")).toBeVisible();
+    await page.screenshot({ path: "test-results/rental-agency-settings.png", fullPage: true });
+    await page.goto("/fr/pro");
+    await expect(page.getByTestId("rental-setup-progress")).toHaveText("1 sur 3");
 
     await page.goto("/fr/deposer");
     await page.getByRole("radio", { name: "Véhicules" }).click();
@@ -211,6 +236,35 @@ test.describe("Car rental", () => {
       await expect(page.getByTestId("fleet-row").filter({ hasText: title }).locator(`button[data-day="${day(10)}"]`)).toHaveAttribute("data-state", "blocked");
       await page.setViewportSize({ width: 390, height: 844 });
       await page.screenshot({ path: "test-results/rental-fleet-mobile.png" });
+      await page.setViewportSize({ width: 1280, height: 900 });
+
+      // The storefront (rental pack §5): the agency's card, its branch, its fleet filtered in place.
+      expect((await request.post("/api/dev/search/rebuild")).ok()).toBe(true);
+      await page.goto(`/fr/boutique/${storefront}`);
+      const main = page.locator("#main");
+      await expect(main.getByTestId("storefront-header")).toContainText("Agence de location de voitures");
+      await expect(main.getByTestId("rental-agrement")).toHaveText("AGR 123/2025");
+      await expect(main.getByTestId("rental-agency")).toContainText("Espèces");
+      await expect(main.getByTestId("rental-branch-card")).toContainText("Avenue Mohammed VI, Guéliz");
+      const fleet = main.getByTestId("rental-fleet");
+      const card = fleet.getByTestId("fleet-card").filter({ hasText: title });
+      await expect(fleet.locator('[data-class="berline"]')).toContainText(title);
+      await expect(card).not.toHaveAttribute("data-status");
+      await fleet.getByLabel("Départ").fill(day(4));
+      await fleet.getByLabel("Retour").fill(day(6));
+      await expect(card).toHaveAttribute("data-status", "blocked");
+      await expect(fleet.getByTestId("rental-fleet-summary")).toContainText("Aucun véhicule libre à ces dates");
+      // Days 3 to 5 and 10 are blocked: free from day 6 to day 9, not up to day 11.
+      await fleet.getByLabel("Départ").fill(day(6));
+      await fleet.getByLabel("Retour").fill(day(9));
+      await expect(card).toHaveAttribute("data-status", "free");
+      await expect(card).toContainText("pour 3 jours");
+      await expect(fleet.getByTestId("rental-fleet-summary")).toHaveText("Libres à ces dates : 1 véhicule");
+      await page.screenshot({ path: "test-results/rental-storefront.png", fullPage: true });
+      await fleet.getByLabel("Retour").fill(day(11));
+      await expect(card).toHaveAttribute("data-status", "blocked");
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.screenshot({ path: "test-results/rental-storefront-mobile.png", fullPage: true });
     }
   });
 });
