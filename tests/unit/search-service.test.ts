@@ -133,6 +133,15 @@ describe("buildFilter", () => {
     expect(filter({ criteria: { year: { kind: "range", min: 2015 } } })).toBeUndefined();
   });
 
+  it("filters a category's shared criteria before a subcategory is chosen (real estate)", () => {
+    const params = parseSearchParams(new URLSearchParams("categorie=immobilier&f-surface-min=80&f-rooms-min=4&f-deposit-max=5000"));
+    expect(params.criteria).toEqual({ rooms: { kind: "range", min: 4 }, surface: { kind: "range", min: 80 } });
+    const parts = (filter(params) as { and: unknown[] }).and;
+    expect(parts).toContainEqual({ field: "a_surface", op: "gte", value: 80 });
+    expect(parts).toContainEqual({ field: "a_rooms", op: "gte", value: 4 });
+    expect(searchPath(params)).toBe("/recherche?categorie=immobilier&f-rooms-min=4&f-surface-min=80");
+  });
+
   it("filters boolean criteria as true and multiselect criteria as any of", () => {
     const params = parseSearchParams(new URLSearchParams("sous-categorie=location&f-furnished=1&f-amenities=piscine,parking"));
     const parts = (filter(params) as { and: unknown[] }).and;

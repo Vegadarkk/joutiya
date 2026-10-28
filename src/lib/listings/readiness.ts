@@ -3,6 +3,7 @@ import { listingQuotas, type Seller } from "@/config/pricing";
 import { cityBySlug } from "@/config/regions";
 import { descriptionSchema, titleSchema, type FieldIssue } from "@/lib/contracts/listings";
 import type { ListingDoc } from "@/lib/db/schemas";
+import { realEstateIssues } from "./real-estate";
 
 // Publish readiness (architecture §7 step 1, design D4/D8): the hard blockers a listing must clear
 // before the pre-moderation runs. Pure: config and contracts only, so the matrix is unit-tested on
@@ -18,11 +19,13 @@ export const READINESS_CODES = [
   "subcategory_required",
   "subcategory_mismatch",
   "pro_only",
+  "criterion_pro_only",
   "criterion_required",
   "criterion_invalid",
   "condition_required",
   "price_required",
   "price_invalid",
+  "deposit_max",
   "donation_not_allowed",
   "donation_price",
   "city_required",
@@ -73,8 +76,8 @@ function treeIssues(listing: Candidate, seller: Seller): { issues: FieldIssue[];
   return { issues, subcategory };
 }
 
-function attributeIssues(attributes: Candidate["attributes"], subcategory: Subcategory): FieldIssue[] {
-  const parsed = criteriaSchema(subcategory.id).safeParse(attributes);
+function attributeIssues(attributes: Candidate["attributes"], subcategory: Subcategory, seller: Seller): FieldIssue[] {
+  const parsed = criteriaSchema(subcategory.id, seller.type).safeParse(attributes);
   if (parsed.success) return [];
   const seen = new Map<string, ReadinessCode>();
   for (const problem of parsed.error.issues) {
@@ -99,7 +102,7 @@ function dossierIssues(attributes: Candidate["attributes"], subcategory: Subcate
   const issues: FieldIssue[] = [];
   for (const criterion of subcategory.criteria) {
     if (attributes[criterion.id] === undefined) continue;
-    if (criterion.proOnly && seller.type !== "pro") issues.push(issue(`attributes.${criterion.id}`, "pro_only"));
+    if (criterion.proOnly && seller.type !== "pro") issues.push(issue(`attributes.${criterion.id}`, "criterion_pro_only"));
     else if (!criterionApplies(criterion, attributes)) issues.push(issue(`attributes.${criterion.id}`, "criterion_invalid"));
   }
   return issues;
@@ -139,8 +142,9 @@ export function assessReadiness(listing: Candidate, facts: SellerFacts): FieldIs
   const tree = treeIssues(listing, facts.seller);
   issues.push(...tree.issues);
   if (tree.subcategory) {
-    issues.push(...attributeIssues(listing.attributes, tree.subcategory));
+    issues.push(...attributeIssues(listing.attributes, tree.subcategory, facts.seller));
     issues.push(...dossierIssues(listing.attributes, tree.subcategory, facts.seller));
+    issues.push(...realEstateIssues(listing, tree.subcategory));
     if (tree.subcategory.condition === "required" && !listing.condition) issues.push(issue("condition", "condition_required"));
     issues.push(...priceIssues(listing, tree.subcategory));
   }

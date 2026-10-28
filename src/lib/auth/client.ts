@@ -116,6 +116,11 @@ export function apiPatch<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, { method: "PATCH", headers: mutationHeaders(true), body: JSON.stringify(body ?? {}) });
 }
 
+/** PUT a JSON body (a whole settings document). */
+export function apiPut<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, { method: "PUT", headers: mutationHeaders(true), body: JSON.stringify(body ?? {}) });
+}
+
 /** DELETE; a 204 answer resolves to undefined. */
 export function apiDelete<T = void>(path: string): Promise<T> {
   return request<T>(path, { method: "DELETE", headers: mutationHeaders(false) });

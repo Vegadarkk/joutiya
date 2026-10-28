@@ -24,5 +24,6 @@ export function toSearchCard(doc: CardDocument, now: Date, featured = false): Se
     sortAt: new Date(Number.isFinite(doc.sortAt) ? doc.sortAt : now.getTime()).toISOString(),
     bumped: doc.isBumped === true,
     featured: featured && typeof doc.featuredUntil === "number" && doc.featuredUntil > now.getTime(),
+    ...(doc.isExample === true ? { example: true as const } : {}),
   };
 }

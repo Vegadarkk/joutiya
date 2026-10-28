@@ -36,7 +36,7 @@ export interface ProApplyResponse {
 // Back office (admin.joutiya.ma/pros): the KYBC queue and the moderator's decision. `submittedAt`
 // pins the application the moderator reviewed: a resubmission meanwhile answers 409.
 
-export const PRO_REGISTRY_SOURCES = ["ompic", "directinfo"] as const;
+export const PRO_REGISTRY_SOURCES = ["ompic", "directinfo", "odco"] as const;
 export const PRO_REJECT_REASON_MIN = 10;
 export const PRO_REJECT_REASON_MAX = 1000;
 

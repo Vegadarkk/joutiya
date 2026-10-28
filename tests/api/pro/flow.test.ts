@@ -137,6 +137,23 @@ describe("POST /api/pro/apply", () => {
     expect(again.status).toBe(409);
     expect(code(again.body)).toBe("pro_application_exists");
   });
+
+  it("takes a cooperative with its register number, checked against ODCo", async () => {
+    const owner = await member({ phone: freshPhone() });
+    const legal = { form: "cooperative", ice: "001 234 567 000 089", coopNumber: "12/2019" };
+    const missing = await applyAs(owner, application([await kybPiece(owner)], { legal: { form: "cooperative", ice: legal.ice } }));
+    expect(missing.status).toBe(400);
+    const applied = await applyAs(owner, application([await kybPiece(owner)], { legal }));
+    expect(applied.status).toBe(201);
+    const proId = applied.body.proId;
+    expect((await getProProfile(proId))?.legal).toEqual({ form: "cooperative", ice: "001234567000089", coopNumber: "12/2019" });
+
+    const review = await admin<{ review: ProReview }>(getReview, "GET", `/api/admin/pros/${proId}`, moderator);
+    expect(review.body.review.legal).toEqual({ form: "cooperative", ice: "001234567000089", coopNumber: "12/2019" });
+    const decided = await admin<ProDecisionResponse>(postDecision, "POST", `/api/admin/pros/${proId}`, moderator, { action: "verify", registrySource: "odco", submittedAt: review.body.review.kybc.submittedAt! });
+    expect(decided.status).toBe(200);
+    expect((await getProProfile(proId))?.kybc.registryCheck?.source).toBe("odco");
+  });
 });
 
 describe("GET /api/pro/me", () => {

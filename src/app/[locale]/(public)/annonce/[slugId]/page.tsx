@@ -13,11 +13,13 @@ import { VehicleBuyingGuide } from "@/components/listing/vehicle-buying-guide";
 import { VehicleDossier } from "@/components/listing/vehicle-dossier";
 import { Gallery } from "@/components/listing/gallery";
 import { JsonLd } from "@/components/listing/json-ld";
+import { ExampleBanner, ExampleContactNotice } from "@/components/listing/example-banner";
 import { ListingStatusBanner } from "@/components/listing/listing-status-banner";
 import { PriceTag } from "@/components/listing/price-tag";
 import { SafetyTips } from "@/components/listing/safety-tips";
 import { GuideCategoryLink } from "@/components/guide/category-link";
 import { rubricForCategory } from "@/content/guide/catalog";
+import { PayAtSeller } from "@/components/listing/pay-at-seller";
 import { SellerCard } from "@/components/listing/seller-card";
 import { ListingMapBlock } from "@/components/map/listing-map-block";
 import { ReportButton } from "@/components/report/report-button";
@@ -35,6 +37,7 @@ import { photoUrl } from "@/lib/listings/client/photo-url";
 import { listingJsonLd } from "@/lib/listings/jsonld";
 import { getPublishedBySlugId, getSeller, listingPath, toPublicListing, type PublicListing, type PublicSeller } from "@/lib/listings/public";
 import { logger } from "@/lib/logging/logger";
+import { shopPaymentFor } from "@/lib/pro/seller-payment";
 import { isIndexable } from "@/lib/search/document";
 import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
 import { mediaBaseUrl } from "@/lib/storage/keys";
@@ -57,6 +60,8 @@ interface Loaded {
   listing: PublicListing;
   /** Server side only: the seller lookup. Never rendered, never passed to a client component. */
   ownerUid: string;
+  /** Server side only: the shop of a Pro listing (its payment button). */
+  proId: string | undefined;
   redirect: boolean;
   /** In the search index (D9), so counted by its deeper category landing pages. */
   indexed: boolean;
@@ -73,6 +78,7 @@ const load = cache(async (segment: string): Promise<Loaded | null> => {
   return {
     listing,
     ownerUid: found.listing.ownerUid,
+    proId: found.listing.sellerType === "pro" ? found.listing.proId : undefined,
     redirect: found.redirect,
     indexed: isIndexable(found.listing),
     adsEligible: found.state === "published" && found.listing.adsEligible === true,
@@ -116,8 +122,9 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     alternates: alternates(locale, path),
     openGraph: { type: "website", siteName: "Joutiya", locale: LOCALE_TAGS[locale].replace("-", "_"), url: `/${locale}${path}`, title, description, images },
     twitter: { card: images ? "summary_large_image" : "summary", title, description, images: images?.map((image) => image.url) },
-    // Paused, sold and expired pages stay reachable for buyers who saved them, not for search engines.
-    ...(listing.state === "published" ? {} : { robots: { index: false, follow: true } }),
+    // Paused, sold and expired pages stay reachable for buyers who saved them, not for search engines;
+    // example listings are not offers.
+    ...(listing.state === "published" && !listing.example ? {} : { robots: { index: false, follow: true } }),
   };
 }
 
@@ -130,8 +137,9 @@ export default async function ListingPage({ params }: { params: Params }) {
   if (found.redirect) permanentRedirect(listingPath(locale, found.listing.slugId));
 
   const { listing } = found;
-  const [seller, legal, flags, t, names] = await Promise.all([
+  const [seller, payment, legal, flags, t, names] = await Promise.all([
     sellerOf(found.ownerUid),
+    listing.state === "published" && !listing.example ? shopPaymentFor(found.proId) : Promise.resolve(null),
     getLegalConfig(),
     getFlags(),
     getTranslations({ locale, namespace: "ListingPage" }),
@@ -155,6 +163,9 @@ export default async function ListingPage({ params }: { params: Params }) {
   const canonicalUrl = `${CANONICAL_ORIGIN}${listingPath(locale, listing.slugId)}`;
   const images = listing.photos.map((photo) => photoUrl(media, listing.id, photo.id, "l")).filter((url): url is string => url !== null);
   const published = listing.state === "published";
+  // An example listing (src/lib/demo) shows the page of an offer without being one: no contact, no
+  // favorite, no Product markup.
+  const contactable = published && !listing.example;
 
   const jsonLd = listingJsonLd({ listing, url: canonicalUrl, images, categoryName: subcategoryName ?? categoryName, cityName: cityLabel, regionName: regionLabel });
   // Crawlable steps: the category landing pages (/recherche is robots-disallowed). /c/{category}
@@ -177,7 +188,7 @@ export default async function ListingPage({ params }: { params: Params }) {
 
   return (
     <>
-      <JsonLd data={jsonLd} />
+      {listing.example ? null : <JsonLd data={jsonLd} />}
       {breadcrumbLd ? <JsonLd data={breadcrumbLd} /> : null}
       <Container className="flex flex-col gap-5 pt-3 pb-12 sm:pt-5 lg:pb-16">
         <Breadcrumb
@@ -188,6 +199,7 @@ export default async function ListingPage({ params }: { params: Params }) {
           ]}
         />
         <ListingStatusBanner state={listing.state} />
+        {listing.example ? <ExampleBanner /> : null}
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-x-10 lg:[grid-template-areas:'gallery_aside'_'header_aside'_'body_aside'] xl:grid-cols-[minmax(0,1fr)_24rem]">
           <div className="-mx-4 sm:mx-0 lg:[grid-area:gallery]">
@@ -219,13 +231,14 @@ export default async function ListingPage({ params }: { params: Params }) {
                 <time dateTime={listing.publishedAt}>{t("publishedOn", { date: formatDate(new Date(listing.publishedAt), locale) })}</time>
               </span>
             </div>
-            {published ? <FavoriteButton listingId={listing.id} variant="inline" className="self-start" /> : null}
+            {contactable ? <FavoriteButton listingId={listing.id} variant="inline" className="self-start" /> : null}
           </header>
 
           <aside aria-label={t("sellerLabel")} className="min-w-0 lg:[grid-area:aside]">
             <div className="flex flex-col gap-6 lg:sticky lg:top-24">
               <SellerCard seller={seller} fallbackName={listing.seller.name} fallbackType={listing.seller.type} locale={locale}>
-                {published ? (
+                {listing.example ? <ExampleContactNotice /> : null}
+                {contactable ? (
                   <ContactBar
                     listingId={listing.id}
                     slugId={listing.slugId}
@@ -237,6 +250,7 @@ export default async function ListingPage({ params }: { params: Params }) {
                     adultsOnly={Boolean(subcategory?.adultsOnly)}
                   />
                 ) : null}
+                {contactable && payment ? <PayAtSeller payment={payment} listingId={listing.id} /> : null}
               </SellerCard>
             </div>
           </aside>

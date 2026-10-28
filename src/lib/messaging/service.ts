@@ -7,7 +7,7 @@ import { getUserRecord } from "@/lib/db/repositories/profiles";
 import type { ConversationDoc, UserDoc } from "@/lib/db/schemas";
 import type { Claims } from "@/lib/firebase/claims";
 import { HttpError, notFound, unavailable } from "@/lib/http/errors";
-import { PUBLIC_STATES } from "@/lib/listings/public";
+import { PUBLIC_STATES, acceptsContact } from "@/lib/listings/public";
 import { logger } from "@/lib/logging/logger";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { publishConversationChange, publishNewMessage, publishRead } from "./events";
@@ -151,7 +151,7 @@ export async function startConversation(actor: MessagingActor, input: { listingI
   // strong signal: 409 (the page shows its banner instead of the contact bar).
   if (!listing || !(PUBLIC_STATES as readonly string[]).includes(listing.status)) throw notFound();
   if (listing.ownerUid === actor.uid || (listing.proId !== undefined && listing.proId === actor.claims.proId)) throw new HttpError(409, "self_conversation");
-  if (listing.status !== "published" || listing.moderation.hiddenBy || !listing.slugId) throw new HttpError(409, "listing_unavailable");
+  if (listing.status !== "published" || listing.moderation.hiddenBy || !listing.slugId || !acceptsContact(listing)) throw new HttpError(409, "listing_unavailable");
   const adultsOnly = Boolean(subcategoryById(listing.subcategoryId ?? "")?.adultsOnly);
   if (adultsOnly && !input.adultConfirmed) throw new HttpError(422, "adult_confirmation_required");
 

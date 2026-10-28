@@ -44,8 +44,9 @@ en production sans tag. Pousser un tag et promouvoir la production attendent ton
    Il liste ensuite ce qu'aucune adresse publique ne montre, à confirmer à la main : application
    OAuth de production publiée dans Google Auth Platform, `salesEnabled=false` et offre de lancement
    Pro au back-office, aucune alerte « Sauvegarde Firestore trop ancienne », seuils anti-abus et
-   listes de modération changés, tarifit relu par un locuteur natif, règles Firestore de production
-   déployées, dépôt repassé en privé le jour de l'ouverture.
+   listes de modération changés, tarifit relu par un locuteur natif, annonces exemple posées en
+   production seulement sur feu vert du propriétaire (`docs/staging-demo.md`), règles Firestore de production déployées, dépôt
+   repassé en privé le jour de l'ouverture.
 6. **Ouverture** : quand tout est vert et coché.
 
 ## Écarts avec le design

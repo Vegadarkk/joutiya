@@ -79,6 +79,7 @@ const PROHIBITED_GROUP_LABEL: Record<ProhibitedGroupId, string> = {
   medicines: "médicaments",
   hacking_piracy: "piratage",
   gambling: "jeux d'argent",
+  inalienable_land: "terres collectives ou habous",
 };
 
 const SENSITIVE_LABEL: Record<SensitiveCategoryId, string> = {

@@ -28,6 +28,8 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   "Listing.errors",
   // Report button of the listing and profile pages; its dialog loads on demand (phase 5).
   "Report",
+  // « Payer chez le vendeur » button and dialog of a Pro's listing and storefront (phase 7).
+  "SellerPayment.public",
   // Search islands shared by the home, category and listing pages (phase 4): favorite heart,
   // À la Une badge, search bar and place field, home search panel.
   "Favorites.button",

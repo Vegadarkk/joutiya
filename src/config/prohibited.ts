@@ -21,6 +21,7 @@ export const PROHIBITED_GROUP_IDS = [
   "medicines",
   "hacking_piracy",
   "gambling",
+  "inalienable_land",
 ] as const;
 export type ProhibitedGroupId = (typeof PROHIBITED_GROUP_IDS)[number];
 
@@ -146,6 +147,14 @@ export const PROHIBITED_GROUPS: readonly ProhibitedGroup[] = [
     ],
     // Traps: pari (plural "paris" = the city), poker (chip sets): not listed.
     soft: ["casino", "paris sportifs", "loterie", "tombola", "jackpot", "كازينو", "رهان"],
+  },
+  {
+    // Collective (soulaliyate, laws 62-17 and 63-17) and habous land cannot be sold (Agence pack
+    // design §1). Review only: a habous property is rented out lawfully, and a listing may name the
+    // land's past status.
+    id: "inalienable_land",
+    hard: [],
+    soft: ["terre collective", "terres collectives", "terrain collectif", "soulaliyate", "soulalia", "soulaliya", "habous", "أراضي الجموع", "أرض الجموع", "أرض سلالية", "أراضي سلالية", "حبوس", "أرض الحبوس"],
   },
 ];
 

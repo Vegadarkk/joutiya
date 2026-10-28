@@ -10,8 +10,8 @@
  * through a cash network before the buyer sees the item.
  */
 export const PAYMENT_KEYWORDS: readonly string[] = [
-  // French
-  "acompte", "avance", "virement", "mandat", "mandat cash", "western union", "westernunion", "moneygram", "money gram",
+  // French. "Mandat" alone is the agency's mandate in real estate: only the money-order phrases.
+  "acompte", "avance", "virement", "mandat cash", "mandat postal", "mandat express", "mandat minute", "western union", "westernunion", "moneygram", "money gram",
   "cash plus", "cashplus", "wafacash", "wafa cash", "barid cash", "baridcash", "damane cash", "chaabi cash", "paypal",
   "transfert d'argent", "envoi d'argent", "frais de dedouanement", "payer avant", "paiement avant",
   // Arabic and darija (Arabic script)

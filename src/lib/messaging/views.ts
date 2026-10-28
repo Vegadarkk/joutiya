@@ -26,6 +26,7 @@ export function conversationView(conversation: ConversationRecord, uid: string):
     counterpartClosed: (conversation.accountClosed ?? []).includes(other),
     appointment: conversation.appointment ? appointmentView(conversation.appointment, uid) : null,
     updatedAt: conversation.updatedAt.getTime(),
+    review: { sellerRepliedAt: conversation.sellerRepliedAt?.getTime() ?? null, reviewedAt: conversation.reviewedAt?.getTime() ?? null },
   };
 }
 

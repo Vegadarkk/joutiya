@@ -20,18 +20,28 @@ export async function getListingStats(listingId: string): Promise<ListingStatsDo
   return parsed.success ? parsed.data : null;
 }
 
-/** +1 phone reveal; creates the document on the first reveal (transaction keeps the schema whole). */
-export async function incrementPhoneReveals(listingId: string, now = new Date()): Promise<void> {
+/** +1 on one counter; creates the document on the first count (transaction keeps the schema whole). */
+async function incrementCounter(listingId: string, field: "phoneReveals" | "paymentClicks", now: Date): Promise<void> {
   const ref = listingStatsRef(listingId);
   await db().runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
     void consume("firestore.reads", 1);
     if (snapshot.exists) {
-      tx.update(ref, { phoneReveals: FieldValue.increment(1) });
+      tx.update(ref, { [field]: FieldValue.increment(1) });
     } else {
-      const doc = listingStatsSchema.parse({ views: 0, favorites: 0, contacts: 0, phoneReveals: 1, flushedAt: now });
+      const doc = listingStatsSchema.parse({ views: 0, favorites: 0, contacts: 0, phoneReveals: 0, flushedAt: now, [field]: 1 });
       tx.create(ref, { ...doc, flushedAt: Timestamp.fromDate(now) });
     }
     void consume("firestore.writes", 1);
   });
+}
+
+/** +1 phone reveal. */
+export function incrementPhoneReveals(listingId: string, now = new Date()): Promise<void> {
+  return incrementCounter(listingId, "phoneReveals", now);
+}
+
+/** +1 « Payer chez le vendeur » opened from the listing. */
+export function incrementPaymentClicks(listingId: string, now = new Date()): Promise<void> {
+  return incrementCounter(listingId, "paymentClicks", now);
 }

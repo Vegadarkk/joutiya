@@ -41,6 +41,7 @@ export type TemplateId =
   // Pro plans (phase 7, lot 4b): the end of the launch offer, notices then downgrade (design D3).
   | "launchOfferNotice"
   | "passNotice"
+  | "sellerPaymentNotice"
   // Messaging (phase 5, L5): the grouped new-messages mail (design D21).
   | "newMessages"
   // Appointments in messaging (28 Oct): reminder the day before and 2 hours before a confirmed slot.
@@ -169,6 +170,12 @@ export interface TemplateData {
   launchOfferNotice: { displayName: string; shopName: string; plan: "essentiel" | "business"; kind: "ending" | "ended"; endsAt: string; freeListings: number | null; paused: number };
   /** Pass Boutique (2026-10-28): notices at J-7 and J-1 (`ending`), then the downgrade (`ended`). */
   passNotice: { displayName: string; shopName: string; kind: "ending" | "ended"; endsAt: string; freeListings: number | null; paused: number };
+  /**
+   * « Payer chez le vendeur »: `changed` (a new link on `host`, active at `activeFrom` ISO, or null
+   * while the host waits for review), `removed`, `suspended` / `restored` by a moderator, or the
+   * host `rejected` (`reason`).
+   */
+  sellerPaymentNotice: { displayName: string; shopName: string; kind: "changed" | "removed" | "contact" | "suspended" | "restored" | "rejected"; host?: string; activeFrom?: string | null; reason?: string };
   /**
    * Grouped new-messages mail (bulk, D21): the unread total and up to 3 conversations (listing
    * title, the other member's display name). Never the text of a message.

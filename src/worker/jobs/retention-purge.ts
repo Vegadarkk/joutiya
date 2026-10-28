@@ -51,7 +51,8 @@ import { recordMediaBytes } from "@/lib/uploads/storage-gauge";
 //    open appeal) and authorityRequests (closed) after 5 years; aiDecisions after 12 months (no
 //    legal hold; one grounding a decision lives as long as the decision, its purgeAt is moved);
 //    auditLogs after 5 years (purgeAt, D22; exported daily first, audit-export); userBlocks of
-//    accounts that no longer exist (rotating scan, USER_BLOCKS_SCAN a night).
+//    accounts that no longer exist (rotating scan, USER_BLOCKS_SCAN a night). Reviews deleted by
+//    their author or hidden by a moderator, 12 months after (vitrine-avis §3, no legal hold).
 // 4. rejected Pro applications past purgeAt (6 months, phase 7): the profile (identifiers) goes
 //    and the owner is unlinked; its KYBC pieces get purgeAt = now and purge-quarantine deletes
 //    them within the hour (src/lib/pro/kybc-retention.ts).
@@ -120,6 +121,8 @@ export interface RetentionResult {
   aiDecisions: number;
   auditLogs: number;
   userBlocks: number;
+  /** Deleted or hidden reviews (vitrine-avis §3). */
+  reviews: number;
   failed: number;
   /** The delete budget or the Firestore quota stopped the run before the end. */
   deferred: boolean;
@@ -351,6 +354,11 @@ export function reportPurgeable(data: Record<string, unknown>, now: Date): boole
   return isPast(data, now) && (data.status === "actioned" || data.status === "dismissed");
 }
 
+/** Past purgeAt (12 months after its deletion or hiding), no legal hold; a published or pending review has none. */
+export function reviewPurgeable(data: Record<string, unknown>, now: Date): boolean {
+  return isPast(data, now) && noHold(data) && (data.status === "deleted" || data.status === "hidden");
+}
+
 /** Past purgeAt (5 years), no appeal under review. */
 export function decisionPurgeable(data: Record<string, unknown>, now: Date): boolean {
   const appeal = data.appeal as { status?: unknown } | undefined;
@@ -372,7 +380,7 @@ export function aiDecisionPurgeable(data: Record<string, unknown>, now: Date, de
   return decisionPurgeAt === undefined || decisionPurgeAt.getTime() <= now.getTime();
 }
 
-type HeldKey = "reports" | "decisions" | "authorityRequests";
+type HeldKey = "reports" | "decisions" | "authorityRequests" | "reviews";
 
 /** One collection purged by pages: the documents `purgeable` accepts go in one transaction per page. */
 async function purgeHeld(collection: HeldCollection, key: HeldKey, state: RunState, purgeable: (data: Record<string, unknown>, now: Date) => boolean): Promise<void> {
@@ -533,7 +541,7 @@ async function purgeUserBlocks(state: RunState): Promise<void> {
 }
 
 /** Phase 5 counts audited once per collection and run (one entry a night, not one per document). */
-const PHASE5_AUDITED: readonly (keyof RetentionResult & string)[] = ["conversations", "messages", "evidence", "reports", "decisions", "authorityRequests", "aiDecisions", "auditLogs", "userBlocks"];
+const PHASE5_AUDITED: readonly (keyof RetentionResult & string)[] = ["conversations", "messages", "evidence", "reports", "decisions", "authorityRequests", "aiDecisions", "auditLogs", "userBlocks", "reviews"];
 
 async function auditPhase5(state: RunState): Promise<void> {
   for (const key of PHASE5_AUDITED) {
@@ -564,6 +572,7 @@ export async function retentionPurge(now = new Date(), deps: { store?: ObjectSto
     aiDecisions: 0,
     auditLogs: 0,
     userBlocks: 0,
+    reviews: 0,
     failed: 0,
     deferred: false,
   };
@@ -597,6 +606,7 @@ export async function retentionPurge(now = new Date(), deps: { store?: ObjectSto
   await step("aiDecisions", state, () => purgeAiDecisions(state));
   await step("auditLogs", state, () => purgeJournal(COLLECTIONS.auditLogs, "auditLogs", state));
   await step("userBlocks", state, () => purgeUserBlocks(state));
+  await step("reviews", state, () => purgeHeld(COLLECTIONS.reviews, "reviews", state, reviewPurgeable));
   // The job completes anyway, so the worker's failed handler never hears of a failed step.
   if (state.failedSteps.length > 0) {
     await alert({

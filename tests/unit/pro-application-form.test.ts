@@ -15,7 +15,7 @@ function draft(overrides: Partial<Draft> = {}): Draft {
     description: "",
     city: cityBySlug("casablanca") ?? null,
     form: "societe",
-    ids: { ice: "001 234 567 000 089", rc: "12345", if: "4567890", aeNumber: "", tp: "" },
+    ids: { ice: "001 234 567 000 089", rc: "12345", if: "4567890", aeNumber: "", tp: "", coopNumber: "" },
     phone: "",
     commitment: true,
     ...overrides,
@@ -32,15 +32,18 @@ describe("draftProblems", () => {
     const empty = draft({ name: " ", city: null, form: null, commitment: false });
     expect(draftProblems(empty, [], false, null)).toEqual({ name: "required", city: "cityRequired", form: "required", pieces: "piecesRequired", commitment: "commitmentRequired", challenge: "challenge" });
     expect(draftProblems(draft({ name: "A" }), [ready], false, "t").name).toBe("nameLength");
-    expect(draftProblems(draft({ ids: { ice: "12345", rc: "", if: "IF#1", aeNumber: "", tp: "" } }), [ready], false, "t")).toEqual({ ice: "iceFormat", rc: "required", if: "identifierFormat" });
+    expect(draftProblems(draft({ ids: { ice: "12345", rc: "", if: "IF#1", aeNumber: "", tp: "", coopNumber: "" } }), [ready], false, "t")).toEqual({ ice: "iceFormat", rc: "required", if: "identifierFormat" });
   });
 
   it("asks the identifiers of the chosen legal form only", () => {
-    const ae = draft({ form: "auto_entrepreneur", ids: { ice: "001234567000089", rc: "", if: "", aeNumber: "", tp: "" } });
+    const ae = draft({ form: "auto_entrepreneur", ids: { ice: "001234567000089", rc: "", if: "", aeNumber: "", tp: "", coopNumber: "" } });
     expect(draftProblems(ae, [ready], false, "t")).toEqual({ aeNumber: "required" });
-    const trader = draft({ form: "commercant", ids: { ice: "001234567000089", rc: "", if: "", aeNumber: "", tp: "" } });
+    const trader = draft({ form: "commercant", ids: { ice: "001234567000089", rc: "", if: "", aeNumber: "", tp: "", coopNumber: "" } });
     expect(draftProblems(trader, [ready], false, "t")).toEqual({ rc: "rcOrTp" });
     expect(draftProblems({ ...trader, ids: { ...trader.ids, tp: "TP-55" } }, [ready], false, "t")).toEqual({});
+    const coop = draft({ form: "cooperative", ids: { ice: "001234567000089", rc: "", if: "", aeNumber: "", tp: "", coopNumber: "" } });
+    expect(draftProblems(coop, [ready], false, "t")).toEqual({ coopNumber: "required" });
+    expect(draftProblems({ ...coop, ids: { ...coop.ids, coopNumber: "12/2019" } }, [ready], false, "t")).toEqual({});
   });
 
   it("asks the number to call only when the form needs it", () => {
@@ -63,7 +66,7 @@ describe("initialDraft", () => {
     const filled = initialDraft(previous);
     expect(filled).toMatchObject({ name: "Atelier Salma", description: "Céramique", form: "commercant", commitment: false });
     expect(filled.city?.slug).toBe("casablanca");
-    expect(filled.ids).toEqual({ ice: "001234567000089", rc: "", if: "", aeNumber: "", tp: "" });
+    expect(filled.ids).toEqual({ ice: "001234567000089", rc: "", if: "", aeNumber: "", tp: "", coopNumber: "" });
     expect(initialDraft(null).form).toBeNull();
   });
 });

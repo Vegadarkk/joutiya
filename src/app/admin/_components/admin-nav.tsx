@@ -17,6 +17,7 @@ const ITEMS = [
   { href: "/autorites", label: "Autorités", adminOnly: true },
   { href: "/personnel", label: "Personnel", adminOnly: true },
   { href: "/parametres/legal", label: "Mentions légales", adminOnly: true },
+  { href: "/parametres/paiements", label: "Paiement vendeur", adminOnly: true },
 ] as const;
 
 /** Pages reached from a section without being listed (a decision opens from the reports and the appeals). */

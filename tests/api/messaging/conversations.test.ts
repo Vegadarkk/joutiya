@@ -124,6 +124,9 @@ describe("POST /api/conversations", () => {
     expectError(await start(buyer, { listingId: paused.id, text: "Salam", turnstileToken: "ok" }), 409, "listing_unavailable");
     const hidden = await seedListing(seller, { moderation: { state: "auto_ok", score: 0, flags: [], openReports: 1, hiddenBy: { reportId: "r1", signal: "trusted", at: new Date() } } });
     expectError(await start(buyer, { listingId: hidden.id, text: "Salam", turnstileToken: "ok" }), 409, "listing_unavailable");
+    // An example listing (src/lib/demo) has no seller to reach.
+    const example = await seedListing(seller, { example: true });
+    expectError(await start(buyer, { listingId: example.id, text: "Salam", turnstileToken: "ok" }), 409, "listing_unavailable");
 
     await db().collection(COLLECTIONS.users).doc(seller.uid).update({ status: "suspended" });
     expectError(await start(buyer, { listingId, text: "Salam", turnstileToken: "ok" }), 409, "listing_unavailable");

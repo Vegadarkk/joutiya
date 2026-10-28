@@ -10,7 +10,7 @@ import type { Criterion } from "@/config/categories";
 import type { CriterionFilter } from "@/lib/search/params";
 import { filterableCriteria, setCriterion } from "./filter-model";
 
-// Criteria of the chosen subcategory as filters (design §2, params.ts `f-*`): select and
+// Criteria of the chosen subcategory (or the category's shared filters) as filters (design §2, params.ts `f-*`): select and
 // multiselect -> several values (chips for short lists, a scrolling checklist for long ones such
 // as car brands), number -> min/max, boolean -> "yes only". Text criteria are left to the words.
 
@@ -18,7 +18,8 @@ import { filterableCriteria, setCriterion } from "./filter-model";
 const CHIP_OPTIONS_MAX = 10;
 
 interface CriteriaFiltersProps {
-  subcategoryId: string;
+  categoryId: string | undefined;
+  subcategoryId: string | undefined;
   value: Record<string, CriterionFilter> | undefined;
   onChange: (value: Record<string, CriterionFilter> | undefined) => void;
 }
@@ -71,11 +72,11 @@ function RangeFilter({ criterion, label, unit, value, onChange }: { criterion: C
   );
 }
 
-export function CriteriaFilters({ subcategoryId, value, onChange }: CriteriaFiltersProps) {
+export function CriteriaFilters({ categoryId, subcategoryId, value, onChange }: CriteriaFiltersProps) {
   const id = useId();
   const labels = useCriteriaLabels();
   const units = useTranslations("Listing.units");
-  const criteria = filterableCriteria(subcategoryId);
+  const criteria = filterableCriteria(categoryId, subcategoryId);
   if (criteria.length === 0) return null;
 
   return (
