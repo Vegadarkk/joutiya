@@ -46,7 +46,6 @@ export async function waitForMail(request: APIRequestContext, to: string, templa
   return found!;
 }
 
-/** Signs up a fresh individual through the French form and confirms the e-mail: the page is signed in. */
 /**
  * Gives the page its own client address (`cf-connecting-ip`, read by the app when not deployed): the
  * suite signs up more accounts than `signup.ip` allows one address per hour. App requests only: a
@@ -61,6 +60,7 @@ export async function ownClientIp(page: Page): Promise<void> {
   );
 }
 
+/** Signs up a fresh individual through the French form and confirms the e-mail: the page is signed in. */
 export async function signUpAndIn(page: Page, request: APIRequestContext, email: string, displayName = "Amina Test"): Promise<void> {
   await ownClientIp(page);
   await page.goto("/fr/inscription");
