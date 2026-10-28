@@ -20,8 +20,9 @@ import { HttpError } from "@/lib/http/errors";
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
-/** Wednesday 4 November 2026, 10:00 in Morocco (UTC+1). */
-const NOW = Date.UTC(2026, 10, 4, 9, 0);
+/** Wednesday 4 November 2026, 10:00 in Morocco, whatever the offset the time zone data gives
+ *  (UTC+1 before tzdata 2026c, UTC+0 since: Morocco left UTC+1 on 20 September 2026). */
+const NOW = moroccoTime("2026-11-04", 10 * 60);
 const at = (hours: number) => NOW + hours * HOUR;
 const slot = (hours: number, minutes: Slot["minutes"] = 30): Slot => ({ start: at(hours), minutes });
 
@@ -61,16 +62,17 @@ describe("slot rules", () => {
 });
 
 describe("Morocco's clock", () => {
-  it("turns a wall-clock time into epoch ms and back, in and out of Ramadan", () => {
-    expect(moroccoTime("2026-11-05", 14 * 60 + 30)).toBe(Date.UTC(2026, 10, 5, 13, 30));
+  it("turns a wall-clock time into epoch ms and back, whatever the offset", () => {
+    // June 2026: UTC+1 in every version of the time zone data.
+    expect(moroccoTime("2026-06-15", 14 * 60 + 30)).toBe(Date.UTC(2026, 5, 15, 13, 30));
     for (const day of ["2026-11-05", "2027-02-20", "2027-03-01", "2027-06-15"]) {
       for (const minutes of [8 * 60, 14 * 60 + 30, 21 * 60 + 30]) expect(moroccoClock(moroccoTime(day, minutes))).toEqual({ day, minutes });
     }
   });
 
   it("lists the next days from today in Morocco", () => {
-    // 23:30 UTC on 4 November is 00:30 on 5 November in Morocco.
-    expect(nextDays(Date.UTC(2026, 10, 4, 23, 30), 3)).toEqual(["2026-11-05", "2026-11-06", "2026-11-07"]);
+    // 23:30 UTC on 15 June 2026 is 00:30 on 16 June in Morocco (UTC+1 then).
+    expect(nextDays(Date.UTC(2026, 5, 15, 23, 30), 3)).toEqual(["2026-06-16", "2026-06-17", "2026-06-18"]);
   });
 
   it("offers grid times from an hour ahead, minus overlaps with picked slots", () => {
@@ -242,7 +244,7 @@ describe("components", () => {
   it("renders each thread step in French and Arabic", () => {
     const step = (patch: Partial<Parameters<typeof AppointmentEventItem>[0]["step"]>) => ({ event: "proposed" as const, kind: "test_drive" as const, byMe: false, slot: null, reason: null, ...patch });
     expect(render(<AppointmentEventItem step={step({})} counterpartName="Karim" time="10:00" />)).toContain("\u2068Karim\u2069 propose un essai");
-    expect(render(<AppointmentEventItem step={step({ event: "confirmed", byMe: true, slot: { start: Date.UTC(2026, 10, 5, 13, 30), minutes: 30 } })} counterpartName="Karim" time="10:00" />)).toContain(
+    expect(render(<AppointmentEventItem step={step({ event: "confirmed", byMe: true, slot: { start: moroccoTime("2026-11-05", 14 * 60 + 30), minutes: 30 } })} counterpartName="Karim" time="10:00" />)).toContain(
       "Vous avez confirmé un essai : jeudi 5 novembre à 14:30",
     );
     expect(render(<AppointmentEventItem step={step({ event: "cancelled", reason: "sold", slot: slot(26) })} counterpartName="Karim" time="10:00" />)).toContain("L&#x27;article n&#x27;est plus disponible");

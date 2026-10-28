@@ -1,5 +1,6 @@
-// Morocco's wall clock (Africa/Casablanca: UTC+1, UTC+0 during Ramadan) <-> epoch ms, for the slot
-// picker: a member picks "jeudi 14:30" in Morocco's time whatever the device's zone. Pure.
+// Morocco's wall clock (Africa/Casablanca, offset from the runtime's time zone data: UTC+0 since
+// 20 September 2026 in tzdata 2026c, UTC+1 before) <-> epoch ms, for the slot picker: a member
+// picks "jeudi 14:30" in Morocco's time whatever the device's zone. Pure.
 
 export const APPOINTMENT_TIME_ZONE = "Africa/Casablanca";
 
