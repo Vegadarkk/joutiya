@@ -1,4 +1,5 @@
 import type { Condition } from "@/config/categories";
+import type { CardFacts } from "@/lib/listings/card-facts";
 import type { SearchParams, SearchSort } from "./params";
 
 // Search contracts (phase 4, design §3). Client-safe types: the engine adapters
@@ -102,9 +103,16 @@ export const CARD_FIELDS = [
   "sortAt",
   "isBumped",
   "featuredUntil",
+  // Card facts (src/lib/listings/card-facts.ts): every category's `cardFacts`, plus the mandate.
+  "a_surface",
+  "a_rooms",
+  "a_bedrooms",
+  "a_mandate",
   "isExample",
 ] as const satisfies readonly (keyof SearchDocument)[];
-export type CardDocument = Pick<SearchDocument, (typeof CARD_FIELDS)[number]>;
+type CardField = (typeof CARD_FIELDS)[number];
+/** The `a_*` card fields stay optional, as in the index (a listing without the criterion). */
+export type CardDocument = Pick<SearchDocument, Exclude<CardField, `a_${string}`>> & Partial<Pick<SearchDocument, Extract<CardField, `a_${string}`>>>;
 
 // ---- Engine query model (adapters translate it; never built from raw user strings).
 
@@ -196,6 +204,8 @@ export interface SearchCard {
   bumped: boolean;
   /** Served in an À la Une slot: "À la Une · Sponsorisé" mention (§8). */
   featured: boolean;
+  /** Key numbers under the title and the exclusive mandate (card-facts.ts); absent = none. */
+  facts?: CardFacts;
   /** Example listing: "Exemple" label, no favorite action. */
   example?: true;
 }

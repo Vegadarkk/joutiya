@@ -47,6 +47,15 @@ describe("toSearchCard", () => {
     });
   });
 
+  it("carries a real-estate card's surface, rooms, bedrooms and exclusive mandate", () => {
+    const flat = toSearchCard(doc({ subcategoryId: "vente", a_surface: 95, a_rooms: 5, a_bedrooms: 3, a_mandate: "exclusif" }), NOW);
+    expect(flat.facts).toEqual({ facts: [{ id: "surface", value: 95 }, { id: "rooms", value: 5 }, { id: "bedrooms", value: 3 }], exclusive: true });
+    expect(toSearchCard(doc({ subcategoryId: "location", a_surface: 60, a_mandate: "simple" }), NOW).facts).toEqual({ facts: [{ id: "surface", value: 60 }], exclusive: false });
+    // A field the subcategory does not declare, or of the wrong type, is not a fact.
+    expect(toSearchCard(doc({ subcategoryId: "colocation", a_surface: 20, a_mandate: "exclusif" }), NOW)).not.toHaveProperty("facts");
+    expect(toSearchCard(doc({ subcategoryId: "vente", a_surface: "95" }), NOW)).not.toHaveProperty("facts");
+  });
+
   it("answers null for a missing price, photo, city or subcategory", () => {
     const { price: _price, photo: _photo, ...rest } = doc();
     const card = toSearchCard({ ...rest, citySlug: "", subcategoryId: "", isDonation: true, priceNegotiable: false, photoCount: 0 }, NOW);

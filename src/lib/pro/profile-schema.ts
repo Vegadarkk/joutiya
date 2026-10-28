@@ -17,6 +17,12 @@ export const PRO_NAME_MAX = 80;
 export const PRO_DESCRIPTION_MAX = 2000;
 export const PRO_SLUG_MAX = 60;
 
+/** Business sector (Agence pack design §3): "real_estate" makes the storefront an agency's; absent reads "general". */
+export const PRO_SECTORS = ["general", "real_estate"] as const;
+export type ProSector = (typeof PRO_SECTORS)[number];
+/** The agency's fee schedule shown on its storefront (free text, no contact details). */
+export const AGENCY_FEE_SCHEDULE_MAX = 500;
+
 const uid = z.string().min(1).max(128);
 const ts = z.date();
 /** Moroccan mobile in E.164, as users/{uid}/private/account.phoneE164 (src/lib/db/schemas.ts). */
@@ -94,6 +100,9 @@ export const proProfileSchema = z
       .strict(),
     /** Badge « Certifié »: pieces checked in detail (Business). */
     certified: z.object({ at: ts, by: uid }).strict().optional(),
+    sector: z.enum(PRO_SECTORS).optional(),
+    /** Real-estate agency details (sector "real_estate"), set by the owner (PUT /api/pro/me/agency). */
+    agency: z.object({ feeSchedule: z.string().trim().max(AGENCY_FEE_SCHEDULE_MAX) }).strict().optional(),
     lifecycle: z.enum(PRO_STATES),
     /** Copy of subscriptions/pro_{proId}, or the launch offer's plan. */
     plan: z.enum(PRO_PLANS),

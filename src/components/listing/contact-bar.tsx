@@ -3,7 +3,7 @@
 import { useId, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { CarFront, LogIn, MessageCircle, MessageSquare, Phone, RotateCw, Settings2 } from "lucide-react";
+import { CalendarClock, CarFront, LogIn, MessageCircle, MessageSquare, Phone, RotateCw, Settings2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { InlineError } from "@/components/feedback/inline-error";
 import { loadWithRetry } from "@/components/layout/chunk-retry";
@@ -75,10 +75,23 @@ export interface ContactBarProps {
   /** Adults-only listing: the message dialog asks the buyer's 18+ confirmation. */
   adultsOnly?: boolean;
   /**
+   * Real estate: a "Demander une visite" action. It writes the first message like the message
+   * button, then opens the conversation on the appointment slots (`?rdv=visit`). No booking, no
+   * deposit: the visit is agreed in the messaging.
+   */
+  visit?: boolean;
+  /**
    * A Pro's vehicle for sale (Concession pack): "Demander un essai" writes a first message, then
    * opens the thread with the slot picker of a test drive (`?rdv=test_drive`).
    */
   testDrive?: boolean;
+}
+
+export type ComposeIntent = "message" | "visit" | "test_drive";
+
+/** The conversation page, opened on the slots of a visit or a test drive. */
+export function threadHref(cid: string, intent: ComposeIntent): string {
+  return intent === "message" ? `/messages/${cid}` : `/messages/${cid}?rdv=${intent}`;
 }
 
 type Phone = PhoneRevealResponse["phone"];
@@ -135,7 +148,7 @@ function BarSpacer() {
   return mounted ? createPortal(<div aria-hidden="true" data-testid="contact-bar-spacer" className="h-24 lg:hidden" />, document.body) : null;
 }
 
-export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, listingTitle, showPhone, whatsapp, adultsOnly = false, testDrive = false }: ContactBarProps) {
+export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, listingTitle, showPhone, whatsapp, adultsOnly = false, visit = false, testDrive = false }: ContactBarProps) {
   const t = useTranslations("ListingPage.contact");
   const locale = useLocale();
   const { status, session } = useSession();
@@ -144,7 +157,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
   /** closed; checking the session; signin: anonymous, the prompt shows; open: the dialog (mounted from then on). */
   const [compose, setCompose] = useState<"closed" | "checking" | "signin" | "open">("closed");
   const [composeMounted, setComposeMounted] = useState(false);
-  const [purpose, setPurpose] = useState<"message" | "test_drive">("message");
+  const [intent, setIntent] = useState<ComposeIntent>("message");
   const desktop = useDesktop();
 
   const canReveal = showPhone || whatsapp;
@@ -173,16 +186,16 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
     }
   }
 
-  async function openComposer(next: "message" | "test_drive" = "message") {
+  async function openComposer(next: ComposeIntent = "message") {
     if (compose === "checking") return;
-    setPurpose(next);
+    setIntent(next);
     setCompose("checking");
     const step = await messageStep(listingId);
     if (step.kind === "signin") {
       setCompose("signin");
     } else if (step.kind === "thread") {
       // Another root layout (private pages): a document load either way. The button spins until then.
-      window.location.assign(getPathname({ href: next === "test_drive" ? `/messages/${step.cid}?rdv=test_drive` : `/messages/${step.cid}`, locale }));
+      window.location.assign(getPathname({ href: threadHref(step.cid, next), locale }));
     } else {
       setComposeMounted(true);
       setCompose("open");
@@ -242,7 +255,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
       type="button"
       variant={canReveal ? "outline" : "primary"}
       onClick={() => void openComposer()}
-      loading={compose === "checking" && purpose === "message"}
+      loading={compose === "checking" && intent === "message"}
       aria-describedby={hintId}
       aria-haspopup="dialog"
       className={cn(compact && "min-w-0 flex-1 px-3", wide && "min-w-0 flex-1")}
@@ -251,6 +264,22 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
       {compact ? t("messageShort") : t("message")}
     </Button>
   );
+
+  const visitButton = (compact: boolean) =>
+    visit ? (
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => void openComposer("visit")}
+        loading={compose === "checking" && intent === "visit"}
+        aria-haspopup="dialog"
+        data-testid="visit-button"
+        className={cn(compact && "min-w-0 flex-1 px-3")}
+      >
+        <CalendarClock aria-hidden="true" />
+        {compact ? t("visitShort") : t("visit")}
+      </Button>
+    ) : null;
 
   const signIn = (body: string) => (
     <div className="flex flex-col gap-2 rounded-md bg-surface-muted p-3 text-sm">
@@ -270,7 +299,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
         <RevealChallenge failed={state.failed} onToken={(token) => void reveal(token)} />
       ) : null
     ) : compose === "signin" ? (
-      signIn(t("signInMessage"))
+      signIn(intent === "visit" ? t("signInVisit") : t("signInMessage"))
     ) : state.kind === "signin" ? (
       signIn(t("signInBody"))
     ) : state.kind === "error" ? (
@@ -290,11 +319,12 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
         {canReveal ? <div className="flex flex-col gap-2">{primary(false)}</div> : null}
         {feedback(true)}
         {messageButton(false)}
+        {visitButton(false)}
         {hint}
       </div>
       {testDrive ? (
         <div className="mt-3 flex flex-col gap-1.5">
-          <Button type="button" variant="structure" onClick={() => void openComposer("test_drive")} loading={compose === "checking" && purpose === "test_drive"} aria-haspopup="dialog" className="w-full">
+          <Button type="button" variant="structure" onClick={() => void openComposer("test_drive")} loading={compose === "checking" && intent === "test_drive"} aria-haspopup="dialog" className="w-full">
             <CarFront aria-hidden="true" />
             {t("testDrive")}
           </Button>
@@ -308,7 +338,8 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
         <div className="mx-auto flex max-w-xl flex-col gap-2">
           {feedback(false)}
           <div className="flex gap-2">
-            {revealed ? null : canReveal ? messageButton(true) : messageButton(false, true)}
+            {revealed ? null : canReveal || visit ? messageButton(true) : messageButton(false, true)}
+            {revealed ? null : visitButton(true)}
             {canReveal ? primary(true) : null}
           </div>
         </div>
@@ -316,7 +347,9 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
       <BarSpacer />
       {composeMounted ? (
         <MessageDialog
-          key={purpose}
+          // A fresh form per intent: the visit request comes with its own draft.
+          key={intent}
+          intent={intent === "visit" ? "visit" : "message"}
           open={compose === "open"}
           onOpenChange={(open) => setCompose(open ? "open" : "closed")}
           listingId={listingId}
@@ -324,7 +357,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
           sellerName={sellerName}
           adultsOnly={adultsOnly}
           onSignedOut={() => setCompose("signin")}
-          {...(purpose === "test_drive" ? { initialText: t("testDriveText", { title: listingTitle ?? "" }), threadQuery: "rdv=test_drive" } : {})}
+          {...(intent === "test_drive" ? { initialText: t("testDriveText", { title: listingTitle ?? "" }), threadQuery: "rdv=test_drive" } : {})}
         />
       ) : null}
     </div>
