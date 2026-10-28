@@ -40,9 +40,10 @@ describe("parseCli", () => {
       allowProduction: false,
       allowUnverified: false,
       allowOverQuota: false,
+      auth: false,
     });
     expect(
-      parseCli(["--identity", "k", "--from-bucket", "prod", "--project", "p-123x", "--collections", "users, listings,", "--until", "2026-10-16", "--apply", "--allow-production", "--allow-unverified", "--allow-over-quota"]),
+      parseCli(["--identity", "k", "--from-bucket", "prod", "--project", "p-123x", "--collections", "users, listings,", "--until", "2026-10-16", "--apply", "--allow-production", "--allow-unverified", "--allow-over-quota", "--auth"]),
     ).toEqual({
       identity: "k",
       from: null,
@@ -54,6 +55,7 @@ describe("parseCli", () => {
       allowProduction: true,
       allowUnverified: true,
       allowOverQuota: true,
+      auth: true,
     });
   });
 
@@ -186,5 +188,23 @@ describe("restore-firestore under plain Node", () => {
       (error: { code: number; stderr: string }) => error,
     );
     expect(failure).toMatchObject({ code: 1, stderr: expect.stringContaining("not recorded in infra/targets.json") });
+  });
+});
+
+describe("scripts/restore-drill.ts helpers", () => {
+  it("parses its arguments", async () => {
+    const { parseDrillCli } = await import("../../scripts/restore-drill.ts");
+    expect(parseDrillCli(["--identity", "k.txt", "--from", "dl", "--until", "2026-10-20"])).toEqual({ identity: "k.txt", from: "dl", fromBucket: null, until: "2026-10-20" });
+    expect(parseDrillCli(["--identity", "k.txt", "--from-bucket", "prod"])).toMatchObject({ from: null, fromBucket: "prod" });
+    expect(() => parseDrillCli(["--identity", "k.txt"])).toThrow(/usage/);
+    expect(() => parseDrillCli(["--identity", "k.txt", "--from", "dl", "--from-bucket", "prod"])).toThrow(/usage/);
+    expect(() => parseDrillCli(["--identity", "k.txt", "--from-bucket", "dev"])).toThrow(/staging or prod/);
+    expect(() => parseDrillCli(["--identity", "k.txt", "--from", "dl", "--project", "x"])).toThrow();
+  });
+
+  it("names a fresh emulator project per run and formats durations", async () => {
+    const { drillProjectId, formatDuration } = await import("../../scripts/restore-drill.ts");
+    expect(drillProjectId(new Date("2026-10-28T11:42:07.123Z"))).toBe("demo-drill-20261028114207");
+    expect([formatDuration(4_400), formatDuration(150_000), formatDuration(3_600_000), formatDuration(11_520_000)]).toEqual(["4 s", "3 min", "1 h", "3 h 12 min"]);
   });
 });

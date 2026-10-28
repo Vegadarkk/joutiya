@@ -1,4 +1,5 @@
 import "server-only";
+import type { UserRecord } from "firebase-admin/auth";
 import { FieldPath, Timestamp, type DocumentReference, type Firestore, type Query, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { QUOTAS } from "@/config/quotas";
 import { alert } from "@/lib/alert";
@@ -9,7 +10,7 @@ import type { ObjectStore } from "@/lib/storage";
 import { isValkeyConfigured, valkey } from "@/lib/valkey/clients";
 import { encryptAge, isAgeRecipient } from "./crypto.ts";
 import { encodeDocument, isDocumentPath } from "./encode.ts";
-import { PART_MAX_BYTES, PART_MAX_DOCS, PartBuilder, manifestKey, partKey, sealPart, type BackupMode, type SealedPart } from "./parts.ts";
+import { PART_MAX_BYTES, PART_MAX_DOCS, PartBuilder, authPartKey, manifestKey, partKey, sealPart, type BackupMode, type SealedPart } from "./parts.ts";
 
 // Nightly export (D17), two passes written to the private bucket as NDJSON -> gzip -> age:
 //   1. incremental, per collection: documents whose `updatedAt` (or, failing that, `createdAt`) is
@@ -20,6 +21,10 @@ import { PART_MAX_BYTES, PART_MAX_DOCS, PartBuilder, manifestKey, partKey, sealP
 //      a field are only in the rolling full;
 //   2. rolling full: up to `fullBudget` documents a night across collections, ordered by document
 //      path and continued from a per-collection cursor; a cycle is one pass over the table below.
+//   3. Firebase Auth accounts (D20), all of them every night through the Admin SDK (no Firestore
+//      read): `backups/{date}/auth/users[-n]`, listed under `auth` in the manifest. A failure there
+//      alerts and leaves the Firestore backup complete.
+// Small settings collections (`nightly`: config) are read whole in pass 1 every night.
 // Cursors live in `system/backup` and move only once the manifest is stored: a failed run is
 // redone by the next one. One run per UTC date: keys are per date, a second run would overwrite
 // the first. Scans stop when the Firestore read quota reaches `readsStopRatio` (the app keeps its
@@ -41,7 +46,12 @@ export interface BackupCollection {
   scope: "root" | "group";
   /** Field of the incremental query; null = rolling full only. */
   timeField: TimeField | null;
+  /** Small settings collection read whole every night in the incremental pass (at most NIGHTLY_MAX_DOCS). */
+  nightly?: true;
 }
+
+/** Documents a `nightly` collection may hold: past it the rest waits for the rolling full (and a warning is logged). */
+export const NIGHTLY_MAX_DOCS = 200;
 
 type CollectionId = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
 /** `account` and `identity` are document ids (of `private`), `system` holds the cursors themselves, `quotaDaily` is rebuilt by the app. */
@@ -54,10 +64,12 @@ type BackedUpId = Exclude<
  * Time field per collection, from the Zod schemas of src/lib/db/schemas.ts. Adding a collection to
  * COLLECTIONS fails to compile until it is listed here: a backup is a conscious decision.
  * `connectionLogs`, `auditLogs`, `contentOps`, `revealLogs`, `mailSuppressions` only have `at`
- * (append-only journals): rolling full only. `quotaDaily` (nightly snapshots) and `config/legal`
- * (not in COLLECTIONS) are rebuilt by the app and the owner (scripts/legal-config.ts).
+ * (append-only journals): rolling full only. `quotaDaily` (nightly snapshots) is rebuilt by the app.
  */
 const TABLE: Record<BackedUpId, Omit<BackupCollection, "id">> = {
+  // Phase 6 (D20): legal mentions, AI and flags settings, edited from the back office; no time
+  // field, a handful of documents: copied whole every night.
+  config: { scope: "root", timeField: null, nightly: true },
   users: { scope: "root", timeField: "updatedAt" },
   private: { scope: "group", timeField: null },
   emailIndex: { scope: "root", timeField: "createdAt" },
@@ -211,6 +223,8 @@ export interface BackupManifest {
   /** Cursors stored for the next run. */
   cursors: CursorsJson;
   collections: BackupCollection[];
+  /** Firebase Auth export: its parts and account count, the error that stopped it, or null when no lister was given. */
+  auth: { users: number; parts: StoredPart[] } | { error: string } | null;
 }
 
 export interface CursorsJson {
@@ -240,7 +254,12 @@ export interface BackupResult {
   retainedBytes: number | null;
   /** Firestore storage estimated from the last complete rolling full (null when skipped or before the first one). */
   firestoreStorageBytes: number | null;
+  /** Firebase Auth accounts exported; null when skipped, without a lister, or when the export failed. */
+  authUsers: number | null;
 }
+
+/** One page of Firebase Auth accounts (Auth.listUsers). */
+export type AuthUserLister = (pageToken?: string) => Promise<{ users: UserRecord[]; pageToken?: string }>;
 
 export interface RunBackupInput {
   db: Firestore;
@@ -251,6 +270,8 @@ export interface RunBackupInput {
   /** Cursor document (default system/backup). */
   cursorDoc?: DocumentReference;
   config?: Partial<BackupConfig>;
+  /** Pages of Firebase Auth accounts (D20); absent: no Auth export (tests, a store without Auth). */
+  authUsers?: AuthUserLister | null;
 }
 
 const CONTENT_TYPE = "application/octet-stream";
@@ -450,26 +471,28 @@ interface WriterContext {
   limits: { maxDocs: number; maxBytes: number };
 }
 
+/** A stored part, as the manifest lists it. */
+export type StoredPart = Omit<SealedPart, "body"> & { key: string; part: number | null };
+
 /**
  * Feeds lines to a PartBuilder and uploads sealed parts. The first part is held back until the
- * collection ends: alone it is `{collection}.ndjson.gz.age`, otherwise `{collection}-1`, `-2`, ...
+ * stream ends: alone its key gets no number (`{collection}.ndjson.gz.age`), otherwise `-1`, `-2`, ...
  */
-class CollectionWriter {
+class PartWriter {
   private readonly builder: PartBuilder;
   private sealed = 0;
   private first: SealedPart | null = null;
-  readonly parts: ManifestPart[] = [];
+  readonly stored: StoredPart[] = [];
 
   constructor(
     private readonly ctx: WriterContext,
-    private readonly mode: BackupMode,
-    private readonly collection: string,
+    private readonly keyOf: (part: number | null) => string,
   ) {
     this.builder = new PartBuilder(ctx.limits);
   }
 
-  async add(snapshot: QueryDocumentSnapshot): Promise<void> {
-    const full = this.builder.push(encodeDocument(snapshot));
+  async addLine(line: string): Promise<void> {
+    const full = this.builder.push(line);
     if (full) await this.seal(full);
   }
 
@@ -497,9 +520,34 @@ class CollectionWriter {
   }
 
   private async upload(part: SealedPart, number: number | null): Promise<void> {
-    const key = partKey(this.ctx.date, this.mode, this.collection, number);
+    const key = this.keyOf(number);
     await this.ctx.store.put("private", key, part.body, { contentType: CONTENT_TYPE });
-    this.parts.push({ key, mode: this.mode, collection: this.collection, part: number, docs: part.docs, plainBytes: part.plainBytes, gzipBytes: part.gzipBytes, bytes: part.bytes, sha256: part.sha256 });
+    this.stored.push({ key, part: number, docs: part.docs, plainBytes: part.plainBytes, gzipBytes: part.gzipBytes, bytes: part.bytes, sha256: part.sha256 });
+  }
+}
+
+/** The documents of one (mode, collection), as `backups/{date}/{mode}/{collection}[-n]` parts. */
+class CollectionWriter {
+  private readonly writer: PartWriter;
+
+  constructor(
+    ctx: WriterContext,
+    private readonly mode: BackupMode,
+    private readonly collection: string,
+  ) {
+    this.writer = new PartWriter(ctx, (part) => partKey(ctx.date, mode, collection, part));
+  }
+
+  add(snapshot: QueryDocumentSnapshot): Promise<void> {
+    return this.writer.addLine(encodeDocument(snapshot));
+  }
+
+  finish(): Promise<void> {
+    return this.writer.finish();
+  }
+
+  get parts(): ManifestPart[] {
+    return this.writer.stored.map((part) => ({ ...part, mode: this.mode, collection: this.collection }));
   }
 }
 
@@ -560,7 +608,7 @@ function resumable(collection: BackupCollection, path: string | null | undefined
 
 /** A run that wrote nothing (also used by the worker job when the storage is missing). */
 export function skippedBackup(reason: BackupSkipReason, date: string, durationMs = 0): BackupResult {
-  return { status: "skipped", reason, date, manifestKey: null, counts: { incremental: {}, full: {} }, parts: 0, bytes: 0, reads: 0, truncated: false, quotaStopped: false, durationMs, cursors: null, retainedBytes: null, firestoreStorageBytes: null };
+  return { status: "skipped", reason, date, manifestKey: null, counts: { incremental: {}, full: {} }, parts: 0, bytes: 0, reads: 0, truncated: false, quotaStopped: false, durationMs, cursors: null, retainedBytes: null, firestoreStorageBytes: null, authUsers: null };
 }
 
 export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
@@ -606,6 +654,17 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
   const timed = order.filter((collection) => collection.timeField !== null);
   const startAt = Math.max(0, timed.findIndex((collection) => collection.id === previous.incrementalNext));
   let budget = Math.min(config.incrementalMax, config.maxRunReads - state.reads);
+  // Settings collections, whole: a handful of documents with no time field to follow.
+  for (const collection of order.filter((item) => item.nightly)) {
+    if (budget <= 0 || state.quotaStopped) break;
+    const writer = new CollectionWriter(ctx, "incremental", collection.id);
+    const result = await scan(baseQuery(db, collection).orderBy(FieldPath.documentId()), Math.min(NIGHTLY_MAX_DOCS, budget), config.pageSize, null, state, (doc) => writer.add(doc));
+    await writer.finish();
+    budget -= result.docs;
+    counts.incremental[collection.id] = result.docs;
+    parts.push(...writer.parts);
+    if (!result.exhausted) logger.warn({ date, collection: collection.id, max: NIGHTLY_MAX_DOCS }, "backup-firestore: nightly collection larger than expected, the rest waits for the rolling full");
+  }
   let incrementalNext: string | null = null;
   for (let step = 0; step < timed.length; step += 1) {
     const collection = timed[(startAt + step) % timed.length] as BackupCollection;
@@ -669,7 +728,11 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
   const cycleComplete = fullNext === null;
   if (truncated || state.quotaStopped) logger.warn({ date, incrementalNext, quotaStopped: state.quotaStopped }, "backup-firestore: incremental stopped early, the cursors stay behind");
 
-  // 3. Manifest, then the cursors (a failed upload leaves the cursors untouched: the next run redoes the work).
+  // 3. Firebase Auth accounts: a failure is reported, the Firestore backup stays complete.
+  const auth = input.authUsers ? await exportAuthUsers(input.authUsers, ctx) : null;
+  const authParts = auth && "parts" in auth ? auth.parts : [];
+
+  // 4. Manifest, then the cursors (a failed upload leaves the cursors untouched: the next run redoes the work).
   const cursors: BackupCursors = {
     incremental,
     incrementalNext,
@@ -686,7 +749,7 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
     storedBytes: retainedStoredBytes(previous.storedBytes, now),
   };
   const finishedAt = new Date();
-  const bytes = parts.reduce((sum, part) => sum + part.bytes, 0);
+  const bytes = [...parts, ...authParts].reduce((sum, part) => sum + part.bytes, 0);
   const manifest: BackupManifest = {
     version: 1,
     date,
@@ -700,6 +763,7 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
     quotaStopped: state.quotaStopped,
     cursors: cursorsJson(cursors),
     collections: [...order],
+    auth,
   };
   // The manifest is age only (no gzip), as its name says: `age -d` prints it.
   const manifestBody = await encryptAge(Buffer.from(JSON.stringify(manifest), "utf8"), recipient);
@@ -709,6 +773,9 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
   await cursorDoc.set(serializeCursors(cursors, finishedAt));
   await consume("firestore.writes", 1);
 
+  if (auth && "error" in auth) {
+    await alert({ severity: "P2", title: "Sauvegarde des comptes Firebase Auth en échec", body: `Le ${date}, l'export des comptes a échoué (${auth.error}). La sauvegarde Firestore est complète ; l'export des comptes reprend la nuit suivante.` });
+  }
   if (state.quotaStopped) {
     await alert({ severity: "P2", title: "Sauvegarde Firestore incomplète : quota de lectures", body: `Le ${date}, les lectures Firestore ont atteint ${Math.round(config.readsStopRatio * 100)} % du quota du jour : sauvegarde arrêtée, reprise la nuit suivante depuis les curseurs.` });
   }
@@ -723,7 +790,90 @@ export async function runBackup(input: RunBackupInput): Promise<BackupResult> {
   const durationMs = Date.now() - started;
   const lastCycleBytes = cursors.full.lastCycleBytes;
   const firestoreStorageBytes = lastCycleBytes === null ? null : firestoreStorageEstimate(lastCycleBytes);
-  const result: BackupResult = { status: "done", date, manifestKey: key, counts, parts: parts.length, bytes, reads: state.reads, truncated, quotaStopped: state.quotaStopped, durationMs, cursors, retainedBytes, firestoreStorageBytes };
-  logger.info({ date, counts, parts: parts.length, bytes, reads: state.reads, truncated, quotaStopped: state.quotaStopped, fullNext, cycleComplete, durationMs }, "backup-firestore");
+  const authUsers = auth && "users" in auth ? auth.users : null;
+  const result: BackupResult = { status: "done", date, manifestKey: key, counts, parts: parts.length + authParts.length, bytes, reads: state.reads, truncated, quotaStopped: state.quotaStopped, durationMs, cursors, retainedBytes, firestoreStorageBytes, authUsers };
+  logger.info({ date, counts, parts: parts.length + authParts.length, bytes, reads: state.reads, truncated, quotaStopped: state.quotaStopped, fullNext, cycleComplete, authUsers, durationMs }, "backup-firestore");
   return result;
+}
+
+// --- Firebase Auth accounts (D20) ----------------------------------------------------------------
+
+/** Accounts per listUsers page (the Admin SDK maximum). */
+const AUTH_PAGE_SIZE = 1000;
+
+/**
+ * One account as a backup line: what an import needs to recreate it (uid, e-mail, providers,
+ * claims, state, dates) and the password hash and salt when the Admin SDK returns them; an import
+ * without the project's hash parameters recreates the accounts without passwords (re-invite by
+ * password reset, docs/backups.md).
+ */
+export function authUserLine(user: UserRecord): string {
+  const line: Record<string, unknown> = {
+    uid: user.uid,
+    email: user.email ?? null,
+    emailVerified: user.emailVerified,
+    disabled: user.disabled,
+    displayName: user.displayName ?? null,
+    providerData: user.providerData.map((provider) => ({ providerId: provider.providerId, uid: provider.uid, email: provider.email ?? null })),
+    customClaims: user.customClaims ?? null,
+    createdAt: user.metadata.creationTime ?? null,
+    lastSignInAt: user.metadata.lastSignInTime ?? null,
+    tokensValidAfter: user.tokensValidAfterTime ?? null,
+  };
+  if (user.passwordHash && user.passwordSalt) Object.assign(line, { passwordHash: user.passwordHash, passwordSalt: user.passwordSalt });
+  return JSON.stringify(line);
+}
+
+async function exportAuthUsers(list: AuthUserLister, ctx: WriterContext): Promise<{ users: number; parts: StoredPart[] } | { error: string }> {
+  const writer = new PartWriter(ctx, (part) => authPartKey(ctx.date, part));
+  let users = 0;
+  try {
+    let pageToken: string | undefined;
+    do {
+      const page = await list(pageToken);
+      for (const user of page.users) await writer.addLine(authUserLine(user));
+      users += page.users.length;
+      pageToken = page.pageToken;
+    } while (pageToken);
+    await writer.finish();
+  } catch (error) {
+    logger.error({ date: ctx.date, err: (error as Error).message }, "backup-firestore: Firebase Auth export failed");
+    return { error: `${(error as Error).name}: ${(error as Error).message}`.slice(0, 200) };
+  }
+  return { users, parts: writer.stored };
+}
+
+/** The Admin SDK's account listing, page by page. */
+export function authUserLister(auth: { listUsers(maxResults?: number, pageToken?: string): Promise<{ users: UserRecord[]; pageToken?: string }> }): AuthUserLister {
+  return (pageToken) => auth.listUsers(AUTH_PAGE_SIZE, pageToken);
+}
+
+// --- Freshness (D20) -----------------------------------------------------------------------------
+
+/** A backup older than this alerts: the 03:30 run missed a night (26 h leaves the run its time). */
+export const BACKUP_MAX_AGE_MS = 26 * 3_600_000;
+
+export interface BackupFreshness {
+  lastRunAt: Date | null;
+  stale: boolean;
+}
+
+/**
+ * Daily check after the night's run: the last completed backup must be under 26 h old. Never run
+ * yet: not stale here (the missing key or storage alerts already say why). One read.
+ */
+export async function checkBackupFreshness(db: Firestore, now = new Date(), cursorDoc?: DocumentReference): Promise<BackupFreshness> {
+  const doc = cursorDoc ?? db.collection(COLLECTIONS.system).doc("backup");
+  const { lastRunAt } = parseCursors((await doc.get()).data());
+  await consume("firestore.reads", 1);
+  const stale = lastRunAt !== null && now.getTime() - lastRunAt.getTime() > BACKUP_MAX_AGE_MS;
+  if (stale) {
+    const hours = Math.floor((now.getTime() - lastRunAt.getTime()) / 3_600_000);
+    await alert({
+      severity: "P1",
+      title: "Sauvegarde Firestore trop ancienne",
+      body: `La dernière sauvegarde terminée date de ${hours} h (${lastRunAt.toISOString()}). Vérifier le worker et la tâche backup-firestore (03:30 UTC) : journaux, clé BACKUP_AGE_RECIPIENT, R2.`,
+    });
+  }
+  return { lastRunAt, stale };
 }

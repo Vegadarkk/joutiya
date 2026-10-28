@@ -1,13 +1,15 @@
 # Sauvegardes Firestore (procédure d'incident)
 
-Export chiffré de Firestore chaque nuit (DESIGN D17). Code : `src/lib/backup/`, tâche
-`src/worker/jobs/backup-firestore.ts`, restauration `scripts/restore-firestore.ts`.
+Export chiffré de Firestore et des comptes Firebase Auth chaque nuit (DESIGN D17, D20). Code :
+`src/lib/backup/`, tâche `src/worker/jobs/backup-firestore.ts`, restauration `scripts/restore-firestore.ts`,
+répétition `scripts/restore-drill.ts`.
 
 ## Tâche de nuit
 
 - `backup-firestore`, à 03:30 UTC sur la file `system` du worker, une seule tentative. Lectures par le SDK
   Admin, comptées dans `firestore.reads`.
-- Passe 1, incrémentale : pour chaque collection qui a un champ de date (`updatedAt`, sinon `createdAt`),
+- Passe 1, incrémentale : d'abord les petites collections de réglages (`config` : textes légaux, CGU), lues
+  en entier chaque nuit (au plus 200 documents). Puis, pour chaque collection qui a un champ de date (`updatedAt`, sinon `createdAt`),
   les documents à partir du curseur de la collection, dans l'ordre (date, chemin), jusqu'à 20 000 par nuit.
   Un parcours coupé reprend strictement après le dernier (date, chemin) exporté : des documents qui
   partagent la même date ne sont jamais sautés. La passe suivante commence par la collection coupée
@@ -18,6 +20,10 @@ Export chiffré de Firestore chaque nuit (DESIGN D17). Code : `src/lib/backup/`,
 - Une nuit lit au plus 20 000 documents (40 % du quota Spark de lectures du jour) pour les deux passes, et
   les parcours s'arrêtent quand le quota de lectures du jour atteint 75 % ; les curseurs gardent
   l'avancement.
+- Passe 3, comptes Firebase Auth : tous les comptes (identifiant, e-mail et sa vérification, état, nom,
+  liens Google, rôles, dates, et l'empreinte du mot de passe quand il y en a une), par pages de 1 000, en
+  parties chiffrées comme les autres. Un échec de cette passe n'annule pas la sauvegarde Firestore : il
+  envoie une alerte P2 « Sauvegarde des comptes Firebase Auth en échec », et la nuit suivante réessaie.
 - Les curseurs sont dans `system/backup` et n'avancent qu'une fois le manifeste déposé : une nuit en échec
   est refaite la nuit suivante. Une seule exécution par date UTC (une deuxième, ou un manifeste déjà
   présent, est ignorée).
@@ -26,6 +32,9 @@ Export chiffré de Firestore chaque nuit (DESIGN D17). Code : `src/lib/backup/`,
   de rotation complète n'est toujours pas fini après 60 jours (au-delà des 98 jours de rétention, des
   documents n'auraient plus de copie). Le résultat (nombres, parties, octets, lectures, durée) est journalisé
   sous `backup-firestore`.
+- `backup-freshness`, chaque jour à 09:05 UTC : alerte P1 « Sauvegarde Firestore trop ancienne » si la
+  dernière nuit terminée date de plus de 26 h (tâche de nuit arrêtée, worker en panne). Rien avant la
+  première sauvegarde.
 
 ### Jauge du stockage Firestore
 
@@ -51,13 +60,14 @@ Bucket privé (`R2_BUCKET_PRIVATE`) :
 ```
 backups/<YYYY-MM-DD>/incremental/<collection>[-<n>].ndjson.gz.age
 backups/<YYYY-MM-DD>/full/<collection>[-<n>].ndjson.gz.age
+backups/<YYYY-MM-DD>/auth/users[-<n>].ndjson.gz.age
 backups/<YYYY-MM-DD>/manifest.json.age
 ```
 
 Une partie est du NDJSON (une ligne par document : `{"p": chemin, "d": données, "u": updateTime}`, les types
 Firestore en objets étiquetés) -> gzip -> age, au plus 20 000 documents ou 16 Mio de NDJSON. Le manifeste
 (age seulement) liste chaque partie avec son nombre de documents, sa taille et son SHA-256, plus les
-curseurs. Rien n'est jamais écrit en clair, ni sur la VM ni dans le bucket.
+curseurs, et les parties des comptes sous `auth`. Rien n'est jamais écrit en clair, ni sur la VM ni dans le bucket.
 
 Rétention : 98 jours, par une règle de cycle de vie R2 sur le préfixe `backups/` de chaque bucket privé
 (réglage d'infrastructure, DESIGN section 7 ; pas posé par ce code) :
@@ -113,6 +123,13 @@ node scripts/restore-firestore.ts ... --apply
   vérification, en les listant.
 - `set()` remplace des documents entiers : restaurer dans une base en service annule ce qui a changé depuis
   la sauvegarde. Préférez un projet vide, ou réduisez avec `--collections`.
+- `--auth` recrée aussi les comptes Firebase Auth de l'export le plus récent (jusqu'à `--until`), **sans
+  mot de passe** : l'empreinte n'est réimportable qu'avec les paramètres de hachage du projet d'origine,
+  que nous n'avons pas. Les membres inscrits par e-mail choisissent un nouveau mot de passe avec « Mot de
+  passe oublié » (prévenez-les par un e-mail groupé) ; les comptes Google se reconnectent normalement.
+  Rôles, vérification de l'e-mail, comptes désactivés et identifiants sont conservés, donc les documents
+  Firestore retrouvent leur propriétaire. Un compte qui existe déjà est remplacé. Avec l'émulateur
+  Firestore, `--auth` demande aussi l'émulateur Auth (`FIREBASE_AUTH_EMULATOR_HOST`).
 
 ### Plus de 20 000 documents (Spark)
 
@@ -136,14 +153,29 @@ Après une restauration :
    reviennent. Une annonce purgée revient sous forme de pierre tombale (elle porte `updatedAt`) dès que
    l'incrémentale qui a suivi la purge est restaurée ; avant cela, son texte complet revient. Lancez
    `retention-purge` et `purge-unactivated`, et vérifiez les conservations légales, avant de rouvrir.
-2. Hors sauvegarde : les comptes Firebase Auth (à exporter à part), `config/legal`
-   (`scripts/legal-config.ts`), `quotaDaily`, les curseurs `system/*` (reconstruits), les objets R2
+2. Hors sauvegarde : `quotaDaily`, les curseurs `system/*` (reconstruits), les objets R2
    (photos).
 3. Reconstruisez l'index de recherche depuis Firestore (phase 4).
 
 ## Répétition de la restauration
 
-Le test contre l'émulateur (`tests/api/backup/restore.test.ts`) passe. La chaîne réelle ne l'est pas
+`scripts/restore-drill.ts` fait une répétition complète sans toucher à un vrai projet : il restaure les
+sauvegardes dans un projet neuf des émulateurs (`demo-drill-<date et heure>`, vide), relit chaque document
+et le compare à la version choisie dans la sauvegarde (nombre, SHA-256 par collection, chemins manquants,
+en trop ou différents), compte les références orphelines (annonce sans propriétaire, photo sans annonce,
+message sans conversation…, signalées sans faire échouer), recrée les comptes Firebase Auth dans
+l'émulateur Auth et les recompte, puis affiche le RTO (durée de la restauration) et le RPO (âge de la
+version la plus récente). Il n'affiche que des nombres et des chemins, jamais le contenu. Code de sortie 1
+si une collection ou les comptes ne correspondent pas.
+
+```
+npx firebase emulators:exec --only auth,firestore --project demo-joutiya \
+  "node --env-file=.env.local scripts/restore-drill.ts --identity joutiya-backup.key --from-bucket staging"
+```
+
+(`--from <dossier>` pour une copie téléchargée, `--until YYYY-MM-DD` pour l'état d'une nuit.)
+
+Les tests contre l'émulateur (`tests/api/backup/restore.test.ts`, `tests/api/backup/drill.test.ts`) passent. La chaîne réelle ne l'est pas
 encore : identifiants du worker -> bucket privé -> cycle de vie -> clé age hors ligne ->
 `restore-firestore.ts --apply` sur un vrai projet. Elle se répète deux fois :
 
@@ -159,6 +191,8 @@ encore : identifiants du worker -> bucket privé -> cycle de vie -> clé age hor
 Prérequis : le fichier de clé age sur le PC qui lance la restauration (le PC2 pour B) ; le projet cible
 vide ou jetable.
 
+0. Pour A, `restore-drill.ts` ci-dessus fait les étapes 1 à 4 d'un coup : reportez ses chiffres dans le
+   tableau (RTO dans « Durée écriture », RPO et références orphelines dans « Écarts »).
 1. Notez l'heure, puis lancez la simulation depuis le bucket de la source (`--from-bucket staging` et
    l'émulateur pour A, `--from-bucket prod --project joutiya-staging` pour B). Notez la plage de dates, le nombre
    de parties, les dates vérifiées et les documents par collection. Toute alerte (jour manquant, partie
@@ -189,4 +223,5 @@ vide ou jetable.
   bucket pourrait y déposer une partie, voire un manifeste. Ne restaurez que depuis le bucket privé de
   l'environnement (jeton R2 limité à ses buckets), et n'utilisez `--allow-unverified` qu'en connaissant
   l'origine des parties listées.
+- Les comptes reviennent sans mot de passe (voir `--auth`) ; les sessions ouvertes sont perdues.
 - La restauration sur de vraies données reste à faire (répétitions A et B ci-dessus).
