@@ -150,6 +150,8 @@ export type ErrorCode =
   | "unavailable"
   /** 422: a short free text (storefront bio, review) refused by the text screen; details: { field, issue }. */
   | "invalid_text"
+  /** 409: the conversation's review window is not open (details: { state, opensAt? }), or already used. */
+  | "review_unavailable"
   | "internal";
 
 export class HttpError extends Error {

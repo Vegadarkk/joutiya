@@ -133,6 +133,9 @@ export const EXPORT_LIMITS = {
   reportsFiled: 100,
   decisions: 100,
   blockedAccounts: 100,
+  /** No "is there more" probe: a full page is reported as possibly cut (the read budget below). */
+  reviewsGiven: 20,
+  reviewsReceived: 20,
 } as const satisfies Record<ExportSection, number>;
 
 /** Messages of one conversation at most (its newest). */
@@ -152,7 +155,9 @@ export const EXPORT_MAX_READS =
   EXPORT_LIMITS.messages + EXPORT_LIMITS.conversations +
   EXPORT_LIMITS.reportsFiled + 1 + EXPORT_LIMITS.reportsFiled +
   EXPORT_LIMITS.decisions + 1 +
-  EXPORT_LIMITS.blockedAccounts;
+  EXPORT_LIMITS.blockedAccounts +
+  EXPORT_LIMITS.reviewsGiven +
+  EXPORT_LIMITS.reviewsReceived;
 
 /** Messages to read for each conversation (newest first), within the per-conversation and total limits. */
 export function messageAllowances(counts: readonly number[], total: number = EXPORT_LIMITS.messages, perConversation: number = EXPORT_MESSAGES_PER_CONVERSATION): number[] {
