@@ -46,17 +46,8 @@ export async function waitForMail(request: APIRequestContext, to: string, templa
   return found!;
 }
 
-/**
- * A documentation-range address (TEST-NET-2, RFC 5737) for one sign-up. The suite signs up more
- * accounts than `signup.ip` allows one address in an hour; outside a deployment the server reads
- * `cf-connecting-ip` (src/lib/security/ip.ts), so each sign-up comes from its own address.
- */
-const signupIp = () => `198.51.100.${1 + (randomBytes(1)[0]! % 254)}`;
-
 /** Signs up a fresh individual through the French form and confirms the e-mail: the page is signed in. */
 export async function signUpAndIn(page: Page, request: APIRequestContext, email: string, displayName = "Amina Test"): Promise<void> {
-  const ip = signupIp();
-  await page.route("**/api/auth/signup", (route) => route.continue({ headers: { ...route.request().headers(), "cf-connecting-ip": ip } }));
   await page.goto("/fr/inscription");
   await page.getByLabel("Nom affiché").fill(displayName);
   await page.getByLabel("Adresse e-mail").fill(email);
@@ -67,7 +58,6 @@ export async function signUpAndIn(page: Page, request: APIRequestContext, email:
   if ((await widget.count()) > 0) await expect(widget.first()).toHaveAttribute("data-turnstile", "ready", { timeout: 20_000 });
   await page.getByRole("button", { name: "Créer mon compte" }).click();
   await expect(page.getByRole("heading", { name: "Vérifiez votre boîte mail" })).toBeVisible({ timeout: 15_000 });
-  await page.unroute("**/api/auth/signup");
   const mail = await waitForMail(request, email, "verifyEmail");
   await page.goto(mail.data.actionUrl!);
   await expect(page.getByRole("heading", { name: "Adresse confirmée" })).toBeVisible({ timeout: 15_000 });
