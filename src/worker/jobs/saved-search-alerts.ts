@@ -10,7 +10,7 @@ import { listingRecipient, siteUrl } from "@/lib/mail/recipients";
 import { isDegraded } from "@/lib/quota";
 import { accountEndPath, listDailySearches, markSearchesNotified, readAlertsCursor, writeAlertsCursor, type AlertSearchRecord } from "@/lib/saved-searches/repository";
 import { LAG_ALERT_SECONDS, readOutboxLag } from "@/lib/search/indexer";
-import { runSearch } from "@/lib/search/service";
+import { activeRentalDates, runSearch } from "@/lib/search/service";
 import { SearchUnavailableError, type FilterExpr } from "@/lib/search/types";
 
 // Daily at 07:00 UTC (design D19): one digest e-mail per account for its saved searches with an
@@ -102,6 +102,8 @@ async function alertHorizon(now: Date): Promise<number> {
 /** New listings of one search up to `horizon`, or null (none, or only approximate matches). */
 async function newsOf(search: AlertSearchRecord, now: Date, horizon: number): Promise<SearchNews | null> {
   if (horizon <= search.lastNotifiedSortAt) return null;
+  // A car rental search whose pick-up day has passed has nothing left to announce (rental pack §4).
+  if (search.params.dates && !activeRentalDates(search.params, now)) return null;
   const extraFilter: FilterExpr = {
     and: [
       { field: "sortAt", op: "gt", value: search.lastNotifiedSortAt },

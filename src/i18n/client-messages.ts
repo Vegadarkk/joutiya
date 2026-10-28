@@ -33,6 +33,9 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   // Car rental availability block of the listing page (rental pack §3).
   "Rental.listing",
   "Rental.calendar",
+  // Home "Louer une voiture" module and its date fields (rental pack §4).
+  "Rental.home",
+  "Rental.search",
   // Search islands shared by the home, category and listing pages (phase 4): favorite heart,
   // À la Une badge, search bar and place field, home search panel.
   "Favorites.button",

@@ -2486,7 +2486,9 @@
       "rooms": "{count, plural, one {# pièce} other {# pièces}}",
       "bedrooms": "{count} ch."
     },
-    "example": "Exemple"
+    "example": "Exemple",
+    "rentalTotal": "≈ {total} pour {days, plural, one {# jour} other {# jours}}",
+    "rentalToConfirm": "Disponibilité à confirmer"
   },
   "ListingPage": {
     "home": "Accueil",
@@ -3093,7 +3095,8 @@
       "seller": "Vendeur",
       "condition": "État",
       "options": "Options",
-      "criteria": "Critères : {subcategory}"
+      "criteria": "Critères : {subcategory}",
+      "rentalDates": "Dates de location"
     },
     "allCategories": "Toutes les catégories",
     "allOfCategory": "Toute la catégorie {category}",
@@ -3139,8 +3142,10 @@
       "range": "{label} : {min} – {max}",
       "rangeFrom": "{label} : dès {min}",
       "rangeTo": "{label} : jusqu'à {max}",
-      "options": "{label} : {values}"
-    }
+      "options": "{label} : {values}",
+      "dates": "{from} – {to} · {days} j"
+    },
+    "rentalDatesHint": "Les agences déclarent leurs jours indisponibles : les véhicules libres sur toute la période s'affichent, ceux à confirmer en dernier."
   },
   "Pro": {
     "metaTitle": "Espace Pro",
@@ -4435,6 +4440,18 @@
       "stale": "Disponibilité à confirmer avec l'agence (dernière mise à jour le {date}).",
       "never": "Disponibilité à confirmer avec l'agence.",
       "note": "Indication de l'agence, sans engagement : la réservation se confirme avec elle."
+    },
+    "search": {
+      "from": "Départ",
+      "to": "Retour",
+      "note": "Totaux estimés hors caution, tarif dégressif appliqué : le prix final est celui du contrat de l'agence.",
+      "barTitle": "Vos dates de location",
+      "submit": "Voir les véhicules libres"
+    },
+    "home": {
+      "title": "Louer une voiture",
+      "body": "Choisissez la ville et vos dates : les agences affichent les véhicules libres sur toute la période.",
+      "submit": "Trouver une voiture"
     }
   }
 }
