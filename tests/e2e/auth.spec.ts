@@ -83,8 +83,9 @@ async function signIn(page: Page, email: string, password: string) {
 async function createVerifiedAccount(page: Page, request: APIRequestContext, prefix: string): Promise<{ email: string; name: string }> {
   const email = uniqueEmail(prefix);
   const name = "Yasmine Test";
-  // Hydrated first: a consent ticked earlier is unticked when the form registers its fields.
-  await page.goto("/fr/inscription", { waitUntil: "networkidle" });
+  await page.goto("/fr/inscription");
+  // Hydrated first (the widget turns ready client side): a consent ticked earlier is unticked when the form registers its fields.
+  await waitForTurnstile(page);
   await fillSignup(page, { name, email, password: PASSWORD });
   await page.getByRole("checkbox", { name: /conditions générales d'utilisation/i }).check();
   await page.getByRole("checkbox", { name: /transférer mes données personnelles/i }).check();
@@ -103,8 +104,9 @@ test.describe("account", () => {
     const email = uniqueEmail();
     const name = "Yasmine Test";
 
-    // Hydrated first: a consent ticked earlier is unticked when the form registers its fields.
-    await page.goto("/fr/inscription", { waitUntil: "networkidle" });
+    await page.goto("/fr/inscription");
+    // Hydrated first (the widget turns ready client side): a consent ticked earlier is unticked when the form registers its fields.
+    await waitForTurnstile(page);
     await expect(page.getByRole("heading", { level: 1, name: "Créer un compte" })).toBeVisible();
     await fillSignup(page, { name, email, password: PASSWORD });
     await page.getByRole("checkbox", { name: /conditions générales d'utilisation/i }).check();
@@ -146,8 +148,9 @@ test.describe("account", () => {
   });
 
   test("the sign-up form explains what to fix", async ({ page }) => {
-    // Hydrated first: a consent ticked earlier is unticked when the form registers its fields.
-    await page.goto("/fr/inscription", { waitUntil: "networkidle" });
+    await page.goto("/fr/inscription");
+    // Hydrated first (the widget turns ready client side): a consent ticked earlier is unticked when the form registers its fields.
+    await waitForTurnstile(page);
     await fillSignup(page, { name: "A", email: "pas-un-email", password: "court" });
     await page.getByRole("button", { name: "Créer mon compte" }).click();
     await expect(page.getByText("Le nom doit faire au moins 2 caractères.")).toBeVisible();
@@ -345,8 +348,9 @@ test.describe("account", () => {
     // posted back): the same one on the next page of this device, another one without the cookie.
     const nonce = await gisNonce();
     expect(nonce).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    // Hydrated first: a consent ticked earlier is unticked when the form registers its fields.
-    await page.goto("/fr/inscription", { waitUntil: "networkidle" });
+    await page.goto("/fr/inscription");
+    // Hydrated first (the widget turns ready client side): a consent ticked earlier is unticked when the form registers its fields.
+    await waitForTurnstile(page);
     await expect(stubButton).toBeVisible();
     expect(await gisNonce()).toBe(nonce);
     await page.context().clearCookies();

@@ -48,8 +48,9 @@ export async function waitForMail(request: APIRequestContext, to: string, templa
 
 /** Signs up a fresh individual through the French form and confirms the e-mail: the page is signed in. */
 export async function signUpAndIn(page: Page, request: APIRequestContext, email: string, displayName = "Amina Test"): Promise<void> {
-  // Hydrated first: a consent ticked earlier is unticked when the form registers its fields.
-  await page.goto("/fr/inscription", { waitUntil: "networkidle" });
+  await page.goto("/fr/inscription");
+  // Hydrated first (the widget turns ready client side): a consent ticked earlier is unticked when the form registers its fields.
+  await expect(page.locator("[data-turnstile]").first()).toHaveAttribute("data-turnstile", "ready", { timeout: 20_000 });
   await page.getByLabel("Nom affiché").fill(displayName);
   await page.getByLabel("Adresse e-mail").fill(email);
   await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
