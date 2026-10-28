@@ -10,7 +10,8 @@
     "post": "Déposer une annonce",
     "searchLabel": "Rechercher une annonce",
     "searchPlaceholder": "Rechercher sur Joutiya",
-    "signIn": "Se connecter"
+    "signIn": "Se connecter",
+    "guide": "Démarches"
   },
   "Locale": {
     "label": "Langue",
@@ -110,7 +111,8 @@
       "mentions": "Mentions légales",
       "autorites": "Contact autorités (DSA)",
       "interdits": "Objets interdits"
-    }
+    },
+    "guide": "Démarches administratives"
   },
   "Legal": {
     "provisionalTitle": "Version provisoire",
@@ -180,6 +182,37 @@
         "turnstile_failed": "La vérification anti-robots a échoué. Cochez à nouveau la case, puis renvoyez votre question."
       }
     }
+  },
+  "Guide": {
+    "metaTitle": "Démarches administratives au Maroc",
+    "metaDescription": "Les liens officiels de vos démarches, classés par profil : étudiants, auto-entrepreneurs, véhicules, immobilier, MRE, sociétés et coopératives, identité.",
+    "title": "Démarches administratives",
+    "lead": "Où faire une démarche, dans quel ordre, et le lien direct vers la page officielle. Classé par profil, en français, en arabe et en tarifit.",
+    "guideHome": "Démarches administratives",
+    "breadcrumb": "Fil d'Ariane",
+    "rubricsTitle": "Choisissez votre situation",
+    "procedureCount": "{count, plural, one {# démarche} other {# démarches}}",
+    "generalTitle": "Portails pour toutes les démarches",
+    "disclaimerTitle": "Une information, pas une démarche officielle",
+    "disclaimer": "Ce guide vous oriente vers les sites des administrations. Seule la source officielle fait foi : procédures, pièces et frais peuvent changer à tout moment. {brand} n'est lié à aucune administration et ne traite aucune démarche : ne payez jamais quelqu'un qui se présente de notre part pour une démarche.",
+    "prepare": "À préparer",
+    "officialLinks": "Sur le site officiel",
+    "langs": "Page en : {langs}",
+    "lang": {
+      "fr": "français",
+      "ar": "arabe",
+      "en": "anglais",
+      "es": "espagnol"
+    },
+    "newTab": "(site officiel, s'ouvre dans un nouvel onglet)",
+    "withdrawn": "Lien retiré le temps de vérifier la page officielle.",
+    "checked": "Liens vérifiés automatiquement le {date}.",
+    "reviewed": "Contenu relu le {date}.",
+    "otherRubrics": "Autres situations",
+    "categoryLink": "Vos démarches : {title}",
+    "helpCardTitle": "Démarches administratives",
+    "helpCardBody": "Bourse, auto-entrepreneur, mutation d'un véhicule, achat d'un bien, MRE : les liens officiels, classés par profil.",
+    "helpCardCta": "Voir les démarches"
   },
   "NotFound": {
     "title": "Cette page n'existe pas",
@@ -2422,6 +2455,9 @@
       "message": "Envoyer un message",
       "messageShort": "Message",
       "messageHint": "Votre message arrive dans la messagerie Joutiya du vendeur. Ni votre e-mail ni votre numéro ne lui sont transmis.",
+      "testDrive": "Demander un essai",
+      "testDriveHint": "Écrivez au vendeur, puis proposez-lui vos créneaux dans la conversation.",
+      "testDriveText": "Bonjour, je souhaite essayer « {title} ». Quels créneaux vous conviennent ?",
       "signInBody": "Connectez-vous pour voir le numéro du vendeur. Vous reviendrez ensuite sur cette annonce.",
       "signInMessage": "Connectez-vous pour écrire au vendeur. Vous reviendrez ensuite sur cette annonce.",
       "signIn": "Se connecter",
@@ -3598,6 +3634,23 @@
       "see": "Voir les biens",
       "feesTitle": "Barème des honoraires",
       "feesNote": "Communiqué par l'agence. Les honoraires de chaque bien figurent aussi sur son annonce, à côté du prix."
+    },
+    "dealer": {
+      "title": "Stock de véhicules",
+      "count": "{count, plural, one {# véhicule en vente} other {# véhicules en vente}}",
+      "priceRange": "de {min} à {max}",
+      "seeAll": "Voir tout le stock",
+      "types": "Par type",
+      "brands": "Marques",
+      "otherBrands": "{count, plural, one {# autre marque} other {# autres marques}}",
+      "engine": "Motorisation",
+      "services": {
+        "tradeIn": "Reprise possible",
+        "financing": "Financement possible",
+        "warranty": "Garantie"
+      },
+      "onVehicles": "{count, plural, one {# véhicule} other {# véhicules}}",
+      "servicesNote": "Services déclarés par la boutique sur ses annonces : leurs conditions se voient avec elle. Une offre de crédit doit être écrite et indiquer le prêteur et le taux (TEG)."
     }
   },
   "Options": {
@@ -4015,6 +4068,11 @@
       "title": "L'import de stock est réservé aux boutiques Pro vérifiées",
       "body": "Il s'ouvre dès que votre boutique est vérifiée et publie sous une offre Pro.",
       "link": "Voir mon espace Pro"
+    },
+    "upgrade": {
+      "title": "L’import de stock est inclus dans les offres Business et Premium",
+      "body": "Avec votre offre actuelle, publiez vos véhicules un par un depuis « Déposer une annonce ».",
+      "link": "Voir les offres"
     },
     "file": {
       "title": "Votre fichier",

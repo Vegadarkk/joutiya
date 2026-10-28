@@ -111,6 +111,16 @@ export function StockImport({ nonce }: { nonce?: string }) {
 
   if (stock.kind === "loading") return <Skeleton className="h-64 w-full" />;
   if (stock.kind === "failed") {
+    if (isApiError(stock.error, "plan_upgrade_required")) {
+      return (
+        <ErrorBanner tone="info" title={t("upgrade.title")}>
+          {t("upgrade.body")}{" "}
+          <Link href="/pro/abonnement" className={cn("text-link", textLinkClassName)}>
+            {t("upgrade.link")}
+          </Link>
+        </ErrorBanner>
+      );
+    }
     if (!isApiError(stock.error, "forbidden", "pro_not_verified", "role_missing")) return <FormMessage error={stock.error} />;
     return (
       <ErrorBanner tone="warning" title={t("notPro.title")}>

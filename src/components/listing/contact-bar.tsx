@@ -3,7 +3,7 @@
 import { useId, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { CalendarClock, LogIn, MessageCircle, MessageSquare, Phone, RotateCw, Settings2 } from "lucide-react";
+import { CalendarClock, CarFront, LogIn, MessageCircle, MessageSquare, Phone, RotateCw, Settings2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { InlineError } from "@/components/feedback/inline-error";
 import { loadWithRetry } from "@/components/layout/chunk-retry";
@@ -80,13 +80,18 @@ export interface ContactBarProps {
    * deposit: the visit is agreed in the messaging.
    */
   visit?: boolean;
+  /**
+   * A Pro's vehicle for sale (Concession pack): "Demander un essai" writes a first message, then
+   * opens the thread with the slot picker of a test drive (`?rdv=test_drive`).
+   */
+  testDrive?: boolean;
 }
 
-export type ComposeIntent = "message" | "visit";
+export type ComposeIntent = "message" | "visit" | "test_drive";
 
-/** The conversation page, opened on the visit slots for a visit request. */
+/** The conversation page, opened on the slots of a visit or a test drive. */
 export function threadHref(cid: string, intent: ComposeIntent): string {
-  return intent === "visit" ? `/messages/${cid}?rdv=visit` : `/messages/${cid}`;
+  return intent === "message" ? `/messages/${cid}` : `/messages/${cid}?rdv=${intent}`;
 }
 
 type Phone = PhoneRevealResponse["phone"];
@@ -143,7 +148,7 @@ function BarSpacer() {
   return mounted ? createPortal(<div aria-hidden="true" data-testid="contact-bar-spacer" className="h-24 lg:hidden" />, document.body) : null;
 }
 
-export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, listingTitle, showPhone, whatsapp, adultsOnly = false, visit = false }: ContactBarProps) {
+export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, listingTitle, showPhone, whatsapp, adultsOnly = false, visit = false, testDrive = false }: ContactBarProps) {
   const t = useTranslations("ListingPage.contact");
   const locale = useLocale();
   const { status, session } = useSession();
@@ -317,6 +322,15 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
         {visitButton(false)}
         {hint}
       </div>
+      {testDrive ? (
+        <div className="mt-3 flex flex-col gap-1.5">
+          <Button type="button" variant="structure" onClick={() => void openComposer("test_drive")} loading={compose === "checking" && intent === "test_drive"} aria-haspopup="dialog" className="w-full">
+            <CarFront aria-hidden="true" />
+            {t("testDrive")}
+          </Button>
+          <p className="text-xs text-foreground-muted text-pretty">{t("testDriveHint")}</p>
+        </div>
+      ) : null}
       {/* Phones and tablets: fixed to the bottom of the screen (the page reserves the space). The
           hint above stays the description of both message buttons (aria-describedby may point at
           hidden text). Once revealed, the bar holds the call and WhatsApp actions only. */}
@@ -335,7 +349,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
         <MessageDialog
           // A fresh form per intent: the visit request comes with its own draft.
           key={intent}
-          intent={intent}
+          intent={intent === "visit" ? "visit" : "message"}
           open={compose === "open"}
           onOpenChange={(open) => setCompose(open ? "open" : "closed")}
           listingId={listingId}
@@ -343,6 +357,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
           sellerName={sellerName}
           adultsOnly={adultsOnly}
           onSignedOut={() => setCompose("signin")}
+          {...(intent === "test_drive" ? { initialText: t("testDriveText", { title: listingTitle ?? "" }), threadQuery: "rdv=test_drive" } : {})}
         />
       ) : null}
     </div>

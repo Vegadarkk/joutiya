@@ -11,6 +11,7 @@ import { AgencyTransactions, FeeSchedule } from "@/components/listing/agency-sto
 import { ListingCard } from "@/components/listing/listing-card";
 import { PayAtSeller } from "@/components/listing/pay-at-seller";
 import { formatMemberSince } from "@/components/listing/seller-card";
+import { DealerStock } from "@/components/pro/dealer-stock";
 import { SellerInfo } from "@/components/pro/seller-info";
 import { ReportButton } from "@/components/report/report-button";
 import { RatingLink } from "@/components/reviews/rating-link";
@@ -26,6 +27,7 @@ import { isolate } from "@/lib/i18n/bidi";
 import { alternates } from "@/lib/i18n/metadata";
 import { getLegalConfig } from "@/lib/legal/config";
 import { getPublicStorefront, parseStorefrontSegment, storefrontPath } from "@/lib/listings/public";
+import { dealerStock } from "@/lib/search/dealer";
 import { shopSubcategoryCounts } from "@/lib/search/storefront";
 import { mediaBaseUrl } from "@/lib/storage/keys";
 
@@ -82,11 +84,13 @@ export default async function StorefrontPage({ params }: { params: Params }) {
   if (!store) notFound();
   if (store.segment !== shop) permanentRedirect(storefrontPath(locale, store.segment));
 
-  const [t, profile, legal, flags] = await Promise.all([
+  const [t, profile, legal, flags, vehicles] = await Promise.all([
     getTranslations({ locale: numbersLocale(locale), namespace: "Storefront" }),
     getTranslations({ locale: numbersLocale(locale), namespace: "Profile" }),
     getLegalConfig(),
     getFlags(),
+    // A car dealer's stock at a glance (Concession pack); null for a shop without vehicles.
+    store.seller.publishedCount > 0 ? dealerStock(store.seller.publicId) : null,
   ]);
   const media = mediaBaseUrl();
   const city = cityBySlug(store.citySlug);
@@ -150,6 +154,8 @@ export default async function StorefrontPage({ params }: { params: Params }) {
           {aside}
         </div>
       </div>
+
+      {vehicles ? <DealerStock stock={vehicles} shop={seller.publicId} /> : null}
 
       <section aria-labelledby="storefront-listings" className="flex flex-col gap-6">
         <h2 id="storefront-listings" className="text-xl font-semibold">

@@ -50,9 +50,13 @@ export interface MessageDialogProps {
   intent?: "message" | "visit";
   /** The session ended meanwhile: the bar shows its sign-in prompt. */
   onSignedOut: () => void;
+  /** First words of the message (a test drive request), the buyer edits them freely. */
+  initialText?: string;
+  /** Query of the thread opened once sent (`rdv=test_drive` opens the slot picker). */
+  threadQuery?: string;
 }
 
-export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sellerName, adultsOnly = false, intent = "message", onSignedOut }: MessageDialogProps) {
+export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sellerName, adultsOnly = false, intent = "message", onSignedOut, initialText, threadQuery }: MessageDialogProps) {
   const t = useTranslations("ListingPage.contact.compose");
   const generic = useApiErrorMessage();
   const locale = useLocale();
@@ -60,7 +64,7 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
   const counterId = useId();
   const turnstile = useRef<TurnstileHandle>(null);
   const visit = intent === "visit";
-  const [text, setText] = useState(() => (visit ? t("visitDraft") : ""));
+  const [text, setText] = useState(() => initialText ?? (visit ? t("visitDraft") : ""));
   const [token, setToken] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<"empty" | "reserved" | null>(null);
@@ -92,7 +96,8 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
     setError(null);
     try {
       const { cid } = await startConversation({ listingId, text: text.trim(), turnstileToken: token, ...(adultsOnly ? { adultConfirmed: true as const } : {}) });
-      router.push(visit ? `/messages/${cid}?rdv=visit` : `/messages/${cid}`);
+      const query = threadQuery ?? (visit ? "rdv=visit" : undefined);
+      router.push(`/messages/${cid}${query ? `?${query}` : ""}`);
     } catch (caught) {
       setPending(false);
       // A token is single use: a fresh one for the next attempt, whatever went wrong.

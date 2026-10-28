@@ -105,6 +105,16 @@ describe("ContactBar", () => {
     expect(html).toContain("env(safe-area-inset-bottom)");
   });
 
+  it("offers a test drive on a dealer's vehicle only, as a third dialog button with its hint", () => {
+    expect(render()).not.toContain(fr.ListingPage.contact.testDrive);
+    const html = render({ testDrive: true });
+    expect(html).toContain(fr.ListingPage.contact.testDrive);
+    expect(html).toContain(escape(fr.ListingPage.contact.testDriveHint));
+    expect(html.match(/aria-haspopup="dialog"/g)).toHaveLength(3);
+    const own = { uid: "u1", publicId: "abcdefghjk", role: "pro" } as unknown as SessionSummary;
+    expect(render({ testDrive: true }, own)).not.toContain(fr.ListingPage.contact.testDrive);
+  });
+
   it("shows the seller their own listing's management link instead of the actions", () => {
     const own = { uid: "u1", publicId: "abcdefghjk", displayName: "Salma", role: "individual" } as unknown as SessionSummary;
     const html = render({}, own);

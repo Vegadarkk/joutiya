@@ -263,6 +263,8 @@ export const RATE_LIMITS = {
   // Back-office reads (queues, target views, stats) and the staff conversation view (D18).
   "admin.read.uid": { points: 3000, duration: HOUR, policy: "open", key: "uid" },
   "admin.conversation.uid": { points: 60, duration: HOUR, policy: "closed", key: "uid" },
+  // Staff "verified" on a link of the admin procedures guide (guide-demarches G4): a weekly review.
+  "admin.guide.uid": { points: 120, duration: HOUR, policy: "closed", key: "uid" },
 } as const satisfies Record<string, RateLimitDefinition>;
 
 export type RateLimitId = keyof typeof RATE_LIMITS;

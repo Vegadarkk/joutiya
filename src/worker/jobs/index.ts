@@ -21,6 +21,8 @@ import { exportAuditLogs } from "./audit-export";
 import { sendMessageDigests } from "./message-digest";
 import { sendAppointmentReminders } from "./appointment-reminders";
 import { sweepReportSla } from "./report-sla-sweep";
+import { checkGuideLinks } from "./guide-links";
+import { reviewChangedLinks } from "@/lib/guide/review";
 
 // Phase 5 (design D19): queue "agent", its own consumer at concurrency 1 (createAgentWorker).
 export { AGENT_CONCURRENCY, AGENT_QUEUE, createAgentWorker, processAgentJob } from "./agent";
@@ -51,6 +53,8 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "appointment-reminders": () => sendAppointmentReminders(),
   "report-sla-sweep": () => sweepReportSla(),
   "audit-export": () => exportAuditLogs(),
+  "guide-links": () => checkGuideLinks(),
+  "guide-review": () => reviewChangedLinks(),
 };
 
 /** Repeatable jobs (UTC cron patterns), upserted at every start. */
@@ -104,4 +108,8 @@ export const SCHEDULES = {
   "report-sla-sweep-10min": { pattern: "7-59/10 * * * *", job: "report-sla-sweep" },
   // Phase 5 (D23). 03:22 UTC: yesterday's auditLogs -> age-encrypted NDJSON in the private bucket, before the backup (03:30).
   "audit-export-nightly": { pattern: "22 3 * * *", job: "audit-export" },
+  // Admin procedures guide (guide-demarches G4). Monday 06:10 UTC: every official link fetched and
+  // fingerprinted, flags for the back office, one info alert when a link newly needs a look.
+  "guide-links-weekly": { pattern: "10 6 * * 1", job: "guide-links" },
+  "guide-review-monthly": { pattern: "30 6 1 * *", job: "guide-review" },
 } as const;
