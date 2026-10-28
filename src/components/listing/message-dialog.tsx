@@ -48,16 +48,20 @@ export interface MessageDialogProps {
   adultsOnly?: boolean;
   /** The session ended meanwhile: the bar shows its sign-in prompt. */
   onSignedOut: () => void;
+  /** First words of the message (a test drive request), the buyer edits them freely. */
+  initialText?: string;
+  /** Query of the thread opened once sent (`rdv=test_drive` opens the slot picker). */
+  threadQuery?: string;
 }
 
-export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sellerName, adultsOnly = false, onSignedOut }: MessageDialogProps) {
+export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sellerName, adultsOnly = false, onSignedOut, initialText, threadQuery }: MessageDialogProps) {
   const t = useTranslations("ListingPage.contact.compose");
   const generic = useApiErrorMessage();
   const locale = useLocale();
   const router = useRouter();
   const counterId = useId();
   const turnstile = useRef<TurnstileHandle>(null);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText ?? "");
   const [token, setToken] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<"empty" | "reserved" | null>(null);
@@ -89,7 +93,7 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
     setError(null);
     try {
       const { cid } = await startConversation({ listingId, text: text.trim(), turnstileToken: token, ...(adultsOnly ? { adultConfirmed: true as const } : {}) });
-      router.push(`/messages/${cid}`);
+      router.push(`/messages/${cid}${threadQuery ? `?${threadQuery}` : ""}`);
     } catch (caught) {
       setPending(false);
       // A token is single use: a fresh one for the next attempt, whatever went wrong.

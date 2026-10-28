@@ -2449,6 +2449,9 @@
       "message": "Envoyer un message",
       "messageShort": "Message",
       "messageHint": "Votre message arrive dans la messagerie Joutiya du vendeur. Ni votre e-mail ni votre numéro ne lui sont transmis.",
+      "testDrive": "Demander un essai",
+      "testDriveHint": "Écrivez au vendeur, puis proposez-lui vos créneaux dans la conversation.",
+      "testDriveText": "Bonjour, je souhaite essayer « {title} ». Quels créneaux vous conviennent ?",
       "signInBody": "Connectez-vous pour voir le numéro du vendeur. Vous reviendrez ensuite sur cette annonce.",
       "signInMessage": "Connectez-vous pour écrire au vendeur. Vous reviendrez ensuite sur cette annonce.",
       "signIn": "Se connecter",
@@ -3565,6 +3568,23 @@
     "meta": {
       "title": "{name}, boutique à {city}",
       "description": "{name}, boutique vérifiée à {city} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya."
+    },
+    "dealer": {
+      "title": "Stock de véhicules",
+      "count": "{count, plural, one {# véhicule en vente} other {# véhicules en vente}}",
+      "priceRange": "de {min} à {max}",
+      "seeAll": "Voir tout le stock",
+      "types": "Par type",
+      "brands": "Marques",
+      "otherBrands": "{count, plural, one {# autre marque} other {# autres marques}}",
+      "engine": "Motorisation",
+      "services": {
+        "tradeIn": "Reprise possible",
+        "financing": "Financement possible",
+        "warranty": "Garantie"
+      },
+      "onVehicles": "{count, plural, one {# véhicule} other {# véhicules}}",
+      "servicesNote": "Services déclarés par la boutique sur ses annonces : leurs conditions se voient avec elle. Une offre de crédit doit être écrite et indiquer le prêteur et le taux (TEG)."
     }
   },
   "Options": {
@@ -3982,6 +4002,11 @@
       "title": "L'import de stock est réservé aux boutiques Pro vérifiées",
       "body": "Il s'ouvre dès que votre boutique est vérifiée et publie sous une offre Pro.",
       "link": "Voir mon espace Pro"
+    },
+    "upgrade": {
+      "title": "L’import de stock est inclus dans les offres Business et Premium",
+      "body": "Avec votre offre actuelle, publiez vos véhicules un par un depuis « Déposer une annonce ».",
+      "link": "Voir les offres"
     },
     "file": {
       "title": "Votre fichier",

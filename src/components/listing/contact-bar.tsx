@@ -3,7 +3,7 @@
 import { useId, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { LogIn, MessageCircle, MessageSquare, Phone, RotateCw, Settings2 } from "lucide-react";
+import { CarFront, LogIn, MessageCircle, MessageSquare, Phone, RotateCw, Settings2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { InlineError } from "@/components/feedback/inline-error";
 import { loadWithRetry } from "@/components/layout/chunk-retry";
@@ -74,6 +74,11 @@ export interface ContactBarProps {
   whatsapp: boolean;
   /** Adults-only listing: the message dialog asks the buyer's 18+ confirmation. */
   adultsOnly?: boolean;
+  /**
+   * A Pro's vehicle for sale (Concession pack): "Demander un essai" writes a first message, then
+   * opens the thread with the slot picker of a test drive (`?rdv=test_drive`).
+   */
+  testDrive?: boolean;
 }
 
 type Phone = PhoneRevealResponse["phone"];
@@ -130,7 +135,7 @@ function BarSpacer() {
   return mounted ? createPortal(<div aria-hidden="true" data-testid="contact-bar-spacer" className="h-24 lg:hidden" />, document.body) : null;
 }
 
-export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, listingTitle, showPhone, whatsapp, adultsOnly = false }: ContactBarProps) {
+export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, listingTitle, showPhone, whatsapp, adultsOnly = false, testDrive = false }: ContactBarProps) {
   const t = useTranslations("ListingPage.contact");
   const locale = useLocale();
   const { status, session } = useSession();
@@ -139,6 +144,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
   /** closed; checking the session; signin: anonymous, the prompt shows; open: the dialog (mounted from then on). */
   const [compose, setCompose] = useState<"closed" | "checking" | "signin" | "open">("closed");
   const [composeMounted, setComposeMounted] = useState(false);
+  const [purpose, setPurpose] = useState<"message" | "test_drive">("message");
   const desktop = useDesktop();
 
   const canReveal = showPhone || whatsapp;
@@ -167,15 +173,16 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
     }
   }
 
-  async function openComposer() {
+  async function openComposer(next: "message" | "test_drive" = "message") {
     if (compose === "checking") return;
+    setPurpose(next);
     setCompose("checking");
     const step = await messageStep(listingId);
     if (step.kind === "signin") {
       setCompose("signin");
     } else if (step.kind === "thread") {
       // Another root layout (private pages): a document load either way. The button spins until then.
-      window.location.assign(getPathname({ href: `/messages/${step.cid}`, locale }));
+      window.location.assign(getPathname({ href: next === "test_drive" ? `/messages/${step.cid}?rdv=test_drive` : `/messages/${step.cid}`, locale }));
     } else {
       setComposeMounted(true);
       setCompose("open");
@@ -235,7 +242,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
       type="button"
       variant={canReveal ? "outline" : "primary"}
       onClick={() => void openComposer()}
-      loading={compose === "checking"}
+      loading={compose === "checking" && purpose === "message"}
       aria-describedby={hintId}
       aria-haspopup="dialog"
       className={cn(compact && "min-w-0 flex-1 px-3", wide && "min-w-0 flex-1")}
@@ -285,6 +292,15 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
         {messageButton(false)}
         {hint}
       </div>
+      {testDrive ? (
+        <div className="mt-3 flex flex-col gap-1.5">
+          <Button type="button" variant="structure" onClick={() => void openComposer("test_drive")} loading={compose === "checking" && purpose === "test_drive"} aria-haspopup="dialog" className="w-full">
+            <CarFront aria-hidden="true" />
+            {t("testDrive")}
+          </Button>
+          <p className="text-xs text-foreground-muted text-pretty">{t("testDriveHint")}</p>
+        </div>
+      ) : null}
       {/* Phones and tablets: fixed to the bottom of the screen (the page reserves the space). The
           hint above stays the description of both message buttons (aria-describedby may point at
           hidden text). Once revealed, the bar holds the call and WhatsApp actions only. */}
@@ -300,6 +316,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
       <BarSpacer />
       {composeMounted ? (
         <MessageDialog
+          key={purpose}
           open={compose === "open"}
           onOpenChange={(open) => setCompose(open ? "open" : "closed")}
           listingId={listingId}
@@ -307,6 +324,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
           sellerName={sellerName}
           adultsOnly={adultsOnly}
           onSignedOut={() => setCompose("signin")}
+          {...(purpose === "test_drive" ? { initialText: t("testDriveText", { title: listingTitle ?? "" }), threadQuery: "rdv=test_drive" } : {})}
         />
       ) : null}
     </div>
