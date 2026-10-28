@@ -327,6 +327,7 @@ export async function buildAccountExport(uid: string, now = new Date()): Promise
           type: user.type,
           regionCode: user.regionCode ?? null,
           citySlug: user.citySlug ?? null,
+          storefront: { bio: user.storefront?.bio ?? null, bannerKey: user.storefront?.bannerKey ?? null },
           locale: user.locale,
           status: user.status,
           badges: { ...user.badges },

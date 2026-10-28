@@ -98,6 +98,10 @@ export type ErrorCode =
   // Pro subscriptions (phase 7, design §7). Messages: Subscription.errors.<code>.
   /** The shop already has a plan: changes go through the Stripe portal (409). */
   | "already_subscribed"
+  /** Pass Boutique: bought now it would end beyond `maxAheadDays`, or the free launch offer still runs. */
+  | "pass_max_ahead"
+  | "launch_offer_running"
+  | "pass_other_plan"
   /** The shop's KYBC is not verified, or the shop is suspended (409). */
   | "pro_not_verified"
   /** No Stripe customer yet: nothing to manage before a first plan (409). */
@@ -148,6 +152,8 @@ export type ErrorCode =
   /** config/legal without a mention art. 1-1 LCEN requires (422; details: { missing }). */
   | "legal_incomplete"
   | "unavailable"
+  /** 422: a short free text (storefront bio, review) refused by the text screen; details: { field, issue }. */
+  | "invalid_text"
   | "internal";
 
 export class HttpError extends Error {

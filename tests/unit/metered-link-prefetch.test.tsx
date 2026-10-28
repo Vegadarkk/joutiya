@@ -38,6 +38,8 @@ const seller: PublicSeller = {
   badges: { emailVerified: true, phoneVerified: true, proCertified: false },
   citySlug: "casablanca",
   publishedCount: 2,
+  bio: null,
+  bannerKey: "zellige",
 };
 
 describe("metered links of the listing page", () => {

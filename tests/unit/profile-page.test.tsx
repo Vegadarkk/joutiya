@@ -167,11 +167,39 @@ describe("profile page", () => {
 
   it("says how many listings are hidden beyond the first page", async () => {
     repo.findUserByPublicId.mockResolvedValue(user());
-    repo.listPublishedByOwner.mockResolvedValue(Array.from({ length: 24 }, (_, index) => listing(`abcd${"abcdefghjkmnpqrstuvwxyz2"[index]}234`, `Annonce ${index}`)));
-    repo.count.mockReturnValue(30);
+    const ids = "abcdefghjkmnpqrstuvwxyz23456789";
+    repo.listPublishedByOwner.mockResolvedValue(Array.from({ length: 48 }, (_, index) => listing(`ab${ids[Math.floor(index / 8)]}${ids[index % 8]}2345`, `Annonce ${index}`)));
+    repo.count.mockReturnValue(60);
     const html = await renderPage();
-    expect(html).toContain("30 annonces en ligne");
-    expect(html).toContain("Les 24 annonces les plus récentes sont affichées.");
+    expect(repo.listPublishedByOwner).toHaveBeenCalledWith("uid-secret-1", 48);
+    expect(html).toContain("60 annonces en ligne");
+    expect(html).toContain("Les 48 annonces les plus récentes sont affichées.");
+    // The search lists them all, sorted by price if asked.
+    expect(html).toContain(`href="/fr/recherche?vendeur-id=${PUBLIC_ID}"`);
+    expect(html).toContain("Voir toutes ses annonces dans la recherche");
+  });
+
+  it("is a storefront: house banner, about text, sort and category filter", async () => {
+    repo.findUserByPublicId.mockResolvedValue(user({ storefront: { bio: "Vélos révisés à Casablanca.\nRencontre le week-end.", bannerKey: "arcades" } }));
+    const other = { ...listing("bcde3456", "Canapé"), categoryId: "maison-jardin", subcategoryId: "ameublement" };
+    repo.listPublishedByOwner.mockResolvedValue([listing("abcd2345", "Vélo de ville"), other]);
+    const html = await renderPage();
+    expect(html).toContain('data-banner="arcades"');
+    expect(html).toContain(fr.Profile.about);
+    expect(html).toContain("Vélos révisés à Casablanca.");
+    expect(html).toContain(fr.Profile.shelf.priceAsc);
+    expect(html).toContain(`aria-label="${fr.Profile.shelf.filter}"`);
+    expect(html).toContain(fr.Categories.vehicules.name);
+  });
+
+  it("shows the default banner and no about block when the member set none", async () => {
+    repo.findUserByPublicId.mockResolvedValue(user());
+    repo.listPublishedByOwner.mockResolvedValue([listing("abcd2345", "Vélo de ville")]);
+    const html = await renderPage();
+    expect(html).toContain('data-banner="zellige"');
+    expect(html).not.toContain(fr.Profile.about);
+    // One category only: no filter chips.
+    expect(html).not.toContain(`aria-label="${fr.Profile.shelf.filter}"`);
   });
 
   it("shows an empty state with a way forward, and a suspended account lists nothing", async () => {

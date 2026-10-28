@@ -1,6 +1,7 @@
 import { z } from "@/lib/zod";
 import { CONDITIONS } from "@/config/categories";
 import { LOCALES } from "@/config/site";
+import { BANNER_KEYS, BIO_MAX } from "@/config/storefront";
 import {
   DESCRIPTION_MAX,
   LISTING_STATUSES,
@@ -73,6 +74,8 @@ export const userSchema = z
     proId: z.string().max(64).optional(),
     regionCode: z.string().regex(/^(0[1-9]|1[0-2])$/).optional(),
     citySlug: z.string().max(64).optional(),
+    /** Storefront of /profil (vitrine-avis §1): "about" text and house banner, both optional. */
+    storefront: z.object({ bio: z.string().max(BIO_MAX).optional(), bannerKey: z.enum(BANNER_KEYS).optional() }).strict().optional(),
     badges: z.object({ emailVerified: z.boolean(), phoneVerified: z.boolean(), proCertified: z.boolean() }).strict(),
     stats: z
       .object({ activeListings: z.number().int().min(0), responseRate: z.number().min(0).max(1), medianReplyMin: z.number().min(0), ratingAvg: z.number().min(0).max(5).optional(), ratingCount: z.number().int().min(0) })
@@ -858,6 +861,17 @@ export const billingAccountSchema = z
       })
       .strict()
       .optional(),
+    /** The last Pass Boutique checkout; an open session is expired before another opens. */
+    lastPassCheckout: z
+      .object({
+        passId: z.string().regex(/^[a-z0-9_]{1,40}$/),
+        consentVersion: z.string().min(1).max(20),
+        at: ts,
+        idempotencyKey: z.string().max(200).optional(),
+        sessionId: z.string().regex(/^cs_[A-Za-z0-9_]{1,200}$/).optional(),
+      })
+      .strict()
+      .optional(),
     /** A refund left the wallet negative: the account waits on an admin. */
     flaggedAt: ts.optional(),
     createdAt: ts,
@@ -926,8 +940,8 @@ export const billingEventSchema = z
     customerId: z.string().min(1).max(255).optional(),
     subscriptionId: z.string().min(1).max(255).optional(),
     objectId: z.string().min(1).max(255).optional(),
-    /** RevenueCat: a pack's purchase or refund, or a Pro plan's change (synced). */
-    kind: z.enum(["pack", "subscription"]).optional(),
+    /** RevenueCat: a pack's purchase or refund, or a Pro plan's change (synced). Stripe: "pass" for a Pass Boutique's Checkout Session. */
+    kind: z.enum(["pack", "subscription", "pass"]).optional(),
     productId: z.string().min(1).max(100).optional(),
     transactionId: z.string().min(1).max(255).optional(),
     cancelReason: z.string().min(1).max(64).optional(),

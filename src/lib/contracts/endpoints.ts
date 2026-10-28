@@ -37,6 +37,8 @@ export const ACCOUNT_API = {
   close: "/api/account/close",
   /** GET with the X-CSRF-Token header -> the AccountExport JSON file (attachment, no-store). */
   export: "/api/account/export",
+  /** GET -> StorefrontSettings; POST StorefrontInput -> StorefrontSettings (vitrine-avis §1). */
+  storefront: "/api/account/storefront",
 } as const;
 
 export const LISTING_API = {

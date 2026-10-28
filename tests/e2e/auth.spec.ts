@@ -125,7 +125,7 @@ test.describe("account", () => {
 
     // Change the display name.
     await page.getByLabel("Nom affiché").fill("Yasmine B.");
-    await page.getByRole("button", { name: "Enregistrer" }).click();
+    await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
     await expect(page.getByText("Profil enregistré")).toBeVisible();
     await page.reload();
     await expect(page.getByLabel("Nom affiché")).toHaveValue("Yasmine B.", { timeout: 15_000 });
