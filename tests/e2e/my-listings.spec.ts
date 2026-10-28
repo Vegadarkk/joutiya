@@ -8,6 +8,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import sharp from "sharp";
 import { isolate } from "../../src/lib/i18n/bidi";
 import { stubGoogleScript } from "./gsi-stub";
+import { ownClientIp } from "./helpers";
 
 // The sign-up page renders the Google button (stub client id): never the real script.
 test.beforeEach(({ page }) => stubGoogleScript(page));
@@ -53,6 +54,7 @@ async function waitForMail(request: APIRequestContext, to: string, template: str
 }
 
 async function signUpAndIn(page: Page, request: APIRequestContext, email: string): Promise<void> {
+  await ownClientIp(page);
   await page.goto("/fr/inscription");
   await page.getByLabel("Nom affiché").fill("Youssef Test");
   await page.getByLabel("Adresse e-mail").fill(email);
