@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_AI } from "@/config/ai";
 import { MODERATION_FLAGS, type ModerationFlag } from "@/lib/contracts/listings";
-import { ALWAYS_REVIEW_FLAGS, FACE_REVIEW_CATEGORIES, HUMAN_REVIEW_FLAGS, PREVIOUS_REJECTION_CAP, RISK_WEIGHTS, decideState, riskScore, sortFlags } from "@/lib/moderation/risk";
+import { ALWAYS_REVIEW_FLAGS, HUMAN_REVIEW_FLAGS, PREVIOUS_REJECTION_CAP, RISK_WEIGHTS, decideState, riskScore, sortFlags } from "@/lib/moderation/risk";
 
 describe("risk table", () => {
   it("weights every moderation flag with a reason, hard keywords and nudity the heaviest", () => {
@@ -17,10 +17,9 @@ describe("risk table", () => {
       expect(RISK_WEIGHTS[flag].reason).not.toBe("");
     }
     expect(RISK_WEIGHTS.prohibited_kw.weight).toBeGreaterThanOrEqual(DEFAULT_AI.risk.reviewAt);
-    expect(RISK_WEIGHTS.nsfw_review.weight).toBeGreaterThan(RISK_WEIGHTS.face.weight);
     for (const flag of ALWAYS_REVIEW_FLAGS) expect(MODERATION_FLAGS).toContain(flag);
-    expect(ALWAYS_REVIEW_FLAGS.has("face")).toBe(false);
-    expect(FACE_REVIEW_CATEGORIES.has("famille")).toBe(true);
+    // A face the seller kept instead of cropping: a moderator checks it (CGU §7).
+    expect(HUMAN_REVIEW_FLAGS.has("face")).toBe(true);
   });
 });
 
@@ -60,10 +59,8 @@ describe("decideState", () => {
     expect(decideState(0, ["price_outlier"], { reviewAt, alwaysReview: new Set<ModerationFlag>(["price_outlier"]) })).toBe("needs_review");
   });
 
-  it("reviews a face only in a sensitive category", () => {
-    expect(decideState(15, ["face"], { reviewAt, categoryId: "vehicules" })).toBe("auto_ok");
-    expect(decideState(15, ["face"], { reviewAt, categoryId: "famille" })).toBe("needs_review");
-    expect(decideState(15, ["face"], { reviewAt })).toBe("auto_ok");
+  it("reviews a kept face in every category", () => {
+    expect(decideState(0, ["face"], { reviewAt })).toBe("needs_review");
   });
 });
 

@@ -31,7 +31,11 @@ function showsUnattachedReady(listing: Pick<ListingRecord, "status" | "legalHold
  * the listing already has). Signed and processing uploads read as such, rejected ones with their reason.
  */
 export function mergePhotos(listing: Pick<ListingRecord, "photos" | "status" | "legalHold">, uploads: readonly UploadRecord[]): OwnerPhoto[] {
-  const photos: OwnerPhoto[] = listing.photos.map((photo) => ({ id: photo.id, status: "ready", w: photo.w, h: photo.h, blurhash: photo.blurhash }));
+  const faces = new Map(uploads.map((upload) => [upload.id, upload.checks?.faces ?? 0]));
+  const photos: OwnerPhoto[] = listing.photos.map((photo) => {
+    const found = faces.get(photo.id) ?? 0;
+    return { id: photo.id, status: "ready", w: photo.w, h: photo.h, blurhash: photo.blurhash, ...(found > 0 ? { faces: found } : {}) };
+  });
   const attached = new Set(listing.photos.map((photo) => photo.id));
   const unattachedReady = showsUnattachedReady(listing);
   const pending = uploads.filter((upload) => !attached.has(upload.id) && (upload.status !== "ready" || unattachedReady)).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
@@ -92,11 +96,16 @@ export function toOwnerSummary(listing: ListingRecord, now = new Date()): OwnerL
   };
 }
 
+/** Statuses the wizard edits a draft in: the attached photos' checks (faces) are read for the crop proposal. */
+const DRAFT_STATUSES: readonly ListingRecord["status"][] = ["draft", "rejected"];
+
 /**
- * Owner view with the uploads of the listing loaded: the pending ones only, plus the ready ones
- * where a ready upload may wait for the owner's save (attached ones are read too, then skipped).
+ * Owner view with the uploads of the listing loaded: the pending ones only on a read-only listing,
+ * every status where the wizard edits it (a ready upload may wait for the owner's save, and the
+ * attached photos' face counts drive the crop proposal).
  */
 export async function ownerListingView(listing: ListingRecord): Promise<OwnerListing> {
-  const uploads = await listUploadsByTarget(listing.id, showsUnattachedReady(listing) ? undefined : PENDING_STATUSES);
+  const everyStatus = showsUnattachedReady(listing) || DRAFT_STATUSES.includes(listing.status);
+  const uploads = await listUploadsByTarget(listing.id, everyStatus ? undefined : PENDING_STATUSES);
   return toOwnerListing(listing, uploads);
 }

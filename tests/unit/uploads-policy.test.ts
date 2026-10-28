@@ -42,6 +42,9 @@ describe("upload policy", () => {
     expect(toStatusResponse({ ...base, status: "processing" })).toEqual({ status: "processing" });
     expect(toStatusResponse({ ...base, status: "rejected", rejectReason: "nsfw" })).toEqual({ status: "rejected", rejectReason: "nsfw" });
     expect(toStatusResponse({ ...base, status: "rejected" })).toEqual({ status: "rejected", rejectReason: "expired" });
+    // Faces found by the local check: the wizard proposes a crop; none, or unchecked, say nothing.
+    expect(toStatusResponse({ ...base, status: "ready", checks: { faces: 1 } })).toMatchObject({ status: "ready", faces: 1 });
+    expect(toStatusResponse({ ...base, status: "ready", checks: { faces: 0 } })).not.toHaveProperty("faces");
     // A ready document missing its dimensions never yields an invalid photo.
     expect(toStatusResponse({ id: base.id, status: "ready" })).toEqual({ status: "processing" });
   });

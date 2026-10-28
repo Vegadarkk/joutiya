@@ -71,3 +71,37 @@ describe("PhotoUploader counter", () => {
     expect(html).toMatch(/<button[^>]*aria-label="Réessayer la photo 11"[^>]*disabled=""/);
   });
 });
+
+describe("PhotoUploader faces", () => {
+  const ready = (key: string, faces?: number): PhotoItem => ({ key, uploadId: key, status: "ready", progress: 1, previewUrl: null, photo: null, ...(faces ? { faces } : {}) });
+
+  function renderWithCrop(photos: PhotoItem[], locale: Locale = "fr") {
+    return renderToStaticMarkup(
+      <NextIntlClientProvider locale={locale} messages={locale === "ar" ? ar : fr}>
+        <PhotoUploader photos={photos} maxPhotos={10} onAdd={noop} onRemove={noop} onRetry={noop} onRefresh={noop} onMove={noop} onCrop={noop} />
+      </NextIntlClientProvider>,
+    );
+  }
+
+  it("marks a photo with a face, offers its crop and says a kept face goes to a moderator", () => {
+    const html = renderWithCrop([ready("a"), ready("b", 2)]);
+    expect(text(html)).toContain("Visage détecté sur 1 photo");
+    expect(text(html)).toContain("un modérateur vérifiera l'annonce");
+    expect(html.match(/data-testid="photo-face"/g)).toHaveLength(1);
+    expect(html).toContain('aria-label="Recadrer la photo 2"');
+    expect(html).not.toContain('aria-label="Recadrer la photo 1"');
+  });
+
+  it("says nothing without faces, and offers no crop without a handler", () => {
+    expect(text(renderWithCrop([ready("a")]))).not.toContain("Visage détecté");
+    const html = render([ready("a", 1)]);
+    expect(text(html)).toContain(fr.Listing.photos.faces.bodyNoCrop);
+    expect(html).not.toContain("Recadrer la photo");
+  });
+
+  it("says it in Arabic too", () => {
+    const html = text(renderWithCrop([ready("a", 1)], "ar"));
+    expect(html).toContain(ar.Listing.photos.faces.tile);
+    expect(html).toContain(ar.Listing.photos.faces.body);
+  });
+});

@@ -14,7 +14,8 @@ export type PhotoUploadPhase =
   | { phase: "preparing" }
   | { phase: "uploading"; progress: number; uploadId: string }
   | { phase: "processing"; uploadId: string }
-  | { phase: "ready"; uploadId: string; photo: ListingPhoto }
+  /** `faces`: faces the local check found on the photo (the wizard proposes a crop). */
+  | { phase: "ready"; uploadId: string; photo: ListingPhoto; faces?: number }
   | { phase: "rejected"; uploadId: string; reason: UploadRejectReason }
   /** The deadline passed while still processing: the caller polls again on demand. */
   | { phase: "timeout"; uploadId: string };
@@ -84,7 +85,7 @@ export async function uploadListingPhoto(listingId: string, file: Blob, options:
     if (!(completed && signal.reason === LEAVE_REASON)) void discard(uploadId).catch(() => undefined);
     throw aborted();
   }
-  if (status.status === "ready") onPhase?.({ phase: "ready", uploadId, photo: status.photo });
+  if (status.status === "ready") onPhase?.({ phase: "ready", uploadId, photo: status.photo, ...(status.faces ? { faces: status.faces } : {}) });
   else if (status.status === "rejected") onPhase?.({ phase: "rejected", uploadId, reason: status.rejectReason });
   else onPhase?.({ phase: "timeout", uploadId });
   return { uploadId, prepared, status };

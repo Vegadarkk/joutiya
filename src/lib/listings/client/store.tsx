@@ -34,6 +34,10 @@ export interface PhotoItem {
   /** DELETE /api/uploads/{id} in flight. */
   removing?: boolean;
   file?: File;
+  /** Faces found on the ready photo: the tile proposes a crop, kept as is it goes to a moderator. */
+  faces?: number;
+  /** Key of the tile this cropped copy replaces once it is ready (cropPhoto). */
+  replaces?: string;
 }
 
 export type SaveMode = "auto" | "manual";
@@ -58,7 +62,7 @@ type Action =
   | { type: "patch"; patch: ListingPatch }
   | { type: "server"; listing: OwnerListing }
   | { type: "save-state"; state: AutosaveState; error?: unknown }
-  | { type: "photo-add"; item: PhotoItem }
+  | { type: "photo-add"; item: PhotoItem; at?: number }
   | { type: "photo-update"; key: string; changes: Partial<PhotoItem> }
   | { type: "photo-remove"; key: string }
   | { type: "photo-move"; key: string; to: number }
@@ -133,8 +137,12 @@ function reducer(state: WizardState, action: Action): WizardState {
         saveState: action.state,
         saveError: action.state === "error" ? action.error : undefined,
       };
-    case "photo-add":
-      return { ...state, photos: [...state.photos, action.item] };
+    case "photo-add": {
+      if (action.at === undefined) return { ...state, photos: [...state.photos, action.item] };
+      const photos = [...state.photos];
+      photos.splice(action.at, 0, action.item);
+      return { ...state, photos };
+    }
     case "photo-update":
       return {
         ...state,
@@ -199,6 +207,7 @@ export function photoItemsFromListing(listing: OwnerListing, mediaBaseUrl: strin
             : null,
           blurhash: photo.blurhash,
           rejectReason: photo.rejectReason,
+          ...(photo.faces ? { faces: photo.faces } : {}),
         };
       })
   );
@@ -216,6 +225,7 @@ export function ownerPhotosOf(items: readonly PhotoItem[]): OwnerPhoto[] {
         w: item.photo.w,
         h: item.photo.h,
         blurhash: item.photo.blurhash,
+        ...(item.faces ? { faces: item.faces } : {}),
       });
     else if (item.status === "rejected")
       photos.push({
@@ -314,6 +324,8 @@ export interface WizardContextValue extends WizardState {
   save: (options?: { reopen?: boolean }) => Promise<boolean>;
   retrySave: () => void;
   addFiles: (files: Iterable<File>) => void;
+  /** Uploads a cropped copy of a ready photo next to it; the original goes once the copy is ready. */
+  cropPhoto: (key: string, file: File) => void;
   removePhoto: (key: string) => void;
   retryPhoto: (key: string) => void;
   refreshPhoto: (key: string) => void;
@@ -366,6 +378,10 @@ interface WizardProviderProps {
   /** Injected in tests. */
   upload?: typeof uploadListingPhoto;
   save?: (id: string, patch: ListingPatch) => Promise<{ listing: OwnerListing }>;
+}
+
+function localKey(): string {
+  return `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function revokePreview(item: PhotoItem | undefined): void {
@@ -516,6 +532,7 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
             photo: status.photo,
             blurhash: status.photo.blurhash,
             previewUrl: previewUrl ?? photoUrl(mediaBaseUrl, listingId, uploadId, "s"),
+            faces: status.faces,
           },
         });
       else if (status.status === "rejected")
@@ -578,6 +595,7 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
                       uploadId: phase.uploadId,
                       photo: phase.photo,
                       blurhash: phase.photo.blurhash,
+                      faces: phase.faces,
                       file: undefined,
                     },
                   });
@@ -622,7 +640,7 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
     (files: Iterable<File>) => {
       const room = Math.max(0, maxPhotos - usedSlots(photosRef.current));
       for (const file of Array.from(files).slice(0, room)) {
-        const key = `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        const key = localKey();
         const previewUrl = typeof URL !== "undefined" && "createObjectURL" in URL ? URL.createObjectURL(file) : null;
         const item: PhotoItem = {
           key,
@@ -686,6 +704,44 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
     },
     [controllers],
   );
+
+  const cropPhoto = useCallback(
+    (key: string, file: File) => {
+      const items = photosRef.current;
+      const index = items.findIndex((photo) => photo.key === key);
+      const original = items[index];
+      if (!original || original.status !== "ready" || original.removing) return;
+      // A crop of the same photo still running gives way to this one.
+      for (const item of items) if (item.replaces === key) removePhoto(item.key);
+      // A full listing has no slot for the copy: the original goes first.
+      const full = usedSlots(items.filter((photo) => photo.replaces !== key)) >= maxPhotos;
+      const item: PhotoItem = {
+        key: localKey(),
+        uploadId: null,
+        status: "preparing",
+        progress: 0,
+        previewUrl: typeof URL !== "undefined" && "createObjectURL" in URL ? URL.createObjectURL(file) : null,
+        photo: null,
+        file,
+        ...(full ? {} : { replaces: key }),
+      };
+      photosRef.current = [...photosRef.current.slice(0, index + 1), item, ...photosRef.current.slice(index + 1)];
+      dispatch({ type: "photo-add", item, at: index + 1 });
+      if (full) removePhoto(key);
+      startUpload(item.key, file);
+    },
+    [maxPhotos, removePhoto, startUpload],
+  );
+
+  // A cropped copy is ready: the original it replaces goes (DELETE), the copy takes its place.
+  useEffect(() => {
+    for (const item of state.photos) {
+      if (!item.replaces || item.status !== "ready") continue;
+      const original = item.replaces;
+      dispatch({ type: "photo-update", key: item.key, changes: { replaces: undefined } });
+      if (photosRef.current.some((photo) => photo.key === original)) removePhoto(original);
+    }
+  }, [state.photos, removePhoto]);
 
   const retryPhoto = useCallback(
     (key: string) => {
@@ -783,6 +839,7 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
       save: saveNow,
       retrySave,
       addFiles,
+      cropPhoto,
       removePhoto,
       retryPhoto,
       refreshPhoto,
@@ -803,6 +860,7 @@ export function WizardProvider({ listing, maxPhotos, mediaBaseUrl, children, onU
       saveNow,
       retrySave,
       addFiles,
+      cropPhoto,
       removePhoto,
       retryPhoto,
       refreshPhoto,
