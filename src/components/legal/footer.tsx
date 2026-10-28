@@ -50,7 +50,7 @@ export function Footer({ publisher }: { publisher: string }) {
               </Link>
             </li>
             <li>
-              <Link href="/aide/demarches" className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>
+              <Link href="/demarches" className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>
                 {t("guide")}
               </Link>
             </li>

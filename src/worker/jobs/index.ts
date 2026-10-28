@@ -22,6 +22,7 @@ import { sendMessageDigests } from "./message-digest";
 import { sendAppointmentReminders } from "./appointment-reminders";
 import { sweepReportSla } from "./report-sla-sweep";
 import { checkGuideLinks } from "./guide-links";
+import { reviewChangedLinks } from "@/lib/guide/review";
 
 // Phase 5 (design D19): queue "agent", its own consumer at concurrency 1 (createAgentWorker).
 export { AGENT_CONCURRENCY, AGENT_QUEUE, createAgentWorker, processAgentJob } from "./agent";
@@ -53,6 +54,7 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "report-sla-sweep": () => sweepReportSla(),
   "audit-export": () => exportAuditLogs(),
   "guide-links": () => checkGuideLinks(),
+  "guide-review": () => reviewChangedLinks(),
 };
 
 /** Repeatable jobs (UTC cron patterns), upserted at every start. */
@@ -109,4 +111,5 @@ export const SCHEDULES = {
   // Admin procedures guide (guide-demarches G4). Monday 06:10 UTC: every official link fetched and
   // fingerprinted, flags for the back office, one info alert when a link newly needs a look.
   "guide-links-weekly": { pattern: "10 6 * * 1", job: "guide-links" },
+  "guide-review-monthly": { pattern: "30 6 1 * *", job: "guide-review" },
 } as const;

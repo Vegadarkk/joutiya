@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ChevronRight } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { GUIDE_RUBRICS, GUIDE_SOURCES, guideRubricCard, guideRubricPage, guideSourceLabel, isGuideRubric } from "@/content/guide";
 import { LOCALE_TAGS } from "@/config/site";
@@ -35,7 +34,7 @@ async function load(params: Params) {
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { locale, page } = await load(params);
-  return { title: page.title, description: page.summary, alternates: alternates(locale, `/aide/demarches/${page.rubric}`) };
+  return { title: page.title, description: page.summary, alternates: alternates(locale, `/demarches/${page.rubric}`) };
 }
 
 export default async function GuideRubricPage({ params }: { params: Params }) {
@@ -56,15 +55,7 @@ export default async function GuideRubricPage({ params }: { params: Params }) {
       <nav aria-label={t("breadcrumb")} className="mb-6 text-sm">
         <ol className="flex flex-wrap items-center gap-1.5 text-foreground-muted">
           <li>
-            <Link href="/aide" className={cn("hover:text-foreground", quietLinkClassName)}>
-              {t("home")}
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <ChevronRight className="size-3.5 rtl:-scale-x-100" />
-          </li>
-          <li>
-            <Link href="/aide/demarches" className={cn("hover:text-foreground", quietLinkClassName)}>
+            <Link href="/demarches" className={cn("hover:text-foreground", quietLinkClassName)}>
               {t("guideHome")}
             </Link>
           </li>
@@ -123,7 +114,7 @@ export default async function GuideRubricPage({ params }: { params: Params }) {
           <ul className="flex flex-col gap-2 border-s-2 border-structure/70 ps-4 dark:border-gold-300/60">
             {others.map((other) => (
               <li key={other.rubric}>
-                <Link href={`/aide/demarches/${other.rubric}`} className={cn("inline-flex min-h-8 items-center font-medium text-link", quietLinkClassName)}>
+                <Link href={`/demarches/${other.rubric}`} className={cn("inline-flex min-h-8 items-center font-medium text-link", quietLinkClassName)}>
                   {other.title}
                 </Link>
               </li>

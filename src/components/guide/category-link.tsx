@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 export function GuideCategoryLink({ rubric, locale, className }: { rubric: GuideRubric; locale: Locale; className?: string }) {
   const t = useTranslations("Guide");
   return (
-    <Link href={`/aide/demarches/${rubric}`} className={cn("inline-flex min-h-11 items-center gap-2 self-start rounded-sm text-sm font-medium text-link", textLinkClassName, className)}>
+    <Link href={`/demarches/${rubric}`} className={cn("inline-flex min-h-11 items-center gap-2 self-start rounded-sm text-sm font-medium text-link", textLinkClassName, className)}>
       <ScrollText aria-hidden="true" className="size-4 shrink-0 text-structure dark:text-gold-300" />
       {t("categoryLink", { title: guideRubricCard(locale, rubric).title })}
     </Link>

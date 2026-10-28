@@ -100,7 +100,7 @@ export default async function HelpHome({ params }: { params: Params }) {
               {guide("helpCardTitle")}
             </h2>
             <p className="max-w-2xl text-pretty text-foreground-muted">{guide("helpCardBody")}</p>
-            <Link href="/aide/demarches" className={cn("w-fit font-medium text-link", textLinkClassName)}>
+            <Link href="/demarches" className={cn("w-fit font-medium text-link", textLinkClassName)}>
               {guide("helpCardCta")}
             </Link>
           </aside>

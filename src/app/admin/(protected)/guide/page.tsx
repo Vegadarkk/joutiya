@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { requirePageStaff } from "@/lib/auth/current-user";
 import { isFirestoreConfigured } from "@/lib/firebase/admin";
 import { CHANGE_THRESHOLD_BITS, changeDistance, linkFlags, type LinkFlag, type LinkOutcome } from "@/lib/guide/check";
+import { readGuideReviews, type GuideReview } from "@/lib/guide/review";
 import { readGuideState, type GuideState } from "@/lib/guide/state";
 import { logger } from "@/lib/logging/logger";
 import { formatDate, formatDateTime } from "../../_lib/moderation-format";
@@ -12,7 +13,8 @@ import { GuideLinkAccept } from "../../_components/guide-link-accept";
 
 // Links of the admin procedures guide (design guide-demarches G4): what the weekly checker saw for
 // each official source, why one needs a look, and "Marquer comme vérifié" once a person has read the
-// page. Fixing a link (new address, page gone) is a change of src/content/guide/sources.ts.
+// page, with the monthly Claude review of a changed page (G5) under its state. Fixing a link (new
+// address, page gone) or a text is a change of src/content/guide/.
 
 export const metadata: Metadata = { title: "Guide des démarches" };
 
@@ -48,15 +50,26 @@ async function loadState(): Promise<GuideState | null> {
   }
 }
 
+async function loadReviews(): Promise<Partial<Record<GuideSourceId, GuideReview>>> {
+  if (!isFirestoreConfigured()) return {};
+  try {
+    return await readGuideReviews();
+  } catch (error) {
+    logger.error({ err: (error as Error).message }, "system/guide-reviews unreadable");
+    return {};
+  }
+}
+
 export default async function GuideLinksPage() {
   await requirePageStaff(["moderator", "admin"]);
-  const state = await loadState();
+  const [state, reviews] = await Promise.all([loadState(), loadReviews()]);
   const now = new Date();
   const rows = GUIDE_SOURCE_IDS.map((id) => {
     const link = state?.links[id];
     const current = link?.url === GUIDE_SOURCES[id].url ? link : undefined;
-    return { id, current, flags: linkFlags(GUIDE_SOURCES[id], current, now) };
-  }).sort((a, b) => b.flags.length - a.flags.length);
+    const review = reviews[id];
+    return { id, current, review, flags: linkFlags(GUIDE_SOURCES[id], current, now) };
+  }).sort((a, b) => Number(b.review?.accurate === false) - Number(a.review?.accurate === false) || b.flags.length - a.flags.length);
   const flagged = rows.filter((row) => row.flags.length > 0).length;
 
   return (
@@ -71,7 +84,7 @@ export default async function GuideLinksPage() {
             : state.runAt
               ? `Dernier contrôle automatique le ${formatDateTime(state.runAt)}, chaque lundi. ${flagged === 0 ? "Aucun lien à revoir." : `${flagged} lien${flagged > 1 ? "s" : ""} à revoir.`}`
               : "Aucun contrôle encore : le premier a lieu lundi à 6 h 10 UTC."}{" "}
-          Une page modifiée au-delà de {CHANGE_THRESHOLD_BITS} bits d&apos;empreinte est signalée ; relisez-la, puis marquez-la comme vérifiée.
+          Une page modifiée au-delà de {CHANGE_THRESHOLD_BITS} bits d&apos;empreinte est signalée, puis résumée par Claude le 1er du mois ; relisez-la, puis marquez-la comme vérifiée.
         </p>
       </div>
       <div role="region" aria-labelledby="guide-title" tabIndex={0} className="overflow-x-auto rounded-lg border border-border bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
@@ -88,7 +101,7 @@ export default async function GuideLinksPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ id, current, flags }) => {
+            {rows.map(({ id, current, review, flags }) => {
               const source = GUIDE_SOURCES[id];
               const label = guideSourceLabel("fr", id);
               const distance = changeDistance(current);
@@ -119,6 +132,16 @@ export default async function GuideLinksPage() {
                         {current.streak > 1 ? `, ${current.streak} contrôles de suite` : ""}
                         {distance !== null && distance > 0 ? `, écart ${distance} bits` : ""}, le {formatDate(current.checkedAt)}
                       </p>
+                    ) : null}
+                    {review ? (
+                      <div className="mt-2 max-w-prose rounded-md border border-border bg-surface-muted px-3 py-2 text-xs">
+                        <p className="flex flex-wrap items-center gap-1.5 font-medium">
+                          <Badge variant={review.accurate ? "success" : "danger"}>{review.accurate ? "Guide toujours juste" : "Texte du guide à revoir"}</Badge>
+                          <span className="text-foreground-muted">Relecture Claude du {formatDate(review.at)}</span>
+                        </p>
+                        <p className="mt-1">{review.summary}</p>
+                        {review.suggestion ? <p className="mt-1 text-foreground-muted">Suggestion : {review.suggestion}</p> : null}
+                      </div>
                     ) : null}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-foreground-muted">{reviewed ? formatDate(`${reviewed}T12:00:00Z`) : ""}</td>

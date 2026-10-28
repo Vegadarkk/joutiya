@@ -10,7 +10,8 @@
     "post": "Déposer une annonce",
     "searchLabel": "Rechercher une annonce",
     "searchPlaceholder": "Rechercher sur Joutiya",
-    "signIn": "Se connecter"
+    "signIn": "Se connecter",
+    "guide": "Démarches"
   },
   "Locale": {
     "label": "Langue",
@@ -187,7 +188,6 @@
     "metaDescription": "Les liens officiels de vos démarches, classés par profil : étudiants, auto-entrepreneurs, véhicules, immobilier, MRE, sociétés et coopératives, identité.",
     "title": "Démarches administratives",
     "lead": "Où faire une démarche, dans quel ordre, et le lien direct vers la page officielle. Classé par profil, en français, en arabe et en tarifit.",
-    "home": "Centre d'aide",
     "guideHome": "Démarches administratives",
     "breadcrumb": "Fil d'Ariane",
     "rubricsTitle": "Choisissez votre situation",
