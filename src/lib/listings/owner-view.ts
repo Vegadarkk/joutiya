@@ -51,6 +51,7 @@ export function toOwnerListing(listing: ListingRecord, uploads: readonly UploadR
     id: listing.id,
     slugId: listing.slugId ?? null,
     status: listing.status,
+    sellerType: listing.sellerType,
     pausedReason: listing.pausedReason ?? null,
     categoryId: listing.categoryId ?? null,
     subcategoryId: listing.subcategoryId ?? null,

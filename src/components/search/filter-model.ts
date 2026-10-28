@@ -332,7 +332,8 @@ export function conditionApplies(params: Pick<SearchParams, "subcategory">): boo
 /** Criteria the search can filter on (text criteria are searched as words, never filtered). */
 export function filterableCriteria(subcategoryId: string | undefined) {
   const sub = subcategoryId ? subcategoryById(subcategoryId) : undefined;
-  return (sub?.criteria ?? []).filter((criterion) => criterion.type !== "text");
+  // The vehicle dossier stays out of the panel, but for the criteria marked `filter`.
+  return (sub?.criteria ?? []).filter((criterion) => criterion.type !== "text" && (!criterion.group || criterion.filter));
 }
 
 /** Sets or clears one criterion filter; undefined when none remains. */

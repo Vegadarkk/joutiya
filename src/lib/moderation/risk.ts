@@ -9,6 +9,7 @@ import type { ScreenState } from "@/lib/moderation/types";
 // - prohibited_kw 60: a hard keyword is a 422 blocker; the flag only documents a blocked attempt.
 // - nsfw_review 40, prohibited_soft 35, dup_* 30: strong signals, each one near the threshold.
 // - sensitive_text / third_party_phone 25 / 20: legally mandatory review (step 3) -> always review.
+// - credit_ad 25: instalment without the APR (loi 31-08 art. 76), the mentions are checked by a person -> always review.
 // - price_outlier 20, new_account 15, volume 15: weak alone, review when combined
 //   (new account + volume + outlier = 50 stays auto; + a duplicate -> review).
 // - restricted_category 0, face 0: not risk signals but rules, always reviewed by a person, never
@@ -35,13 +36,14 @@ export const RISK_WEIGHTS: Readonly<Record<ModerationFlag, RiskWeight>> = {
   new_account: { weight: 15, reason: "account younger than the threshold" },
   volume: { weight: 15, reason: "many listings in 24 hours" },
   restricted_category: { weight: 0, reason: "adults-only subcategory, human review required" },
+  credit_ad: { weight: 25, reason: "instalment quoted without the APR (loi 31-08 art. 76), review required" },
 };
 
 export const PREVIOUS_REJECTION_WEIGHT = 10;
 export const PREVIOUS_REJECTION_CAP = 30;
 
 /** Flags that send the listing to review whatever the score (step 2 soft hits, step 3 legal review, step 5 nudity). */
-export const ALWAYS_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["prohibited_kw", "prohibited_soft", "sensitive_text", "third_party_phone", "nsfw_review", "restricted_category", "face"]);
+export const ALWAYS_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["prohibited_kw", "prohibited_soft", "sensitive_text", "third_party_phone", "nsfw_review", "restricted_category", "face", "credit_ad"]);
 
 /** Flags the agent may never lift alone, whatever `agent.autoApproveSoftFlags` says (a moderator decides). */
 export const HUMAN_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["restricted_category", "face"]);

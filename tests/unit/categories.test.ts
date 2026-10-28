@@ -11,6 +11,8 @@ import {
   CRITERION_TEXT_MAX,
   CRITERION_TYPES,
   CRITERION_UNITS,
+  DOSSIER_CRITERIA_MAX,
+  MAIN_CRITERIA_MAX,
   PRICE_UNITS,
   SUBCATEGORY_IDS,
   categoryById,
@@ -63,11 +65,12 @@ describe("category tree", () => {
     }
   });
 
-  it("keeps the criteria small (at most 10 fields) and every field used by a subcategory", () => {
+  it("keeps the criteria small (main ones and the folded dossier capped) and every field used by a subcategory", () => {
     const used = new Set<string>();
     for (const category of CATEGORIES) {
       for (const subcategory of category.subcategories) {
-        expect(subcategory.criteria.length, subcategory.id).toBeLessThanOrEqual(10);
+        expect(subcategory.criteria.filter((criterion) => !criterion.group).length, subcategory.id).toBeLessThanOrEqual(MAIN_CRITERIA_MAX);
+        expect(subcategory.criteria.filter((criterion) => criterion.group === "dossier").length, subcategory.id).toBeLessThanOrEqual(DOSSIER_CRITERIA_MAX);
         for (const criterion of subcategory.criteria) used.add(criterion.id);
         if (subcategory.priceUnit) expect(PRICE_UNITS).toContain(subcategory.priceUnit);
       }

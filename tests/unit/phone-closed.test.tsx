@@ -49,6 +49,7 @@ const listing: OwnerListing = {
   id: "l1",
   slugId: null,
   status: "draft",
+  sellerType: "individual",
   pausedReason: null,
   categoryId: null,
   subcategoryId: null,

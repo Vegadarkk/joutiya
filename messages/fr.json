@@ -554,7 +554,9 @@
       "unsavedLeftBody": "Vous avez quitté l'annonce sans enregistrer vos dernières modifications.",
       "held": "Ce champ sera enregistré dès qu'il sera complet.",
       "saveLimit": "Cette modification doit être vérifiée par notre équipe, et une annonce en cours de vérification compte parmi vos annonces actives : vous avez atteint le maximum. Mettez en pause ou supprimez une autre annonce, puis enregistrez à nouveau.",
-      "saveQuota": "La limite quotidienne de notre service est atteinte : vos dernières modifications ne sont pas encore enregistrées. Gardez cette page ouverte et réessayez après 9 h (heure du Maroc)."
+      "saveQuota": "La limite quotidienne de notre service est atteinte : vos dernières modifications ne sont pas encore enregistrées. Gardez cette page ouverte et réessayez après 9 h (heure du Maroc).",
+      "dossierTitle": "Historique, garantie et équipements",
+      "dossierHint": "Facultatif : une fiche complète inspire confiance et ressort mieux dans la recherche."
     },
     "start": {
       "title": "Déposer une annonce",
@@ -2087,6 +2089,76 @@
         "good": "Bon état",
         "for_parts": "Pour pièces"
       }
+    },
+    "body-type": {
+      "label": "Carrosserie",
+      "options": {
+        "citadine": "Citadine",
+        "compacte": "Compacte",
+        "berline": "Berline",
+        "break": "Break",
+        "suv-4x4": "SUV / 4x4",
+        "coupe": "Coupé",
+        "cabriolet": "Cabriolet",
+        "monospace": "Monospace",
+        "pick-up": "Pick-up"
+      }
+    },
+    "service-history": {
+      "label": "Carnet d'entretien",
+      "options": {
+        "complet": "Complet",
+        "partiel": "Partiel",
+        "aucun": "Aucun"
+      }
+    },
+    "no-accident": {
+      "label": "Non accidenté"
+    },
+    "vehicle-papers": {
+      "label": "Papiers disponibles",
+      "options": {
+        "carte-grise": "Carte grise au nom du vendeur",
+        "visite-technique": "Visite technique valide",
+        "libre-de-gage": "Libre de gage (mainlevée faite)",
+        "factures-entretien": "Factures d'entretien",
+        "double-cles": "Double des clés"
+      }
+    },
+    "vehicle-warranty": {
+      "label": "Garantie",
+      "options": {
+        "constructeur": "Garantie constructeur",
+        "vendeur": "Garantie du vendeur",
+        "aucune": "Sans garantie"
+      }
+    },
+    "warranty-months": {
+      "label": "Durée de la garantie"
+    },
+    "trade-in": {
+      "label": "Reprise de votre véhicule possible"
+    },
+    "financing": {
+      "label": "Financement possible"
+    },
+    "car-equipment": {
+      "label": "Équipements",
+      "options": {
+        "climatisation": "Climatisation",
+        "gps": "GPS",
+        "camera-recul": "Caméra de recul",
+        "radar-recul": "Radar de recul",
+        "carplay-android-auto": "CarPlay / Android Auto",
+        "regulateur": "Régulateur de vitesse",
+        "toit-ouvrant": "Toit ouvrant",
+        "sieges-cuir": "Sièges cuir",
+        "jantes-alu": "Jantes alu",
+        "transmission-4x4": "Transmission 4x4"
+      }
+    },
+    "stock-ref": {
+      "label": "Référence de stock"
     }
   },
   "MyListings": {
@@ -2348,6 +2420,33 @@
     "adultsOnly": {
       "title": "Réservé aux personnes majeures.",
       "body": "Objet décoratif d'artisanat, vendu uniquement aux personnes de 18 ans et plus."
+    },
+    "dossier": {
+      "title": "Dossier du véhicule",
+      "stockRef": "Réf.",
+      "months": "{count, plural, one {# mois} other {# mois}}",
+      "tradeIn": "Reprise possible",
+      "tradeInDetail": "Le vendeur peut reprendre votre véhicule actuel.",
+      "financing": "Financement possible",
+      "financingDetail": "Demandez l'offre écrite au vendeur ou à son organisme de crédit.",
+      "history": "Entretien suivi",
+      "declared": "Informations déclarées par le vendeur : vérifiez-les sur place et sur les papiers avant de payer."
+    },
+    "buyingGuide": {
+      "title": "Acheter ce véhicule au Maroc",
+      "customs": "Véhicule pas encore dédouané : le dédouanement reste à faire et peut coûter cher. Renseignez-vous auprès de la Douane avant de vous engager.",
+      "steps": {
+        "owner": "Vérifiez que le nom sur la carte grise est celui du vendeur, ou qu'un professionnel vous montre son mandat.",
+        "mutation": "La vente se déclare sur le portail de mutation de la NARSA : contrat de vente signé et légalisé, dossier déposé dans les 30 jours qui suivent.",
+        "pledge": "Un véhicule gagé ou acheté à crédit doit avoir sa mainlevée avant la mutation : demandez-la avant de payer.",
+        "inspection": "Pour la mutation, la visite technique doit être valide et les vignettes payées.",
+        "payment": "{brand} ne vend pas ce véhicule et ne reçoit aucun paiement : la vente est un contrat entre vous et le vendeur. Payez au moment de la remise des papiers, jamais d'avance."
+      },
+      "notes": {
+        "financing": "Financement : toute offre de crédit doit vous être remise par écrit avec le taux effectif global (TEG), et vous avez 7 jours pour réfléchir (loi 31-08).",
+        "warranty": "Garantie du vendeur : un professionnel doit vous la remettre par écrit, avec sa durée, ce qu'elle couvre et la garantie légale des vices cachés (loi 31-08, art. 66 et 67)."
+      },
+      "source": "Démarches indicatives, à vérifier auprès de la NARSA (narsa.ma) ou de votre centre d'immatriculation."
     }
   },
   "Profile": {
