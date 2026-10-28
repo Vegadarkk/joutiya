@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations } from "next-intl/server";
 import { isRtl, LOCALE_TAGS, type Locale } from "@/config/site";
+import { CguNotice } from "@/components/legal/cgu-notice";
 import { Footer } from "@/components/legal/footer";
 import type { PublicConfig } from "@/lib/config/public-types";
 import type { SessionSummary } from "@/lib/contracts/auth";
@@ -52,6 +53,7 @@ export async function RootShell({ locale, nonce, config, initialSession, clientN
         <NextIntlClientProvider messages={messages}>
           <Providers dir={dir} config={config} initialSession={initialSession}>
             <SiteHeader locale={locale} />
+            <CguNotice />
             <main id="main" className="flex flex-1 flex-col">
               {children}
             </main>

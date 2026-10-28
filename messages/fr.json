@@ -3443,5 +3443,13 @@
         "cta": "Mettre À la Une"
       }
     }
+  },
+  "CguNotice": {
+    "titleUpcoming": "Nos conditions générales d'utilisation changent le {date}",
+    "titleChanged": "Nos conditions générales d'utilisation ont changé le {date}",
+    "body": "Prenez un moment pour lire la nouvelle version. Si vous ne l'acceptez pas, vous pouvez fermer votre compte depuis vos paramètres.",
+    "read": "Lire les CGU",
+    "acknowledge": "J'ai compris",
+    "failed": "L'enregistrement a échoué. Réessayez."
   }
 }

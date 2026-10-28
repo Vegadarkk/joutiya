@@ -42,7 +42,9 @@ export type TemplateId =
   // Messaging (phase 5, L5): the grouped new-messages mail (design D21).
   | "newMessages"
   // Account closure (phase 5, L7, D26): confirmation with what is kept and until when.
-  | "accountClosed";
+  | "accountClosed"
+  // Legal (phase 6, D11): the CGU changed since the member accepted them (DSA art. 14 § 2).
+  | "cguChanged";
 
 /**
  * Statement of reasons (art. 17 DSA, design D8) carried by the hold and rejection mails. The
@@ -168,6 +170,8 @@ export interface TemplateData {
   newMessages: { displayName: string; count: number; conversations: { listingTitle: string; counterpartName: string }[] };
   /** The account is closed: closure date and the purge of the account data (ISO). */
   accountClosed: { displayName: string; closedAt: string; purgeAt: string };
+  /** `effective`: ISO day (LEGAL_VERSIONS.cgu). */
+  cguChanged: { displayName: string; version: string; effective: string };
 }
 
 /** One saved search of the digest: its results page, the count of new listings and the newest few. */

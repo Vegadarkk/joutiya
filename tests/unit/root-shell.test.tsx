@@ -5,13 +5,14 @@ import { describe, expect, it, vi } from "vitest";
 
 // The <html> shell of both localized root layouts: the footer © line follows the live
 // config/legal (getLegalConfig, cached 5 minutes), not the built-in defaults. The client
-// providers, header, fonts and footer are stubbed (they have their own tests).
+// providers, header, CGU notice, fonts and footer are stubbed (they have their own tests).
 
 const getLegalConfig = vi.hoisted(() => vi.fn(async () => ({ companyName: "Société Test" })));
 vi.mock("@/lib/legal/config", () => ({ getLegalConfig }));
 vi.mock("@/lib/fonts", () => ({ readex: { variable: "font-readex" }, tarifitFallback: { variable: "font-tarifit" }, ruqaa: { variable: "font-ruqaa" } }));
 vi.mock("@/components/layout/providers", () => ({ Providers: ({ children }: { children: ReactNode }) => children }));
 vi.mock("@/components/layout/site-header", () => ({ SiteHeader: () => <header /> }));
+vi.mock("@/components/legal/cgu-notice", () => ({ CguNotice: () => null }));
 vi.mock("@/components/legal/footer", () => ({ Footer: ({ publisher }: { publisher: string }) => <footer data-publisher={publisher} /> }));
 vi.mock("next-intl", async (importOriginal) => ({
   ...(await importOriginal<typeof NextIntl>()),

@@ -1,4 +1,5 @@
 import "server-only";
+import { cguAccepted, LEGAL_VERSIONS } from "@/config/legal-versions";
 import type { SessionSummary } from "@/lib/contracts/auth";
 import { getUser, getUserPrivate } from "@/lib/db/repositories/users";
 import type { SessionUser } from "@/lib/firebase/session";
@@ -20,5 +21,7 @@ export async function sessionSummary(user: SessionUser, readPrivate: typeof getU
     phoneVerified: profile?.badges.phoneVerified ?? false,
     locale: profile?.locale ?? null,
     providers: account?.providers ?? [],
+    // No private document (an account being created): nothing to acknowledge.
+    cguUpdate: account && !cguAccepted(account.consents?.cgu?.version) ? { version: LEGAL_VERSIONS.cgu.version, effective: LEGAL_VERSIONS.cgu.effective } : null,
   };
 }

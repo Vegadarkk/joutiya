@@ -166,6 +166,35 @@ export async function updateTransfersConsent(uid: string, version: string, now =
   void consume("firestore.writes", 1);
 }
 
+export async function updateCguConsent(uid: string, version: string, now = new Date()): Promise<void> {
+  await privateRef(uid).update({ "consents.cgu": { version, at: now } });
+  void consume("firestore.writes", 1);
+}
+
+/** system/cguNotice: the CGU version the cgu-notice job works on and the last account it visited. */
+export interface CguNoticeCursor {
+  version: string;
+  lastUid: string | null;
+  done: boolean;
+}
+
+export async function readCguNoticeCursor(): Promise<CguNoticeCursor | null> {
+  const snapshot = await db().collection(COLLECTIONS.system).doc("cguNotice").get();
+  void consume("firestore.reads", 1);
+  const version: unknown = snapshot.get("version");
+  if (typeof version !== "string") return null;
+  const lastUid: unknown = snapshot.get("lastUid");
+  return { version, lastUid: typeof lastUid === "string" && lastUid ? lastUid : null, done: snapshot.get("done") === true };
+}
+
+export async function writeCguNoticeCursor(cursor: CguNoticeCursor, now = new Date()): Promise<void> {
+  await db()
+    .collection(COLLECTIONS.system)
+    .doc("cguNotice")
+    .set({ version: cursor.version, lastUid: cursor.lastUid ?? "", done: cursor.done, updatedAt: Timestamp.fromDate(now) });
+  void consume("firestore.writes", 1);
+}
+
 /** Accounts still pending after `before` (purge-unactivated): uids, oldest first. */
 export async function listPendingAccounts(before: Date, limit = 200): Promise<string[]> {
   const snapshot = await db()
