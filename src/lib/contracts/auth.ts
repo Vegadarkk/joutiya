@@ -10,6 +10,8 @@ import { PASSWORD_MAX, PASSWORD_MIN } from "./endpoints";
 export const CGU_VERSION = "2026-10";
 /** 2026-10-19: the text names each provider, its role and region (audit C2-04); older consents are asked again. */
 export const TRANSFERS_CONSENT_VERSION = "2026-10-19";
+/** Version of the opt-in text for information e-mails (SignUp.consents.marketing). */
+export const MARKETING_CONSENT_VERSION = "2026-10";
 
 export { AUTH_API, PASSWORD_MAX, PASSWORD_MIN } from "./endpoints";
 

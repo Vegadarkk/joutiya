@@ -138,6 +138,9 @@ export type ErrorCode =
   | "pro_subscription_active"
   /** Purchased credits are left in the wallet (409). */
   | "wallet_not_empty"
+  // Back office (phase 6, D13).
+  /** config/legal without a mention art. 1-1 LCEN requires (422; details: { missing }). */
+  | "legal_incomplete"
   | "unavailable"
   | "internal";
 

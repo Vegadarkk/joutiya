@@ -7,6 +7,8 @@ import { consume } from "@/lib/quota";
 // Firestore `config/legal` over the defaults, cached 5 minutes in memory (§5, §7).
 const TTL_MS = 5 * 60 * 1000;
 let cache: { value: LegalConfig; expires: number } | undefined;
+/** Bumped by invalidateLegalConfig: a read started before a save does not cache the old value. */
+let generation = 0;
 
 /** Reads `config/legal` (throws when Firestore is unreachable). */
 export async function fetchLegalConfig(): Promise<{ config: LegalConfig; errors: string[] }> {
@@ -20,13 +22,20 @@ export async function fetchLegalConfig(): Promise<{ config: LegalConfig; errors:
 export async function getLegalConfig(): Promise<LegalConfig> {
   const now = Date.now();
   if (cache && cache.expires > now) return cache.value;
+  const started = generation;
   try {
     const { config, errors } = await fetchLegalConfig();
     if (errors.length > 0) logger.error({ errors }, "config/legal is invalid: defaults rendered");
-    cache = { value: config, expires: now + TTL_MS };
+    if (started === generation) cache = { value: config, expires: now + TTL_MS };
     return config;
   } catch (error) {
     logger.error({ err: error }, "config/legal unreachable: last known value rendered");
     return cache?.value ?? DEFAULT_LEGAL;
   }
+}
+
+/** Drops the cached value: the next render reads `config/legal` again (after a back-office save). */
+export function invalidateLegalConfig(): void {
+  cache = undefined;
+  generation += 1;
 }

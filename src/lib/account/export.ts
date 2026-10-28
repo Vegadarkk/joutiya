@@ -346,6 +346,9 @@ export async function buildAccountExport(uid: string, now = new Date()): Promise
             cgu: { version: account.consents.cgu.version, at: account.consents.cgu.at.toISOString() },
             transfers: { version: account.consents.transfers.version, at: account.consents.transfers.at.toISOString() },
             marketing: account.consents.marketing,
+            marketingConsent: account.consents.marketingConsent
+              ? { version: account.consents.marketingConsent.version, at: account.consents.marketingConsent.at.toISOString() }
+              : null,
           },
           notifications: { messagesEmail: account.notifications?.messagesEmail ?? true },
           sanctions: { strikeLevel: account.strikes.level, lastAt: iso(account.strikes.lastAt), suspendedUntil: iso(account.strikes.suspendedUntil) },

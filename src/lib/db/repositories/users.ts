@@ -2,6 +2,7 @@ import "server-only";
 import { randomInt } from "node:crypto";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import type { Locale } from "@/config/site";
+import { MARKETING_CONSENT_VERSION } from "@/lib/contracts/auth";
 import type { z } from "@/lib/zod";
 import { db } from "@/lib/firebase/admin";
 import { HttpError } from "@/lib/http/errors";
@@ -81,6 +82,7 @@ export async function createAccountDocuments(input: CreateAccountInput): Promise
       cgu: { version: input.consents.cguVersion, at: now },
       transfers: { version: input.consents.transfersVersion, at: now },
       marketing: input.consents.marketing,
+      ...(input.consents.marketing ? { marketingConsent: { version: MARKETING_CONSENT_VERSION, at: now } } : {}),
     },
     strikes: { level: 0 },
     reporter: { recent: [], total: 0 },

@@ -15,6 +15,7 @@ export const ADMIN_API = {
   conversations: "/api/admin/conversations",
   exports: "/api/admin/exports",
   users: "/api/admin/users",
+  legal: "/api/admin/legal",
 } as const;
 
 const CSRF_COOKIE = "__Host-csrf";
@@ -37,6 +38,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
+    /** `details` of the error body (field paths of an invalid body, missing mentions). */
+    readonly details?: unknown,
   ) {
     super(`${status} ${code}`);
     this.name = "ApiError";
@@ -44,7 +47,7 @@ export class ApiError extends Error {
 }
 
 interface FetchOptions {
-  method: "GET" | "POST" | "PATCH" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   /** Authenticated mutation: sends the CSRF header. */
   csrf?: boolean;
@@ -63,7 +66,10 @@ export async function adminFetch<T>(path: string, options: FetchOptions): Promis
   });
   if (response.status === 204) return null;
   const payload: unknown = await response.json().catch(() => null);
-  if (!response.ok) throw new ApiError(response.status, (payload as ErrorBody | null)?.error?.code ?? "internal");
+  if (!response.ok) {
+    const error = (payload as ErrorBody | null)?.error;
+    throw new ApiError(response.status, error?.code ?? "internal", error?.details);
+  }
   return payload as T;
 }
 
