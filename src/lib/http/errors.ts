@@ -60,6 +60,8 @@ export type ErrorCode =
   | "reveal_not_allowed"
   /** Publish in an adults-only subcategory without the seller's attestation (422). */
   | "adults_only_attestation"
+  /** Publish a real-estate listing without the advertiser's attestation of its declared data (422). */
+  | "real_estate_attestation"
   // Search and discovery (phase 4). Messages: Listing.errors.<code>.
   /** Search engine missing or unreachable (503). */
   | "search_unavailable"

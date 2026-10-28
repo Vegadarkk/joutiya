@@ -189,6 +189,25 @@ describe("POST /api/listings/{id}/publish", () => {
     expect((await getListing(id))?.moderation).toMatchObject({ state: "needs_review", flags: ["restricted_category"], score: 0 });
   });
 
+  it("publishes a real-estate listing only with the advertiser's attestation of its declared data", async () => {
+    const owner = await member();
+    const id = await readyDraft(owner, {
+      subcategoryId: "vente",
+      title: "Appartement de 85 m² au Maârif",
+      description: "Appartement lumineux de 85 m² au troisième étage avec ascenseur, deux chambres, cuisine équipée. Titre foncier.",
+      attributes: { "property-type": "appartement", surface: 85, "property-title": "titre-foncier" },
+      price: 950000,
+    });
+    const missing = await api<ErrorBody>(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: ACCEPT });
+    expect(missing.status).toBe(422);
+    expect(missing.body.error.code).toBe("real_estate_attestation");
+    expect((await getListing(id))?.status).toBe("draft");
+
+    const result = await api<PublishBody>(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: { ...ACCEPT, realEstateAttestation: true } });
+    expect(result.status).toBe(200);
+    expect(result.body.status).toBe("published");
+  });
+
   it("limits an individual to 5 publications a day (listing_daily_limit, Retry-After)", { timeout: 90_000 }, async () => {
     const owner = await member();
     for (let i = 0; i < 5; i += 1) {

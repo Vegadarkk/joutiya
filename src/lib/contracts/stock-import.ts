@@ -89,6 +89,8 @@ export interface StockListing {
   status: ListingStatus;
   photoCount: number;
   slugId: string | null;
+  /** Its subcategory: real estate needs the advertiser's attestation at publication. */
+  subcategoryId: string | null;
 }
 
 export interface StockImportResponse {

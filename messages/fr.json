@@ -573,7 +573,8 @@
       "invalid_token": "Ce lien n'est plus valide.",
       "upload_limit": "Trop de photos ont été envoyées pour cette annonce, photos refusées comprises. Supprimez les photos refusées pour en ajouter d'autres, ou patientez : elles sont effacées automatiquement 7 jours après leur envoi.",
       "quota_exhausted": "Le dépôt et la modification d'annonces sont momentanément suspendus : la limite quotidienne de notre service est atteinte. Votre annonce est conservée ; réessayez après 9 h (heure du Maroc).",
-      "adults_only_attestation": "Pour publier dans cette catégorie, confirmez qu'il s'agit d'un objet décoratif vendu uniquement à une personne majeure."
+      "adults_only_attestation": "Pour publier dans cette catégorie, confirmez qu'il s'agit d'un objet décoratif vendu uniquement à une personne majeure.",
+      "real_estate_attestation": "Pour publier une annonce immobilière, attestez que ses informations sont exactes et sous votre seule responsabilité."
     },
     "wizard": {
       "title": "Déposer une annonce",
@@ -822,7 +823,8 @@
         "explicit_consent": "Une autre personne, avec son accord explicite"
       },
       "sensitiveNote": "Sans l'accord de la personne concernée, retirez ces informations de l'annonce.",
-      "adultsOnlyAttestation": "J'atteste qu'il s'agit d'un objet décoratif d'artisanat (koumiya ou poignard décoratif), qui n'est pas une arme de combat, et que je le vendrai uniquement à une personne majeure (18 ans et plus). Mon annonce sera vérifiée par un modérateur avant sa mise en ligne."
+      "adultsOnlyAttestation": "J'atteste qu'il s'agit d'un objet décoratif d'artisanat (koumiya ou poignard décoratif), qui n'est pas une arme de combat, et que je le vendrai uniquement à une personne majeure (18 ans et plus). Mon annonce sera vérifiée par un modérateur avant sa mise en ligne.",
+      "realEstateAttestation": "J'atteste que les informations de mon annonce (titre de propriété, mandat, honoraires, permis, autorisation d'hébergement) sont exactes et que j'ai le droit de proposer ce bien. Je suis seul responsable de ces informations et de la transaction : {brand} ne les vérifie pas (<cgu>CGU</cgu>, art. 7.10 et 19.1)."
     },
     "done": {
       "publishedTitle": "Votre annonce est en ligne",
@@ -883,7 +885,8 @@
       "messaging_only": "Dans cette catégorie, le contact passe uniquement par la messagerie : désactivez le téléphone et WhatsApp.",
       "adults_only_attestation": "Confirmez qu'il s'agit d'un objet décoratif d'artisanat vendu uniquement à une personne majeure.",
       "criterion_pro_only": "Ce champ est réservé aux comptes professionnels.",
-      "deposit_max": "Le dépôt de garantie ne peut pas dépasser 2 mois de loyer (loi 67-12)."
+      "deposit_max": "Le dépôt de garantie ne peut pas dépasser 2 mois de loyer (loi 67-12).",
+      "real_estate_attestation": "Pour publier une annonce immobilière, attestez que ses informations sont exactes et sous votre seule responsabilité."
     },
     "status": {
       "draft": "Brouillon",
@@ -2595,7 +2598,8 @@
       "delivery": "Livraison prévue en {year}",
       "permit": "Permis de construire",
       "authorization": "Autorisation d'hébergement",
-      "declared": "N° {number}, déclaré par l'annonceur"
+      "declared": "N° {number}, déclaré par l'annonceur",
+      "declaredNote": "Informations déclarées par l'annonceur, sous sa seule responsabilité. {brand} ne les vérifie pas. Demandez les justificatifs (titre foncier, mandat, autorisation) avant de vous engager."
     },
     "example": {
       "title": "Annonce exemple",
@@ -3633,7 +3637,7 @@
       "count": "{count, plural, one {# bien en ligne} other {# biens en ligne}}",
       "see": "Voir les biens",
       "feesTitle": "Barème des honoraires",
-      "feesNote": "Communiqué par l'agence. Les honoraires de chaque bien figurent aussi sur son annonce, à côté du prix."
+      "feesNote": "Barème communiqué par l'agence, sous sa seule responsabilité. Les honoraires de chaque bien figurent aussi sur son annonce, à côté du prix."
     },
     "dealer": {
       "title": "Stock de véhicules",
@@ -4172,7 +4176,8 @@
       "send": "Publier {count, plural, one {# brouillon} other {# brouillons}}",
       "progress": "Publication {done} sur {total}…",
       "outcome": "{published, plural, one {# annonce en ligne} other {# annonces en ligne}}, {pending_review, plural, one {# en vérification} other {# en vérification}}, {incomplete, plural, one {# incomplète} other {# incomplètes}}, {failed, plural, one {# échec} other {# échecs}}.",
-      "incomplete": "{count, plural, one {# brouillon à compléter} other {# brouillons à compléter}}"
+      "incomplete": "{count, plural, one {# brouillon à compléter} other {# brouillons à compléter}}",
+      "realEstate": "Pour les annonces immobilières : j'atteste que leurs informations (titre de propriété, mandat, honoraires, permis, autorisation d'hébergement) sont exactes et que j'ai le droit de proposer ces biens. J'en suis seul responsable : {brand} ne les vérifie pas."
     },
     "absent": {
       "title": "Véhicules absents du fichier",

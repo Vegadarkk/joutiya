@@ -39,14 +39,13 @@ const stockRefOf = (listing: ListingRecord) => {
 };
 
 function toStockListing(listing: ListingRecord, ref: string): StockListing {
-  return { id: listing.id, ref, title: listing.title, status: listing.status, photoCount: listing.photos.length, slugId: listing.slugId ?? null };
+  return { id: listing.id, ref, title: listing.title, status: listing.status, photoCount: listing.photos.length, slugId: listing.slugId ?? null, subcategoryId: listing.subcategoryId ?? null };
 }
 
 function entryOf(listing: ListingRecord, ref: string): StockEntry {
   const location = listing.location ? { regionCode: listing.location.regionCode, citySlug: listing.location.citySlug, ...(listing.location.district ? { district: listing.location.district } : {}) } : null;
   return {
     ...toStockListing(listing, ref),
-    subcategoryId: listing.subcategoryId ?? null,
     fields: {
       title: listing.title,
       description: listing.description,
@@ -101,7 +100,7 @@ async function proSeller(auth: AuthContext): Promise<SellerContext> {
 export async function stockList(auth: AuthContext): Promise<StockListResponse> {
   await proSeller(auth);
   const stock = await readStock(auth.user.uid);
-  return { listings: stock.entries.map(({ id, ref, title, status, photoCount, slugId }) => ({ id, ref, title, status, photoCount, slugId })) };
+  return { listings: stock.entries.map(({ id, ref, title, status, photoCount, slugId, subcategoryId }) => ({ id, ref, title, status, photoCount, slugId, subcategoryId })) };
 }
 
 /** A patch through the wizard's own contract (null when it refuses it: the line fails, nothing is written). */

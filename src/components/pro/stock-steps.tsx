@@ -9,6 +9,8 @@ import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { textLinkClassName } from "@/components/ui/text-link";
+import { subcategoryById } from "@/config/categories";
+import { SITE_NAME } from "@/config/site";
 import { Link } from "@/i18n/navigation";
 import { isApiError } from "@/lib/auth/client";
 import type { ListingStatus } from "@/lib/contracts/listings";
@@ -17,6 +19,7 @@ import type { StockListing } from "@/lib/contracts/stock-import";
 import { getListing, listingAction, patchListing, publishListing } from "@/lib/listings/client/api";
 import { ACCEPTED_INPUT_TYPES } from "@/lib/listings/client/prepare-image";
 import { uploadListingPhoto } from "@/lib/listings/client/upload";
+import { needsRealEstateAttestation } from "@/lib/listings/real-estate";
 import { matchPhotos } from "@/lib/pro/stock-import/photos";
 import { cn } from "@/lib/utils";
 import { FileDrop, Step } from "./stock-ui";
@@ -148,6 +151,9 @@ export function PublishStep({ stock, nonce, onDone }: { stock: readonly StockLis
   const drafts = useMemo(() => stock.filter((listing) => listing.status === "draft"), [stock]);
   const ready = drafts.filter((listing) => listing.photoCount > 0);
   const [accepted, setAccepted] = useState(false);
+  // Real estate in the batch: the agency attests the declared data of those listings (review-step).
+  const realEstate = ready.some((listing) => needsRealEstateAttestation(subcategoryById(listing.subcategoryId ?? "")));
+  const [declared, setDeclared] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [results, setResults] = useState<Map<string, PublishResult>>(new Map());
   const [error, setError] = useState<unknown>(null);
@@ -166,7 +172,8 @@ export function PublishStep({ stock, nonce, onDone }: { stock: readonly StockLis
         const listing = queue.current[0]!;
         setProgress({ done: outcome.size, total });
         try {
-          const response = await publishListing(listing.id, { acceptRules: true, ...(pass ? { turnstileToken: pass } : {}) });
+          const attest = needsRealEstateAttestation(subcategoryById(listing.subcategoryId ?? ""));
+          const response = await publishListing(listing.id, { acceptRules: true, ...(attest ? { realEstateAttestation: true } : {}), ...(pass ? { turnstileToken: pass } : {}) });
           outcome.set(listing.id, response.status === "published" ? "published" : "pending_review");
         } catch (caught) {
           if (isApiError(caught, "turnstile_required", "turnstile_failed")) {
@@ -222,8 +229,14 @@ export function PublishStep({ stock, nonce, onDone }: { stock: readonly StockLis
             <input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} className="mt-0.5 size-4 shrink-0 accent-structure" />
             <span className="text-pretty">{t.rich("rules", { cgu: legal("cgu"), interdits: legal("objets-interdits") })}</span>
           </label>
+          {realEstate ? (
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={declared} onChange={(event) => setDeclared(event.target.checked)} className="mt-0.5 size-4 shrink-0 accent-structure" />
+              <span className="text-pretty">{t("realEstate", { brand: SITE_NAME })}</span>
+            </label>
+          ) : null}
           <div className="flex flex-wrap gap-3">
-            <Button disabled={!accepted || ready.length === 0 || progress !== null || needToken} loading={progress !== null} onClick={start}>
+            <Button disabled={!accepted || (realEstate && !declared) || ready.length === 0 || progress !== null || needToken} loading={progress !== null} onClick={start}>
               <Send aria-hidden="true" />
               {t("send", { count: ready.length })}
             </Button>
