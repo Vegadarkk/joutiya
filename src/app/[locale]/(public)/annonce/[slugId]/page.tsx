@@ -16,6 +16,7 @@ import { JsonLd } from "@/components/listing/json-ld";
 import { ListingStatusBanner } from "@/components/listing/listing-status-banner";
 import { PriceTag } from "@/components/listing/price-tag";
 import { SafetyTips } from "@/components/listing/safety-tips";
+import { PayAtSeller } from "@/components/listing/pay-at-seller";
 import { SellerCard } from "@/components/listing/seller-card";
 import { ListingMapBlock } from "@/components/map/listing-map-block";
 import { ReportButton } from "@/components/report/report-button";
@@ -33,6 +34,7 @@ import { photoUrl } from "@/lib/listings/client/photo-url";
 import { listingJsonLd } from "@/lib/listings/jsonld";
 import { getPublishedBySlugId, getSeller, listingPath, toPublicListing, type PublicListing, type PublicSeller } from "@/lib/listings/public";
 import { logger } from "@/lib/logging/logger";
+import { shopPaymentFor } from "@/lib/pro/seller-payment";
 import { isIndexable } from "@/lib/search/document";
 import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
 import { mediaBaseUrl } from "@/lib/storage/keys";
@@ -55,6 +57,8 @@ interface Loaded {
   listing: PublicListing;
   /** Server side only: the seller lookup. Never rendered, never passed to a client component. */
   ownerUid: string;
+  /** Server side only: the shop of a Pro listing (its payment button). */
+  proId: string | undefined;
   redirect: boolean;
   /** In the search index (D9), so counted by its deeper category landing pages. */
   indexed: boolean;
@@ -71,6 +75,7 @@ const load = cache(async (segment: string): Promise<Loaded | null> => {
   return {
     listing,
     ownerUid: found.listing.ownerUid,
+    proId: found.listing.sellerType === "pro" ? found.listing.proId : undefined,
     redirect: found.redirect,
     indexed: isIndexable(found.listing),
     adsEligible: found.state === "published" && found.listing.adsEligible === true,
@@ -128,8 +133,9 @@ export default async function ListingPage({ params }: { params: Params }) {
   if (found.redirect) permanentRedirect(listingPath(locale, found.listing.slugId));
 
   const { listing } = found;
-  const [seller, legal, flags, t, names] = await Promise.all([
+  const [seller, payment, legal, flags, t, names] = await Promise.all([
     sellerOf(found.ownerUid),
+    listing.state === "published" ? shopPaymentFor(found.proId) : Promise.resolve(null),
     getLegalConfig(),
     getFlags(),
     getTranslations({ locale, namespace: "ListingPage" }),
@@ -234,6 +240,7 @@ export default async function ListingPage({ params }: { params: Params }) {
                     adultsOnly={Boolean(subcategory?.adultsOnly)}
                   />
                 ) : null}
+                {published && payment ? <PayAtSeller payment={payment} listingId={listing.id} /> : null}
               </SellerCard>
             </div>
           </aside>

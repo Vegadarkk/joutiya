@@ -8,7 +8,10 @@ import type { RatingSummary, ReviewPage } from "@/lib/contracts/reviews";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { getListing, listPublishedByOwner, type ListingRecord } from "@/lib/db/repositories/listings";
 import { findUserByPublicId, getUserRecord, type UserRecord } from "@/lib/db/repositories/profiles";
+import { getSellerPayments } from "@/lib/config/runtime";
+import type { PublicShopPayment } from "@/lib/contracts/seller-payment";
 import { getProProfile } from "@/lib/db/repositories/pro-profiles";
+import { publicShopPayment } from "@/lib/pro/seller-payment";
 import { db } from "@/lib/firebase/admin";
 import { aggregationReads, consume } from "@/lib/quota";
 import { assertQuotas, PUBLIC_READ_QUOTAS } from "@/lib/quota/gate";
@@ -318,6 +321,8 @@ export interface PublicStorefront {
   name: string;
   description: string;
   citySlug: string;
+  /** « Payer chez le vendeur » and the seller information, when the shop has turned them on. */
+  payment: PublicShopPayment | null;
   /** The owner's public face and listings, as on /profil. */
   seller: PublicProfileView;
 }
@@ -334,7 +339,9 @@ export async function getPublicStorefront(proId: string, limit = 24): Promise<Pu
   if (!profile || !storefrontShown(profile.lifecycle, profile.plan)) return null;
   const user = await getUserRecord(profile.ownerUid);
   if (!user || !isVisibleAccount(user) || user.status === "suspended") return null;
+  const payment = profile.sellerPayment ? publicShopPayment(profile, await getSellerPayments(), new Date()) : null;
   return {
+    payment,
     proId: profile.proId,
     segment: storefrontSegment(profile.slug, profile.proId),
     name: profile.name,
