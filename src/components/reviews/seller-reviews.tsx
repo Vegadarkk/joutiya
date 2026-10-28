@@ -1,5 +1,6 @@
 import { MessagesSquare } from "lucide-react";
 import type { Locale } from "@/config/site";
+import { Link } from "@/i18n/navigation";
 import { useNumbersTranslations } from "@/i18n/numbers";
 import type { RatingSummary, ReviewPage } from "@/lib/contracts/reviews";
 import { isolate } from "@/lib/i18n/bidi";
@@ -82,7 +83,12 @@ export function SellerReviews({
                 );
               })}
             </ul>
-            <p className="text-xs text-pretty text-foreground-muted">{t("verifiedHint")}</p>
+            <p className="text-xs text-pretty text-foreground-muted">
+              {t("verifiedHint")}{" "}
+              <Link href="/legal/avis-utilisateurs#verification" prefetch={false} className="font-medium text-link underline underline-offset-2">
+                {t("rules")}
+              </Link>
+            </p>
           </div>
           <div className="flex min-w-0 flex-col divide-y divide-border">
             {page.reviews.map((review) => (
@@ -96,7 +102,12 @@ export function SellerReviews({
           <MessagesSquare className="mt-0.5 size-5 shrink-0 text-foreground-muted" aria-hidden="true" />
           <div className="flex flex-col gap-1">
             <p className="font-medium">{t("emptyTitle")}</p>
-            <p className="text-sm text-pretty text-foreground-muted">{t("emptyBody", { name: isolate(sellerName) })}</p>
+            <p className="text-sm text-pretty text-foreground-muted">
+              {t("emptyBody", { name: isolate(sellerName) })}{" "}
+              <Link href="/legal/avis-utilisateurs#verification" prefetch={false} className="font-medium text-link underline underline-offset-2">
+                {t("rules")}
+              </Link>
+            </p>
           </div>
         </div>
       )}

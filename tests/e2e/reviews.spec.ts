@@ -113,6 +113,7 @@ test.describe("verified reviews", () => {
 
     const dialog = buyerPage.getByTestId("review-dialog");
     await expect(dialog.getByRole("heading", { name: `Votre avis sur ${isolate(seller.displayName)}` })).toBeVisible({ timeout: 15_000 });
+    await expect(dialog.getByRole("link", { name: "Règles des avis" })).toHaveAttribute("href", "/fr/legal/avis-utilisateurs#regles");
     // Nothing is sent before the note, the text and the statement are there.
     await dialog.getByRole("button", { name: "Publier mon avis" }).click();
     await expect(dialog.getByText("Choisissez une note.")).toBeVisible();
@@ -137,6 +138,7 @@ test.describe("verified reviews", () => {
     await expect(block.getByTestId("rating-average")).toHaveText("4,0");
     await expect(block.getByTestId("review")).toContainText(review);
     await expect(block.getByTestId("review")).toContainText("Échange vérifié");
+    await expect(block.getByRole("link", { name: "Comment fonctionnent les avis" })).toHaveAttribute("href", "/fr/legal/avis-utilisateurs#verification");
     await expect(buyerPage.getByTestId("profile-header").getByTestId("rating-link")).toContainText("1 avis vérifié");
 
     // The conversation no longer invites the buyer.
