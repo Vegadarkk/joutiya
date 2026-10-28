@@ -1,8 +1,8 @@
 import "server-only";
-import type { Condition } from "@/config/categories";
+import { RENTAL_SUBCATEGORY, type Condition } from "@/config/categories";
 import { REVIEWS_PAGE } from "@/config/reviews";
 import { DEFAULT_BANNER, type BannerKey } from "@/config/storefront";
-import type { ListingAttributes, ListingStatus } from "@/lib/contracts/listings";
+import type { ListingAttributes, ListingStatus, RentalAvailability } from "@/lib/contracts/listings";
 import type { PhotoVariant } from "@/lib/contracts/photo-variants";
 import type { RatingSummary, ReviewPage } from "@/lib/contracts/reviews";
 import { COLLECTIONS } from "@/lib/db/schemas";
@@ -19,6 +19,7 @@ import { storefrontShown } from "@/lib/pro/lifecycle";
 import { PRO_ID_PATTERN, type ProSector } from "@/lib/pro/profile-schema";
 import { sellerReviews } from "@/lib/reviews/seller";
 import { ratingSummary } from "@/lib/reviews/views";
+import { rentalAvailabilityOf } from "./availability";
 import { cardFactsField, cardFactsOf, type CardFacts } from "./card-facts";
 import { buildSlugId, parseSlugId } from "./ids";
 
@@ -159,6 +160,8 @@ export interface PublicListing {
   seller: { publicId: string; name: string; type: UserRecord["type"] };
   /** Example listing (src/lib/demo): labelled, no contact action, not indexed by search engines. */
   example: boolean;
+  /** Car rentals: the agency's declared availability (rental pack §3); null otherwise. */
+  rental: RentalAvailability | null;
   /** ISO 8601. */
   publishedAt: string;
   sortAt: string;
@@ -216,6 +219,7 @@ export function toPublicListing(record: ListingRecord, state: PublicState, slugI
     contact: { showPhone: record.contact.showPhone, whatsapp: record.contact.whatsapp },
     seller: { publicId: record.sellerPublicId, name: record.sellerName, type: record.sellerType },
     example: record.example === true,
+    rental: subcategoryId === RENTAL_SUBCATEGORY ? rentalAvailabilityOf(record) : null,
     publishedAt: publishedAt.toISOString(),
     sortAt: record.sortAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),

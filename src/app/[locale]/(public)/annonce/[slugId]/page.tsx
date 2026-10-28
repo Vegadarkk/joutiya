@@ -14,6 +14,7 @@ import { VehicleBuyingGuide } from "@/components/listing/vehicle-buying-guide";
 import { VehicleDossier } from "@/components/listing/vehicle-dossier";
 import { RentalGuide } from "@/components/listing/rental-guide";
 import { RentalTerms } from "@/components/listing/rental-terms";
+import { ListingAvailability } from "@/components/rental/listing-availability";
 import { Gallery } from "@/components/listing/gallery";
 import { JsonLd } from "@/components/listing/json-ld";
 import { ExampleBanner, ExampleContactNotice } from "@/components/listing/example-banner";
@@ -267,6 +268,7 @@ export default async function ListingPage({ params }: { params: Params }) {
             <CriteriaSection title={t("criteriaTitle")} subcategoryId={listing.subcategoryId} attributes={listing.attributes} condition={listing.condition} exclude={realEstate ? PROPERTY_TERM_FIELDS : undefined} />
             <VehicleDossier subcategoryId={listing.subcategoryId} attributes={listing.attributes} />
             <RentalTerms subcategoryId={listing.subcategoryId} attributes={listing.attributes} locale={locale} />
+            {listing.rental ? <ListingAvailability rental={listing.rental} locale={locale} /> : null}
 
             <section aria-labelledby="description-title" className="flex flex-col gap-3">
               <h2 id="description-title" className="text-lg font-semibold">

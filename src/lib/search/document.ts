@@ -5,6 +5,7 @@ import type { ListingStatus, ModerationState } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import ar from "../../../messages/ar.json";
 import fr from "../../../messages/fr.json";
+import { blockedDays, freshUntil, moroccoToday } from "@/lib/listings/rental-availability";
 import { foldDigits } from "./normalize";
 import { districtKey } from "./params";
 import { SEARCH_DESCRIPTION_MAX, SITEMAP_SHARDS, attributeField, sitemapShardOf, type SearchDocument } from "./types";
@@ -165,6 +166,8 @@ export function toSearchDocument(listing: ListingRecord, now: Date = new Date())
   const photo = listing.photos[0];
   const featuredUntil = listing.boosts.featuredUntil?.getTime();
   const price = listing.price !== null && !listing.isDonation ? listing.price : undefined;
+  // Car rentals (rental pack §4): blocked days from today on, and the end of the fresh window.
+  const rentalDays = listing.rental ? blockedDays(listing.rental.unavailable, moroccoToday(now)) : [];
 
   return {
     id: listing.id,
@@ -195,6 +198,8 @@ export function toSearchDocument(listing: ListingRecord, now: Date = new Date())
     isBumped: listing.sortSource === "bump",
     ...(featuredUntil !== undefined && featuredUntil > now.getTime() ? { featuredUntil } : {}),
     ...(listing.example ? { isExample: true as const } : {}),
+    ...(rentalDays.length ? { rentUnavailableDays: rentalDays } : {}),
+    ...(listing.rental ? { rentFreshUntil: freshUntil(listing.rental.updatedAt) } : {}),
     _geo: { lat: roundGeo(location.geo.lat), lng: roundGeo(location.geo.lng) },
     version: listing.version,
     ...attributes,

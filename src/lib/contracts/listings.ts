@@ -3,6 +3,7 @@ import { CONDITIONS, categoryById, subcategoryById } from "@/config/categories";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
 import { MAX_PHOTOS_PRO, uploadIdSchema, type ListingPhoto, type UploadRejectReason, type UploadStatus } from "@/lib/contracts/media";
 import { LISTING_ID_PATTERN, SLUG_ID_MAX, SLUG_ID_PATTERN } from "@/lib/listings/ids";
+import { DAY_PATTERN, RENTAL_PERIODS_MAX, type RentalPeriod } from "@/lib/listings/rental-availability";
 
 // Shared client/server contracts of the listings API (phase 3, design §3). Imported by the wizard
 // (react-hook-form + zodResolver) and by the route handlers: one validation, same messages.
@@ -158,7 +159,27 @@ export const publishListingSchema = z
   .strict();
 export type PublishListingInput = z.infer<typeof publishListingSchema>;
 
+/** A blocked period of a car rental (rental pack §3): Morocco days, bounds included. */
+export const rentalPeriodSchema = z.object({ from: z.string().regex(DAY_PATTERN), to: z.string().regex(DAY_PATTERN) }).strict();
+
+/**
+ * PUT /api/listings/{id}/availability: every blocked period (replaces them), merged and trimmed
+ * server-side. `since` is the `updatedAt` the calendar was opened with (null: never set): another
+ * save meanwhile answers 409 `conflict`. Unchanged periods confirm the availability ("Tout est à jour").
+ */
+export const rentalAvailabilityInputSchema = z
+  .object({ unavailable: z.array(rentalPeriodSchema).max(RENTAL_PERIODS_MAX * 2), since: z.string().datetime().nullable() })
+  .strict();
+export type RentalAvailabilityInput = z.infer<typeof rentalAvailabilityInputSchema>;
+
 /** Answers. Dates are ISO 8601 strings. */
+
+/** A car rental's declared availability; `updatedAt` null until the agency first saves it. */
+export interface RentalAvailability {
+  unavailable: RentalPeriod[];
+  updatedAt: string | null;
+}
+export type RentalAvailabilityResponse = { rental: RentalAvailability };
 export interface FieldIssue {
   /** Dotted path in the listing ("title", "attributes.year", "photos"). */
   path: string;
@@ -197,6 +218,8 @@ export interface OwnerListingSummary {
   expiresAt: string | null;
   /** Expired before purge, or published with less than 7 days left (D16). */
   canRenew: boolean;
+  /** Car rentals only: the blocked periods the availability calendar edits. */
+  rental?: RentalAvailability;
 }
 
 export interface OwnerListing {

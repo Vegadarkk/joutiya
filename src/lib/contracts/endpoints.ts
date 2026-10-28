@@ -54,6 +54,8 @@ export const LISTING_API = {
   renew: (id: string) => `/api/listings/${id}/renew`,
   /** POST, answer `Cache-Control: no-store`. */
   phone: (id: string) => `/api/listings/${id}/phone`,
+  /** PUT a car rental's blocked periods (rental pack §3). */
+  availability: (id: string) => `/api/listings/${id}/availability`,
 } as const;
 
 // Phase 5 (design phase-5 §3, §4).

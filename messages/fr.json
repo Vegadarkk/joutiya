@@ -4399,5 +4399,42 @@
       "saved": "Vos réglages sont enregistrés.",
       "submit": "Enregistrer"
     }
+  },
+  "Rental": {
+    "calendar": {
+      "previous": "Mois précédent",
+      "next": "Mois suivant",
+      "past": "hors calendrier",
+      "blocked": "indisponible",
+      "free": "disponible",
+      "legendFree": "Disponible",
+      "legendBlocked": "Indisponible"
+    },
+    "availability": {
+      "open": "Disponibilités",
+      "openOf": "Disponibilités de « {title} »",
+      "title": "Disponibilités de « {title} »",
+      "hint": "Touchez le premier puis le dernier jour d'une période pour la bloquer. Une période qui commence sur un jour bloqué le libère. Un jour bloqué veut dire qu'aucun véhicule de cette annonce n'est libre.",
+      "updatedOn": "Disponibilités à jour, confirmées le {date}",
+      "stale": "À confirmer : dernière mise à jour le {date}. Les locataires voient « disponibilité à confirmer ».",
+      "never": "Disponibilités jamais renseignées : les locataires voient « disponibilité à confirmer ».",
+      "anchor": "Touchez maintenant le dernier jour de la période.",
+      "summaryNone": "Aucune période bloquée.",
+      "summary": "{count, plural, one {# période bloquée.} other {# périodes bloquées.}}",
+      "tooMany": "Au plus {max} périodes : regroupez des jours proches.",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "confirm": "Tout est à jour",
+      "saved": "Disponibilités enregistrées.",
+      "confirmed": "Disponibilités confirmées.",
+      "conflict": "Le calendrier a changé entre-temps. Rouvrez-le pour voir la dernière version."
+    },
+    "listing": {
+      "title": "Disponibilités",
+      "updatedOn": "Déclarées par l'agence, mises à jour le {date}.",
+      "stale": "Disponibilité à confirmer avec l'agence (dernière mise à jour le {date}).",
+      "never": "Disponibilité à confirmer avec l'agence.",
+      "note": "Indication de l'agence, sans engagement : la réservation se confirme avec elle."
+    }
   }
 }

@@ -11,9 +11,12 @@ vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 import { POST as create } from "@/app/api/listings/route";
 import { PATCH as patch } from "@/app/api/listings/[id]/route";
 import { POST as publish } from "@/app/api/listings/[id]/publish/route";
+import { PUT as putAvailability } from "@/app/api/listings/[id]/availability/route";
 import { DEFAULT_PRICING } from "@/config/pricing";
-import type { CreateListingResponse, FieldIssue } from "@/lib/contracts/listings";
+import type { CreateListingResponse, FieldIssue, RentalAvailabilityResponse } from "@/lib/contracts/listings";
 import { getListing } from "@/lib/db/repositories/listings";
+import { getSearchOutbox } from "@/lib/db/repositories/search-outbox";
+import { dayString, moroccoToday } from "@/lib/listings/rental-availability";
 import { proProfileRef, proProfileToFirestore } from "@/lib/db/repositories/pro-profiles";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { resetServerEnv } from "@/lib/env";
@@ -113,5 +116,55 @@ describe("car rental publication", () => {
     const held = await api<PublishBody>(publish, "POST", `/api/listings/${driven}/publish`, { member: owner, body: { ...ACCEPT, rentalAttestation: true } });
     expect(held.status).toBe(200);
     expect(held.body).toMatchObject({ status: "pending_review", flags: ["rental_review"] });
+  });
+});
+
+describe("car rental availability", () => {
+  const day = (offset: number) => dayString(moroccoToday(new Date()) + offset);
+  const put = (owner: Member, id: string, body: unknown) => api<RentalAvailabilityResponse & ErrorBody & { error: { details?: FieldIssue[] } }>(putAvailability, "PUT", `/api/listings/${id}/availability`, { member: owner, body });
+
+  it("stores merged periods, re-indexes a published rental and refuses a stale calendar", async () => {
+    const owner = await agency();
+    const id = await rentalDraft(owner);
+    expect((await api<PublishBody>(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: { ...ACCEPT, rentalAttestation: true } })).body.status).toBe("published");
+    const before = (await getListing(id))?.version ?? 0;
+
+    const saved = await put(owner, id, {
+      unavailable: [
+        { from: day(5), to: day(8) },
+        { from: day(9), to: day(10) },
+        { from: day(-4), to: day(-1) },
+      ],
+      since: null,
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.body.rental.unavailable).toEqual([{ from: day(5), to: day(10) }]);
+    const stored = await getListing(id);
+    expect(stored?.rental?.unavailable).toEqual([{ from: day(5), to: day(10) }]);
+    expect(stored?.version).toBe(before + 1);
+    expect((await getSearchOutbox(id))?.version).toBe(before + 1);
+
+    // A calendar opened before that save is refused; the current one confirms unchanged days.
+    expect((await put(owner, id, { unavailable: [], since: null })).status).toBe(409);
+    const confirmed = await put(owner, id, { unavailable: saved.body.rental.unavailable, since: saved.body.rental.updatedAt });
+    expect(confirmed.status).toBe(200);
+    expect(confirmed.body.rental.unavailable).toEqual([{ from: day(5), to: day(10) }]);
+  });
+
+  it("refuses days past the horizon, another member's rental and a listing that is not a rental", async () => {
+    const owner = await agency();
+    const id = await rentalDraft(owner);
+    const far = await put(owner, id, { unavailable: [{ from: day(10), to: day(400) }], since: null });
+    expect(far.status).toBe(422);
+    expect(far.body.error.details).toEqual([{ path: "unavailable", code: "too_far" }]);
+    expect((await put(owner, id, { unavailable: [{ from: day(3), to: day(1) }], since: null })).status).toBe(422);
+
+    const stranger = await agency();
+    expect((await put(stranger, id, { unavailable: [], since: null })).status).toBe(404);
+
+    const bike = await api<CreateListingResponse>(create, "POST", "/api/listings", { member: owner, body: {} });
+    await api<ListingBody>(patch, "PATCH", `/api/listings/${bike.body.id}`, { member: owner, body: readyPatch() });
+    const refused = await put(owner, bike.body.id, { unavailable: [], since: null });
+    expect(refused.status).toBe(409);
   });
 });

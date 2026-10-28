@@ -60,6 +60,10 @@ export interface SearchDocument {
   featuredUntil?: number;
   /** Example listing (src/lib/demo): labelled card, no contact; out of the sitemap (`sitemapShard` out of range). */
   isExample?: true;
+  /** Car rental: blocked day numbers (days since 1970-01-01, Morocco) from the indexing day on (rental pack §4). */
+  rentUnavailableDays?: number[];
+  /** Car rental: epoch ms until which the availability counts as up to date (last save + 14 days). */
+  rentFreshUntil?: number;
   /** Rounded city (later district) centroid. */
   _geo: { lat: number; lng: number };
   version: number;

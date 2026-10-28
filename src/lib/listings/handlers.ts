@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "@/lib/zod";
 import { requireUser, type AuthContext } from "@/lib/auth/guards";
 import { applyDevice, applyTurnstilePass, deviceOf, jsonResponse } from "@/lib/auth/respond";
-import { OWNER_LIST_BUCKETS, createListingSchema, listingPatchSchema, publishListingSchema, type CreateListingResponse, type ListingResponse, type OwnerListingsResponse } from "@/lib/contracts/listings";
+import { OWNER_LIST_BUCKETS, createListingSchema, listingPatchSchema, publishListingSchema, rentalAvailabilityInputSchema, type CreateListingResponse, type ListingResponse, type OwnerListingsResponse, type RentalAvailabilityResponse } from "@/lib/contracts/listings";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
 import { getListing, listOwnerListings } from "@/lib/db/repositories/listings";
 import { getFlags } from "@/lib/config/runtime";
@@ -12,6 +12,7 @@ import { json, noContent } from "@/lib/http/route";
 import { assertQuotas, DEPOSIT_QUOTAS } from "@/lib/quota/gate";
 import { requestIdentity } from "@/lib/rate-limit/keys";
 import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
+import { setRentalAvailability } from "./availability";
 import { isListingId } from "./ids";
 import { ownerListingView, toOwnerSummary } from "./owner-view";
 import { revealPhone } from "./phone-reveal";
@@ -154,4 +155,15 @@ export async function handlePhone(request: Request, params: Params): Promise<Res
   const outcome = await revealPhone(auth, request, id, { turnstileToken: input.turnstileToken, device });
   const response = applyDevice(jsonResponse(outcome.response), device);
   return outcome.turnstilePassed ? applyTurnstilePass(response, device) : response;
+}
+
+/** PUT /api/listings/{id}/availability: a car rental's blocked periods (rental pack §3). */
+export async function handleAvailability(request: Request, params: Params): Promise<Response> {
+  const auth = await requireUser(request, { mutation: true });
+  const id = await listingIdOf(params);
+  const input = await readJson(request, rentalAvailabilityInputSchema);
+  await enforceLimit("rental.availability.uid", auth.user.uid);
+  await assertQuotas(DEPOSIT_QUOTAS);
+  const body: RentalAvailabilityResponse = { rental: await setRentalAvailability(auth, id, input) };
+  return json(body);
 }

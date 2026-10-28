@@ -118,6 +118,7 @@ describe("toPublicListing", () => {
       contact: { showPhone: true, whatsapp: false },
       seller: { publicId: "abcdefghjk", name: "Salma", type: "individual" },
       example: false,
+      rental: null,
       publishedAt: NOW.toISOString(),
       sortAt: NOW.toISOString(),
       updatedAt: NOW.toISOString(),
