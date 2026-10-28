@@ -2802,7 +2802,7 @@
     "retry": "Réessayer",
     "intro": {
       "title": "Ouvrir une boutique Pro sur Joutiya",
-      "lead": "Pour les sociétés, commerçants et auto-entrepreneurs : une boutique à votre nom, des annonces marquées Pro et des quotas adaptés à votre activité.",
+      "lead": "Pour les sociétés, coopératives, commerçants et auto-entrepreneurs : une boutique à votre nom, des annonces marquées Pro et des quotas adaptés à votre activité.",
       "offer": "L'offre Essentiel est offerte aux boutiques validées jusqu'à l'ouverture des ventes. Vous serez prévenu {days} jours avant tout paiement.",
       "how": "Nous vérifions vos identifiants (ICE, registre) et une pièce justificative avant d'ouvrir la boutique, en général sous deux jours ouvrés."
     },
@@ -2831,7 +2831,8 @@
       "forms": {
         "societe": "Société (SARL, SA…)",
         "auto_entrepreneur": "Auto-entrepreneur",
-        "commercant": "Commerçant personne physique"
+        "commercant": "Commerçant personne physique",
+        "cooperative": "Coopérative"
       },
       "ice": "ICE",
       "iceHint": "Identifiant commun de l'entreprise : 15 chiffres.",
@@ -2839,8 +2840,9 @@
       "if": "Identifiant fiscal (IF)",
       "aeNumber": "Numéro d'auto-entrepreneur",
       "tp": "Numéro de taxe professionnelle (TP)",
+      "coopNumber": "Numéro d'immatriculation au registre des coopératives",
       "rcOrTp": "Indiquez le RC ou la taxe professionnelle.",
-      "piecesLead": "Ajoutez de 1 à {max} documents : extrait du registre de commerce (modèle J), attestation d'auto-entrepreneur ou de taxe professionnelle. Pas de copie de carte d'identité : si un document porte votre numéro de CNIE, masquez-le avant l'envoi. Formats acceptés : PDF, JPEG ou PNG, 10 Mo au plus chacun.",
+      "piecesLead": "Ajoutez de 1 à {max} documents : extrait du registre de commerce (modèle J), attestation d'auto-entrepreneur ou de taxe professionnelle, certificat d'immatriculation de la coopérative. Pas de copie de carte d'identité : si un document porte votre numéro de CNIE, masquez-le avant l'envoi. Formats acceptés : PDF, JPEG ou PNG, 10 Mo au plus chacun.",
       "piecesNotice": "Ces documents servent uniquement à vérifier votre activité professionnelle. Seuls nos modérateurs les consultent et chaque consultation est journalisée. Ils sont hébergés hors du Maroc, conservés le temps de la vérification, puis supprimés 6 mois après la fermeture de votre boutique ou le refus de la demande. Vous pouvez demander à y accéder ou à les faire supprimer à tout moment : <link>politique de confidentialité</link>.",
       "addPiece": "Ajouter un document",
       "removePiece": "Retirer {name}",
@@ -2875,7 +2877,8 @@
       "legalFormHint": {
         "societe": "ICE, RC et identifiant fiscal.",
         "auto_entrepreneur": "ICE et numéro d'auto-entrepreneur.",
-        "commercant": "ICE, et RC ou taxe professionnelle."
+        "commercant": "ICE, et RC ou taxe professionnelle.",
+        "cooperative": "ICE et numéro d'immatriculation au registre des coopératives."
       }
     },
     "pending": {
