@@ -1,9 +1,10 @@
 import { ApiError, apiDelete, apiGet, apiPost, uploadToPresignedUrl, type UploadProgress } from "@/lib/auth/client";
 import { KYBC_DECLARED_TYPES, MAX_UPLOAD_BYTES, type KybcDeclaredType } from "@/lib/contracts/media";
+import { STOCK_API, type StockImportMode, type StockImportResponse, type StockListResponse } from "@/lib/contracts/stock-import";
 import { PRO_API, type KybcCompleteResponse, type KybcSignResponse, type ProApplyInput, type ProApplyResponse, type ProMeResponse } from "@/lib/contracts/pro";
 
 // Browser side of /api/pro/** (phase 7 design §4): the Pro area state, one KYBC piece end to end
-// (sign, PUT to the presigned URL with progress, complete) and the application.
+// (sign, PUT to the presigned URL with progress, complete), the application and the stock import.
 
 export const loadProMe = () => apiGet<ProMeResponse>(PRO_API.me);
 
@@ -26,3 +27,9 @@ export async function uploadKybcPiece(file: File, onProgress?: UploadProgress, s
 
 /** Removes a piece the wizard no longer lists (a piece of an application under review is refused: 409). */
 export const removeKybcPiece = (uploadId: string) => apiDelete(PRO_API.kybcDelete(uploadId));
+
+/** The shop's listings with a stock reference (Concession pack). */
+export const loadStock = () => apiGet<StockListResponse>(STOCK_API.list);
+
+/** Preview (nothing written) or apply of a stock file, sent as text. */
+export const importStockFile = (mode: StockImportMode, csv: string) => apiPost<StockImportResponse>(STOCK_API.import, { mode, csv });

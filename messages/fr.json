@@ -2877,7 +2877,8 @@
       "grace_title": "Paiement à régulariser",
       "downgraded": "Boutique sans offre",
       "quotasTitle": "Vos quotas",
-      "shortcuts": "Raccourcis"
+      "shortcuts": "Raccourcis",
+      "stockImport": "Importer mon stock"
     },
     "errors": {
       "pro_signup_closed": "Les demandes de compte Pro sont fermées pour le moment.",
@@ -3568,5 +3569,124 @@
     "read": "Lire les CGU",
     "acknowledge": "J'ai compris",
     "failed": "L'enregistrement a échoué. Réessayez."
+  },
+  "StockImport": {
+    "metaTitle": "Importer mon stock",
+    "title": "Importer mon stock",
+    "lead": "Mettez en ligne tout votre parc depuis un tableur : un fichier CSV, une ligne par véhicule, la référence de stock comme clé. Un nouvel envoi met à jour les annonces existantes.",
+    "back": "Espace Pro",
+    "notPro": {
+      "title": "L'import de stock est réservé aux boutiques Pro vérifiées",
+      "body": "Il s'ouvre dès que votre boutique est vérifiée et publie sous une offre Pro.",
+      "link": "Voir mon espace Pro"
+    },
+    "file": {
+      "title": "Votre fichier",
+      "lead": "CSV en UTF-8 ou exporté d'Excel (virgule, point-virgule ou tabulation), {rows} lignes au plus.",
+      "template": "Télécharger le modèle",
+      "pick": "Choisir un fichier CSV",
+      "hint": "Ou glissez-le ici. Rien n'est enregistré avant votre confirmation.",
+      "chosen": "Fichier analysé : {name}. Choisissez-en un autre pour recommencer.",
+      "columnsTitle": "Colonnes reconnues",
+      "columns": "reference (obligatoire, unique), categorie (Voitures par défaut, Utilitaires & camions, Motos & scooters), titre, description, prix, negociable, ville, quartier, etat, puis les critères par leur nom : marque, modele, annee, kilometrage, carburant, boite, puissance fiscale, origine, carrosserie, portes, couleur, premiere main, carnet, non accidente, papiers, garantie, duree garantie, reprise, financement, equipements. Les valeurs acceptent le libellé du site (« Diesel », « Caméra de recul ») ; plusieurs choix se séparent par « | ». Une cellule vide garde la valeur déjà sur le site.",
+      "errors": {
+        "too_large": "Ce fichier dépasse 1 Mo : découpez-le en plusieurs fichiers.",
+        "not_csv": "Ce fichier n'est pas un CSV. Dans votre tableur, choisissez « Enregistrer sous », format CSV."
+      }
+    },
+    "csvErrors": {
+      "empty": "Le fichier ne contient aucune ligne de véhicule sous l'en-tête.",
+      "unclosed_quote": "Un guillemet ouvert ligne {line} n'est jamais fermé : corrigez la cellule puis renvoyez le fichier.",
+      "too_many_rows": "Le fichier dépasse 300 lignes (ligne {line}) : découpez-le en plusieurs fichiers."
+    },
+    "preview": {
+      "title": "Vérifier",
+      "lead": "Voici ce que l'import fera, ligne par ligne. Corrigez les erreurs dans votre fichier et renvoyez-le, ou importez les lignes valides maintenant.",
+      "summary": "Résumé de l'import",
+      "ignored": "Colonnes ignorées : {columns}.",
+      "errorsOnly": "Afficher seulement les lignes à corriger",
+      "line": "Ligne",
+      "ref": "Référence",
+      "vehicle": "Véhicule",
+      "action": "Action",
+      "changes": "Modifie : {fields}",
+      "issue": "{column} : {message}",
+      "apply": "Importer {count, plural, one {# ligne} other {# lignes}}",
+      "remaining": "Place pour {count, plural, one {# nouveau brouillon} other {# nouveaux brouillons}} sous votre offre",
+      "done": "Import terminé : {created, plural, one {# brouillon créé} other {# brouillons créés}}, {updated, plural, one {# annonce mise à jour} other {# annonces mises à jour}}."
+    },
+    "actions": {
+      "create": "Nouveau",
+      "update": "Mise à jour",
+      "unchanged": "Inchangé",
+      "error": "À corriger",
+      "createCount": "{count, plural, one {# nouvelle} other {# nouvelles}}",
+      "updateCount": "{count, plural, one {# mise à jour} other {# mises à jour}}",
+      "unchangedCount": "{count, plural, one {# inchangée} other {# inchangées}}",
+      "errorCount": "{count, plural, one {# à corriger} other {# à corriger}}"
+    },
+    "fields": {
+      "subcategoryId": "catégorie",
+      "title": "titre",
+      "description": "description",
+      "price": "prix",
+      "priceNegotiable": "prix négociable",
+      "condition": "état",
+      "attributes": "caractéristiques",
+      "location": "ville"
+    },
+    "codes": {
+      "ref_required": "référence manquante",
+      "ref_invalid": "référence invalide (lettres, chiffres, - _ . /, 40 caractères au plus)",
+      "ref_duplicate": "référence déjà présente plus haut dans le fichier",
+      "category_unknown": "catégorie non importable (voitures, utilitaires, motos)",
+      "value_unknown": "valeur non reconnue",
+      "number_invalid": "nombre invalide ou hors limites",
+      "required": "obligatoire",
+      "city_unknown": "ville inconnue",
+      "price_invalid": "prix invalide",
+      "too_long": "trop long",
+      "pro_only": "réservé aux Pros",
+      "status_locked": "annonce vendue ou retirée, plus modifiable",
+      "quota": "plus de place sous votre offre",
+      "description_short": "description courte : à compléter avant publication",
+      "title_generated": "titre créé à partir de la marque, du modèle et de l'année",
+      "column_ignored": "ignoré, la colonne dont il dépend ne l'ouvre pas",
+      "failed": "non enregistré, réessayez"
+    },
+    "photos": {
+      "title": "Photos",
+      "lead": "Nommez chaque photo d'après la référence : DUS-041.jpg, DUS-041-2.jpg, DUS-041-3.jpg… Elles sont rangées dans l'ordre de leur numéro et vérifiées comme toutes les photos du site.",
+      "empty": "Importez d'abord un fichier : les photos se rangent sous les références de votre stock.",
+      "pick": "Choisir les photos",
+      "hint": "Sélectionnez ou glissez toutes les photos d'un coup (JPEG, PNG, WebP, HEIC).",
+      "matched": "{photos, plural, one {# photo reconnue} other {# photos reconnues}} pour {listings, plural, one {# annonce} other {# annonces}}",
+      "count": "{count, plural, one {# photo} other {# photos}}",
+      "extra": "{count, plural, one {# photo de trop} other {# photos de trop}} ({max} au plus par annonce)",
+      "unmatched": "{count, plural, one {# fichier ne correspond} other {# fichiers ne correspondent}} à aucune référence : {names}",
+      "send": "Envoyer {count, plural, one {# photo} other {# photos}}",
+      "clear": "Vider la sélection",
+      "progress": "Photo {done} sur {total}…",
+      "outcome": "{sent, plural, one {# photo ajoutée} other {# photos ajoutées}}, {refused, plural, one {# refusée} other {# refusées}} par la vérification, {failed, plural, one {# échec} other {# échecs}}."
+    },
+    "publish": {
+      "title": "Publier",
+      "lead": "Les brouillons complets, avec au moins une photo, sont publiés un par un sous les limites de votre offre. Ceux qui manquent d'une information restent en brouillon.",
+      "empty": "Aucun brouillon de stock à publier.",
+      "drafts": "{ready, plural, one {# brouillon prêt} other {# brouillons prêts}}, {missing, plural, one {# sans photo} other {# sans photo}}.",
+      "rules": "Je confirme que ces annonces respectent les <cgu>conditions d'utilisation</cgu> et la <interdits>liste des objets interdits</interdits>.",
+      "send": "Publier {count, plural, one {# brouillon} other {# brouillons}}",
+      "progress": "Publication {done} sur {total}…",
+      "outcome": "{published, plural, one {# annonce en ligne} other {# annonces en ligne}}, {pending_review, plural, one {# en vérification} other {# en vérification}}, {incomplete, plural, one {# incomplète} other {# incomplètes}}, {failed, plural, one {# échec} other {# échecs}}.",
+      "incomplete": "{count, plural, one {# brouillon à compléter} other {# brouillons à compléter}}"
+    },
+    "absent": {
+      "title": "Véhicules absents du fichier",
+      "lead": "Ces annonces en ligne n'apparaissent plus dans votre dernier fichier. Rien n'est retiré automatiquement : marquez comme vendus ceux qui ont quitté votre parc.",
+      "empty": "Toutes vos annonces en ligne figurent dans le fichier.",
+      "markOne": "Marquer vendu",
+      "markAll": "Tout marquer vendu ({count})",
+      "done": "Vendu"
+    }
   }
 }

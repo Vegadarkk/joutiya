@@ -2,15 +2,18 @@ import "server-only";
 import { requireUser } from "@/lib/auth/guards";
 import { uploadIdSchema } from "@/lib/contracts/media";
 import { kybcSignSchema, proApplySchema, type ProApplyResponse } from "@/lib/contracts/pro";
+import { STOCK_IMPORT_BODY_MAX_BYTES, stockImportRequestSchema } from "@/lib/contracts/stock-import";
 import { serverEnv } from "@/lib/env";
 import { HttpError, notFound } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { json, noContent } from "@/lib/http/route";
+import { assertQuotas, DEPOSIT_QUOTAS } from "@/lib/quota/gate";
 import { requestIdentity } from "@/lib/rate-limit/keys";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 import { completeKybcUpload, deleteKybcUpload, signKybcUpload } from "./kybc-uploads";
 import { proSelf, submitApplication } from "./service";
+import { importStock, stockList } from "./stock-import/service";
 
 // Route handlers of /api/pro/** (phase 7 design §4): requireUser (Origin + CSRF on mutations),
 // strict body, per-account limiter before the first Firestore read, Turnstile on the application.
@@ -58,4 +61,24 @@ export async function handleMe(request: Request): Promise<Response> {
   const auth = await requireUser(request);
   await enforceLimit("pro.read.uid", auth.user.uid);
   return json(await proSelf(auth));
+}
+
+/** GET /api/pro/stock: the shop's listings with a stock reference (Concession pack). */
+export async function handleStock(request: Request): Promise<Response> {
+  const auth = await requireUser(request);
+  await enforceLimit("listing.owner.read.uid", auth.user.uid);
+  return json(await stockList(auth));
+}
+
+/**
+ * POST /api/pro/stock/import: preview (20 a day, writes nothing) or apply (10 a day, under the
+ * deposit quota gate) of a stock file; the listings read are charged to listing.owner.read.uid.
+ */
+export async function handleStockImport(request: Request): Promise<Response> {
+  const auth = await requireUser(request, { mutation: true });
+  const input = await readJson(request, stockImportRequestSchema, STOCK_IMPORT_BODY_MAX_BYTES);
+  await enforceLimit(input.mode === "apply" ? "pro.import.uid" : "pro.import.preview.uid", auth.user.uid);
+  if (input.mode === "apply") await assertQuotas(DEPOSIT_QUOTAS);
+  await enforceLimit("listing.owner.read.uid", auth.user.uid);
+  return json(await importStock({ auth, ip: requestIdentity(request.headers).ip }, input));
 }

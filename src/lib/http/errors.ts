@@ -104,6 +104,8 @@ export type ErrorCode =
   | "no_billing_customer"
   /** A webhook whose signature does not match (400, Stripe's expected answer). */
   | "invalid_signature"
+  /** A stock import file that is no CSV (empty, unclosed quote, over 300 lines; 400; details: { reason, line }). Messages: StockImport.errors. */
+  | "invalid_csv"
     /** Firestore daily quota degraded (src/lib/quota/gate.ts): deposit or sign-up suspended until the reset. */
   | "quota_exhausted"
   // Messaging, reports, appeals, assistant (phase 5). Messages: Messaging.errors / Report.errors.
