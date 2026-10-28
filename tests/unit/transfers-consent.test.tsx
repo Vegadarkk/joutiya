@@ -9,9 +9,13 @@ import fr from "../../messages/fr.json";
 import { ConsentFields, TRANSFER_PROVIDERS, TransfersDetails } from "@/components/auth/consent-fields";
 import { TransfersReconsent } from "@/components/auth/transfers-reconsent";
 import { RATE_LIMITS } from "@/config/rate-limits";
-import { LEGAL_TEXTS } from "@/content/legal/fr";
+import { DEFAULT_LEGAL } from "@/config/legal";
+import { LEGAL_VERSIONS } from "@/config/legal-versions";
 import { transfersConsentVersion } from "@/lib/auth/consent-version";
 import { needsTransfersReconsent } from "@/lib/auth/consents";
+import { legalSource } from "@/lib/legal/sources";
+import { renderTemplate } from "@/lib/legal/template";
+import { legalScope } from "@/lib/legal/values";
 import { PublicConfigProvider } from "@/lib/config/client";
 import type { PublicConfig } from "@/lib/config/public-types";
 import type { ServerEnv } from "@/lib/env";
@@ -109,7 +113,9 @@ describe("transfers consent text", () => {
 
   it("names every US recipient of the privacy policy", () => {
     const names = TRANSFER_PROVIDERS.us.map(([name]) => name).join(" ");
-    const privacy = JSON.stringify(LEGAL_TEXTS.confidentialite.sections.find((section) => section.id === "destinataires"));
+    // The privacy policy with every switch on (Meta is named only once WhatsApp is live, D24).
+    const { text } = renderTemplate(legalSource("confidentialite", "fr"), legalScope(DEFAULT_LEGAL, { whatsapp: true, ads: true, adsCmpEea: true }, LEGAL_VERSIONS.confidentialite, "fr"));
+    const privacy = text.slice(text.indexOf("{#destinataires}"), text.indexOf("{#transferts}"));
     for (const provider of ["Google", "Cloudflare", "Anthropic", "OpenAI", "Meta", "Resend", "Stripe", "RevenueCat"]) {
       expect(names, provider).toContain(provider);
       expect(privacy, provider).toContain(provider);

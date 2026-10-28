@@ -116,8 +116,8 @@
     "provisionalTitle": "Version provisoire",
     "provisionalBody": "Ce texte sera finalisé avant l'ouverture du site. Il décrit déjà les règles qui s'appliqueront.",
     "frenchPrevails": "Les textes légaux font foi en français.",
-    "updated": "Mise à jour : {date}",
-    "contents": "Sommaire"
+    "contents": "Sommaire",
+    "frenchOnly": "Ce texte n'existe qu'en français pour le moment. Il fait foi."
   },
   "Help": {
     "metaTitle": "Centre d'aide",

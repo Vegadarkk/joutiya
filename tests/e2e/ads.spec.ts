@@ -143,15 +143,23 @@ async function adsOn(page: Page, baseURL: string, { country, choice }: AdsSetup)
   return requests;
 }
 
+/**
+ * Slots inside #main only: React reveals a streamed page a moment after the load event, and until
+ * then a hidden copy of it waits at the end of <body>.
+ */
+const main = (page: Page) => page.locator("#main");
+
 const cls = (page: Page) => page.evaluate(() => (window as unknown as { __cls: number }).__cls);
 
 test.describe("ad slots", () => {
   test.use({ contextOptions: { reducedMotion: "reduce" } });
+  // A late /api/config fetch can still be in a route handler when the test ends.
+  test.afterEach(({ page }) => page.unrouteAll({ behavior: "ignoreErrors" }));
 
   test("search: a consenting visitor outside the EEA gets the in-feed ad after the 6th card, filled late without a shift", { tag: "@mobile" }, async ({ page, baseURL }) => {
     const requests = await adsOn(page, baseURL!, { country: "MA", choice: { ads: true, perso: false } });
     await page.goto(`/fr/recherche?q=${WORD}`);
-    const grid = page.getByRole("region", { name: "Résultats" }).getByTestId("results-grid");
+    const grid = main(page).getByRole("region", { name: "Résultats" }).getByTestId("results-grid");
     await expect(grid.locator(":scope > li")).toHaveCount(RESULTS + 1);
     const infeed = grid.locator('[data-ad-slot="search-infeed"]');
     await expect(infeed).toHaveCount(1);
@@ -172,7 +180,7 @@ test.describe("ad slots", () => {
   test("search: a refusal or an EEA visitor sends no AdSense request and keeps the house promotions", async ({ page, baseURL }) => {
     const requests = await adsOn(page, baseURL!, { country: "MA", choice: { ads: false, perso: false } });
     await page.goto(`/fr/recherche?q=${WORD}`);
-    const infeed = page.locator('[data-ad-slot="search-infeed"]');
+    const infeed = main(page).locator('[data-ad-slot="search-infeed"]');
     await expect(infeed).toHaveAttribute("data-ad-state", "promo");
     await expect(infeed).toHaveAttribute("aria-label", "À découvrir sur Joutiya");
     await page.waitForLoadState("networkidle");
@@ -181,7 +189,7 @@ test.describe("ad slots", () => {
     const eea = await page.context().newPage();
     const eeaRequests = await adsOn(eea, baseURL!, { country: "FR", choice: { ads: true, perso: true } });
     await eea.goto(`/fr/recherche?q=${WORD}`);
-    await expect(eea.locator('[data-ad-slot="search-infeed"]')).toHaveAttribute("data-ad-state", "promo");
+    await expect(main(eea).locator('[data-ad-slot="search-infeed"]')).toHaveAttribute("data-ad-state", "promo");
     await eea.waitForLoadState("networkidle");
     expect(eeaRequests).toEqual([]);
   });
@@ -189,7 +197,7 @@ test.describe("ad slots", () => {
   test("listing: a blocked loader gives the slot back to the house promotion, at the same height", { tag: "@mobile" }, async ({ page, baseURL }) => {
     await adsOn(page, baseURL!, { country: "MA", choice: { ads: true, perso: true } });
     await page.goto(`/fr/annonce/${listingSlug}`);
-    const slot = page.locator('[data-ad-slot="listing-bottom"]');
+    const slot = main(page).locator('[data-ad-slot="listing-bottom"]');
     await expect(slot).toHaveAttribute("data-ad-eligible", "true");
     await slot.scrollIntoViewIfNeeded();
     await expect(slot).toHaveAttribute("data-ad-state", "promo", { timeout: 8000 });
@@ -201,12 +209,12 @@ test.describe("ad slots", () => {
   test("home: the leaderboard shows on desktop only, and Tarifit pages never ask for an ad", async ({ page, baseURL }) => {
     const requests = await adsOn(page, baseURL!, { country: "MA", choice: { ads: true, perso: true } });
     await page.goto(`/rif/recherche?q=${WORD}`);
-    await expect(page.locator('[data-ad-slot="search-infeed"]')).toHaveAttribute("data-ad-state", "promo");
+    await expect(main(page).locator('[data-ad-slot="search-infeed"]')).toHaveAttribute("data-ad-state", "promo");
     await page.waitForLoadState("networkidle");
     expect(requests).toEqual([]);
 
     await page.goto("/fr");
-    const leaderboard = page.locator('[data-ad-slot="home-leaderboard"]');
+    const leaderboard = main(page).locator('[data-ad-slot="home-leaderboard"]');
     await expect(leaderboard).toBeVisible();
     expect((await leaderboard.boundingBox())?.height).toBe(110);
     await page.setViewportSize({ width: 412, height: 915 });
