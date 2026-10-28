@@ -6,7 +6,7 @@ import { z } from "@/lib/zod";
 // normalised and bounded: their exact formats are not checked automatically (no official source
 // read yet), the moderator verifies them with the uploaded pieces.
 
-export const LEGAL_FORMS = ["societe", "auto_entrepreneur", "commercant"] as const;
+export const LEGAL_FORMS = ["societe", "auto_entrepreneur", "commercant", "cooperative"] as const;
 export type LegalForm = (typeof LEGAL_FORMS)[number];
 
 /** Identifier fields required per legal form; `commercant` needs `rc` or `tp` (one of them). */
@@ -14,6 +14,8 @@ export const REQUIRED_IDENTIFIERS: Record<LegalForm, readonly string[]> = {
   societe: ["ice", "rc", "if"],
   auto_entrepreneur: ["ice", "aeNumber"],
   commercant: ["ice"],
+  // Law 112-12: registered at the local register of cooperatives (tribunal), mirrored by ODCo's central one.
+  cooperative: ["ice", "coopNumber"],
 };
 
 /** Removes spaces, dots and dashes users type in identifiers (ICE "001 234 567 000 089"). */
@@ -32,7 +34,7 @@ const ice = z
   .transform(normalizeIdentifier)
   .refine((value) => /^\d{15}$/.test(value), { message: "ice_format" });
 
-/** Registry numbers (RC, IF, AE number, taxe professionnelle): letters, digits and "/" only. */
+/** Registry numbers (RC, IF, AE number, taxe professionnelle, cooperative number): letters, digits and "/" only. */
 const registryNumber = z
   .string()
   .transform((value) => normalizeIdentifier(value))
@@ -45,6 +47,7 @@ export const proLegalSchema = z.discriminatedUnion("form", [
     .object({ form: z.literal("commercant"), ice, rc: registryNumber.optional(), tp: registryNumber.optional() })
     .strict()
     .refine((value) => value.rc !== undefined || value.tp !== undefined, { message: "rc_or_tp_required", path: ["rc"] }),
+  z.object({ form: z.literal("cooperative"), ice, coopNumber: registryNumber }).strict(),
 ]);
 export type ProLegal = z.infer<typeof proLegalSchema>;
 

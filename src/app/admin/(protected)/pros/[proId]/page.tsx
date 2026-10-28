@@ -8,9 +8,11 @@ import { requirePageStaff } from "@/lib/auth/current-user";
 import { displayPhone } from "@/lib/phone/normalize";
 import { proIdSchema } from "@/lib/pro/profile-schema";
 import { proReview } from "@/lib/pro/review";
+import { shopPaymentAdmin } from "@/lib/pro/seller-payment";
 import { ProDecisionForm, ProEffectsRerun } from "../../../_components/pro-decision-form";
 import { IDENTIFIER_LABEL, LEGAL_FORM_LABEL, LIFECYCLE_LABEL, PHONE_OUTCOME_LABEL, formatIce } from "../../../_components/pro-labels";
 import { ProPhoneCheckForm } from "../../../_components/pro-phone-check-form";
+import { ShopPaymentPanel } from "../../../_components/shop-payment-panel";
 
 // Review of one Pro application (phase 7 design §4): the shop, the legal identifiers to check
 // against the registry, the KYBC pieces (each opening is journaled), the applicant's account, the
@@ -22,11 +24,11 @@ const dateTime = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeSty
 const date = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeZone: "Africa/Casablanca" });
 
 const PIECE_TYPE: Record<string, string> = { "application/pdf": "PDF", "image/jpeg": "Image JPEG", "image/png": "Image PNG" };
-const REGISTRY_LABEL: Record<string, string> = { ompic: "OMPIC", directinfo: "DirectInfo" };
+const REGISTRY_LABEL: Record<string, string> = { ompic: "OMPIC", directinfo: "DirectInfo", odco: "ODCo" };
 
 /** Points the moderator checks before validating (design §4); the CNIE line follows audit C2-03. */
 const CHECKLIST = [
-  "Le nom, l'ICE et le RC (ou le n° d'auto-entrepreneur, la TP) correspondent au registre consulté.",
+  "Le nom, l'ICE et le RC (ou le n° d'auto-entrepreneur, la TP, le n° de coopérative) correspondent au registre consulté.",
   "Le justificatif est lisible, récent et au nom de la boutique ou du demandeur.",
   "L'activité déclarée est cohérente avec les annonces du compte.",
   "Un justificatif laisse voir un numéro de CNIE : refusez avec le motif « envoyez une copie où le numéro de CNIE est masqué ».",
@@ -66,7 +68,7 @@ export default async function ProReviewPage({ params }: { params: Promise<{ proI
   await requirePageStaff(["moderator", "admin"]);
   const id = proIdSchema.safeParse((await params).proId);
   if (!id.success) notFound();
-  const review = await proReview(id.data);
+  const [review, payment] = await Promise.all([proReview(id.data), shopPaymentAdmin(id.data).catch(() => null)]);
   if (!review) notFound();
 
   const city = cityBySlug(review.citySlug);
@@ -156,6 +158,11 @@ export default async function ProReviewPage({ params }: { params: Promise<{ proI
         </article>
 
         <aside className="flex flex-col gap-6" aria-label="Demandeur, appel et décision">
+          {payment && (payment.url || payment.pendingUrl || payment.cashOnDelivery || payment.suspended) ? (
+            <Panel title="Paiement chez le vendeur">
+              <ShopPaymentPanel proId={review.proId} initial={payment} />
+            </Panel>
+          ) : null}
           <Panel title="Demandeur">
             {owner ? (
               <Facts

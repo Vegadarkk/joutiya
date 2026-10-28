@@ -103,6 +103,7 @@ export function invoiceFields(legal: ProLegal): { name: string; value: string }[
   const fields = [{ name: "ICE", value: legal.ice }];
   if (legal.form === "societe") fields.push({ name: "IF", value: legal.if }, { name: "RC", value: legal.rc });
   else if (legal.form === "auto_entrepreneur") fields.push({ name: "N° auto-entrepreneur", value: legal.aeNumber });
+  else if (legal.form === "cooperative") fields.push({ name: "N° coopérative", value: legal.coopNumber });
   else {
     if (legal.rc) fields.push({ name: "RC", value: legal.rc });
     if (legal.tp) fields.push({ name: "Taxe professionnelle", value: legal.tp });

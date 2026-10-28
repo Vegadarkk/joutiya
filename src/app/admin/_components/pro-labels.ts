@@ -4,6 +4,7 @@ export const LEGAL_FORM_LABEL: Record<string, string> = {
   societe: "Société",
   auto_entrepreneur: "Auto-entrepreneur",
   commercant: "Commerçant personne physique",
+  cooperative: "Coopérative",
 };
 
 export const IDENTIFIER_LABEL: Record<string, string> = {
@@ -12,6 +13,7 @@ export const IDENTIFIER_LABEL: Record<string, string> = {
   if: "Identifiant fiscal (IF)",
   aeNumber: "N° d'auto-entrepreneur",
   tp: "Taxe professionnelle (TP)",
+  coopNumber: "N° d'immatriculation au registre des coopératives",
 };
 
 export const LIFECYCLE_LABEL: Record<string, string> = {

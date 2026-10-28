@@ -52,6 +52,7 @@ function row(n: number, updatedAt: number, patch: Partial<ConversationView> = {}
     blockedMe: false,
     frozen: false,
     counterpartClosed: false,
+    review: { sellerRepliedAt: null, reviewedAt: null },
     updatedAt,
     ...patch,
   };

@@ -39,14 +39,17 @@ export function withCategory(draft: SearchParams, value: string): SearchParams {
   const next: SearchParams = { ...draft };
   const [kind, id] = value.split(":");
   if (kind === "s" && id && subcategoryById(id)) {
-    if (next.subcategory !== id) delete next.criteria;
     next.subcategory = id;
     next.category = subcategoryById(id)?.categoryId;
   } else {
     delete next.subcategory;
-    delete next.criteria;
     next.category = kind === "c" && id ? id : undefined;
   }
+  // A filter the new scope still offers (a shared one such as the surface) stays.
+  const allowed = new Set(filterableCriteria(next.category, next.subcategory).map((criterion) => criterion.id));
+  const kept = Object.entries(next.criteria ?? {}).filter(([criterionId]) => allowed.has(criterionId));
+  if (kept.length) next.criteria = Object.fromEntries(kept);
+  else delete next.criteria;
   if (!conditionApplies(next)) delete next.conditions;
   return next;
 }
@@ -105,7 +108,7 @@ export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
   // District choices come from the facet of the current city only (D7: no district list exists).
   const districts = draft.city && draft.city === params.city && !draft.radiusKm ? Object.entries(facets?.districts ?? {}).filter(([, n]) => n > 0) : [];
   districts.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  const criteria = filterableCriteria(draft.subcategory);
+  const criteria = filterableCriteria(draft.category, draft.subcategory);
 
   function apply(event: FormEvent) {
     event.preventDefault();
@@ -274,9 +277,9 @@ export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
                 <SwitchField label={t("donation")} checked={Boolean(draft.donation)} onCheckedChange={(checked) => update({ donation: checked ? true : undefined })} />
               </Section>
 
-              {draft.subcategory && criteria.length > 0 ? (
-                <Section title={t("sections.criteria", { subcategory: names.subcategory(draft.category ?? "", draft.subcategory) })}>
-                  <CriteriaFilters subcategoryId={draft.subcategory} value={draft.criteria} onChange={(value) => update({ criteria: value })} />
+              {criteria.length > 0 ? (
+                <Section title={t("sections.criteria", { subcategory: draft.subcategory ? names.subcategory(draft.category ?? "", draft.subcategory) : names.category(draft.category ?? "") })}>
+                  <CriteriaFilters categoryId={draft.category} subcategoryId={draft.subcategory} value={draft.criteria} onChange={(value) => update({ criteria: value })} />
                 </Section>
               ) : null}
             </div>

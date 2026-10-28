@@ -95,7 +95,7 @@ describe("readiness of the dossier", () => {
 
   it("blocks a stock reference from an individual and a duration without a warranty", () => {
     const blockers = issuesByPath(assessReadiness(car({ "stock-ref": "X1", "vehicle-warranty": "aucune", "warranty-months": 6 }, { sellerType: "individual" }), INDIVIDUAL));
-    expect(blockers.get("attributes.stock-ref")).toEqual(["pro_only"]);
+    expect(blockers.get("attributes.stock-ref")).toEqual(["criterion_pro_only"]);
     expect(blockers.get("attributes.warranty-months")).toEqual(["criterion_invalid"]);
     expect(assessReadiness(car({ "trade-in": true }, { sellerType: "individual" }), INDIVIDUAL)).toEqual([]);
   });

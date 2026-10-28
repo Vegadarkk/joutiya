@@ -66,6 +66,15 @@ export const REPORT_REASONS = [
     ground: { type: "illegal", ref: "C. pén. art. 313-1" },
   },
   {
+    // « Payer chez le vendeur » (2026-10-28): a moderator may cut the shop's button, listings kept.
+    id: "payment_link",
+    priority: "P1",
+    targets: ["listing", "user", "pro"],
+    label: { fr: "Lien de paiement suspect", ar: "رابط دفع مشبوه" },
+    hint: { fr: "Le bouton « Payer chez le vendeur » mène à une page douteuse ou à un autre vendeur.", ar: "زر «الدفع لدى البائع» يقود إلى صفحة مريبة أو إلى بائع آخر." },
+    ground: { type: "illegal", ref: "C. pén. art. 313-1" },
+  },
+  {
     id: "illegal_item",
     priority: "P1",
     targets: CONTENT,

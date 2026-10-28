@@ -30,7 +30,8 @@ import { MAX_PHOTOS_PRO } from "@/lib/contracts/media";
 export type DraftLike = Pick<
   OwnerListing,
   "categoryId" | "subcategoryId" | "title" | "description" | "attributes" | "condition" | "price" | "priceNegotiable" | "isDonation" | "location" | "photos" | "contact"
->;
+> &
+  Partial<Pick<OwnerListing, "sellerType">>;
 
 export { TITLE_MIN, TITLE_MAX, DESCRIPTION_MIN, DESCRIPTION_MAX, PRICE_MAX, DISTRICT_MAX };
 
@@ -102,9 +103,9 @@ function conditionSchema(subcategory: Subcategory | undefined) {
 }
 
 /** `{ attributes, condition }` of a subcategory; an unknown subcategory accepts nothing. */
-export function criteriaStepSchema(subcategoryId: string | null) {
+export function criteriaStepSchema(subcategoryId: string | null, sellerType: OwnerListing["sellerType"] = "individual") {
   const subcategory = subcategoryId ? subcategoryById(subcategoryId) : undefined;
-  const attributes = subcategory ? criteriaSchema(subcategory.id) : z.object({}).strict();
+  const attributes = subcategory ? criteriaSchema(subcategory.id, sellerType) : z.object({}).strict();
   return z.object({ attributes, condition: conditionSchema(subcategory) });
 }
 
@@ -242,7 +243,7 @@ export function stepIssues(step: WizardStep, draft: DraftLike, options: IssueOpt
     case "categorie":
       return toIssues(categoryStepSchema.safeParse(values), values);
     case "criteres":
-      return draft.subcategoryId ? toIssues(criteriaStepSchema(draft.subcategoryId).safeParse(values), values) : [{ path: "subcategoryId", code: "subcategory_required" }];
+      return draft.subcategoryId ? toIssues(criteriaStepSchema(draft.subcategoryId, draft.sellerType).safeParse(values), values) : [{ path: "subcategoryId", code: "subcategory_required" }];
     case "titre":
       return toIssues(titleStepSchema.safeParse(values), values);
     case "description":

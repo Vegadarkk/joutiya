@@ -198,7 +198,8 @@ export type HeldCollection =
   | typeof COLLECTIONS.reports
   | typeof COLLECTIONS.moderationDecisions
   | typeof COLLECTIONS.authorityRequests
-  | typeof COLLECTIONS.aiDecisions;
+  | typeof COLLECTIONS.aiDecisions
+  | typeof COLLECTIONS.reviews;
 
 /** A document past purgeAt, as stored (Timestamps as Dates). */
 export interface PastPurgeDoc {

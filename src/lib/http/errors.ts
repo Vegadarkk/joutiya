@@ -102,6 +102,12 @@ export type ErrorCode =
   | "pass_max_ahead"
   | "launch_offer_running"
   | "pass_other_plan"
+  /** « Payer chez le vendeur »: a link refused by its shape (details: PaymentLinkIssue). */
+  | "payment_link_invalid"
+  /** The seller information (law 31-08) and the terms are needed to turn the button on. */
+  | "payment_info_required"
+  /** The shop's button is off now (state, suspension, host withdrawn). */
+  | "payment_unavailable"
   /** The shop's KYBC is not verified, or the shop is suspended (409). */
   | "pro_not_verified"
   /** The shop's plan does not include this feature (the stock import: Business and up) (403). */
@@ -156,6 +162,8 @@ export type ErrorCode =
   | "unavailable"
   /** 422: a short free text (storefront bio, review) refused by the text screen; details: { field, issue }. */
   | "invalid_text"
+  /** 409: the conversation's review window is not open (details: { state, opensAt? }), or already used. */
+  | "review_unavailable"
   | "internal";
 
 export class HttpError extends Error {

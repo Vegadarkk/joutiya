@@ -1,4 +1,4 @@
-import { CONDITIONS, categoryById, criterionById, subcategoryById, type Condition } from "@/config/categories";
+import { CONDITIONS, categoryById, criterionById, searchCriteria, subcategoryById, type Condition } from "@/config/categories";
 import { cityBySlug, regionByCode } from "@/config/regions";
 import { z } from "@/lib/zod";
 
@@ -214,7 +214,7 @@ export function parseSearchParams(source: Source): SearchParams {
 /**
  * Removes contradictions and values outside the whitelist: subcategory implies its category,
  * city implies its region, radius and district need a city (radius wins), criteria need the
- * subcategory that declares them, distance sort needs a city, price bounds are ordered and
+ * subcategory that declares them (or the category's shared filters), distance sort needs a city, price bounds are ordered and
  * dropped by "donations only".
  */
 export function canonicalSearchParams(input: SearchParams): SearchParams {
@@ -252,7 +252,7 @@ export function canonicalSearchParams(input: SearchParams): SearchParams {
     else delete params.conditions;
   }
   if (params.criteria) {
-    const allowed = new Set((params.subcategory ? subcategoryById(params.subcategory)?.criteria : undefined)?.map((criterion) => criterion.id) ?? []);
+    const allowed = new Set(searchCriteria(params.category, params.subcategory).map((criterion) => criterion.id));
     const criteria: Record<string, CriterionFilter> = {};
     for (const id of Object.keys(params.criteria).sort()) {
       const filter = params.criteria[id];

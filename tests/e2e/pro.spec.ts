@@ -75,6 +75,8 @@ async function waitForMail(request: APIRequestContext, to: string, template: str
 async function signUpAndIn(page: Page, request: APIRequestContext, email: string): Promise<void> {
   await ownClientIp(page);
   await page.goto("/fr/inscription");
+  // Hydrated first (the widget turns ready client side): a consent ticked earlier is unticked when the form registers its fields.
+  await waitForTurnstile(page);
   await page.getByLabel("Nom affiché").fill("Salma Test");
   await page.getByLabel("Adresse e-mail").fill(email);
   await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);

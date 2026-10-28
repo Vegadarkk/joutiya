@@ -20,7 +20,7 @@ describe("ICE", () => {
 
 describe("legal identifiers per form", () => {
   it("lists the required identifiers of §8", () => {
-    expect(REQUIRED_IDENTIFIERS).toEqual({ societe: ["ice", "rc", "if"], auto_entrepreneur: ["ice", "aeNumber"], commercant: ["ice"] });
+    expect(REQUIRED_IDENTIFIERS).toEqual({ societe: ["ice", "rc", "if"], auto_entrepreneur: ["ice", "aeNumber"], commercant: ["ice"], cooperative: ["ice", "coopNumber"] });
   });
 
   it("parses a company and normalises its identifiers", () => {
@@ -32,6 +32,9 @@ describe("legal identifiers per form", () => {
     expect(proLegalSchema.safeParse({ form: "societe", ice: ICE, rc: "12345" }).success).toBe(false);
     expect(proLegalSchema.safeParse({ form: "auto_entrepreneur", ice: ICE }).success).toBe(false);
     expect(proLegalSchema.safeParse({ form: "auto_entrepreneur", ice: ICE, aeNumber: "998877" }).success).toBe(true);
+    // A cooperative: ICE and its number at the register of cooperatives (law 112-12).
+    expect(proLegalSchema.safeParse({ form: "cooperative", ice: ICE }).success).toBe(false);
+    expect(proLegalSchema.safeParse({ form: "cooperative", ice: ICE, coopNumber: "12/2019" }).data).toEqual({ form: "cooperative", ice: ICE, coopNumber: "12/2019" });
   });
 
   it("requires RC or taxe professionnelle for a sole trader", () => {

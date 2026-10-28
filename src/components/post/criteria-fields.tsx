@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { InlineError } from "@/components/feedback/inline-error";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { CONDITIONS, CRITERION_TEXT_MAX, criterionApplies, type Condition, type Criterion, type Subcategory } from "@/config/categories";
+import { CONDITIONS, CRITERION_TEXT_MAX, criteriaFor, criterionApplies, type Condition, type Criterion, type Subcategory } from "@/config/categories";
 import type { ListingAttributes } from "@/lib/contracts/listings";
 import { cn } from "@/lib/utils";
 import { ChipCheckboxGroup, ChipRadioGroup } from "./controls/chips";
@@ -33,7 +33,7 @@ interface CriteriaFieldsProps {
   onAttribute: (id: string, value: AttributeValue | undefined) => void;
   onCondition: (value: Condition | null) => void;
   onBlur?: () => void;
-  /** The listing is a Pro's: Pro-only criteria are shown. */
+  /** The listing is a Pro's: Pro-only criteria (stock reference, mandate, agency fees) are shown. */
   pro?: boolean;
 }
 
@@ -47,7 +47,7 @@ export function CriteriaFields({ subcategory, attributes, condition, errors = {}
   const units = useTranslations("Listing.units");
   const label = labels.label;
   const optionLabel = labels.option;
-  const shown = subcategory.criteria.filter((criterion) => (pro || !criterion.proOnly) && criterionApplies(criterion, attributes));
+  const shown = criteriaFor(subcategory, pro ? "pro" : "individual").filter((criterion) => criterionApplies(criterion, attributes));
   const main = shown.filter((criterion) => !criterion.group);
   const dossier = shown.filter((criterion) => criterion.group === "dossier");
   const dossierActive = dossier.some((criterion) => attributes[criterion.id] !== undefined || errors[`attributes.${criterion.id}`]);

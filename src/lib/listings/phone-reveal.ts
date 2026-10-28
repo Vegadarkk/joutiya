@@ -13,7 +13,7 @@ import { logger } from "@/lib/logging/logger";
 import { displayPhone } from "@/lib/phone/normalize";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { escalateOnIp } from "./escalation";
-import { PUBLIC_STATES } from "./public";
+import { PUBLIC_STATES, acceptsContact } from "./public";
 
 // Phone reveal (§6 "/api/listings/[id]/phone"): a signed-in account older than 24 hours with a
 // verified e-mail; 10/h and 30/day per uid, 20/day per device, 60/day per IP then Turnstile; every
@@ -53,7 +53,8 @@ export async function revealPhone(auth: AuthContext, request: Request, listingId
   // the route does not tell which ids exist. Public but not live (paused, sold, expired: the page
   // shows a banner instead of the contact actions): 409.
   if (!listing || !(PUBLIC_STATES as readonly string[]).includes(listing.status)) throw notFound();
-  if (listing.status !== "published") throw new HttpError(409, "listing_unavailable");
+  // An example listing has no seller to reach: 409 as well.
+  if (listing.status !== "published" || !acceptsContact(listing)) throw new HttpError(409, "listing_unavailable");
   if (!listing.contact.showPhone && !listing.contact.whatsapp) throw notFound();
 
   // A listing this account already revealed does not count again (§6).
