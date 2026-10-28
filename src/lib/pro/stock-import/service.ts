@@ -2,7 +2,7 @@ import "server-only";
 import { audit } from "@/lib/audit";
 import type { AuthContext } from "@/lib/auth/guards";
 import { LISTING_STATUSES, listingPatchSchema, type ListingPatch, type ListingStatus } from "@/lib/contracts/listings";
-import { STOCK_IMPORT_MAX_ROWS, type StockImportRequest, type StockImportResponse, type StockListing, type StockListResponse, type StockRowResult } from "@/lib/contracts/stock-import";
+import { importsStock, STOCK_IMPORT_MAX_ROWS, type StockImportRequest, type StockImportResponse, type StockListing, type StockListResponse, type StockRowResult } from "@/lib/contracts/stock-import";
 import { ACTIVE_STATUSES, listOwnerListingsByStatus, type ListingRecord } from "@/lib/db/repositories/listings";
 import { HttpError } from "@/lib/http/errors";
 import { logger } from "@/lib/logging/logger";
@@ -88,11 +88,12 @@ export function remainingSlots(activeQuota: number | null, active: number, draft
   return Math.max(0, cap - drafts);
 }
 
-/** A Pro whose shop publishes (verified, not suspended); individuals have no stock import. */
+/** A Pro whose shop publishes (verified, not suspended) under a plan with the import. */
 async function proSeller(auth: AuthContext): Promise<SellerContext> {
   const seller = await sellerOf(auth);
   if (seller.seller.type !== "pro") throw new HttpError(403, "forbidden", "stock import is for Pro shops");
   if (seller.seller.plan === "none") throw new HttpError(409, "pro_not_verified");
+  if (!importsStock(seller.seller.plan)) throw new HttpError(403, "plan_upgrade_required", "stock import needs the Business plan");
   return seller;
 }
 

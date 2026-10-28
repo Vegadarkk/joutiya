@@ -3816,6 +3816,11 @@
       "body": "Il s'ouvre dès que votre boutique est vérifiée et publie sous une offre Pro.",
       "link": "Voir mon espace Pro"
     },
+    "upgrade": {
+      "title": "L’import de stock est inclus dans les offres Business et Premium",
+      "body": "Avec votre offre actuelle, publiez vos véhicules un par un depuis « Déposer une annonce ».",
+      "link": "Voir les offres"
+    },
     "file": {
       "title": "Votre fichier",
       "lead": "CSV en UTF-8 ou exporté d'Excel (virgule, point-virgule ou tabulation), {rows} lignes au plus.",

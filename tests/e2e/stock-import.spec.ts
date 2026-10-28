@@ -45,9 +45,10 @@ async function seedShop(email: string): Promise<string> {
       legal: { form: "societe", ice: "001234567000089", rc: "12345", if: "1234567" },
       kybc: { status: "verified", iceFormatOk: true, uploadIds: [] },
       lifecycle: "verified",
-      plan: "essentiel",
-      planSource: "launch_offer",
-      quotas: { activeListings: 50, photosPerListing: 20, listingsPerDay: 25 },
+      // The stock import comes with the Business and Premium plans.
+      plan: "business",
+      planSource: "subscription",
+      quotas: { activeListings: 250, photosPerListing: 20, listingsPerDay: 100 },
       createdAt: now,
       updatedAt: now,
     });

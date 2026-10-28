@@ -1,3 +1,4 @@
+import type { ProPlan } from "@/config/pricing";
 import { z } from "@/lib/zod";
 import type { ListingStatus } from "@/lib/contracts/listings";
 
@@ -104,6 +105,11 @@ export interface StockImportResponse {
 export interface StockListResponse {
   listings: StockListing[];
 }
+
+/** Pro plans with the stock import (owner's choice, 28 Oct 2026: the upper plans only). */
+export const STOCK_IMPORT_PLANS: readonly ProPlan[] = ["business", "premium"];
+
+export const importsStock = (plan: ProPlan): boolean => STOCK_IMPORT_PLANS.includes(plan);
 
 export const STOCK_API = {
   list: "/api/pro/stock",
