@@ -27,6 +27,7 @@ import { reportReceived } from "./templates/reportReceived";
 import { resetPassword } from "./templates/resetPassword";
 import { savedSearchAlert } from "./templates/savedSearchAlert";
 import { newMessages } from "./templates/newMessages";
+import { appointmentReminder } from "./templates/appointmentReminder";
 import { signupExisting } from "./templates/signupExisting";
 import { staffInvite } from "./templates/staffInvite";
 import { verifyEmail } from "./templates/verifyEmail";
@@ -61,6 +62,7 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   proRejected,
   launchOfferNotice,
   newMessages,
+  appointmentReminder,
   accountClosed,
   cguChanged,
 };

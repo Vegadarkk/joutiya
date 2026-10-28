@@ -140,15 +140,28 @@ export interface NewMessageInput {
   flags: MessageRiskFlag[];
   /** Original text, kept as evidence when links were masked. */
   original?: string;
+  /** A system message about the conversation's appointment (src/lib/appointments). */
+  appointment?: MessageDoc["appointment"];
   now: Date;
 }
+
+/**
+ * Runs inside the append transaction on the conversation as read (src/lib/appointments): throws
+ * to abort, else returns the conversation fields to set with the message (null deletes a field)
+ * and, for a system message, its text and appointment step.
+ */
+export type ConversationExtension = (conversation: ConversationRecord) => {
+  fields: Partial<Record<"appointment" | "appointmentRemindAt", unknown>>;
+  message?: Required<Pick<NewMessageInput, "text" | "appointment">>;
+};
 
 function messageDoc(conversation: Pick<ConversationDoc, "participants" | "sellerProId">, input: NewMessageInput): MessageDoc {
   return messageSchema.parse({
     senderUid: input.senderUid,
     participants: conversation.participants,
     ...(conversation.sellerProId ? { sellerProId: conversation.sellerProId } : {}),
-    type: "text",
+    type: input.appointment ? "system" : "text",
+    ...(input.appointment ? { appointment: input.appointment } : {}),
     text: input.text,
     ...(input.flags.length > 0 ? { risk: { flags: input.flags, warned: true } } : {}),
     createdAt: input.now,
@@ -200,11 +213,13 @@ export interface AppendResult {
  * lists of both accounts, which decide, audit D1a-10), the conversation is not frozen ("frozen"),
  * no participant closed the account ("closed", L7).
  * The recipient's unread count + 1; archive and delete-for-me are lifted for both participants.
+ * `extend` adds conversation fields to the same transaction (appointments), after these checks.
  */
-export async function appendMessage(cid: string, input: NewMessageInput): Promise<AppendResult> {
+export async function appendMessage(cid: string, given: NewMessageInput, extend?: ConversationExtension): Promise<AppendResult> {
   const messageRef = messagesRef(cid).doc();
   const result = await db().runTransaction(async (tx) => {
     const conversation = conversationFromSnapshot(await tx.get(conversationRef(cid)));
+    let input = given;
     if (!conversation || !isParticipant(conversation, input.senderUid)) throw new ConversationAccessError("missing");
     if (conversation.blockedBy.length > 0) throw new ConversationAccessError("blocked");
     const recipientUid = counterpartOf(conversation, input.senderUid);
@@ -213,9 +228,14 @@ export async function appendMessage(cid: string, input: NewMessageInput): Promis
     if (conversation.status === "frozen") throw new ConversationAccessError("frozen");
     // A participant closed the account (L7): the other one keeps reading, nobody writes.
     if ((conversation.accountClosed ?? []).length > 0) throw new ConversationAccessError("closed");
+    const extension = extend?.(conversation);
+    const extra = extension?.fields ?? {};
+    if (extension?.message) input = { ...input, ...extension.message };
     const message = messageDoc(conversation, input);
     const evidence = evidenceDoc(input);
-    const { cid: _cid, ...current } = conversation;
+    const { cid: _cid, ...rest } = conversation;
+    const cleared = Object.keys(extra).filter((key) => extra[key as keyof typeof extra] === null);
+    const current = Object.fromEntries(Object.entries(rest).filter(([key]) => !cleared.includes(key)));
     const next = conversationSchema.parse({
       ...current,
       lastMessage: lastMessageOf(input),
@@ -225,6 +245,7 @@ export async function appendMessage(cid: string, input: NewMessageInput): Promis
       messageCount: conversation.messageCount + 1,
       updatedAt: input.now,
       purgeAt: conversationPurgeAt(input.now),
+      ...Object.fromEntries(Object.entries(extra).filter(([, value]) => value !== null)),
     });
     tx.set(messageRef, toFirestore(message));
     if (evidence) tx.set(evidenceRef(cid, messageRef.id), toFirestore(evidence));
@@ -238,6 +259,7 @@ export async function appendMessage(cid: string, input: NewMessageInput): Promis
         messageCount: next.messageCount,
         updatedAt: next.updatedAt,
         purgeAt: next.purgeAt,
+        ...Object.fromEntries(Object.keys(extra).map((key) => [key, cleared.includes(key) ? FieldValue.delete() : next[key as keyof typeof extra]])),
       }),
     );
     return { conversation, recipientUid, writes: evidence ? 3 : 2 };

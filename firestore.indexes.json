@@ -574,6 +574,16 @@
       "indexes": []
     },
     {
+      "collectionGroup": "conversations",
+      "fieldPath": "appointment",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "messages",
+      "fieldPath": "appointment",
+      "indexes": []
+    },
+    {
       "collectionGroup": "reports",
       "fieldPath": "explanation",
       "indexes": []

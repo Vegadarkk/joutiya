@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CalendarPlus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { toast } from "sonner";
+import { AppointmentCard } from "@/components/appointments/appointment-card";
+import type { AppointmentDialogProps } from "@/components/appointments/appointment-dialog";
 import { FormMessage } from "@/components/auth/form-message";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { EmptyState } from "@/components/feedback/empty-state";
@@ -14,7 +17,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Locale } from "@/config/site";
 import { getPathname, Link, useRouter } from "@/i18n/navigation";
 import { isApiError, refreshSession, useSession } from "@/lib/auth/client";
+import { APPOINTMENT_KINDS, type AppointmentKind, type AppointmentResponse } from "@/lib/contracts/appointments";
 import { URL_MARKER, type ConversationView, type MessageView } from "@/lib/contracts/messaging";
+import { isActive } from "@/lib/appointments/rules";
 import { isolate } from "@/lib/i18n/bidi";
 import { formatPrice } from "@/lib/listings/client/format";
 import { changeConversationState, fetchConversation, fetchThread, markConversationRead, sendMessage } from "@/lib/messaging/client";
@@ -43,6 +48,17 @@ import { useMessagingStream } from "./use-live";
 
 /** The notice form loads on demand; while its chunk cannot be downloaded nothing opens. */
 const ReportDialog = dynamic(() => loadWithRetry<ReportDialogProps>(() => import("@/components/report/report-dialog").then((module) => module.ReportDialog), () => null)(), { ssr: false });
+
+/** The slot picker loads on demand, like the notice form. */
+const AppointmentDialog = dynamic(() => loadWithRetry<AppointmentDialogProps>(() => import("@/components/appointments/appointment-dialog").then((module) => module.AppointmentDialog), () => null)(), {
+  ssr: false,
+});
+
+/** `?rdv={kind}` on the thread's URL opens the slot picker with that kind (Concession, Agence entry points). */
+export function requestedKind(search: string): AppointmentKind | null {
+  const kind = new URLSearchParams(search).get("rdv");
+  return (APPOINTMENT_KINDS as readonly string[]).includes(kind ?? "") ? (kind as AppointmentKind) : null;
+}
 
 /** What the thread reports: the other participant (menu) or one message received. */
 type ReportSubject = { kind: "user" } | { kind: "message"; message: MessageView };
@@ -96,6 +112,7 @@ function ThreadSkeleton({ label }: { label: string }) {
 
 export function ThreadView({ cid }: { cid: string }) {
   const t = useTranslations("Messaging.thread");
+  const appointmentText = useTranslations("Appointments");
   const card = useTranslations("ListingCard");
   const locale = useLocale() as Locale;
   const router = useRouter();
@@ -107,6 +124,7 @@ export function ThreadView({ cid }: { cid: string }) {
   const [attempt, setAttempt] = useState(0);
   const [sendError, setSendError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [picker, setPicker] = useState<{ open: boolean; kind?: AppointmentKind } | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const olderMark = useRef<HTMLDivElement>(null);
 
@@ -139,6 +157,14 @@ export function ThreadView({ cid }: { cid: string }) {
         if (!active) return;
         update(() => ({ kind: "ready", data: fromNewestPage(page), older: "idle", pending: [] }));
         putRow(page.conversation);
+        // A link to the thread may ask for the slot picker once (`?rdv=visit`); the parameter then goes.
+        const kind = requestedKind(window.location.search);
+        if (kind) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("rdv");
+          window.history.replaceState(window.history.state, "", url);
+          if (canWrite(page.conversation, false)) setPicker({ open: true, kind });
+        }
       },
       (error: unknown) => {
         if (!active) return;
@@ -333,6 +359,13 @@ export function ThreadView({ cid }: { cid: string }) {
   }
 
   const [report, setReport] = useState<{ subject: ReportSubject; open: boolean } | null>(null);
+
+  function onAppointment(response: AppointmentResponse) {
+    updateData((data) => ({ ...data, conversation: { ...data.conversation, appointment: response.appointment } }));
+    const view = current.current;
+    if (view.kind === "ready") putRow(view.data.conversation);
+    void fetchNewer();
+  }
   const [unblocking, setUnblocking] = useState(false);
   async function unblock(conversation: ConversationView) {
     setUnblocking(true);
@@ -448,6 +481,20 @@ export function ThreadView({ cid }: { cid: string }) {
         <ErrorBanner tone="info" title={t("blockedMe")} className="mx-3 mt-3 lg:mx-5" />
       ) : null}
 
+      {conversation.appointment ? (
+        <AppointmentCard
+          key={conversation.appointment.id}
+          cid={cid}
+          appointment={conversation.appointment}
+          counterpartName={name}
+          listingTitle={conversation.listing.title}
+          writable={writable}
+          now={now}
+          onChange={onAppointment}
+          onReschedule={() => setPicker({ open: true, kind: conversation.appointment?.kind })}
+        />
+      ) : null}
+
       <div ref={scroller} className="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto overscroll-contain" data-testid="thread">
         <div className="flex flex-col gap-2 px-3 py-4 sm:px-5 lg:px-8">
           {data.older ? (
@@ -502,7 +549,41 @@ export function ThreadView({ cid }: { cid: string }) {
         </div>
       </div>
 
-      {writable ? <Composer onSend={send} error={sendError} onTyping={() => setSendError(null)} /> : sendError ? <p className="px-4 pb-3 text-sm text-danger">{sendError}</p> : null}
+      {writable ? (
+        <Composer
+          onSend={send}
+          error={sendError}
+          onTyping={() => setSendError(null)}
+          leading={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="shrink-0 rounded-full text-foreground-muted hover:text-foreground"
+              aria-label={appointmentText("propose")}
+              title={appointmentText("propose")}
+              data-testid="appointment-open"
+              onClick={() => setPicker({ open: true, kind: conversation.appointment?.kind })}
+            >
+              <CalendarPlus aria-hidden="true" />
+            </Button>
+          }
+        />
+      ) : sendError ? <p className="px-4 pb-3 text-sm text-danger">{sendError}</p> : null}
+      {picker ? (
+        <AppointmentDialog
+          cid={cid}
+          open={picker.open}
+          onOpenChange={(open) => setPicker((current) => (current ? { ...current, open } : current))}
+          counterpartName={name}
+          defaultKind={picker.kind}
+          rescheduling={conversation.appointment ? isActive(conversation.appointment, now) : false}
+          onDone={(response) => {
+            onAppointment(response);
+            toast.success(appointmentText("proposedToast", { name: isolate(name) }));
+          }}
+        />
+      ) : null}
       {report ? (
         <ReportDialog
           // One form per subject: another message starts a new notice.

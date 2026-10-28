@@ -19,6 +19,7 @@ import { sendSavedSearchAlerts } from "./saved-search-alerts";
 import { sendCguNotices } from "./cgu-notice";
 import { exportAuditLogs } from "./audit-export";
 import { sendMessageDigests } from "./message-digest";
+import { sendAppointmentReminders } from "./appointment-reminders";
 import { sweepReportSla } from "./report-sla-sweep";
 
 // Phase 5 (design D19): queue "agent", its own consumer at concurrency 1 (createAgentWorker).
@@ -47,6 +48,7 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "billing-thresholds": () => updateBillingThresholds(),
   "lift-suspensions": () => liftSuspensions(),
   "message-digest": () => sendMessageDigests(),
+  "appointment-reminders": () => sendAppointmentReminders(),
   "report-sla-sweep": () => sweepReportSla(),
   "audit-export": () => exportAuditLogs(),
 };
@@ -96,6 +98,8 @@ export const SCHEDULES = {
   "lift-suspensions-hourly": { pattern: "35 * * * *", job: "lift-suspensions" },
   // Phase 5 (D21). Every 10 minutes from :01: grouped new-messages mails due (30 min after the first unread).
   "message-digest-10min": { pattern: "1-59/10 * * * *", job: "message-digest" },
+  // Appointments (28 Oct). Every 10 minutes from :04: reminders due (the day before, 2 hours before).
+  "appointment-reminders-10min": { pattern: "4-59/10 * * * *", job: "appointment-reminders" },
   // Phase 5 (D12). Every 10 minutes from :07: open P0 reports past their 1-hour target -> one more P0 alert.
   "report-sla-sweep-10min": { pattern: "7-59/10 * * * *", job: "report-sla-sweep" },
   // Phase 5 (D23). 03:22 UTC: yesterday's auditLogs -> age-encrypted NDJSON in the private bucket, before the backup (03:30).
