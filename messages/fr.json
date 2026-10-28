@@ -2987,6 +2987,140 @@
       "invalid_body": "Ce message ne peut pas être envoyé tel quel. Vérifiez-le, puis réessayez."
     }
   },
+  "Appointments": {
+    "propose": "Proposer un rendez-vous",
+    "proposedToast": "Créneaux envoyés à {name}",
+    "kind": {
+      "meeting": "Rencontre",
+      "visit": "Visite",
+      "test_drive": "Essai",
+      "pickup": "Retrait"
+    },
+    "kindPhrase": {
+      "meeting": "un rendez-vous",
+      "visit": "une visite",
+      "test_drive": "un essai",
+      "pickup": "un retrait"
+    },
+    "confirmedTitle": {
+      "meeting": "Rendez-vous confirmé",
+      "visit": "Visite confirmée",
+      "test_drive": "Essai confirmé",
+      "pickup": "Retrait confirmé"
+    },
+    "duration": {
+      "m15": "15 min",
+      "m30": "30 min",
+      "m45": "45 min",
+      "m60": "1 h",
+      "m90": "1 h 30",
+      "m120": "2 h"
+    },
+    "reasons": {
+      "unavailable": "Je ne suis plus disponible",
+      "sold": "L'article n'est plus disponible",
+      "other": "Autre raison"
+    },
+    "picker": {
+      "kind": "Type de rendez-vous",
+      "day": "Jour",
+      "timeZone": "Heure du Maroc",
+      "otherDay": "Autre date",
+      "duration": "Durée de chaque créneau",
+      "times": "Heures libres le {day}",
+      "picked": "Créneaux proposés",
+      "count": "{count} sur {max}",
+      "empty": "Choisissez un jour, puis une ou plusieurs heures : jusqu'à 5 créneaux, sur un ou plusieurs jours.",
+      "remove": "Retirer le créneau du {time}",
+      "place": "Lieu (facultatif)",
+      "placePlaceholder": "Ex. : parking du Morocco Mall, agence de Maârif",
+      "placeHint": "Préférez un lieu public ou fréquenté. Les liens sont masqués.",
+      "safety": "Retrouvez-vous dans un lieu public et ne versez jamais d'acompte. {site} n'intervient pas dans la transaction.",
+      "cancel": "Annuler",
+      "submit": "Proposer {count, plural, one {# créneau} other {# créneaux}}",
+      "pickOne": "Choisissez au moins un créneau.",
+      "reserved": "Retirez les caractères ⟦ et ⟧ du lieu : ils ne sont pas acceptés.",
+      "problems": {
+        "too_soon": "Un créneau commence dans moins d'une heure : choisissez-en un plus tard.",
+        "too_far": "Un créneau est à plus de 60 jours : choisissez une date plus proche.",
+        "overlap": "Deux créneaux se chevauchent : retirez-en un ou réduisez la durée.",
+        "duplicate": "Ce créneau est déjà proposé."
+      }
+    },
+    "dialog": {
+      "title": "Proposer des créneaux",
+      "rescheduleTitle": "Proposer d'autres créneaux",
+      "lead": "{name} choisira celui qui lui convient. Vous serez prévenu dans la conversation.",
+      "close": "Fermer"
+    },
+    "card": {
+      "maskedLink": "[lien masqué]",
+      "icsTitle": "{kind} avec {name} ({site})",
+      "safety": "Retrouvez-vous dans un lieu public et ne versez jamais d'acompte. {site} n'intervient pas dans la transaction.",
+      "addToCalendar": "Ajouter à mon agenda",
+      "reschedule": "Reporter",
+      "cancel": "Annuler",
+      "cancelTitle": "Annuler ce rendez-vous ?",
+      "cancelBody": "{name} en sera informé dans la conversation.",
+      "reason": "Motif (facultatif)",
+      "keep": "Garder le rendez-vous",
+      "cancelConfirm": "Annuler le rendez-vous",
+      "cancelledToast": "Rendez-vous annulé",
+      "proposedMine": "Vous avez proposé {count, plural, one {# créneau} other {# créneaux}} pour {kind}",
+      "waiting": "En attente de la réponse de {name}",
+      "change": "Modifier les créneaux",
+      "withdraw": "Retirer ma proposition",
+      "withdrawnToast": "Proposition retirée",
+      "proposedTheirs": "{name} vous propose {kind} : {count, plural, one {# créneau} other {# créneaux au choix}}",
+      "pick": "Choisissez un créneau",
+      "confirm": "Confirmer ce créneau",
+      "confirmedToast": "Rendez-vous confirmé",
+      "counter": "Proposer d'autres créneaux",
+      "decline": "Aucun ne me convient",
+      "declinedToast": "Vous avez refusé les créneaux"
+    },
+    "event": {
+      "when": "{day} à {time}",
+      "proposed": {
+        "mine": "Vous avez proposé {kind}",
+        "theirs": "{name} propose {kind}"
+      },
+      "rescheduled": {
+        "mine": "Vous avez proposé de nouveaux créneaux",
+        "theirs": "{name} propose de nouveaux créneaux"
+      },
+      "confirmed": {
+        "mine": "Vous avez confirmé {kind} : {when}",
+        "theirs": "{name} a confirmé {kind} : {when}"
+      },
+      "declined": {
+        "mine": "Vous avez refusé les créneaux proposés",
+        "theirs": "{name} a refusé les créneaux proposés"
+      },
+      "withdrawn": {
+        "mine": "Vous avez retiré votre proposition",
+        "theirs": "{name} a retiré sa proposition"
+      },
+      "cancelled": {
+        "mine": "Vous avez annulé le rendez-vous du {when}",
+        "theirs": "{name} a annulé le rendez-vous du {when}"
+      },
+      "reminder": "Rappel : {kind} le {when}"
+    },
+    "preview": {
+      "proposed": "Rendez-vous proposé",
+      "rescheduled": "Nouveaux créneaux proposés",
+      "confirmed": "Rendez-vous confirmé",
+      "declined": "Créneaux refusés",
+      "withdrawn": "Proposition retirée",
+      "cancelled": "Rendez-vous annulé",
+      "reminder": "Rappel de rendez-vous"
+    },
+    "errors": {
+      "appointment_changed": "Ce rendez-vous a changé entre-temps : voici sa dernière version.",
+      "appointment_slot_past": "Ce créneau est déjà passé. Choisissez-en un autre ou proposez d'autres créneaux."
+    }
+  },
   "Report": {
     "trigger": {
       "listing": "Signaler l'annonce",

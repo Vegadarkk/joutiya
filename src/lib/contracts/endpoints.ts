@@ -69,6 +69,8 @@ export const MESSAGING_API = {
   read: (cid: string) => `/api/conversations/${cid}/read`,
   /** POST { archived } | { hidden: true } | { blocked }. */
   state: (cid: string) => `/api/conversations/${cid}/state`,
+  /** POST AppointmentAction -> 201 AppointmentResponse (contracts/appointments.ts). */
+  appointment: (cid: string) => `/api/conversations/${cid}/appointment`,
   /** GET { total } (Valkey). */
   unread: "/api/messages/unread",
   /** GET text/event-stream of MessagingEvent (session cookie; one per tab, D2). */

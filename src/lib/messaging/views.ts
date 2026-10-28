@@ -1,5 +1,6 @@
 import "server-only";
 import { cidSchema, messageIdSchema, type ConversationView, type MessageView } from "@/lib/contracts/messaging";
+import { appointmentEventView, appointmentView } from "@/lib/appointments/views";
 import { counterpartOf, type ConversationRecord, type MessageRecord, type PagePosition } from "./repository";
 
 // What a participant sees of a conversation and its messages (design D2): documents mapped to the
@@ -23,6 +24,7 @@ export function conversationView(conversation: ConversationRecord, uid: string):
     blockedMe: conversation.blockedBy.includes(other),
     frozen: conversation.status === "frozen",
     counterpartClosed: (conversation.accountClosed ?? []).includes(other),
+    appointment: conversation.appointment ? appointmentView(conversation.appointment, uid) : null,
     updatedAt: conversation.updatedAt.getTime(),
   };
 }
@@ -36,6 +38,7 @@ export function messageView(message: MessageRecord, uid: string): MessageView {
     text: message.text,
     flags: message.risk?.flags ?? [],
     hidden: message.hidden === true,
+    ...(message.appointment ? { appointment: appointmentEventView(message.appointment, message.senderUid === uid) } : {}),
     createdAt: message.createdAt.getTime(),
     readAt: message.readAt?.getTime() ?? null,
   };
