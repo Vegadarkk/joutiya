@@ -4304,7 +4304,8 @@
       "progress": "Publication {done} sur {total}…",
       "outcome": "{published, plural, one {# annonce en ligne} other {# annonces en ligne}}, {pending_review, plural, one {# en vérification} other {# en vérification}}, {incomplete, plural, one {# incomplète} other {# incomplètes}}, {failed, plural, one {# échec} other {# échecs}}.",
       "incomplete": "{count, plural, one {# brouillon à compléter} other {# brouillons à compléter}}",
-      "realEstate": "Pour les annonces immobilières : j'atteste que leurs informations (titre de propriété, mandat, honoraires, permis, autorisation d'hébergement) sont exactes et que j'ai le droit de proposer ces biens. J'en suis seul responsable : {brand} ne les vérifie pas."
+      "realEstate": "Pour les annonces immobilières : j'atteste que leurs informations (titre de propriété, mandat, honoraires, permis, autorisation d'hébergement) sont exactes et que j'ai le droit de proposer ces biens. J'en suis seul responsable : {brand} ne les vérifie pas.",
+      "rental": "Pour les locations de voitures : je déclare que mon agence détient l'agrément de location sans chauffeur et que ces véhicules sont immatriculés pour la location, dans la limite d'âge de la flotte et assurés. Leurs informations, disponibilités et conditions engagent ma seule responsabilité : {brand} ne les vérifie pas."
     },
     "absent": {
       "title": "Véhicules absents du fichier",
