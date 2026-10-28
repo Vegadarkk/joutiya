@@ -142,6 +142,8 @@ export type ErrorCode =
   /** config/legal without a mention art. 1-1 LCEN requires (422; details: { missing }). */
   | "legal_incomplete"
   | "unavailable"
+  /** 422: a short free text (storefront bio, review) refused by the text screen; details: { field, issue }. */
+  | "invalid_text"
   | "internal";
 
 export class HttpError extends Error {

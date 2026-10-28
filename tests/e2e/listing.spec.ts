@@ -95,6 +95,7 @@ async function seed(): Promise<Fixture> {
     displayName: name,
     type: "individual",
     citySlug: "casablanca",
+    storefront: { bio: "Vélos révisés et accessoires.\nRencontre à Casablanca le week-end.", bannerKey: "arcades" },
     badges: { emailVerified: true, phoneVerified: true, proCertified: false },
     stats: { activeListings: 1, responseRate: 0, medianReplyMin: 0, ratingCount: 0 },
     status: "active",
@@ -336,6 +337,10 @@ test.describe("seller profile", () => {
     await expect(page.getByRole("heading", { level: 1 })).toContainText(fixture.name);
     await expect(page.getByTestId("profile-header")).toContainText("Membre depuis octobre 2025");
     await expect(page.getByRole("heading", { level: 2, name: "1 annonce en ligne" })).toBeVisible();
+    // Storefront (vitrine-avis §1): the chosen house banner and the "about" text.
+    await expect(page.getByTestId("storefront-banner")).toHaveAttribute("data-banner", "arcades");
+    await expect(page.getByRole("heading", { level: 2, name: "À propos" })).toBeVisible();
+    await expect(page.getByText("Rencontre à Casablanca le week-end.")).toBeVisible();
     const cards = page.getByTestId("listing-card");
     await expect(cards).toHaveCount(1);
     await expect(page.getByText(fixture.sold.title)).toHaveCount(0);

@@ -364,6 +364,29 @@
         "save": "Enregistrer",
         "saved": "Profil enregistré"
       },
+      "storefront": {
+        "title": "Ma vitrine",
+        "body": "Votre page publique : une bannière, quelques mots sur vous et la ville affichée. Vos annonces s'y ajoutent d'elles-mêmes.",
+        "banner": "Bannière",
+        "banners": {
+          "zellige": "Zellige vert",
+          "zellige-ochre": "Zellige ocre",
+          "arcades": "Arcades",
+          "losanges": "Losanges dorés",
+          "dunes": "Dunes",
+          "nuit": "Nuit étoilée"
+        },
+        "bio": "Présentation",
+        "bioHint": "Ce que vous vendez, quand vous êtes disponible pour une rencontre… Sans numéro ni lien : les acheteurs vous écrivent par la messagerie.",
+        "bioCount": "{count} sur {max} caractères",
+        "cityHint": "Facultatif. Seule la ville apparaît, jamais votre adresse.",
+        "cityRemove": "Ne plus afficher de ville",
+        "save": "Enregistrer la vitrine",
+        "saved": "Vitrine enregistrée",
+        "view": "Voir ma vitrine",
+        "loading": "Chargement de la vitrine",
+        "retry": "Réessayer"
+      },
       "password": {
         "title": "Mot de passe",
         "body": "Choisissez un mot de passe que vous n'utilisez nulle part ailleurs.",
@@ -490,7 +513,8 @@
       "unavailable": "Le service est momentanément indisponible. Réessayez dans quelques minutes.",
       "internal": "Une erreur technique est survenue. Réessayez.",
       "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez.",
-      "quota_exhausted": "Cette action est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc)."
+      "quota_exhausted": "Cette action est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc).",
+      "invalid_text": "Le texte contient un élément refusé. Corrigez-le puis réessayez."
     }
   },
   "Listing": {
@@ -2363,7 +2387,24 @@
     "meta": {
       "title": "Annonces de {name}",
       "description": "{name}, membre depuis {date} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya."
+    },
+    "about": "À propos",
+    "seeAll": "Voir toutes ses annonces dans la recherche",
+    "shelf": {
+      "sort": "Trier",
+      "recent": "Plus récentes",
+      "priceAsc": "Prix croissant",
+      "priceDesc": "Prix décroissant",
+      "filter": "Filtrer par catégorie",
+      "all": "Toutes"
     }
+  },
+  "FreeText": {
+    "phone_in_text": "Retirez le numéro de téléphone : les acheteurs vous contactent par la messagerie.",
+    "email_in_text": "Retirez l'adresse e-mail : les acheteurs vous contactent par la messagerie.",
+    "url_in_text": "Retirez le lien : les liens ne sont pas affichés.",
+    "prohibited": "Ce texte mentionne un objet interdit à la vente.",
+    "sensitive": "Retirez les informations personnelles sensibles (santé, religion, opinions, origine…)."
   },
   "Seo": {
     "breadcrumb": "Fil d'Ariane",

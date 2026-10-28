@@ -1,5 +1,6 @@
 import "server-only";
 import type { Condition } from "@/config/categories";
+import { DEFAULT_BANNER, type BannerKey } from "@/config/storefront";
 import type { ListingAttributes, ListingStatus } from "@/lib/contracts/listings";
 import type { PhotoVariant } from "@/lib/contracts/photo-variants";
 import { COLLECTIONS } from "@/lib/db/schemas";
@@ -228,6 +229,9 @@ export interface PublicSeller {
   citySlug: string | null;
   /** Listings online right now (count aggregation: one read per 1 000). */
   publishedCount: number;
+  /** Storefront (vitrine-avis §1): the "about" text, if any, and the house banner. */
+  bio: string | null;
+  bannerKey: BannerKey;
 }
 
 /**
@@ -250,6 +254,8 @@ function toSeller(user: UserRecord, publishedCount: number): PublicSeller {
     badges: user.badges,
     citySlug: user.citySlug ?? null,
     publishedCount,
+    bio: user.storefront?.bio ?? null,
+    bannerKey: user.storefront?.bannerKey ?? DEFAULT_BANNER,
   };
 }
 
