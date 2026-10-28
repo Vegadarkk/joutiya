@@ -70,9 +70,10 @@ describe("CriteriaGrid", () => {
       />,
     );
     const labels = [...html.matchAll(/<dt[^>]*>([^<]*)<\/dt>/g)].map((match) => match[1]);
-    expect(labels).toEqual(["État", "Marque", "Modèle", "Année-modèle", "Kilométrage", "Carburant", "Boîte de vitesses", "Première main"]);
+    // "Première main" belongs to the vehicle dossier (its own section, vehicle-dossier.tsx).
+    expect(labels).toEqual(["État", "Marque", "Modèle", "Année-modèle", "Kilométrage", "Carburant", "Boîte de vitesses"]);
     const values = [...html.matchAll(/<dd[^>]*>([^<]*)<\/dd>/g)].map((match) => match[1]);
-    expect(values).toEqual(["Très bon état", "Dacia", "Logan", "2019", `120${NNBSP}000 km`, "Diesel", "Manuelle", "Oui"]);
+    expect(values).toEqual(["Très bon état", "Dacia", "Logan", "2019", `120${NNBSP}000 km`, "Diesel", "Manuelle"]);
   });
 
   it("joins multiselect options, renders surfaces in m² and skips empty values", () => {

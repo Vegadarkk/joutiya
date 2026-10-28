@@ -32,6 +32,7 @@ interface Fixture {
   name: string;
   published: { id: string; slugId: string; title: string };
   sold: { id: string; slugId: string; title: string };
+  car: { id: string; slugId: string; title: string };
 }
 
 /** Writes both WebP variants of a photo where the dev storage route serves them. */
@@ -116,7 +117,43 @@ async function seed(): Promise<Fixture> {
   const soldId = randomId(8);
   const sold = { id: soldId, slugId: `casque-velo-casablanca-${soldId}`, title: "Casque vélo" };
   await firestore.collection("listings").doc(soldId).set(listingDoc({ uid, publicId, name, ...sold, status: "sold", photos: [] }));
-  return { publicId, name, published, sold };
+  // A car with its dossier (Concession pack), by another seller so the profile counts stay as they are.
+  const carUid = `e2e-seller-${randomId(12)}`;
+  const carPublicId = randomId(10);
+  await firestore
+    .collection("users")
+    .doc(carUid)
+    .set({ ...(await firestore.collection("users").doc(uid).get()).data(), publicId: carPublicId, displayName: "Karim Test" });
+  const carId = randomId(8);
+  const car = { id: carId, slugId: `dacia-duster-casablanca-${carId}`, title: "Dacia Duster 2022" };
+  const carPhotoId = `e2ephotoc${randomId(6)}`;
+  await firestore
+    .collection("listings")
+    .doc(carId)
+    .set({
+      ...listingDoc({ uid: carUid, publicId: carPublicId, name: "Karim Test", ...car, status: "published", photos: [{ id: carPhotoId, ...(await storePhoto(carId, carPhotoId, { r: 120, g: 120, b: 128 })), blurhash: BLURHASH }] }),
+      subcategoryId: "voitures",
+      description: "Duster 1.5 dCi, entretien complet chez le concessionnaire, aucun accident.",
+      attributes: {
+        "car-brand": "dacia",
+        model: "Duster",
+        year: 2022,
+        mileage: 41000,
+        fuel: "diesel",
+        gearbox: "manuelle",
+        origin: "pas-dedouanee",
+        "body-type": "suv-4x4",
+        "first-hand": true,
+        "service-history": "complet",
+        "vehicle-papers": ["carte-grise", "visite-technique"],
+        "vehicle-warranty": "constructeur",
+        "warranty-months": 12,
+        "trade-in": true,
+        "car-equipment": ["climatisation", "camera-recul"],
+      },
+      price: 189000,
+    });
+  return { publicId, name, published, sold, car };
 }
 
 /** Collects CSP violations reported by the page itself. */
@@ -180,6 +217,27 @@ test.describe("listing page", () => {
 
     await page.waitForLoadState("networkidle");
     expect(violations).toEqual([]);
+  });
+
+  test("shows a car's dossier and the Moroccan buying guide", { tag: "@mobile" }, async ({ page }) => {
+    await page.goto(`/fr/annonce/${fixture.car.slugId}`);
+    const dossier = page.getByTestId("vehicle-dossier");
+    await expect(dossier.getByRole("heading", { name: "Dossier du véhicule" })).toBeVisible();
+    await expect(dossier.getByTestId("dossier-warranty")).toContainText("Garantie constructeur");
+    await expect(dossier.getByTestId("dossier-warranty")).toContainText("12 mois");
+    await expect(dossier.getByTestId("dossier-trade-in")).toBeVisible();
+    await expect(dossier).toContainText("Caméra de recul");
+    // The dossier stays out of the main criteria.
+    await expect(page.getByTestId("criteria-grid")).not.toContainText("Première main");
+    await expect(page.getByTestId("criteria-grid")).toContainText("SUV / 4x4");
+    const guide = page.getByTestId("vehicle-buying-guide");
+    await expect(guide.getByRole("heading", { name: "Acheter ce véhicule au Maroc" })).toBeVisible();
+    await expect(guide).toContainText("NARSA");
+    await expect(guide.getByTestId("buying-guide-customs")).toBeVisible();
+    // A bicycle gets neither.
+    await page.goto(`/fr/annonce/${fixture.published.slugId}`);
+    await expect(page.getByTestId("vehicle-buying-guide")).toHaveCount(0);
+    await expect(page.getByTestId("vehicle-dossier")).toHaveCount(0);
   });
 
   test("publishes Product structured data without any contact data", async ({ page }) => {

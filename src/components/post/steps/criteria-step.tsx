@@ -3,7 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { ErrorBanner } from "@/components/feedback/error-banner";
-import { criterionById, subcategoryById, type Condition } from "@/config/categories";
+import { criterionApplies, criterionById, subcategoryById, type Condition } from "@/config/categories";
 import type { FieldIssue } from "@/lib/contracts/listings";
 import { useWizard } from "@/lib/listings/client/store";
 import { criterionBounds, stepIssues } from "@/lib/listings/client/validation";
@@ -42,6 +42,10 @@ export function CriteriaStep({ onNext }: { onNext: () => void }) {
     const attributes = { ...listing.attributes };
     if (value === undefined) delete attributes[id];
     else attributes[id] = value;
+    // A dependent criterion (a warranty's duration) goes with the value that opened it.
+    for (const criterion of subcategory?.criteria ?? []) {
+      if (criterion.showIf?.id === id && !criterionApplies(criterion, attributes)) delete attributes[criterion.id];
+    }
     update({ attributes });
   }
 
@@ -62,7 +66,7 @@ export function CriteriaStep({ onNext }: { onNext: () => void }) {
       ) : (
         <>
           <p className="text-sm text-foreground-muted">{t("wizard.requiredHint")}</p>
-          <CriteriaFields subcategory={subcategory} attributes={listing.attributes} condition={listing.condition} errors={errors} onAttribute={onAttribute} onCondition={onCondition} onBlur={() => void flush()} />
+          <CriteriaFields subcategory={subcategory} attributes={listing.attributes} condition={listing.condition} errors={errors} onAttribute={onAttribute} onCondition={onCondition} onBlur={() => void flush()} pro={listing.sellerType === "pro"} />
         </>
       )}
     </form>

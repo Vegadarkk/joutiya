@@ -21,6 +21,7 @@ const FLAGS: Record<MailLocale, Record<string, string>> = {
     new_account: "compte créé récemment",
     volume: "nombre élevé d'annonces déposées en 24 heures",
     restricted_category: "catégorie réservée aux personnes majeures : chaque annonce est vérifiée par un modérateur avant sa mise en ligne",
+    credit_ad: "mensualité de crédit annoncée sans le taux effectif global (TEG) ni les mentions obligatoires de la loi 31-08",
   },
   ar: {
     prohibited_kw: "ذكر غرض أو خدمة ممنوعة على Joutiya",
@@ -35,6 +36,7 @@ const FLAGS: Record<MailLocale, Record<string, string>> = {
     new_account: "حساب أُنشئ مؤخرًا",
     volume: "عدد كبير من الإعلانات المودعة خلال 24 ساعة",
     restricted_category: "فئة مخصصة للبالغين: يراجع مشرف كل إعلان قبل نشره",
+    credit_ad: "قسط قرض معلن دون السعر الفعلي الإجمالي ولا البيانات الإلزامية للقانون 31.08",
   },
 };
 

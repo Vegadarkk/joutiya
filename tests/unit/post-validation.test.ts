@@ -10,6 +10,7 @@ function draft(overrides: Partial<OwnerListing> = {}): OwnerListing {
     id: "abcdefgh",
     slugId: null,
     status: "draft",
+    sellerType: "individual",
     pausedReason: null,
     categoryId: null,
     subcategoryId: null,

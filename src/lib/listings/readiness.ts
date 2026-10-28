@@ -1,4 +1,4 @@
-import { criteriaSchema, subcategoryById, type Subcategory } from "@/config/categories";
+import { criteriaSchema, criterionApplies, subcategoryById, type Subcategory } from "@/config/categories";
 import { listingQuotas, type Seller } from "@/config/pricing";
 import { cityBySlug } from "@/config/regions";
 import { descriptionSchema, titleSchema, type FieldIssue } from "@/lib/contracts/listings";
@@ -94,6 +94,17 @@ function attributeIssues(attributes: Candidate["attributes"], subcategory: Subca
   return [...seen].map(([path, code]) => issue(path, code));
 }
 
+/** Pro-only criteria (stock reference) and dependent ones (a warranty's duration needs a warranty). */
+function dossierIssues(attributes: Candidate["attributes"], subcategory: Subcategory, seller: Seller): FieldIssue[] {
+  const issues: FieldIssue[] = [];
+  for (const criterion of subcategory.criteria) {
+    if (attributes[criterion.id] === undefined) continue;
+    if (criterion.proOnly && seller.type !== "pro") issues.push(issue(`attributes.${criterion.id}`, "pro_only"));
+    else if (!criterionApplies(criterion, attributes)) issues.push(issue(`attributes.${criterion.id}`, "criterion_invalid"));
+  }
+  return issues;
+}
+
 function priceIssues(listing: Candidate, subcategory: Subcategory): FieldIssue[] {
   const issues: FieldIssue[] = [];
   if (listing.isDonation) {
@@ -129,6 +140,7 @@ export function assessReadiness(listing: Candidate, facts: SellerFacts): FieldIs
   issues.push(...tree.issues);
   if (tree.subcategory) {
     issues.push(...attributeIssues(listing.attributes, tree.subcategory));
+    issues.push(...dossierIssues(listing.attributes, tree.subcategory, facts.seller));
     if (tree.subcategory.condition === "required" && !listing.condition) issues.push(issue("condition", "condition_required"));
     issues.push(...priceIssues(listing, tree.subcategory));
   }
