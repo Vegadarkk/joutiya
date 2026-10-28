@@ -45,12 +45,14 @@ await build({
   ...common,
   // Search scripts run in the worker image (design D3, D12): `node dist/worker/reindex-search.mjs`,
   // `node dist/worker/search-setup.mjs` (with the master key of meilisearch.env in its environment);
-  // so does the P0 drill (phase 6 D16): `node dist/worker/alert-drill.mjs`.
+  // so do the P0 drill (phase 6 D16): `node dist/worker/alert-drill.mjs`, and the load test data
+  // set (D17): `node dist/worker/seed-loadtest.mjs`.
   entryPoints: {
     "worker/index": "src/worker/index.ts",
     "worker/reindex-search": "scripts/reindex-search.ts",
     "worker/search-setup": "scripts/search-setup.ts",
     "worker/alert-drill": "scripts/alert-drill.ts",
+    "worker/seed-loadtest": "scripts/seed-loadtest.ts",
   },
   packages: "external",
   // The web server revalidates ISR pages itself; Node cannot import "next/cache" from the worker.
@@ -58,7 +60,7 @@ await build({
 });
 
 const worker = "dist/worker/index.mjs";
-const { fileList, warnings } = await nodeFileTrace([worker, "dist/worker/reindex-search.mjs", "dist/worker/search-setup.mjs", "dist/worker/alert-drill.mjs"], { base: root });
+const { fileList, warnings } = await nodeFileTrace([worker, "dist/worker/reindex-search.mjs", "dist/worker/search-setup.mjs", "dist/worker/alert-drill.mjs", "dist/worker/seed-loadtest.mjs"], { base: root });
 for (const warning of warnings) {
   // Expected: optional dependencies that are not installed, and non-JS assets (proto LICENSE files).
   if (!/Cannot find module|Failed to resolve dependency|Failed to parse/.test(warning.message)) console.warn(`trace: ${warning.message}`);

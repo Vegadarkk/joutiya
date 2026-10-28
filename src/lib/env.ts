@@ -49,6 +49,8 @@ const schema = z.object({
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   RELEASE: optional,
   CSP_REPORT_ONLY: flag,
+  /** Staging only: requests carrying it in x-joutiya-loadtest skip the app's rate limits (load test, phase 6 D17). */
+  LOADTEST_BYPASS_SECRET: optional,
   QUEUE_REDIS_URL: optional,
   RATE_LIMIT_REDIS_URL: optional,
   TELEGRAM_BOT_TOKEN: optional,
@@ -277,6 +279,9 @@ export function parseEnv(source: Record<string, string | undefined>): ParsedEnv 
     }
     // §6: report-only is a staging tool; production enforces its CSP.
     if (env.APP_ENV === "prod" && env.CSP_REPORT_ONLY) errors.push("CSP_REPORT_ONLY must not be set in prod");
+    // The load test bypass exists for staging only, and a short secret could be guessed.
+    if (env.APP_ENV === "prod" && env.LOADTEST_BYPASS_SECRET) errors.push("LOADTEST_BYPASS_SECRET must not be set in prod");
+    if (env.LOADTEST_BYPASS_SECRET && !/^[A-Za-z0-9]{32,128}$/.test(env.LOADTEST_BYPASS_SECRET)) errors.push("LOADTEST_BYPASS_SECRET must be 32 to 128 letters and digits");
     // A leftover phase 1 name would be silently ignored: refuse it so the rename is not missed.
     for (const name of legacy) errors.push(`${name} is no longer read: use ${name.replace("NEXT_PUBLIC_", "")} (runtime configuration)`);
   } else if (legacy.length > 0) {

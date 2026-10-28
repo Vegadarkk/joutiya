@@ -1,0 +1,18 @@
+# ZAP rule configuration (D18), for zap-baseline.py and zap-full-scan.py (-c): rule id, tab, WARN | IGNORE | FAIL, tab, name.
+# Rules not listed stay WARN. FAIL fails the scan job; WARN goes to the encrypted report.
+10011	FAIL	(Cookie Without Secure Flag)
+10020	FAIL	(Missing Anti-clickjacking Header)
+10021	FAIL	(X-Content-Type-Options Header Missing)
+10035	FAIL	(Strict-Transport-Security Header Not Set)
+10038	FAIL	(Content Security Policy (CSP) Header Not Set)
+10054	FAIL	(Cookie without SameSite Attribute)
+40012	FAIL	(Cross Site Scripting (Reflected))
+40014	FAIL	(Cross Site Scripting (Persistent))
+40018	FAIL	(SQL Injection)
+90020	FAIL	(Remote OS Command Injection)
+6	FAIL	(Path Traversal)
+7	FAIL	(Remote File Inclusion)
+# jt_consent is read by the page script (consent banner, D1): not HttpOnly on purpose.
+10010	WARN	(Cookie No HttpOnly Flag)
+# State-changing requests carry the CSRF header (§6), not a form token.
+10202	IGNORE	(Absence of Anti-CSRF Tokens)

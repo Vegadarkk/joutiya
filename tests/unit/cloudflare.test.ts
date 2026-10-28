@@ -5,6 +5,10 @@ import {
   containsEdge,
   dnsChange,
   googleIdp,
+  LOADTEST_RULE_REF,
+  loadtestRule,
+  loadtestRuleset,
+  redact,
   needsAccess,
   preflightErrors,
   readEdgeFile,
@@ -194,5 +198,34 @@ describe("zone --check", () => {
     const values = Object.fromEntries(settings.settings.map((setting) => [setting.id, setting.value]));
     expect(settingsDrift(settings, values)).toEqual([]);
     expect(settingsDrift(settings, { ...values, email_obfuscation: "on" })).toEqual(['setting email_obfuscation is "on", expected "off"']);
+  });
+});
+
+describe("load test rule", () => {
+  const secret = "a".repeat(20) + "B9".repeat(10);
+  const waf = readEdgeFile<Ruleset>("waf-rules.json");
+
+  it("skips the edge limits for staging requests carrying the secret header only", () => {
+    const rule = loadtestRule(secret);
+    expect(rule.expression).toBe(`http.host eq "staging.joutiya.ma" and any(http.request.headers["x-joutiya-loadtest"][*] eq "${secret}")`);
+    expect(rule.action_parameters).toEqual({ phases: ["http_ratelimit", "http_request_firewall_managed"], products: ["bic", "securityLevel"] });
+  });
+
+  it("refuses a secret that could change the expression", () => {
+    for (const bad of ["short", `${"a".repeat(32)}" or true or "`, `${"a".repeat(31)} `]) expect(() => loadtestRule(bad)).toThrow(/32 to 128/);
+  });
+
+  it("goes first, within the Free limit, and goes away with the committed rules", () => {
+    const on = loadtestRuleset(waf, secret);
+    expect(on.rules.map((rule) => rule.ref)).toEqual([LOADTEST_RULE_REF, ...waf.rules.map((rule) => rule.ref)]);
+    expect(loadtestRuleset(on, secret).rules).toHaveLength(on.rules.length);
+    expect(loadtestRuleset(waf, null)).toBe(waf);
+    expect(() => loadtestRuleset({ ...waf, rules: [...waf.rules, { ...waf.rules[0]!, ref: "extra" }] }, secret)).toThrow(/Free allows 5/);
+  });
+
+  it("never prints the secret", () => {
+    const shown = JSON.stringify(redact({ rules: loadtestRuleset(waf, secret).rules }, secret));
+    expect(shown).not.toContain(secret);
+    expect(shown).toContain('eq \\"***\\"');
   });
 });

@@ -15,6 +15,7 @@ import {
   SHAPE,
   SMALL_SHAPE_CONFIG,
   bootstrapLines,
+  cpuScript,
   buildUserData,
   deployScript,
   deployStagingKey,
@@ -349,5 +350,20 @@ describe("build-staging", () => {
     expect(script).toContain("/etc/joutiya/staging/app.env");
     expect(script.indexOf("the start waits for")).toBeLessThan(script.indexOf("joutiya-deploy staging"));
     expect(() => buildStagingScript("main; rm -rf /")).toThrow("--commit");
+  });
+});
+
+describe("cpuScript", () => {
+  it("samples every 5 s for the minutes asked, 1 to 15", () => {
+    expect(cpuScript(8)).toContain("$(seq 96)");
+    for (const minutes of [0, 16, 2.5, Number.NaN]) expect(() => cpuScript(minutes)).toThrow(/1 to 15/);
+  });
+
+  it("prints the busy share of each CPU from /proc/stat", () => {
+    const script = cpuScript(1).replace("$(seq 12)", "$(seq 1)").replace("sleep 5", "sleep 1");
+    const result = spawnSync("bash", ["-euo", "pipefail", "-c", script], { encoding: "utf8" });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toMatch(/^cpu +avg +[\d.]+ %  peak +[\d.]+ %  \(1 samples\)$/m);
+    expect(result.stdout).toMatch(/^cpu0 /m);
   });
 });

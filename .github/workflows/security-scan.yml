@@ -1,0 +1,120 @@
+name: Security scan
+
+# OWASP ZAP (D18, docs/lancement/securite.md): passive baseline of staging every Monday and on
+# demand; the active full scan on demand only (once before v1.0.0); a passive baseline of
+# production after the launch. ZAP runs in its pinned image, without a third-party action.
+#
+# Staging is behind Cloudflare Access: the scanner sends the Access service token "joutiya-scan" in
+# single-header mode (ZAP adds one header to its requests, only for the staging host), whose
+# header name is the repository variable ACCESS_TOKEN_HEADER and whose value is the JSON
+# {"cf-access-client-id": "...", "cf-access-client-secret": "..."} in the secret
+# STAGING_SCAN_ACCESS_TOKEN. The workflow stays inert until the variable SECURITY_SCAN_ENABLED=true.
+#
+# The repository is public until the launch, and so are its logs and artifacts: the log shows alert
+# counts only, and the reports are encrypted with age for SCAN_REPORT_AGE_RECIPIENT (the owner's
+# public key, `age1...`) before upload. Read them with `age -d -i <key> zap-reports.tar.age | tar -x`.
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "baseline (passive) or full (active, staging only)"
+        type: choice
+        options: [baseline, full]
+        default: baseline
+      target:
+        type: choice
+        options: [staging, prod]
+        default: staging
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: security-scan
+  cancel-in-progress: false
+
+jobs:
+  zap:
+    name: ZAP ${{ inputs.mode || 'baseline' }} (${{ inputs.target || 'staging' }})
+    if: vars.SECURITY_SCAN_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      ZAP_IMAGE: ghcr.io/zaproxy/zaproxy:2.17.0@sha256:030d3df57735dacbb83464854758e674dd9ad01d79d12a129a8e58b1fd384238
+      MODE: ${{ inputs.mode || 'baseline' }}
+      TARGET: ${{ inputs.target || 'staging' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check the settings
+        env:
+          RECIPIENT: ${{ vars.SCAN_REPORT_AGE_RECIPIENT }}
+          HEADER: ${{ vars.ACCESS_TOKEN_HEADER }}
+          HAS_TOKEN: ${{ secrets.STAGING_SCAN_ACCESS_TOKEN != '' }}
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [[ "$RECIPIENT" =~ ^age1[02-9ac-hj-np-z]{58}$ ]] || fail "SCAN_REPORT_AGE_RECIPIENT is not an age public key"
+          [[ "$MODE" == "baseline" || "$TARGET" == "staging" ]] || fail "the active full scan runs against staging only"
+          if [[ "$TARGET" == "staging" ]]; then
+            [[ "$HEADER" =~ ^[A-Za-z0-9-]+$ ]] || fail "ACCESS_TOKEN_HEADER is not set"
+            [[ "$HAS_TOKEN" == "true" ]] || fail "STAGING_SCAN_ACCESS_TOKEN is not set"
+          fi
+      - name: Scan
+        id: scan
+        env:
+          ZAP_AUTH_HEADER: ${{ vars.ACCESS_TOKEN_HEADER }}
+          ZAP_AUTH_HEADER_VALUE: ${{ secrets.STAGING_SCAN_ACCESS_TOKEN }}
+          ZAP_AUTH_HEADER_SITE: staging.joutiya.ma
+        run: |
+          if [[ "$TARGET" == "staging" ]]; then url="https://staging.joutiya.ma/fr"; else url="https://joutiya.ma/fr"; unset ZAP_AUTH_HEADER ZAP_AUTH_HEADER_VALUE ZAP_AUTH_HEADER_SITE; fi
+          if [[ "$MODE" == "full" ]]; then script=zap-full-scan.py; minutes=10; else script=zap-baseline.py; minutes=3; fi
+          work="$RUNNER_TEMP/zap"
+          install -d -m 0777 "$work"
+          cp .zap/rules.tsv "$work/rules.tsv"
+          docker pull --quiet "$ZAP_IMAGE"
+          set +e
+          # Console output to the encrypted report only: it lists URLs and findings.
+          docker run --rm -v "$work:/zap/wrk:rw" -e ZAP_AUTH_HEADER -e ZAP_AUTH_HEADER_VALUE -e ZAP_AUTH_HEADER_SITE \
+            "$ZAP_IMAGE" "$script" -t "$url" -c rules.tsv -m "$minutes" -T 60 -J report.json -r report.html > "$work/console.txt" 2>&1
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          # 0: no alert, 1: at least one FAIL rule, 2: WARN only, 3: scan error.
+          if [[ -s "$work/report.json" ]]; then
+            jq -r '[.site[]?.alerts[]? | .riskcode] | "Alerts: high \(map(select(. == "3")) | length), medium \(map(select(. == "2")) | length), low \(map(select(. == "1")) | length), info \(map(select(. == "0")) | length)"' "$work/report.json"
+          fi
+          echo "ZAP exit code $code"
+      - name: Encrypt the reports
+        if: always() && steps.scan.outcome != 'skipped'
+        env:
+          RECIPIENT: ${{ vars.SCAN_REPORT_AGE_RECIPIENT }}
+        run: |
+          sudo apt-get install -y -qq age > /dev/null
+          work="$RUNNER_TEMP/zap"
+          files=()
+          for file in report.json report.html console.txt; do if [[ -f "$work/$file" ]]; then files+=("$file"); fi; done
+          [[ ${#files[@]} -gt 0 ]] || { echo "::error::no report to encrypt"; exit 1; }
+          tar -C "$work" -cf - "${files[@]}" | age -r "$RECIPIENT" -o "$RUNNER_TEMP/zap-reports.tar.age"
+          rm -rf "$work"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && steps.scan.outcome != 'skipped'
+        with:
+          name: zap-${{ env.MODE }}-${{ env.TARGET }}
+          path: ${{ runner.temp }}/zap-reports.tar.age
+          retention-days: 30
+          if-no-files-found: error
+      - name: Verdict
+        env:
+          CODE: ${{ steps.scan.outputs.code }}
+        run: |
+          case "$CODE" in
+            0|2) echo "No FAIL rule matched (warnings, if any, are in the report)." ;;
+            1) echo "::error::At least one FAIL rule of .zap/rules.tsv matched: read the report"; exit 1 ;;
+            *) echo "::error::The scan did not complete (exit code $CODE): read console.txt in the report"; exit 1 ;;
+          esac

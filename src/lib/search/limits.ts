@@ -5,6 +5,7 @@ import { serverEnv } from "@/lib/env";
 import { HttpError, rateLimited } from "@/lib/http/errors";
 import { requestIdentity } from "@/lib/rate-limit/keys";
 import { consumeLimit, type LimitOutcome } from "@/lib/rate-limit/limiter";
+import { isLoadTestRequest } from "@/lib/rate-limit/loadtest";
 import { assertChallengeBudget, recordChallengeFailure } from "@/lib/security/challenge-handler";
 import { hasChallengePass } from "@/lib/security/challenge-pass";
 import { verifyTurnstile, type TurnstileAction } from "@/lib/security/turnstile";
@@ -26,6 +27,8 @@ const isLimited = (outcome: LimitOutcome): boolean => !outcome.ok && outcome.rea
  * `turnstile_required` / `turnstile_failed` or 429.
  */
 export async function enforceSearchLimit(request: Request): Promise<{ passGranted: boolean }> {
+  // The staging load test (src/lib/rate-limit/loadtest.ts) measures the engine, not the limits.
+  if (isLoadTestRequest(request.headers)) return { passGranted: false };
   const identity = requestIdentity(request.headers);
   // Local signature check only (no revocation lookup); an invalid cookie counts as the device.
   const viewer = await optionalUser(request);

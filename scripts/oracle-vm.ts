@@ -61,6 +61,9 @@
 //       (`vX.Y.Z` or `vX.Y.Z-rc.N`, pushed after release.yml checked it) and a commit of origin/main.
 //   node scripts/oracle-vm.ts rollback [--apply]
 //       production back to its previous release, then the cache is purged.
+//   node scripts/oracle-vm.ts cpu --minutes=<n>
+//       samples the VM's CPU every 5 s for n minutes (1 to 15; read only, also without --apply) and
+//       prints the average and peak busy share of each CPU and of the whole host (load test, D17).
 //
 // Environment (never printed): JOUTIYA_OCI_TENANCY, _USER, _FINGERPRINT, _REGION, _COMPARTMENT,
 // _KEY_B64 (base64 of the PEM key of joutiya-claude), JOUTIYA_CLOUDFLARE_API_TOKEN.
@@ -728,6 +731,34 @@ export const SYNC_DIR = "/var/lib/joutiya/sync";
  * A root script as Run Command text: ocarun writes it to a temporary file, root runs it through
  * sudo in strict mode, stdin closed (a command reading stdin cannot eat the rest of the script).
  */
+export const CPU_SAMPLE_SECONDS = 5;
+
+/**
+ * Bash that reads /proc/stat every 5 s for `minutes` and prints, per CPU and for the host, the
+ * average and peak busy share (everything but idle and iowait): a few lines, within Run Command's
+ * 1 KB of output.
+ */
+export function cpuScript(minutes: number): string {
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 15) throw new Error("--minutes must be 1 to 15");
+  const samples = (minutes * 60) / CPU_SAMPLE_SECONDS;
+  return [
+    `prev="$(grep '^cpu' /proc/stat)"`,
+    `for _ in $(seq ${samples}); do`,
+    `  sleep ${CPU_SAMPLE_SECONDS}`,
+    `  cur="$(grep '^cpu' /proc/stat)"`,
+    `  paste -d' ' <(echo "$prev") <(echo "$cur")`,
+    `  prev="$cur"`,
+    `done | awk '{`,
+    // Each line: the previous then the current row of one CPU; user..steal only (guest is in user).
+    `  n = NF / 2; t0 = 0; t1 = 0`,
+    `  for (i = 2; i <= 9; i++) { t0 += $i; t1 += $(n + i) }`,
+    `  idle = ($(n + 5) + $(n + 6)) - ($5 + $6); total = t1 - t0`,
+    `  busy = total > 0 ? 100 * (total - idle) / total : 0`,
+    `  sum[$1] += busy; count[$1]++; if (busy > peak[$1]) peak[$1] = busy`,
+    `} END { for (cpu in sum) printf "%-5s avg %5.1f %%  peak %5.1f %%  (%d samples)\\n", cpu, sum[cpu] / count[cpu], peak[cpu], count[cpu] }' | sort`,
+  ].join("\n");
+}
+
 export function rootCommand(script: string): string {
   if (script.split("\n").includes(ROOT_SCRIPT_END)) throw new Error(`a line of the script is ${ROOT_SCRIPT_END}`);
   const text = [
@@ -851,6 +882,14 @@ async function agent(oci: Oci, compartmentId: string): Promise<void> {
   }
   const plugins = await oci.call<{ name: string; status: string; message?: string }[]>("GET", "iaas", `/20180530/instanceagents/${instance.id}/plugins${query({ compartmentId })}`);
   for (const plugin of plugins) console.log(`plugin   ${plugin.name}: ${plugin.status}${plugin.message ? ` (${plugin.message})` : ""}`);
+}
+
+async function cpu(oci: Oci, compartmentId: string, minutes: number): Promise<void> {
+  const script = cpuScript(minutes);
+  const instance = await runningInstance(oci, compartmentId);
+  console.log(`sampling the CPU of ${NAMES.instance} for ${minutes} min (starts when the agent picks the command up)`);
+  const output = await runCommand(oci, compartmentId, instance.id, `joutiya-cpu ${minutes}m`, rootCommand(script), minutes * 60 + 120, true);
+  console.log(output.trimEnd());
 }
 
 async function run(oci: Oci, compartmentId: string, file: string): Promise<void> {
@@ -1395,12 +1434,12 @@ async function main(): Promise<void> {
   const [action, file] = args.filter((arg) => !arg.startsWith("--"));
   const retry = Number(/^--retry-minutes=(\d+)$/.exec(args.find((arg) => arg.startsWith("--retry-minutes=")) ?? "")?.[1] ?? 0);
   const smallFallback = args.includes("--small-fallback");
-  const actions = ["create", "launcher", "tunnels", "transfer", "build-staging", "rebuild", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback"];
+  const actions = ["create", "launcher", "tunnels", "transfer", "build-staging", "rebuild", "status", "reboot", "agent", "run", "sync", "env", "search-setup", "wif", "deploy-status", "promote", "rollback", "cpu"];
   const perEnv = action === "env" || action === "search-setup" || action === "wif";
   const argument = action === "run" || perEnv;
   if (!action || !actions.includes(action) || argument !== (file !== undefined) || (perEnv && !(DEPLOYED_ENVS as readonly string[]).includes(file ?? ""))) {
     throw new Error(
-      "usage: scripts/oracle-vm.ts <create|launcher|tunnels|transfer|build-staging [--commit=<sha>]|rebuild [--keep-disk]|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|--sealed=<file>[,...]|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote --tag=vX.Y.Z|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
+      "usage: scripts/oracle-vm.ts <create|launcher|tunnels|transfer|build-staging [--commit=<sha>]|rebuild [--keep-disk]|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|--sealed=<file>[,...]|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote --tag=vX.Y.Z|rollback|cpu --minutes=<n>> [--apply] [--retry-minutes=<n>] [--small-fallback]",
     );
   }
 
@@ -1436,9 +1475,10 @@ async function main(): Promise<void> {
     else await envFiles(oci, targets, compartment, file as DeployedEnv, froms);
   }
   else if (action === "deploy-status") await release(oci, targets, compartment, "status");
+  else if (action === "cpu") await cpu(oci, compartment, Number(args.find((arg) => arg.startsWith("--minutes="))?.slice("--minutes=".length) ?? "NaN"));
   else if (action === "promote" || action === "rollback") await release(oci, targets, compartment, action, args.find((arg) => arg.startsWith("--tag="))?.slice("--tag=".length));
   else await status(oci, targets, compartment);
-  if (!["status", "agent", "deploy-status", "launcher"].includes(action)) console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
+  if (!["status", "agent", "deploy-status", "launcher", "cpu"].includes(action)) console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
 }
 
 const self = fileURLToPath(import.meta.url);

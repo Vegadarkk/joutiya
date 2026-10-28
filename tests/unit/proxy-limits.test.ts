@@ -98,6 +98,24 @@ describe("checkPageLimits", () => {
     await expect(checkPageLimits(request({}, { "x-verified-bot": "true" }))).resolves.toMatchObject({ kind: "challenge" });
   });
 
+  it("exempts the staging load test only with its secret, never outside staging", async () => {
+    const secret = "Lt".repeat(20);
+    store.outcomes.set("pages.ip", LIMITED);
+    process.env.LOADTEST_BYPASS_SECRET = secret;
+    try {
+      process.env.APP_ENV = "staging";
+      resetServerEnv();
+      await expect(checkPageLimits(request({}, { "x-joutiya-loadtest": secret }))).resolves.toEqual({ kind: "allow" });
+      expect(store.calls).toEqual([]);
+      await expect(checkPageLimits(request({}, { "x-joutiya-loadtest": "wrong" }))).resolves.toMatchObject({ kind: "challenge" });
+      process.env.APP_ENV = "prod";
+      resetServerEnv();
+      await expect(checkPageLimits(request({}, { "x-joutiya-loadtest": secret }))).resolves.toMatchObject({ kind: "challenge" });
+    } finally {
+      delete process.env.LOADTEST_BYPASS_SECRET;
+    }
+  });
+
   it("sends a visitor over any limit to the challenge when it holds no pass", async () => {
     store.outcomes.set("pages.device", LIMITED);
     const device = newDeviceCookie();
