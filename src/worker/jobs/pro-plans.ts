@@ -3,6 +3,7 @@ import { getProProfile } from "@/lib/db/repositories/pro-profiles";
 import { isFirebaseConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
 import { runLaunchOfferEnd, type LaunchOfferRun } from "@/lib/payments/launch-offer";
+import { runPassExpiry, type PassExpiryRun } from "@/lib/payments/pass";
 import { pastDue } from "@/lib/payments/stripe-events";
 import { endGrace, syncShopSubscription } from "@/lib/payments/subscriptions";
 
@@ -12,6 +13,7 @@ import { endGrace, syncShopSubscription } from "@/lib/payments/subscriptions";
 //    grace RevenueCat reports. A grace opened from Stripe (`startGrace`) while RevenueCat still shows
 //    the plan paid is not synced back to active while Stripe says past due: it ends at `graceUntil`.
 // 2. The end of the launch offer (notices, then downgrade) once its end date is set.
+// 3. The end of each Pass Boutique (notices at J-7 and J-1, then downgrade without grace).
 // One failure is logged and counted; the next night retries it. A subscription skipped or failed has
 // its `syncedAt` touched so it cannot hold the head of the queue night after night.
 
@@ -22,10 +24,11 @@ export interface ProPlansResult {
   graceEnded: number;
   failed: number;
   launchOffer: LaunchOfferRun;
+  pass: PassExpiryRun;
 }
 
 export async function proPlansNightly(now = new Date()): Promise<ProPlansResult> {
-  const result: ProPlansResult = { synced: 0, graceEnded: 0, failed: 0, launchOffer: { noticed: 0, ended: 0, failed: 0 } };
+  const result: ProPlansResult = { synced: 0, graceEnded: 0, failed: 0, launchOffer: { noticed: 0, ended: 0, failed: 0 }, pass: { noticed: 0, ended: 0, failed: 0 } };
   if (!isFirebaseConfigured()) {
     logger.warn("pro-plans skipped: Firebase not configured");
     return result;
@@ -56,6 +59,12 @@ export async function proPlansNightly(now = new Date()): Promise<ProPlansResult>
   } catch (error) {
     result.launchOffer.failed += 1;
     logger.error({ err: (error as Error).message }, "pro-plans: launch offer end failed");
+  }
+  try {
+    result.pass = await runPassExpiry(now);
+  } catch (error) {
+    result.pass.failed += 1;
+    logger.error({ err: (error as Error).message }, "pro-plans: pass expiry failed");
   }
   if (result.synced + result.graceEnded + result.failed > 0) logger.info({ synced: result.synced, graceEnded: result.graceEnded, failed: result.failed }, "pro-plans done");
   return result;

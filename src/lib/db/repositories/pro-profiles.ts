@@ -78,6 +78,24 @@ export async function listLaunchOfferProfiles(after: string | null, limit: numbe
   };
 }
 
+/** Shops on a Pass Boutique (running or ended but not yet downgraded), by id. */
+export async function listPassProfiles(after: string | null, limit: number): Promise<{ profiles: ProProfileRecord[]; next: string | null }> {
+  let query = db().collection(COLLECTIONS.proProfiles).where("planSource", "==", "pass").orderBy(FieldPath.documentId()).limit(limit);
+  if (after) query = query.startAfter(after);
+  const snapshot = await query.get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  return {
+    profiles: snapshot.docs.map(proProfileFromSnapshot).filter((record): record is ProProfileRecord => record !== null),
+    next: snapshot.size === limit ? (snapshot.docs.at(-1)?.id ?? null) : null,
+  };
+}
+
+/** Date of the last notice mailed before the end of the shop's pass. */
+export async function markPassNotice(proId: string, now: Date): Promise<void> {
+  await proProfileRef(proId).update({ passNoticeSentAt: Timestamp.fromDate(now) });
+  void consume("firestore.writes", 1);
+}
+
 /** Date of the last launch-offer notice mailed to the shop (the next one is due from it). */
 export async function markLaunchOfferNotice(proId: string, now: Date): Promise<void> {
   await proProfileRef(proId).update({ launchOfferNoticeSentAt: Timestamp.fromDate(now) });
