@@ -21,7 +21,7 @@ import { transition, type ProEvent } from "@/lib/pro/lifecycle";
 import { pauseListingsOverQuota } from "@/lib/pro/quota";
 import { mailBudget } from "./launch-offer";
 import { passEndAfter, passNoticeDue, runningPassEnd } from "./pass-rules";
-import { expireOpenSession, ownShop, pageUrl, SESSION_LIFETIME_MS, stripeCustomer } from "./plans";
+import { expireOpenSession, invoiceFields, ownShop, pageUrl, SESSION_LIFETIME_MS, stripeCustomer } from "./plans";
 import { isStripeConfigured, stripeRequest } from "./stripe-api";
 import { ledgerKey, profileAfter } from "./subscriptions";
 import { grantPlanPeriod } from "./wallet";
@@ -92,7 +92,8 @@ export async function startPassCheckout(auth: AuthContext, input: CheckoutPassIn
       line_items: [{ price: pass.stripePrice, quantity: 1, ...(pricing.plans.stripeTaxRate ? { tax_rates: [pricing.plans.stripeTaxRate] } : {}) }],
       billing_address_collection: "required",
       customer_update: { address: "auto" },
-      invoice_creation: { enabled: true, invoice_data: { metadata } },
+      // The shop's identifiers (ICE, RC...) on the invoice, as on the subscription invoices.
+      invoice_creation: { enabled: true, invoice_data: { metadata, custom_fields: invoiceFields(profile.legal) } },
       payment_intent_data: { metadata },
       // The end seen now: back from Stripe, the page waits for another one.
       success_url: pageUrl(locale, `?pass=${running?.getTime() ?? 0}`),

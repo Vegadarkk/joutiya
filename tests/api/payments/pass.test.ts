@@ -193,7 +193,7 @@ describe("pass checkout", () => {
       customer: `cus_${proId}`,
       payment_method_types: ["card"],
       line_items: [{ price: "price_PassBoutique30", quantity: 1 }],
-      invoice_creation: { enabled: true },
+      invoice_creation: { enabled: true, invoice_data: { custom_fields: [{ name: "ICE", value: "001234567000089" }, { name: "IF", value: "1234567" }, { name: "RC", value: "12345" }] } },
       metadata: { accountId: `pro_${proId}`, app_user_id: account!.rcAppUserId, kind: "pass", passId: "boutique30" },
     });
     expect(session.params.success_url).toMatch(/\/fr\/pro\/abonnement\?pass=0$/);
