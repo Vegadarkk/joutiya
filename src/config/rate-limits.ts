@@ -88,6 +88,8 @@ export const RATE_LIMITS = {
   "pro.apply.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },
   // GET /api/pro/me (3 to 4 reads: account, shop, active count): the Pro area's page loads.
   "pro.read.uid": { points: 300, duration: HOUR, policy: "open", key: "uid" },
+  // PUT /api/pro/me/agency (1 read, 1 write, a storefront revalidation): 20 per day per account.
+  "pro.agency.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
   // POST /api/listings/{id}/options (phase 7): a paid option, ~4 reads and 4 writes. Closed: it
   // debits credits. 30 per day per account.
   "listing.options.uid": { points: 30, duration: DAY, policy: "closed", key: "uid" },

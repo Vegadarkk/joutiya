@@ -110,6 +110,8 @@ export type ErrorCode =
   | "payment_unavailable"
   /** The shop's KYBC is not verified, or the shop is suspended (409). */
   | "pro_not_verified"
+  /** The shop's plan does not include this feature (the stock import: Business and up) (403). */
+  | "plan_upgrade_required"
   /** No Stripe customer yet: nothing to manage before a first plan (409). */
   | "no_billing_customer"
   /** A webhook whose signature does not match (400, Stripe's expected answer). */

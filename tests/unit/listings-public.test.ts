@@ -194,7 +194,7 @@ describe("storefront", () => {
     repo.getUserRecord.mockResolvedValue(user({ type: "pro" }));
     repo.listPublishedByOwner.mockResolvedValue([record("published")]);
     const store = await getPublicStorefront(PRO);
-    expect(store).toMatchObject({ proId: PRO, segment: `atelier-salma-casablanca-${PRO}`, name: "Atelier Salma", citySlug: "casablanca" });
+    expect(store).toMatchObject({ proId: PRO, segment: `atelier-salma-casablanca-${PRO}`, name: "Atelier Salma", citySlug: "casablanca", sector: "general", feeSchedule: "" });
     expect(store?.seller.publishedCount).toBe(1);
     expect(store?.seller.listings.map((card) => card.id)).toEqual([ID]);
   });

@@ -3,7 +3,7 @@ import { turnstileTokenSchema } from "@/lib/contracts/auth";
 import { citySlugSchema, regionCodeSchema } from "@/lib/contracts/listings";
 import { KYBC_DECLARED_TYPES, MAX_UPLOAD_BYTES, type KybcDeclaredType } from "@/lib/contracts/media";
 import { KYBC_MAX_PIECES, KYBC_MIN_PIECES, proLegalSchema } from "@/lib/pro/kybc";
-import { PHONE_CHECK_OUTCOMES, PRO_DESCRIPTION_MAX, PRO_NAME_MAX, type PhoneCheckOutcome } from "@/lib/pro/profile-schema";
+import { AGENCY_FEE_SCHEDULE_MAX, PHONE_CHECK_OUTCOMES, PRO_DESCRIPTION_MAX, PRO_NAME_MAX, PRO_SECTORS, type PhoneCheckOutcome, type ProSector } from "@/lib/pro/profile-schema";
 
 // Pro application (phase 7 design §4): POST /api/pro/apply. Client-safe contract shared by the
 // wizard and the route. The KYBC pieces are uploads (purpose `kyb`) the applicant signed before.
@@ -164,10 +164,21 @@ export interface ProDecisionResponse {
 export const PRO_API = {
   apply: "/api/pro/apply",
   me: "/api/pro/me",
+  agency: "/api/pro/me/agency",
   kybcSign: "/api/pro/kybc/uploads",
   kybcComplete: (id: string) => `/api/pro/kybc/uploads/${id}/complete`,
   kybcDelete: (id: string) => `/api/pro/kybc/uploads/${id}`,
 } as const;
+
+/** PUT /api/pro/me/agency (Agence pack design §3): the shop's sector and, for an agency, its fee schedule. */
+export const proAgencySchema = z
+  .object({
+    sector: z.enum(PRO_SECTORS),
+    feeSchedule: z.string().trim().max(AGENCY_FEE_SCHEDULE_MAX),
+  })
+  .strict();
+export type ProAgencyInput = z.infer<typeof proAgencySchema>;
+export type ProAgencyResponse = ProAgencyInput;
 
 export const kybcSignSchema = z
   .object({
@@ -226,4 +237,7 @@ export interface ProSelfView {
   launchOffer: { endsAt: string | null; noticeDays: number } | null;
   /** Public storefront path segment `{slug}-{proId}`, when the storefront is shown. */
   storefront: string | null;
+  sector: ProSector;
+  /** The agency's fee schedule ("" when none or not an agency). */
+  feeSchedule: string;
 }

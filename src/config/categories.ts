@@ -112,6 +112,8 @@ export interface Category {
    * field never matches a filter on it.
    */
   sharedFilters?: readonly CriterionId[];
+  /** Number criteria shown on result cards under the title, in order ("95 m² · 5 pièces"). */
+  cardFacts?: readonly CriterionId[];
 }
 
 /** Car brands common in Morocco, plus `autre`; the model stays free text. */
@@ -316,6 +318,7 @@ export const CATEGORIES: readonly Category[] = [
   {
     id: "immobilier",
     sharedFilters: ["property-type", "surface", "rooms", "bedrooms"],
+    cardFacts: ["surface", "rooms", "bedrooms"],
     subcategories: [
       { id: "vente", categoryId: "immobilier", criteria: [required("property-type"), required("surface"), optional("rooms"), optional("bedrooms"), optional("living-rooms"), optional("bathrooms"), optional("floor"), optional("standing"), optional("property-age"), optional("property-title"), optional("furnished"), optional("amenities"), proOptional("off-plan"), proOptional("building-permit"), proOptional("delivery-year"), proRequired("mandate"), proOptional("agency-reference"), proRequired("agency-fees"), proOptional("agency-fees-amount")] },
       { id: "location", categoryId: "immobilier", priceOptional: true, priceUnit: "month", criteria: [required("property-type"), required("surface"), optional("rooms"), optional("bedrooms"), optional("living-rooms"), optional("bathrooms"), optional("floor"), required("furnished"), optional("amenities"), optional("deposit"), optional("availability"), proRequired("mandate"), proOptional("agency-reference"), proRequired("agency-fees"), proOptional("agency-fees-amount")] },

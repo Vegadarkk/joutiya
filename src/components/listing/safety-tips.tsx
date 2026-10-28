@@ -7,14 +7,23 @@ import { cn } from "@/lib/utils";
 // Safety advice of the listing page (§10 "conseils de sécurité") and the neutral-host statement:
 // Joutiya hosts the listing and is party to no transaction (LCEN art. 6 / DSA art. 6 hosting).
 
-const TIPS = [
-  { key: "noAdvance", icon: HandCoins },
-  { key: "meetPublic", icon: Users },
-  { key: "checkItem", icon: Store },
-  { key: "noCodes", icon: ShieldAlert },
-] as const;
+const TIPS = {
+  goods: [
+    { key: "noAdvance", icon: HandCoins },
+    { key: "meetPublic", icon: Users },
+    { key: "checkItem", icon: Store },
+    { key: "noCodes", icon: ShieldAlert },
+  ],
+  // Real estate: the classic scam is a deposit to "hold" a flat or a holiday rental never visited.
+  realEstate: [
+    { key: "noDeposit", icon: HandCoins },
+    { key: "visitFirst", icon: Users },
+    { key: "checkTitle", icon: Store },
+    { key: "noCodes", icon: ShieldAlert },
+  ],
+} as const;
 
-export function SafetyTips({ className }: { className?: string }) {
+export function SafetyTips({ variant = "goods", className }: { variant?: keyof typeof TIPS; className?: string }) {
   const t = useTranslations("ListingPage.safety");
   return (
     <section data-testid="safety-tips" aria-labelledby="safety-title" className={cn("flex flex-col gap-4 rounded-lg bg-surface-brand p-5", className)}>
@@ -22,7 +31,7 @@ export function SafetyTips({ className }: { className?: string }) {
         {t("title")}
       </h2>
       <ul className="flex flex-col gap-3">
-        {TIPS.map(({ key, icon: Icon }) => (
+        {TIPS[variant].map(({ key, icon: Icon }) => (
           <li key={key} className="flex items-start gap-3 text-sm text-pretty">
             <Icon className="mt-0.5 size-4 shrink-0 text-structure dark:text-gold-300" aria-hidden="true" />
             <span>{t(`tips.${key}`)}</span>

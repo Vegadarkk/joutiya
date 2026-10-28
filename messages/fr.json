@@ -2479,6 +2479,12 @@
     "featuredInfo": "Emplacement payé par l'annonceur. Il ne modifie pas le classement des autres résultats.",
     "bumped": "Remontée",
     "bumpedInfo": "Cette annonce a été remontée par son auteur, contre paiement.",
+    "exclusive": "Exclusivité",
+    "facts": {
+      "surface": "{count} m²",
+      "rooms": "{count, plural, one {# pièce} other {# pièces}}",
+      "bedrooms": "{count} ch."
+    },
     "example": "Exemple"
   },
   "ListingPage": {
@@ -2542,6 +2548,9 @@
       "message": "Envoyer un message",
       "messageShort": "Message",
       "messageHint": "Votre message arrive dans la messagerie Joutiya du vendeur. Ni votre e-mail ni votre numéro ne lui sont transmis.",
+      "testDrive": "Demander un essai",
+      "testDriveHint": "Écrivez au vendeur, puis proposez-lui vos créneaux dans la conversation.",
+      "testDriveText": "Bonjour, je souhaite essayer « {title} ». Quels créneaux vous conviennent ?",
       "signInBody": "Connectez-vous pour voir le numéro du vendeur. Vous reviendrez ensuite sur cette annonce.",
       "signInMessage": "Connectez-vous pour écrire au vendeur. Vous reviendrez ensuite sur cette annonce.",
       "signIn": "Se connecter",
@@ -2588,8 +2597,15 @@
           "adult_confirmation_required": "Cet article est réservé aux personnes majeures : confirmez avoir 18 ans ou plus pour écrire au vendeur."
         },
         "adultConfirm": "Je confirme avoir 18 ans ou plus.",
-        "adultMissing": "Confirmez avoir 18 ans ou plus pour écrire au vendeur."
-      }
+        "adultMissing": "Confirmez avoir 18 ans ou plus pour écrire au vendeur.",
+        "visitTitle": "Demander une visite à {name}",
+        "visitTitleFallback": "Demander une visite",
+        "visitDraft": "Bonjour, votre bien m'intéresse et je souhaiterais le visiter. Quelles sont vos disponibilités ?",
+        "visitSafety": "Une visite ne se paie jamais : ne versez ni acompte ni frais de réservation avant d'avoir vu le bien et signé un contrat. Après l'envoi, proposez vos créneaux dans la conversation."
+      },
+      "visit": "Demander une visite",
+      "visitShort": "Visite",
+      "signInVisit": "Connectez-vous pour demander une visite. Vous reviendrez ensuite sur cette annonce."
     },
     "safety": {
       "title": "Conseils de sécurité",
@@ -2597,7 +2613,10 @@
         "noAdvance": "Ne payez jamais à l'avance : ni acompte, ni frais d'envoi, ni réservation avant d'avoir vu l'article.",
         "meetPublic": "Rencontrez le vendeur dans un lieu public et fréquenté, de préférence en journée.",
         "checkItem": "Vérifiez l'article et ses papiers avant de payer.",
-        "noCodes": "Ne communiquez jamais vos codes bancaires, ni un code reçu par SMS ou WhatsApp."
+        "noCodes": "Ne communiquez jamais vos codes bancaires, ni un code reçu par SMS ou WhatsApp.",
+        "noDeposit": "Ne versez jamais d'acompte, de caution ni de frais de réservation avant d'avoir visité le bien et signé un contrat.",
+        "visitFirst": "Visitez le bien en personne et vérifiez l'identité du propriétaire ou de l'agence.",
+        "checkTitle": "Pour un achat, vérifiez le titre foncier auprès de la Conservation foncière (ANCFCC) et signez chez un notaire ou des adouls."
       },
       "host": "Joutiya héberge les annonces de ses utilisateurs : elle n'est ni vendeur ni acheteur, et n'est partie ni aux transactions ni aux litiges entre eux.",
       "more": "Tous nos conseils de confiance et de sécurité"
@@ -2648,6 +2667,28 @@
         "warranty": "Garantie du vendeur : un professionnel doit vous la remettre par écrit, avec sa durée, ce qu'elle couvre et la garantie légale des vices cachés (loi 31-08, art. 66 et 67)."
       },
       "source": "Démarches indicatives, à vérifier auprès de la NARSA (narsa.ma) ou de votre centre d'immatriculation."
+    },
+    "terms": {
+      "mandate": "Mandat",
+      "mandates": {
+        "exclusif": "Exclusif",
+        "simple": "Simple",
+        "vente-directe": "Sans mandat : bien du professionnel"
+      },
+      "exclusive": "Exclusivité",
+      "reference": "Référence agence",
+      "fees": "Honoraires d'agence",
+      "feesOnTop": "En plus du prix, à la charge du client",
+      "feesOnTopAmount": "{amount} en plus du prix, à la charge du client",
+      "feesIncluded": "Inclus dans le prix",
+      "feesIncludedAmount": "{amount}, inclus dans le prix",
+      "feesNone": "Sans frais pour le client",
+      "offPlan": "Vente sur plan",
+      "offPlanYes": "Oui (VEFA)",
+      "delivery": "Livraison prévue en {year}",
+      "permit": "Permis de construire",
+      "authorization": "Autorisation d'hébergement",
+      "declared": "N° {number}, déclaré par l'annonceur"
     },
     "example": {
       "title": "Annonce exemple",
@@ -3202,6 +3243,24 @@
       "phone_required": "Indiquez le numéro de mobile qu'un modérateur appellera.",
       "account_suspended": "Votre compte est suspendu : vous ne pouvez pas demander de compte Pro.",
       "email_not_verified": "Confirmez d'abord votre adresse e-mail."
+    },
+    "agency": {
+      "title": "Secteur d'activité",
+      "lead": "Une agence immobilière a une vitrine dédiée : ses biens par transaction et son barème d'honoraires.",
+      "sectors": {
+        "general": "Commerce et services",
+        "real_estate": "Agence immobilière"
+      },
+      "sectorHints": {
+        "general": "Vitrine de boutique classique.",
+        "real_estate": "Vitrine d'agence, mandat et honoraires sur vos annonces."
+      },
+      "feeSchedule": "Barème des honoraires",
+      "feeScheduleHint": "Affiché sur votre vitrine, {max} caractères au plus. Pas de téléphone, d'e-mail ni de lien : les clients vous écrivent par la messagerie.",
+      "feeSchedulePlaceholder": "Exemple : vente 2,5 % du prix à la charge de l'acquéreur ; location un mois de loyer.",
+      "save": "Enregistrer",
+      "saved": "Secteur enregistré. Votre vitrine est mise à jour.",
+      "failed": "L'enregistrement a échoué."
     }
   },
   "Messaging": {
@@ -3658,6 +3717,33 @@
     "meta": {
       "title": "{name}, boutique à {city}",
       "description": "{name}, boutique vérifiée à {city} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya."
+    },
+    "agency": {
+      "label": "Agence immobilière",
+      "verified": "Agence vérifiée",
+      "verifiedNote": "Les identifiants professionnels de cette agence (ICE, registre du commerce) ont été vérifiés. Les ventes et locations se concluent directement entre vous et l'agence : le site n'est partie à aucune transaction et ne perçoit ni honoraires, ni acompte, ni dépôt de garantie. Ne versez jamais d'argent avant d'avoir visité le bien.",
+      "transactionsTitle": "Les biens de l'agence",
+      "count": "{count, plural, one {# bien en ligne} other {# biens en ligne}}",
+      "see": "Voir les biens",
+      "feesTitle": "Barème des honoraires",
+      "feesNote": "Communiqué par l'agence. Les honoraires de chaque bien figurent aussi sur son annonce, à côté du prix."
+    },
+    "dealer": {
+      "title": "Stock de véhicules",
+      "count": "{count, plural, one {# véhicule en vente} other {# véhicules en vente}}",
+      "priceRange": "de {min} à {max}",
+      "seeAll": "Voir tout le stock",
+      "types": "Par type",
+      "brands": "Marques",
+      "otherBrands": "{count, plural, one {# autre marque} other {# autres marques}}",
+      "engine": "Motorisation",
+      "services": {
+        "tradeIn": "Reprise possible",
+        "financing": "Financement possible",
+        "warranty": "Garantie"
+      },
+      "onVehicles": "{count, plural, one {# véhicule} other {# véhicules}}",
+      "servicesNote": "Services déclarés par la boutique sur ses annonces : leurs conditions se voient avec elle. Une offre de crédit doit être écrite et indiquer le prêteur et le taux (TEG)."
     }
   },
   "Options": {
@@ -4075,6 +4161,11 @@
       "title": "L'import de stock est réservé aux boutiques Pro vérifiées",
       "body": "Il s'ouvre dès que votre boutique est vérifiée et publie sous une offre Pro.",
       "link": "Voir mon espace Pro"
+    },
+    "upgrade": {
+      "title": "L’import de stock est inclus dans les offres Business et Premium",
+      "body": "Avec votre offre actuelle, publiez vos véhicules un par un depuis « Déposer une annonce ».",
+      "link": "Voir les offres"
     },
     "file": {
       "title": "Votre fichier",
