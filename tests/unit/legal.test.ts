@@ -102,6 +102,14 @@ describe("legal pages", () => {
     }
   });
 
+  it("gives every anchored heading its id", () => {
+    for (const { slug, language } of sources) {
+      for (const block of parseMarkdown(render(slug, language, { whatsapp: true, ads: true, adsCmpEea: true }).text)) {
+        if (block.type === "heading") expect(block.text, `${language}/${slug}`).not.toContain("{#");
+      }
+    }
+  });
+
   it("opens every page with its title and its version line", () => {
     for (const { slug, language } of sources) {
       const blocks = parseMarkdown(render(slug, language).text);
@@ -218,6 +226,24 @@ describe("legal templates", () => {
     expect(parseInline("\u2068https://cndp.ma\u2069 \u2068dpo@example.ma\u2069").filter((node) => node.type === "link").map((node) => (node as { href: string }).href)).toEqual(["https://cndp.ma", "mailto:dpo@example.ma"]);
   });
 
+  it("keeps config values literal: one line, no Markdown", () => {
+    const hostile = { ...scope, name: "x | y\n# Owned [a](https://evil.example) **b** {#id}" };
+    const table = parseMarkdown(renderTemplate("| h |\n| --- |\n| {name} |\n", hostile).text);
+    expect(table).toHaveLength(1);
+    const rows = (table[0] as Extract<MdBlock, { type: "table" }>).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveLength(1);
+    // A bare URL in a value is still linked (the mediator's site); the Markdown around it is not.
+    expect(inlineText(rows[0]![0]!)).toBe("x | y # Owned [a](https://evil.example) **b** {#id}");
+    expect(rows[0]![0]!.map((node) => node.type)).toEqual(["text", "link", "text"]);
+    const heading = parseMarkdown(renderTemplate("## Title {name} {#t}\n", hostile).text);
+    expect(heading).toEqual([expect.objectContaining({ type: "heading", id: "t", text: "Title x | y # Owned [a](https://evil.example) **b** {#id}" })]);
+  });
+
+  it("drops editor notes without eating the blank line after them", () => {
+    expect(parseMarkdown(renderTemplate("Para <!-- note -->\n\n## H {#h}\n", scope).text).map((block) => block.type)).toEqual(["paragraph", "heading"]);
+  });
+
   it("drops editor notes and reports conditions or lists on unknown keys", () => {
     expect(renderTemplate("a <!-- note: {nope} --> b", scope)).toEqual({ text: "a b", missing: [] });
     expect(renderTemplate("<!--if:typo-->x<!--endif--><!--each:nolist-->y<!--endeach-->", scope).missing).toEqual(["typo", "nolist"]);
@@ -242,8 +268,16 @@ describe("legal Markdown", () => {
   });
 
   it("keeps only same-site, anchor, https and mailto links", () => {
-    expect(parseInline("[a](/legal/cgu#x) [b](https://cndp.ma) [c](mailto:dpo@example.ma) [d](javascript:alert(1)) [e](//evil.example) [f](http://x.example)").filter((node) => node.type === "link").map((node) => (node as { href: string }).href)).toEqual(["/legal/cgu#x", "https://cndp.ma", "mailto:dpo@example.ma"]);
+    expect(parseInline("[a](/legal/cgu#x) [b](https://cndp.ma) [c](mailto:dpo@example.ma) [d](javascript:alert(1)) [e](//evil.example) [f](http://x.example) [g](/\\evil.example)").filter((node) => node.type === "link").map((node) => (node as { href: string }).href)).toEqual(["/legal/cgu#x", "https://cndp.ma", "mailto:dpo@example.ma"]);
     expect(inlineText(parseInline("[d](javascript:alert(1))"))).toContain("d");
+  });
+
+  it("never nests a link in a link", () => {
+    expect(parseInline("[contact@x.ma](mailto:contact@x.ma)")).toEqual([{ type: "link", href: "mailto:contact@x.ma", children: [{ type: "text", value: "contact@x.ma" }] }]);
+  });
+
+  it("reads anchors with underscores", () => {
+    expect(parseMarkdown("### Docs {#liste-identity_documents}\n")[0]).toMatchObject({ id: "liste-identity_documents", text: "Docs" });
   });
 
   it("turns bare https URLs and e-mail addresses into links, and parses emphasis and code", () => {

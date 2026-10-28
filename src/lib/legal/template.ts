@@ -16,7 +16,7 @@ export interface TemplateScope {
 
 const MARKER = /<!--(if:[^>]*?|else|endif|each:[^>]*?|endeach)-->/g;
 const OWN_LINE = /^[ \t]*(<!--(?:if:[^>]*?|else|endif|each:[^>]*?|endeach)-->)[ \t]*\r?\n/gm;
-const NOTE = /<!--(?!(?:if:|else-->|endif-->|each:|endeach-->))[\s\S]*?-->\s*/g;
+const NOTE = /<!--(?!(?:if:|else-->|endif-->|each:|endeach-->))[\s\S]*?-->[ \t]*(?:\r?\n)?/g;
 const PLACEHOLDER = /\{([A-Za-z][\w]*(?:\.[\w]+)*)\}/g;
 
 type Node = string | { kind: "if"; test: string; then: Node[]; otherwise: Node[] } | { kind: "each"; list: string; body: Node[] };
@@ -84,6 +84,14 @@ function parse(source: string): Node[] {
   return root;
 }
 
+/**
+ * A value as literal Markdown text: config/legal is free text (admin-editable), so its line breaks
+ * collapse and its Markdown characters are escaped (never a heading, a link, a table cell or an id).
+ */
+function markdownText(value: string): string {
+  return value.replace(/\s+/g, " ").trim().replace(/[\\`*_[\](){}#|]/g, "\\$&");
+}
+
 function evaluate(nodes: Node[], scope: TemplateScope, missing: Set<string>, isolate: boolean): string {
   let out = "";
   for (const node of nodes) {
@@ -94,7 +102,7 @@ function evaluate(nodes: Node[], scope: TemplateScope, missing: Set<string>, iso
           missing.add(key);
           return "";
         }
-        const text = value === null ? "" : String(value);
+        const text = value === null ? "" : markdownText(String(value));
         return isolate && text ? `\u2068${text}\u2069` : text;
       });
     } else if (node.kind === "if") {

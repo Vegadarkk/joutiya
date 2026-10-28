@@ -16,7 +16,7 @@ export type MdBlock =
   | { type: "table"; head: Inline[][]; rows: Inline[][][] }
   | { type: "rule" };
 
-const HEADING = /^(#{1,4})\s+(.*?)(?:\s+\{#([A-Za-z0-9-]+)\})?\s*$/;
+const HEADING = /^(#{1,4})\s+(.*?)(?:\s+\{#([\w-]+)\})?\s*$/;
 const BULLET = /^[-*]\s+(.*)$/;
 const NUMBERED = /^(\d+)[.)]\s+(.*)$/;
 const TABLE_SEPARATOR = /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/;
@@ -24,7 +24,8 @@ const RULE = /^(?:-{3,}|\*{3,})\s*$/;
 
 /** A link target the page may carry; anything else is rendered as plain text. */
 export function safeHref(href: string): string | null {
-  if (/^\/(?!\/)/.test(href) || href.startsWith("#")) return href;
+  // "/\host" is read as "//host" by browsers: a protocol-relative URL, never a same-site path.
+  if (/^\/(?![/\\])/.test(href) || href.startsWith("#")) return href;
   if (/^https:\/\/[^\s]+$/.test(href) || /^mailto:[^\s@]+@[^\s@]+$/.test(href)) return href;
   return null;
 }
@@ -63,33 +64,44 @@ function autolink(value: string): Inline[] {
   return out;
 }
 
-/** Inline syntax: code, links, bold, italic; the rest is text (with bare URLs and e-mails linked). */
-export function parseInline(source: string): Inline[] {
+/** Characters a backslash makes literal (the template escapes them in config values). */
+const ESCAPABLE = /[\\`*_[\](){}#|]/;
+
+/**
+ * Inline syntax: code, links, bold, italic, backslash escapes; the rest is text, with bare URLs and
+ * e-mails linked except inside a link (`autolinks` false: no link in a link).
+ */
+export function parseInline(source: string, autolinks = true): Inline[] {
   const out: Inline[] = [];
   let text = "";
   const flush = () => {
-    if (text) out.push(...autolink(text));
+    if (text) out.push(...(autolinks ? autolink(text) : [{ type: "text" as const, value: text }]));
     text = "";
   };
   let index = 0;
   while (index < source.length) {
     const rest = source.slice(index);
     let match: RegExpExecArray | null;
+    if (source[index] === "\\" && ESCAPABLE.test(source[index + 1] ?? "")) {
+      text += source[index + 1];
+      index += 2;
+      continue;
+    }
     if ((match = /^`([^`]+)`/.exec(rest))) {
       flush();
       out.push({ type: "code", value: match[1]! });
     } else if ((match = /^\[([^\]]+)\]\(([^)\s]+)\)/.exec(rest))) {
       flush();
       const href = safeHref(match[2]!);
-      const children = parseInline(match[1]!);
+      const children = parseInline(match[1]!, false);
       if (href) out.push({ type: "link", href, children });
       else out.push(...children);
     } else if ((match = /^\*\*(.+?)\*\*/.exec(rest))) {
       flush();
-      out.push({ type: "strong", children: parseInline(match[1]!) });
+      out.push({ type: "strong", children: parseInline(match[1]!, autolinks) });
     } else if ((match = /^\*([^*\s][^*]*?)\*/.exec(rest))) {
       flush();
-      out.push({ type: "em", children: parseInline(match[1]!) });
+      out.push({ type: "em", children: parseInline(match[1]!, autolinks) });
     } else {
       text += source[index];
       index += 1;
@@ -132,11 +144,11 @@ export function parseMarkdown(source: string): MdBlock[] {
       continue;
     }
     if (line.trim().startsWith("|") && lines[index + 1] !== undefined && TABLE_SEPARATOR.test(lines[index + 1]!)) {
-      const head = splitRow(line).map(parseInline);
+      const head = splitRow(line).map((cell) => parseInline(cell));
       const rows: Inline[][][] = [];
       index += 2;
       while (index < lines.length && lines[index]!.trim().startsWith("|")) {
-        rows.push(splitRow(lines[index]!).map(parseInline));
+        rows.push(splitRow(lines[index]!).map((cell) => parseInline(cell)));
         index += 1;
       }
       blocks.push({ type: "table", head, rows });
@@ -156,7 +168,7 @@ export function parseMarkdown(source: string): MdBlock[] {
         else break;
         index += 1;
       }
-      blocks.push({ type: "list", ordered, start: numbered ? Number(numbered[1]) : 1, items: items.map(parseInline) });
+      blocks.push({ type: "list", ordered, start: numbered ? Number(numbered[1]) : 1, items: items.map((cell) => parseInline(cell)) });
       continue;
     }
     const paragraph: string[] = [];
