@@ -952,6 +952,8 @@ export const COLLECTIONS = {
   moderationDecisions: "moderationDecisions",
   /** system/backup (cursor state of backup-firestore), free-form documents. */
   system: "system",
+  /** config/{legal,ai,flags,...}: runtime settings (back office, scripts), read through src/lib/config. */
+  config: "config",
   // Phase 4 (subcollections of users/{uid})
   favorites: "favorites",
   savedSearches: "savedSearches",

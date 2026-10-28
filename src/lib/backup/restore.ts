@@ -344,3 +344,126 @@ export async function applyRestore(
   await commit();
   return { writes, batches };
 }
+
+// --- Firebase Auth accounts (D20) --------------------------------------------------------------
+
+/** One account as authUserLine (src/lib/backup/export.ts) wrote it. */
+export interface AuthBackupUser {
+  uid: string;
+  email: string | null;
+  emailVerified: boolean;
+  disabled: boolean;
+  displayName: string | null;
+  providerData: { providerId: string; uid: string; email: string | null }[];
+  customClaims: Record<string, unknown> | null;
+  createdAt: string | null;
+  lastSignInAt: string | null;
+}
+
+export interface AuthExport {
+  date: string;
+  users: AuthBackupUser[];
+}
+
+/** The `auth` entry of a manifest: its parts (checked like the Firestore parts), or null when that night has none. */
+export function parseAuthManifest(text: string, date: string): { key: string; docs: number; plainBytes: number; sha256: string }[] | null {
+  const manifest = JSON.parse(text) as { auth?: unknown };
+  const auth = manifest.auth as { users?: unknown; parts?: unknown } | null | undefined;
+  if (!auth || !Array.isArray(auth.parts)) return null;
+  return auth.parts.map((raw: unknown, index) => {
+    const part = (raw ?? {}) as Record<string, unknown>;
+    const { key, docs, plainBytes, sha256 } = part;
+    if (typeof key !== "string" || !key.includes(`${date}/auth/users`) || !isCount(docs) || !isCount(plainBytes) || typeof sha256 !== "string" || !SHA256.test(sha256)) {
+      throw new RestoreError(`manifest of ${date}: auth part ${index} is malformed`);
+    }
+    return { key, docs, plainBytes, sha256 };
+  });
+}
+
+function parseAuthUser(line: string, where: string): AuthBackupUser {
+  let value: Partial<AuthBackupUser>;
+  try {
+    value = JSON.parse(line) as Partial<AuthBackupUser>;
+  } catch {
+    throw new RestoreError(`${where}: not JSON`);
+  }
+  if (typeof value.uid !== "string" || value.uid.length === 0 || !Array.isArray(value.providerData)) throw new RestoreError(`${where}: not an account line`);
+  return {
+    uid: value.uid,
+    email: typeof value.email === "string" ? value.email : null,
+    emailVerified: value.emailVerified === true,
+    disabled: value.disabled === true,
+    displayName: typeof value.displayName === "string" ? value.displayName : null,
+    providerData: value.providerData.filter((provider) => typeof provider?.providerId === "string" && typeof provider.uid === "string"),
+    customClaims: value.customClaims && typeof value.customClaims === "object" ? value.customClaims : null,
+    createdAt: typeof value.createdAt === "string" ? value.createdAt : null,
+    lastSignInAt: typeof value.lastSignInAt === "string" ? value.lastSignInAt : null,
+  };
+}
+
+/**
+ * The newest Auth export with a manifest (on or before `until`): every part checked against the
+ * manifest (count, size, SHA-256) and every line parsed. Null when no night holds one. Password
+ * hashes are read but never returned: they need the project's hash parameters to be imported.
+ */
+export async function readAuthExport(source: BackupSource, identity: string, options: { until?: string | null } = {}): Promise<AuthExport | null> {
+  const manifests = new Map<string, string>();
+  const objects = new Map<string, string>();
+  for (const key of await source.list()) {
+    const normalized = key.replaceAll("\\", "/");
+    const parsed = parseBackupKey(normalized);
+    if (parsed?.kind === "manifest" && !(options.until && parsed.date > options.until)) manifests.set(parsed.date, key);
+    const auth = /(\d{4}-\d{2}-\d{2}\/auth\/users(?:-[1-9]\d*)?\.ndjson\.gz\.age)$/.exec(normalized);
+    if (auth) objects.set(auth[1] as string, key);
+  }
+  for (const date of [...manifests.keys()].sort().reverse()) {
+    const entries = parseAuthManifest(await decryptManifest(source, manifests.get(date) as string, identity), date);
+    if (!entries) continue;
+    const users: AuthBackupUser[] = [];
+    for (const entry of entries) {
+      const logical = entry.key.slice(entry.key.indexOf(`${date}/auth/`));
+      const key = objects.get(logical);
+      if (!key) throw new RestoreError(`${logical} is listed in the manifest of ${date} but missing from ${source.label}`);
+      const part: RestorePart = { key, logical, date, mode: "full", collection: "auth", part: null, expected: { docs: entry.docs, plainBytes: entry.plainBytes, sha256: entry.sha256 } };
+      const opened = await openChecked(source, part, identity);
+      for (const [index, line] of opened.lines.entries()) users.push(parseAuthUser(line, `${key} line ${index + 1}`));
+    }
+    return { date, users };
+  }
+  return null;
+}
+
+/** Accounts per importUsers call (the Admin SDK maximum). */
+export const AUTH_IMPORT_BATCH = 1000;
+
+export interface AuthImportTarget {
+  importUsers(users: Record<string, unknown>[]): Promise<{ successCount: number; failureCount: number; errors: { index: number; error: { message: string } }[] }>;
+}
+
+/**
+ * Recreates the accounts without passwords (members set a new one through "Mot de passe oublié",
+ * docs/backups.md): uid, e-mail and its verification, state, display name, Google links, claims
+ * (role, staff) and dates. An account that already exists is overwritten by the import.
+ */
+export async function applyAuthRestore(users: readonly AuthBackupUser[], target: AuthImportTarget): Promise<{ imported: number; failed: { uid: string; message: string }[] }> {
+  let imported = 0;
+  const failed: { uid: string; message: string }[] = [];
+  for (let start = 0; start < users.length; start += AUTH_IMPORT_BATCH) {
+    const batch = users.slice(start, start + AUTH_IMPORT_BATCH);
+    const records = batch.map((user) => ({
+      uid: user.uid,
+      ...(user.email ? { email: user.email } : {}),
+      emailVerified: user.emailVerified,
+      disabled: user.disabled,
+      ...(user.displayName ? { displayName: user.displayName } : {}),
+      // "password" is not a linked provider: it comes back with the next password the member sets.
+      providerData: user.providerData.filter((provider) => provider.providerId !== "password").map((provider) => ({ providerId: provider.providerId, uid: provider.uid, ...(provider.email ? { email: provider.email } : {}) })),
+      ...(user.customClaims ? { customClaims: user.customClaims } : {}),
+      metadata: { ...(user.createdAt ? { creationTime: user.createdAt } : {}), ...(user.lastSignInAt ? { lastSignInTime: user.lastSignInAt } : {}) },
+    }));
+    const result = await target.importUsers(records);
+    imported += result.successCount;
+    for (const error of result.errors) failed.push({ uid: batch[error.index]?.uid ?? "?", message: error.error.message });
+  }
+  return { imported, failed };
+}

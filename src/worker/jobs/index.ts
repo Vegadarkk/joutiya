@@ -1,5 +1,5 @@
 import type { Job } from "bullmq";
-import { backupFirestore } from "./backup-firestore";
+import { backupFirestore, backupFreshness } from "./backup-firestore";
 import { expireListings } from "./expire-listings";
 import { liftSuspensions } from "./lift-suspensions";
 import { sendExpiryReminders } from "./listing-expiry-reminders";
@@ -32,6 +32,7 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "purge-quarantine": () => purgeQuarantine(),
   "r2-storage-gauge": () => r2StorageGauge(),
   "backup-firestore": () => backupFirestore(),
+  "backup-freshness": () => backupFreshness(),
   "expire-listings": () => expireListings(),
   "listing-expiry-reminders": () => sendExpiryReminders(),
   "retention-purge": () => retentionPurge(),
@@ -71,6 +72,8 @@ export const SCHEDULES = {
   "purge-connection-logs-nightly": { pattern: "15 3 * * *", job: "purge-connection-logs" },
   // 03:30 UTC (D17): encrypted Firestore backup, after retention-purge (03:00) and the R2 gauge (03:10).
   "backup-firestore-nightly": { pattern: "30 3 * * *", job: "backup-firestore" },
+  // D20: the last completed backup must be under 26 h old (one read).
+  "backup-freshness-daily": { pattern: "5 9 * * *", job: "backup-freshness" },
   // Phase 7. 03:50 UTC: Pro claims and listings retag a verification left pending (effects.ts).
   "pro-effects-sync-nightly": { pattern: "50 3 * * *", job: "pro-effects-sync" },
   // Phase 4. 04:05 UTC: À la Une ended since the last sweep -> searchOutbox (safety net of the

@@ -3,7 +3,7 @@
 //
 //   node scripts/restore-firestore.ts --identity <age key file> --from <dir> --project <id> \
 //     [--collections users,listings] [--until YYYY-MM-DD] [--apply] [--allow-production] \
-//     [--allow-unverified] [--allow-over-quota]
+//     [--allow-unverified] [--allow-over-quota] [--auth]
 //   node --env-file=.env.local scripts/restore-firestore.ts --identity <file> --from-bucket <staging|prod> --project <id> ...
 //
 // <dir> is a download of the private bucket's `backups/` prefix (the files stay encrypted);
@@ -18,6 +18,9 @@
 // Blaze, where they are billed): split with --collections over several days (docs/backups.md).
 // Target: with FIRESTORE_EMULATOR_HOST set, the emulator (any project id); otherwise the staging or
 // production project recorded in infra/targets.json, the production one only with --allow-production.
+// --auth also recreates the Firebase Auth accounts of the newest export (D20) without passwords
+// (members set a new one through "Mot de passe oublié"); with the Firestore emulator it needs the
+// Auth emulator too (FIREBASE_AUTH_EMULATOR_HOST).
 // Credentials: the target's worker identity, with a one-day certificate signed by the CA of
 // scripts/google-wif.ts, so the restore runs on the CA machine and needs no gcloud sign-in (never
 // `gcloud auth application-default login`, which would replace the owner's other projects' sign-in).
@@ -28,14 +31,14 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { bucketSource, type BucketSourceConfig } from "../src/lib/backup/bucket-source.ts";
 import { loadAgeIdentity, redactSecrets } from "../src/lib/backup/crypto.ts";
-import { applyRestore, checkRestore, directorySource, planRestore, type BackupSource } from "../src/lib/backup/restore.ts";
+import { applyAuthRestore, applyRestore, checkRestore, directorySource, planRestore, readAuthExport, type AuthImportTarget, type BackupSource } from "../src/lib/backup/restore.ts";
 import { APP_ENVS, validateTargets, type Targets } from "./assert-target.ts";
 import { keylessEnv, mintCredentials } from "./google-wif.ts";
 import { DEPLOYED_ENVS, R2_KEYS, r2Endpoint, type DeployedEnv } from "./vm-env.ts";
 import { requireEnvProxy } from "./env-proxy.ts";
 
 const USAGE =
-  "usage: scripts/restore-firestore.ts --identity <age key file> (--from <dir> | --from-bucket <staging|prod>) --project <id> [--collections a,b] [--until YYYY-MM-DD] [--apply] [--allow-production] [--allow-unverified] [--allow-over-quota]";
+  "usage: scripts/restore-firestore.ts --identity <age key file> (--from <dir> | --from-bucket <staging|prod>) --project <id> [--collections a,b] [--until YYYY-MM-DD] [--apply] [--allow-production] [--allow-unverified] [--allow-over-quota] [--auth]";
 const PROJECT_ID = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
 /** Spark: 20 000 document writes a day, the app's own included; past it every write fails until the Pacific midnight. */
 export const SPARK_DAILY_WRITES = 20_000;
@@ -52,6 +55,8 @@ export interface RestoreArgs {
   allowProduction: boolean;
   allowUnverified: boolean;
   allowOverQuota: boolean;
+  /** Also recreate the Firebase Auth accounts. */
+  auth: boolean;
 }
 
 export function parseCli(argv: readonly string[]): RestoreArgs {
@@ -68,6 +73,7 @@ export function parseCli(argv: readonly string[]): RestoreArgs {
       "allow-production": { type: "boolean", default: false },
       "allow-unverified": { type: "boolean", default: false },
       "allow-over-quota": { type: "boolean", default: false },
+      auth: { type: "boolean", default: false },
     },
     strict: true,
   });
@@ -98,6 +104,7 @@ export function parseCli(argv: readonly string[]): RestoreArgs {
     allowProduction: values["allow-production"] === true,
     allowUnverified: values["allow-unverified"] === true,
     allowOverQuota: values["allow-over-quota"] === true,
+    auth: values.auth === true,
   };
 }
 
@@ -157,14 +164,14 @@ export function bucketConfig(targets: Targets, env: DeployedEnv, vars: Record<st
   return { config: { endpoint: r2Endpoint(accountId), accessKeyId, secretAccessKey, bucket }, problems };
 }
 
-function readTargets(): Targets {
+export function readTargets(): Targets {
   const raw: unknown = JSON.parse(readFileSync(fileURLToPath(new URL("../infra/targets.json", import.meta.url)), "utf8"));
   const errors = validateTargets(raw);
   if (errors.length > 0) throw new Error(errors.map((error) => `infra/targets.json: ${error}`).join("\n"));
   return raw as Targets;
 }
 
-async function readIdentity(path: string): Promise<{ identity: string; recipient: string }> {
+export async function readIdentity(path: string): Promise<{ identity: string; recipient: string }> {
   let text: string;
   try {
     text = readFileSync(path, "utf8");
@@ -182,6 +189,7 @@ async function main(): Promise<void> {
   const emulated = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
   const problem = projectProblem(targets, args.project, { emulated, allowProduction: args.allowProduction });
   if (problem) throw new Error(problem);
+  if (args.auth && emulated && !process.env.FIREBASE_AUTH_EMULATOR_HOST) throw new Error("--auth with the Firestore emulator needs the Auth emulator too (FIREBASE_AUTH_EMULATOR_HOST)");
 
   let source: BackupSource;
   if (args.fromBucket) {
@@ -205,6 +213,8 @@ async function main(): Promise<void> {
   const check = await checkRestore(source, plan, identity);
   console.log(`${check.lines} lines decrypted and decoded; ${check.documents} documents to write:`);
   for (const [collection, count] of Object.entries(check.byCollection).sort()) console.log(`  ${collection}: ${count}`);
+  const accounts = args.auth ? await readAuthExport(source, identity, { until: args.until }) : null;
+  if (args.auth) console.log(accounts ? `Firebase Auth export of ${accounts.date}: ${accounts.users.length} accounts to recreate, without passwords` : "Warning: --auth: no Firebase Auth export in these backups");
   const writes = writesProblem(check.documents, { emulated, allowOverQuota: args.allowOverQuota });
   if (!args.apply) {
     if (writes) console.warn(`Warning: --apply will refuse: ${writes}.`);
@@ -228,6 +238,12 @@ async function main(): Promise<void> {
     try {
       const result = await applyRestore(source, plan, check, identity, getFirestore(app), { log: (line) => console.log(line) });
       console.log(`\n${result.writes} documents written into ${args.project} in ${result.batches} batch(es).`);
+      if (accounts) {
+        const { getAuth } = await import("firebase-admin/auth");
+        const imported = await applyAuthRestore(accounts.users, getAuth(app) as unknown as AuthImportTarget);
+        console.log(`${imported.imported} Firebase Auth accounts recreated${imported.failed.length > 0 ? `; ${imported.failed.length} refused: ${imported.failed.slice(0, 10).map((failure) => failure.uid).join(", ")}` : ""}.`);
+        if (imported.failed.length > 0) process.exitCode = 1;
+      }
     } finally {
       await deleteApp(app);
     }
