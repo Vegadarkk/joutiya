@@ -1,4 +1,5 @@
 import type { Locale } from "@/config/site";
+import type { AppointmentKind } from "@/lib/contracts/appointments";
 
 // Mail adapter (§2 "Adapters": MailTransport). Resend in production, Brevo as the security
 // fallback, an in-memory mailbox in development (DEV_MAILBOX). The web app only enqueues; the
@@ -41,6 +42,8 @@ export type TemplateId =
   | "launchOfferNotice"
   // Messaging (phase 5, L5): the grouped new-messages mail (design D21).
   | "newMessages"
+  // Appointments in messaging (28 Oct): reminder the day before and 2 hours before a confirmed slot.
+  | "appointmentReminder"
   // Account closure (phase 5, L7, D26): confirmation with what is kept and until when.
   | "accountClosed"
   // Legal (phase 6, D11): the CGU changed since the member accepted them (DSA art. 14 § 2).
@@ -168,6 +171,17 @@ export interface TemplateData {
    * title, the other member's display name). Never the text of a message.
    */
   newMessages: { displayName: string; count: number; conversations: { listingTitle: string; counterpartName: string }[] };
+  /** A confirmed appointment approaches: `startsAt` ISO, `place` with its links masked (URL_MARKER). */
+  appointmentReminder: {
+    displayName: string;
+    counterpartName: string;
+    listingTitle: string;
+    kind: AppointmentKind;
+    startsAt: string;
+    minutes: number;
+    place: string | null;
+    cid: string;
+  };
   /** The account is closed: closure date and the purge of the account data (ISO). */
   accountClosed: { displayName: string; closedAt: string; purgeAt: string };
   /** `effective`: ISO day (LEGAL_VERSIONS.cgu). */
