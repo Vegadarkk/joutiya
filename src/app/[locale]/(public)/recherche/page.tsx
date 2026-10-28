@@ -141,12 +141,12 @@ export default async function SearchPage({ params, searchParams }: Props) {
   const locale = pageLocale((await params).locale);
   setRequestLocale(locale);
   const query = parseSearchParams(await searchParams);
-  const outcome = await loadSearch(query, await pageRequest());
+  const [outcome, flags] = await Promise.all([pageRequest().then((request) => loadSearch(query, request)), getFlags()]);
   const applied = outcome.kind === "results" ? outcome.response.params : query;
   // The count prints a number: Tarifit pages format it as French (no Intl data for "rif").
   const [t, title] = await Promise.all([getTranslations({ locale: numbersLocale(locale), namespace: "SearchPage" }), searchPageTitle(locale, applied)]);
   const total = outcome.kind === "results" ? outcome.response.total : 0;
-  const promos = availablePromos(await getFlags());
+  const promos = availablePromos(flags);
 
   // The public layout ships only the public client namespaces; the filters sheet and the save
   // dialog read more (src/i18n/client-messages.ts). A nested provider replaces, never merges.

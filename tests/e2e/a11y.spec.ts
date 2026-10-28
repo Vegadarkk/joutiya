@@ -135,7 +135,7 @@ test.describe("accessibility (axe, WCAG 2.1 A and AA)", { tag: "@mobile" }, () =
       });
 
       test("search results", async ({ page }) => {
-        await expectAccessible(page, `/${locale}/recherche?q=${WORD}`, (p) => p.getByTestId("results-grid").getByRole("link", { name: new RegExp(WORD) }).first());
+        await expectAccessible(page, `/${locale}/recherche?q=${WORD}`, (p) => p.locator("#main").getByTestId("results-grid").getByRole("link", { name: new RegExp(WORD) }).first());
       });
 
       test("sign-up", async ({ page }) => {
