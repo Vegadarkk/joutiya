@@ -1,5 +1,5 @@
 #!/bin/bash
-# Staging demo listings (scripts/seed-demo.ts, docs/staging-demo.md): writes or refreshes them from
+# Example listings on staging (scripts/seed-demo.ts, docs/staging-demo.md): writes or refreshes them from
 # the staging worker container. Run as root on joutiya-vm: node scripts/oracle-vm.ts run infra/demo/seed.sh [--apply]
 set -euo pipefail
 id="$(docker ps -q --filter label=com.docker.compose.project=joutiya-staging --filter label=com.docker.compose.service=worker)"

@@ -3,12 +3,12 @@ import { CATEGORIES, criteriaSchema, subcategoryById } from "@/config/categories
 import { REGIONS, cityBySlug } from "@/config/regions";
 import { publishedListingSchema, userSchema } from "@/lib/db/schemas";
 import { DEMO_ENTRIES, DEMO_SELLERS } from "@/lib/demo/catalog";
-import { DEMO_ID_PREFIX, DEMO_UID_PREFIX, demoListings, demoPhotoRefs, demoSellers, pexelsUrl } from "@/lib/demo/data";
+import { DEMO_ID_PREFIX, DEMO_LIFETIME_DAYS, DEMO_UID_PREFIX, demoListings, demoPhotoRefs, demoSellers, pexelsUrl } from "@/lib/demo/data";
 import { LISTING_ID_PATTERN, parseSlugId } from "@/lib/listings/ids";
 import { toSearchDocument } from "@/lib/search/document";
 import { downloadPhoto, parseSeedDemoCli, removeDemo, seedDemo, type SeedDemoTarget } from "../../scripts/seed-demo";
 
-// Staging demo data set: every subcategory and region covered, every listing valid as published,
+// Example listings: every subcategory and region covered, every listing valid as published,
 // and a seed that removes exactly what it wrote.
 
 const NOW = new Date("2026-11-01T10:00:00Z");
@@ -69,6 +69,16 @@ describe("demo listings", () => {
     expect(demoListings(NOW)).toEqual(listings);
   });
 
+  it("are all labelled examples: no paid boost, no ad, not expiring like a member's listing", () => {
+    for (const listing of demoListings(NOW)) {
+      expect(listing.example, listing.id).toBe(true);
+      expect(listing.boosts, listing.id).toEqual({});
+      expect(listing.adsEligible, listing.id).toBe(false);
+      expect((listing.expiresAt?.getTime() ?? 0) - NOW.getTime(), listing.id).toBe(DEMO_LIFETIME_DAYS * 86_400_000);
+      expect(toSearchDocument(listing, NOW)?.isExample, listing.id).toBe(true);
+    }
+  });
+
   it("belong to valid sellers", () => {
     for (const { uid, doc } of demoSellers(NOW)) expect(userSchema.safeParse(doc).error?.issues ?? [], uid).toEqual([]);
   });
@@ -126,8 +136,9 @@ describe("seed-demo", () => {
   }
 
   it("parses its flags", () => {
-    expect(parseSeedDemoCli([])).toEqual({ remove: false, apply: false });
-    expect(parseSeedDemoCli(["--remove", "--apply"])).toEqual({ remove: true, apply: true });
+    expect(parseSeedDemoCli([])).toEqual({ remove: false, apply: false, production: false });
+    expect(parseSeedDemoCli(["--remove", "--apply"])).toEqual({ remove: true, apply: true, production: false });
+    expect(parseSeedDemoCli(["--apply", "--production"])).toEqual({ remove: false, apply: true, production: true });
     expect(() => parseSeedDemoCli(["--all"])).toThrow();
   });
 

@@ -129,6 +129,10 @@ describe("POST /api/listings/{id}/phone", () => {
       const ended = await ask(viewer, live);
       expect([ended.status, ended.body.error.code], status).toEqual([409, "listing_unavailable"]);
     }
+    // An example listing (src/lib/demo): published, never contactable.
+    await updateListing(live, { status: "published", example: true });
+    const example = await ask(viewer, live);
+    expect([example.status, example.body.error.code]).toEqual([409, "listing_unavailable"]);
     expect(await listRevealLogs(live)).toEqual([]);
   });
 

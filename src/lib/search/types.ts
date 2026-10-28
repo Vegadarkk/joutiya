@@ -57,6 +57,8 @@ export interface SearchDocument {
   isBumped: boolean;
   /** Epoch ms; À la Une while > now (separate query, never the main sort). */
   featuredUntil?: number;
+  /** Example listing (src/lib/demo): labelled card, no contact; out of the sitemap (`sitemapShard` out of range). */
+  isExample?: true;
   /** Rounded city (later district) centroid. */
   _geo: { lat: number; lng: number };
   version: number;
@@ -100,6 +102,7 @@ export const CARD_FIELDS = [
   "sortAt",
   "isBumped",
   "featuredUntil",
+  "isExample",
 ] as const satisfies readonly (keyof SearchDocument)[];
 export type CardDocument = Pick<SearchDocument, (typeof CARD_FIELDS)[number]>;
 
@@ -193,6 +196,8 @@ export interface SearchCard {
   bumped: boolean;
   /** Served in an À la Une slot: "À la Une · Sponsorisé" mention (§8). */
   featured: boolean;
+  /** Example listing: "Exemple" label, no favorite action. */
+  example?: true;
 }
 
 export interface SearchFacets {
