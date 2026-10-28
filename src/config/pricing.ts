@@ -125,6 +125,32 @@ export const plansSchema = z
   .refine((plans) => plans.essentiel.entitlement !== plans.business.entitlement, "plan entitlements must differ");
 export type PlansConfig = z.infer<typeof plansSchema>;
 
+/**
+ * Pass Boutique (owner decision 2026-10-28, design phase-7/boutique-temporaire.md §1): `days` of a
+ * plan's quotas and storefront for one payment, no subscription, no renewal. Paid by Stripe Checkout
+ * in `payment` mode (`stripePrice`: a one-time Price, per environment, none by default: the checkout
+ * answers unavailable). `credits` are the plan credits granted once, lost at the end of the pass. A
+ * pass bought during a pass extends it, up to `maxAheadDays` ahead of today.
+ */
+export const passSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9_]{1,40}$/),
+    plan: z.enum(PAID_PLANS),
+    days: z.number().int().min(1).max(90),
+    priceMinor: z.number().int().min(100).max(100_000_000),
+    credits: z.number().int().min(0).max(10_000),
+    maxAheadDays: z.number().int().min(1).max(366),
+    stripePrice: stripePriceId.optional(),
+  })
+  .strict()
+  .refine((pass) => pass.days <= pass.maxAheadDays, "a pass cannot last longer than maxAheadDays");
+export type PassConfig = z.infer<typeof passSchema>;
+
+export const passesSchema = z
+  .array(passSchema)
+  .max(4)
+  .refine((passes) => new Set(passes.map((pass) => pass.id)).size === passes.length, "pass ids must be unique");
+
 export const pricingConfigSchema = z
   .object({
     individual: listingQuotasSchema,
@@ -135,6 +161,7 @@ export const pricingConfigSchema = z
     options: optionPricesSchema,
     packs: creditPacksSchema,
     plans: plansSchema,
+    passes: passesSchema,
   })
   .strict();
 export type PricingConfig = z.infer<typeof pricingConfigSchema>;
@@ -161,7 +188,14 @@ export const DEFAULT_PRICING: PricingConfig = {
     essentiel: { priceMinor: { monthly: 24_900, yearly: 249_000 }, credits: 30, featured: 0, entitlement: "essentiel", stripePrices: {} },
     business: { priceMinor: { monthly: 59_000, yearly: 590_000 }, credits: 100, featured: 4, entitlement: "business", stripePrices: {} },
   },
+  // 249 MAD HT for 30 days, as a month of Essentiel (owner, 2026-10-28).
+  passes: [{ id: "boutique30", plan: "essentiel", days: 30, priceMinor: 24_900, credits: 30, maxAheadDays: 90 }],
 };
+
+/** The pass sold as `id`, if the config lists it. */
+export function passById(id: string, config: PricingConfig = DEFAULT_PRICING): PassConfig | undefined {
+  return config.passes.find((pass) => pass.id === id);
+}
 
 /** Plan carried by a RevenueCat entitlement `lookup_key`, if any. */
 export function planOfEntitlement(lookupKey: string, config: PricingConfig = DEFAULT_PRICING): PaidPlanId | undefined {

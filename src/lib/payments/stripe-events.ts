@@ -10,6 +10,7 @@ import { BillingRetryError, expectedEnvironment } from "./billing-common";
 import { enqueueBillingEvent, isBillingQueueEnabled } from "./billing-queue";
 import { postStripeReceipt, RevenueCatApiError } from "./revenuecat-api";
 import { stripeRequest, StripeApiError } from "./stripe-api";
+import { applyPassSession, type PassOutcome } from "./pass";
 import { startGrace, syncShopSubscription, type SyncDeps, type SyncOutcome } from "./subscriptions";
 
 // Stripe webhook events of the Pro subscriptions (phase 7 design §7). The route checks the
@@ -17,7 +18,9 @@ import { startGrace, syncShopSubscription, type SyncDeps, type SyncOutcome } fro
 // queue (inline without Valkey):
 // - a new or changed subscription is handed to RevenueCat (POST /v1/receipts) so it tracks it now;
 // - a failed payment puts an active shop in grace at once (and stops there);
-// - every other event syncs the shop from RevenueCat (src/lib/payments/subscriptions.ts), the source of truth.
+// - every other event syncs the shop from RevenueCat (src/lib/payments/subscriptions.ts), the source of truth;
+// - a completed Checkout Session of a Pass Boutique (payment mode, metadata kind "pass") extends the
+//   shop's pass (src/lib/payments/pass.ts); RevenueCat does not see passes.
 // Event payloads are not trusted beyond their ids: the sync re-reads everything.
 
 export const STRIPE_EVENT_TYPES: ReadonlySet<string> = new Set([
@@ -57,7 +60,7 @@ export const stripeEventSchema = z.object({
 });
 
 export type StripeReceiveOutcome = "unreadable" | "wrong_environment" | "ignored_type" | "duplicate" | "queued" | StripeProcessOutcome;
-export type StripeProcessOutcome = SyncOutcome | "missing" | "unknown_customer";
+export type StripeProcessOutcome = SyncOutcome | PassOutcome | "missing" | "unknown_customer";
 const IGNORED: ReadonlySet<StripeProcessOutcome> = new Set(["unknown_customer", "no_shop", "no_subscription"]);
 
 export interface StripeProcessDeps extends SyncDeps {
@@ -73,8 +76,9 @@ export async function receiveStripeEvent(body: unknown, deps: StripeProcessDeps 
   // Test-mode events never change a production shop, and the reverse.
   if (event.livemode !== (expectedEnvironment() === "PRODUCTION")) return "wrong_environment";
   const object = event.data.object;
-  // Packs are paid on RevenueCat's page: a Checkout Session here is always a plan's.
-  if (!STRIPE_EVENT_TYPES.has(event.type) || (object.object === "checkout.session" && object.mode !== "subscription")) return "ignored_type";
+  // Packs are paid on RevenueCat's page: a Checkout Session here is a plan's or a pass's.
+  const pass = object.object === "checkout.session" && object.mode === "payment" && object.metadata?.kind === "pass";
+  if (!STRIPE_EVENT_TYPES.has(event.type) || (object.object === "checkout.session" && object.mode !== "subscription" && !pass)) return "ignored_type";
   const now = deps.now?.() ?? new Date();
   const subscriptionId = object.object === "subscription" ? object.id : (object.subscription ?? undefined);
   const doc: BillingEventDoc = {
@@ -85,6 +89,7 @@ export async function receiveStripeEvent(body: unknown, deps: StripeProcessDeps 
     ...(object.metadata?.app_user_id ? { appUserId: object.metadata.app_user_id.slice(0, 1_500) } : {}),
     ...(object.customer ? { customerId: object.customer } : {}),
     ...(subscriptionId ? { subscriptionId } : {}),
+    ...(pass ? { kind: "pass" as const } : {}),
     objectId: object.id,
     status: "received",
     attempts: 0,
@@ -135,6 +140,16 @@ async function apply(event: BillingEventDoc, deps: StripeProcessDeps): Promise<S
       body: `Événement ${event.eventId} (${event.type}) : aucun compte de facturation pour ce client Stripe. Vérifier le client et l'abonnement dans Stripe.`,
     });
     return "unknown_customer";
+  }
+  if (event.kind === "pass") {
+    if (event.type !== "checkout.session.completed" || !event.objectId) return "unchanged";
+    try {
+      return await applyPassSession(account, event.objectId, deps);
+    } catch (error) {
+      if (error instanceof StripeApiError && !error.retryable) throw new UnrecoverableError(error.message);
+      if (error instanceof StripeApiError) throw new BillingRetryError(error.message);
+      throw error;
+    }
   }
   if (RECEIPT_EVENTS.has(event.type) && event.subscriptionId) {
     if (serverEnv().REVENUECAT_STRIPE_PUBLIC_KEY) {
