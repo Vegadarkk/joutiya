@@ -149,7 +149,7 @@ test.describe("Car rental", () => {
       await page.goto(`/fr/annonce/${answer.slugId}`);
       const shown = page.getByTestId("rental-terms");
       await expect(shown.getByTestId("rental-insurance")).toContainText("Tous risques sans franchise");
-      await expect(shown.getByTestId("rental-rates")).toContainText(/260 DH par jour dès 7 jours/);
+      await expect(shown.getByTestId("rental-rates")).toContainText(/260\s+DH par jour dès 7 jours/u);
       await expect(page.getByTestId("rental-guide")).toBeVisible();
     }
   });

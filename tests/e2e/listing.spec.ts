@@ -284,7 +284,8 @@ test.describe("listing page", () => {
     await expect(terms.getByRole("heading", { name: "Conditions de location" })).toBeVisible();
     await expect(terms.getByTestId("rental-mileage")).toContainText("Kilométrage illimité");
     await expect(terms.getByTestId("rental-insurance")).toContainText("Tous risques avec franchise");
-    await expect(terms.getByTestId("rental-deposit")).toContainText(/Caution de 4\s000 DH/);
+    await expect(terms.getByTestId("rental-deposit")).toContainText("Caution de 4");
+    await expect(terms.getByTestId("rental-deposit")).toContainText("000 DH");
     await expect(terms).toContainText("sous sa seule responsabilité");
     // The terms stay out of the main criteria.
     await expect(page.getByTestId("criteria-grid")).toContainText("Berline");

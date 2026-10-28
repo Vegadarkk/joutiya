@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { Subcategory } from "@/config/categories";
 import { Link, useRouter } from "@/i18n/navigation";
-import { isApiError } from "@/lib/auth/client";
+import { isApiError, useSession } from "@/lib/auth/client";
 import { createListing, listMine } from "@/lib/listings/client/api";
 import { wizardPath } from "@/lib/listings/client/routes";
 import { CategoryPicker } from "./category-picker";
@@ -24,6 +24,7 @@ export function WizardStart() {
   const apiMessage = useApiErrorMessage();
   const router = useRouter();
   const params = useSearchParams();
+  const { session } = useSession();
   const forceNew = params.get("nouveau") === "1";
   const [state, setState] = useState<State>({ kind: forceNew ? "pick" : "checking" });
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -100,7 +101,7 @@ export function WizardStart() {
           {apiMessage(state.failed)}
         </FormMessage>
       ) : null}
-      <CategoryPicker categoryId={categoryId} subcategoryId={null} onCategory={setCategoryId} onSubcategory={(subcategory) => void onSubcategory(subcategory)} />
+      <CategoryPicker categoryId={categoryId} subcategoryId={null} isPro={session?.role === "pro"} onCategory={setCategoryId} onSubcategory={(subcategory) => void onSubcategory(subcategory)} />
     </div>
   );
 }
