@@ -86,6 +86,8 @@ export interface SellerContext {
   user: UserRecord;
   seller: Seller;
   quotas: ListingQuotas;
+  /** ONSSA numbers a moderator already checked for the shop (Produits du terroir); none for an individual. */
+  sanitaryNumbers?: readonly string[];
 }
 
 export async function sellerOf(auth: AuthContext): Promise<SellerContext> {
@@ -99,7 +101,8 @@ export async function sellerOf(auth: AuthContext): Promise<SellerContext> {
   const profile = proId ? await getProProfile(proId) : null;
   const plan = profile && profile.ownerUid === user.uid && publishesAsPro(profile.lifecycle) ? profile.plan : "none";
   const seller: Seller = { type: "pro", plan };
-  return { user, seller, quotas: listingQuotas(seller, pricing) };
+  const sanitaryNumbers = profile && profile.ownerUid === user.uid ? (profile.sanitaryNumbers ?? []) : [];
+  return { user, seller, quotas: listingQuotas(seller, pricing), sanitaryNumbers };
 }
 
 async function lifetime(): Promise<Lifetime> {
@@ -304,6 +307,7 @@ async function screenFor(listing: ListingDoc & { id: string }, seller: SellerCon
     phoneVerified: seller.user.badges.phoneVerified,
     others: others.filter((other) => other.id !== listing.id),
     selfRejected: rejectedByModerator(listing),
+    sanitaryNumbers: seller.sanitaryNumbers,
     now,
   });
   return screen({ listing, uploads, seller: facts, others: others.filter((other) => other.status !== "rejected") }, listing.id);

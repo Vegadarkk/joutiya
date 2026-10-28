@@ -25,6 +25,17 @@ export type CriterionUnit = (typeof CRITERION_UNITS)[number];
 /** Max length of a free-text criterion (model, brand, breed). */
 export const CRITERION_TEXT_MAX = 80;
 
+/**
+ * Checked shapes of a free-text criterion. `onssa`: the sanitary number of a food business (ONSSA
+ * approval or authorisation, decree 2-10-473 art. 13): activity letters, province code, filing
+ * number and year, dot-separated ("M.07.113.20", "HFO.24.07.15"); every number of the ONSSA lists
+ * matches it. Letters are upper case: the form upper-cases what is typed.
+ */
+export const CRITERION_FORMATS = {
+  onssa: /^[A-Z]{1,6}\.\d{1,2}\.\d{1,4}\.\d{2}$/,
+} as const;
+export type CriterionFormat = keyof typeof CRITERION_FORMATS;
+
 export interface Criterion {
   id: string;
   type: CriterionType;
@@ -51,6 +62,8 @@ export interface Criterion {
   proOnly?: boolean;
   /** Shown and accepted only while criterion `id` holds one of `values` (a warranty's duration). */
   showIf?: { id: string; values: readonly string[] };
+  /** text: the value must match `CRITERION_FORMATS[format]` (refused as `criterion_format_<format>`). */
+  format?: CriterionFormat;
 }
 
 export const CRITERION_GROUPS = ["dossier"] as const;
@@ -251,6 +264,14 @@ const FIELDS = {
   "frequency": { id: "frequency", type: "select", options: ["ponctuel", "hebdomadaire", "quotidien"] },
   "event-service": { id: "event-service", type: "select", options: ["traiteur", "neggafa", "photographe-video", "dj-animation", "location-salle", "decoration", "location-materiel", "autre"] },
   "beauty-service": { id: "beauty-service", type: "select", options: ["coiffure", "maquillage", "esthetique", "henne", "onglerie", "autre"] },
+  "beauty-product-type": { id: "beauty-product-type", type: "select", options: ["huile-argan", "savon-noir", "ghassoul", "eau-de-rose", "henne", "parfum", "maquillage", "soin-visage-corps", "soin-cheveux", "autre"] },
+  // Produits du terroir (owner decision of 2026-10-28, design phase-7/boutique-temporaire.md §3).
+  "onssa-number": { id: "onssa-number", type: "text", format: "onssa" },
+  "olive-oil-grade": { id: "olive-oil-grade", type: "select", options: ["vierge-extra", "vierge", "vierge-courante"] },
+  "honey-type": { id: "honey-type", type: "select", options: ["euphorbe", "thym", "jujubier", "oranger", "eucalyptus", "romarin", "lavande", "caroube", "toutes-fleurs", "autre"] },
+  "date-variety": { id: "date-variety", type: "select", options: ["mejhoul", "boufeggous", "jihel", "aziza", "bouskri", "najda", "autre"] },
+  "spice-type": { id: "spice-type", type: "select", options: ["safran", "ras-el-hanout", "cumin", "paprika", "gingembre", "curcuma", "poivre", "cannelle", "herbes-aromatiques", "autre"] },
+  "terroir-type": { id: "terroir-type", type: "select", options: ["couscous-pates", "olives", "conserves-confitures", "the-infusions", "farines-semoules", "autre"] },
 } as const satisfies Record<string, FieldDef>;
 
 export type CriterionId = keyof typeof FIELDS;
@@ -334,6 +355,22 @@ export const CATEGORIES: readonly Category[] = [
       { id: "chaussures", categoryId: "mode", condition: "required", donationAllowed: true, criteria: [required("audience"), required("shoe-type"), required("shoe-size"), optional("brand"), optional("color")] },
       { id: "sacs-accessoires", categoryId: "mode", condition: "required", donationAllowed: true, criteria: [required("fashion-accessory-type"), optional("audience"), optional("brand"), optional("color")] },
       { id: "montres-bijoux", categoryId: "mode", condition: "required", criteria: [required("jewelry-type"), optional("jewelry-material"), optional("audience"), optional("brand")] },
+      // Cosmetics (cosmetic argan oil included) fall under the cosmetics rules, not ONSSA: no sanitary number.
+      { id: "beaute-soins", categoryId: "mode", condition: "required", criteria: [required("beauty-product-type"), optional("brand")] },
+    ],
+  },
+  {
+    // Food from producers: verified Pros only, with their ONSSA sanitary number, shown on the listing
+    // (decree 2-10-473 art. 14: on advertising) and checked by a moderator the first time a shop uses it.
+    id: "terroir",
+    subcategories: [
+      { id: "huile-olive", categoryId: "terroir", proOnly: true, criteria: [required("onssa-number"), required("olive-oil-grade")] },
+      { id: "huile-argan-alimentaire", categoryId: "terroir", proOnly: true, criteria: [required("onssa-number")] },
+      { id: "miel", categoryId: "terroir", proOnly: true, criteria: [required("onssa-number"), required("honey-type")] },
+      { id: "amlou-pates-a-tartiner", categoryId: "terroir", proOnly: true, criteria: [required("onssa-number")] },
+      { id: "dattes-fruits-secs", categoryId: "terroir", proOnly: true, criteria: [required("onssa-number"), optional("date-variety")] },
+      { id: "epices-herbes", categoryId: "terroir", proOnly: true, criteria: [required("onssa-number"), required("spice-type")] },
+      { id: "autres-produits-terroir", categoryId: "terroir", proOnly: true, criteria: [required("onssa-number"), required("terroir-type")] },
     ],
   },
   {
@@ -422,6 +459,18 @@ export function criterionApplies(criterion: Pick<Criterion, "showIf">, attribute
   return typeof value === "string" && criterion.showIf.values.includes(value);
 }
 
+/**
+ * The ONSSA number of a listing in a food subcategory, when well-formed (trimmed); undefined for
+ * any other subcategory. A moderator checks a number the first time a shop uses it.
+ */
+export function sanitaryNumber(subcategoryId: string | undefined, attributes: Readonly<Record<string, unknown>>): string | undefined {
+  const criterion = subcategoryId ? subcategoryById(subcategoryId)?.criteria.find((candidate) => candidate.format === "onssa") : undefined;
+  const value = criterion ? attributes[criterion.id] : undefined;
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return CRITERION_FORMATS.onssa.test(trimmed) ? trimmed : undefined;
+}
+
 export function criterionById(id: string): FieldDef | undefined {
   return Object.hasOwn(FIELDS, id) ? FIELDS[id as CriterionId] : undefined;
 }
@@ -448,7 +497,9 @@ function criterionSchema(criterion: Criterion): z.ZodType {
       return z.boolean();
     case "text": {
       const text = z.string().trim().max(CRITERION_TEXT_MAX);
-      return criterion.required ? text.min(1) : text;
+      const sized = criterion.required ? text.min(1) : text;
+      const pattern = criterion.format ? CRITERION_FORMATS[criterion.format] : undefined;
+      return pattern ? sized.refine((value) => value === "" || pattern.test(value), { message: `criterion_format_${criterion.format}` }) : sized;
     }
   }
 }

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { Subcategory } from "@/config/categories";
 import { Link, useRouter } from "@/i18n/navigation";
-import { isApiError } from "@/lib/auth/client";
+import { isApiError, useSession } from "@/lib/auth/client";
 import { createListing, listMine } from "@/lib/listings/client/api";
 import { wizardPath } from "@/lib/listings/client/routes";
 import { CategoryPicker } from "./category-picker";
@@ -25,6 +25,8 @@ export function WizardStart() {
   const router = useRouter();
   const params = useSearchParams();
   const forceNew = params.get("nouveau") === "1";
+  // Before the draft exists its seller type is unknown: the session's role opens the Pro-only subcategories.
+  const { session } = useSession();
   const [state, setState] = useState<State>({ kind: forceNew ? "pick" : "checking" });
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const started = useRef(false);
@@ -100,7 +102,7 @@ export function WizardStart() {
           {apiMessage(state.failed)}
         </FormMessage>
       ) : null}
-      <CategoryPicker categoryId={categoryId} subcategoryId={null} onCategory={setCategoryId} onSubcategory={(subcategory) => void onSubcategory(subcategory)} />
+      <CategoryPicker categoryId={categoryId} subcategoryId={null} onCategory={setCategoryId} onSubcategory={(subcategory) => void onSubcategory(subcategory)} isPro={session?.role === "pro"} />
     </div>
   );
 }

@@ -49,7 +49,7 @@ describe("sellerFacts", () => {
       { status: "published" as const, createdAt: new Date(NOW.getTime() - 2 * 60 * 60 * 1000) },
     ];
     const base = { accountCreatedAt: new Date(NOW.getTime() - 40 * DAY_MS), phoneVerified: true, others, now: NOW };
-    expect(sellerFacts(base)).toEqual({ accountAgeDays: 40, listingsLast24h: 1, phoneVerified: true, previousRejections: 1 });
+    expect(sellerFacts(base)).toEqual({ accountAgeDays: 40, listingsLast24h: 1, phoneVerified: true, previousRejections: 1, sanitaryNumbers: [] });
     expect(sellerFacts({ ...base, selfRejected: true }).previousRejections).toBe(2);
     expect(sellerFacts({ ...base, others: [], selfRejected: false }).previousRejections).toBe(0);
   });

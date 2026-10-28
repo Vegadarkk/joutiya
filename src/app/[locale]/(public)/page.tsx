@@ -23,7 +23,7 @@ import type { SearchCard } from "@/lib/search/types";
 
 const favoriteAction = (card: SearchCard) => <FavoriteButton listingId={card.id} />;
 
-// Home (design D21): search hero, the eleven categories, À la Une (8 drawn) and the 12 newest
+// Home (design D21): search hero, the twelve categories, À la Une (8 drawn) and the 12 newest
 // listings, behind the welcome threshold of a first visit (design C7). ISR every 5 minutes; an
 // engine failure hides the two listing sections (D2) and the page still renders.
 

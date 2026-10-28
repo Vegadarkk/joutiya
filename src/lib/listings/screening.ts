@@ -19,6 +19,8 @@ export interface SellerFacts {
   listingsLast24h: number;
   phoneVerified: boolean;
   previousRejections: number;
+  /** ONSSA numbers a moderator already checked for the seller's shop. */
+  sanitaryNumbers?: readonly string[];
 }
 
 export interface ScreeningResult {
@@ -62,13 +64,14 @@ export function detectDuplicates(listing: Pick<ListingDoc, "title" | "descriptio
  * Seller facts from the account and its other listings (volume = the last 24 hours). `selfRejected`:
  * the screened listing itself was rejected by a moderator (reopened since), one more rejection.
  */
-export function sellerFacts(input: { accountCreatedAt: Date; phoneVerified: boolean; others: readonly Pick<ListingRecord, "createdAt" | "status">[]; selfRejected?: boolean; now: Date }): SellerFacts {
+export function sellerFacts(input: { accountCreatedAt: Date; phoneVerified: boolean; others: readonly Pick<ListingRecord, "createdAt" | "status">[]; selfRejected?: boolean; sanitaryNumbers?: readonly string[]; now: Date }): SellerFacts {
   const dayAgo = input.now.getTime() - 24 * 60 * 60 * 1000;
   return {
     accountAgeDays: Math.max(0, Math.floor((input.now.getTime() - input.accountCreatedAt.getTime()) / (24 * 60 * 60 * 1000))),
     listingsLast24h: input.others.filter((other) => other.createdAt.getTime() >= dayAgo).length,
     phoneVerified: input.phoneVerified,
     previousRejections: input.others.filter((other) => other.status === "rejected").length + (input.selfRejected ? 1 : 0),
+    sanitaryNumbers: input.sanitaryNumbers ?? [],
   };
 }
 

@@ -16,6 +16,9 @@ import type { ScreenState } from "@/lib/moderation/types";
 //   auto-approved by the agent (HUMAN_REVIEW_FLAGS): an adults-only subcategory (decorative
 //   koumiyas); a photo the seller kept with a face after the wizard proposed to crop it (CGU §7,
 //   privacy policy §4.4: « recadrage proposé, sinon examen humain », phase 6 decision).
+// - sanitary_check 0: a rule too, never auto-approved: the first listing of a shop with a given ONSSA
+//   number (Produits du terroir); the moderator checks it in the ONSSA lists, then the shop's later
+//   listings with that number pass (owner decision of 2026-10-28).
 // - previous rejections: +10 each, max 30, no flag (history, not content).
 
 export interface RiskWeight {
@@ -37,16 +40,17 @@ export const RISK_WEIGHTS: Readonly<Record<ModerationFlag, RiskWeight>> = {
   volume: { weight: 15, reason: "many listings in 24 hours" },
   restricted_category: { weight: 0, reason: "adults-only subcategory, human review required" },
   credit_ad: { weight: 25, reason: "instalment quoted without the APR (loi 31-08 art. 76), review required" },
+  sanitary_check: { weight: 0, reason: "ONSSA number new for the shop, human check required" },
 };
 
 export const PREVIOUS_REJECTION_WEIGHT = 10;
 export const PREVIOUS_REJECTION_CAP = 30;
 
 /** Flags that send the listing to review whatever the score (step 2 soft hits, step 3 legal review, step 5 nudity). */
-export const ALWAYS_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["prohibited_kw", "prohibited_soft", "sensitive_text", "third_party_phone", "nsfw_review", "restricted_category", "face", "credit_ad"]);
+export const ALWAYS_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["prohibited_kw", "prohibited_soft", "sensitive_text", "third_party_phone", "nsfw_review", "restricted_category", "face", "credit_ad", "sanitary_check"]);
 
 /** Flags the agent may never lift alone, whatever `agent.autoApproveSoftFlags` says (a moderator decides). */
-export const HUMAN_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["restricted_category", "face"]);
+export const HUMAN_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["restricted_category", "face", "sanitary_check"]);
 
 /** `accountAgeDays` below which `new_account` is raised (lot decision; architecture §7 cites 7 days for the AI agent context). */
 export const NEW_ACCOUNT_DAYS = 1;

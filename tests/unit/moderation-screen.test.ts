@@ -210,3 +210,32 @@ describe("screenListing: soft flags and state", () => {
     expect(soft).toMatchObject({ blockers: [], flags: ["sensitive_text"], state: "needs_review" });
   });
 });
+
+describe("screenListing: food with an ONSSA number", () => {
+  const honey = (sanitaryNumbers?: readonly string[], number = "M.07.113.20") =>
+    cleanListing({
+      title: "Miel de thym 500 g",
+      description: "Miel de thym récolté cet été, pot en verre de 500 g, non chauffé.",
+      attributes: { "onssa-number": number, "honey-type": "thym" },
+      categoryId: "terroir",
+      subcategoryId: "miel",
+      price: 220,
+      seller: { accountAgeDays: 30, listingsLast24h: 0, phoneVerified: true, previousRejections: 0, ...(sanitaryNumbers ? { sanitaryNumbers } : {}) },
+    });
+
+  it("sends a number new for the shop to a moderator, without risk points", () => {
+    expect(screenListing(honey(), ctx)).toMatchObject({ state: "needs_review", flags: ["sanitary_check"], score: 0, blockers: [], evidence: ["ONSSA number M.07.113.20 not yet checked for this shop"] });
+    expect(screenListing(honey(["HFO.24.07.15"]), ctx).flags).toEqual(["sanitary_check"]);
+  });
+
+  it("lets a number a moderator already checked through", () => {
+    expect(screenListing(honey(["HFO.24.07.15", "M.07.113.20"]), ctx)).toMatchObject({ state: "auto_ok", flags: [], blockers: [] });
+  });
+
+  it("leaves a malformed number to the criteria check, and other subcategories alone", () => {
+    const malformed = screenListing(honey(undefined, "M07113"), ctx);
+    expect(malformed.blockers).toEqual([{ path: "attributes.onssa-number", code: "invalid" }]);
+    expect(malformed.flags).not.toContain("sanitary_check");
+    expect(screenListing(cleanListing(), ctx).flags).not.toContain("sanitary_check");
+  });
+});

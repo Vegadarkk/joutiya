@@ -40,6 +40,7 @@ export const MODERATION_FLAGS = [
   "volume",
   "restricted_category",
   "credit_ad",
+  "sanitary_check",
 ] as const;
 export type ModerationFlag = (typeof MODERATION_FLAGS)[number];
 

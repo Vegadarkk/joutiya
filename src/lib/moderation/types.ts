@@ -21,6 +21,8 @@ export interface ScreenSeller {
   listingsLast24h: number;
   phoneVerified: boolean;
   previousRejections: number;
+  /** ONSSA numbers a moderator already checked for the seller's shop (none for an individual). */
+  sanitaryNumbers?: readonly string[];
 }
 
 export interface ScreenDuplicates {
