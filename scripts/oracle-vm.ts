@@ -55,9 +55,10 @@
 //       the same steps renew them.
 //   node scripts/oracle-vm.ts deploy-status
 //       releases and image IDs running in staging and production (read only).
-//   node scripts/oracle-vm.ts promote [--apply]
-//       the release running in staging, if it is a commit of origin/main, goes to production
-//       (pinned by image ID), then the Cloudflare cache of the zone is purged.
+//   node scripts/oracle-vm.ts promote --tag=vX.Y.Z [--apply]
+//       the release running in staging goes to production (pinned by image ID), then the Cloudflare
+//       cache of the zone is purged; only when it is the commit of that annotated release tag
+//       (`vX.Y.Z` or `vX.Y.Z-rc.N`, pushed after release.yml checked it) and a commit of origin/main.
 //   node scripts/oracle-vm.ts rollback [--apply]
 //       production back to its previous release, then the cache is purged.
 //
@@ -1163,6 +1164,31 @@ function printStatus(current: VmStatus): void {
   }
 }
 
+/** A release tag (D21): `vX.Y.Z`, or `vX.Y.Z-rc.N` for a candidate. */
+export const RELEASE_TAG = /^v\d+\.\d+\.\d+(?:-rc\.[1-9]\d*)?$/;
+
+/**
+ * Why `promote` must not send staging's release under `tag`; null when it may. `object` is what
+ * `git cat-file -t` says of the tag ("tag" for an annotated one), `commit` the commit it points at.
+ */
+export function tagProblem(tag: string, object: string, commit: string, stagingRelease: string): string | null {
+  if (!RELEASE_TAG.test(tag)) return `--tag=${tag}: vX.Y.Z or vX.Y.Z-rc.N expected`;
+  if (object !== "tag") return object === "" ? `tag ${tag} is not on origin: push it first (release.yml checks it)` : `tag ${tag} is not annotated: create it with git tag -a`;
+  if (!RELEASE.test(commit) || !RELEASE.test(stagingRelease) || !commit.startsWith(stagingRelease)) {
+    return `tag ${tag} points at ${commit.slice(0, 12) || "nothing"} but staging runs ${stagingRelease || "no release"}: deploy the tag's commit to staging first, or tag what staging runs`;
+  }
+  return null;
+}
+
+/** The type of `refs/tags/<tag>` fetched from origin ("tag" when annotated, "" when missing) and its commit. */
+function readTag(tag: string): { object: string; commit: string } {
+  if (!RELEASE_TAG.test(tag)) return { object: "", commit: "" };
+  spawnSync("git", ["fetch", "--quiet", "--force", "origin", `refs/tags/${tag}:refs/tags/${tag}`], { cwd: root, stdio: "ignore" });
+  const object = spawnSync("git", ["cat-file", "-t", `refs/tags/${tag}`], { cwd: root, encoding: "utf8" });
+  const commit = spawnSync("git", ["rev-parse", "--verify", "--quiet", `refs/tags/${tag}^{commit}`], { cwd: root, encoding: "utf8" });
+  return { object: object.status === 0 ? object.stdout.trim() : "", commit: commit.status === 0 ? commit.stdout.trim() : "" };
+}
+
 function isOnMain(release: string): boolean {
   spawnSync("git", ["fetch", "--quiet", "origin", "main"], { cwd: root, stdio: "ignore" });
   return spawnSync("git", ["merge-base", "--is-ancestor", release, "origin/main"], { cwd: root, stdio: "ignore" }).status === 0;
@@ -1180,7 +1206,8 @@ async function purgeCache(targets: Targets): Promise<void> {
   }
 }
 
-async function release(oci: Oci, targets: Targets, compartmentId: string, action: "status" | "promote" | "rollback"): Promise<void> {
+async function release(oci: Oci, targets: Targets, compartmentId: string, action: "status" | "promote" | "rollback", tag?: string): Promise<void> {
+  if (action === "promote" && (tag === undefined || !RELEASE_TAG.test(tag))) throw new Error("promote needs --tag=vX.Y.Z (an annotated release tag on the commit staging runs)");
   const instance = await runningInstance(oci, compartmentId);
   const current = await deployStatus(oci, compartmentId, instance.id);
   printStatus(current);
@@ -1189,6 +1216,9 @@ async function release(oci: Oci, targets: Targets, compartmentId: string, action
   if (action === "promote") {
     request = promoteCommand(current.staging);
     if (current.staging.release === current.prod.release) throw new Error("production already runs this release");
+    const { object, commit } = readTag(tag as string);
+    const problem = tagProblem(tag as string, object, commit, current.staging.release);
+    if (problem) throw new Error(`${problem}: not promoted`);
     if (!isOnMain(current.staging.release)) throw new Error(`release ${current.staging.release} is not a commit of origin/main: not promoted`);
     const { tarball } = current.staging;
     const repository = targets.shared.github.repository;
@@ -1370,7 +1400,7 @@ async function main(): Promise<void> {
   const argument = action === "run" || perEnv;
   if (!action || !actions.includes(action) || argument !== (file !== undefined) || (perEnv && !(DEPLOYED_ENVS as readonly string[]).includes(file ?? ""))) {
     throw new Error(
-      "usage: scripts/oracle-vm.ts <create|launcher|tunnels|transfer|build-staging [--commit=<sha>]|rebuild [--keep-disk]|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|--sealed=<file>[,...]|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
+      "usage: scripts/oracle-vm.ts <create|launcher|tunnels|transfer|build-staging [--commit=<sha>]|rebuild [--keep-disk]|status|reboot|agent|sync|run <script>|env <staging|prod> --from=<file>|--sealed=<file>[,...]|search-setup <staging|prod> [--reindex=<n>]|wif <staging|prod> [--certificates=<file>]|deploy-status|promote --tag=vX.Y.Z|rollback> [--apply] [--retry-minutes=<n>] [--small-fallback]",
     );
   }
 
@@ -1406,7 +1436,7 @@ async function main(): Promise<void> {
     else await envFiles(oci, targets, compartment, file as DeployedEnv, froms);
   }
   else if (action === "deploy-status") await release(oci, targets, compartment, "status");
-  else if (action === "promote" || action === "rollback") await release(oci, targets, compartment, action);
+  else if (action === "promote" || action === "rollback") await release(oci, targets, compartment, action, args.find((arg) => arg.startsWith("--tag="))?.slice("--tag=".length));
   else await status(oci, targets, compartment);
   if (!["status", "agent", "deploy-status", "launcher"].includes(action)) console.log(oci.apply ? "\nDone." : "\nDry run: nothing written. Add --apply to send these requests.");
 }
