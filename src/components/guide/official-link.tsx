@@ -27,14 +27,13 @@ export function OfficialLink({ id, label, display }: { id: GuideSourceId; label:
         ) : (
           <span className="font-medium">{label}</span>
         )}
-        <p className="text-sm text-foreground-muted">
+        <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-foreground-muted">
           <span>{sourceAuthority(id)}</span>
-          <span aria-hidden="true">, </span>
           <bdi dir="ltr" className="font-medium text-foreground">
             {sourceDomain(id)}
           </bdi>
           <span className="sr-only">. </span>
-          <span className="block text-xs">{t("langs", { langs })}</span>
+          <span className="basis-full text-xs">{t("langs", { langs })}</span>
         </p>
         {display === "withdrawn" ? <p className="text-sm text-warning">{t("withdrawn")}</p> : null}
       </div>

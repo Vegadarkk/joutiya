@@ -23,7 +23,7 @@ export const OFFICIAL_HOSTS = {
   "www.narsa-securiteroutiere.ma": "NARSA",
   "www.ancfcc.gov.ma": "ANCFCC",
   "www.mre.gov.ma": "Ministère des MRE",
-  "www.consulat.ma": "Consulat.ma",
+  "www.consulat.ma": "Affaires étrangères",
   "casierjudiciaire.justice.gov.ma": "Ministère de la Justice",
   "nationalitemarocaine.justice.gov.ma": "Ministère de la Justice",
   "www.odco.gov.ma": "ODCO",
