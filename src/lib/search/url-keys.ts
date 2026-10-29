@@ -13,6 +13,8 @@ export const SEARCH_QUERY_KEYS = {
   city: "ville",
   radius: "rayon",
   district: "quartier",
+  /** Map area of "Rechercher dans cette zone": `lat,lng,km` (params.ts). */
+  zone: "zone",
   priceMin: "prix-min",
   priceMax: "prix-max",
   sellerType: "vendeur",

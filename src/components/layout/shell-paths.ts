@@ -11,8 +11,11 @@ const FOCUSED_PATHS = ["/deposer", "/connexion", "/inscription", "/mot-de-passe-
 /** Pages with their own bar at the bottom of a phone: the listing's contact bar, the Pro save bars. */
 const BOTTOM_BAR_PATHS = ["/annonce", "/pro"];
 
+/** The search page (lot 2): its own filters and category shortcuts sit beside the results. */
+const SEARCH_PATHS = ["/recherche"];
+
 export function showsCategoryRow(pathname: string): boolean {
-  return !under(pathname, FOCUSED_PATHS);
+  return !under(pathname, FOCUSED_PATHS) && !under(pathname, SEARCH_PATHS);
 }
 
 export function showsSellButton(pathname: string): boolean {

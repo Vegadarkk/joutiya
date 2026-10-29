@@ -250,6 +250,38 @@ test.describe("search page", () => {
     expect(body.hits.map((hit) => hit.id)).toEqual([listings.flat.id]);
   });
 
+  test("searches a map zone: the circle wins over a city, clamped and rounded", async ({ request }) => {
+    const response = await request.get(`/api/search?q=${WORD}&zone=33.59921,-7.62004,19.2&ville=rabat`);
+    expect(response.status()).toBe(200);
+    const body = (await response.json()) as { hits: { id: string }[]; params: { zone?: unknown; city?: string } };
+    expect(body.params.zone).toEqual({ lat: 33.599, lng: -7.62, km: 20 });
+    expect(body.params.city).toBeUndefined();
+    expect(body.hits.map((hit) => hit.id).sort()).toEqual([listings.bike.id, listings.car.id].sort());
+  });
+
+  test("shows a map zone as a removable chip and names it in the title", async ({ page }) => {
+    await page.goto(`/fr/recherche?q=${WORD}&zone=33.599,-7.62,20`);
+    await expect(results(page).getByTestId("search-count")).toHaveText("2 annonces");
+    await expect(results(page).locator("h1")).toContainText("dans la zone de la carte");
+    await results(page).getByRole("link", { name: /Zone de la carte · 20 km/ }).click();
+    await expect(page).not.toHaveURL(/zone=/);
+    await expect(results(page).getByTestId("search-count")).toHaveText("3 annonces");
+  });
+
+  test("fills the header pill from the URL and keeps the other filters on a new search", async ({ page }) => {
+    await page.goto(`/fr/recherche?q=${WORD}&categorie=vehicules`);
+    const pill = page.getByRole("banner").getByRole("search");
+    await expect(pill.locator("#header-search")).toHaveValue(WORD);
+    await expect(pill.locator('input[type="hidden"][name="categorie"]')).toHaveValue("vehicules");
+    // The page has no second search field of its own.
+    await expect(results(page).getByRole("search")).toHaveCount(0);
+    await pill.locator("#header-search").fill(`tomobil ${WORD}`);
+    await pill.locator("#header-search").press("Enter");
+    await expect(page).toHaveURL(/categorie=vehicules/);
+    await expect(page).toHaveURL(/q=tomobil/);
+    await expect(results(page).getByTestId("search-count")).toHaveText("1 annonce");
+  });
+
   test("reads right to left in Arabic", { tag: "@mobile" }, async ({ page }) => {
     await page.goto(`/ar/recherche?q=${WORD}`);
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");

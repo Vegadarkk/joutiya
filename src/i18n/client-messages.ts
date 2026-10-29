@@ -55,6 +55,8 @@ export const PUBLIC_CLIENT_NAMESPACES = [
 export const SEARCH_PAGE_CLIENT_NAMESPACES = [
   "SearchFilters",
   "SearchPage",
+  // The map view (Carte vivante, lot 2): switch, sheet, pins, detail panel.
+  "SearchMap",
   "Criteria",
   "Categories",
   "Listing.units",

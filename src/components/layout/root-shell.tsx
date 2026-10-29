@@ -40,7 +40,7 @@ export async function RootShell({ locale, nonce, config, initialSession, clientN
   const dir = isRtl(locale) ? "rtl" : "ltr";
   return (
     <html lang={LOCALE_TAGS[locale]} dir={dir} className={`${readex.variable} ${tarifitFallback.variable} ${ruqaa.variable}`} suppressHydrationWarning>
-      <body className="flex min-h-dvh flex-col antialiased">
+      <body className="flex min-h-dvh flex-col antialiased search-map:h-dvh search-map:overflow-hidden">
         <ThemeScript nonce={nonce} />
         {/* Before anything paints too: the welcome threshold of a first visit to the home page. */}
         <WelcomeScript nonce={nonce} />

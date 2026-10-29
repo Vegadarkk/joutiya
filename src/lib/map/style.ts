@@ -3,7 +3,7 @@
 // the 12 regions drawn from our GeoJSON and the listing's approximate area as a circle. No text layer, so
 // the style needs neither glyphs nor sprites (no external origin for the CSP).
 
-import { layers, namedFlavor } from "@protomaps/basemaps";
+import { layers, namedFlavor, type Flavor } from "@protomaps/basemaps";
 import { version as maplibreVersion } from "maplibre-gl/package.json";
 import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from "maplibre-gl";
 import { metersPerPixel } from "./projection";
@@ -39,6 +39,13 @@ export interface HouseStyleOptions {
   attribution?: string;
   /** Approximate position of the listing (never the exact point) and the drawn radius. */
   approx?: { lng: number; lat: number; radiusMeters?: number };
+  /**
+   * Draw the 12 regions (default true). The search map draws no administrative line at all
+   * (contested borders): the basemap's `boundaries` layer is always left out.
+   */
+  regions?: boolean;
+  /** Basemap colours (default: Protomaps light). */
+  flavor?: Flavor;
 }
 
 const escapeHtml = (text: string) =>
@@ -54,9 +61,9 @@ export function attributionHtml(text: string = MAP_ATTRIBUTION_TEXT): string {
     .replace("Protomaps", '<a href="https://protomaps.com" target="_blank" rel="noopener noreferrer">Protomaps</a>');
 }
 
-/** Basemap layers of the light flavour without text (no `lang`) and without the `boundaries` source layer. */
-export function basemapLayers(): LayerSpecification[] {
-  const all = layers(PROTOMAPS_SOURCE, namedFlavor("light")) as LayerSpecification[];
+/** Basemap layers of a flavour (light by default) without text (no `lang`) and without the `boundaries` source layer. */
+export function basemapLayers(flavor: Flavor = namedFlavor("light")): LayerSpecification[] {
+  const all = layers(PROTOMAPS_SOURCE, flavor) as LayerSpecification[];
   return all.filter((layer) => !("source-layer" in layer) || layer["source-layer"] !== "boundaries");
 }
 
@@ -71,23 +78,23 @@ export function buildHouseStyle(pmtilesUrl: string, options: HouseStyleOptions =
     version: 8,
     sources: {
       [PROTOMAPS_SOURCE]: { type: "vector", url: `pmtiles://${pmtilesUrl}`, attribution: attributionHtml(options.attribution) },
-      [REGIONS_SOURCE]: { type: "geojson", data: REGIONS_GEOJSON },
     },
-    layers: [
-      ...basemapLayers(),
-      {
-        id: HOUSE_LAYERS.regions,
-        type: "line",
-        source: REGIONS_SOURCE,
-        layout: { "line-join": "round", "line-cap": "round" },
-        paint: {
-          "line-color": OCHRE_500,
-          "line-width": ["interpolate", ["linear"], ["zoom"], MAP_ZOOM.min, 1, MAP_ZOOM.max, 2.5],
-          "line-opacity": 0.8,
-        },
-      },
-    ],
+    layers: basemapLayers(options.flavor),
   };
+  if (options.regions !== false) {
+    style.sources[REGIONS_SOURCE] = { type: "geojson", data: REGIONS_GEOJSON };
+    style.layers.push({
+      id: HOUSE_LAYERS.regions,
+      type: "line",
+      source: REGIONS_SOURCE,
+      layout: { "line-join": "round", "line-cap": "round" },
+      paint: {
+        "line-color": OCHRE_500,
+        "line-width": ["interpolate", ["linear"], ["zoom"], MAP_ZOOM.min, 1, MAP_ZOOM.max, 2.5],
+        "line-opacity": 0.8,
+      },
+    });
+  }
   if (options.approx) {
     const { lng, lat, radiusMeters = APPROX_RADIUS_METERS } = options.approx;
     style.sources[APPROX_SOURCE] = {

@@ -1,5 +1,5 @@
 import { CONDITIONS, RENTAL_SUBCATEGORY, categoryById, criterionById, searchCriteria, subcategoryById, type Condition } from "@/config/categories";
-import { cityBySlug, regionByCode } from "@/config/regions";
+import { cityBySlug, MOROCCO_BBOX, regionByCode } from "@/config/regions";
 import { DAY_PATTERN, RENTAL_SEARCH_DAYS_MAX, dayNumber } from "@/lib/listings/rental-availability";
 import { z } from "@/lib/zod";
 import { SECTION_ID_PATTERN } from "@/lib/contracts/catalog";
@@ -19,6 +19,21 @@ export const SEARCH_PAGE_SIZE = 24;
 export const SEARCH_MAX_PAGE = 50;
 export const SEARCH_MAX_TOTAL_HITS = SEARCH_PAGE_SIZE * SEARCH_MAX_PAGE;
 export const SEARCH_DISTRICT_MAX = 64;
+/**
+ * Map area searched by "Rechercher dans cette zone" (Carte vivante): a circle around the centre of
+ * the visible map, kept inside Morocco, its centre rounded to 3 decimals (~110 m) so that nearby
+ * views share one URL, its radius a whole number of km.
+ */
+export const ZONE_KM_MIN = 1;
+export const ZONE_KM_MAX = 200;
+export const ZONE_DECIMALS = 3;
+
+export interface SearchZone {
+  lat: number;
+  lng: number;
+  km: number;
+}
+
 /** Radius choices around the chosen city centroid, km. */
 export const RADIUS_KM = [5, 10, 20, 50, 100, 200] as const;
 export type RadiusKm = (typeof RADIUS_KM)[number];
@@ -60,6 +75,8 @@ export interface SearchParams {
   radiusKm?: RadiusKm;
   /** Only with `city` and without `radiusKm`; normalized key (see `districtKey`). */
   district?: string;
+  /** Map area; replaces the city, region, radius and district (the last place chosen wins). */
+  zone?: SearchZone;
   priceMin?: number;
   priceMax?: number;
   sellerType?: SellerTypeFilter;
@@ -101,6 +118,37 @@ function validDates(from: string | undefined, to: string | undefined): RentalDat
   const end = dayNumber(to);
   if (Number.isNaN(start) || Number.isNaN(end) || end < start || end - start > RENTAL_SEARCH_DAYS_MAX) return undefined;
   return { from, to };
+}
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const roundTo = (value: number, decimals: number) => {
+  const factor = 10 ** decimals;
+  // `+ 0` turns a rounded -0 into 0, so the URL never reads "-0".
+  return Math.round(value * factor) / factor + 0;
+};
+
+/** A zone brought inside Morocco and the radius bounds, rounded; undefined when not finite. */
+export function normalizeZone(zone: SearchZone): SearchZone | undefined {
+  const { lat, lng, km } = zone;
+  if (![lat, lng, km].every(Number.isFinite)) return undefined;
+  return {
+    lat: roundTo(clamp(lat, MOROCCO_BBOX.south, MOROCCO_BBOX.north), ZONE_DECIMALS),
+    lng: roundTo(clamp(lng, MOROCCO_BBOX.west, MOROCCO_BBOX.east), ZONE_DECIMALS),
+    km: clamp(Math.ceil(km), ZONE_KM_MIN, ZONE_KM_MAX),
+  };
+}
+
+const ZONE_PATTERN = /^(-?\d{1,3}(?:\.\d{1,10})?),(-?\d{1,3}(?:\.\d{1,10})?),(\d{1,5}(?:\.\d{1,3})?)$/;
+
+/** `zone=33.573,-7.59,12`: lenient (clamped and rounded), undefined when malformed. */
+export function parseZone(value: string | undefined): SearchZone | undefined {
+  const match = value ? ZONE_PATTERN.exec(value.trim()) : null;
+  if (!match) return undefined;
+  return normalizeZone({ lat: Number(match[1]), lng: Number(match[2]), km: Number(match[3]) });
+}
+
+export function formatZone(zone: SearchZone): string {
+  return `${zone.lat},${zone.lng},${zone.km}`;
 }
 
 const PUBLIC_ID = /^[a-hj-km-np-z2-9]{10}$/;
@@ -174,6 +222,8 @@ export function parseSearchParams(source: Source): SearchParams {
   if (radius !== undefined && (RADIUS_KM as readonly number[]).includes(radius)) params.radiusKm = radius as RadiusKm;
   const district = read(source, k.district);
   if (district) params.district = districtKey(district);
+  const zone = parseZone(read(source, k.zone));
+  if (zone) params.zone = zone;
   const priceMin = int(read(source, k.priceMin), 0, SEARCH_PRICE_MAX);
   if (priceMin !== undefined) params.priceMin = priceMin;
   const priceMax = int(read(source, k.priceMax), 0, SEARCH_PRICE_MAX);
@@ -230,7 +280,8 @@ export function parseSearchParams(source: Source): SearchParams {
 
 /**
  * Removes contradictions and values outside the whitelist: subcategory implies its category,
- * city implies its region, radius and district need a city (radius wins), criteria need the
+ * a map zone replaces the city and region, city implies its region, radius and district need a
+ * city (radius wins), criteria need the
  * subcategory that declares them (or the category's shared filters), distance sort needs a city, price bounds are ordered and
  * dropped by "donations only".
  */
@@ -243,6 +294,12 @@ export function canonicalSearchParams(input: SearchParams): SearchParams {
     else params.category = sub.categoryId;
   }
   if (params.category && !categoryById(params.category)) delete params.category;
+  const zone = params.zone ? normalizeZone(params.zone) : undefined;
+  if (zone) {
+    params.zone = zone;
+    delete params.city;
+    delete params.region;
+  } else delete params.zone;
   const city = params.city ? cityBySlug(params.city) : undefined;
   if (params.city && !city) delete params.city;
   if (city) params.region = city.regionCode;
@@ -297,7 +354,7 @@ export function canonicalSearchParams(input: SearchParams): SearchParams {
     if (dates) params.dates = dates;
     else delete params.dates;
   }
-  if (params.sort === "distance" && !params.city) delete params.sort;
+  if (params.sort === "distance" && !params.city && !params.zone) delete params.sort;
   if (params.sort && params.sort === defaultSort(params)) delete params.sort;
   if (params.page !== undefined && (params.page <= 1 || params.page > SEARCH_MAX_PAGE)) delete params.page;
   return params;
@@ -325,6 +382,7 @@ export function searchParamsToQuery(input: SearchParams): URLSearchParams {
   if (params.city) query.set(k.city, params.city);
   if (params.radiusKm) query.set(k.radius, String(params.radiusKm));
   if (params.district) query.set(k.district, params.district);
+  if (params.zone) query.set(k.zone, formatZone(params.zone));
   if (params.priceMin !== undefined) query.set(k.priceMin, String(params.priceMin));
   if (params.priceMax !== undefined) query.set(k.priceMax, String(params.priceMax));
   if (params.sellerType && !params.shop) query.set(k.sellerType, SELLER_PARAM[params.sellerType]);
@@ -389,6 +447,14 @@ export const storedSearchParamsSchema = z
     city: z.string().regex(ID).max(64).optional(),
     radiusKm: z.union([z.literal(5), z.literal(10), z.literal(20), z.literal(50), z.literal(100), z.literal(200)]).optional(),
     district: z.string().min(1).max(SEARCH_DISTRICT_MAX).optional(),
+    zone: z
+      .object({
+        lat: z.number().min(MOROCCO_BBOX.south).max(MOROCCO_BBOX.north),
+        lng: z.number().min(MOROCCO_BBOX.west).max(MOROCCO_BBOX.east),
+        km: z.number().int().min(ZONE_KM_MIN).max(ZONE_KM_MAX),
+      })
+      .strict()
+      .optional(),
     priceMin: z.number().int().min(0).max(SEARCH_PRICE_MAX).optional(),
     priceMax: z.number().int().min(0).max(SEARCH_PRICE_MAX).optional(),
     sellerType: z.enum(SELLER_TYPES_FILTER).optional(),

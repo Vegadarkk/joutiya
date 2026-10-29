@@ -10,6 +10,17 @@
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/*
+ * The search page in its map view (Carte vivante, lot 2), for the shell around it (header, footer,
+ * "Vendre"): a script ran (the theme script marks the root, or the page's island hydrated) and the
+ * page shows the map. Without script the same page is a plain list.
+ */
+@custom-variant search-map {
+  &:where(:root[data-theme]:has([data-search-view="map"]) *, :root:has([data-search-view="map"][data-search-enhanced]) *) {
+    @slot;
+  }
+}
+
 @theme {
   --font-sans: var(--font-readex), var(--font-tarifit), ui-sans-serif, system-ui, "Segoe UI", Tahoma, sans-serif;
 
@@ -102,6 +113,8 @@
   --danger-foreground: #ffffff;
   --danger-surface: #fdecea;
   --success: #17703f;
+  /* "Published today" dot of the search map and its rows. */
+  --today: #2f9e6e;
   --success-surface: #e8f5ee;
   --warning: #8a5a00;
   --warning-surface: #fdf3dc;
@@ -137,6 +150,7 @@
   --danger-foreground: var(--color-bab-950);
   --danger-surface: #3a1714;
   --success: #6ce9a6;
+  --today: #4cc38a;
   --success-surface: #0f2e22;
   --warning: #fdb022;
   --warning-surface: #33260a;
@@ -168,6 +182,7 @@
   --color-danger-foreground: var(--danger-foreground);
   --color-danger-surface: var(--danger-surface);
   --color-success: var(--success);
+  --color-today: var(--today);
   --color-success-surface: var(--success-surface);
   --color-warning: var(--warning);
   --color-warning-surface: var(--warning-surface);
@@ -607,3 +622,567 @@ html[data-welcome]:has(#main:target) .welcome {
   transform: translateZ(calc(var(--welcome-u) * var(--welcome-edge-d) / -2)) rotateZ(var(--edge-a)) rotateX(90deg);
 }
 /* ── end welcome ── */
+
+/* ── Search page, map first (Carte vivante, lot 2) ──
+ * One server-rendered panel, three layouts read from [data-search-root]:
+ *  - list view (data-search-view="list"): the page flow, the card grid, the page footer;
+ *  - map view with script: a full-bleed map, the panel floating at the start side (desktop) or as a
+ *    bottom sheet (phones), the filters row floating over the map, the legal links in the panel;
+ *  - map view without script: the rows as a plain list in the page flow.
+ * Logical properties only: in Arabic the panel stands on the right.
+ */
+:root {
+  --search-sheet: 10.5rem;
+}
+:root[data-search-snap="half"] {
+  --search-sheet: 50dvh;
+}
+:root[data-search-snap="full"] {
+  /* Under the header and the floating filters row, which stay in reach. */
+  --search-sheet: calc(100dvh - 7.25rem);
+}
+
+[data-search-view="list"] :is(.search-rows, .search-map-pagination) {
+  display: none;
+}
+.search-panel-legal,
+.search-sheet-handle,
+.search-panel-handle {
+  display: none;
+}
+.today-dot {
+  display: inline-block;
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--today);
+}
+
+:is(:root[data-theme] [data-search-view="map"], [data-search-view="map"][data-search-enhanced]) {
+  & .search-flow {
+    padding: 0;
+  }
+  & .search-panel {
+    position: fixed;
+    z-index: 20;
+    gap: 0;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow:
+      0 0 0 1px var(--float-edge),
+      0 22px 44px -22px var(--float-shadow);
+  }
+  & .search-panel-head {
+    padding: 0.875rem 1rem 0.125rem;
+    gap: 0;
+  }
+  & .search-panel-head h1 {
+    font-size: var(--text-lg);
+    line-height: var(--text-lg--line-height);
+  }
+  & .search-panel-head [data-testid="search-count"] {
+    font-size: var(--text-sm);
+  }
+  & .search-panel-tools {
+    padding: 0.25rem 1rem 0.625rem;
+    border-bottom: 1px solid var(--border);
+  }
+  & .search-panel-tools .search-refine {
+    order: 2;
+    margin-inline: -1rem;
+  }
+  /* One scrolling row of category shortcuts, like on phones: the results stay in sight. */
+  & .search-panel-tools .search-refine > ul {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-inline: 1rem;
+    scroll-padding-inline: 1rem;
+  }
+  /* Narrow panel: "Sauvegarder" as a 44 px icon button, the sort without its visible label (both
+     keep their accessible names). */
+  & .search-panel-tools [data-testid="save-search-button"] {
+    width: 2.75rem;
+    padding-inline: 0;
+  }
+  & .search-panel-tools :is([data-testid="save-search-button"] span, label[for]) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  & .search-panel > :is([role="alert"], [role="status"], [data-testid="rental-dates-bar"], .search-empty) {
+    margin: 0.75rem 1rem 0;
+  }
+  & .search-empty {
+    padding-block: 1.5rem;
+  }
+  & .search-rows {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.5rem;
+  }
+  & .search-map-pagination {
+    padding: 0.25rem 0.5rem;
+    border-top: 1px solid var(--border);
+  }
+  & .search-panel-legal {
+    display: flex;
+  }
+  /* The filters row floats over the map: the chips are the floating pieces, no band. */
+  & .search-toolbar {
+    position: fixed;
+    z-index: 20;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    backdrop-filter: none;
+    pointer-events: none;
+  }
+  & .search-toolbar > * {
+    pointer-events: auto;
+  }
+  & .search-toolbar-scroll {
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 0.375rem 0.25rem;
+    margin: -0.375rem -0.25rem;
+  }
+  & .search-toolbar-scroll > * {
+    flex-shrink: 0;
+  }
+  & .search-toolbar-scroll button,
+  & .search-toolbar-chips a {
+    box-shadow:
+      0 0 0 1px var(--float-edge),
+      0 6px 14px -8px var(--float-shadow);
+  }
+  & .search-toolbar-chips {
+    flex-wrap: nowrap;
+  }
+
+  @media (width >= 64rem) {
+    & .search-panel {
+      top: 5.25rem;
+      bottom: 1rem;
+      inset-inline-start: 1rem;
+      width: 25rem;
+      border-radius: 1.25rem;
+      transition:
+        inset-inline-start 0.35s var(--ease-door),
+        visibility 0s;
+    }
+    &[data-search-panel="collapsed"] .search-panel {
+      inset-inline-start: -27rem;
+      visibility: hidden;
+      transition:
+        inset-inline-start 0.35s var(--ease-door),
+        visibility 0s 0.35s;
+    }
+    & .search-toolbar {
+      top: 5.25rem;
+      inset-inline: 27rem 1rem;
+      transition: inset-inline-start 0.35s var(--ease-door);
+    }
+    &[data-search-panel="collapsed"] .search-toolbar {
+      inset-inline-start: 4rem;
+    }
+    &[data-search-detail="open"] .search-toolbar {
+      inset-inline-end: 26rem;
+    }
+    & .search-panel-handle {
+      position: fixed;
+      z-index: 21;
+      top: calc(50% + 2rem);
+      inset-inline-start: 26rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.75rem;
+      height: 3.5rem;
+      border-start-start-radius: 0;
+      border-end-start-radius: 0;
+      border-start-end-radius: 0.75rem;
+      border-end-end-radius: 0.75rem;
+      color: var(--foreground-muted);
+      transition: inset-inline-start 0.35s var(--ease-door);
+    }
+    & .search-panel-handle:hover {
+      color: var(--foreground);
+    }
+    &[data-search-panel="collapsed"] .search-panel-handle {
+      inset-inline-start: 0;
+    }
+  }
+
+  @media (width < 64rem) {
+    & .search-panel {
+      inset-inline: 0;
+      bottom: 0;
+      height: var(--search-sheet);
+      border-radius: 1.25rem 1.25rem 0 0;
+      padding-bottom: env(safe-area-inset-bottom);
+      transition: height 0.3s var(--ease-door);
+      /* The whole sheet scrolls (heading, rows, legal links): a half sheet still shows results. */
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    & .search-rows {
+      flex: none;
+      overflow: visible;
+    }
+    & .search-panel[data-dragging] {
+      transition: none;
+    }
+    & .search-sheet-handle {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--surface);
+      display: flex;
+      flex: none;
+      align-items: center;
+      justify-content: center;
+      height: 1.75rem;
+      margin-bottom: -0.5rem;
+      touch-action: none;
+      cursor: grab;
+    }
+    & .search-panel-head {
+      padding-top: 0.25rem;
+    }
+    & .search-toolbar {
+      top: 4.25rem;
+      inset-inline: 0;
+      padding-inline: 1rem;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    & :is(.search-panel, .search-toolbar, .search-panel-handle) {
+      transition: none;
+    }
+  }
+}
+
+/* The map behind the panel, under the header. */
+.search-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: #cfe3e6; /* The search map's water (search-style.ts): an unloaded tile reads as sea. */
+}
+[data-theme="dark"] .search-stage {
+  background: #081e20;
+}
+.search-stage .maplibregl-canvas:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -4px;
+}
+.search-legend {
+  position: fixed;
+  z-index: 10;
+  bottom: 1rem;
+  inset-inline-start: 27rem;
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  border-radius: 0.875rem;
+  padding: 0.5rem 0.875rem;
+  font-size: var(--text-xs);
+  transition: inset-inline-start 0.35s var(--ease-door);
+}
+[data-search-panel="collapsed"] .search-legend {
+  inset-inline-start: 1rem;
+}
+.search-zoom {
+  position: fixed;
+  z-index: 10;
+  bottom: 2.75rem;
+  inset-inline-end: 1rem;
+  display: grid;
+  gap: 0.5rem;
+  transition: inset-inline-end 0.35s var(--ease-door);
+}
+[data-search-detail="open"] .search-zoom {
+  inset-inline-end: 26rem;
+}
+.search-zoom-button {
+  display: inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  color: var(--structure);
+}
+[data-theme="dark"] .search-zoom-button {
+  color: var(--color-cream-100);
+}
+.search-attribution {
+  position: fixed;
+  z-index: 10;
+  bottom: 0.375rem;
+  inset-inline-end: 1rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  color: var(--foreground-muted);
+}
+.search-zone-slot {
+  position: fixed;
+  z-index: 15;
+  top: 8.75rem;
+  inset-inline: 27rem 1rem;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+[data-search-panel="collapsed"] .search-zone-slot {
+  inset-inline-start: 1rem;
+}
+[data-search-detail="open"] :is(.search-zone-slot, .search-attribution) {
+  inset-inline-end: 26rem;
+}
+.search-zone-button {
+  pointer-events: auto;
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  background: var(--color-bab-900);
+  padding: 0 1.125rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-cream-100);
+  box-shadow: 0 10px 22px -10px rgb(11 30 31 / 0.6);
+  animation: search-zone-in 0.25s var(--ease-door);
+}
+.search-zone-button:hover {
+  background: var(--color-bab-800);
+}
+@keyframes search-zone-in {
+  from {
+    opacity: 0;
+    translate: 0 -0.375rem;
+  }
+}
+@media (width < 64rem) {
+  .search-zone-slot {
+    top: 7.75rem;
+    inset-inline: 1rem;
+  }
+  .search-attribution {
+    bottom: calc(var(--search-sheet) + 0.375rem);
+    inset-inline-end: auto;
+    inset-inline-start: 0.75rem;
+    transition: bottom 0.3s var(--ease-door);
+  }
+  /* A full sheet hides the map: its credits go with it. */
+  :root[data-search-snap="full"] .search-attribution {
+    visibility: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .search-zone-button {
+    animation: none;
+  }
+}
+
+/* Detail panel at the end side of the desktop map. */
+.search-detail {
+  position: fixed;
+  z-index: 25;
+  top: 5.25rem;
+  bottom: 1rem;
+  inset-inline-end: 1rem;
+  display: flex;
+  width: 24rem;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  box-shadow:
+    0 0 0 1px var(--float-edge),
+    0 22px 44px -22px var(--float-shadow);
+  animation: search-detail-in 0.3s var(--ease-door);
+}
+@keyframes search-detail-in {
+  from {
+    opacity: 0;
+    translate: 1.5rem 0;
+  }
+}
+[dir="rtl"] .search-detail {
+  animation-name: search-detail-in-rtl;
+}
+@keyframes search-detail-in-rtl {
+  from {
+    opacity: 0;
+    translate: -1.5rem 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .search-detail {
+    animation: none;
+  }
+}
+
+/* Pins: price pills, À la Une photo arches ringed in gold, count bubbles. Real buttons (44 px hit area). */
+.search-pin {
+  position: relative;
+  display: inline-flex;
+  min-height: 1.875rem;
+  align-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 0 0.625rem;
+  font: 600 0.8125rem/1 var(--font-sans);
+  color: var(--foreground);
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 4px 10px -4px rgb(11 30 31 / 0.35);
+  transition:
+    background-color 0.15s var(--ease-door),
+    color 0.15s var(--ease-door),
+    scale 0.15s var(--ease-door);
+  font-variant-numeric: tabular-nums;
+}
+.search-pin::before {
+  content: "";
+  position: absolute;
+  inset: -0.4375rem -0.25rem;
+}
+.search-pin[data-today]::after {
+  content: "";
+  position: absolute;
+  top: -0.25rem;
+  inset-inline-end: -0.25rem;
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 1.5px solid var(--surface);
+  border-radius: 999px;
+  background: var(--today);
+  animation: search-today 2.2s ease-out infinite;
+}
+@keyframes search-today {
+  0% {
+    box-shadow: 0 0 0 0 rgb(47 158 110 / 0.55);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 0.5625rem rgb(47 158 110 / 0);
+  }
+}
+.search-pin[data-state="highlight"] {
+  scale: 1.12;
+  background: var(--structure);
+  border-color: var(--structure);
+  color: var(--structure-foreground);
+}
+.search-pin[data-state="selected"] {
+  scale: 1.2;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+.search-pin:focus-visible,
+.search-cluster:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.search-pin-featured {
+  flex-direction: column;
+  gap: 0.1875rem;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
+.search-pin-photo {
+  display: block;
+  width: 2.75rem;
+  height: 3.25rem;
+  overflow: hidden;
+  border-radius: 999px 999px 0.5rem 0.5rem;
+  background: var(--surface-muted);
+  box-shadow:
+    0 0 0 2.5px var(--surface),
+    0 0 0 4px var(--featured),
+    0 8px 16px -6px rgb(11 30 31 / 0.5);
+}
+.search-pin-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.search-pin-featured .search-pin-price {
+  border-radius: 999px;
+  background: var(--featured);
+  padding: 0.1875rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--featured-foreground);
+  box-shadow: 0 4px 10px -4px rgb(11 30 31 / 0.4);
+}
+.search-pin-featured[data-state] {
+  background: transparent;
+  color: var(--foreground);
+}
+.search-pin-featured[data-state="selected"] .search-pin-price {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.search-pin-featured[data-today]::after {
+  top: -0.125rem;
+  inset-inline-end: 0.125rem;
+}
+.search-cluster {
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bab-700) 92%, transparent);
+  font: 600 0.8125rem/1 var(--font-sans);
+  color: var(--color-cream-200);
+  cursor: pointer;
+  box-shadow:
+    0 0 0 0.375rem color-mix(in srgb, var(--color-bab-700) 18%, transparent),
+    0 6px 14px -6px rgb(11 30 31 / 0.5);
+  font-variant-numeric: tabular-nums;
+  transition: scale 0.15s var(--ease-door);
+}
+.search-cluster[data-size="m"] {
+  width: 2.875rem;
+  height: 2.875rem;
+}
+.search-cluster[data-size="l"] {
+  width: 3.25rem;
+  height: 3.25rem;
+}
+.search-cluster:hover {
+  scale: 1.06;
+}
+[data-theme="dark"] .search-cluster {
+  background: var(--color-bab-500);
+  color: var(--color-cream-50);
+}
+@media (prefers-reduced-motion: reduce) {
+  .search-pin,
+  .search-cluster {
+    transition: none;
+  }
+  .search-pin[data-today]::after {
+    animation: none;
+  }
+}
+/* ── end search map ── */
