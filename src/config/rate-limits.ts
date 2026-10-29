@@ -33,7 +33,7 @@ export const RATE_LIMITS = {
   // Sign-up attempt on an e-mail that already has an account: the warning mail to its owner is
   // sent 3 times per hour at most per normalized e-mail (mail bombing); the answer never changes.
   "signup.existing.email": { points: 3, duration: HOUR, policy: "closed", key: "email" },
-  // Google sign-in (/api/auth/google and /api/auth/session): 10 per hour per device, 60 per hour per IP.
+  // Google sign-in (/api/auth/google): 10 per hour per device, 60 per hour per IP.
   "google.device": { points: 10, duration: HOUR, policy: "closed", key: "device" },
   "google.ip": { points: 60, duration: HOUR, policy: "closed", key: "ip" },
   // /api/auth/login: 5 failures in 15 min then a 15 min lock for this account + IP /64;

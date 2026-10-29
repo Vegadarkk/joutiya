@@ -1,7 +1,6 @@
 import "server-only";
 import type { DecodedIdToken } from "firebase-admin/auth";
 import { STAFF_SESSION_SECONDS, USER_SESSION_SECONDS } from "@/lib/security/cookies";
-import { HttpError } from "@/lib/http/errors";
 import { logger } from "@/lib/logging/logger";
 import { auth } from "./admin";
 import { readClaims, isStaff, type Claims } from "./claims";
@@ -31,9 +30,6 @@ export interface MintedSession {
   maxAge: number;
   user: SessionUser;
 }
-
-/** Maximum age of an ID token accepted by /api/auth/session (§6: auth_time of 5 minutes). */
-export const MAX_ID_TOKEN_AGE_SECONDS = 5 * 60;
 
 function toUser(decoded: DecodedIdToken): SessionUser {
   const claims = readClaims(decoded as unknown as Record<string, unknown>);
@@ -67,32 +63,6 @@ async function mint(idToken: string): Promise<MintedSession> {
 export async function createSessionForUid(uid: string): Promise<MintedSession> {
   const custom = await auth().createCustomToken(uid);
   const { idToken } = await signInWithCustomToken(custom);
-  return mint(idToken);
-}
-
-export interface IdTokenSessionOptions {
-  /** Providers accepted for this exchange (§6: google.com only for the browser flow). */
-  providers: readonly string[];
-  now?: number;
-}
-
-/**
- * Session from an ID token the browser obtained. Refused (§6): a token older than 5 minutes, a
- * provider outside `providers`, an unverified e-mail, an account without a role.
- */
-export async function createSessionFromIdToken(idToken: string, options: IdTokenSessionOptions): Promise<MintedSession> {
-  let decoded: DecodedIdToken;
-  try {
-    decoded = await auth().verifyIdToken(idToken, true);
-  } catch {
-    throw new HttpError(401, "invalid_credentials");
-  }
-  const now = Math.floor((options.now ?? Date.now()) / 1000);
-  if (now - decoded.auth_time > MAX_ID_TOKEN_AGE_SECONDS) throw new HttpError(401, "invalid_credentials", "recent sign-in required");
-  const provider = decoded.firebase?.sign_in_provider ?? "";
-  if (!options.providers.includes(provider)) throw new HttpError(401, "invalid_credentials", "provider not accepted");
-  if (decoded.email_verified !== true) throw new HttpError(403, "email_not_verified");
-  if (!readClaims(decoded as unknown as Record<string, unknown>).role) throw new HttpError(403, "role_missing");
   return mint(idToken);
 }
 
