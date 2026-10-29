@@ -5115,7 +5115,7 @@
     "nearZone": "À {km} km de vous",
     "useLocation": "Utiliser ma position",
     "locating": "Localisation…",
-    "privacy": "Votre position est arrondie à 100 m environ et sert seulement à cette recherche. Elle n'est pas enregistrée.",
+    "privacy": "Votre position est arrondie à 100 m environ et sert seulement à cette recherche. Elle n'est enregistrée que si vous sauvegardez la recherche.",
     "remove": "Retirer « {filter} »",
     "from": "Compris dans « {words} »",
     "exact": "Chercher le texte exact",
