@@ -21,6 +21,7 @@ import type { ListingOptionsResponse, OptionOffer } from "@/lib/contracts/paymen
 import { isolate } from "@/lib/i18n/bidi";
 import { buyListingOption, loadListingOptions } from "@/lib/payments/client";
 import { cn } from "@/lib/utils";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // "Mettre en avant" (phase 7 design §5): the paid options of one listing, priced for its category
 // by the server, with the mention each one puts on the card, the wallet that pays, and the two
@@ -59,8 +60,8 @@ export function PromoteDialog({ listingId, title, onClose }: PromoteDialogProps)
   const descriptionId = useId();
   const body = useRef<HTMLDivElement>(null);
 
-  const date = useCallback((iso: string) => new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeZone: "Africa/Casablanca" }).format(new Date(iso)), [locale]);
-  const time = useCallback((iso: string) => new Intl.DateTimeFormat(numbersLocale(locale), { timeStyle: "short", timeZone: "Africa/Casablanca" }).format(new Date(iso)), [locale]);
+  const date = useCallback((iso: string) => new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeZone: moroccoTimeZone(new Date(iso).getTime()) }).format(new Date(iso)), [locale]);
+  const time = useCallback((iso: string) => new Intl.DateTimeFormat(numbersLocale(locale), { timeStyle: "short", timeZone: moroccoTimeZone(new Date(iso).getTime()) }).format(new Date(iso)), [locale]);
 
   // State changes only once the answer is in (the first render is already "loading").
   const fetchOptions = useCallback(async () => {

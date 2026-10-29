@@ -17,6 +17,7 @@ import { apiDownload, apiPost, isApiError, setSession, signOut } from "@/lib/aut
 import { ACCOUNT_API } from "@/lib/contracts/endpoints";
 import type { CloseAccountResponse } from "@/lib/contracts/account";
 import { cn } from "@/lib/utils";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // /parametres, last two sections (phase 5 design D26, lot L7): the personal data export (a JSON
 // file, three a day) and the account closure. The closure dialog lays out what happens on a time
@@ -125,9 +126,9 @@ export function CloseAccountSection({ onClosed }: { onClosed: (closed: CloseAcco
   const refusal = refusalOf(error);
 
   const now = new Date();
-  const format = new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeZone: "Africa/Casablanca" });
-  const purgeDay = format.format(addYears(now, 1));
-  const identityDay = format.format(addYears(now, 5));
+  const day = (date: Date) => new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeZone: moroccoTimeZone(date.getTime()) }).format(date);
+  const purgeDay = day(addYears(now, 1));
+  const identityDay = day(addYears(now, 5));
 
   function onOpenChange(next: boolean) {
     if (busy) return;
@@ -253,7 +254,7 @@ export function AccountClosedView({ closed }: { closed: CloseAccountResponse }) 
   const t = useTranslations("Account.close");
   const locale = useLocale() as Locale;
   const ref = useRef<HTMLDivElement>(null);
-  const date = new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeZone: "Africa/Casablanca" }).format(new Date(closed.purgeAt));
+  const date = new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeZone: moroccoTimeZone(new Date(closed.purgeAt).getTime()) }).format(new Date(closed.purgeAt));
 
   // The dialog and the sections are gone: back to the top of the (now short) page, focus on the message.
   useEffect(() => {

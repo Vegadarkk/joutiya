@@ -21,6 +21,7 @@ import { PASS_BUYER_STATES, type PlanOffer, type SubscriptionResponse } from "@/
 import { checkoutPlan, loadSubscription, openBillingPortal } from "@/lib/payments/client";
 import { cn } from "@/lib/utils";
 import { PassOffer, passBlock } from "./pass-offer";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // /pro/abonnement (phase 7 design §7): the shop's plan and the two offers, drawn as the doors of
 // the brand. A shop without a running plan picks an offer and a payment rhythm, accepts the terms
@@ -65,7 +66,7 @@ export function SubscriptionView() {
   const paidPass = passBefore !== null;
   const [waited, setWaited] = useState(false);
 
-  const date = useCallback((iso: string) => new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeZone: "Africa/Casablanca" }).format(new Date(iso)), [locale]);
+  const date = useCallback((iso: string) => new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeZone: moroccoTimeZone(new Date(iso).getTime()) }).format(new Date(iso)), [locale]);
 
   // State changes only once the answer is in (the first render is already "loading").
   const fetchPlan = useCallback(async () => {

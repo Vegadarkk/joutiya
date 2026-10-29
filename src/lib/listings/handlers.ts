@@ -239,6 +239,7 @@ export async function handleAvailability(request: Request, params: Params): Prom
   const id = await listingIdOf(params);
   const input = await readJson(request, rentalAvailabilityInputSchema);
   await enforceLimit("rental.availability.uid", auth.user.uid);
+  await enforceLimit("rental.availability.day.uid", auth.user.uid);
   await assertQuotas(DEPOSIT_QUOTAS);
   const body: RentalAvailabilityResponse = { rental: await setRentalAvailability(auth, id, input) };
   return json(body);
@@ -261,6 +262,7 @@ export async function handleFleetSave(request: Request): Promise<Response> {
   const auth = await requireUser(request, { mutation: true });
   const input = await readJson(request, fleetSaveSchema, FLEET_SAVE_MAX_BYTES);
   await enforceLimit("rental.availability.uid", auth.user.uid, input.changes.length);
+  await enforceLimit("rental.availability.day.uid", auth.user.uid, input.changes.length);
   await assertQuotas(DEPOSIT_QUOTAS);
   return json(await saveFleet(auth, input));
 }

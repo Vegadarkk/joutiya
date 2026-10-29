@@ -39,6 +39,9 @@ type Params = Promise<Record<string, string | string[] | undefined>>;
 /** "Mes avis" reads at most this many of each side. */
 const MINE_LIMIT = 50;
 
+/** A review write (3 writes and mails) stops with the other writes when the Firestore write quota is degraded. */
+const REVIEW_QUOTAS = ["firestore.writes"] as const;
+
 function reviewErrorToHttp(error: unknown): never {
   if (!(error instanceof ReviewError)) throw error;
   switch (error.reason) {
@@ -97,6 +100,7 @@ export async function handleCreateReview(request: Request): Promise<Response> {
   const { user } = await requireUser(request, { mutation: true });
   const input = await readJson(request, reviewInputSchema);
   await enforceLimit("review.create.uid", user.uid);
+  await assertQuotas(REVIEW_QUOTAS);
   // Sensitive data (Russmedia): held for a moderator instead of refused.
   const { sensitive } = screened(input.text, "text");
   const review = await createReview({ cid: input.cid, authorUid: user.uid, rating: input.rating, text: input.text, status: sensitive ? "pending" : "published", now: new Date() }).catch(reviewErrorToHttp);
@@ -113,6 +117,7 @@ export async function handleDeleteReview(request: Request, params: Params): Prom
   const { user } = await requireUser(request, { mutation: true, allowSuspended: true });
   const id = await reviewIdOf(params);
   await enforceLimit("review.mutation.uid", user.uid);
+  await assertQuotas(REVIEW_QUOTAS);
   const review = await getReview(id);
   await deleteReview(id, user.uid, new Date()).catch(reviewErrorToHttp);
   if (review) revalidateListingPaths({ publicId: review.targetPublicId });
@@ -125,6 +130,7 @@ export async function handleReplyReview(request: Request, params: Params): Promi
   const id = await reviewIdOf(params);
   const input = await readJson(request, reviewReplySchema);
   await enforceLimit("review.mutation.uid", user.uid);
+  await assertQuotas(REVIEW_QUOTAS);
   if (screened(input.text, "text").sensitive) throw new HttpError(422, "invalid_text", "reply holds sensitive data", { details: { field: "text", issue: "sensitive" } });
   const review = await replyToReview(id, user.uid, input.text, new Date()).catch(reviewErrorToHttp);
   revalidateListingPaths({ publicId: review.targetPublicId });

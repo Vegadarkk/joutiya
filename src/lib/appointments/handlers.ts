@@ -6,6 +6,7 @@ import { notFound } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { json } from "@/lib/http/route";
 import { MESSAGING_QUOTAS } from "@/lib/messaging/service";
+import { enforceSendLimits } from "@/lib/messaging/send-limits";
 import { assertQuotas } from "@/lib/quota/gate";
 import { assertLimit, consumeLimit } from "@/lib/rate-limit/limiter";
 import { actOnAppointment } from "./service";
@@ -26,7 +27,7 @@ export async function handleAppointment(request: Request, params: Params): Promi
   const cid = parsed.data;
   const action = await readJson(request, appointmentActionSchema, APPOINTMENT_BODY_MAX);
   assertLimit("appointment.uid", await consumeLimit("appointment.uid", auth.user.uid));
-  assertLimit("message.send.thread", await consumeLimit("message.send.thread", `${auth.user.uid}:${cid}`));
+  await enforceSendLimits(auth.user.uid, cid);
   await assertQuotas(MESSAGING_QUOTAS);
   const body: AppointmentResponse = await actOnAppointment({ uid: auth.user.uid, claims: auth.user.claims }, cid, action);
   return json(body, { status: 201 });

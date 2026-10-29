@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { PriceTag } from "./price-tag";
 import { PromoBadge } from "./promo-badge";
 import { blurhashPlaceholder, photoSources } from "./photo";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // A listing in a grid (profile page, search results, home, category pages): the footprint of
 // ListingCardSkeleton (4:3 photo, title, price, place) so nothing shifts while a grid loads. The
@@ -50,7 +51,7 @@ export interface ListingCardProps {
 }
 
 export function formatCardDate(iso: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", timeZone: "Africa/Casablanca" }).format(new Date(iso));
+  return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", timeZone: moroccoTimeZone(new Date(iso).getTime()) }).format(new Date(iso));
 }
 
 export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3", badge, action, priority = false, wide = false, className }: ListingCardProps) {

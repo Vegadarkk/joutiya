@@ -8,6 +8,7 @@ import { formatPrice } from "@/lib/listings/client/format";
 import type { RentalAgency } from "@/lib/pro/profile-schema";
 import type { FleetConditions } from "@/lib/search/rental-fleet-view";
 import { cn } from "@/lib/utils";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // Blocks of a car rental agency's storefront (rental pack §5), server-rendered: the agency card
 // (licence reference « déclarée par l'agence », or « contrôlé sur document » once its decision
@@ -45,7 +46,7 @@ export function RentalAgencyCard({ rental, checkedAt = null, locale, className }
           {checkedAt ? (
             <>
               <p data-testid="rental-agrement-checked" className="text-sm font-medium text-success text-pretty">
-                {t("agrementChecked", { date: format.dateTime(new Date(checkedAt), { dateStyle: "long", timeZone: "Africa/Casablanca" }) })}
+                {t("agrementChecked", { date: format.dateTime(new Date(checkedAt), { dateStyle: "long", timeZone: moroccoTimeZone(new Date(checkedAt).getTime()) }) })}
               </p>
               <p className="text-xs text-foreground-muted text-pretty">{t("agrementCheckedNote")}</p>
             </>

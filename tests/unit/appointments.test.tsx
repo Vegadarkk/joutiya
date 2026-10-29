@@ -173,7 +173,10 @@ describe("step machine", () => {
     expect(nextStep(appointment, { action: "decline", id: appointment.id }, "buyer", now).appointment.status).toBe("declined");
     expect(nextStep(appointment, { action: "withdraw", id: appointment.id }, "seller", now).appointment.status).toBe("withdrawn");
     const confirmed = nextStep(appointment, { action: "confirm", id: appointment.id, start: at(2) }, "buyer", now).appointment;
-    const cancelled = nextStep(confirmed, { action: "cancel", id: confirmed.id, reason: "sold" }, "seller", now);
+    // Only the seller cancels because the item is gone (#167), whatever the client sends.
+    expect(() => nextStep(confirmed, { action: "cancel", id: confirmed.id, reason: "sold" }, "buyer", now, "seller")).toThrow(expect.objectContaining({ code: "forbidden" }));
+    expect(nextStep(confirmed, { action: "cancel", id: confirmed.id, reason: "unavailable" }, "buyer", now, "seller").appointment.cancelledBy).toBe("buyer");
+    const cancelled = nextStep(confirmed, { action: "cancel", id: confirmed.id, reason: "sold" }, "seller", now, "seller");
     expect(cancelled).toMatchObject({ event: "cancelled", remindAt: null, appointment: { status: "cancelled", cancelledBy: "seller", reason: "sold" } });
     expect(nextStep(confirmed, { action: "propose", kind: "visit", slots: [slot(30)] }, "buyer", now).event).toBe("rescheduled");
     expect(nextStep(cancelled.appointment, { action: "propose", kind: "visit", slots: [slot(30)] }, "buyer", now).event).toBe("proposed");

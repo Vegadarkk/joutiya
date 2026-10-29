@@ -22,6 +22,7 @@ import { deleteSavedSearch, listSavedSearches, updateSavedSearch } from "@/lib/s
 import { searchQueryObject, SEARCH_PATH } from "@/lib/search/params";
 import { cn } from "@/lib/utils";
 import { useSearchSummary } from "./summary";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // "Mes recherches" (design D18): the saved searches (10 at most), each with its filters, the daily
 // alert switch, open, rename and delete. The gold edge of a row marks an active alert.
@@ -37,7 +38,7 @@ export function withBusy(busy: ReadonlySet<string>, id: string, value: boolean):
 }
 
 export function formatDay(iso: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "long", timeZone: "Africa/Casablanca" }).format(new Date(iso));
+  return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "long", timeZone: moroccoTimeZone(new Date(iso).getTime()) }).format(new Date(iso));
 }
 
 function RenameDialog({ search, onClose, onRenamed }: { search: SavedSearchView | null; onClose: () => void; onRenamed: (search: SavedSearchView) => void }) {

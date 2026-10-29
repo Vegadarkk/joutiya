@@ -29,7 +29,7 @@ import { getProProfile, listPaymentHostReview, listPendingPaymentHost, proProfil
 import { getUserRecord } from "@/lib/db/repositories/profiles";
 import { db, isFirestoreConfigured } from "@/lib/firebase/admin";
 import { HttpError, notFound } from "@/lib/http/errors";
-import { isVisibleAccount, storefrontSegment } from "@/lib/listings/public";
+import { acceptsContact, isPubliclyVisible, isVisibleAccount, storefrontSegment } from "@/lib/listings/public";
 import { revalidateListingPaths } from "@/lib/listings/revalidate";
 import { logger } from "@/lib/logging/logger";
 import { sendMail } from "@/lib/mail";
@@ -217,8 +217,9 @@ async function ownerShown(profile: ProProfileRecord): Promise<boolean> {
 export async function openShopPayment(proId: string, listingId: string | undefined, visitor: string, now = new Date()): Promise<OpenPaymentResponse> {
   const [profile, config, listing] = await Promise.all([getProProfile(proId), getSellerPayments(), listingId ? getListing(listingId).catch(() => null) : Promise.resolve(null)]);
   if (!profile) throw notFound();
-  // Only the shop's own published listing brings its link (and counts a click).
-  const own = listing && listing.ownerUid === profile.ownerUid && listing.status === "published" ? listing : null;
+  // Only the shop's own published listing, shown and contactable (not hidden by moderation, not an
+  // example), brings its link (and counts a click).
+  const own = listing && listing.ownerUid === profile.ownerUid && isPubliclyVisible(listing) && acceptsContact(listing) ? listing : null;
   const shown = publicShopPayment(profile, config, now, own?.paymentLink);
   const link = linkInForce(profile, config, now, own?.paymentLink);
   if (!shown?.online || !link.url || !link.host || !(await ownerShown(profile))) throw new HttpError(404, "payment_unavailable");

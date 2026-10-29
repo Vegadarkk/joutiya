@@ -5,6 +5,7 @@ import type { ReviewView } from "@/lib/contracts/reviews";
 import { intlLocale } from "@/lib/listings/client/format";
 import { cn } from "@/lib/utils";
 import { Stars } from "./stars";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // One published review (vitrine-avis §2) as the storefront shows it: stars, the author's display
 // name (never a link: the buyer's profile is not exposed), the "verified exchange" mark, the
@@ -28,7 +29,7 @@ export interface ReviewItemLabels {
 }
 
 export function formatReviewDate(at: number, locale: Locale): string {
-  return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Casablanca" }).format(new Date(at));
+  return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "long", year: "numeric", timeZone: moroccoTimeZone(new Date(at).getTime()) }).format(new Date(at));
 }
 
 /** The DSA contact (config/legal) and the storefront's canonical URL: the report form's e-mail stand-in. */

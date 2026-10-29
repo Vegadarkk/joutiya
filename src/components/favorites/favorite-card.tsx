@@ -12,6 +12,7 @@ import { Link } from "@/i18n/navigation";
 import type { FavoriteView } from "@/lib/contracts/search";
 import { intlLocale } from "@/lib/listings/client/format";
 import { cn } from "@/lib/utils";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // A favorite on "Mes favoris" (design D17): the listing card footprint (4:3 photo, title, price,
 // place), with the date it was kept. A listing that left the search (sold, expired, paused,
@@ -21,7 +22,7 @@ import { cn } from "@/lib/utils";
 const CARD_SIZES = "(min-width: 1024px) 18rem, (min-width: 640px) 33vw, 50vw";
 
 export function formatSavedDate(iso: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "long", timeZone: "Africa/Casablanca" }).format(new Date(iso));
+  return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "long", timeZone: moroccoTimeZone(new Date(iso).getTime()) }).format(new Date(iso));
 }
 
 export interface FavoriteCardProps {

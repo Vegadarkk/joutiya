@@ -18,7 +18,6 @@ import { serverEnv } from "@/lib/env";
 import { HttpError, notFound } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { json, noContent } from "@/lib/http/route";
-import type { RateLimitId } from "@/config/rate-limits";
 import { assertQuotas } from "@/lib/quota/gate";
 import { requestIdentity } from "@/lib/rate-limit/keys";
 import { assertLimit, consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
@@ -31,6 +30,7 @@ import { conversationId } from "./ids";
 import { MESSAGING_READ_QUOTAS, conversationRow, inboxPage, threadPage, type Charged } from "./reads";
 import { MESSAGING_QUOTAS, changeConversationState, readConversation, sendMessage, startConversation, unreadBadge, type MessagingActor } from "./service";
 import { markSeen } from "./unread";
+import { enforceSendLimits } from "./send-limits";
 import { decodeCursor, type CursorKind } from "./views";
 
 // Route handlers of /api/conversations/** and /api/messages/unread (design D2-D9, §4). Members
@@ -46,22 +46,6 @@ type Params = Promise<Record<string, string | string[] | undefined>>;
 
 /** Large enough for a 2 000-character message in Arabic (UTF-8, JSON escapes) and a Turnstile token. */
 export const MESSAGE_BODY_MAX = 32 * 1024;
-
-/**
- * The send limiters (D4, audit D1a-01): a burst per minute, an hour and a day per account, and an
- * hour per account and thread. Consumed in that order and stopped at the first refusal, so a
- * refused send (a client retrying on 429) never uses up the hour and day budgets; every one is
- * open (a Valkey outage never blocks a reply).
- */
-async function enforceSendLimits(uid: string, cid: string): Promise<void> {
-  const checks: readonly (readonly [RateLimitId, string])[] = [
-    ["message.send.uid", uid],
-    ["message.send.hour.uid", uid],
-    ["message.send.day.uid", uid],
-    ["message.send.thread", `${uid}:${cid}`],
-  ];
-  for (const [id, key] of checks) assertLimit(id, await consumeLimit(id, key));
-}
 
 async function cidOf(params: Params): Promise<string> {
   const { cid } = await params;

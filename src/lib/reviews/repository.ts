@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { FieldValue, Timestamp, type DocumentSnapshot, type Transaction } from "firebase-admin/firestore";
 import { REVIEW_PURGE_MONTHS } from "@/config/reviews";
 import { reviewWindow, type ReviewWindow } from "@/lib/contracts/reviews";
-import { COLLECTIONS, reviewSchema, userSchema, type ReviewDoc } from "@/lib/db/schemas";
+import { COLLECTIONS, reviewSchema, type ReviewDoc } from "@/lib/db/schemas";
 import { datesToTimestamps, timestampsToDates } from "@/lib/db/repositories/timestamps";
 import { db } from "@/lib/firebase/admin";
 import { addMonths, blocksOf, conversationFromSnapshot, conversationRef, isPairBlocked, userBlocksRef, type ConversationRecord } from "@/lib/messaging/repository";
@@ -62,13 +62,22 @@ interface RatingStats {
   ratingHistogram: Histogram;
 }
 
-/** The seller's aggregates as stored; an account from before the reviews starts at zero. */
-function ratingStatsOf(snapshot: DocumentSnapshot): RatingStats {
-  const parsed = userSchema.shape.stats.safeParse(snapshot.get("stats"));
-  const stats = parsed.success ? parsed.data : null;
-  const count = stats?.ratingCount ?? 0;
-  const histogram = (stats?.ratingHistogram as Histogram | undefined) ?? [0, 0, 0, 0, 0];
-  return { ratingCount: count, ratingSum: stats?.ratingSum ?? Math.round((stats?.ratingAvg ?? 0) * count), ratingHistogram: [...histogram] as Histogram };
+/** A stored counter, or 0 when absent, negative or not a whole number. */
+const counter = (value: unknown): number => (typeof value === "number" && Number.isInteger(value) && value > 0 ? value : 0);
+
+/**
+ * The seller's aggregates as stored; an account from before the reviews starts at zero. Only the rating
+ * fields are read: another `stats` counter out of range (a stray negative `activeListings`, staging
+ * 28 Oct) must not reset the ratings, which the next write would then persist.
+ */
+export function ratingStatsOf(snapshot: DocumentSnapshot): RatingStats {
+  const stats = snapshot.get("stats") as Record<string, unknown> | undefined;
+  const count = counter(stats?.["ratingCount"]);
+  const stored = stats?.["ratingHistogram"];
+  const histogram = (Array.isArray(stored) && stored.length === 5 ? stored.map(counter) : [0, 0, 0, 0, 0]) as Histogram;
+  const average = typeof stats?.["ratingAvg"] === "number" ? Math.min(5, Math.max(0, stats["ratingAvg"] as number)) : 0;
+  const sum = stats?.["ratingSum"] === undefined ? Math.round(average * count) : counter(stats["ratingSum"]);
+  return { ratingCount: count, ratingSum: sum, ratingHistogram: histogram };
 }
 
 /** Adds (delta 1) or removes (delta -1) one published rating; the dotted fields of `stats` only. */
@@ -117,7 +126,8 @@ export async function createReview(input: NewReview): Promise<ReviewRecord> {
       userBlocksRef(conversation.sellerUid),
     );
     if (existing!.exists) throw new ReviewError("exists");
-    if (!seller!.exists || !author!.exists) throw new ReviewError("not_allowed");
+    // Both accounts active (Avis utilisateurs §1.2): a restricted, suspended, banned or closed account neither reviews nor is reviewed.
+    if (!seller!.exists || !author!.exists || seller!.get("status") !== "active" || author!.get("status") !== "active") throw new ReviewError("not_allowed");
     if (isPairBlocked(blocksOf([authorBlocks!, sellerBlocks!]), input.authorUid, conversation.sellerUid)) throw new ReviewError("not_allowed");
     const authorPublicId = author!.get("publicId") as string;
     const authorName = author!.get("displayName") as string;

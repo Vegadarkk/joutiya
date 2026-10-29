@@ -19,6 +19,7 @@ import { numbersLocale } from "@/i18n/params";
 import { apiGet, apiPut, isApiError, signOut } from "@/lib/auth/client";
 import { SELLER_PAYMENT_API, type PaymentLinkIssue, type SellerPaymentInput, type SellerPaymentView } from "@/lib/contracts/seller-payment";
 import { cn } from "@/lib/utils";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // /pro/paiement (owner decision 2026-10-28, design phase-7/boutique-temporaire.md §2): the owner
 // links its own payment page and/or accepts cash on delivery, and fills the distance seller's
@@ -108,7 +109,7 @@ function Settings({ data, onSaved }: { data: SellerPaymentView; onSaved: (data: 
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<unknown>(undefined);
   const [saved, setSaved] = useState(false);
-  const date = (iso: string) => new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeStyle: "short", timeZone: "Africa/Casablanca" }).format(new Date(iso));
+  const date = (iso: string) => new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeStyle: "short", timeZone: moroccoTimeZone(new Date(iso).getTime()) }).format(new Date(iso));
 
   const url = draft.url.trim();
   const turningOn = url !== "" || draft.cashOnDelivery;

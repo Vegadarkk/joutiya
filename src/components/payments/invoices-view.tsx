@@ -16,6 +16,7 @@ import { numbersLocale } from "@/i18n/params";
 import type { InvoiceView, InvoicesResponse } from "@/lib/contracts/payments";
 import { loadInvoices } from "@/lib/payments/client";
 import { cn } from "@/lib/utils";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // /pro/factures (phase 7 design §7): the shop's latest Stripe invoices, newest first, each with
 // Stripe's page and PDF. Older ones stay in Stripe's portal.
@@ -30,7 +31,7 @@ export function InvoicesView() {
   const locale = useLocale() as Locale;
   const [state, setState] = useState<State>({ kind: "loading" });
 
-  const date = useCallback((iso: string) => new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "medium", timeZone: "Africa/Casablanca" }).format(new Date(iso)), [locale]);
+  const date = useCallback((iso: string) => new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "medium", timeZone: moroccoTimeZone(new Date(iso).getTime()) }).format(new Date(iso)), [locale]);
 
   const fetchInvoices = useCallback(async () => {
     try {

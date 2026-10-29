@@ -15,6 +15,7 @@ import { numbersLocale } from "@/i18n/params";
 import type { LedgerEntryView, WalletResponse } from "@/lib/contracts/payments";
 import { loadWallet } from "@/lib/payments/client";
 import { cn } from "@/lib/utils";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // Wallet page (phase 7 design §5, §6): what can be spent now (the plan's credits first, then the
 // purchased ones), the plan's À la Une allowance, the way to buy credits, and the ledger, newest
@@ -36,7 +37,7 @@ export function WalletView() {
   const opening = useRef<number | null>(null);
   const credited = useRef(false);
 
-  const date = useCallback((iso: string, withTime = false) => new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: withTime ? "medium" : "long", ...(withTime ? { timeStyle: "short" } : {}), timeZone: "Africa/Casablanca" }).format(new Date(iso)), [locale]);
+  const date = useCallback((iso: string, withTime = false) => new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: withTime ? "medium" : "long", ...(withTime ? { timeStyle: "short" } : {}), timeZone: moroccoTimeZone(new Date(iso).getTime()) }).format(new Date(iso)), [locale]);
 
   // State changes only once the answer is in (the first render is already "loading").
   const fetchWallet = useCallback(async () => {

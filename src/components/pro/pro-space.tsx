@@ -25,6 +25,7 @@ import { RentalSetup } from "@/components/rental/rental-setup";
 import { AgencySettings } from "./agency-settings";
 import { SectionsSettings } from "./sections-settings";
 import { ProApplicationForm } from "./pro-application-form";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // /pro: the member's Pro area (phase 7 design §4). One request (GET /api/pro/me) decides the
 // screen: the application (intro, eligibility, form), the pending review, a rejection to correct,
@@ -194,7 +195,7 @@ function InlineLink({ href, children }: { href: "/parametres" | "/verifications"
 
 function useDate() {
   const locale = useLocale() as Locale;
-  return (iso: string) => new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeZone: "Africa/Casablanca" }).format(new Date(iso));
+  return (iso: string) => new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeZone: moroccoTimeZone(new Date(iso).getTime()) }).format(new Date(iso));
 }
 
 function Pending({ shop }: { shop: ProSelfView }) {

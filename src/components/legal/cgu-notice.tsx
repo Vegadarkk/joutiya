@@ -11,6 +11,7 @@ import { numbersLocale } from "@/i18n/params";
 import { apiPost, setSession, useSession } from "@/lib/auth/client";
 import type { ConsentsResponse } from "@/lib/contracts/auth";
 import { AUTH_API } from "@/lib/contracts/endpoints";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // CGU change notice (phase 6, D11; DSA art. 14 § 2): a signed-in member who accepted an earlier
 // version sees this band under the header, on every page, until they acknowledge the new text.
@@ -18,7 +19,8 @@ import { AUTH_API } from "@/lib/contracts/endpoints";
 
 /** Today's date in Casablanca, as the ISO day of LEGAL_VERSIONS. */
 function today(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Casablanca" }).format(new Date());
+  const now = Date.now();
+  return new Intl.DateTimeFormat("en-CA", { timeZone: moroccoTimeZone(now) }).format(new Date(now));
 }
 
 export function CguNotice() {
