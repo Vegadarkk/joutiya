@@ -256,7 +256,7 @@ export function VerificationSection({ session }: { session: SessionSummary }) {
   // WhatsApp parked (no phone number id): the check cannot start, so no call to action leads to a 503.
   const phoneOpen = usePublicConfig()?.phoneVerification !== false;
   return (
-    <Section id="verification" title={t("title")} body={t("body")}>
+    <Section id="verification" title={t("title")} body={phoneOpen ? t("body") : t("bodyClosed")}>
       <ul className="flex flex-col divide-y divide-border">
         <li className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0">
           <Mail className="size-5 shrink-0 text-foreground-muted" aria-hidden="true" />
