@@ -1,5 +1,6 @@
 import type { Condition } from "@/config/categories";
 import type { CardFacts } from "@/lib/listings/card-facts";
+import type { CardPromo, PromoKind } from "@/lib/contracts/catalog-core";
 import type { SearchParams, SearchSort } from "./params";
 
 // Search contracts (phase 4, design §3). Client-safe types: the engine adapters
@@ -68,6 +69,15 @@ export interface SearchDocument {
   soldOut?: true;
   /** Combinations at different prices: `price` is the lowest (« à partir de »). */
   priceFrom?: true;
+  /** Promotion (catalogue §4), current or scheduled, epoch ms: running while start <= now < end. */
+  promoStartsAt?: number;
+  promoEndsAt?: number;
+  promoKind?: PromoKind;
+  /** Largest cut against the struck-out price (0 without one): the « Réduction » sort. */
+  promoPercent?: number;
+  /** Lowest promotional price and its struck-out price (0: none, a listing younger than 30 days). */
+  promoPrice?: number;
+  promoReference?: number;
   /** Rounded city (later district) centroid. */
   _geo: { lat: number; lng: number };
   version: number;
@@ -124,6 +134,12 @@ export const CARD_FIELDS = [
   // Pro catalogue: « Épuisé » and « À partir de » on the card.
   "soldOut",
   "priceFrom",
+  "promoStartsAt",
+  "promoEndsAt",
+  "promoKind",
+  "promoPercent",
+  "promoPrice",
+  "promoReference",
 ] as const satisfies readonly (keyof SearchDocument)[];
 type CardField = (typeof CARD_FIELDS)[number];
 /** The `a_*` card fields stay optional, as in the index (a listing without the criterion). */
@@ -142,7 +158,7 @@ export type FilterExpr =
   | { field: string; op: "exists" }
   | { geoRadius: { lat: number; lng: number; meters: number } };
 
-export type SortSpec = { field: "sortAt" | "price"; dir: "asc" | "desc" } | { geoPoint: { lat: number; lng: number }; dir: "asc" };
+export type SortSpec = { field: "sortAt" | "price" | "promoPercent"; dir: "asc" | "desc" } | { geoPoint: { lat: number; lng: number }; dir: "asc" };
 
 export interface EngineQuery {
   /** Normalized text (src/lib/search/normalize.ts); "" = browse. */
@@ -227,6 +243,8 @@ export interface SearchCard {
   soldOut?: true;
   /** Combinations at different prices: `price` is the lowest (« À partir de »). */
   priceFrom?: true;
+  /** A promotion running when the card was built. */
+  promo?: CardPromo;
   /**
    * Car rental in a search by dates (rental pack §4): rental days, estimated total in MAD (long-term
    * rate applied, deposit excluded; null without a price) and whether the availability is up to date.

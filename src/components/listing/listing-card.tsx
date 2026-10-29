@@ -14,6 +14,7 @@ import type { PublicListingCard } from "@/lib/listings/public";
 import type { SearchCard } from "@/lib/search/types";
 import { cn } from "@/lib/utils";
 import { PriceTag } from "./price-tag";
+import { PromoBadge } from "./promo-badge";
 import { blurhashPlaceholder, photoSources } from "./photo";
 
 // A listing in a grid (profile page, search results, home, category pages): the footprint of
@@ -61,6 +62,8 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
   const placeholder = blurhashPlaceholder(listing.photo?.blurhash);
   // Only the facts the messages can say (a category may add one before its wording lands).
   const facts = (listing.facts?.facts ?? []).filter((fact) => t.has(`facts.${fact.id as FactKey}`));
+  // A running promotion (catalogue §4), not on a sold-out article: nothing left to sell at that price.
+  const promo = listing.promo && !listing.soldOut ? listing.promo : undefined;
   const details = (
     <>
       {/* Physical alignment on the heading: the dir="auto" title inherits the page side, not its own start. */}
@@ -79,7 +82,17 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
           {facts.map((fact) => t(`facts.${fact.id as FactKey}`, { count: fact.value })).join(" · ")}
         </p>
       ) : null}
-      <PriceTag price={listing.price} isDonation={listing.isDonation} negotiable={listing.priceNegotiable} unit={unit} locale={locale} from={listing.priceFrom === true} className={cn(listing.soldOut && "text-foreground-muted")} />
+      <PriceTag
+        price={promo ? promo.price : listing.price}
+        isDonation={listing.isDonation}
+        negotiable={listing.priceNegotiable}
+        unit={unit}
+        locale={locale}
+        from={listing.priceFrom === true}
+        promo={promo !== undefined}
+        before={promo?.reference ?? null}
+        className={cn(listing.soldOut && "text-foreground-muted")}
+      />
       {listing.rental ? (
         <p data-testid="card-rental" className="flex flex-col text-xs tabular-nums">
           {listing.rental.total !== null ? <span className="font-medium">{t("rentalTotal", { days: listing.rental.days, total: formatPrice(listing.rental.total, locale) })}</span> : null}
@@ -141,6 +154,7 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
             {t("soldOut")}
           </span>
         ) : null}
+        {promo && !listing.example ? <PromoBadge kind={promo.kind} percent={promo.percent} className="absolute bottom-2 start-2" /> : null}
         {listing.example ? (
           <span data-testid="example-chip" className="absolute bottom-2 start-2 rounded-sm bg-featured px-2 py-0.5 text-xs font-semibold text-featured-foreground">
             {t("example")}

@@ -1,7 +1,7 @@
 import { z } from "@/lib/zod";
 import { CONDITIONS, categoryById, subcategoryById } from "@/config/categories";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
-import { listingVariantsSchema, stockSchema, type ListingVariants } from "@/lib/contracts/catalog";
+import { listingVariantsSchema, stockSchema, type ListingVariants, type PromoView } from "@/lib/contracts/catalog";
 import { MAX_PHOTOS_PRO, uploadIdSchema, type ListingPhoto, type UploadRejectReason, type UploadStatus } from "@/lib/contracts/media";
 import { LISTING_ID_PATTERN, SLUG_ID_MAX, SLUG_ID_PATTERN } from "@/lib/listings/ids";
 import { DAY_PATTERN, RENTAL_PERIODS_MAX, type RentalPeriod } from "@/lib/listings/rental-availability";
@@ -44,6 +44,7 @@ export const MODERATION_FLAGS = [
   "credit_ad",
   "sanitary_check",
   "rental_review",
+  "promo_check",
 ] as const;
 export type ModerationFlag = (typeof MODERATION_FLAGS)[number];
 
@@ -227,6 +228,18 @@ export interface OwnerPhoto {
   faces?: number;
 }
 
+/** A Pro listing's catalogue in « Mes annonces »: stock, and what the promotion dialog needs. */
+export interface OwnerCatalogue {
+  stock: number | null;
+  variants: ListingVariants | null;
+  /** Current or scheduled promotion (an ended one is left out). */
+  promo: PromoView | null;
+  /** Struck-out price a promotion starting now would show, per key ("" the listing): null when unknown (younger than 30 days). */
+  references: Record<string, number | null>;
+  /** ISO 8601: earliest start of a new promotion (7 days after the last one). */
+  promoFrom: string;
+}
+
 export interface OwnerListingSummary {
   id: string;
   slugId: string | null;
@@ -247,7 +260,7 @@ export interface OwnerListingSummary {
   /** Expired before purge, or published with less than 7 days left (D16). */
   canRenew: boolean;
   /** Pro listing (catalogue §3): its declared stock, edited in place from « Mes annonces ». */
-  catalogue?: { stock: number | null; variants: ListingVariants | null };
+  catalogue?: OwnerCatalogue;
   /** Car rentals only: the blocked periods the availability calendar edits. */
   rental?: RentalAvailability;
 }
@@ -288,6 +301,8 @@ export type CreateListingResponse = { id: string };
 /** `salesOpen`: paid options can be bought (config/flags.salesEnabled, phase 7). */
 export type OwnerListingsResponse = { listings: OwnerListingSummary[]; salesOpen: boolean };
 export type ListingResponse = { listing: OwnerListing };
+/** A promotion set or ended (catalogue §4): the « Mes annonces » row (status included: a deep cut is held). */
+export type PromoResponse = { listing: OwnerListingSummary };
 export type PublishListingResponse = {
   status: Extract<ListingStatus, "published" | "pending_review" | "rejected">;
   slugId?: string;

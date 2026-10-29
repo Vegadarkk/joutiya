@@ -109,6 +109,8 @@ export function buildFilter(input: SearchParams, now: Date): FilterExpr | undefi
   if (params.withPhoto) parts.push(eq("hasPhoto", true));
   // Sold-out listings stay online but leave the default results (owner decision 1, 2026-10-28).
   if (!params.includeSoldOut) parts.push({ not: eq("soldOut", true) });
+  // Promotions running at `now` (catalogue §4): an ended one is ignored without any rewrite.
+  if (params.promo || params.sort === "discount") parts.push(promoRunningFilter(now));
   if (params.conditions?.length) parts.push({ field: "condition", op: "in", values: [...params.conditions] });
   for (const [id, filter] of Object.entries(params.criteria ?? {})) {
     const field = attributeField(id);
@@ -122,6 +124,11 @@ export function buildFilter(input: SearchParams, now: Date): FilterExpr | undefi
   const dates = activeRentalDates(params, now);
   if (dates) parts.push(rentalDatesFilter(dates));
   return and(parts);
+}
+
+/** A promotion started and not ended at `now`. */
+export function promoRunningFilter(now: Date): FilterExpr {
+  return { and: [{ field: "promoStartsAt", op: "lte", value: now.getTime() }, { field: "promoEndsAt", op: "gt", value: now.getTime() }] };
 }
 
 /** À la Une scope (D8): category, subcategory and place only, boost running at `now`. */
@@ -151,6 +158,8 @@ export function sortSpecs(sort: SearchSort, params: Pick<SearchParams, "city">):
     }
     case "recent":
       return [{ field: "sortAt", dir: "desc" }];
+    case "discount":
+      return [{ field: "promoPercent", dir: "desc" }, { field: "sortAt", dir: "desc" }];
   }
 }
 

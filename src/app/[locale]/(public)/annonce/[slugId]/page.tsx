@@ -20,7 +20,7 @@ import { JsonLd } from "@/components/listing/json-ld";
 import { ExampleBanner, ExampleContactNotice } from "@/components/listing/example-banner";
 import { ListingStatusBanner } from "@/components/listing/listing-status-banner";
 import { ListingCatalogue } from "@/components/listing/listing-catalogue";
-import { PriceTag } from "@/components/listing/price-tag";
+import { ListingPrice } from "@/components/listing/listing-price";
 import { SafetyTips } from "@/components/listing/safety-tips";
 import { GuideCategoryLink } from "@/components/guide/category-link";
 import { rubricForCategory } from "@/content/guide/catalog";
@@ -175,7 +175,9 @@ export default async function ListingPage({ params }: { params: Params }) {
   // An example listing (src/lib/demo) shows the page of an offer without being one: no contact, no
   // favorite, no Product markup.
   const contactable = published && !listing.example;
-  // Pro catalogue: the lowest price of the combinations, « À partir de » when they differ.
+  // Pro catalogue: the lowest price of the combinations, « À partir de » when they differ; a
+  // promotion runs on the page's own clock (ISR HTML can be minutes old).
+  const renderedAt = new Date().getTime();
   const variants = listing.catalogue?.variants;
   const range = variants ? priceRange({ variants, price: listing.price, isDonation: listing.isDonation }) : null;
   // The picker's axes named here: the criteria labels stay out of the page's JavaScript.
@@ -230,16 +232,19 @@ export default async function ListingPage({ params }: { params: Params }) {
             <h1 dir="auto" className="text-2xl font-semibold text-balance break-words sm:text-3xl">
               {listing.title}
             </h1>
-            <PriceTag
+            <ListingPrice
               price={range ? range.min : listing.price}
               from={range !== null && range.max > range.min}
               isDonation={listing.isDonation}
               negotiable={listing.priceNegotiable}
               unit={subcategory?.priceUnit}
               locale={locale}
-              size="lg"
+              promo={published ? (listing.catalogue?.promo ?? null) : null}
+              renderedAt={renderedAt}
             />
-            {listing.catalogue && published ? <ListingCatalogue listingId={listing.id} catalogue={listing.catalogue} axes={pickerAxes} price={listing.price} locale={locale} /> : null}
+            {listing.catalogue && published ? (
+              <ListingCatalogue listingId={listing.id} catalogue={listing.catalogue} axes={pickerAxes} price={listing.price} locale={locale} renderedAt={renderedAt} />
+            ) : null}
             {realEstate ? <PropertyTerms attributes={listing.attributes} locale={locale} className="self-stretch sm:max-w-xl" /> : null}
             {subcategory?.adultsOnly ? (
               <p data-testid="adults-only-notice" className="flex items-start gap-2 self-start rounded-md border border-warning/30 bg-warning-surface px-3 py-2 text-sm text-foreground text-pretty">

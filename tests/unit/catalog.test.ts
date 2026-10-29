@@ -16,8 +16,10 @@ import { listingPatchSchema } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { ListingDoc, PriceLogEntry } from "@/lib/db/schemas";
 import { PRICE_LOG_DAYS, effectivePrices, logPrices, prunePriceLog } from "@/lib/listings/catalog";
+import { planPromo, promoEnd, promoView, referencePrices } from "@/lib/listings/promo";
 import { assessReadiness, issuesByPath, type SellerFacts } from "@/lib/listings/readiness";
 import { toSearchDocument } from "@/lib/search/document";
+import { buildFilter, promoRunningFilter, sortSpecs } from "@/lib/search/service";
 
 // Pro catalogue, lot 4 PR 1 (design phase-7/catalogue-boutique.md §2-4): the variants contract,
 // stock states, the price history behind a promotion's struck-out price, the publish readiness
@@ -244,5 +246,94 @@ describe("search document of a catalogue listing", () => {
     expect(doc.attrsText).toContain("Contenance 250 g 1 kg");
     expect(doc.price).toBe(90);
     expect(doc).not.toHaveProperty("priceFrom");
+  });
+});
+
+describe("promotions (catalogue §4)", () => {
+  const at = (days: number) => new Date(NOW.getTime() - days * DAY);
+  const later = (hours: number) => new Date(NOW.getTime() + hours * 60 * 60 * 1000).toISOString();
+  // Published 40 days ago at 300 DH, 250 DH for the last 10 days.
+  const plain = (overrides: Partial<ListingDoc> = {}) =>
+    shirt({ variants: undefined, attributes: { audience: "homme", "clothing-type": "haut", "clothing-size": "m" }, price: 250, publishedAt: at(40), priceLog: [{ at: at(40), price: 300 }, { at: at(10), price: 250 }], ...overrides });
+
+  it("strikes the lowest price of the 30 days before, none for a younger listing", () => {
+    expect(referencePrices(plain(), NOW)).toEqual(new Map([["", 250]]));
+    expect(referencePrices(plain({ priceLog: [{ at: at(40), price: 200 }, { at: at(10), price: 250 }] }), NOW)).toEqual(new Map([["", 200]]));
+    expect(referencePrices(plain({ publishedAt: at(10) }), NOW)).toEqual(new Map([["", null]]));
+    // A combination without a point before the window has no struck-out price.
+    expect(referencePrices(shirt({ publishedAt: at(40), priceLog: [{ at: at(40), price: 250, key: "s|bleu" }] }), NOW)).toEqual(
+      new Map([
+        ["s|bleu", 250],
+        ["m|bleu", null],
+        ["l|noir", null],
+      ]),
+    );
+  });
+
+  it("plans a cut under the struck-out price", () => {
+    const plan = planPromo(plain(), { kind: "promo", endsAt: later(72), percent: 20 }, NOW);
+    expect(plan).toEqual({ ok: true, review: false, percent: 20, promo: { kind: "promo", startsAt: NOW, endsAt: new Date(later(72)), percent: 20, prices: [{ key: "", price: 200, reference: 250 }] } });
+    expect(planPromo(plain(), { kind: "promo", endsAt: later(72), price: 199 }, NOW)).toMatchObject({ ok: true, promo: { prices: [{ key: "", price: 199, reference: 250 }] } });
+    // Deeper than 70 %: a moderator checks it.
+    expect(planPromo(plain(), { kind: "promo", endsAt: later(72), percent: 80 }, NOW)).toMatchObject({ ok: true, review: true, percent: 80 });
+    // Younger than 30 days: no struck-out price, the cut is against the current price.
+    expect(planPromo(plain({ publishedAt: at(10) }), { kind: "soldes", endsAt: later(72), percent: 10 }, NOW)).toMatchObject({ ok: true, percent: 10, promo: { prices: [{ key: "", price: 225, reference: null }] } });
+  });
+
+  it("refuses what art. 54 and the owner's rules forbid", () => {
+    const issue = (input: Parameters<typeof planPromo>[1], listing = plain()) => {
+      const plan = planPromo(listing, input, NOW);
+      return plan.ok ? null : plan.issues;
+    };
+    expect(issue({ kind: "promo", endsAt: later(72), price: 260 })).toEqual([{ path: "price", code: "promo_not_lower", value: "250" }]);
+    expect(issue({ kind: "promo", endsAt: later(72), percent: 10 }, plain({ priceLog: [{ at: at(40), price: 200 }, { at: at(10), price: 250 }] }))).toEqual([{ path: "percent", code: "promo_not_below_reference", value: "200" }]);
+    expect(issue({ kind: "flash", endsAt: later(73), percent: 20 })).toEqual([{ path: "endsAt", code: "promo_flash_too_long" }]);
+    expect(issue({ kind: "promo", endsAt: later(31 * 24), percent: 20 })).toEqual([{ path: "endsAt", code: "promo_too_long" }]);
+    expect(issue({ kind: "promo", endsAt: later(0.5), percent: 20 })).toEqual([{ path: "endsAt", code: "promo_too_short" }]);
+    expect(issue({ kind: "promo", startsAt: later(-1), endsAt: later(72), percent: 20 })).toEqual([{ path: "startsAt", code: "promo_start_past" }]);
+    expect(issue({ kind: "promo", startsAt: later(31 * 24), endsAt: later(32 * 24), percent: 20 })).toEqual([{ path: "startsAt", code: "promo_start_far" }]);
+    expect(issue({ kind: "promo", endsAt: later(72), percent: 20 }, plain({ lastPromoEndedAt: at(3) }))).toEqual([{ path: "startsAt", code: "promo_gap", value: new Date(at(3).getTime() + 7 * DAY).toISOString() }]);
+    expect(issue({ kind: "promo", endsAt: later(72), price: 100 }, shirt())).toEqual([{ path: "price", code: "promo_price_with_variants" }]);
+    expect(issue({ kind: "promo", endsAt: later(72), percent: 20 }, plain({ price: null }))).toEqual([{ path: "price", code: "promo_no_price" }]);
+    const running = { kind: "promo" as const, startsAt: at(1), endsAt: new Date(later(24)), prices: [{ key: "", price: 200, reference: 250 }] };
+    expect(issue({ kind: "promo", endsAt: later(72), percent: 20 }, plain({ promo: running }))).toEqual([{ path: "promo", code: "promo_exists" }]);
+  });
+
+  it("cuts every combination by the percentage", () => {
+    const plan = planPromo(shirt(), { kind: "promo", endsAt: later(72), percent: 10 }, NOW);
+    expect(plan.ok && plan.promo.prices).toEqual([
+      { key: "s|bleu", price: 225, reference: null },
+      { key: "m|bleu", price: 261, reference: null },
+      { key: "l|noir", price: 225, reference: null },
+    ]);
+  });
+
+  it("ends a promotion: a running one starts the 7-day gap, a scheduled one leaves none", () => {
+    const running = { kind: "promo" as const, startsAt: at(1), endsAt: new Date(later(24)), prices: [{ key: "", price: 200, reference: 250 }] };
+    expect(promoEnd({ promo: running }, NOW)).toEqual({ promo: null, lastPromoEndedAt: NOW });
+    expect(promoEnd({ promo: { ...running, startsAt: new Date(later(2)) } }, NOW)).toEqual({ promo: null });
+    expect(promoEnd({}, NOW)).toBeNull();
+    expect(promoView({ ...running, endsAt: at(0.1) }, NOW)).toBeNull();
+  });
+
+  it("keeps « Soldes » in a title for a soldes promotion only (art. 53)", () => {
+    const codes = (listing: ListingDoc) => issuesByPath(assessReadiness(listing, PRO)).get("title");
+    expect(codes(plain({ title: "Chemise en lin, SOLDES d'automne" }))).toEqual(["title_soldes"]);
+    expect(codes(plain({ title: "Chemise en lin - solde" }))).toEqual(["title_soldes"]);
+    expect(codes(plain({ title: "Chemise en lin consoldée main" }))).toBeUndefined();
+    const soldes = { kind: "soldes" as const, startsAt: at(1), endsAt: new Date(later(24)), prices: [{ key: "", price: 200, reference: 250 }] };
+    expect(codes(plain({ title: "Chemise en lin, soldes d'automne", promo: soldes }))).toBeUndefined();
+  });
+
+  it("indexes the promotion; search filters and sorts on it while it runs", () => {
+    const promo = { kind: "flash" as const, startsAt: at(1), endsAt: new Date(later(24)), percent: 20, prices: [{ key: "", price: 200, reference: 250 }] };
+    expect(toSearchDocument(plain({ promo }), NOW)).toMatchObject({ promoKind: "flash", promoStartsAt: at(1).getTime(), promoEndsAt: new Date(later(24)).getTime(), promoPercent: 20, promoPrice: 200, promoReference: 250 });
+    expect(toSearchDocument(plain(), NOW)).not.toHaveProperty("promoKind");
+    expect(buildFilter({ promo: true, includeSoldOut: true }, NOW)).toEqual(promoRunningFilter(NOW));
+    expect(buildFilter({ sort: "discount", includeSoldOut: true }, NOW)).toEqual(promoRunningFilter(NOW));
+    expect(sortSpecs("discount", {})).toEqual([
+      { field: "promoPercent", dir: "desc" },
+      { field: "sortAt", dir: "desc" },
+    ]);
   });
 });

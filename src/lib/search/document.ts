@@ -1,9 +1,10 @@
 import "server-only";
 import { criterionById, subcategoryById } from "@/config/categories";
 import { cityBySlug, regionByCode } from "@/config/regions";
-import { availableValues, isSoldOut, isVariantCriterion, priceRange } from "@/lib/contracts/catalog";
+import { availableValues, isSoldOut, isVariantCriterion, priceRange, promoSummary } from "@/lib/contracts/catalog";
 import type { ListingStatus, ModerationState } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
+import type { ListingDoc } from "@/lib/db/schemas";
 import ar from "../../../messages/ar.json";
 import fr from "../../../messages/fr.json";
 import { blockedDays, freshUntil, moroccoToday } from "@/lib/listings/rental-availability";
@@ -137,6 +138,14 @@ function criterionValue(id: string, value: AttributeValue): DocumentAttribute | 
  * The search document of a listing, or null when it must not be in the index (`isIndexable`).
  * `now` drops an À la Une end date already past, so an expiry re-index clears it (D8).
  */
+/** A current or scheduled promotion (catalogue §4): the engine filters on its dates at query time. */
+function promoFields(listing: Pick<ListingDoc, "promo">): Partial<SearchDocument> {
+  const promo = listing.promo;
+  const summary = promo ? promoSummary(promo) : null;
+  if (!promo || !summary) return {};
+  return { promoStartsAt: promo.startsAt.getTime(), promoEndsAt: promo.endsAt.getTime(), promoKind: promo.kind, promoPercent: summary.percent, promoPrice: summary.price, promoReference: summary.reference ?? 0 };
+}
+
 export function toSearchDocument(listing: ListingRecord, now: Date = new Date()): SearchDocument | null {
   if (!isIndexable(listing)) return null;
   const { slugId, categoryId, subcategoryId, location } = listing;
@@ -217,6 +226,7 @@ export function toSearchDocument(listing: ListingRecord, now: Date = new Date())
     ...(listing.rental ? { rentFreshUntil: freshUntil(listing.rental.updatedAt) } : {}),
     ...(isSoldOut(listing) ? { soldOut: true as const } : {}),
     ...(range && range.max > range.min ? { priceFrom: true as const } : {}),
+    ...promoFields(listing),
     _geo: { lat: roundGeo(location.geo.lat), lng: roundGeo(location.geo.lng) },
     version: listing.version,
     ...attributes,

@@ -287,6 +287,7 @@ export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
               <Section title={t("sections.options")} className="gap-1">
                 <SwitchField label={t("withPhoto")} checked={Boolean(draft.withPhoto)} onCheckedChange={(checked) => update({ withPhoto: checked ? true : undefined })} />
                 <SwitchField label={t("donation")} checked={Boolean(draft.donation)} onCheckedChange={(checked) => update({ donation: checked ? true : undefined })} />
+                <SwitchField label={t("promo")} checked={Boolean(draft.promo)} onCheckedChange={(checked) => update({ promo: checked ? true : undefined })} />
                 <SwitchField label={t("includeSoldOut")} hint={t("includeSoldOutHint")} checked={Boolean(draft.includeSoldOut)} onCheckedChange={(checked) => update({ includeSoldOut: checked ? true : undefined })} />
               </Section>
 

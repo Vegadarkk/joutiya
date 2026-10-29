@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut, csrfToken } from "@/lib/auth/client";
-import type { StockUpdateInput } from "@/lib/contracts/catalog";
+import type { PromoInput, StockUpdateInput } from "@/lib/contracts/catalog";
 import {
   LISTING_API,
   type CreateListingInput,
@@ -11,6 +11,7 @@ import {
   type ListingResponse,
   type OwnerListBucket,
   type OwnerListingsResponse,
+  type PromoResponse,
   type PublishListingInput,
   type PublishListingResponse,
   type RentalAvailabilityInput,
@@ -73,6 +74,15 @@ export function saveAvailability(id: string, input: RentalAvailabilityInput): Pr
 /** The declared stock alone of a Pro listing (catalogue §3): no new moderation. */
 export function saveStock(id: string, input: StockUpdateInput): Promise<ListingResponse> {
   return apiPut<ListingResponse>(LISTING_API.stock(id), input);
+}
+
+/** A promotion of a Pro listing (catalogue §4); DELETE ends the current or scheduled one. */
+export function savePromo(id: string, input: PromoInput): Promise<PromoResponse> {
+  return apiPut<PromoResponse>(LISTING_API.promo(id), input);
+}
+
+export function endPromo(id: string): Promise<PromoResponse> {
+  return apiDelete<PromoResponse>(LISTING_API.promo(id));
 }
 
 /** A car rental agency's fleet planning. */

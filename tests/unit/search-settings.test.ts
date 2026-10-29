@@ -20,7 +20,7 @@ import { attributeField, CARD_FIELDS } from "@/lib/search/types";
 describe("SEARCH_SETTINGS", () => {
   it("follows D4", () => {
     expect(SEARCH_SETTINGS.searchableAttributes).toEqual(["title", "categoryText", "attrsText", "placeText", "description"]);
-    expect(SEARCH_SETTINGS.sortableAttributes).toEqual(["sortAt", "price", "_geo"]);
+    expect(SEARCH_SETTINGS.sortableAttributes).toEqual(["sortAt", "price", "_geo", "promoPercent"]);
     expect(SEARCH_SETTINGS.rankingRules.slice(0, 2)).toEqual(["words", "sort"]);
     expect(SEARCH_SETTINGS.rankingRules.at(-1)).toBe("sortAt:desc");
     expect(SEARCH_SETTINGS.pagination.maxTotalHits).toBe(SEARCH_MAX_TOTAL_HITS);
@@ -119,7 +119,7 @@ describe("settingsDiff", () => {
 
   it("is empty for the same settings, whatever the order Meilisearch returns unordered lists in", () => {
     const current = live();
-    current.sortableAttributes = ["_geo", "price", "sortAt"];
+    current.sortableAttributes = ["promoPercent", "_geo", "price", "sortAt"];
     current.stopWords = [...SEARCH_SETTINGS.stopWords].reverse();
     current.synonyms = Object.fromEntries(Object.entries(SEARCH_SETTINGS.synonyms).reverse().map(([k, v]) => [k, [...v].reverse()]));
     // Extra keys and defaults Meilisearch adds do not count.

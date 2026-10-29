@@ -26,6 +26,7 @@ export type FilterKey =
   | "donation"
   | "withPhoto"
   | "includeSoldOut"
+  | "promo"
   | "conditions"
   | "dates"
   | `criterion:${string}`;
@@ -44,6 +45,7 @@ export const CHIP_KEYS = [
   "donation",
   "withPhoto",
   "includeSoldOut",
+  "promo",
   "conditions",
   "range",
   "rangeFrom",
@@ -125,6 +127,10 @@ export function withoutFilter(params: SearchParams, key: FilterKey): SearchParam
     case "includeSoldOut":
       delete next.includeSoldOut;
       break;
+    case "promo":
+      delete next.promo;
+      if (next.sort === "discount") delete next.sort;
+      break;
     case "conditions":
       delete next.conditions;
       break;
@@ -154,6 +160,7 @@ export function activeFilterKeys(params: SearchParams): FilterKey[] {
   if (params.donation) keys.push("donation");
   if (params.withPhoto) keys.push("withPhoto");
   if (params.includeSoldOut) keys.push("includeSoldOut");
+  if (params.promo) keys.push("promo");
   if (params.conditions?.length) keys.push("conditions");
   for (const id of Object.keys(params.criteria ?? {})) keys.push(`criterion:${id}`);
   return keys;
@@ -236,6 +243,8 @@ function filterLabel(params: SearchParams, key: FilterKey, locale: Locale, label
       return labels.chip("withPhoto");
     case "includeSoldOut":
       return labels.chip("includeSoldOut");
+    case "promo":
+      return labels.chip("promo");
     case "conditions":
       return labels.chip("conditions", { values: joinValues((params.conditions ?? []).map((value) => labels.condition(value)), labels) });
     case "dates": {
@@ -254,10 +263,12 @@ export function describeFilters(params: SearchParams, locale: Locale, labels: Fi
 }
 
 /** Sorts that make sense for this search: relevance needs words, distance a city (D6). */
-export function sortOptions(params: Pick<SearchParams, "q" | "city">): SearchSort[] {
+export function sortOptions(params: Pick<SearchParams, "q" | "city" | "promo">): SearchSort[] {
   const sorts: SearchSort[] = [];
   if (params.q) sorts.push("relevance");
   sorts.push("recent", "price_asc", "price_desc");
+  // « Plus forte réduction » ranks the running promotions: offered once the filter keeps only them.
+  if (params.promo) sorts.push("discount");
   if (params.city) sorts.push("distance");
   return sorts;
 }

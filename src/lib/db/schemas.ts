@@ -17,7 +17,7 @@ import {
   regionCodeSchema,
   slugIdSchema,
 } from "@/lib/contracts/listings";
-import { listingVariantsSchema, stockSchema, variantItemSchema } from "@/lib/contracts/catalog";
+import { PROMO_KINDS, listingVariantsSchema, stockSchema, variantItemSchema } from "@/lib/contracts/catalog";
 import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, UPLOAD_DOC_DECLARED_TYPES, UPLOAD_REJECT_REASONS, UPLOAD_STATUSES, listingPhotoSchema, uploadIdSchema } from "@/lib/contracts/media";
 import { ROLES } from "@/lib/firebase/claims";
 import { DAY_PATTERN, RENTAL_PERIODS_MAX } from "@/lib/listings/rental-availability";
@@ -285,6 +285,30 @@ export const priceLogEntrySchema = z
 export type PriceLogEntry = z.infer<typeof priceLogEntrySchema>;
 
 /**
+ * A promotion of a Pro listing (catalogue §4): its prices per key ("" the listing, else a
+ * combination) with the struck-out price Joutiya computed at saving (lowest of the 30 days before,
+ * null for a younger listing). Readers ignore it once ended; a price change ends it.
+ */
+export const listingPromoSchema = z
+  .object({
+    kind: z.enum(PROMO_KINDS),
+    startsAt: ts,
+    endsAt: ts,
+    /** The cut as the Pro entered it (absent: a new price). */
+    percent: z.number().int().min(1).max(90).optional(),
+    prices: z
+      .array(
+        z
+          .object({ key: z.union([z.literal(""), variantItemSchema.shape.key]), price: z.number().int().min(1).max(PRICE_MAX), reference: z.number().int().min(1).max(PRICE_MAX).nullable() })
+          .strict(),
+      )
+      .min(1)
+      .max(50),
+  })
+  .strict();
+export type ListingPromo = z.infer<typeof listingPromoSchema>;
+
+/**
  * listings/{listingId}: §5 `Listing` plus `slugId`; the id is the document id. A draft (D2) is the
  * same document with `status: "draft"`: the fields the wizard fills step by step (category, texts,
  * location, slug) are optional or empty until publish, which `publishedListingSchema` requires.
@@ -324,6 +348,10 @@ export const listingSchema = z
      * of law 31-08). The point in force when the window opens is kept too.
      */
     priceLog: z.array(priceLogEntrySchema).max(PRICE_LOG_MAX).optional(),
+    /** Current or scheduled promotion (Pro only). */
+    promo: listingPromoSchema.optional(),
+    /** End of the last promotion that ran: the next one starts 7 days later at the earliest (decision 4). */
+    lastPromoEndedAt: ts.optional(),
     /** The number is never here; `showPhone` requires `badges.phoneVerified` at publish. */
     contact: z.object({ messaging: z.literal(true), showPhone: z.boolean(), whatsapp: z.boolean() }).strict(),
     boosts: z.object({ bumpedAt: ts.optional(), featuredUntil: ts.optional(), dailyBumpUntil: ts.optional(), highlightUntil: ts.optional() }).strict(),

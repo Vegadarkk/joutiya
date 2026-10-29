@@ -23,6 +23,7 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   "ListingPage.gallery",
   "ListingPage.contact",
   "ListingPage.catalogue",
+  "ListingPage.promo",
   "Map",
   "Auth.common",
   "Auth.errors",
