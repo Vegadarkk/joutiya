@@ -48,6 +48,7 @@ export const COMPOSE_ERROR_KEYS = [
   "quota_exhausted",
   "adult_confirmation_required",
   "rental_request_unavailable",
+  "place_payment_details",
 ] as const;
 export type ComposeErrorKey = (typeof COMPOSE_ERROR_KEYS)[number];
 

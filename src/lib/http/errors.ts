@@ -143,6 +143,8 @@ export type ErrorCode =
   | "appointment_changed"
   /** The chosen slot has started or passed (409). */
   | "appointment_slot_past"
+  /** An appointment place or a rental pick-up place with bank details or payment terms (422, audit A-02). */
+  | "place_payment_details"
   /** The booking request changed since the caller saw it (answered, withdrawn, replaced; 409). */
   | "rental_request_changed"
   /** The requested pick-up day has passed: the agency can no longer accept (409). */

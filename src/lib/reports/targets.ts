@@ -7,6 +7,7 @@ import { db } from "@/lib/firebase/admin";
 import { HttpError } from "@/lib/http/errors";
 import { isListingId } from "@/lib/listings/ids";
 import { PUBLIC_STATES } from "@/lib/listings/public";
+import { memberTextOf } from "@/lib/messaging/member-text";
 import { consume } from "@/lib/quota";
 import { getReview } from "@/lib/reviews/repository";
 import { splitMessageId } from "./target-key";
@@ -42,6 +43,8 @@ export interface ConversationFacts {
 export interface MessageFacts {
   senderUid: string;
   type: string;
+  /** The member text the message shows (a text, or a system step's place; A-02), null when none. */
+  memberText: string | null;
 }
 
 /** The fields of a conversation the reports need, or null (missing, malformed). Read without the full schema: messaging owns it. */
@@ -62,7 +65,7 @@ export async function readMessageFacts(cid: string, mid: string): Promise<Messag
   const senderUid: unknown = snapshot.get("senderUid");
   const type: unknown = snapshot.get("type");
   if (!snapshot.exists || typeof senderUid !== "string" || typeof type !== "string") return null;
-  return { senderUid, type };
+  return { senderUid, type, memberText: memberTextOf(snapshot.data() ?? {})?.text ?? null };
 }
 
 /** A profile that can be reported: activated, neither closed nor banned. */
@@ -94,7 +97,8 @@ async function resolveMessage(id: string, reporterUid: string | null): Promise<R
   // Not a participant: the same answer as a missing conversation (IDOR).
   if (!conversation || !conversation.participants.includes(reporterUid)) throw invalidTarget();
   const message = await readMessageFacts(ids.cid, ids.mid);
-  if (!message || message.type !== "text") throw invalidTarget();
+  // A text message, or a system step carrying its sender's own words (a meeting or pick-up place, A-02).
+  if (!message || (message.type !== "text" && message.memberText === null)) throw invalidTarget();
   if (message.senderUid === reporterUid) throw notAllowed();
   return { target: { type: "message", id: `${ids.cid}/${ids.mid}`, ownerUid: message.senderUid, listingId: conversation.listingId } };
 }

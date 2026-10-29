@@ -11,10 +11,14 @@ import { POST as rentalRequestRoute } from "@/app/api/conversations/[cid]/rental
 import { MESSAGING_API } from "@/lib/contracts/endpoints";
 import type { RentalRequestResponse } from "@/lib/contracts/rental-requests";
 import { getListing } from "@/lib/db/repositories/listings";
+import { COLLECTIONS } from "@/lib/db/schemas";
+import { db } from "@/lib/firebase/admin";
+import { conversationId } from "@/lib/messaging/ids";
 import { setEventPublisherForTests } from "@/lib/messaging/events";
 import { setMessagingValkeyForTests } from "@/lib/messaging/unread";
 import { dayString, moroccoToday } from "@/lib/listings/rental-availability";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
+import { resolveReportTarget } from "@/lib/reports/targets";
 import { FakeValkey } from "../../unit/messaging-fake-valkey";
 import { call, type CallResult } from "../favorites/helpers";
 import { expectError, member, row, seedListing, start, startOk, thread, type ErrorBody, type Member } from "./helpers";
@@ -131,6 +135,22 @@ describe("booking request of a car rental", () => {
 
     const { cid } = await startOk(renter, bike.id, "Encore une question");
     expectError(await act(renter, cid, { action: "request", from: day(1), to: day(2) }), 409, "rental_request_unavailable");
+  });
+
+  it("refuses a pick-up place with payment details, before the first message is sent (audit A-02)", async () => {
+    const { renter, agency, listing } = await rentalListing();
+    expectError(await start(renter, { listingId: listing.id, text: "Bonjour", turnstileToken: "ok", rentalRequest: { from: day(1), to: day(3), pickup: "Aéroport, acompte par Wafacash" } }), 422, "place_payment_details");
+    expect((await db().collection(COLLECTIONS.conversations).doc(conversationId(listing.id, renter.uid)).get()).exists).toBe(false);
+
+    const { cid } = await requestOk(renter, listing.id, { from: day(1), to: day(3), pickup: "Aéroport Mohammed V" });
+    expectError(await act(renter, cid, { action: "request", from: day(2), to: day(4), pickup: "RIB 011 780 0000123456789012 34" }), 422, "place_payment_details");
+    // The renter's request can be reported by the agency; its answer carries no place.
+    const page = await thread(agency, cid);
+    const request = page.body.messages.find((message) => message.rentalRequest?.event === "requested");
+    expect(request?.rentalRequest?.pickup).toBe("Aéroport Mohammed V");
+    expect((await resolveReportTarget({ type: "message", id: `${cid}/${request!.id}` }, agency.uid)).target.ownerUid).toBe(renter.uid);
+    const accepted = await actOk(agency, cid, { action: "accept", id: page.body.conversation.rentalRequest!.id, block: false });
+    expect((await thread(renter, cid)).body.messages.find((message) => message.id === accepted.messageId)?.rentalRequest?.pickup).toBeNull();
   });
 
   it("limits new requests to 20 a day per renter", async () => {

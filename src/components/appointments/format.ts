@@ -1,5 +1,6 @@
 import type { Locale } from "@/config/site";
 import type { Slot } from "@/lib/contracts/appointments";
+import { URL_MARKER } from "@/lib/contracts/messaging";
 import { slotEnd } from "@/lib/appointments/rules";
 import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 import { intlLocale } from "@/lib/listings/client/format";
@@ -37,3 +38,6 @@ export function dayTile(day: string, locale: Locale): { weekday: string; date: s
 export function formatDayKey(day: string, locale: Locale): string {
   return new Intl.DateTimeFormat(intlLocale(locale), { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${day}T12:00:00Z`));
 }
+
+/** The place with its masked links shown as such. */
+export const placeText = (place: string, masked: string) => place.split(URL_MARKER).join(masked);

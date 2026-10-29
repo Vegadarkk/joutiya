@@ -1,13 +1,15 @@
 "use client";
 
 import { Fragment } from "react";
-import { Check, CheckCheck, Clock3, EyeOff, Flag, Link2Off, ShieldAlert } from "lucide-react";
+import { Check, CheckCheck, Clock3, EyeOff, Link2Off, ShieldAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { AppointmentEventItem } from "@/components/appointments/appointment-event";
 import { RentalRequestEventItem } from "@/components/rental/rental-request-event";
 import { OfferEventItem } from "@/components/offers/offer-event";
 import { Link } from "@/i18n/navigation";
 import { HIDDEN_MARKER, URL_MARKER, type MessageRiskFlag, type MessageView } from "@/lib/contracts/messaging";
+import { memberTextOf } from "@/lib/messaging/member-text";
+import { ReportButton } from "./report-button";
 import { cn } from "@/lib/utils";
 
 // One message of a thread (design phase-5 D5, D10): plain text in its own direction, each masked
@@ -87,24 +89,28 @@ export interface MessageItemProps {
   status?: "sent" | "seen" | "sending";
   /** Shown to screen readers before the text ("Vous", or the other participant's name). */
   sender: string;
-  /** Opens the notice form about this message (received text messages only). */
+  /** Opens the notice form about this message (received messages with their sender's words only). */
   onReport?: (message: MessageView) => void;
 }
 
-/** Only a text message received, still shown, can be reported (the server refuses the rest). */
-export function canReport(message: Pick<MessageView, "mine" | "type" | "hidden" | "text">): boolean {
-  return !message.mine && message.type === "text" && !message.hidden && message.text !== HIDDEN_MARKER;
+/**
+ * Only a message received, still shown, with its sender's own words can be reported: a text, or a
+ * step carrying a place (appointment proposal, booking request; A-02). The server refuses the rest.
+ */
+export function canReport(message: Pick<MessageView, "mine" | "type" | "hidden" | "text" | "appointment" | "rentalRequest">): boolean {
+  return !message.mine && !message.hidden && message.text !== HIDDEN_MARKER && memberTextOf(message) !== null;
 }
 
 export function MessageItem({ message, time, status, sender, onReport }: MessageItemProps) {
   const t = useTranslations("Messaging.thread");
-  const report = useTranslations("Report.trigger");
+  const reportable = onReport !== undefined && canReport(message);
+  const report = reportable ? () => onReport(message) : undefined;
   if (message.type === "system" && message.appointment) {
     // `sender` is the other participant's name whenever the step is theirs.
-    return <AppointmentEventItem step={message.appointment} counterpartName={sender} time={time} />;
+    return <AppointmentEventItem step={message.appointment} counterpartName={sender} time={time} onReport={report} />;
   }
   if (message.type === "system" && message.rentalRequest) {
-    return <RentalRequestEventItem step={message.rentalRequest} counterpartName={sender} time={time} />;
+    return <RentalRequestEventItem step={message.rentalRequest} counterpartName={sender} time={time} onReport={report} />;
   }
   if (message.type === "system" && message.offer) {
     return <OfferEventItem step={message.offer} counterpartName={sender} time={time} />;
@@ -122,7 +128,6 @@ export function MessageItem({ message, time, status, sender, onReport }: Message
   const mine = message.mine;
   const hidden = message.hidden || message.text === HIDDEN_MARKER;
   const warnings = warningsFor(message);
-  const reportable = onReport !== undefined && canReport(message);
   return (
     <li data-testid="message" data-mine={mine} className={cn("group/message flex flex-col gap-1.5", mine ? "items-end" : "items-start")}>
       <div className={cn("flex w-full items-center gap-1", mine && "justify-end")}>
@@ -162,20 +167,7 @@ export function MessageItem({ message, time, status, sender, onReport }: Message
             ) : null}
           </p>
         </div>
-        {reportable ? (
-          <button
-            type="button"
-            onClick={() => onReport(message)}
-            aria-label={report("message")}
-            title={report("message")}
-            className={cn(
-              "inline-flex size-10 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-opacity duration-150 ease-door hover:bg-surface-muted hover:text-foreground",
-              "[@media(hover:hover)]:opacity-0 group-hover/message:opacity-100 focus-visible:opacity-100",
-            )}
-          >
-            <Flag className="size-4" aria-hidden="true" />
-          </button>
-        ) : null}
+        {report ? <ReportButton onClick={report} /> : null}
       </div>
       {warnings.length > 0 ? <RiskWarning flags={warnings} /> : null}
     </li>

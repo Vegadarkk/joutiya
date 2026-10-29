@@ -24,7 +24,7 @@ import { formatRentalDay } from "./rental-day";
 // sent, withdraw it. Once accepted: the days, and the pick-up appointment of the messaging. The
 // card always says that nothing is paid through the site.
 
-const ERROR_KEYS = ["rental_request_changed", "rental_request_past", "rental_request_unavailable"] as const;
+const ERROR_KEYS = ["rental_request_changed", "rental_request_past", "rental_request_unavailable", "place_payment_details"] as const;
 
 export function useRentalRequestErrorMessage(): (error: unknown) => string {
   const t = useTranslations("RentalRequest.errors");

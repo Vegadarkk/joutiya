@@ -644,6 +644,8 @@ export const appointmentEventSchema = z
     kind: z.enum(APPOINTMENT_KINDS),
     slot: storedSlotSchema.optional(),
     reason: z.enum(APPOINTMENT_CANCEL_REASONS).optional(),
+    /** The proposer's place, on a proposal or a rescheduling only (links masked; removed when moderation hides it). */
+    place: z.string().max(APPOINTMENT_PLACE_MAX + 40).optional(),
   })
   .strict();
 export type AppointmentEventDoc = z.infer<typeof appointmentEventSchema>;

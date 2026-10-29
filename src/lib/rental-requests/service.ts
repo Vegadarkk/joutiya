@@ -9,7 +9,7 @@ import { blockRentalDates } from "@/lib/listings/availability";
 import { acceptsContact } from "@/lib/listings/public";
 import { dayNumber, moroccoToday } from "@/lib/listings/rental-availability";
 import { ConversationAccessError, getParticipantConversation, type ConversationRecord } from "@/lib/messaging/repository";
-import { maskLinks } from "@/lib/messaging/risk";
+import { screenPlace } from "@/lib/messaging/place";
 import { appendSystemStep, type MessagingActor } from "@/lib/messaging/service";
 import { rentalRequestView } from "./views";
 
@@ -42,7 +42,7 @@ export function nextRentalStep(current: RentalRequestDoc | undefined, action: Re
     if (role !== "buyer") throw new HttpError(403, "forbidden", "only the renter sends a booking request");
     const problem = rentalRequestProblem(action, today);
     if (problem) invalidDates(problem);
-    const pickup = action.pickup ? maskLinks(action.pickup).text : undefined;
+    const pickup = action.pickup ? screenPlace(action.pickup) : undefined;
     const request = rentalRequestSchema.parse({ id: newRequestId(), status: "requested", from: action.from, to: action.to, ...(pickup ? { pickup } : {}), createdAt: now, updatedAt: now });
     return { request, event: current?.status === "requested" ? "changed" : "requested" };
   }
@@ -114,7 +114,8 @@ export async function actOnRentalRequest(actor: MessagingActor, cid: string, act
         event: step.event,
         from: step.request.from,
         to: step.request.to,
-        ...(step.request.pickup ? { pickup: step.request.pickup } : {}),
+        // The renter's own words travel with the request only: that message is the one a member reports (A-02).
+        ...(step.request.pickup && (step.event === "requested" || step.event === "changed") ? { pickup: step.request.pickup } : {}),
       };
       return { fields: { rentalRequest: step.request }, message: { text: rentalRequestMarker(step.event), rentalRequest } };
     },

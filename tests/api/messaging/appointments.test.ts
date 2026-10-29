@@ -16,11 +16,12 @@ import type { AppointmentResponse } from "@/lib/contracts/appointments";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { db } from "@/lib/firebase/admin";
 import { sendMail } from "@/lib/mail";
-import { freezeConversation } from "@/lib/messaging";
+import { freezeConversation, hideMessage, unhideMessage } from "@/lib/messaging";
 import { setEventPublisherForTests, type Delivery } from "@/lib/messaging/events";
 import { getConversation } from "@/lib/messaging/repository";
 import { setMessagingValkeyForTests } from "@/lib/messaging/unread";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
+import { resolveReportTarget } from "@/lib/reports/targets";
 import { sendAppointmentReminders } from "@/worker/jobs/appointment-reminders";
 import { FakeValkey } from "../../unit/messaging-fake-valkey";
 import { call, type CallResult } from "../favorites/helpers";
@@ -144,6 +145,56 @@ describe("POST /api/conversations/{cid}/appointment", () => {
 
     expect(await freezeConversation(cid, "authority:test", true)).toBe(true);
     expectError(await act(seller, cid, { action: "propose", kind: "visit", slots: [{ start: startIn(5), minutes: 30 }] }), 409, "conversation_unavailable");
+  });
+});
+
+describe("the place of a proposal (audit A-02)", () => {
+  // Far enough for the reminder test's job run (a day before its own slot) to leave it alone.
+  const slots = () => [{ start: startIn(500), minutes: 30 }];
+  const messageDoc = async (cid: string, mid: string) => (await db().collection(COLLECTIONS.conversations).doc(cid).collection(COLLECTIONS.messages).doc(mid).get()).data()!;
+  const reportCode = (promise: Promise<unknown>) =>
+    promise.then(
+      () => "ok",
+      (error: { status?: number; code?: string }) => `${error.status} ${error.code}`,
+    );
+
+  it("refuses bank details and payment terms before writing anything", async () => {
+    const { buyer, seller, cid } = await conversation();
+    expectError(await act(seller, cid, { action: "propose", kind: "visit", slots: slots(), place: "Agence, RIB 011 780 0000123456789012 34" }), 422, "place_payment_details");
+    expectError(await act(buyer, cid, { action: "propose", kind: "visit", slots: slots(), place: "Virement de l'acompte avant la visite" }), 422, "place_payment_details");
+    const page = await thread(buyer, cid);
+    expect(page.body.messages).toHaveLength(1);
+    expect(page.body.conversation.appointment).toBeNull();
+  });
+
+  it("lets the other member report the proposal, and moderation hide and restore its place", async () => {
+    const { buyer, seller, cid } = await conversation();
+    const proposed = await actOk(seller, cid, { action: "propose", kind: "visit", slots: slots(), place: "Café du parc, Maârif" });
+    const mid = proposed.messageId;
+    expect((await thread(buyer, cid)).body.messages[0]).toMatchObject({ appointment: { event: "proposed", place: "Café du parc, Maârif" } });
+
+    // The other member reports it like a message; the author cannot, a confirmation carries no place.
+    const target = await resolveReportTarget({ type: "message", id: `${cid}/${mid}` }, buyer.uid);
+    expect(target.target).toMatchObject({ type: "message", id: `${cid}/${mid}`, ownerUid: seller.uid });
+    expect(await reportCode(resolveReportTarget({ type: "message", id: `${cid}/${mid}` }, seller.uid))).toBe("403 report_not_allowed");
+    const confirmed = await actOk(buyer, cid, { action: "confirm", id: proposed.appointment.id, start: proposed.appointment.slots[0]!.start });
+    expect(await reportCode(resolveReportTarget({ type: "message", id: `${cid}/${confirmed.messageId}` }, seller.uid))).toBe("422 report_target_invalid");
+
+    // Hidden: gone from the step and from the current appointment (card, reminder mails), kept as evidence.
+    expect(await hideMessage(cid, mid, "decision:test")).toBe(true);
+    const hidden = await messageDoc(cid, mid);
+    expect(hidden).toMatchObject({ hidden: true, text: "⟦rdv:proposed⟧" });
+    expect(hidden.appointment.place).toBeUndefined();
+    expect((await conversationDoc(cid)).appointment.place).toBeUndefined();
+    expect((await db().collection(COLLECTIONS.conversations).doc(cid).collection(COLLECTIONS.evidence).doc(mid).get()).data()).toMatchObject({ text: "Café du parc, Maârif", reason: "hidden" });
+    expect((await thread(buyer, cid)).body.messages.find((message) => message.id === mid)).toMatchObject({ hidden: true, appointment: { place: null } });
+    expect(await reportCode(resolveReportTarget({ type: "message", id: `${cid}/${mid}` }, buyer.uid))).toBe("422 report_target_invalid");
+
+    // Restored on appeal: back on the step and on the appointment, the evidence deleted.
+    expect(await unhideMessage(cid, mid)).toBe(true);
+    expect((await messageDoc(cid, mid)).appointment.place).toBe("Café du parc, Maârif");
+    expect((await conversationDoc(cid)).appointment.place).toBe("Café du parc, Maârif");
+    expect((await db().collection(COLLECTIONS.conversations).doc(cid).collection(COLLECTIONS.evidence).doc(mid).get()).exists).toBe(false);
   });
 });
 

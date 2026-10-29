@@ -4,6 +4,7 @@ import { cidSchema } from "@/lib/contracts/messaging";
 import type { OfferEventDoc } from "@/lib/db/schemas";
 import { forbidden, notFound } from "@/lib/http/errors";
 import { getConversationForStaff } from "@/lib/messaging";
+import { staffMemberText, staffPlaceLabel } from "@/lib/messaging/member-text";
 import { consume } from "@/lib/quota";
 import { splitMessageId } from "@/lib/reports/target-key";
 import { openAuthorityIds } from "./authorities";
@@ -67,7 +68,7 @@ export async function staffConversation(reader: StaffReader, cid: string, reason
 
   const { conversation } = transcript;
   const reported = new Set(reportedMids);
-  const from = (senderUid: string, type: string): "buyer" | "seller" | "system" => (type === "system" ? "system" : senderUid === conversation.sellerUid ? "seller" : "buyer");
+  const role = (senderUid: string): "buyer" | "seller" => (senderUid === conversation.sellerUid ? "seller" : "buyer");
   return {
     cid,
     listingId: conversation.listingId,
@@ -75,15 +76,19 @@ export async function staffConversation(reader: StaffReader, cid: string, reason
     status: conversation.status,
     buyer: { uid: conversation.buyerUid, name: conversation.buyerName, publicId: conversation.buyerPublicId },
     seller: { uid: conversation.sellerUid, name: conversation.sellerName, publicId: conversation.sellerPublicId },
-    messages: transcript.messages.map((message) => ({
-      id: message.id,
-      from: from(message.senderUid, message.type),
-      text: message.offer ? staffOfferText(message.offer) : message.text,
-      hidden: message.hidden === true,
-      flags: [...(message.risk?.flags ?? [])],
-      createdAt: message.createdAt.toISOString(),
-      reported: reported.has(message.id),
-    })),
+    messages: transcript.messages.map((message) => {
+      // A step carrying its sender's place (A-02) reads as that member's words, hidden or not.
+      const place = message.type === "system" ? (staffMemberText(message) ?? (message.hidden ? staffPlaceLabel(message) : null)) : null;
+      return {
+        id: message.id,
+        from: message.type === "system" && place === null ? "system" : role(message.senderUid),
+        text: message.offer ? staffOfferText(message.offer) : (place ?? message.text),
+        hidden: message.hidden === true,
+        flags: [...(message.risk?.flags ?? [])],
+        createdAt: message.createdAt.toISOString(),
+        reported: reported.has(message.id),
+      };
+    }),
     evidence: Object.fromEntries(Object.entries(transcript.evidence).map(([mid, evidence]) => [mid, { text: evidence.text, reason: evidence.reason }])),
     access: { reportIds: reports.map((report) => report.id), authorityHolds: openAuthorities.map((id) => `${AUTHORITY_PREFIX}${id}`) },
   };

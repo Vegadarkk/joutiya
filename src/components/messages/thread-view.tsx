@@ -31,6 +31,7 @@ import { isolate } from "@/lib/i18n/bidi";
 import { formatPrice } from "@/lib/listings/client/format";
 import { changeConversationState, fetchConversation, fetchThread, markConversationRead, sendMessage } from "@/lib/messaging/client";
 import { messagingLive } from "@/lib/messaging/live";
+import { memberTextOf } from "@/lib/messaging/member-text";
 import { cn } from "@/lib/utils";
 import { Composer } from "./composer";
 import { useMessagingErrorMessage } from "./errors";
@@ -711,7 +712,7 @@ export function ThreadView({ cid }: { cid: string }) {
           target={report.subject.kind === "message" ? { type: "message", id: `${cid}/${report.subject.message.id}` } : { type: "user", id: conversation.counterpart.publicId }}
           context={report.subject.kind === "message" ? "message" : "conversation"}
           subject={name}
-          quote={report.subject.kind === "message" ? report.subject.message.text.replaceAll(URL_MARKER, `[${t("maskedLink")}]`) : undefined}
+          quote={report.subject.kind === "message" ? (memberTextOf(report.subject.message)?.text ?? "").replaceAll(URL_MARKER, `[${t("maskedLink")}]`) : undefined}
         />
       ) : null}
     </div>
