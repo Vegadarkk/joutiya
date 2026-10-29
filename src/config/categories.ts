@@ -323,6 +323,23 @@ const rental = (id: CriterionId, options: { filter?: true } = {}): Criterion => 
 /** Car rental by Pro agencies (rental pack): rental terms, availability by dates, fleet storefront. */
 export const RENTAL_SUBCATEGORY = "location-voitures";
 
+/**
+ * Subcategories rented by dates (rental pack §3-4, seasonal rental conception §2): the owner blocks
+ * periods and a search takes the start and end dates. "day": a car, both bounds rented; "night": a
+ * home, the departure day stays free. `minimum`: the criterion holding the shortest rental.
+ */
+export const DATED_RENTALS = {
+  [RENTAL_SUBCATEGORY]: { unit: "day", minimum: "min-rental-days" },
+  "location-vacances": { unit: "night", minimum: "min-nights" },
+} as const satisfies Record<string, { unit: "day" | "night"; minimum: CriterionId }>;
+export type DatedRental = (typeof DATED_RENTALS)[keyof typeof DATED_RENTALS];
+export type RentalUnit = DatedRental["unit"];
+
+/** How `subcategoryId` is rented by dates, or undefined when it is not. */
+export function datedRental(subcategoryId: string | null | undefined): DatedRental | undefined {
+  return subcategoryId && Object.hasOwn(DATED_RENTALS, subcategoryId) ? DATED_RENTALS[subcategoryId as keyof typeof DATED_RENTALS] : undefined;
+}
+
 const RENTAL_TERMS = [
   rental("rental-insurance", { filter: true }),
   rental("insurance-excess"),

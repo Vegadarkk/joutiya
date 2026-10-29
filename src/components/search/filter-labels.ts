@@ -8,7 +8,7 @@ import type { FilterLabels } from "./filter-model";
 
 /** The part of a next-intl translator the labels use. */
 export interface LooseTranslator {
-  (key: string, values?: Record<string, string>): string;
+  (key: string, values?: Record<string, string | number>): string;
   has(key: string): boolean;
 }
 

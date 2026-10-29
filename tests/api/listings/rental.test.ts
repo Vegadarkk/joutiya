@@ -195,6 +195,19 @@ describe("car rental availability", () => {
     const refused = await put(owner, bike.body.id, { unavailable: [], since: null });
     expect(refused.status).toBe(409);
   });
+
+  it("takes the nights of a holiday home, an individual's included (seasonal rental conception §2)", async () => {
+    const host = await member();
+    const home = await api<CreateListingResponse>(create, "POST", "/api/listings", { member: host, body: {} });
+    const saved = await api<ListingBody>(patch, "PATCH", `/api/listings/${home.body.id}`, {
+      member: host,
+      body: readyPatch({ categoryId: "immobilier", subcategoryId: "location-vacances", title: "Appartement face à la mer à Agadir", attributes: { "property-type": "appartement", guests: 4, "min-nights": 2 }, condition: null, price: 600 }),
+    });
+    expect(saved.status).toBe(200);
+    const set = await put(host, home.body.id, { unavailable: [{ from: day(5), to: day(8) }], since: null });
+    expect(set.status).toBe(200);
+    expect(set.body.rental.unavailable).toEqual([{ from: day(5), to: day(8) }]);
+  });
 });
 
 describe("fleet planning", () => {

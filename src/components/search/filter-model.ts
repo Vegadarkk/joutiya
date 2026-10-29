@@ -1,4 +1,4 @@
-import { CATEGORIES, categoryById, criterionById, searchCriteria, subcategoryById, type Condition, type CriterionUnit } from "@/config/categories";
+import { CATEGORIES, categoryById, criterionById, datedRental, searchCriteria, subcategoryById, type Condition, type CriterionUnit } from "@/config/categories";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { formatPrice, groupDigits, intlLocale } from "@/lib/listings/client/format";
@@ -54,6 +54,7 @@ export const CHIP_KEYS = [
   "rangeTo",
   "options",
   "dates",
+  "datesNights",
 ] as const;
 export type ChipKey = (typeof CHIP_KEYS)[number];
 
@@ -65,7 +66,7 @@ export interface FilterLabels {
   option(criterionId: string, optionId: string): string;
   condition(condition: Condition): string;
   unit(unit: CriterionUnit): string;
-  chip(key: ChipKey, values?: Record<string, string>): string;
+  chip(key: ChipKey, values?: Record<string, string | number>): string;
   /** List separator: ", " (fr) or "، " (ar). */
   separator: string;
 }
@@ -255,7 +256,8 @@ function filterLabel(params: SearchParams, key: FilterKey, locale: Locale, label
       if (!params.dates) return key;
       const day = new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", timeZone: "UTC" });
       const at = (value: string) => day.format(new Date(`${value}T12:00:00Z`));
-      return labels.chip("dates", { from: at(params.dates.from), to: at(params.dates.to), days: String(rentalDuration(params.dates)) });
+      const nights = datedRental(params.subcategory)?.unit === "night";
+      return nights ? labels.chip("datesNights", { from: at(params.dates.from), to: at(params.dates.to), days: rentalDuration(params.dates) }) : labels.chip("dates", { from: at(params.dates.from), to: at(params.dates.to), days: String(rentalDuration(params.dates)) });
     }
   }
   return key;

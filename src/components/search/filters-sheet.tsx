@@ -10,7 +10,7 @@ import { SwitchField } from "@/components/post/controls/switch";
 import { NumberInput } from "@/components/post/criteria-fields";
 import { useCategoryLabels } from "@/components/post/labels";
 import { Button } from "@/components/ui/button";
-import { CATEGORIES, CONDITIONS, RENTAL_SUBCATEGORY, subcategoryById, type Condition } from "@/config/categories";
+import { CATEGORIES, CONDITIONS, datedRental, subcategoryById, type Condition } from "@/config/categories";
 import { RentalDatesFields, completeDates } from "@/components/rental/rental-dates-fields";
 import type { Locale } from "@/config/site";
 import { useNumbersTranslations } from "@/i18n/numbers";
@@ -104,7 +104,7 @@ export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
   const ids = useId();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<SearchParams>(params);
-  // Car rentals: the days being typed (one may still be empty), applied once both are set.
+  // Rentals by dates (cars, homes): the days being typed (one may still be empty), applied once both are set.
   const [rentDates, setRentDates] = useState<Partial<RentalDates>>(params.dates ?? {});
   const count = countFilters(params);
   const update = (patch: Partial<SearchParams>) => setDraft((current) => ({ ...current, ...patch }));
@@ -113,10 +113,11 @@ export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
   const districts = draft.city && draft.city === params.city && !draft.radiusKm ? Object.entries(facets?.districts ?? {}).filter(([, n]) => n > 0) : [];
   districts.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   const criteria = filterableCriteria(draft.category, draft.subcategory);
+  const rentalUnit = datedRental(draft.subcategory)?.unit;
 
   function apply(event: FormEvent) {
     event.preventDefault();
-    navigation?.navigate(canonicalSearchParams({ ...draft, dates: completeDates(rentDates), page: undefined }));
+    navigation?.navigate(canonicalSearchParams({ ...draft, dates: completeDates(rentDates, datedRental(draft.subcategory)?.unit), page: undefined }));
     setOpen(false);
   }
 
@@ -171,10 +172,10 @@ export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col divide-y divide-border overflow-y-auto overscroll-contain px-5">
-              {draft.subcategory === RENTAL_SUBCATEGORY ? (
-                <Section title={t("sections.rentalDates")}>
-                  <RentalDatesFields value={rentDates} onChange={setRentDates} />
-                  <p className="text-sm text-foreground-muted">{t("rentalDatesHint")}</p>
+              {rentalUnit ? (
+                <Section title={t(rentalUnit === "night" ? "sections.stayDates" : "sections.rentalDates")}>
+                  <RentalDatesFields value={rentDates} onChange={setRentDates} unit={rentalUnit} />
+                  <p className="text-sm text-foreground-muted">{t(rentalUnit === "night" ? "stayDatesHint" : "rentalDatesHint")}</p>
                 </Section>
               ) : null}
               <Section title={t("sections.category")}>

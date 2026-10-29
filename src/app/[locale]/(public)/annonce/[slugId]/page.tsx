@@ -29,7 +29,7 @@ import { PayAtSeller } from "@/components/listing/pay-at-seller";
 import { SellerCard } from "@/components/listing/seller-card";
 import { ListingMapBlock } from "@/components/map/listing-map-block";
 import { ReportButton } from "@/components/report/report-button";
-import { RENTAL_SUBCATEGORY, VEHICLE_SALE_SUBCATEGORIES, categoryById, subcategoryById } from "@/config/categories";
+import { RENTAL_SUBCATEGORY, VEHICLE_SALE_SUBCATEGORIES, categoryById, datedRental, subcategoryById } from "@/config/categories";
 import { availablePromos } from "@/config/house-promos";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
@@ -332,7 +332,7 @@ export default async function ListingPage({ params }: { params: Params }) {
             <CriteriaSection title={t("criteriaTitle")} subcategoryId={listing.subcategoryId} attributes={listing.attributes} condition={listing.condition} exclude={realEstate ? PROPERTY_TERM_FIELDS : undefined} />
             <VehicleDossier subcategoryId={listing.subcategoryId} attributes={listing.attributes} />
             <RentalTerms subcategoryId={listing.subcategoryId} attributes={listing.attributes} locale={locale} />
-            {listing.rental ? <ListingAvailability rental={listing.rental} locale={locale} /> : null}
+            {listing.rental ? <ListingAvailability rental={listing.rental} locale={locale} unit={datedRental(listing.subcategoryId)?.unit} /> : null}
 
             <section aria-labelledby="description-title" className="flex flex-col gap-3">
               <h2 id="description-title" className="text-lg font-semibold">

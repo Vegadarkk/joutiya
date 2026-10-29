@@ -1,5 +1,5 @@
 import "server-only";
-import { RENTAL_SUBCATEGORY } from "@/config/categories";
+import { datedRental } from "@/config/categories";
 import { requireOwner, type AuthContext } from "@/lib/auth/guards";
 import type { RentalAvailability, RentalAvailabilityInput } from "@/lib/contracts/listings";
 import { getListing, getListingTx, updateListingTx, type ListingFieldPatch, type ListingRecord } from "@/lib/db/repositories/listings";
@@ -10,7 +10,8 @@ import { notifySearchIndex } from "@/lib/search/queue";
 import { moroccoToday, normalizePeriods, type RentalPeriod } from "./rental-availability";
 import { revalidateListingPaths } from "./revalidate";
 
-// A car rental's availability (rental pack §3): the agency replaces its blocked periods, or saves
+// A rental's availability by dates (rental pack §3: a car; seasonal rental conception §2: a home):
+// the owner replaces its blocked periods, or saves
 // them unchanged to confirm they are up to date. No text, so no moderation pass; the listing is
 // re-indexed (search by dates) and its public page revalidated.
 
@@ -27,7 +28,7 @@ export async function setRentalAvailability(auth: AuthContext, id: string, input
   const listing = await getListing(id);
   if (!listing) throw notFound();
   requireOwner(auth, listing);
-  if (listing.subcategoryId !== RENTAL_SUBCATEGORY || !CALENDAR_STATUSES.includes(listing.status)) throw new HttpError(409, "conflict", "not an editable car rental");
+  if (!datedRental(listing.subcategoryId) || !CALENDAR_STATUSES.includes(listing.status)) throw new HttpError(409, "conflict", "not an editable rental by dates");
   const normalized = normalizePeriods(input.unavailable, moroccoToday(now));
   if ("problem" in normalized) throw new HttpError(422, "invalid_body", undefined, { details: [{ path: "unavailable", code: normalized.problem }] });
   const rental = { unavailable: normalized.periods, updatedAt: now };
@@ -63,7 +64,7 @@ export async function blockRentalDates(actor: Pick<AuthContext["user"], "uid" | 
   let slugId: string | undefined;
   const written = await db().runTransaction(async (tx) => {
     const current = await getListingTx(tx, id);
-    if (!current || current.subcategoryId !== RENTAL_SUBCATEGORY || !CALENDAR_STATUSES.includes(current.status)) return false;
+    if (!current || !datedRental(current.subcategoryId) || !CALENDAR_STATUSES.includes(current.status)) return false;
     if (current.ownerUid !== actor.uid && !(current.proId && current.proId === actor.claims.proId)) return false;
     const normalized = normalizePeriods([...(current.rental?.unavailable ?? []), period], moroccoToday(now));
     if ("problem" in normalized) return false;

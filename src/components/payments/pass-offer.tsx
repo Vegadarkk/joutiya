@@ -82,6 +82,7 @@ export function PassOffer({ data, offer, block, locale, date, onReload }: { data
             {t("pass.title")}
           </h2>
           <p className="max-w-prose text-sm text-foreground-muted text-pretty">{t("pass.lead", { days: offer.days })}</p>
+          <p className="max-w-prose text-sm text-foreground-muted text-pretty">{t("pass.agencyHint")}</p>
         </div>
         <p className="shrink-0 text-sm leading-tight sm:text-end">
           {t.rich("pass.price", { amount: major(offer.priceMinor), days: offer.days, n: (chunks) => <span className="block pb-1 text-4xl font-semibold tracking-tight text-foreground tabular-nums">{chunks}</span> })}

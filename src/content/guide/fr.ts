@@ -115,6 +115,13 @@ export const GUIDE_FR: GuideLocaleContent = {
       title: "Taxe d'habitation et taxe de services communaux",
       body: ["Ces taxes locales sont émises par la Trésorerie générale du Royaume, qui permet de consulter et de payer ses avis en ligne."],
     },
+    "immo-location-touristique": {
+      title: "Louer un logement à des touristes",
+      body: [
+        "Louer un logement meublé à des touristes, même pour quelques nuits, relève de la loi 80-14 sur l'hébergement touristique : selon le type d'hébergement, une autorisation préalable d'exploitation et une assurance sont exigées. Le ministère du Tourisme publie la loi et ses textes d'application.",
+        "L'exploitant vérifie l'identité de chaque client et déclare ses séjours chaque jour aux autorités. Il collecte aussi la taxe de séjour, qu'il reverse à la commune. Renseignez-vous auprès de votre commune avant la première location.",
+      ],
+    },
     "immo-location": {
       title: "Louer un logement",
       body: [
@@ -182,6 +189,7 @@ export const GUIDE_FR: GuideLocaleContent = {
   sources: {
     "idarati-entreprises": "Services en ligne pour les entreprises (Idarati)",
     "idarati-logement": "Services en ligne logement et immobilier (Idarati)",
+    "tourisme-hebergement": "Hébergement touristique : loi 80-14 et textes d'application (ministère du Tourisme)",
     "idarati-papiers": "Services en ligne papiers, famille et citoyenneté (Idarati)",
     "maroc-grand-public": "Services numériques pour les citoyens et les MRE",
     "maroc-entreprises": "Services numériques pour les entreprises",

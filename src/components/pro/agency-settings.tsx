@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
-import { Building2, CarFront, Store } from "lucide-react";
+import { Building2, CarFront, Palmtree, Store } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { FormMessage } from "@/components/auth/form-message";
@@ -18,12 +18,13 @@ import { ProCommitments } from "./pro-commitments";
 
 // The shop's sector in the Pro area (Agence pack design §3): a real-estate agency gets an agency
 // storefront (listings per transaction, fee schedule) and the mandate and fees on its listings; a
-// car rental agency its fleet storefront (rental pack §5), set up from /pro/location.
+// car rental agency its fleet storefront (rental pack §5), set up from /pro/location; a seasonal
+// rental agency its homes (location-saisonniere/conception.md §1).
 // The fee schedule follows the storefront text screen (free-text.ts), live here and again on the server.
 // Becoming an agency takes the trade's legal commitments and the admin guide's procedures, ticked
 // before the save (the server refuses it without them).
 
-const ICONS = { general: Store, real_estate: Building2, car_rental: CarFront } as const;
+const ICONS = { general: Store, real_estate: Building2, car_rental: CarFront, holiday_rental: Palmtree } as const;
 
 export function AgencySettings({ shop }: { shop: Pick<ProSelfView, "sector" | "feeSchedule"> }) {
   const t = useTranslations("Pro.agency");
@@ -76,7 +77,7 @@ export function AgencySettings({ shop }: { shop: Pick<ProSelfView, "sector" | "f
         <p className="text-sm text-foreground-muted text-pretty">{t("lead")}</p>
       </header>
       <form onSubmit={(event) => void onSubmit(event)} noValidate className="flex flex-col gap-5">
-        <fieldset className="grid gap-2 md:grid-cols-3">
+        <fieldset className="grid gap-2 sm:grid-cols-2">
           <legend className="sr-only">{t("title")}</legend>
           {PRO_SECTORS.map((value) => {
             const Icon = ICONS[value];

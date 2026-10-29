@@ -1,11 +1,11 @@
-import { RENTAL_SUBCATEGORY } from "@/config/categories";
+import { datedRental } from "@/config/categories";
 import { promoRunning, type CardPromo } from "@/lib/contracts/catalog-core";
 import { cardFactsField, cardFactsOf } from "@/lib/listings/card-facts";
 import { rentalDayRate } from "@/lib/listings/rental";
 import { rentalDuration, type RentalDates } from "./params";
 import { attributeField, type CardDocument, type SearchCard } from "./types";
 
-/** A car rental searched by dates: its estimated total (long-term rate applied) and freshness. */
+/** A rental searched by dates: its estimated total (a car's long-term rate applied; a home has none) and freshness. */
 function rentalOf(doc: CardDocument, now: Date, dates: RentalDates): NonNullable<SearchCard["rental"]> {
   const days = rentalDuration(dates);
   const attributes: Record<string, number> = {};
@@ -53,6 +53,6 @@ export function toSearchCard(doc: CardDocument, now: Date, featured = false, dat
     ...(doc.soldOut === true ? { soldOut: true as const } : {}),
     ...(doc.priceFrom === true ? { priceFrom: true as const } : {}),
     ...promoOf(doc, now),
-    ...(dates && doc.subcategoryId === RENTAL_SUBCATEGORY ? { rental: rentalOf(doc, now, dates) } : {}),
+    ...(dates && datedRental(doc.subcategoryId) ? { rental: rentalOf(doc, now, dates) } : {}),
   };
 }

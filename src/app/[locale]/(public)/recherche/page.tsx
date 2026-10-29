@@ -28,7 +28,7 @@ import { PendingBar, PendingRegion, SearchNavigationProvider } from "@/component
 import { SortSelect } from "@/components/search/sort-select";
 import { UnderstoodChips, understoodChipKeys } from "@/components/search/understood-chips";
 import { infeedPositions } from "@/config/ads";
-import { RENTAL_SUBCATEGORY, subcategoryAllowsAds } from "@/config/categories";
+import { datedRental, subcategoryAllowsAds } from "@/config/categories";
 import { availablePromos, type HousePromo } from "@/config/house-promos";
 import type { Locale } from "@/config/site";
 import { PUBLIC_CLIENT_NAMESPACES, SEARCH_PAGE_CLIENT_NAMESPACES, pickMessages } from "@/i18n/client-messages";
@@ -157,7 +157,7 @@ function Results({ response, locale, title, count, promos, map, publisher, trans
               <SortSelect params={params} />
             </div>
           </div>
-          {params.subcategory === RENTAL_SUBCATEGORY ? <RentalDatesBar key={searchPath(params)} params={params} /> : null}
+          {datedRental(params.subcategory) ? <RentalDatesBar key={searchPath(params)} params={params} /> : null}
           {response.approximate ? (
             <ErrorBanner tone="info" title={t("approximate.title")}>
               {t("approximate.body")}

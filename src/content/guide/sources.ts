@@ -30,6 +30,7 @@ export const OFFICIAL_HOSTS = {
   "www.ompic.ma": "OMPIC",
   "www.cnie.ma": "DGSN",
   "www.passeport.ma": "DGSN",
+  "mtaess.gov.ma": "Ministère du Tourisme",
 } as const;
 export type OfficialHost = keyof typeof OFFICIAL_HOSTS;
 
@@ -52,6 +53,8 @@ export const GUIDE_SOURCES = {
   // Portals
   "idarati-entreprises": source("https://idarati.ma/e-service/services-en-ligne/?thematic=entreprises-emploi-et-affaires", ["fr"]),
   "idarati-logement": source("https://idarati.ma/e-service/services-en-ligne/?thematic=construction-logement-et-immobilier", ["fr"]),
+  // Tourist accommodation: law 80-14 and its texts (no step-by-step procedure on the page).
+  "tourisme-hebergement": source("https://mtaess.gov.ma/fr/tourisme/metiers-tourisme/hebergement-touristique/", ["fr", "ar"], true, "2026-10-29"),
   "idarati-papiers": source("https://idarati.ma/e-service/services-en-ligne/?thematic=papiers-famille-et-citoyennete", ["fr"]),
   "maroc-grand-public": source("https://maroc.ma/fr/services-numeriques/grand-public", ["fr", "ar"]),
   "maroc-entreprises": source("https://maroc.ma/fr/services-numeriques/entreprises-professionnels", ["fr", "ar"]),

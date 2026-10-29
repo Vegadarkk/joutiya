@@ -115,6 +115,13 @@ export const GUIDE_RIF: GuideLocaleContent = {
       title: "Taxe d'habitation d taxe de services communaux",
       body: ["Tibazar-a n temnaḍt ttffɣent-d zeg TGR, d tzemmreḍ ad tent-teẓreḍ d ad tent-txelleṣeḍ deg internet."],
     },
+    "immo-location-touristique": {
+      title: "Lekra n wexxam i turist",
+      body: [
+        "Lekra n wexxam s lmefrucat i turist, ula i kra n yiḍan, ttwaḥkem s lqanun 80-14 n usensi aturisti: ɣer wanaw n usensi, ixs turagt zzat lexdma d ttamin. Lwizara n Turizm tssufeɣ lqanun d yiḍrisen-nnes.",
+        "Win yesseqdacen axxam ad yessenqed tamagit n kul amsaɣ, ad t-ixebber kul ass i tmeqranin. Ad yejmeɛ daɣ tabzert n wqqim, ad tt-yerr i tɣiwant. Steqsa tiɣiwant-nnek uqbel lekra amezwaru.",
+      ],
+    },
     "immo-location": {
       title: "Lekra n wexxam",
       body: [
@@ -182,6 +189,7 @@ export const GUIDE_RIF: GuideLocaleContent = {
   sources: {
     "idarati-entreprises": "Isenfaren i tisharikin (Idarati)",
     "idarati-logement": "Isenfaren n wexxam (Idarati)",
+    "tourisme-hebergement": "Asensi aturisti: lqanun 80-14 (Lwizara n Turizm)",
     "idarati-papiers": "Isenfaren n ikaɣeḍen d twacult (Idarati)",
     "maroc-grand-public": "Isenfaren n internet i imezdaɣ d MRE",
     "maroc-entreprises": "Isenfaren n internet i tisharikin",
