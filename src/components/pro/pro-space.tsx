@@ -336,7 +336,11 @@ function Dashboard({ me, shop, lifecycle }: { me: ProMeResponse; shop: ProSelfVi
           </Button>
           {shop.storefront && !suspended ? (
             <Button asChild variant="outline">
-              <Link href={`/boutique/${shop.storefront}`}>{t("storefront")}</Link>
+              {/* No prefetch: a storefront render started here could finish after a save on this
+                  page revalidated it, and the owner would see the old storefront for 5 minutes. */}
+              <Link href={`/boutique/${shop.storefront}`} prefetch={false}>
+                {t("storefront")}
+              </Link>
             </Button>
           ) : null}
           {paymentEligible(lifecycle, plan) ? (
