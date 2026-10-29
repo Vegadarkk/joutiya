@@ -75,7 +75,7 @@ export interface SearchDocument {
   promoStartsAt?: number;
   promoEndsAt?: number;
   promoKind?: PromoKind;
-  /** Largest cut against the struck-out price (0 without one): the « Réduction » sort. */
+  /** Cut of the price shown against its struck-out price (0 without one): the « Réduction » sort. */
   promoPercent?: number;
   /** Lowest promotional price and its struck-out price (0: none, a listing younger than 30 days). */
   promoPrice?: number;

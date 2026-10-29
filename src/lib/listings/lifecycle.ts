@@ -1,6 +1,7 @@
 import type { ListingStatus } from "@/lib/contracts/listings";
+import { livePriceLog } from "./catalog";
 import type { ListingDoc, PausedReason } from "./lifecycle-types";
-import type { ContentOp, MailTemplateForListing, TransitionEffects, TransitionResult } from "./lifecycle-types";
+import type { ContentOp, ListingFieldPatch, MailTemplateForListing, TransitionEffects, TransitionResult } from "./lifecycle-types";
 
 // Listing status machine (architecture §5 "Cycle de vie d'une annonce", design D16). Pure: the
 // transition returns the field patch and the side effects; service.ts writes them (Firestore
@@ -99,7 +100,8 @@ function effects(partial: Partial<TransitionEffects>): TransitionEffects {
   return { ...NO_EFFECTS, ...partial };
 }
 
-type Listing = Pick<ListingDoc, "status" | "version" | "publishedAt" | "expiresAt" | "purgeAt" | "pausedReason" | "sortAt" | "sortSource">;
+type Listing = Pick<ListingDoc, "status" | "version" | "publishedAt" | "expiresAt" | "purgeAt" | "pausedReason" | "sortAt" | "sortSource"> &
+  Partial<Pick<ListingDoc, "price" | "isDonation" | "variants" | "priceLog">>;
 
 const lapsed = (listing: Pick<ListingDoc, "expiresAt">, now: Date) => !listing.expiresAt || listing.expiresAt.getTime() <= now.getTime();
 
@@ -163,6 +165,21 @@ export function transition(listing: Listing, to: ListingStatus, ctx: TransitionC
 }
 
 function apply(listing: Listing, to: ListingStatus, ctx: TransitionContext): TransitionResult {
+  const result = applyStatus(listing, to, ctx);
+  return to === "published" && listing.status !== "published" ? withLivePrices(listing, result, ctx.now) : result;
+}
+
+/**
+ * A listing going live starts showing its prices: they join its price history now (B-03), so a
+ * price set while paused, expired or held never counts from before its return.
+ */
+export function withLivePrices<R extends { patch: ListingFieldPatch }>(listing: Partial<Pick<ListingDoc, "price" | "isDonation" | "variants" | "priceLog">>, result: R, now: Date): R {
+  if (listing.price === undefined) return result;
+  const priceLog = livePriceLog({ price: listing.price, isDonation: listing.isDonation ?? false, variants: listing.variants, priceLog: listing.priceLog }, now);
+  return priceLog ? { ...result, patch: { ...result.patch, priceLog } } : result;
+}
+
+function applyStatus(listing: Listing, to: ListingStatus, ctx: TransitionContext): TransitionResult {
   const from = listing.status;
   if (!canTransition(from, to)) throw new IllegalTransitionError(from, to);
   const { now, lifetime } = ctx;

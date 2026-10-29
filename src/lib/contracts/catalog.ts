@@ -187,7 +187,7 @@ export function withVariantAnswers<T extends Record<string, unknown>>(attributes
 
 // ---- Promotions (catalogue §4; owner decisions 2-4 of 28 Oct 2026; law 31-08 art. 53-55)
 
-export { PROMO_KINDS, cardPromo, percentOff, promoRunning, promoSummary, type CardPromo, type PromoKind, type PromoPrice, type PromoView } from "./catalog-core";
+export { PRICE_LOG_MAX, PROMO_KINDS, cardPromo, percentOff, promoRunning, promoSummary, type CardPromo, type PromoKind, type PromoPrice, type PromoView } from "./catalog-core";
 
 const HOUR_MS = 60 * 60 * 1000;
 /** Shortest promotion. */

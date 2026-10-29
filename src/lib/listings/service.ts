@@ -58,7 +58,7 @@ import { buildSlugId, newListingId } from "./ids";
 import { IllegalTransitionError, canRenew, canTransition, draftPurgeAt, renew, renewForReview, transition, type Lifetime, type TransitionContext, type TransitionEffects, type TransitionResult } from "./lifecycle";
 import { ownerListingView, toOwnerSummary } from "./owner-view";
 import { PUBLIC_STATES } from "./public";
-import { effectivePrices, logPrices } from "./catalog";
+import { effectivePrices, livePriceLog } from "./catalog";
 import { planPromo, promoEnd } from "./promo";
 import { assessReadiness } from "./readiness";
 import { needsRealEstateAttestation } from "./real-estate";
@@ -87,6 +87,8 @@ export const EDITABLE_STATUSES: readonly ListingStatus[] = ["draft", "pending_re
 const SCREENED_STATUSES: readonly ListingStatus[] = ["published", "paused", "pending_review", "expired"];
 /** Fields whose change re-runs the pre-moderation (every free text, the district included). */
 const SCREENED_FIELDS: readonly (keyof ListingDoc)[] = ["title", "description", "attributes", "categoryId", "subcategoryId", "price", "isDonation", "photos", "contact", "location"];
+/** A patch touching what sets the prices shown (the listing's, or its combinations'). */
+const pricesTouched = (fields: ListingFieldPatch) => fields.price !== undefined || fields.isDonation !== undefined || fields.variants !== undefined;
 /** CGU reference quoted in the automated statements (design D8). */
 const AUTOMATED_GROUND = "CGU §7 (contrôle avant publication)";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -396,13 +398,8 @@ export async function patchListing(actor: Actor, id: string, patch: ListingPatch
   let maxActive: number | null | undefined;
 
   if (SCREENED_STATUSES.includes(listing.status)) {
-    // A listing published before keeps its price history (the struck-out price of a promotion).
-    if (fields.price !== undefined || fields.isDonation !== undefined || fields.variants !== undefined) {
-      const priceLog = logPrices(listing.priceLog, applyPatch(listing, fields), now);
-      if (priceLog && !isDeepStrictEqual(priceLog, listing.priceLog)) fields.priceLog = priceLog;
-      // A price change ends the promotion: its struck-out price no longer holds (catalogue §4).
-      if (listing.promo && !isDeepStrictEqual(effectivePrices(listing), effectivePrices(applyPatch(listing, fields)))) Object.assign(fields, promoEnd(listing, now));
-    }
+    // A price change ends the promotion: its struck-out price no longer holds (catalogue §4).
+    if (listing.promo && pricesTouched(fields) && !isDeepStrictEqual(effectivePrices(listing), effectivePrices(applyPatch(listing, fields)))) Object.assign(fields, promoEnd(listing, now));
     const next = applyPatch(listing, fields);
     const blockers = assessReadiness(next, { seller: seller.seller, phoneVerified: seller.user.badges.phoneVerified });
     if (blockers.length > 0) throw invalidListing(blockers);
@@ -441,6 +438,12 @@ export async function patchListing(actor: Actor, id: string, patch: ListingPatch
     maxDrafts = MAX_DRAFTS;
   }
 
+  // The price history holds the prices buyers saw (B-03, art. 54): a change counts here while the
+  // listing stays published; made while paused, expired or held, it counts from its return (lifecycle).
+  if (listing.status === "published" && (fields.status ?? listing.status) === "published" && pricesTouched(fields)) {
+    const priceLog = livePriceLog({ ...applyPatch(listing, fields), priceLog: listing.priceLog }, now);
+    if (priceLog) fields.priceLog = priceLog;
+  }
   const updated = await commit(listing, fields, effects, { actor, user: seller.user, now, hold, maxDrafts, maxActive });
   if (fields.photos) await releaseDroppedPhotos(listing, fields.photos, now);
   if (mail) await notifySeller(updated, seller.user, mail);
@@ -656,8 +659,6 @@ export async function publish(actor: Actor, request: Request, id: string, option
   const ctx = { now, lifetime: await lifetime(), ip: actor.ip };
   const { patch, effects } = step(() => transition(listing, to, ctx));
   patch.slugId = slugId;
-  // The price history starts with the publication (catalogue §4).
-  patch.priceLog = logPrices(listing.priceLog, listing, now) ?? null;
   patch.moderation = moderationPatch(listing.moderation, screening, to === "pending_review");
   patch.adsEligible = to === "published" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy && subcategoryAllowsAds(listing.subcategoryId);
   const hold = to === "pending_review" ? holdRecord(listing, screening, now, rejectedBefore) : undefined;
