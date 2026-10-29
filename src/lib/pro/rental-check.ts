@@ -16,7 +16,7 @@ import { getUpload, getUploads } from "@/lib/db/repositories/uploads";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { serverEnv } from "@/lib/env";
 import { db } from "@/lib/firebase/admin";
-import { HttpError, notFound } from "@/lib/http/errors";
+import { HttpError, notFound, rateLimited } from "@/lib/http/errors";
 import { revalidateListingPaths } from "@/lib/listings/revalidate";
 import { logger } from "@/lib/logging/logger";
 import { consume } from "@/lib/quota";
@@ -26,7 +26,7 @@ import { objectStore } from "@/lib/storage";
 import { z } from "@/lib/zod";
 import { storefrontShown } from "./lifecycle";
 import { RENTAL_CHECK_SIGNS_MAX, rentalCheckSchema, type RentalCheck, type RentalCheckIssue, type RentalCheckStatus } from "./profile-schema";
-import { agrementIssues, rentalCheckView, type AgrementReading } from "./rental-check-rules";
+import { agrementIssues, referenceKey, rentalCheckView, type AgrementReading } from "./rental-check-rules";
 import { ownedPublishingShop } from "./service";
 
 // Check of a car rental agency's licence decision (decision 5). The agency uploads the decision
@@ -40,12 +40,18 @@ import { ownedPublishingShop } from "./service";
 // unavailable (no key, budget, spend limit, failure) or no queue: `review`, for a moderator who
 // verifies or refuses with a reason. A new reference in the settings drops the check. The
 // document never leaves the private bucket except to Claude and to staff (journaled view).
+// Cost (audit B-05): 5 documents per shop and calendar month; the worker counts the document's
+// tokens first (a free call) and leaves anything longer than a few pages to a moderator.
 
 export const RENTAL_CHECK_PROMPT_VERSION = "rental-check-2";
 const MAX_TOKENS = 8000;
 const TIMEOUT_MS = 120_000;
 /** A piece is at most 10 MiB as uploaded; a re-encoded PNG may come out a little larger. */
 const MAX_DOCUMENT_BYTES = 12 * 1024 * 1024;
+/** Input tokens Claude reads at most (prompt included): about 5 PDF pages, ~0.06 USD with Sonnet; longer goes to a moderator. */
+export const RENTAL_CHECK_MAX_INPUT_TOKENS = 30_000;
+/** Documents a shop may send per calendar month (each one is a Claude call under the 5 USD monthly cap). */
+export const RENTAL_CHECK_MONTHLY_MAX = 5;
 export const RENTAL_CHECK_QUEUE_PAGE = 50;
 
 const SYSTEM_PROMPT = `You read a document a car rental agency uploaded on Joutiya, a Moroccan classifieds site. The agency says it is the decision (agrément, autorisation or arrêté) by which the Moroccan administration in charge of transport, or one of its regional or provincial directorates, allows a company to run a car rental business without a driver (location de voitures sans chauffeur). The document may be in French or Arabic, scanned or photographed, one or several pages.
@@ -80,7 +86,7 @@ type ModelReading = z.infer<typeof readingSchema>;
 
 /** The part of the SDK client the check uses (a stub in tests). */
 export interface RentalCheckClient {
-  messages: Pick<Anthropic["messages"], "parse">;
+  messages: Pick<Anthropic["messages"], "parse" | "countTokens">;
 }
 
 let override: { client: RentalCheckClient | null } | undefined;
@@ -148,12 +154,22 @@ export async function submitRentalCheck(auth: AuthContext, input: RentalCheckSub
   const previous = profile.rentalCheck;
   if (previous && previous.uploadId === input.uploadId && previous.status !== "rejected") return { rentalCheck: rentalCheckView(previous) };
   await enforceLimit("pro.rental.check.uid", uid);
+  const month = now.toISOString().slice(0, 7);
+  const sent = profile.rentalCheckUsage?.month === month ? profile.rentalCheckUsage.count : 0;
+  if (sent >= RENTAL_CHECK_MONTHLY_MAX) throw rateLimited((Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1) - now.getTime()) / 1000);
   const upload = await getUpload(input.uploadId);
   if (!upload || upload.ownerUid !== uid || upload.purpose !== "kyb" || profile.kybc.uploadIds.includes(upload.id)) throw notFound();
   if (upload.status !== "ready" || !upload.finalKey) throw new HttpError(409, "upload_not_ready");
 
-  const check: RentalCheck = rentalCheckSchema.parse({ status: "pending", uploadId: upload.id, agrementRef: profile.rental.agrementRef, submittedAt: now, issues: [] });
-  await proProfileRef(profile.proId).update({ rentalCheck: datesToTimestamps(check), updatedAt: Timestamp.fromDate(now) });
+  const check: RentalCheck = rentalCheckSchema.parse({
+    status: "pending",
+    uploadId: upload.id,
+    agrementRef: profile.rental.agrementRef,
+    referenceKey: referenceKey(profile.rental.agrementRef),
+    submittedAt: now,
+    issues: [],
+  });
+  await proProfileRef(profile.proId).update({ rentalCheck: datesToTimestamps(check), rentalCheckUsage: { month, count: sent + 1 }, updatedAt: Timestamp.fromDate(now) });
   void consume("firestore.reads", 2);
   void consume("firestore.writes", 1);
   // The badge of the previous document goes until this one is checked.
@@ -229,6 +245,15 @@ export interface RentalCheckRunResult {
 
 type DocumentBlock = Anthropic.DocumentBlockParam | Anthropic.ImageBlockParam;
 
+/** Another shop holds a verified check of this reference (equality only: no composite index). */
+async function referenceTakenElsewhere(proId: string, agrementRef: string): Promise<boolean> {
+  const key = referenceKey(agrementRef);
+  if (!key) return false;
+  const query = await db().collection(COLLECTIONS.proProfiles).where("rentalCheck.referenceKey", "==", key).limit(20).get();
+  void consume("firestore.reads", Math.max(1, query.size));
+  return query.docs.some((doc) => doc.id !== proId && proProfileFromSnapshot(doc)?.rentalCheck?.status === "verified");
+}
+
 function documentBlock(bytes: Buffer, type: string): DocumentBlock {
   const data = bytes.toString("base64");
   if (type === "application/pdf") return { type: "document", source: { type: "base64", media_type: "application/pdf", data } };
@@ -268,13 +293,21 @@ export async function runRentalCheck(job: RentalCheckJobData, options: RentalChe
       }
     },
   };
+  const system: Anthropic.TextBlockParam[] = [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral", ttl: "1h" } }];
+  const messages: Anthropic.MessageParam[] = [{ role: "user", content: [documentBlock(bytes, upload.declaredType), { type: "text", text: "Lisez ce document et répondez au format demandé." }] }];
   let response;
   try {
+    // Free and unbilled: a document of more than a few pages is not read at the budget's expense.
+    const { input_tokens: inputTokens } = await client.messages.countTokens({ model, system, messages });
+    if (inputTokens > RENTAL_CHECK_MAX_INPUT_TOKENS) {
+      logger.info({ model, inputTokens, prompt: RENTAL_CHECK_PROMPT_VERSION }, "rental check: document too long, left to a moderator");
+      return toModerator(["too_long"]);
+    }
     response = await client.messages.parse({
       model,
       max_tokens: MAX_TOKENS,
-      system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral", ttl: "1h" } }],
-      messages: [{ role: "user", content: [documentBlock(bytes, upload.declaredType), { type: "text", text: "Lisez ce document et répondez au format demandé." }] }],
+      system,
+      messages,
       output_config: { effort: "medium", format: lenient },
       ...(model.startsWith("claude-haiku-") ? { thinking: { type: "disabled" as const } } : {}),
     });
@@ -291,7 +324,8 @@ export async function runRentalCheck(job: RentalCheckJobData, options: RentalChe
   logger.info({ model, costMicroUsd, stop: response.stop_reason, prompt: RENTAL_CHECK_PROMPT_VERSION }, "rental check read");
   if (!parsed) return toModerator(["unreadable"], costMicroUsd);
   const reading = clampReading(parsed);
-  const issues = agrementIssues(reading, { agrementRef: check.agrementRef, ice: profile.legal.ice, name: profile.name }, now);
+  const referenceTaken = await referenceTakenElsewhere(profile.proId, check.agrementRef);
+  const issues = agrementIssues(reading, { agrementRef: check.agrementRef, ice: profile.legal.ice, name: profile.name, referenceTaken }, now);
   const extracted = { companyName: reading.companyName, ice: reading.ice, reference: reading.reference, decisionDate: reading.decisionDate, signs: reading.tamperingSigns, note: reading.note };
   const status = issues.length === 0 ? "verified" : "review";
   await finishCheck(profile.proId, job.submittedAt, { status, issues, extracted }, now);

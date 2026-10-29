@@ -3,17 +3,19 @@ import {
   RENTAL_CHECK_MIN_CONFIDENCE,
   agrementIssues,
   badDecisionDate,
+  companyMatch,
   nameKey,
   referenceDigits,
+  referenceKey,
   rentalCheckView,
-  sameCompany,
   sameReference,
   type AgrementReading,
 } from "@/lib/pro/rental-check-rules";
 
 // The comparison of a car rental agency's licence decision with its declarations (decision 5):
-// Claude reads, the server decides. Reference digits, beneficiary by ICE then by name, the date,
-// signs of editing and Claude's confidence; every doubt is named for the moderator.
+// Claude reads, the server decides. Reference digits (one shop per verified reference), beneficiary
+// by ICE (a name alone goes to a moderator), the date, signs of editing and Claude's confidence;
+// every doubt is named for the moderator.
 
 const NOW = new Date("2026-10-28T12:00:00.000Z");
 const DECLARATION = { agrementRef: "AGR 123/2025", ice: "001234567000089", name: "Océan Rent" };
@@ -36,21 +38,26 @@ describe("licence references", () => {
     expect(sameReference("123/2025", "1232025")).toBe(false);
     expect(sameReference("123/2025", "")).toBe(false);
     expect(sameReference("0/2025", "0/2025")).toBe(true);
+    expect(referenceKey("AGR 0123/2025")).toBe("123-2025");
+    expect(referenceKey("N° 123-2025")).toBe("123-2025");
+    expect(referenceKey("AGR")).toBe("");
   });
 });
 
 describe("the beneficiary", () => {
   it("is the shop by its 15-digit ICE, a different ICE never matching", () => {
-    expect(sameCompany(DECLARATION, { ice: "001234567000089", companyName: "Autre nom" })).toBe(true);
-    expect(sameCompany(DECLARATION, { ice: "001234567000090", companyName: "Océan Rent" })).toBe(false);
+    expect(companyMatch(DECLARATION, { ice: "001234567000089", companyName: "Autre nom" })).toBe("ice");
+    expect(companyMatch(DECLARATION, { ice: "001234567000090", companyName: "Océan Rent" })).toBeNull();
   });
 
-  it("else by its name, legal forms, accents and punctuation aside", () => {
+  it("else by its exact name, legal forms, accents and punctuation aside; a name containing the other never matches", () => {
     expect(nameKey("S.A.R.L. Océan-Rent")).toBe("oceanrent");
-    expect(sameCompany(DECLARATION, { ice: "", companyName: "Société OCEAN RENT S.A.R.L" })).toBe(true);
-    expect(sameCompany(DECLARATION, { ice: "", companyName: "Ocean Rent Cars" })).toBe(true);
-    expect(sameCompany(DECLARATION, { ice: "", companyName: "Atlas Cars" })).toBe(false);
-    expect(sameCompany({ ...DECLARATION, name: "AB" }, { ice: "", companyName: "AB" })).toBe(false);
+    expect(companyMatch(DECLARATION, { ice: "", companyName: "Société OCEAN RENT S.A.R.L" })).toBe("name");
+    expect(companyMatch(DECLARATION, { ice: "", companyName: "Ocean Rent Cars" })).toBeNull();
+    expect(companyMatch(DECLARATION, { ice: "", companyName: "Atlas Cars" })).toBeNull();
+    expect(companyMatch({ ...DECLARATION, name: "AB" }, { ice: "", companyName: "AB" })).toBeNull();
+    // Audit B-04: the real decision of a company with a shorter name does not pass for the shop.
+    expect(companyMatch({ ...DECLARATION, name: "Marrakech Car Rental Premium" }, { ice: "", companyName: "Marrakech Car" })).toBeNull();
   });
 });
 
@@ -65,8 +72,14 @@ describe("the decision date", () => {
 });
 
 describe("agrementIssues", () => {
-  it("finds none when everything is consistent", () => {
+  it("finds none when everything is consistent, the shop's ICE on the document", () => {
     expect(agrementIssues(READING, DECLARATION, NOW)).toEqual([]);
+  });
+
+  it("leaves a document without ICE, or a reference verified for another shop, to a moderator", () => {
+    expect(agrementIssues({ ...READING, ice: "", companyName: "Océan Rent SARL" }, DECLARATION, NOW)).toEqual(["no_ice"]);
+    expect(agrementIssues({ ...READING, ice: "", companyName: "Marrakech Car" }, { ...DECLARATION, name: "Marrakech Car Rental Premium" }, NOW)).toEqual(["company"]);
+    expect(agrementIssues(READING, { ...DECLARATION, referenceTaken: true }, NOW)).toEqual(["reference_taken"]);
   });
 
   it("names every doubt", () => {

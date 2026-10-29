@@ -4,9 +4,11 @@ import type { RentalCheck, RentalCheckIssue } from "./profile-schema";
 
 // Comparison of a car rental agency's licence decision with its declarations (decision 5). Claude
 // only reads the document (rental-check.ts); this decides, deterministically: the decision's
-// number must carry the digits of the declared reference, the beneficiary must be the shop (its
-// verified ICE, else its name), the date must not be in the future, and no sign of editing may
-// show. Anything else goes to a moderator with the reasons. Pure: the unit tests cover it.
+// number must carry the digits of the declared reference, no other shop may hold that reference
+// verified, the beneficiary must be the shop by its verified ICE (a name alone, even identical,
+// leaves it to a moderator: names are not unique), the date must not be in the future, and no sign
+// of editing may show. Anything else goes to a moderator with the reasons. Pure: the unit tests
+// cover it.
 
 /** Claude's confidence under which a consistent reading still goes to a moderator. */
 export const RENTAL_CHECK_MIN_CONFIDENCE = 0.85;
@@ -29,11 +31,18 @@ export interface AgrementDeclaration {
   ice: string;
   /** The shop's name. */
   name: string;
+  /** Another shop holds a verified check of the same reference (referenceKey). */
+  referenceTaken?: boolean;
 }
 
 /** Digit groups of a reference, leading zeros dropped: "AGR 0123/2025" and "N° 123-2025" both give ["123", "2025"]. */
 export function referenceDigits(reference: string): string[] {
   return (reference.match(/\d+/g) ?? []).map((group) => group.replace(/^0+(?=\d)/, ""));
+}
+
+/** The reference as compared across shops: "AGR 0123/2025" -> "123-2025"; empty without digits. */
+export function referenceKey(reference: string): string {
+  return referenceDigits(reference).join("-");
 }
 
 export function sameReference(declared: string, read: string): boolean {
@@ -58,13 +67,16 @@ export function nameKey(name: string): string {
 
 const digits = (value: string) => value.replace(/\D/g, "");
 
-export function sameCompany(declaration: Pick<AgrementDeclaration, "ice" | "name">, reading: Pick<AgrementReading, "ice" | "companyName">): boolean {
+/**
+ * How the beneficiary matches the shop: "ice" when the document shows the shop's 15-digit ICE,
+ * "name" when it shows no ICE but the same name (legal forms, accents and punctuation aside), null
+ * otherwise. A different ICE never matches, a name merely containing the other one neither.
+ */
+export function companyMatch(declaration: Pick<AgrementDeclaration, "ice" | "name">, reading: Pick<AgrementReading, "ice" | "companyName">): "ice" | "name" | null {
   const ice = digits(reading.ice);
-  if (ice.length === 15) return ice === digits(declaration.ice);
+  if (ice.length === 15) return ice === digits(declaration.ice) ? "ice" : null;
   const read = nameKey(reading.companyName);
-  const declared = nameKey(declaration.name);
-  if (read.length < 3 || declared.length < 3) return false;
-  return read === declared || (Math.min(read.length, declared.length) >= 5 && (read.includes(declared) || declared.includes(read)));
+  return read.length >= 3 && read === nameKey(declaration.name) ? "name" : null;
 }
 
 /** A decision date that is not a real day, or after today in Morocco. Absent: no issue (old decisions may not show it legibly). */
@@ -79,7 +91,10 @@ export function agrementIssues(reading: AgrementReading, declaration: AgrementDe
   const issues: RentalCheckIssue[] = [];
   if (!reading.legible) issues.push("unreadable");
   if (!sameReference(declaration.agrementRef, reading.reference)) issues.push("reference");
-  if (!sameCompany(declaration, reading)) issues.push("company");
+  if (declaration.referenceTaken) issues.push("reference_taken");
+  const company = companyMatch(declaration, reading);
+  if (company === null) issues.push("company");
+  else if (company === "name") issues.push("no_ice");
   if (badDecisionDate(reading.decisionDate, now)) issues.push("date");
   if (reading.tamperingSigns.length > 0) issues.push("tampering");
   if (!(reading.confidence >= RENTAL_CHECK_MIN_CONFIDENCE)) issues.push("low_confidence");

@@ -28,7 +28,8 @@ import { db } from "@/lib/firebase/admin";
 import { setClaims } from "@/lib/firebase/claims";
 import { createSessionForUid } from "@/lib/firebase/session";
 import { getPublicStorefront } from "@/lib/listings/public";
-import { runRentalCheck, setRentalCheckClientForTests, type RentalCheckClient } from "@/lib/pro/rental-check";
+import { RENTAL_CHECK_MAX_INPUT_TOKENS, RENTAL_CHECK_MONTHLY_MAX, runRentalCheck, setRentalCheckClientForTests, type RentalCheckClient } from "@/lib/pro/rental-check";
+import { referenceKey } from "@/lib/pro/rental-check-rules";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { csrfToken } from "@/lib/security/csrf";
 import { MemoryObjectStore, resetObjectStore, setObjectStoreForTests } from "@/lib/storage";
@@ -55,14 +56,16 @@ beforeEach(() => {
 const PRO_ID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 const newProId = () => Array.from({ length: 8 }, () => PRO_ID_ALPHABET[randomInt(PRO_ID_ALPHABET.length)]).join("");
 const ICE = "001234567000089";
-const SETTINGS = { agrementRef: "AGR 123/2025", branches: [], hours: "", payments: [], airports: [] };
+const SETTINGS = { branches: [], hours: "", payments: [], airports: [] };
 
 interface Agency extends Member {
   proId: string;
+  /** Its licence reference, unique unless given: one shop per verified reference. */
+  reference: string;
 }
 
 /** A verified car rental agency on the launch offer, signed in as its owner; `settings: false` before it saved its reference. */
-async function agency({ settings = true }: { settings?: boolean } = {}): Promise<Agency> {
+async function agency({ settings = true, reference = `AGR ${randomInt(100_000, 1_000_000)}/2025` }: { settings?: boolean; reference?: string } = {}): Promise<Agency> {
   const owner = await member({ displayName: "Océan Rent" });
   const proId = newProId();
   const now = new Date();
@@ -83,7 +86,7 @@ async function agency({ settings = true }: { settings?: boolean } = {}): Promise
       planSource: "launch_offer",
       quotas: DEFAULT_PRICING.pro.essentiel,
       sector: "car_rental",
-      ...(settings ? { rental: SETTINGS } : {}),
+      ...(settings ? { rental: { ...SETTINGS, agrementRef: reference } } : {}),
       createdAt: now,
       updatedAt: now,
     }),
@@ -93,8 +96,11 @@ async function agency({ settings = true }: { settings?: boolean } = {}): Promise
   const minted = await createSessionForUid(owner.uid);
   owner.jar.cookies.set("__Host-session", minted.cookie);
   owner.jar.cookies.set("__Host-csrf", csrfToken(minted.cookie));
-  return { ...owner, proId };
+  return { ...owner, proId, reference };
 }
+
+/** The agency's reference as a decision shows it ("AGR 123456/2025" -> "N° 123456/2025"). */
+const printed = (owner: Agency) => owner.reference.replace("AGR", "N°");
 
 const send = (owner: Member, uploadId: string) => api<RentalCheckResponse & ErrorBody>(submit, "POST", "/api/pro/me/rental/check", { member: owner, body: { uploadId } });
 const me = async (owner: Member) => (await api<ProMeResponse>(getMe, "GET", "/api/pro/me", { member: owner })).body.shop;
@@ -112,7 +118,9 @@ async function documentOf(owner: Member): Promise<string> {
 
 /** Makes the agency's check pending again for `uploadId`, as a submission with a queue leaves it. */
 async function pending(owner: Agency, uploadId: string, submittedAt = new Date()): Promise<number> {
-  await proProfileRef(owner.proId).update({ rentalCheck: datesToTimestamps({ status: "pending", uploadId, agrementRef: SETTINGS.agrementRef, submittedAt, issues: [] }) });
+  await proProfileRef(owner.proId).update({
+    rentalCheck: datesToTimestamps({ status: "pending", uploadId, agrementRef: owner.reference, referenceKey: referenceKey(owner.reference), submittedAt, issues: [] }),
+  });
   return submittedAt.getTime();
 }
 
@@ -128,11 +136,16 @@ const READING = {
   note: "Décision du ministère du Transport, lisible.",
 };
 
-function claude(reading: Partial<typeof READING> | Error = {}): RentalCheckClient & { calls: unknown[] } {
+function claude(reading: Partial<typeof READING> | Error = {}, inputTokens = 3000): RentalCheckClient & { calls: unknown[]; counted: number } {
   const calls: unknown[] = [];
-  return {
+  const stub = {
     calls,
+    counted: 0,
     messages: {
+      countTokens: (async () => {
+        stub.counted += 1;
+        return { input_tokens: inputTokens };
+      }) as unknown as RentalCheckClient["messages"]["countTokens"],
       parse: (async (request: unknown) => {
         calls.push(request);
         if (reading instanceof Error) throw reading;
@@ -140,6 +153,7 @@ function claude(reading: Partial<typeof READING> | Error = {}): RentalCheckClien
       }) as unknown as RentalCheckClient["messages"]["parse"],
     },
   };
+  return stub;
 }
 
 describe("licence document upload", () => {
@@ -172,7 +186,7 @@ describe("licence check", () => {
 
     const moderator = await staffAccount("moderator");
     const review = await admin<{ review: ProReview }>(getReview, "GET", `/api/admin/pros/${owner.proId}`, moderator);
-    expect(review.body.review.rentalCheck).toMatchObject({ status: "review", agrementRef: "AGR 123/2025", issues: ["ai_unavailable"], extracted: null, piece: { id: uploadId, status: "ready" } });
+    expect(review.body.review.rentalCheck).toMatchObject({ status: "review", agrementRef: owner.reference, issues: ["ai_unavailable"], extracted: null, piece: { id: uploadId, status: "ready" } });
     const path = `/api/admin/pros/${owner.proId}/rental-check`;
     const stale = await admin<ErrorBody>(decide, "POST", path, moderator, { action: "verify", submittedAt: new Date(0).toISOString() });
     expect(stale.status).toBe(409);
@@ -207,11 +221,27 @@ describe("licence check", () => {
     expect((await send(owner, "nopenopenope1")).status).toBe(404);
   });
 
+  it("is limited to a few documents per shop and calendar month (each one is a Claude call)", async () => {
+    const owner = await agency();
+    const month = new Date().toISOString().slice(0, 7);
+    await proProfileRef(owner.proId).update({ rentalCheckUsage: { month, count: RENTAL_CHECK_MONTHLY_MAX } });
+    const refused = await send(owner, await documentOf(owner));
+    expect(refused.status).toBe(429);
+    expect(code(refused.body)).toBe("rate_limited");
+    expect((await getProProfile(owner.proId))?.rentalCheck).toBeUndefined();
+    // A new month starts again from zero.
+    await proProfileRef(owner.proId).update({ rentalCheckUsage: { month: "2000-01", count: RENTAL_CHECK_MONTHLY_MAX } });
+    const uploadId = await documentOf(owner);
+    expect((await send(owner, uploadId)).status).toBe(200);
+    expect((await send(owner, uploadId)).status).toBe(200);
+    expect((await getProProfile(owner.proId))?.rentalCheckUsage).toEqual({ month, count: 1 });
+  });
+
   it("is dropped by a new reference in the settings", async () => {
     const owner = await agency();
     await send(owner, await documentOf(owner));
     const put = (body: unknown) => api<ErrorBody>(putRental, "PUT", "/api/pro/me/rental", { member: owner, body });
-    expect((await put({ ...SETTINGS, hours: "Tous les jours" })).status).toBe(200);
+    expect((await put({ ...SETTINGS, agrementRef: owner.reference, hours: "Tous les jours" })).status).toBe(200);
     expect((await getProProfile(owner.proId))?.rentalCheck).toBeDefined();
     expect((await put({ ...SETTINGS, agrementRef: "AGR 456/2026" })).status).toBe(200);
     expect((await getProProfile(owner.proId))?.rentalCheck).toBeUndefined();
@@ -224,13 +254,13 @@ describe("the worker's reading", () => {
     const owner = await agency();
     const uploadId = await documentOf(owner);
     const submittedAt = await pending(owner, uploadId);
-    const stub = claude();
+    const stub = claude({ reference: printed(owner) });
     setRentalCheckClientForTests(stub);
     expect(await runRentalCheck({ proId: owner.proId, submittedAt })).toMatchObject({ status: "done", outcome: "verified" });
-    expect((await getProProfile(owner.proId))?.rentalCheck).toMatchObject({ status: "verified", method: "ai", issues: [], extracted: { reference: "N° 123/2025", ice: ICE, signs: [] } });
+    expect((await getProProfile(owner.proId))?.rentalCheck).toMatchObject({ status: "verified", method: "ai", issues: [], extracted: { reference: printed(owner), ice: ICE, signs: [] } });
     const request = JSON.stringify(stub.calls[0]);
     expect(request).toContain('"type":"document"');
-    expect(request).not.toContain("123/2025");
+    expect(request).not.toContain(owner.reference.slice(4));
     expect(request).not.toContain(ICE);
     // The same job again finds nothing pending.
     expect((await runRentalCheck({ proId: owner.proId, submittedAt })).status).toBe("skipped");
@@ -241,7 +271,7 @@ describe("the worker's reading", () => {
     const owner = await agency();
     const uploadId = await documentOf(owner);
     const submittedAt = await pending(owner, uploadId);
-    setRentalCheckClientForTests(claude({ reference: "456/2025", tamperingSigns: ["Numéro en surimpression"], confidence: 0.6 }));
+    setRentalCheckClientForTests(claude({ reference: "N° 456/2025", tamperingSigns: ["Numéro en surimpression"], confidence: 0.6 }));
     expect((await runRentalCheck({ proId: owner.proId, submittedAt })).outcome).toBe("review");
     expect((await getProProfile(owner.proId))?.rentalCheck).toMatchObject({
       status: "review",
@@ -249,6 +279,26 @@ describe("the worker's reading", () => {
       extracted: { signs: ["Numéro en surimpression"] },
     });
     expect((await getPublicStorefront(owner.proId))?.rentalCheckedAt).toBeNull();
+  });
+
+  it("leaves a reference already verified for another shop to a moderator (audit B-04)", async () => {
+    const first = await agency();
+    setRentalCheckClientForTests(claude({ reference: printed(first) }));
+    expect((await runRentalCheck({ proId: first.proId, submittedAt: await pending(first, await documentOf(first)) })).outcome).toBe("verified");
+    const second = await agency({ reference: first.reference.replace("AGR ", "AGR-0") });
+    expect((await runRentalCheck({ proId: second.proId, submittedAt: await pending(second, await documentOf(second)) })).outcome).toBe("review");
+    expect((await getProProfile(second.proId))?.rentalCheck?.issues).toEqual(["reference_taken"]);
+  });
+
+  it("does not read a document longer than a few pages: a moderator does (audit B-05)", async () => {
+    const owner = await agency();
+    const submittedAt = await pending(owner, await documentOf(owner));
+    const stub = claude({ reference: printed(owner) }, RENTAL_CHECK_MAX_INPUT_TOKENS + 1);
+    setRentalCheckClientForTests(stub);
+    expect(await runRentalCheck({ proId: owner.proId, submittedAt })).toMatchObject({ status: "done", outcome: "review", costMicroUsd: 0 });
+    expect(stub.counted).toBe(1);
+    expect(stub.calls).toHaveLength(0);
+    expect((await getProProfile(owner.proId))?.rentalCheck?.issues).toEqual(["too_long"]);
   });
 
   it("retries a transient failure, then leaves it to a moderator on the last attempt; no key reads nothing", async () => {
