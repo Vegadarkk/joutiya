@@ -16,6 +16,7 @@ import { GET as getStock } from "@/app/api/pro/stock/route";
 import { POST as postImport } from "@/app/api/pro/stock/import/route";
 import type { StockImportResponse, StockListResponse } from "@/lib/contracts/stock-import";
 import { getListing } from "@/lib/db/repositories/listings";
+import { stockTemplateCsv } from "@/lib/pro/stock-import/template";
 import { dayString, moroccoToday } from "@/lib/listings/rental-availability";
 import { proProfileRef, proProfileToFirestore } from "@/lib/db/repositories/pro-profiles";
 import { COLLECTIONS } from "@/lib/db/schemas";
@@ -144,6 +145,37 @@ describe("POST /api/pro/stock/import", () => {
       { from: day(12), to: day(13) },
     ]);
     expect((await send(owner, "preview", `${header}\n${rental("LOG-1", `"${day(10)}; ${day(12)}/${day(13)}"`)}`)).body.rows[0]!.action).toBe("unchanged");
+  });
+
+  it("imports a shop's shirt in sizes and colours as one draft, then its stock and a new size (catalogue §2)", async () => {
+    const owner = await dealer();
+    const applied = await send(owner, "apply", stockTemplateCsv("shop"));
+    expect(applied.body.rows).toHaveLength(1);
+    expect(applied.body.rows[0]).toMatchObject({ line: 2, ref: "CHM-LIN", action: "create", issues: [] });
+    const id = applied.body.rows[0]!.listingId!;
+    const created = (await getListing(id))!;
+    expect(created).toMatchObject({ subcategoryId: "vetements", price: 250, attributes: { "stock-ref": "CHM-LIN", audience: "homme", "clothing-type": "haut" } });
+    expect(created.variants?.items).toEqual([
+      { key: "m|bleu", stock: 4 },
+      { key: "l|bleu", stock: 2 },
+      { key: "xl|noir", stock: 0, price: 290 },
+    ]);
+
+    // The same file, its first line's stock changed and a new size at the end.
+    const [header, first, ...rest] = stockTemplateCsv("shop").replace(/^\ufeff/, "").trim().split("\r\n");
+    const lines = [header, first!.replace(/;4$/, ";3"), ...rest.map((line) => line.replace(/;0$/, ";5")), "CHM-LIN;;;;;;;;;Taille : S;Couleur : Bleu;1"];
+    const restock = await send(owner, "apply", lines.join("\n"));
+    expect(restock.body.rows.map((row) => [row.action, row.changes, row.issues])).toEqual([["update", ["variants"], []]]);
+    const updated = (await getListing(id))!;
+    expect(updated.variants?.axes[0]?.values).toEqual(["m", "l", "xl", "s"]);
+    expect(updated.variants?.items.map((item) => [item.key, item.stock])).toEqual([
+      ["m|bleu", 3],
+      ["l|bleu", 2],
+      ["xl|noir", 5],
+      ["s|bleu", 1],
+    ]);
+    // The other fields stay as they were.
+    expect(updated.title).toBe("Chemise en lin brodée main");
   });
 
   it("publishes an imported draft with its photo under the Pro budget, then lists it as absent", async () => {

@@ -157,4 +157,33 @@ test.describe("Stock import", () => {
     await page.getByRole("link", { name: "Importer mon stock" }).click();
     await expect(page.getByRole("heading", { name: "Importer mon stock", level: 1 })).toBeVisible();
   });
+
+  test("a shop imports a shirt in sizes and colours from the shop template, one listing for its lines", async ({ page, request }) => {
+    test.setTimeout(120_000);
+    const email = `stock-${randomId(10)}@joutiya.test`;
+    await signUpAndIn(page, request, email, "Maison Lalla");
+    const proId = await seedShop(email);
+    await signInAgain(page, email);
+    await page.goto("/fr/pro/stock");
+
+    const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Modèle pour une boutique (tailles, couleurs, stock)" }).click()]);
+    expect(download.suggestedFilename()).toBe("modele-boutique.csv");
+    const template = await (await download.createReadStream()).toArray();
+    // The template, plus a line whose combination repeats the first one's.
+    const file = `${Buffer.concat(template).toString("utf8")}CHM-LIN;;;;;;;;;Taille : M;Couleur : Bleu;9\r\n`;
+    await page.locator('input[type="file"][accept*=".csv"]').setInputFiles({ name: "boutique.csv", mimeType: "text/csv", buffer: Buffer.from(file) });
+    const preview = page.getByTestId("stock-preview");
+    await expect(preview.getByText(/Ligne 5, variante_1 : combinaison déjà présente pour cette référence/)).toBeVisible({ timeout: 15_000 });
+    await expect(preview.getByRole("row")).toHaveCount(2);
+    await page.screenshot({ path: "test-results/stock-preview-shop.png", fullPage: true });
+
+    await page.locator('input[type="file"][accept*=".csv"]').setInputFiles({ name: "boutique.csv", mimeType: "text/csv", buffer: Buffer.concat(template) });
+    await expect(preview.getByText("Nouveau")).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: "Importer 1 ligne" }).click();
+    await expect(page.getByText("Import terminé : 1 brouillon créé, 0 annonce mise à jour.")).toBeVisible({ timeout: 15_000 });
+    const listings = await getFirestore(firebase()).collection("listings").where("attributes.stock-ref", "==", "CHM-LIN").get();
+    const shirt = listings.docs.map((doc) => doc.data()).find((data) => data.proId === proId);
+    expect(shirt?.variants?.items).toHaveLength(3);
+  });
 });
+

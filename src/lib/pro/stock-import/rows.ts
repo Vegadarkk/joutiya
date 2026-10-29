@@ -1,7 +1,23 @@
 import { CATEGORIES, CONDITIONS, CRITERION_TEXT_MAX, RENTAL_SUBCATEGORY, criteriaSchema, criterionApplies, subcategoryById, type Condition, type Criterion, type Subcategory } from "@/config/categories";
 import { CITIES, type City } from "@/config/regions";
+import {
+  FREE_AXES,
+  STOCK_MAX,
+  VARIANT_ITEMS_MAX,
+  VARIANT_KEY_SEPARATOR,
+  VARIANT_LABEL_MAX,
+  VARIANT_VALUES_MAX,
+  VARIANT_VALUE_MAX,
+  isVariantCriterion,
+  listingVariantsSchema,
+  variantKey,
+  type ListingVariants,
+  type VariantAxis,
+  type VariantCriterion,
+  type VariantItem,
+} from "@/lib/contracts/catalog";
 import { DESCRIPTION_MAX, DESCRIPTION_MIN, DISTRICT_MAX, PRICE_MAX, TITLE_MAX, TITLE_MIN, type ListingAttributes } from "@/lib/contracts/listings";
-import { refKey, type StockRowIssue } from "@/lib/contracts/stock-import";
+import { STOCK_WARNING_CODES, refKey, type StockRowIssue } from "@/lib/contracts/stock-import";
 import { DAY_PATTERN, moroccoToday, normalizePeriods, type RentalPeriod } from "@/lib/listings/rental-availability";
 import { normalizeText } from "@/lib/text/normalize";
 import ar from "../../../../messages/ar.json";
@@ -16,8 +32,12 @@ import type { CsvTable } from "./csv";
 // brand column follows it (car brand, motorbike brand or free brand). A line comes out with the
 // fields it sets, its issues and, without errors, is ready to become a draft or an update. A car
 // rental line may carry its blocked periods (`indisponible`: "2026-11-02/2026-11-05; 2026-12-24").
+// A shop's goods (catalogue §2) may carry their stock (`stock`) and their variants: one line per
+// combination, `variante_1` / `variante_2` as « Taille : M », « Couleur : Noir » or a free axis
+// (« Contenance : 500 g »), the lines of one reference grouped into one listing; the later lines
+// may leave the listing's cells empty (they take the first line's) and give their own price.
 
-export type CoreField = "ref" | "category" | "title" | "description" | "price" | "negotiable" | "city" | "district" | "condition" | "unavailable";
+export type CoreField = "ref" | "category" | "title" | "description" | "price" | "negotiable" | "city" | "district" | "condition" | "unavailable" | "variant1" | "variant2" | "stock";
 
 /** Criterion holding the stock reference (Pro-only). */
 export const STOCK_REF = "stock-ref";
@@ -41,6 +61,10 @@ const CORE_ALIASES: Record<CoreField, readonly string[]> = {
   city: ["ville", "city", "المدينة"],
   district: ["quartier", "district", "الحي"],
   condition: ["etat", "état", "condition", "الحالة"],
+  variant1: ["variante 1", "variante1", "variant 1", "declinaison 1", "déclinaison 1", "option 1", "المتغير 1"],
+  variant2: ["variante 2", "variante2", "variant 2", "declinaison 2", "déclinaison 2", "option 2", "المتغير 2"],
+  // Not « quantité »: the criterion of wholesale lots (`quantity`) keeps that name.
+  stock: ["stock", "en stock", "quantite en stock", "quantité en stock", "qte stock", "المخزون"],
   unavailable: ["indisponible", "indisponibilite", "indisponibilités", "indisponibilites", "jours bloques", "jours bloqués", "periodes bloquees", "périodes bloquées", "unavailable", "غير متاح"],
 };
 
@@ -160,6 +184,17 @@ export function mapColumns(header: readonly string[]): ColumnMap {
   return { targets, ignored };
 }
 
+/** An axis read in a variant cell: a criterion of the subcategory (size, colour) or a free one. */
+export type ImportedAxis = { id: VariantCriterion } | { id: "free"; label: string };
+
+/** A line's combination (catalogue §2): its axes and values in column order, its stock and price. */
+export interface VariantLine {
+  axes: ImportedAxis[];
+  values: string[];
+  stock?: number;
+  price: number | null;
+}
+
 export interface ImportedFields {
   title: string;
   description: string;
@@ -170,6 +205,10 @@ export interface ImportedFields {
   location: { regionCode: string; citySlug: string; district?: string } | null;
   /** Car rentals: the blocked periods of the line (undefined: the file leaves them as they are). */
   unavailable?: RentalPeriod[];
+  /** Variants of the reference's lines (undefined: the file has none for it). */
+  variants?: ListingVariants;
+  /** The listing's own stock, without variants (undefined: left as it is). */
+  stock?: number;
 }
 
 export interface ParsedRow {
@@ -178,6 +217,8 @@ export interface ParsedRow {
   subcategoryId: string | null;
   fields: ImportedFields;
   issues: StockRowIssue[];
+  /** The line's combination when it has a variant cell. */
+  variant?: VariantLine;
 }
 
 /** Stock references: letters, digits and - _ . / (case kept, compared without case). */
@@ -235,6 +276,36 @@ function generatedTitle(subcategory: Subcategory, attributes: ListingAttributes)
   return parts.join(" ").slice(0, TITLE_MAX);
 }
 
+/** Axis names a shop writes, on top of the criteria labels (« Taille : M »). */
+const AXIS_NAMES: Record<VariantCriterion, readonly string[]> = {
+  "clothing-size": ["taille", "size", FR.Criteria["clothing-size"]?.label ?? "", AR.Criteria["clothing-size"]?.label ?? ""],
+  "shoe-size": ["pointure", "taille chaussure", FR.Criteria["shoe-size"]?.label ?? "", AR.Criteria["shoe-size"]?.label ?? ""],
+  color: ["couleur", "coloris", "color", "colour", FR.Criteria["color"]?.label ?? "", AR.Criteria["color"]?.label ?? ""],
+};
+const VARIANT_CELL = /^([^:=：]+?)\s*[:=：]\s*(.+)$/u;
+
+/**
+ * A variant cell (« Taille : M »): a size or colour of the subcategory takes its option, any other
+ * name is a free axis with the value as written. « Taille » of shoes is their size.
+ */
+function readVariantCell(raw: string, subcategory: Subcategory): { axis: ImportedAxis; value: string } | undefined {
+  const match = VARIANT_CELL.exec(raw);
+  if (!match) return undefined;
+  const name = match[1]!.trim();
+  const value = match[2]!.trim();
+  const has = (id: string) => subcategory.criteria.find((criterion) => criterion.id === id);
+  const wanted = key(name);
+  for (const [id, names] of Object.entries(AXIS_NAMES) as [VariantCriterion, readonly string[]][]) {
+    if (!names.some((candidate) => candidate && key(candidate) === wanted)) continue;
+    const criterion = has(id) ?? (id === "clothing-size" ? has("shoe-size") : undefined);
+    if (!criterion) break;
+    const option = optionOf(criterion, value);
+    return option === undefined ? undefined : { axis: { id: criterion.id as VariantCriterion }, value: option };
+  }
+  if (name.length > VARIANT_LABEL_MAX || value.length > VARIANT_VALUE_MAX || value.includes(VARIANT_KEY_SEPARATOR)) return undefined;
+  return { axis: { id: "free", label: name }, value };
+}
+
 /** A cell meaning "no blocked day". */
 const NO_PERIOD_WORDS = new Set(["aucune", "aucun", "libre", "-", "0", "none", "لا"].map(key));
 const PERIOD = /^(\d{4}-\d{2}-\d{2})(?:\s*(?:\/|au|à|->|→|\.\.)\s*(\d{4}-\d{2}-\d{2}))?$/iu;
@@ -275,13 +346,26 @@ export function parseRow(record: { line: number; cells: readonly string[] }, hea
   if (categoryCell && !subcategory) issues.push({ column: categoryCell.column, code: "category_unknown", value: cut(categoryCell.raw) });
   if (subcategory?.proOnly && !options.pro) issues.push({ column: categoryCell?.column ?? "categorie", code: "pro_only" });
 
+  // Variant cells first: a size or colour axis takes over its criterion (its column is not read).
+  const variantCells = (["variant1", "variant2"] as const).flatMap((field) => (core(field) ? [core(field)!] : []));
+  const read = subcategory ? variantCells.map((cell) => ({ cell, parsed: readVariantCell(cell.raw, subcategory) })) : [];
+  for (const { cell, parsed } of read) if (!parsed) issues.push({ column: cell.column, code: "variant_invalid", value: cut(cell.raw) });
+  const axisCriteria = new Set<string>(read.flatMap(({ parsed }) => (parsed && isVariantCriterion(parsed.axis.id) ? [parsed.axis.id] : [])));
+  let stock: number | undefined;
+  const stockCell = core("stock");
+  if (stockCell) {
+    const value = parseInteger(stockCell.raw);
+    if (value === undefined || value < 0 || value > STOCK_MAX) issues.push({ column: stockCell.column, code: "stock_invalid", value: cut(stockCell.raw) });
+    else stock = value;
+  }
+
   const attributes: ListingAttributes = {};
   // The reference is stored as the `stock-ref` criterion: only subcategories that have it import.
   if (subcategory && !subcategory.criteria.some((criterion) => criterion.id === STOCK_REF)) issues.push({ column: categoryCell?.column ?? "categorie", code: "category_unknown", value: cut(categoryCell?.raw ?? subcategory.id) });
   if (subcategory) {
     if (ref && REF_PATTERN.test(ref) && options.pro) attributes[STOCK_REF] = ref;
     for (const criterion of subcategory.criteria) {
-      if (criterion.id === STOCK_REF) continue;
+      if (criterion.id === STOCK_REF || axisCriteria.has(criterion.id)) continue;
       // "Kilométrage" is the mileage of a car for sale and the mileage policy of a rental.
       const cell = cells.get(criterion.id) ?? (criterion === brandCriterion(subcategory) ? cells.get(BRAND) : criterion.id === "mileage-policy" ? cells.get("mileage") : undefined);
       if (!cell) continue;
@@ -305,7 +389,7 @@ export function parseRow(record: { line: number; cells: readonly string[] }, hea
       for (const problem of parsed.error.issues) {
         const id = String(problem.path[0] ?? "");
         const criterion = subcategory.criteria.find((item) => item.id === id);
-        if (!criterion) continue;
+        if (!criterion || axisCriteria.has(id)) continue;
         const missing = attributes[id] === undefined;
         if (issues.some((issue) => issue.column === (cells.get(id)?.column ?? FR.Criteria[id]?.label))) continue;
         issues.push({ column: cells.get(id)?.column ?? FR.Criteria[id]?.label ?? id, code: missing ? "required" : criterion.type === "number" ? "number_invalid" : "value_unknown", ...(missing ? {} : { value: cut(String(attributes[id])) }) });
@@ -363,12 +447,24 @@ export function parseRow(record: { line: number; cells: readonly string[] }, hea
     if (!unavailable) issues.push({ column: unavailableCell.column, code: "periods_invalid", value: cut(unavailableCell.raw) });
   } else if (unavailableCell && subcategory) issues.push({ column: unavailableCell.column, code: "periods_ignored" });
 
+  const combination = read.length > 0 && read.every(({ parsed }) => parsed) ? read.map(({ parsed }) => parsed!) : null;
   return {
     line: record.line,
     ref,
     subcategoryId: subcategory?.id ?? null,
-    fields: { title, description: description.slice(0, DESCRIPTION_MAX), price, priceNegotiable: negotiable ?? false, condition, attributes, location, ...(unavailable ? { unavailable } : {}) },
+    fields: {
+      title,
+      description: description.slice(0, DESCRIPTION_MAX),
+      price,
+      priceNegotiable: negotiable ?? false,
+      condition,
+      attributes,
+      location,
+      ...(unavailable ? { unavailable } : {}),
+      ...(variantCells.length === 0 && stock !== undefined ? { stock } : {}),
+    },
     issues,
+    ...(combination ? { variant: { axes: combination.map((entry) => entry.axis), values: combination.map((entry) => entry.value), ...(stock !== undefined ? { stock } : {}), price } } : {}),
   };
 }
 
@@ -392,8 +488,92 @@ function readCriterion(criterion: Criterion, raw: string): ListingAttributes[str
   }
 }
 
-/** Every line of a parsed file. */
+const axisKey = (axis: ImportedAxis) => (axis.id === "free" ? `free:${key(axis.label)}` : axis.id);
+
+/**
+ * One listing out of a reference's variant lines (catalogue §2): the first line's fields, the axes
+ * in column order, a combination per line with its stock and its price when it differs. The other
+ * lines' problems join the first line's, with their line number.
+ */
+function mergeVariantLines(head: ParsedRow, members: readonly ParsedRow[]): void {
+  const first = head.variant;
+  // A line without the head's size axis reads it as a missing criterion: its variant issue says it.
+  const axisLabels = new Set((first?.axes ?? []).flatMap((axis) => (axis.id === "free" ? [] : [FR.Criteria[axis.id]?.label ?? axis.id])));
+  for (const member of members) {
+    if (member === head) continue;
+    for (const issue of member.issues) {
+      if (STOCK_WARNING_CODES.includes(issue.code) || (issue.code === "required" && axisLabels.has(issue.column))) continue;
+      head.issues.push({ ...issue, line: member.line });
+    }
+  }
+  if (!first) return;
+  const lines = members.filter((member) => member.variant);
+  const signature = first.axes.map(axisKey).join("|");
+  let free = 0;
+  const axes: VariantAxis[] = first.axes.map((axis) => (axis.id === "free" ? { id: FREE_AXES[free++]!, label: axis.label, values: [] } : { id: axis.id, values: [] }));
+  const items: VariantItem[] = [];
+  const keys = new Set<string>();
+  let refused = lines.length !== members.length;
+  for (const member of lines) {
+    const variant = member.variant!;
+    const at = member === head ? {} : { line: member.line };
+    if (variant.axes.map(axisKey).join("|") !== signature) {
+      head.issues.push({ column: "variante_1", code: "variant_axes", ...at });
+      refused = true;
+      continue;
+    }
+    // A free value keeps its first spelling (« 500 g » and « 500 G » are one value).
+    const values = variant.values.map((value, index) => {
+      const axis = axes[index]!;
+      const known = axis.values.find((candidate) => candidate.toLowerCase() === value.toLowerCase());
+      if (known) return known;
+      axis.values.push(value);
+      return value;
+    });
+    const itemKey = variantKey(values);
+    if (keys.has(itemKey)) {
+      head.issues.push({ column: "variante_1", code: "variant_duplicate", value: cut(values.join(" / ")), ...at });
+      refused = true;
+      continue;
+    }
+    keys.add(itemKey);
+    items.push({ key: itemKey, ...(variant.stock !== undefined ? { stock: variant.stock } : {}), ...(variant.price !== null && variant.price !== head.fields.price ? { price: variant.price } : {}) });
+  }
+  if (refused) return;
+  if (items.length > VARIANT_ITEMS_MAX || axes.some((axis) => axis.values.length > VARIANT_VALUES_MAX)) {
+    head.issues.push({ column: "variante_1", code: "variant_too_many" });
+    return;
+  }
+  const parsed = listingVariantsSchema.safeParse({ axes, items });
+  if (!parsed.success) head.issues.push({ column: "variante_1", code: "variant_invalid" });
+  else head.fields.variants = parsed.data;
+}
+
+/**
+ * Every line of a parsed file. The variant lines of one reference make one row: its first line,
+ * whose empty cells the next lines take before they are read.
+ */
 export function parseRows(table: CsvTable, options: { pro: boolean; today?: number }): { rows: ParsedRow[]; ignoredColumns: string[] } {
   const columns = mapColumns(table.header);
-  return { rows: table.records.map((record) => parseRow(record, table.header, columns, options)), ignoredColumns: columns.ignored };
+  const columnOf = (field: CoreField) => [...columns.targets].find(([, target]) => target === `core:${field}`)?.[0];
+  const refAt = columnOf("ref");
+  const own = new Set([columnOf("variant1"), columnOf("variant2"), columnOf("stock")].filter((index): index is number => index !== undefined));
+  const heads = new Map<string, { cells: string[]; row: ParsedRow; members: ParsedRow[] }>();
+  const rows: ParsedRow[] = [];
+  for (const record of table.records) {
+    const cell = (index: number | undefined) => (index === undefined ? "" : (record.cells[index] ?? "").trim());
+    const refK = refKey(cell(refAt));
+    const variantLine = refK !== "" && [...own].some((index) => index !== columnOf("stock") && cell(index) !== "");
+    const head = variantLine ? heads.get(refK) : undefined;
+    const cells = head ? table.header.map((_, index) => (own.has(index) || cell(index) !== "" ? (record.cells[index] ?? "") : (head.cells[index] ?? ""))) : record.cells;
+    const row = parseRow({ line: record.line, cells }, table.header, columns, options);
+    if (head) {
+      head.members.push(row);
+      continue;
+    }
+    rows.push(row);
+    if (variantLine) heads.set(refK, { cells: table.header.map((_, index) => record.cells[index] ?? ""), row, members: [row] });
+  }
+  for (const group of heads.values()) mergeVariantLines(group.row, group.members);
+  return { rows, ignoredColumns: columns.ignored };
 }

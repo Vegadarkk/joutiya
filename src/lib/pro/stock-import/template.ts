@@ -125,8 +125,36 @@ const RENTAL_EXAMPLE: Record<(typeof RENTAL_TEMPLATE_COLUMNS)[number], string> =
   indisponible: "2026-12-20/2027-01-03",
 };
 
+/**
+ * A shop's goods (catalogue §2): one line per combination of a shirt in sizes and colours, grouped
+ * by its reference; the next lines leave the listing's cells empty, one gives its own price.
+ */
+export const SHOP_TEMPLATE_COLUMNS = ["reference", "categorie", "titre", "description", "prix", "etat", "ville", "pour qui", "type de vetement", "variante_1", "variante_2", "stock"] as const;
+
+const SHOP_EXAMPLES: readonly Partial<Record<(typeof SHOP_TEMPLATE_COLUMNS)[number], string>>[] = [
+  {
+    reference: "CHM-LIN",
+    categorie: "Vêtements",
+    titre: "Chemise en lin brodée main",
+    description: "Chemise en lin lavé, broderie faite main dans notre atelier de Fès, coupe droite.",
+    prix: "250",
+    etat: "Neuf avec étiquette",
+    ville: "Fès",
+    "pour qui": "Homme",
+    "type de vetement": "Haut & t-shirt",
+    variante_1: "Taille : M",
+    variante_2: "Couleur : Bleu",
+    stock: "4",
+  },
+  { reference: "CHM-LIN", variante_1: "Taille : L", variante_2: "Couleur : Bleu", stock: "2" },
+  { reference: "CHM-LIN", prix: "290", variante_1: "Taille : XL", variante_2: "Couleur : Noir", stock: "0" },
+];
+
+export type StockTemplateKind = "sale" | "rental" | "shop";
+
 /** A template as CSV text (semicolons, as spreadsheets in French write them), with a byte order mark for Excel. */
-export function stockTemplateCsv(kind: "sale" | "rental" = "sale"): string {
-  const [columns, example]: [readonly string[], Record<string, string>] = kind === "rental" ? [RENTAL_TEMPLATE_COLUMNS, RENTAL_EXAMPLE] : [STOCK_TEMPLATE_COLUMNS, EXAMPLE];
-  return `﻿${csvLine(columns)}\r\n${csvLine(columns.map((column) => example[column] ?? ""))}\r\n`;
+export function stockTemplateCsv(kind: StockTemplateKind = "sale"): string {
+  const [columns, examples]: [readonly string[], readonly Record<string, string>[]] =
+    kind === "rental" ? [RENTAL_TEMPLATE_COLUMNS, [RENTAL_EXAMPLE]] : kind === "shop" ? [SHOP_TEMPLATE_COLUMNS, SHOP_EXAMPLES] : [STOCK_TEMPLATE_COLUMNS, [EXAMPLE]];
+  return `﻿${[columns, ...examples.map((example) => columns.map((column) => example[column] ?? ""))].map((cells) => `${csvLine(cells)}\r\n`).join("")}`;
 }

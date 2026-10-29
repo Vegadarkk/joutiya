@@ -75,6 +75,13 @@ export function diffFields(row: ParsedRow, entry: Pick<StockEntry, "subcategoryI
   const attributes = patch.subcategoryId ? next.attributes : mergedAttributes(entry.subcategoryId, before.attributes, next.attributes);
   if (patch.subcategoryId || !isDeepStrictEqual(attributes, before.attributes)) set("attributes", attributes);
   if (next.location && !isDeepStrictEqual(next.location, before.location)) set("location", next.location);
+  // Variants replace the listing's (its combinations keep their references set on the site); a
+  // stock alone applies to a listing without variants. No cell keeps what the site has.
+  if (next.variants) {
+    const refs = new Map((before.variants?.items ?? []).flatMap((item) => (item.ref ? [[item.key, item.ref] as const] : [])));
+    const variants = { ...next.variants, items: next.variants.items.map((item) => (refs.has(item.key) && item.ref === undefined ? { ...item, ref: refs.get(item.key)! } : item)) };
+    if (!isDeepStrictEqual(variants, before.variants)) set("variants", variants);
+  } else if (next.stock !== undefined && !before.variants && next.stock !== before.stock) set("stock", next.stock);
   if (next.unavailable && !isDeepStrictEqual(next.unavailable, before.unavailable ?? [])) {
     changes.push("unavailable");
     return { patch, changes, unavailable: next.unavailable };
