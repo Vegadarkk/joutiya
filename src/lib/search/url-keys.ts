@@ -17,6 +17,8 @@ export const SEARCH_QUERY_KEYS = {
   district: "quartier",
   /** Map area of "Rechercher dans cette zone": `lat,lng,km` (params.ts). */
   zone: "zone",
+  /** `position=1`: the zone is a circle around the visitor's own position (« Utiliser ma position »). */
+  fromPosition: "position",
   priceMin: "prix-min",
   priceMax: "prix-max",
   sellerType: "vendeur",

@@ -242,12 +242,25 @@ describe("applyInterpretation", () => {
     expect(asked?.near).toEqual({ state: "ask", km: NEAR_KM, target: { q: "vélo à côté" } });
     expect(asked?.params).toEqual({ category: "vehicules", subcategory: "velos" });
     const zone = { lat: 33.599, lng: -7.62, km: 3 };
-    const located = interpretSearch({ q: "vélo à côté", zone });
+    const located = interpretSearch({ q: "vélo à côté", zone, fromPosition: true });
     expect(located?.near?.state).toBe("zone");
-    expect(located?.params).toEqual({ category: "vehicules", subcategory: "velos", zone });
+    expect(located?.params).toEqual({ category: "vehicules", subcategory: "velos", zone, fromPosition: true });
     expect(located?.items.find((item) => item.key === "near")?.without).toEqual({ category: "vehicules", subcategory: "velos" });
     // A city of the URL: the near words go, no position asked.
     expect(interpretSearch({ q: "vélo à côté", city: "rabat" })?.near).toBeUndefined();
+  });
+
+  it("never calls a map area « de vous »: the position is still asked, the zone kept", () => {
+    // « Rechercher dans cette zone » around Agadir, then « vélo à côté » typed in the header.
+    const area = { lat: 30.421, lng: -9.598, km: 15 };
+    const applied = interpretSearch({ q: "vélo à côté", zone: area });
+    expect(applied?.near).toEqual({ state: "ask", km: NEAR_KM, target: { q: "vélo à côté", zone: area } });
+    expect(applied?.params).toEqual({ category: "vehicules", subcategory: "velos", zone: area });
+    // The flag lives with a zone only, and round-trips in the URL.
+    expect(parseSearchParams(new URLSearchParams("q=velo&position=1"))).toEqual({ q: "velo" });
+    const located = parseSearchParams(new URLSearchParams("q=velo&zone=33.599,-7.62,3&position=1"));
+    expect(located).toEqual({ q: "velo", zone: { lat: 33.599, lng: -7.62, km: 3 }, fromPosition: true });
+    expect(searchParamsToQuery(located).toString()).toBe("q=velo&zone=33.599%2C-7.62%2C3&position=1");
   });
 
   it("leaves a raw search and a search without understood words alone", () => {

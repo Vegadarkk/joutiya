@@ -376,7 +376,10 @@ export interface AppliedItem {
 }
 
 export interface AppliedNear {
-  /** "ask": the page offers « Utiliser ma position »; "zone": the URL already holds the visitor's circle. */
+  /**
+   * "ask": the page offers « Utiliser ma position »; "zone": the URL already holds the visitor's
+   * circle (`fromPosition`). A map area of the URL is not the visitor's: still "ask".
+   */
   state: "ask" | "zone";
   km: number;
   /** The search to run with the visitor's circle as `zone` (the sentence kept: its items stay understood). */
@@ -425,7 +428,7 @@ export function applyInterpretation(url: SearchParams, interpretation: Interpret
   for (const item of interpretation.understood) {
     if (!accepted.has(item)) continue;
     if (item.key === "near") {
-      const zone = url.zone;
+      const zone = url.zone && url.fromPosition ? url.zone : undefined;
       near = { state: zone ? "zone" : "ask", km: zone?.km ?? item.km ?? NEAR_KM, target: canonicalSearchParams({ ...url, raw: undefined }) };
       const rest = { ...params, raw: true as const };
       if (zone) delete rest.zone;

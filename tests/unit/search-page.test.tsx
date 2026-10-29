@@ -256,10 +256,16 @@ describe("search page states", () => {
     expect(html).toContain('data-testid="search-exact"');
     expect((await generateMetadata(props({ q: "velo", ville: "rabat" }))).title).toContain("Vélos");
 
-    // « à côté » with a zone: one chip for it, « À 3 km de vous », and no second zone chip in the toolbar.
-    const near = await renderPage({ q: "velo a cote", zone: "33.599,-7.62,3" });
-    expect(near).toContain(`aria-label="${fr.SearchInterpret.remove.replace("{filter}", fr.SearchInterpret.nearZone.replace("{km}", "3"))}"`);
+    // « à côté » with the visitor's zone: one chip for it, « À 3 km de vous », and no second zone chip in the toolbar.
+    const nearChip = `aria-label="${fr.SearchInterpret.remove.replace("{filter}", fr.SearchInterpret.nearZone.replace("{km}", "3"))}"`;
+    const near = await renderPage({ q: "velo a cote", zone: "33.599,-7.62,3", position: "1" });
+    expect(near).toContain(nearChip);
     expect(near).not.toContain('data-filter="location"');
+    // A map area is not « de vous »: the zone chip of the toolbar, and the position offered.
+    const area = await renderPage({ q: "velo a cote", zone: "33.599,-7.62,3" });
+    expect(area).not.toContain(nearChip);
+    expect(area).toContain('data-filter="location"');
+    expect(area).toContain('data-testid="near-me"');
     expect(await renderPage({ q: "draisienne", zone: "33.599,-7.62,3" })).toContain('data-filter="location"');
 
     mocks.runSearch.mockClear();
