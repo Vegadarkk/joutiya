@@ -1,4 +1,5 @@
 import type { ConversationView, MessagesPage, MessageView } from "@/lib/contracts/messaging";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // Pure state of an open thread (design phase-5 D2, D7): pages of GET .../messages (newest first on
 // the wire) kept oldest first for display, older pages prepended, newer messages (`after=latest`)
@@ -109,7 +110,7 @@ export function lastMineStatus(messages: readonly MessageView[]): { id: string; 
 
 /** Day key in Morocco's time zone ("2026-10-19"). */
 export function dayKey(at: number): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Casablanca", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(at));
+  return new Intl.DateTimeFormat("en-CA", { timeZone: moroccoTimeZone(at), year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(at));
 }
 
 /** Messages grouped by day, oldest first. */

@@ -1,5 +1,6 @@
 import { LOCALE_TAGS, SITE_NAME } from "@/config/site";
 import type { TemplateData } from "../types";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 import { GREETING, pageUrl, renderLayout, type BuiltMail, type MailLocale, type TemplateContext } from "./layout";
 
 // Appointment reminder (architecture §5, 28 Oct; job appointment-reminders): the day before and two
@@ -56,8 +57,8 @@ const COPY: Record<MailLocale, Copy> = {
 export function formatAppointmentTime(iso: string, lang: MailLocale): string {
   const date = new Date(iso);
   const tag = lang === "ar" ? LOCALE_TAGS.ar : LOCALE_TAGS.fr;
-  const day = new Intl.DateTimeFormat(tag, { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Casablanca" }).format(date);
-  const time = new Intl.DateTimeFormat(tag, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Africa/Casablanca" }).format(date);
+  const day = new Intl.DateTimeFormat(tag, { weekday: "long", day: "numeric", month: "long", timeZone: moroccoTimeZone(date.getTime()) }).format(date);
+  const time = new Intl.DateTimeFormat(tag, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: moroccoTimeZone(date.getTime()) }).format(date);
   return lang === "ar" ? `${day} على الساعة ${time}` : `${day} à ${time}`;
 }
 

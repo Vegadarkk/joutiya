@@ -1,6 +1,7 @@
 import type { Locale } from "@/config/site";
 import { LOCALE_TAGS } from "@/config/site";
 import { DEFAULT_LEGAL, type LegalConfig } from "@/config/legal";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // Shared e-mail layout: table-based HTML, inline styles only, no remote image, no tracking pixel.
 // Brand tokens mirror src/styles/globals.css (ochre primary, cream surfaces, deep green text).
@@ -151,7 +152,7 @@ export function formatDate(value: string, locale: Locale): string {
   if (Number.isNaN(date.getTime())) return value;
   // Tarifit has no Intl data: the copy is French, so is the date.
   const tag = LOCALE_TAGS[locale === "rif" ? "fr" : locale];
-  return new Intl.DateTimeFormat(tag, { dateStyle: "long", timeStyle: "short", timeZone: "Africa/Casablanca" }).format(date);
+  return new Intl.DateTimeFormat(tag, { dateStyle: "long", timeStyle: "short", timeZone: moroccoTimeZone(date.getTime()) }).format(date);
 }
 
 /** Formats an ISO date as a day (no time) for the recipient (Morocco time). */
@@ -159,7 +160,7 @@ export function formatDay(value: string, locale: Locale): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   const tag = LOCALE_TAGS[locale === "rif" ? "fr" : locale];
-  return new Intl.DateTimeFormat(tag, { dateStyle: "long", timeZone: "Africa/Casablanca" }).format(date);
+  return new Intl.DateTimeFormat(tag, { dateStyle: "long", timeZone: moroccoTimeZone(date.getTime()) }).format(date);
 }
 
 export function pageUrl(ctx: TemplateContext, segment: string): string {
