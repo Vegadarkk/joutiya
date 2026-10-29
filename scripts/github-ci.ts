@@ -18,7 +18,7 @@
 //       (Claude, cloud, JOUTIYA_CLOUDFLARE_API_TOKEN) the Access service token joutiya-scan (created,
 //       or rotated if it exists) and a new load-test bypass secret, sealed into <out> with the scan
 //       and load-test variables (both workflows enabled). The bypass secret also goes, unsealed and
-//       mode 0600, to <out>.staging.env (LOADTEST_BYPASS_SECRET, for seal-env.ts app staging) and
+//       mode 0600, to <out>.staging.env (LOADTEST_BYPASS_SECRET_STAGING, for seal-env.ts app staging) and
 //       <out>.cloudflare.env (JOUTIYA_LOADTEST_BYPASS_SECRET, for cloudflare.ts loadtest). Prints
 //       the token's id, ACCESS_SCAN_TOKEN_ID of cloudflare.ts access.
 //   node scripts/github-ci.ts apply <bundle> [--apply]
@@ -36,8 +36,8 @@ export const BUNDLE_FORMAT = "joutiya-github-ci v1";
 export const SSH_HOST = "ssh.joutiya.ma";
 const CI_TOKEN_NAME = "joutiya-ci";
 export const SCAN_TOKEN_NAME = "joutiya-scan";
-/** Single-header Access authentication of staging.joutiya.ma (infra/cloudflare/access-apps.json). */
-export const SCAN_HEADER = "x-joutiya-access-token";
+/** Single-header Access authentication of staging.joutiya.ma (infra/cloudflare/access-apps.json): Access accepts no other name. */
+export const SCAN_HEADER = "Authorization";
 /** The only names a bundle may write: those of deploy-staging.yml, security-scan.yml and load-test.yml. */
 export const SECRET_NAMES = ["STAGING_DEPLOY_SSH_KEY", "STAGING_ACCESS_CLIENT_ID", "STAGING_ACCESS_CLIENT_SECRET", "STAGING_SCAN_ACCESS_TOKEN", "LOADTEST_BYPASS_SECRET"] as const;
 export const VARIABLE_NAMES = ["VM_SSH_KNOWN_HOSTS", "STAGING_DEPLOY_ENABLED", "ACCESS_TOKEN_HEADER", "SCAN_REPORT_AGE_RECIPIENT", "SECURITY_SCAN_ENABLED", "LOAD_TEST_ENABLED"] as const;
@@ -274,7 +274,7 @@ async function sealScanAction(targets: Targets, repository: string, args: string
     },
     variables: { ACCESS_TOKEN_HEADER: SCAN_HEADER, SCAN_REPORT_AGE_RECIPIENT: recipient, SECURITY_SCAN_ENABLED: "true", LOAD_TEST_ENABLED: "true" },
   };
-  writeFileSync(`${out}.staging.env`, `LOADTEST_BYPASS_SECRET=${bypass}\n`, { mode: 0o600 });
+  writeFileSync(`${out}.staging.env`, `LOADTEST_BYPASS_SECRET_STAGING=${bypass}\n`, { mode: 0o600 });
   writeFileSync(`${out}.cloudflare.env`, `JOUTIYA_LOADTEST_BYPASS_SECRET=${bypass}\n`, { mode: 0o600 });
   writeFileSync(out, `${JSON.stringify(bundle, null, 2)}\n`);
   console.log(`ACCESS_SCAN_TOKEN_ID=${token.id ?? scan[0]?.id ?? "(see the dashboard)"}`);
