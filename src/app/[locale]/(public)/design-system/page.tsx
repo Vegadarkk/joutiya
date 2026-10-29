@@ -110,7 +110,7 @@ export default async function DesignSystemPage({ params }: { params: Promise<{ l
       <Section title="Messages">
         <ErrorBanner title="L'annonce n'a pas pu être publiée">Une photo dépasse 10 Mo. Remplacez-la puis publiez à nouveau.</ErrorBanner>
         <ErrorBanner tone="warning" title="Votre annonce expire dans 3 jours">Renouvelez-la pour la garder en ligne.</ErrorBanner>
-        <ErrorBanner tone="info" title="Joutiya ouvre bientôt">Les annonces apparaîtront ici dès l&apos;ouverture du dépôt.</ErrorBanner>
+        <ErrorBanner tone="info" title="Aalan ouvre bientôt">Les annonces apparaîtront ici dès l&apos;ouverture du dépôt.</ErrorBanner>
       </Section>
 
       <Section title="Notifications">

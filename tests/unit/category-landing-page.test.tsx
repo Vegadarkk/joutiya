@@ -213,7 +213,7 @@ describe("category landing page", () => {
     expect(html).not.toContain("/recherche");
     const metadata = await generateMetadata(params("animaux"));
     expect(metadata.robots).toEqual({ index: false, follow: true });
-    expect(metadata.description).toBe("Animaux au Maroc : achetez et vendez entre particuliers et professionnels sur Joutiya. Déposez votre annonce gratuitement.");
+    expect(metadata.description).toBe("Animaux au Maroc : achetez et vendez entre particuliers et professionnels sur Aalan. Déposez votre annonce gratuitement.");
   });
 
   it("speaks Arabic with Arabic city names", async () => {

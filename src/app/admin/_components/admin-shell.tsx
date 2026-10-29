@@ -24,8 +24,8 @@ export function AdminShell({ email, role, children }: AdminShellProps) {
     <div className="flex min-h-dvh flex-col">
       <header className="border-t-[3px] border-b border-border border-t-structure bg-surface-brand dark:border-t-bab-600">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-stretch gap-x-6 px-4 sm:px-6 xl:flex-nowrap">
-          <Link href="/" className="flex h-14 shrink-0 items-center gap-3 rounded-sm" aria-label="Back-office Joutiya, accueil">
-            <Logo label="Joutiya" className="h-7" />
+          <Link href="/" className="flex h-14 shrink-0 items-center gap-3 rounded-sm" aria-label="Back-office Aalan, accueil">
+            <Logo label="Aalan" className="h-7" />
             <Badge variant="pro" className="whitespace-nowrap dark:bg-bab-700">
               Back-office
             </Badge>

@@ -184,7 +184,7 @@ describe("GET /api/account/export: the file", () => {
     const result = await download(me);
     expect(result.status, JSON.stringify(result.body)).toBe(200);
     expect(result.header("content-type")).toBe("application/json; charset=utf-8");
-    expect(result.header("content-disposition")).toMatch(/^attachment; filename="joutiya-mes-donnees-\d{4}-\d{2}-\d{2}\.json"$/);
+    expect(result.header("content-disposition")).toMatch(/^attachment; filename="aalan-mes-donnees-\d{4}-\d{2}-\d{2}\.json"$/);
     expect(result.header("cache-control")).toBe("no-store");
     expect(result.header("x-content-type-options")).toBe("nosniff");
 

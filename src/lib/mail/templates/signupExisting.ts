@@ -6,20 +6,20 @@ import { GREETING, NOT_YOU, renderLayout, type BuiltMail, type MailLocale, type 
 
 const COPY: Record<MailLocale, { subject: string; title: string; body: string[]; button: string; reset: string }> = {
   fr: {
-    subject: "Tu as déjà un compte Joutiya",
+    subject: "Tu as déjà un compte Aalan",
     title: "Ton compte existe déjà",
     body: [
-      "Quelqu'un, sans doute toi, vient d'essayer de créer un compte Joutiya avec cette adresse e-mail. Elle est déjà associée à un compte : il suffit de te connecter pour continuer.",
+      "Quelqu'un, sans doute toi, vient d'essayer de créer un compte Aalan avec cette adresse e-mail. Elle est déjà associée à un compte : il suffit de te connecter pour continuer.",
       "Mot de passe oublié ? Tu peux en choisir un nouveau grâce au lien ci-dessous.",
     ],
     button: "Me connecter",
     reset: "Réinitialiser mon mot de passe :",
   },
   ar: {
-    subject: "لديك حساب على Joutiya بالفعل",
+    subject: "لديك حساب على Aalan بالفعل",
     title: "حسابك موجود بالفعل",
     body: [
-      "حاول شخص ما، وربما كنت أنت، إنشاء حساب على Joutiya بعنوان البريد الإلكتروني هذا. هذا العنوان مرتبط بحساب قائم: يكفي تسجيل الدخول للمتابعة.",
+      "حاول شخص ما، وربما كنت أنت، إنشاء حساب على Aalan بعنوان البريد الإلكتروني هذا. هذا العنوان مرتبط بحساب قائم: يكفي تسجيل الدخول للمتابعة.",
       "هل نسيت كلمة المرور؟ يمكنك اختيار كلمة مرور جديدة عبر الرابط أدناه.",
     ],
     button: "تسجيل الدخول",

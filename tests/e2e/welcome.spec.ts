@@ -97,7 +97,7 @@ test.describe("welcome threshold", () => {
     await expect(welcome(page)).toBeVisible();
     // Measured in the inscription's own font, not a fallback.
     await page.evaluate(() => document.fonts.ready);
-    for (const name of ["Bienvenue sur Joutiya", "Bienvenue sur Marrakchia Souk"]) {
+    for (const name of ["Bienvenue sur Aalan", "Bienvenue sur Marrakchia Souk"]) {
       const fits = await page.evaluate((text) => {
         const crest = document.querySelector<HTMLElement>(".welcome-crest");
         const span = crest?.querySelector<HTMLElement>(".welcome-crest-text");
@@ -196,7 +196,7 @@ test.describe("welcome threshold", () => {
     test("a client-side arrival on home plays it too", async ({ page }) => {
       await page.goto("/fr/legal/mentions-legales");
       await page.waitForLoadState("networkidle");
-      await page.getByRole("link", { name: "Accueil Joutiya" }).click();
+      await page.getByRole("link", { name: "Accueil Aalan" }).click();
       await expect(page).toHaveURL(/\/fr$/);
       await expect(page.locator(".welcome")).toHaveCount(0, { timeout: 5_000 });
       expect(await page.evaluate(() => localStorage.getItem("door"))).toBe("opened");

@@ -42,7 +42,7 @@ function saveFile(blob: Blob, name: string): void {
 }
 
 function exportName(): string {
-  return `joutiya-mes-donnees-${new Date().toISOString().slice(0, 10)}.json`;
+  return `aalan-mes-donnees-${new Date().toISOString().slice(0, 10)}.json`;
 }
 
 export function DataSection() {

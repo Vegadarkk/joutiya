@@ -38,8 +38,8 @@ export const REJECT_REASONS: Record<RejectReasonCode, RejectReason> = {
   prohibited: {
     label: "Objet ou service interdit",
     facts: {
-      fr: "l'annonce propose un objet ou un service interdit sur Joutiya (voir la page « Objets interdits »)",
-      ar: "يعرض الإعلان غرضًا أو خدمة ممنوعة على Joutiya (انظر صفحة «الأغراض الممنوعة»)",
+      fr: "l'annonce propose un objet ou un service interdit sur Aalan (voir la page « Objets interdits »)",
+      ar: "يعرض الإعلان غرضًا أو خدمة ممنوعة على Aalan (انظر صفحة «الأغراض الممنوعة»)",
     },
     ground: { type: "terms", ref: `${LISTING_RULES}, objets interdits` },
   },
@@ -88,8 +88,8 @@ export const REJECT_REASONS: Record<RejectReasonCode, RejectReason> = {
   scam: {
     label: "Suspicion d'arnaque",
     facts: {
-      fr: "l'annonce présente des signes d'arnaque (paiement d'avance, prix irréaliste, contact hors de Joutiya)",
-      ar: "يحمل الإعلان مؤشرات احتيال (دفع مسبق، سعر غير واقعي، تواصل خارج Joutiya)",
+      fr: "l'annonce présente des signes d'arnaque (paiement d'avance, prix irréaliste, contact hors d'Aalan)",
+      ar: "يحمل الإعلان مؤشرات احتيال (دفع مسبق، سعر غير واقعي، تواصل خارج Aalan)",
     },
     ground: { type: "terms", ref: "CGU « Modération », risque d'arnaque" },
   },

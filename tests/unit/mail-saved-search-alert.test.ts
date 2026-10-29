@@ -35,7 +35,7 @@ function mail(locale: "fr" | "ar" | "rif", data: TemplateData["savedSearchAlert"
 beforeAll(() => {
   process.env.APP_ENV = "dev";
   process.env.SITE_URL = SITE;
-  process.env.MAIL_FROM = "Joutiya <no-reply@notif.joutiya.ma>";
+  process.env.MAIL_FROM = "Aalan <no-reply@notif.joutiya.ma>";
   resetServerEnv();
 });
 

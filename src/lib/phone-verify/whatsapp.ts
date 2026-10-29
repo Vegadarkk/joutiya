@@ -5,13 +5,13 @@ import { whatsappDisplayNumber } from "./config";
 import { CHALLENGE_TTL_SECONDS, challengeStore, type ChallengeStore } from "./store";
 import type { PhoneVerifier, VerificationChallenge, VerificationState } from "./types";
 
-// Inbound WhatsApp verifier (§6): the user sends "JOUTIYA <code>" to Joutiya's number from their
+// Inbound WhatsApp verifier (§6): the user sends "AALAN <code>" to the site's number from their
 // own WhatsApp; Meta's signed webhook (src/app/api/webhooks/whatsapp) brings the sender number and
 // the text back, and src/lib/phone-verify/inbound.ts matches them. Nothing is ever sent.
 
 /** Click-to-chat link with the prefilled message (number: digits only, no "+"). */
 export function waLink(number: string, code: string): string {
-  return `https://wa.me/${number}?text=${encodeURIComponent(`JOUTIYA ${code}`)}`;
+  return `https://wa.me/${number}?text=${encodeURIComponent(`AALAN ${code}`)}`;
 }
 
 export class WhatsAppInboundVerifier implements PhoneVerifier {

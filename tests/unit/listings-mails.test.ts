@@ -15,7 +15,7 @@ const statement: ModerationStatement = { measure: "hold", facts: ["new_account",
 beforeAll(() => {
   process.env.APP_ENV = "dev";
   process.env.SITE_URL = SITE;
-  process.env.MAIL_FROM = "Joutiya <no-reply@notif.joutiya.ma>";
+  process.env.MAIL_FROM = "Aalan <no-reply@notif.joutiya.ma>";
   resetServerEnv();
 });
 
@@ -145,7 +145,7 @@ describe("human decisions (moderation queue)", () => {
     expect(expired.html).toContain("Renouveler mon annonce");
     for (const mail of [paused, expired]) {
       expect(mail.text).not.toMatch(/maintenant visible|est en ligne|publiée/);
-      expect(mail.text).toContain("n'est pas visible sur Joutiya");
+      expect(mail.text).toContain("n'est pas visible sur Aalan");
     }
     const ar = renderMail({ template: "listingChangesApproved", locale: "ar", to: "salma@example.com", data: { displayName: "سلمى", title: "دراجة", status: "expired", url: `${SITE}/ar/mes-annonces?onglet=ended`, until: "2027-12-15T10:00:00.000Z" } });
     expect(ar.html).toContain('dir="rtl"');

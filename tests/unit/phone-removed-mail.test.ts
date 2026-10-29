@@ -13,7 +13,7 @@ const data = { displayName: "Nadia", phone: "06 12 34 56 78" };
 beforeAll(() => {
   process.env.APP_ENV = "dev";
   process.env.SITE_URL = SITE;
-  process.env.MAIL_FROM = "Joutiya <no-reply@notif.joutiya.ma>";
+  process.env.MAIL_FROM = "Aalan <no-reply@notif.joutiya.ma>";
   resetServerEnv();
 });
 
@@ -29,7 +29,7 @@ describe("phoneRemoved", () => {
     for (const body of [rendered.html, rendered.text]) {
       expect(body).toContain("Bonjour Nadia,");
       expect(body).toContain("06 12 34 56 78");
-      expect(body).toContain("sur un autre compte Joutiya");
+      expect(body).toContain("sur un autre compte Aalan");
       expect(body).toContain("retiré de ton compte");
       expect(body).toContain(DEFAULT_LEGAL.email);
       expect(body).toContain(`${SITE}/fr/verifications`);

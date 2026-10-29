@@ -32,7 +32,7 @@ const COPY: Record<
     delay: (hours) => (hours <= 1 ? "en priorité, dans l'heure" : hours < 48 ? `sous ${hours} heures` : `sous ${Math.round(hours / 24)} jours`),
     review: (delay) => `Notre équipe de modération l'examinera ${delay}. Nous vous informerons par e-mail de la décision prise et des moyens de la contester.`,
     urgent: "En cas de danger immédiat, contactez les autorités (police : 19, Gendarmerie royale : 177).",
-    host: "Joutiya héberge les annonces et les messages de ses utilisateurs sans en être l'auteur : nous traitons les contenus signalés selon la loi et nos conditions générales.",
+    host: "Aalan héberge les annonces et les messages de ses utilisateurs sans en être l'auteur : nous traitons les contenus signalés selon la loi et nos conditions générales.",
     button: "Nos conseils de sécurité",
   },
   ar: {
@@ -44,7 +44,7 @@ const COPY: Record<
     delay: (hours) => (hours <= 1 ? "بأولوية خلال ساعة" : hours < 48 ? `خلال ${hours} ساعة` : `خلال ${Math.round(hours / 24)} أيام`),
     review: (delay) => `سيدرسه فريق الإشراف ${delay}. سنخبرك عبر البريد الإلكتروني بالقرار المتخذ وبطرق الطعن فيه.`,
     urgent: "في حالة خطر وشيك، اتصل بالسلطات (الشرطة: 19، الدرك الملكي: 177).",
-    host: "تستضيف Joutiya إعلانات ورسائل مستخدميها دون أن تكون كاتبتها: نتعامل مع المحتويات المبلغ عنها وفقًا للقانون ولشروطنا العامة.",
+    host: "تستضيف Aalan إعلانات ورسائل مستخدميها دون أن تكون كاتبتها: نتعامل مع المحتويات المبلغ عنها وفقًا للقانون ولشروطنا العامة.",
     button: "نصائح الأمان",
   },
 };

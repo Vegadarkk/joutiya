@@ -21,7 +21,7 @@ const MESSAGES: Record<string, string> = {
   rate_limited: "Trop de conversations ouvertes en peu de temps. Réessayez plus tard.",
 };
 
-const FROM_LABEL = { buyer: "Acheteur", seller: "Vendeur", system: "Joutiya" } as const;
+const FROM_LABEL = { buyer: "Acheteur", seller: "Vendeur", system: "Aalan" } as const;
 
 /** The transcript, oldest first (the API answers newest first), with the evidence of masked or hidden messages. */
 function Transcript({ conversation }: { conversation: StaffConversationView }) {

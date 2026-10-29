@@ -63,7 +63,7 @@ async function exifGpsFixture(): Promise<Buffer> {
     .jpeg()
     .withMetadata({ orientation: 6 })
     .withExifMerge({
-      IFD0: { Make: "Joutiya test", Model: "Fixture", Software: "vitest" },
+      IFD0: { Make: "Aalan test", Model: "Fixture", Software: "vitest" },
       IFD3: { GPSLatitudeRef: "N", GPSLatitude: "33/1 35/1 0/1", GPSLongitudeRef: "W", GPSLongitude: "7/1 36/1 0/1" },
     })
     .toBuffer();
@@ -75,7 +75,7 @@ describe("processImage", () => {
     const before = await sharp(fixture).metadata();
     expect(before.exif).toBeInstanceOf(Buffer);
     expect(before.orientation).toBe(6);
-    expect(before.exif!.includes("Joutiya test")).toBe(true);
+    expect(before.exif!.includes("Aalan test")).toBe(true);
     // The GPS IFD pointer tag (0x8825) is present in the fixture's EXIF block.
     expect(before.exif!.includes(Buffer.from([0x88, 0x25])) || before.exif!.includes(Buffer.from([0x25, 0x88]))).toBe(true);
     expect(jpegSegments(fixture)).toContain("e1");
@@ -98,7 +98,7 @@ describe("processImage", () => {
       expect(chunks).not.toContain("EXIF");
       expect(chunks).not.toContain("XMP ");
       expect(chunks).not.toContain("ICCP");
-      expect(buffer.includes("Joutiya test")).toBe(false);
+      expect(buffer.includes("Aalan test")).toBe(false);
     }
     expect(result.hash).toMatch(/^[0-9a-f]{16}$/);
     expect(isBlurhashValid(result.blurhash).result).toBe(true);

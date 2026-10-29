@@ -114,7 +114,7 @@ const schema = z.object({
   MAIL_API_KEY: optional,
   MAIL_WEBHOOK_SECRET: optional,
   MAIL_FALLBACK_API_KEY: optional,
-  MAIL_FROM: z.string().trim().default("Joutiya <no-reply@notif.joutiya.ma>"),
+  MAIL_FROM: z.string().trim().default("Aalan <no-reply@notif.joutiya.ma>"),
   WHATSAPP_PHONE_NUMBER_ID: optional,
   WHATSAPP_APP_SECRET: optional,
   WHATSAPP_VERIFY_TOKEN: optional,

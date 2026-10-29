@@ -8,10 +8,10 @@ import { formatDay, GREETING, mailContact, pageUrl, renderLayout, type BuiltMail
 
 const COPY: Record<MailLocale, { subject: string; title: string; body: (closed: string, purge: string) => string[]; button: string; notYou: (contact: string) => string }> = {
   fr: {
-    subject: "Votre compte Joutiya est fermé",
+    subject: "Votre compte Aalan est fermé",
     title: "Compte fermé",
     body: (closed, purge) => [
-      `Votre compte Joutiya a été fermé le ${closed}, à votre demande. Vous ne pouvez plus vous y connecter, vos annonces ne sont plus en ligne, et vos favoris et recherches enregistrées ont été supprimés.`,
+      `Votre compte Aalan a été fermé le ${closed}, à votre demande. Vous ne pouvez plus vous y connecter, vos annonces ne sont plus en ligne, et vos favoris et recherches enregistrées ont été supprimés.`,
       "Les personnes avec qui vous avez échangé peuvent encore relire vos conversations, sans pouvoir vous écrire. Elles sont supprimées 12 mois après le dernier message.",
       `Comme la loi nous y oblige, nous conservons vos données de compte (adresse e-mail, téléphone, nom affiché) jusqu'au ${purge}, puis nous les supprimons. Votre nom légal, s'il nous a été communiqué, est conservé cinq ans ; les signalements et les décisions de modération qui vous concernent, cinq ans également.`,
     ],
@@ -19,10 +19,10 @@ const COPY: Record<MailLocale, { subject: string; title: string; body: (closed: 
     notYou: (contact) => `Si vous n'avez pas demandé cette fermeture, écrivez-nous sans attendre à ${contact}.`,
   },
   ar: {
-    subject: "تم إغلاق حسابك على Joutiya",
+    subject: "تم إغلاق حسابك على Aalan",
     title: "تم إغلاق الحساب",
     body: (closed, purge) => [
-      `تم إغلاق حسابك على Joutiya بتاريخ ${closed} بناءً على طلبك. لم يعد بإمكانك تسجيل الدخول إليه، ولم تعد إعلاناتك منشورة، وتم حذف مفضلاتك وعمليات البحث المحفوظة.`,
+      `تم إغلاق حسابك على Aalan بتاريخ ${closed} بناءً على طلبك. لم يعد بإمكانك تسجيل الدخول إليه، ولم تعد إعلاناتك منشورة، وتم حذف مفضلاتك وعمليات البحث المحفوظة.`,
       "يمكن للأشخاص الذين تبادلت معهم الرسائل إعادة قراءة محادثاتكم دون أن يتمكنوا من مراسلتك. تُحذف هذه المحادثات بعد 12 شهرًا من آخر رسالة.",
       `وفقًا لما يفرضه القانون، نحتفظ ببيانات حسابك (البريد الإلكتروني والهاتف والاسم المعروض) حتى ${purge}، ثم نحذفها. ويُحتفظ باسمك القانوني، إن كنت قد قدمته، لمدة خمس سنوات، وكذلك البلاغات وقرارات الإشراف المتعلقة بك.`,
     ],

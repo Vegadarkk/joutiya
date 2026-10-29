@@ -39,7 +39,7 @@ export const COMMON_PASSWORDS: ReadonlySet<string> = new Set<string>([
   "0123456789", "1234567891", "123456789a", "12345678a", "123456aa", "12341234", "12121212", "11223344", "10203040", "147258369",
   "159357", "741852963", "963852741", "1029384756", "0987654321", "9876543210", "87654321", "123654789", "321654987", "123123123",
   "asdfghjkl", "asdf1234", "asdasd", "asdasdasd", "zxczxc", "qweqwe", "qweasd", "qweasdzxc", "qwe123", "qwerty!",
-  "joutiya", "joutiya123", "joutiya2026", "annonce", "annonces", "vendre", "acheter", "bienvenue", "bienvenue1", "client123",
+  "aalan", "aalan123", "aalan2026", "a3lan", "joutiya", "joutiya123", "joutiya2026", "annonce", "annonces", "vendre", "acheter", "bienvenue", "bienvenue1", "client123",
 ]);
 
 function fold(value: string): string {

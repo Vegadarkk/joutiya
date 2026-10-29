@@ -16,7 +16,7 @@ Vendre de temps en temps vos propres affaires reste une activité de particulier
 
 Vous êtes un professionnel si vous achetez pour revendre, ou si vous vendez ou louez de façon régulière ou organisée, pour en tirer un revenu. {brand} ne fixe pas de seuil : la loi tient compte de l'ensemble de la situation, par exemple la fréquence des ventes, leur nombre, l'origine des biens et le but lucratif.
 
-Un professionnel ouvre un compte Pro et ne publie jamais depuis un compte de particulier (voir les [CGU](/legal/cgu#roles-3)). Les comptes Pro sont ouverts dès le lancement de {brand} ; {brand} vérifie les documents du professionnel avant sa première publication. Chaque annonce indique si son auteur est un particulier ou un professionnel.
+Un professionnel ouvre un compte Pro et ne publie jamais depuis un compte de particulier (voir les [CGU](/legal/cgu#roles-3)). Les comptes Pro sont ouverts dès le lancement d'{brand} ; {brand} vérifie les documents du professionnel avant sa première publication. Chaque annonce indique si son auteur est un particulier ou un professionnel.
 
 ### 1.3 En cas de doute {#vendeurs-3}
 
@@ -55,7 +55,7 @@ Cela ne vous dispense pas de déclarer vous-même vos revenus. Si {brand} ajoute
 - La Direction générale des impôts (tax.gov.ma).
 - L'Office marocain de la propriété industrielle et commerciale (ompic.ma) pour l'immatriculation et l'identifiant commun de l'entreprise (ICE).
 
-### 3.4 Factures de {brand} {#fiscal-4}
+### 3.4 Factures d'{brand} {#fiscal-4}
 
 Les options et abonnements vendus par {brand} donneront lieu à une facture. Leurs conditions figureront dans les conditions générales de vente, publiées avant l'ouverture des ventes.
 
@@ -69,7 +69,7 @@ Quand {brand} retire, masque ou fait descendre un contenu, suspend ou ferme un c
 
 ### 4.2 Contester une décision {#dsa-2}
 
-La réclamation interne est gratuite et ouverte pendant 6 mois. Elle est réexaminée par un autre modérateur que celui qui a décidé, ou par un administrateur de {brand}, qui peut être la personne qui a pris la décision, et chaque examen est enregistré ; {brand} vous répond en moins de 14 jours. L'auteur d'un signalement peut aussi contester la décision prise. Vous pouvez en outre saisir un organisme de règlement extrajudiciaire ou le tribunal compétent. Voir les [CGU](/legal/cgu#recours).
+La réclamation interne est gratuite et ouverte pendant 6 mois. Elle est réexaminée par un autre modérateur que celui qui a décidé, ou par un administrateur d'{brand}, qui peut être la personne qui a pris la décision, et chaque examen est enregistré ; {brand} vous répond en moins de 14 jours. L'auteur d'un signalement peut aussi contester la décision prise. Vous pouvez en outre saisir un organisme de règlement extrajudiciaire ou le tribunal compétent. Voir les [CGU](/legal/cgu#recours).
 
 ### 4.3 Signaler un contenu et connaître la suite {#dsa-3}
 
@@ -93,7 +93,7 @@ Vous pouvez accéder à vos données, les corriger, les effacer, vous opposer à
 
 ## 5. Vos obligations sur {brand} {#obligations}
 
-Les règles complètes figurent dans les [CGU](/legal/cgu). Voici l'essentiel de ce que {brand} attend de vous.
+Les règles complètes figurent dans les [CGU](/legal/cgu). Voici l'essentiel de ce qu'{brand} attend de vous.
 
 ### 5.1 Votre compte {#obligations-1}
 
@@ -128,13 +128,13 @@ Vous déclarez vos revenus et accomplissez les formalités de votre activité au
 
 Un manquement peut entraîner le refus ou le retrait d'une annonce, un avertissement, une suspension ou la fermeture du compte, selon une échelle graduée et avec un exposé des motifs (voir les [CGU](/legal/cgu#sanctions) et §4.1). Un professionnel qui se présente comme particulier s'expose en outre aux sanctions prévues par la loi (§1.3). Les contenus ou les agissements illégaux peuvent être signalés aux autorités.
 
-## 6. Rôle de {brand} {#role}
+## 6. Rôle d'{brand} {#role}
 
 ### 6.1 Un hébergeur neutre {#role-1}
 
 {brand} est un service d'hébergement d'annonces. Elle n'est ni vendeur, ni acheteur, ni mandataire ou agent de l'un ou de l'autre, et elle n'est pas partie aux contrats conclus entre utilisateurs (voir les [CGU](/legal/cgu#role)). Chaque annonce indique si son auteur est un particulier ou un professionnel.
 
-### 6.2 Ce que {brand} ne fait pas {#role-2}
+### 6.2 Ce qu'{brand} ne fait pas {#role-2}
 
 - Elle n'encaisse aucun paiement entre utilisateurs, ne connaît pas le prix final d'une vente et ne transmet aucune déclaration fiscale (§3.2).
 - Elle ne vérifie pas l'identité civile des particuliers, ni leur situation fiscale. Elle vérifie les documents d'entreprise des professionnels, sans garantir la qualité de leurs biens ou de leurs services.
@@ -145,4 +145,4 @@ Un manquement peut entraîner le refus ou le retrait d'une annonce, un avertisse
 
 {brand} répond de ses propres obligations, notamment : les droits décrits au §4, le traitement des signalements et des réclamations, la protection des données personnelles, et les contenus qu'elle rédige elle-même, dont cette page. Elle répond aux demandes légales des autorités compétentes.
 
-Rien dans les présentes ne limite la responsabilité de {brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.
+Rien dans les présentes ne limite la responsabilité d'{brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.

@@ -54,7 +54,7 @@ test.describe("help centre", () => {
     await page.goto("/fr/aide/deposer-une-annonce");
     await page.getByRole("button", { name: "Poser une question à l'Assistant" }).click();
 
-    const dialog = page.getByRole("dialog", { name: /Assistant Joutiya/ });
+    const dialog = page.getByRole("dialog", { name: /Assistant Aalan/ });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByTestId("assistant-disclosure")).toContainText("intelligence artificielle");
     await expect(dialog.getByTestId("assistant-disclosure")).toContainText("Ne donnez aucune donnée personnelle");
@@ -71,7 +71,7 @@ test.describe("help centre", () => {
 
   test("/aide#assistant opens the assistant (the account menu's help entry)", async ({ page }) => {
     await page.goto("/fr/aide#assistant");
-    await expect(page.getByRole("dialog", { name: /Assistant Joutiya/ })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: /Assistant Aalan/ })).toBeVisible();
     await page.getByRole("button", { name: "Fermer l'assistant" }).click();
     await expect(page).toHaveURL(/\/fr\/aide$/);
   });

@@ -5,7 +5,7 @@ import { containsPhoneNumber } from "@/lib/moderation/phones";
 import { detectSensitiveDetailed } from "@/lib/moderation/sensitive";
 
 // Message risk (architecture §7 step 7, design D5): local rules, never AI. Every URL or bare domain
-// except joutiya.ma is replaced by URL_MARKER in the stored text (the original goes to the
+// except aalan.ma, a3lan.ma and joutiya.ma are replaced by URL_MARKER in the stored text (the original goes to the
 // server-only evidence document); flags warn the recipient. A phone number or a WhatsApp mention
 // alone is NOT flagged (normal in Morocco): only together with a payment keyword. Pure.
 //
@@ -22,7 +22,7 @@ const BARE_DOMAIN = /(?<![a-z0-9@.-])[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|ma|net|
 const TRAILING_PUNCTUATION = /[.,;:!?)\]}»"']+$/;
 
 /** Links to the platform itself stay readable. */
-const OWN_HOST = /^(?:[a-z0-9-]+\.)*joutiya\.ma$/;
+const OWN_HOST = /^(?:[a-z0-9-]+\.)*(?:aalan|a3lan|joutiya)\.ma$/;
 
 interface Span {
   start: number;

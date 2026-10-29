@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { getTranslations } from "next-intl/server";
-import { CANONICAL_ORIGIN, HREFLANG_LOCALES, LOCALE_TAGS, type Locale } from "@/config/site";
+import { CANONICAL_ORIGIN, SITE_NAME, HREFLANG_LOCALES, LOCALE_TAGS, type Locale } from "@/config/site";
 
 /**
  * Base of canonical and hreflang URLs. A constant on purpose: public pages are prerendered once
@@ -33,11 +33,11 @@ export async function rootMetadata(locale: Locale): Promise<Metadata> {
     metadataBase: siteUrl(),
     title: { default: t("title"), template: t("titleTemplate") },
     description: t("description"),
-    applicationName: "Joutiya",
+    applicationName: SITE_NAME,
     alternates: alternates(locale),
-    icons: { icon: "/brand/joutiya-icon.svg" },
+    icons: { icon: "/brand/aalan-icon.svg" },
     formatDetection: { telephone: false, email: false, address: false },
-    openGraph: { siteName: "Joutiya", locale: LOCALE_TAGS[locale].replace("-", "_"), type: "website" },
+    openGraph: { siteName: SITE_NAME, locale: LOCALE_TAGS[locale].replace("-", "_"), type: "website" },
     other: DARK_READER_LOCK,
   };
 }

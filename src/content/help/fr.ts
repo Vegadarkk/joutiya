@@ -12,7 +12,7 @@ export const HELP_FR: HelpLocaleContent = {
     messagerie: { title: "Messagerie", description: "Écrire à un vendeur, répondre, bloquer quelqu'un." },
     securite: { title: "Sécurité", description: "Reconnaître une arnaque et s'en protéger." },
     moderation: { title: "Signalements et décisions", description: "Signaler un contenu, comprendre une décision, la contester." },
-    donnees: { title: "Données et rôle de Joutiya", description: "Vos données, notre rôle d'hébergeur, l'Assistant Joutiya." },
+    donnees: { title: "Données et rôle d'Aalan", description: "Vos données, notre rôle d'hébergeur, l'Assistant Aalan." },
   },
   articles: {
     "creer-un-compte": {
@@ -44,7 +44,7 @@ export const HELP_FR: HelpLocaleContent = {
           ],
         },
         "Après plusieurs mots de passe erronés, la connexion est bloquée quelques minutes pour protéger le compte, et une vérification anti-robots peut vous être demandée.",
-        { note: "Joutiya ne vous demandera jamais votre mot de passe, ni un code reçu par SMS ou par e-mail, par message ou par téléphone." },
+        { note: "Aalan ne vous demandera jamais votre mot de passe, ni un code reçu par SMS ou par e-mail, par message ou par téléphone." },
       ],
       keywords: ["mot de passe oublié", "réinitialiser", "se connecter", "connexion impossible", "bloqué", "déconnexion"],
     },
@@ -64,7 +64,7 @@ export const HELP_FR: HelpLocaleContent = {
         },
         "Votre brouillon est enregistré au fil de la saisie : vous pouvez reprendre plus tard. Vous pouvez garder jusqu'à {maxDrafts} brouillons ; un brouillon sans modification pendant {draftPurgeDays} jours est supprimé.",
         "En général, l'annonce est en ligne dès sa publication. Certaines sont relues par un modérateur avant leur mise en ligne, en général sous 24 heures ; un e-mail vous prévient.",
-        "Une annonce reste en ligne {ttlDays} jours. Vous êtes responsable de ce que vous vendez au regard de la loi marocaine. Les objets et services interdits sur Joutiya sont listés dans la page « Objets interdits ».",
+        "Une annonce reste en ligne {ttlDays} jours. Vous êtes responsable de ce que vous vendez au regard de la loi marocaine. Les objets et services interdits sur Aalan sont listés dans la page « Objets interdits ».",
         "Les koumiyas et poignards décoratifs d'artisanat se déposent uniquement dans la catégorie « Koumiyas & poignards décoratifs » (Maison & Jardin), réservée aux personnes majeures : vous attestez que l'objet est décoratif et que vous le vendrez à une personne majeure, chaque annonce est vérifiée par un modérateur avant sa mise en ligne, et le contact passe uniquement par la messagerie.",
       ],
       keywords: ["publier", "vendre", "poster", "mettre en ligne", "nouvelle annonce", "brouillon", "gratuit", "relecture", "koumiya", "poignard"],
@@ -126,7 +126,7 @@ export const HELP_FR: HelpLocaleContent = {
     },
     "contacter-un-vendeur": {
       title: "Contacter un vendeur",
-      summary: "La messagerie Joutiya est le seul moyen de contacter un vendeur ; elle demande un compte confirmé.",
+      summary: "La messagerie Aalan est le seul moyen de contacter un vendeur ; elle demande un compte confirmé.",
       blocks: [
         "Pour écrire à un vendeur, ouvrez son annonce et cliquez sur le bouton de contact. Il faut être connecté avec un compte dont l'adresse e-mail est confirmée. Une vérification anti-robots est demandée au premier message d'une conversation.",
         "La messagerie est aujourd'hui le seul moyen de contact entre acheteurs et vendeurs : le numéro de téléphone des vendeurs n'est pas affiché.",
@@ -155,7 +155,7 @@ export const HELP_FR: HelpLocaleContent = {
     },
     "eviter-les-arnaques": {
       title: "Éviter les arnaques",
-      summary: "Ne payez jamais avant d'avoir vu l'article, et restez sur la messagerie Joutiya.",
+      summary: "Ne payez jamais avant d'avoir vu l'article, et restez sur la messagerie Aalan.",
       blocks: [
         { note: "Ne payez jamais un acompte, des frais de livraison ou un article avant de l'avoir vu et vérifié." },
         "Signes d'arnaque fréquents :",
@@ -168,7 +168,7 @@ export const HELP_FR: HelpLocaleContent = {
           ],
         },
         "Rencontrez le vendeur dans un lieu public, en journée, et vérifiez l'article avant de payer. N'ouvrez pas les liens envoyés par des inconnus.",
-        "Joutiya ne prend jamais part au paiement entre acheteur et vendeur et ne propose aucune livraison : un message qui prétend le contraire est une arnaque. Signalez-le. Si vous avez été victime d'une arnaque, portez plainte auprès de la police ou de la Gendarmerie royale, ou signalez-la sur e-blagh.ma, la plateforme de la Sûreté nationale.",
+        "Aalan ne prend jamais part au paiement entre acheteur et vendeur et ne propose aucune livraison : un message qui prétend le contraire est une arnaque. Signalez-le. Si vous avez été victime d'une arnaque, portez plainte auprès de la police ou de la Gendarmerie royale, ou signalez-la sur e-blagh.ma, la plateforme de la Sûreté nationale.",
       ],
       keywords: ["arnaque", "escroquerie", "fraude", "acompte", "virement", "rib", "iban", "code sms", "lien", "faux vendeur", "livraison"],
     },
@@ -230,20 +230,20 @@ export const HELP_FR: HelpLocaleContent = {
       keywords: ["données", "vie privée", "rgpd", "cndp", "supprimer mes données", "cookies", "confidentialité", "droits"],
     },
     "role-de-joutiya": {
-      title: "Le rôle de Joutiya",
-      summary: "Joutiya héberge les annonces de ses utilisateurs : elle n'est ni vendeur, ni acheteur, ni partie aux ventes.",
+      title: "Le rôle d'Aalan",
+      summary: "Aalan héberge les annonces de ses utilisateurs : elle n'est ni vendeur, ni acheteur, ni partie aux ventes.",
       blocks: [
-        "Joutiya met en relation acheteurs et vendeurs. Les annonces sont écrites et publiées par leurs auteurs, qui en sont responsables.",
-        "Joutiya n'intervient pas dans la vente : elle n'encaisse aucun paiement entre utilisateurs, ne livre rien, ne garantit pas les articles et n'arbitre pas les litiges entre acheteur et vendeur.",
-        "En cas de désaccord, cherchez d'abord une solution à l'amiable avec l'autre personne. Entre particuliers, la vente relève du Dahir formant Code des obligations et des contrats (DOC) ; quand un professionnel vend à un consommateur, la loi n° 31-08 sur la protection du consommateur s'applique aussi. À défaut d'accord, vous pouvez saisir le tribunal compétent. En cas d'escroquerie ou d'infraction, portez plainte auprès de la police, de la Gendarmerie royale ou du procureur du Roi, et signalez le contenu sur Joutiya.",
+        "Aalan met en relation acheteurs et vendeurs. Les annonces sont écrites et publiées par leurs auteurs, qui en sont responsables.",
+        "Aalan n'intervient pas dans la vente : elle n'encaisse aucun paiement entre utilisateurs, ne livre rien, ne garantit pas les articles et n'arbitre pas les litiges entre acheteur et vendeur.",
+        "En cas de désaccord, cherchez d'abord une solution à l'amiable avec l'autre personne. Entre particuliers, la vente relève du Dahir formant Code des obligations et des contrats (DOC) ; quand un professionnel vend à un consommateur, la loi n° 31-08 sur la protection du consommateur s'applique aussi. À défaut d'accord, vous pouvez saisir le tribunal compétent. En cas d'escroquerie ou d'infraction, portez plainte auprès de la police, de la Gendarmerie royale ou du procureur du Roi, et signalez le contenu sur Aalan.",
       ],
       keywords: ["litige", "remboursement", "garantie", "hébergeur", "responsabilité", "médiation", "conflit", "vendeur malhonnête"],
     },
     "assistant-joutiya": {
-      title: "L'Assistant Joutiya",
+      title: "L'Assistant Aalan",
       summary: "Un assistant d'intelligence artificielle qui répond à vos questions à partir des articles de ce centre d'aide.",
       blocks: [
-        "L'Assistant Joutiya est une intelligence artificielle, pas une personne. Il répond à partir des articles du centre d'aide et indique ceux qu'il a utilisés.",
+        "L'Assistant Aalan est une intelligence artificielle, pas une personne. Il répond à partir des articles du centre d'aide et indique ceux qu'il a utilisés.",
         "Il peut se tromper : vérifiez dans l'article cité. Il n'a pas accès à votre compte et ne peut faire aucune action à votre place (modifier une annonce, traiter un signalement, lever une sanction).",
         "Ne lui donnez aucune donnée personnelle : nom, téléphone, adresse e-mail, adresse, mot de passe ou code.",
         "Quand le service n'est pas disponible, l'assistant affiche les articles du centre d'aide qui correspondent à votre question.",

@@ -21,7 +21,7 @@ Answer with one action:
 - "escalate": you cannot tell (language you do not understand, unreadable photos, missing context).
 Set "policy" to the report reason that applies to a listing, or "none" when you approve. "templateId" stays empty.`;
 
-const REPORT_TRIAGE = `Task: triage one report (notice) sent to Joutiya about a listing, a user profile, a private message or a buyer's review of a seller. You receive the report reason chosen by the reporter, the reporter's explanation and the reported content (masked). Reporters can be wrong or abusive: judge the content, not the reporter's tone.
+const REPORT_TRIAGE = `Task: triage one report (notice) sent to Aalan about a listing, a user profile, a private message or a buyer's review of a seller. You receive the report reason chosen by the reporter, the reporter's explanation and the reported content (masked). Reporters can be wrong or abusive: judge the content, not the reporter's tone.
 
 Answer with one action:
 - "reject": the report looks founded and the content should be removed or restricted.

@@ -270,14 +270,14 @@ async function readBlocked(uids: readonly string[]): Promise<AccountExport["bloc
 
 const ABOUT: Record<"fr" | "ar", (date: string, contact: string) => string[]> = {
   fr: (date, contact) => [
-    `Données personnelles de votre compte Joutiya, au ${date} : profil, paramètres, consentements, annonces (terminées comprises), favoris, recherches enregistrées, conversations et messages, signalements envoyés, décisions de modération vous concernant et vos recours, comptes bloqués.`,
+    `Données personnelles de votre compte Aalan, au ${date} : profil, paramètres, consentements, annonces (terminées comprises), favoris, recherches enregistrées, conversations et messages, signalements envoyés, décisions de modération vous concernant et vos recours, comptes bloqués.`,
     "Les messages sont tels qu'ils sont enregistrés : liens et coordonnées masqués, messages retirés par la modération remplacés par une mention.",
     "Les photos de vos annonces sont désignées par leur identifiant et ne sont pas jointes au fichier.",
     `Ne figurent pas dans ce fichier : les journaux de connexion (adresse IP, conservés un an pour répondre aux autorités) et les pièces justificatives d'un compte professionnel. Vous pouvez les demander à ${contact}.`,
     "Les listes trop longues sont limitées aux éléments les plus récents ; la rubrique « truncated » indique lesquelles.",
   ],
   ar: (date, contact) => [
-    `البيانات الشخصية لحسابك على Joutiya بتاريخ ${date}: الملف الشخصي، الإعدادات، الموافقات، الإعلانات (بما فيها المنتهية)، المفضلات، عمليات البحث المحفوظة، المحادثات والرسائل، البلاغات المرسلة، قرارات الإشراف المتعلقة بك وطعونك، الحسابات المحظورة.`,
+    `البيانات الشخصية لحسابك على Aalan بتاريخ ${date}: الملف الشخصي، الإعدادات، الموافقات، الإعلانات (بما فيها المنتهية)، المفضلات، عمليات البحث المحفوظة، المحادثات والرسائل، البلاغات المرسلة، قرارات الإشراف المتعلقة بك وطعونك، الحسابات المحظورة.`,
     "الرسائل كما هي محفوظة: الروابط ووسائل الاتصال مخفية، والرسائل التي أزالها فريق الإشراف مستبدلة بإشارة.",
     "صور إعلاناتك مذكورة بمعرّفاتها ولا يتضمنها الملف.",
     `لا يتضمن هذا الملف سجلات الاتصال (عنوان IP، يُحتفظ بها سنة واحدة للرد على طلبات السلطات) ولا وثائق إثبات الحساب المهني. يمكنك طلبها عبر ${contact}.`,
@@ -432,7 +432,7 @@ export async function buildAccountExport(uid: string, now = new Date()): Promise
 
 /** joutiya-mes-donnees-2026-10-20.json */
 export function exportFileName(now: Date): string {
-  return `joutiya-mes-donnees-${now.toISOString().slice(0, 10)}.json`;
+  return `aalan-mes-donnees-${now.toISOString().slice(0, 10)}.json`;
 }
 
 /**

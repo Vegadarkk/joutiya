@@ -7,7 +7,7 @@ import type { RenderedMail } from "@/lib/mail/types";
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 
 const MAIL: RenderedMail = {
-  from: "Joutiya <no-reply@notif.joutiya.ma>",
+  from: "Aalan <no-reply@notif.joutiya.ma>",
   to: "nadia@example.com",
   subject: "Confirme ton adresse e-mail",
   text: "Bonjour",
@@ -181,7 +181,7 @@ describe("BrevoTransport", () => {
     expect(headers["Content-Type"]).toBe("application/json");
     expect(headers["User-Agent"]).toBe("joutiya/1.2.3");
     const body = JSON.parse(String(call.init.body));
-    expect(body.sender).toEqual({ name: "Joutiya", email: "no-reply@notif.joutiya.ma" });
+    expect(body.sender).toEqual({ name: "Aalan", email: "no-reply@notif.joutiya.ma" });
     expect(body.to).toEqual([{ email: MAIL.to }]);
     expect(body.subject).toBe(MAIL.subject);
     expect(body.htmlContent).toBe(MAIL.html);

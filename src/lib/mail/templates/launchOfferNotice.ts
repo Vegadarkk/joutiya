@@ -41,7 +41,7 @@ const COPY: Record<MailLocale, Copy> = {
         : `${count} annonces ont été mises en pause. Elles ne sont pas supprimées : remettez-les en ligne depuis Mes annonces après avoir choisi une offre.`,
     storefront: "Votre vitrine n'est plus visible. Choisissez une offre pour la retrouver et recevoir les crédits de l'offre chaque mois.",
     button: "Choisir mon offre",
-    closing: "Pour payer, passez toujours par votre espace Pro sur Joutiya : nous ne vous demanderons jamais de paiement par message.",
+    closing: "Pour payer, passez toujours par votre espace Pro sur Aalan : nous ne vous demanderons jamais de paiement par message.",
   },
   ar: {
     subject: (plan, day, ended) => (ended ? `انتهت باقة ${plan} المجانية` : `تنتهي باقة ${plan} المجانية في ${day}`),
@@ -63,7 +63,7 @@ const COPY: Record<MailLocale, Copy> = {
         : `عدد الإعلانات الموقوفة مؤقتًا: ${count}. لم تُحذف: أعد نشرها من «إعلاناتي» بعد اختيار باقة.`,
     storefront: "لم تعد واجهة متجرك ظاهرة. اختر باقة لاستعادتها والحصول على نقاط الباقة كل شهر.",
     button: "اختيار باقتي",
-    closing: "للدفع، مرّ دائمًا عبر فضائك المهني على جوطية: لن نطلب منك أي دفع عبر الرسائل.",
+    closing: "للدفع، مرّ دائمًا عبر فضائك المهني على أعلان: لن نطلب منك أي دفع عبر الرسائل.",
   },
 };
 
