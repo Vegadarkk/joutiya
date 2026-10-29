@@ -70,15 +70,20 @@ test.describe("welcome threshold", () => {
     await page.goto("/fr");
     await expect(welcome(page)).toBeVisible();
     await page.waitForLoadState("networkidle");
-    // What Escape starts, read in the same task: one 200 ms crossfade, no swing or push.
-    const started = await page.evaluate(() => {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-      return document
-        .querySelector(".welcome")
-        ?.getAnimations({ subtree: true })
-        .map((animation) => ({ target: (animation.effect as KeyframeEffect).target?.className, duration: animation.effect?.getTiming().duration }));
-    });
-    expect(started).toEqual([{ target: "welcome", duration: 200 }]);
+    // What Escape starts, read in the same task: one 200 ms crossfade, no swing or push. The key
+    // listener is a passive effect that can land after networkidle on a loaded runner: press again
+    // until it answers (a press it missed starts nothing).
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+          return document
+            .querySelector(".welcome")
+            ?.getAnimations({ subtree: true })
+            .map((animation) => ({ target: (animation.effect as KeyframeEffect).target?.className, duration: animation.effect?.getTiming().duration }));
+        }),
+      )
+      .toEqual([{ target: "welcome", duration: 200 }]);
     await expect(welcome(page)).toHaveCount(0, { timeout: 1_500 });
     await expect(page.locator("#main")).toBeFocused();
   });
