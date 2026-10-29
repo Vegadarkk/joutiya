@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { ArrowLeft, CalendarPlus } from "lucide-react";
+import { ArrowLeft, CalendarPlus, HandCoins } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { AppointmentCard } from "@/components/appointments/appointment-card";
 import { RentalRequestCard } from "@/components/rental/rental-request-card";
+import { OfferCard } from "@/components/offers/offer-card";
+import type { OfferDialogProps } from "@/components/offers/offer-dialog";
 import type { AppointmentDialogProps } from "@/components/appointments/appointment-dialog";
 import { FormMessage } from "@/components/auth/form-message";
 import { ErrorBanner } from "@/components/feedback/error-banner";
@@ -23,6 +25,8 @@ import { APPOINTMENT_KINDS, type AppointmentKind, type AppointmentResponse } fro
 import { URL_MARKER, type ConversationView, type MessageView } from "@/lib/contracts/messaging";
 import { isActive } from "@/lib/appointments/rules";
 import type { RentalRequestResponse } from "@/lib/contracts/rental-requests";
+import type { OfferResponse } from "@/lib/contracts/offers";
+import { offerPending } from "@/lib/offers/rules";
 import { isolate } from "@/lib/i18n/bidi";
 import { formatPrice } from "@/lib/listings/client/format";
 import { changeConversationState, fetchConversation, fetchThread, markConversationRead, sendMessage } from "@/lib/messaging/client";
@@ -56,6 +60,20 @@ const ReportDialog = dynamic(() => loadWithRetry<ReportDialogProps>(() => import
 const AppointmentDialog = dynamic(() => loadWithRetry<AppointmentDialogProps>(() => import("@/components/appointments/appointment-dialog").then((module) => module.AppointmentDialog), () => null)(), {
   ssr: false,
 });
+
+/** The offer form loads on demand, like the slot picker (Carte vivante lot 5). */
+const OfferDialog = dynamic(() => loadWithRetry<OfferDialogProps>(() => import("@/components/offers/offer-dialog").then((module) => module.OfferDialog), () => null)(), { ssr: false });
+
+/** `?offre=1` on the thread's URL opens the buyer's offer form (the listing page's « Faire une offre »). */
+export function requestedOffer(search: string): boolean {
+  return new URLSearchParams(search).get("offre") === "1";
+}
+
+/** The buyer may make an offer now: the listing took offers, none of his is waiting for an answer. */
+export function canOffer(conversation: Pick<ConversationView, "role" | "offersAllowed" | "offer" | "listing">, now: number): boolean {
+  if (conversation.role !== "buyer" || conversation.offersAllowed !== true || !conversation.listing.price) return false;
+  return !conversation.offer || !offerPending(conversation.offer, now);
+}
 
 /** `?rdv={kind}` on the thread's URL opens the slot picker with that kind (Concession, Agence entry points). */
 export function requestedKind(search: string): AppointmentKind | null {
@@ -128,6 +146,8 @@ export function ThreadView({ cid }: { cid: string }) {
   const [sendError, setSendError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [picker, setPicker] = useState<{ open: boolean; kind?: AppointmentKind } | null>(null);
+  const [offerForm, setOfferForm] = useState<{ open: boolean; answering?: { id: string; amount: number }; price: number } | null>(null);
+  const offerText = useTranslations("Offers");
   const scroller = useRef<HTMLDivElement>(null);
   const olderMark = useRef<HTMLDivElement>(null);
 
@@ -167,6 +187,14 @@ export function ThreadView({ cid }: { cid: string }) {
           url.searchParams.delete("rdv");
           window.history.replaceState(window.history.state, "", url);
           if (canWrite(page.conversation, false)) setPicker({ open: true, kind });
+        }
+        // The listing page's « Faire une offre » on an existing conversation: `?offre=1`, once.
+        if (requestedOffer(window.location.search)) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("offre");
+          window.history.replaceState(window.history.state, "", url);
+          const { conversation } = page;
+          if (canWrite(conversation, false) && canOffer(conversation, Date.now()) && conversation.listing.price) setOfferForm({ open: true, price: conversation.listing.price });
         }
       },
       (error: unknown) => {
@@ -375,6 +403,12 @@ export function ThreadView({ cid }: { cid: string }) {
     if (view.kind === "ready") putRow(view.data.conversation);
     void fetchNewer();
   }
+  function onOffer(response: OfferResponse) {
+    updateData((data) => ({ ...data, conversation: { ...data.conversation, offer: response.offer } }));
+    const view = current.current;
+    if (view.kind === "ready") putRow(view.data.conversation);
+    void fetchNewer();
+  }
   const [unblocking, setUnblocking] = useState(false);
   async function unblock(conversation: ConversationView) {
     setUnblocking(true);
@@ -503,6 +537,22 @@ export function ThreadView({ cid }: { cid: string }) {
         />
       ) : null}
 
+      {conversation.offer ? (
+        <OfferCard
+          key={conversation.offer.id}
+          cid={cid}
+          offer={conversation.offer}
+          counterpartName={name}
+          writable={writable}
+          now={now}
+          onChange={onOffer}
+          onCounter={() => {
+            const offer = conversation.offer;
+            if (offer) setOfferForm({ open: true, price: offer.price, answering: { id: offer.id, amount: offer.amount } });
+          }}
+        />
+      ) : null}
+
       {conversation.appointment ? (
         <AppointmentCard
           key={conversation.appointment.id}
@@ -589,18 +639,35 @@ export function ThreadView({ cid }: { cid: string }) {
           error={sendError}
           onTyping={() => setSendError(null)}
           leading={
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="shrink-0 rounded-full text-foreground-muted hover:text-foreground"
-              aria-label={appointmentText("propose")}
-              title={appointmentText("propose")}
-              data-testid="appointment-open"
-              onClick={() => setPicker({ open: true, kind: conversation.appointment?.kind })}
-            >
-              <CalendarPlus aria-hidden="true" />
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="shrink-0 rounded-full text-foreground-muted hover:text-foreground"
+                aria-label={appointmentText("propose")}
+                title={appointmentText("propose")}
+                data-testid="appointment-open"
+                onClick={() => setPicker({ open: true, kind: conversation.appointment?.kind })}
+              >
+                <CalendarPlus aria-hidden="true" />
+              </Button>
+              {canOffer(conversation, now) && conversation.listing.price ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 rounded-full text-foreground-muted hover:text-foreground"
+                  aria-label={offerText("listing.make")}
+                  title={offerText("listing.make")}
+                  aria-haspopup="dialog"
+                  data-testid="offer-open"
+                  onClick={() => setOfferForm({ open: true, price: conversation.listing.price ?? 0 })}
+                >
+                  <HandCoins aria-hidden="true" />
+                </Button>
+              ) : null}
+            </>
           }
         />
       ) : sendError ? <p className="px-4 pb-3 text-sm text-danger">{sendError}</p> : null}
@@ -615,6 +682,23 @@ export function ThreadView({ cid }: { cid: string }) {
           onDone={(response) => {
             onAppointment(response);
             toast.success(appointmentText("proposedToast", { name: isolate(name) }));
+          }}
+        />
+      ) : null}
+      {offerForm ? (
+        <OfferDialog
+          // A fresh form per offer answered (or a new offer). Prefixed: the card above is keyed by the
+          // bare offer id among the same children, and a duplicate key would duplicate the card.
+          key={offerForm.answering ? `counter:${offerForm.answering.id}` : "offer:make"}
+          cid={cid}
+          open={offerForm.open}
+          onOpenChange={(open) => setOfferForm((current) => (current ? { ...current, open } : current))}
+          counterpartName={name}
+          price={offerForm.price}
+          answering={offerForm.answering}
+          onDone={(response) => {
+            onOffer(response);
+            toast.success(offerForm.answering ? offerText("card.counterToast") : offerText("dialog.sentToast", { name: isolate(name) }));
           }}
         />
       ) : null}

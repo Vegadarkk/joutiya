@@ -32,6 +32,12 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   "Report",
   // « Payer chez le vendeur » button and dialog of a Pro's listing and storefront (phase 7).
   "SellerPayment.public",
+  // « Faire une offre » of the listing page: the button, the amount and the first-message dialog
+  // (Carte vivante lot 5). The thread's card and steps stay private.
+  "Offers.listing",
+  "Offers.field",
+  "Offers.dialog",
+  "Offers.errors",
   // Car rental availability block of the listing page (rental pack §3).
   "Rental.listing",
   "Rental.calendar",

@@ -3930,6 +3930,118 @@
       "appointment_slot_past": "Ce créneau est déjà passé. Choisissez-en un autre ou proposez d'autres créneaux."
     }
   },
+  "PriceGuide": {
+    "title": "Prix repère",
+    "count": "{count, plural, one {# annonce comparable} other {# annonces comparables}} {where}",
+    "range": "{low} – {high}",
+    "scope": {
+      "city": "à {place}",
+      "region": "dans la région {place}",
+      "country": "au Maroc"
+    },
+    "position": {
+      "below": "Le prix de cette annonce, {price}, se situe sous la fourchette habituelle des annonces comparables ({range}).",
+      "within": "Le prix de cette annonce, {price}, se situe dans la fourchette habituelle des annonces comparables ({range}).",
+      "above": "Le prix de cette annonce, {price}, se situe au-dessus de la fourchette habituelle des annonces comparables ({range})."
+    },
+    "notice": "Indication calculée sur les annonces publiées, sans garantie."
+  },
+  "Offers": {
+    "listing": {
+      "make": "Faire une offre",
+      "makeHint": "Proposez votre prix : le vendeur peut accepter, refuser ou vous faire une contre-offre sous 48 heures.",
+      "signIn": "Connectez-vous pour faire une offre. Vous reviendrez ensuite sur cette annonce.",
+      "notice": "Une offre acceptée n'engage pas à vendre ; le paiement et la remise se règlent entre vous.",
+      "safety": "{site} n'encaisse rien : ne versez jamais d'acompte avant d'avoir vu l'article.",
+      "draft": "Bonjour, je vous propose {amount} pour « {title} ». Est-ce toujours disponible ?"
+    },
+    "field": {
+      "problems": {
+        "empty": "Indiquez un montant.",
+        "not_whole": "Indiquez un montant en dirhams entiers.",
+        "too_low": "L'offre ne peut pas être inférieure à {min}.",
+        "too_high": "L'offre ne peut pas dépasser le prix affiché ({max}).",
+        "not_above_offer": "La contre-offre doit dépasser l'offre reçue ({amount})."
+      },
+      "bounds": "Entre {min} et {max}",
+      "listed": "Prix affiché : {price}",
+      "suggestions": "Montants suggérés"
+    },
+    "dialog": {
+      "makeTitle": "Faire une offre à {name}",
+      "counterTitle": "Contre-offre à {name}",
+      "makeLead": "{name} a 48 heures pour accepter, refuser ou vous faire une contre-offre.",
+      "counterLead": "Proposez un autre montant à {name}. Une seule contre-offre est possible, valable 48 heures.",
+      "close": "Fermer",
+      "amount": "Votre offre",
+      "counterAmount": "Votre contre-offre",
+      "note": "Un mot pour accompagner l'offre (facultatif)",
+      "notePlaceholder": "Par exemple : je peux passer le chercher samedi.",
+      "reserved": "Retirez les caractères ⟦ et ⟧ : ils ne sont pas acceptés.",
+      "cancel": "Annuler",
+      "send": "Envoyer l'offre",
+      "sendCounter": "Envoyer la contre-offre",
+      "sentToast": "Offre envoyée à {name}."
+    },
+    "card": {
+      "expiresSoon": "Expire dans moins d'une heure",
+      "expiresIn": "Expire dans {hours, plural, one {# heure} other {# heures}}",
+      "acceptedTitle": "Offre acceptée à {amount}",
+      "listed": "Prix affiché : {price}",
+      "pendingMine": "Votre offre : {amount}",
+      "received": "{name} vous propose {amount}",
+      "waiting": "En attente de la réponse de {name}",
+      "counterReceived": "{name} vous fait une contre-offre à {amount}",
+      "counterMine": "Votre contre-offre : {amount}",
+      "yourOffer": "Votre offre : {amount}",
+      "acceptAmount": "Accepter {amount}",
+      "acceptedToast": "Offre acceptée. Convenez de la remise dans la conversation.",
+      "counter": "Contre-offre",
+      "counterToast": "Contre-offre envoyée.",
+      "decline": "Refuser",
+      "declinedToast": "Offre refusée.",
+      "withdraw": "Retirer l'offre",
+      "withdrawnToast": "Offre retirée."
+    },
+    "event": {
+      "made": {
+        "mine": "Vous avez proposé {amount}",
+        "theirs": "{name} propose {amount}"
+      },
+      "countered": {
+        "mine": "Vous avez fait une contre-offre à {amount}",
+        "theirs": "{name} fait une contre-offre à {amount}"
+      },
+      "accepted": {
+        "mine": "Vous avez accepté le prix de {amount}",
+        "theirs": "{name} a accepté le prix de {amount}"
+      },
+      "declined": {
+        "mine": "Vous avez refusé l'offre de {amount}",
+        "theirs": "{name} a refusé l'offre de {amount}"
+      },
+      "withdrawn": {
+        "mine": "Vous avez retiré l'offre de {amount}",
+        "theirs": "{name} a retiré son offre de {amount}"
+      },
+      "expired": "L'offre de {amount} a expiré sans réponse"
+    },
+    "preview": {
+      "made": "Offre de prix",
+      "countered": "Contre-offre",
+      "accepted": "Offre acceptée",
+      "declined": "Offre refusée",
+      "withdrawn": "Offre retirée",
+      "expired": "Offre expirée"
+    },
+    "errors": {
+      "offer_changed": "Cette offre a changé entre-temps : voici sa dernière version.",
+      "offer_expired": "Cette offre a expiré. L'acheteur peut en faire une nouvelle.",
+      "offer_pending": "Une offre attend déjà une réponse dans cette conversation.",
+      "offer_unavailable": "Cette annonce n'accepte pas d'offre pour le moment.",
+      "amount": "Ce montant n'est plus possible : le prix de l'annonce a peut-être changé. Vérifiez-le, puis réessayez."
+    }
+  },
   "Report": {
     "trigger": {
       "listing": "Signaler l'annonce",

@@ -144,18 +144,21 @@ export interface NewMessageInput {
   appointment?: MessageDoc["appointment"];
   /** A system message about the conversation's booking request (src/lib/rental-requests). */
   rentalRequest?: MessageDoc["rentalRequest"];
+  /** A system message about the conversation's price offer (src/lib/offers). */
+  offer?: MessageDoc["offer"];
   now: Date;
 }
 
 /**
  * Runs inside the append transaction on the conversation as read (src/lib/appointments,
- * src/lib/rental-requests): throws to abort, else returns the conversation fields to set with the
- * message (null deletes a field) and, for a system message, its text and appointment or booking
- * request step.
+ * src/lib/rental-requests, src/lib/offers): throws to abort, else returns the conversation fields
+ * to set with the message (null deletes a field) and, for a system message, its text and
+ * appointment, booking request or offer step.
  */
 export type ConversationExtension = (conversation: ConversationRecord) => {
-  fields: Partial<Record<"appointment" | "appointmentRemindAt" | "rentalRequest", unknown>>;
-  message?: Pick<NewMessageInput, "text"> & (Required<Pick<NewMessageInput, "appointment">> | Required<Pick<NewMessageInput, "rentalRequest">>);
+  fields: Partial<Record<"appointment" | "appointmentRemindAt" | "rentalRequest" | "offer" | "offerExpiresAt", unknown>>;
+  message?: Pick<NewMessageInput, "text"> &
+    (Required<Pick<NewMessageInput, "appointment">> | Required<Pick<NewMessageInput, "rentalRequest">> | Required<Pick<NewMessageInput, "offer">>);
 };
 
 function messageDoc(conversation: Pick<ConversationDoc, "participants" | "sellerProId">, input: NewMessageInput): MessageDoc {
@@ -163,9 +166,10 @@ function messageDoc(conversation: Pick<ConversationDoc, "participants" | "seller
     senderUid: input.senderUid,
     participants: conversation.participants,
     ...(conversation.sellerProId ? { sellerProId: conversation.sellerProId } : {}),
-    type: input.appointment || input.rentalRequest ? "system" : "text",
+    type: input.appointment || input.rentalRequest || input.offer ? "system" : "text",
     ...(input.appointment ? { appointment: input.appointment } : {}),
     ...(input.rentalRequest ? { rentalRequest: input.rentalRequest } : {}),
+    ...(input.offer ? { offer: input.offer } : {}),
     text: input.text,
     ...(input.flags.length > 0 ? { risk: { flags: input.flags, warned: true } } : {}),
     createdAt: input.now,

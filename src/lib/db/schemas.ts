@@ -35,6 +35,7 @@ import {
   slotSchema,
 } from "@/lib/contracts/appointments";
 import { RENTAL_PICKUP_MAX, RENTAL_REQUEST_EVENTS, RENTAL_REQUEST_STATUSES, rentalRequestIdSchema } from "@/lib/contracts/rental-requests";
+import { OFFER_EVENTS, OFFER_STATUSES, offerIdSchema } from "@/lib/contracts/offers";
 import { REPORT_PRIORITIES, REPORT_REASON_IDS, REPORT_TARGET_TYPES } from "@/config/report-reasons";
 import { PAYMENT_URL_MAX } from "@/config/seller-payments";
 import type { LedgerReason } from "@/lib/payments/wallet";
@@ -672,6 +673,31 @@ export const rentalRequestEventSchema = z
   .strict();
 export type RentalRequestEventDoc = z.infer<typeof rentalRequestEventSchema>;
 
+const offerAmount = z.number().int().min(1).max(PRICE_MAX);
+
+/** Conversation.offer: the buyer's current price offer and the seller's answer (Carte vivante lot 5). */
+export const offerSchema = z
+  .object({
+    id: offerIdSchema,
+    status: z.enum(OFFER_STATUSES),
+    /** The buyer's offer, DH. */
+    amount: offerAmount,
+    /** The seller's counter-offer (one at most), DH. */
+    counter: offerAmount.optional(),
+    /** The listing's price the bounds were measured against when the offer was made. */
+    price: offerAmount,
+    createdAt: ts,
+    updatedAt: ts,
+    /** End of the current 48 h: the offer's, then the counter-offer's. */
+    expiresAt: ts,
+  })
+  .strict();
+export type OfferDoc = z.infer<typeof offerSchema>;
+
+/** Message.offer: the step an offer system message shows. */
+export const offerEventSchema = z.object({ id: offerIdSchema, event: z.enum(OFFER_EVENTS), amount: offerAmount }).strict();
+export type OfferEventDoc = z.infer<typeof offerEventSchema>;
+
 /** conversations/{cid}: one per (listing, buyer); cid derived on the server (D1). Served to participants by the API (D2). */
 export const conversationSchema = z
   .object({
@@ -693,6 +719,8 @@ export const conversationSchema = z
         price: z.number().int().min(0).max(PRICE_MAX).nullable(),
         isDonation: z.boolean(),
         photo: z.object({ id: z.string().min(1).max(64), blurhash: z.string().max(100) }).strict().nullable(),
+        /** The listing took price offers when the conversation started (Carte vivante lot 5); absent before. */
+        offers: z.boolean().optional(),
       })
       .strict(),
     lastMessage: z.object({ preview: z.string().max(140), senderUid: uid, at: ts, flagged: z.boolean() }).strict(),
@@ -720,6 +748,10 @@ export const conversationSchema = z
     appointmentRemindAt: ts.optional(),
     /** The current booking request of a car rental (requested, answered or withdrawn); the thread keeps every step. */
     rentalRequest: rentalRequestSchema.optional(),
+    /** The buyer's current price offer (open, answered, withdrawn or expired); the thread keeps every step. */
+    offer: offerSchema.optional(),
+    /** Due time of the pending offer's expiry (job offer-expiry); absent once answered. */
+    offerExpiresAt: ts.optional(),
     /** The buyer reviewed the seller from this conversation (once, even if the review is deleted later). */
     reviewedAt: ts.optional(),
     /** The seller's first message: the exchange is reciprocal, a review opens 24 h later (vitrine-avis §2). */
@@ -743,6 +775,8 @@ export const messageSchema = z
     appointment: appointmentEventSchema.optional(),
     /** Booking request system message: its text is the rentalRequestMarker of the event. */
     rentalRequest: rentalRequestEventSchema.optional(),
+    /** Offer system message: its text is the offerMarker of the event. */
+    offer: offerEventSchema.optional(),
     createdAt: ts,
     readAt: ts.optional(),
   })

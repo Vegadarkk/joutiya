@@ -4,6 +4,7 @@ import { MESSAGE_TEXT_MAX } from "@/lib/contracts/endpoints";
 import { listingIdSchema } from "@/lib/contracts/listings";
 import type { AppointmentEventView, AppointmentView } from "@/lib/contracts/appointments";
 import type { RentalRequestEventView, RentalRequestView } from "@/lib/contracts/rental-requests";
+import type { OfferEventView, OfferView } from "@/lib/contracts/offers";
 
 // Messaging contracts shared by the browser and the route handlers (design D1-D7). Messages are plain
 // text; the server masks URLs before storage and the reader renders the markers below as chips.
@@ -120,6 +121,10 @@ export interface ConversationView {
   appointment?: AppointmentView | null;
   /** The current booking request of a car rental (src/lib/contracts/rental-requests.ts); null when none. */
   rentalRequest?: RentalRequestView | null;
+  /** The buyer's current price offer (src/lib/contracts/offers.ts); null when none. */
+  offer?: OfferView | null;
+  /** The listing took price offers when the conversation started (the buyer's « Faire une offre »). */
+  offersAllowed?: boolean;
   updatedAt: number;
   /** What the buyer's review window needs (vitrine-avis §2, `reviewWindow`): epoch ms or null. */
   review: { sellerRepliedAt: number | null; reviewedAt: number | null };
@@ -135,6 +140,7 @@ export interface MessageView {
   /** Appointment system message: the step it shows. */
   appointment?: AppointmentEventView;
   rentalRequest?: RentalRequestEventView;
+  offer?: OfferEventView;
   createdAt: number;
   readAt: number | null;
 }

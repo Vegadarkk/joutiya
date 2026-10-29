@@ -1,6 +1,7 @@
 import "server-only";
 import { audit } from "@/lib/audit";
 import { cidSchema } from "@/lib/contracts/messaging";
+import type { OfferEventDoc } from "@/lib/db/schemas";
 import { forbidden, notFound } from "@/lib/http/errors";
 import { getConversationForStaff } from "@/lib/messaging";
 import { consume } from "@/lib/quota";
@@ -15,6 +16,20 @@ import { conversationRef, reportsOnConversation } from "./repository";
 // of hidden or masked messages only for the reported ones (all of them under an authority request).
 
 const AUTHORITY_PREFIX = "authority:";
+
+/** A price offer step as staff read it (the members' thread renders the marker localized). */
+const OFFER_STEPS: Record<OfferEventDoc["event"], string> = {
+  made: "Offre de prix",
+  countered: "Contre-offre",
+  accepted: "Offre acceptée",
+  declined: "Offre refusée",
+  withdrawn: "Offre retirée",
+  expired: "Offre expirée",
+};
+
+export function staffOfferText(step: OfferEventDoc): string {
+  return `${OFFER_STEPS[step.event]} : ${step.amount} DH`;
+}
 
 export interface StaffReader {
   uid: string;
@@ -63,7 +78,7 @@ export async function staffConversation(reader: StaffReader, cid: string, reason
     messages: transcript.messages.map((message) => ({
       id: message.id,
       from: from(message.senderUid, message.type),
-      text: message.text,
+      text: message.offer ? staffOfferText(message.offer) : message.text,
       hidden: message.hidden === true,
       flags: [...(message.risk?.flags ?? [])],
       createdAt: message.createdAt.toISOString(),

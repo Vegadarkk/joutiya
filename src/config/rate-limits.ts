@@ -173,6 +173,9 @@ export const RATE_LIMITS = {
   // Public listing and profile reads (API; the SSR page limit lives in the proxy, phase 4).
   "listing.read.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
   "profile.read.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
+  // « Prix repère » API (Carte vivante lot 5): the map panel asks it once per listing opened;
+  // cached 24 h server side and an hour at the edge, so a few hundred per hour per IP is plenty.
+  "priceguide.ip": { points: 600, duration: HOUR, policy: "open", key: "ip" },
   // Staff moderation decisions (admin host, behind Access): a moderator working the queue.
   "moderation.decision.uid": { points: 300, duration: HOUR, policy: "closed", key: "uid" },
   // Pro applications (phase 7): a moderator's verify or reject; each verification retags the
@@ -235,6 +238,10 @@ export const RATE_LIMITS = {
   "appointment.uid": { points: 30, duration: HOUR, policy: "open", key: "uid" },
   // Car rental booking requests (rental pack §6): 20 new requests a day per renter, on top of the send limiters.
   "rental.request.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
+  // Price offers in messaging (Carte vivante lot 5): 20 new offers a day per buyer, and 5 offers or
+  // counter-offers per conversation and participant in 24 h, on top of the send limiters.
+  "offer.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
+  "offer.thread": { points: 5, duration: DAY, policy: "open", key: "uid+cid" },
   "conversation.new.uid": { points: 50, duration: DAY, policy: "open", key: "uid" },
   "conversation.new.young.uid": { points: 10, duration: DAY, policy: "open", key: "uid" },
   // Read, archive, hide, block calls of the inbox, and the unread badge.

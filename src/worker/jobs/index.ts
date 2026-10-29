@@ -20,6 +20,7 @@ import { sendCguNotices } from "./cgu-notice";
 import { exportAuditLogs } from "./audit-export";
 import { sendMessageDigests } from "./message-digest";
 import { sendAppointmentReminders } from "./appointment-reminders";
+import { expireOffers } from "./offer-expiry";
 import { sweepReportSla } from "./report-sla-sweep";
 import { checkGuideLinks } from "./guide-links";
 import { reviewChangedLinks } from "@/lib/guide/review";
@@ -51,6 +52,7 @@ export const JOBS: Record<string, (job: Job) => Promise<unknown>> = {
   "lift-suspensions": () => liftSuspensions(),
   "message-digest": () => sendMessageDigests(),
   "appointment-reminders": () => sendAppointmentReminders(),
+  "offer-expiry": () => expireOffers(),
   "report-sla-sweep": () => sweepReportSla(),
   "audit-export": () => exportAuditLogs(),
   "guide-links": () => checkGuideLinks(),
@@ -104,6 +106,8 @@ export const SCHEDULES = {
   "message-digest-10min": { pattern: "1-59/10 * * * *", job: "message-digest" },
   // Appointments (28 Oct). Every 10 minutes from :04: reminders due (the day before, 2 hours before).
   "appointment-reminders-10min": { pattern: "4-59/10 * * * *", job: "appointment-reminders" },
+  // Price offers (Carte vivante lot 5). Every 10 minutes from :09: offers unanswered for 48 h expire.
+  "offer-expiry-10min": { pattern: "9-59/10 * * * *", job: "offer-expiry" },
   // Phase 5 (D12). Every 10 minutes from :07: open P0 reports past their 1-hour target -> one more P0 alert.
   "report-sla-sweep-10min": { pattern: "7-59/10 * * * *", job: "report-sla-sweep" },
   // Phase 5 (D23). 03:22 UTC: yesterday's auditLogs -> age-encrypted NDJSON in the private bucket, before the backup (03:30).

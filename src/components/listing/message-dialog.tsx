@@ -12,13 +12,18 @@ import { RentalDatesFields, completeDates } from "@/components/rental/rental-dat
 import { formatRentalDay, fragmentDates } from "@/components/rental/rental-day";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AmountField, amountProblem } from "@/components/offers/amount-field";
+import { offerErrorKey } from "@/components/offers/error-keys";
+import { OfferNotice } from "@/components/offers/offer-notice";
 import type { Locale } from "@/config/site";
 import { Link, useRouter } from "@/i18n/navigation";
 import { ApiError, refreshSession } from "@/lib/auth/client";
 import { MESSAGE_TEXT_MAX } from "@/lib/contracts/endpoints";
 import { isolate } from "@/lib/i18n/bidi";
+import { formatPrice, parsePriceInput } from "@/lib/listings/client/format";
 import { moroccoToday, rentalDuration } from "@/lib/listings/rental-availability";
 import { startConversation } from "@/lib/messaging/client";
+import type { OfferProblem } from "@/lib/offers/rules";
 import { RENTAL_PICKUP_MAX, rentalRequestProblem } from "@/lib/rental-requests/rules";
 import type { RentalDates } from "@/lib/search/params";
 import { cn } from "@/lib/utils";
@@ -30,7 +35,8 @@ import { cn } from "@/lib/utils";
 // An adults-only listing (decorative koumiyas) adds the buyer's 18+ confirmation, required. A car
 // rental's booking request (rental pack §6) adds its days (those of the search the renter came
 // from, when the URL fragment carries them) and a pick-up place; the message is drafted from them until
-// the renter edits it, and the request shows as a card in the thread.
+// the renter edits it, and the request shows as a card in the thread. A price offer (Carte vivante
+// lot 5) adds its amount, drafts the message from it the same way, and lands on the offer's card.
 
 /** Codes with their own wording here; the rest take the generic API message. */
 export const COMPOSE_ERROR_KEYS = [
@@ -74,8 +80,13 @@ export interface MessageDialogProps {
   sellerName?: string;
   /** Adults-only listing: the buyer confirms being 18 or older before the first message. */
   adultsOnly?: boolean;
-  /** "visit": a visit request (real estate), with its draft, then the thread on the slots. "rental": a car rental's booking request. */
-  intent?: "message" | "visit" | "rental";
+  /**
+   * "visit": a visit request (real estate), with its draft, then the thread on the slots. "rental": a
+   * car rental's booking request. "offer": a price offer, with its amount.
+   */
+  intent?: "message" | "visit" | "rental" | "offer";
+  /** The price an offer is measured against (intent "offer"). */
+  offerPrice?: number;
   /** The session ended meanwhile: the bar shows its sign-in prompt. */
   onSignedOut: () => void;
   /** First words of the message (a test drive request), the buyer edits them freely. */
@@ -84,8 +95,11 @@ export interface MessageDialogProps {
   threadQuery?: string;
 }
 
-export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sellerName, adultsOnly = false, intent = "message", onSignedOut, initialText, threadQuery }: MessageDialogProps) {
+export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sellerName, adultsOnly = false, intent = "message", onSignedOut, initialText, threadQuery, offerPrice }: MessageDialogProps) {
   const t = useTranslations("ListingPage.contact.compose");
+  const offers = useTranslations("Offers.listing");
+  const offerDialog = useTranslations("Offers.dialog");
+  const offerErrors = useTranslations("Offers.errors");
   const generic = useApiErrorMessage();
   const locale = useLocale();
   const router = useRouter();
@@ -93,6 +107,9 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
   const turnstile = useRef<TurnstileHandle>(null);
   const visit = intent === "visit";
   const rental = intent === "rental";
+  const offer = intent === "offer" && offerPrice !== undefined && offerPrice > 0 ? offerPrice : null;
+  const [amountText, setAmountText] = useState("");
+  const [amountShown, setAmountShown] = useState<OfferProblem | "empty" | null>(null);
   const [dates, setDates] = useState<Partial<RentalDates>>(() => (rental && typeof window !== "undefined" ? requestedDates(window.location.hash, moroccoToday(Date.now())) : {}));
   const [pickup, setPickup] = useState("");
   const [edited, setEdited] = useState(false);
@@ -102,6 +119,10 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
     if (!complete) return "";
     const values = { title: listingTitle ?? "", from: formatRentalDay(complete.from, locale as Locale), to: formatRentalDay(complete.to, locale as Locale), days: rentalDuration(complete) };
     return place.trim() ? t("rentalDraftPickup", { ...values, pickup: place.trim() }) : t("rentalDraft", values);
+  };
+  const offerDraft = (typed: string): string => {
+    const amount = parsePriceInput(typed);
+    return amount === null ? "" : offers("draft", { amount: formatPrice(amount, locale as Locale), title: listingTitle ?? "" });
   };
   const [text, setText] = useState(() => initialText ?? (visit ? t("visitDraft") : rental ? draft(dates, "") : ""));
   const [token, setToken] = useState<string | null>(null);
@@ -115,6 +136,11 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
   const remaining = MESSAGE_TEXT_MAX - text.length;
 
   function message(caught: unknown): string {
+    if (offer !== null) {
+      const offerKey = offerErrorKey(caught);
+      if (offerKey) return offerErrors(offerKey);
+      if (caught instanceof ApiError && caught.code === "invalid_body") return offerErrors("amount");
+    }
     const key = composeErrorKey(caught);
     if (key === "rate_limited") return t("errors.rate_limited", { wait: formatWait(locale, caught instanceof ApiError ? caught.retryAfter : undefined, t("errors.later")) });
     return key ? t(`errors.${key}`) : generic(caught);
@@ -128,7 +154,10 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
     if (adultsOnly && !adult) setAdultMissing(true);
     const period = rental ? completeDates(dates) : undefined;
     if (rental && !period) setDatesMissing(true);
-    if (found || (adultsOnly && !adult) || (rental && !period)) return;
+    const amountIssue = offer !== null ? amountProblem(amountText, offer) : null;
+    setAmountShown(amountIssue);
+    if (found || (adultsOnly && !adult) || (rental && !period) || amountIssue) return;
+    const amount = offer !== null ? parsePriceInput(amountText) : null;
     if (!token) {
       setChallengeMissing(true);
       return;
@@ -142,6 +171,7 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
         turnstileToken: token,
         ...(adultsOnly ? { adultConfirmed: true as const } : {}),
         ...(period ? { rentalRequest: { ...period, ...(pickup.trim() ? { pickup: pickup.trim() } : {}) } } : {}),
+        ...(amount !== null ? { offer: { amount } } : {}),
       });
       const query = threadQuery ?? (visit ? "rdv=visit" : undefined);
       router.push(`/messages/${cid}${query ? `?${query}` : ""}`);
@@ -182,7 +212,9 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
                     ? sellerName
                       ? t("rentalTitle", { name: isolate(sellerName) })
                       : t("rentalTitleFallback")
-                    : sellerName
+                    : offer !== null
+                      ? offerDialog("makeTitle", { name: isolate(sellerName ?? "") })
+                      : sellerName
                       ? t("title", { name: isolate(sellerName) })
                       : t("titleFallback")}
               </Dialog.Title>
@@ -223,6 +255,20 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
               </div>
             ) : null}
 
+            {offer !== null ? (
+              <AmountField
+                price={offer}
+                value={amountText}
+                label={offerDialog("amount")}
+                problem={amountShown}
+                onChange={(next) => {
+                  setAmountText(next);
+                  if (amountShown) setAmountShown(amountProblem(next, offer));
+                  if (!edited) setText(offerDraft(next));
+                }}
+              />
+            ) : null}
+
             <div className="flex flex-col gap-1.5">
               <label htmlFor={`${counterId}-text`} className="text-sm font-medium">
                 {t("label")}
@@ -251,6 +297,8 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
                 </p>
               ) : null}
             </div>
+
+            {offer !== null ? <OfferNotice className="text-sm" /> : null}
 
             {adultsOnly ? (
               <div className="flex flex-col gap-1.5">
@@ -313,7 +361,7 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
               </Dialog.Close>
               <Button type="submit" loading={pending}>
                 <Send className="rtl:-scale-x-100" aria-hidden="true" />
-                {rental ? t("rentalSend") : t("send")}
+                {rental ? t("rentalSend") : offer !== null ? offerDialog("send") : t("send")}
               </Button>
             </div>
           </form>
