@@ -1,5 +1,5 @@
 {
-  "description": "Zero Trust Access applications (Free, up to 50 users). ${VAR} values come from the environment of scripts/cloudflare.ts, never from this file; ACCESS_GOOGLE_IDP_ID is looked up by the script (the account's only Google login method). Staff sign in with Google only, on an account with 2-step verification (§6). Service tokens are created in the dashboard (secret shown once). Only the CI token reaches sshd, where its key is only accepted for deploy-staging (forced command): nobody else has an SSH user, administration goes through OCI Run Command. The AUD tag of admin.joutiya.ma and admin-staging.joutiya.ma goes to CF_ACCESS_AUD of each environment and to infra/targets.json. Resend and Meta webhooks cannot sign in: staging.joutiya.ma/api/webhooks/* bypasses Access (the routes check each sender's signature, the WAF skips the path); the production site is public.",
+  "description": "Zero Trust Access applications (Free, up to 50 users). ${VAR} values come from the environment of scripts/cloudflare.ts, never from this file; ACCESS_GOOGLE_IDP_ID is looked up by the script (the account's only Google login method). Staff sign in with Google only, on an account with 2-step verification (§6). Service tokens are created in the dashboard (secret shown once), joutiya-scan by scripts/github-ci.ts seal-scan; staging.joutiya.ma also reads a service token from the single header x-joutiya-access-token (scripts/github-ci.ts SCAN_HEADER), which ZAP and k6 send. Only the CI token reaches sshd, where its key is only accepted for deploy-staging (forced command): nobody else has an SSH user, administration goes through OCI Run Command. The AUD tag of admin.joutiya.ma and admin-staging.joutiya.ma goes to CF_ACCESS_AUD of each environment and to infra/targets.json. Resend and Meta webhooks cannot sign in: staging.joutiya.ma/api/webhooks/* bypasses Access (the routes check each sender's signature, the WAF skips the path); the production site is public.",
   "apps": [
     {
       "name": "Joutiya back-office",
@@ -52,6 +52,7 @@
       "domain": "staging.joutiya.ma",
       "type": "self_hosted",
       "session_duration": "24h",
+      "read_service_tokens_from_header": "x-joutiya-access-token",
       "allowed_idps": [
         "${ACCESS_GOOGLE_IDP_ID}"
       ],
@@ -64,6 +65,17 @@
             {
               "service_token": {
                 "token_id": "${ACCESS_PROBE_TOKEN_ID}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Security scan and load test",
+          "decision": "non_identity",
+          "include": [
+            {
+              "service_token": {
+                "token_id": "${ACCESS_SCAN_TOKEN_ID}"
               }
             }
           ]

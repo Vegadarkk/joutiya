@@ -12,7 +12,7 @@
 //
 // Environment (never printed): JOUTIYA_CLOUDFLARE_API_TOKEN, a custom token limited to the Joutiya
 // account and the joutiya.ma zone (a prefixed name: a shared shell may hold other projects' tokens);
-// for access: ACCESS_OWNER_EMAIL, ACCESS_CI_TOKEN_ID, ACCESS_PROBE_TOKEN_ID.
+// for access: ACCESS_OWNER_EMAIL, ACCESS_CI_TOKEN_ID, ACCESS_PROBE_TOKEN_ID, ACCESS_SCAN_TOKEN_ID.
 // r2 only checks: Nav applies r2-buckets.json in the dashboard (bucket settings need account-wide
 // R2 rights), and this part sends its CORS preflights, which need no token.
 // loadtest --on puts a temporary skip rule first in the WAF custom rules (load test of staging,
@@ -74,6 +74,8 @@ export interface AccessApp {
   session_duration: string;
   allowed_idps?: string[];
   auto_redirect_to_identity?: boolean;
+  /** Single-header service token authentication (the security scan and the load test). */
+  read_service_tokens_from_header?: string;
   policies: { name: string; decision: string; include: unknown[] }[];
 }
 

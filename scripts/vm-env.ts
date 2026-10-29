@@ -49,6 +49,7 @@ const NOT_IN_APP_ENV = new Set([
   "ACCESS_OWNER_EMAIL",
   "ACCESS_CI_TOKEN_ID",
   "ACCESS_PROBE_TOKEN_ID",
+  "ACCESS_SCAN_TOKEN_ID",
   // Meilisearch's own key, in meilisearch.env only: the app holds two scoped keys made from it.
   "MEILI_MASTER_KEY",
 ]);
