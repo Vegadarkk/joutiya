@@ -168,7 +168,7 @@ Avant votre première annonce en tant que professionnel, {brand} vérifie votre 
 
 Un modérateur contrôle le format de l'ICE puis son existence dans un registre public ou une base d'entreprises. Tant que la vérification n'est pas validée, votre compte reste un compte de particulier et ne publie pas en tant que Pro.
 
-**Vos engagements.** Pour demander le statut Pro, pour passer en agence immobilière ou en agence de location de voitures, et pour acheter un Pass Boutique, vous acceptez une liste d'engagements propres à votre activité, sous votre seule responsabilité ; {brand} enregistre la version acceptée et sa date. Une fausse déclaration, ou l'usage du nom, de l'ICE ou des documents d'une autre entreprise, entraîne le refus de la demande ou la suspension du compte Pro, et le retrait de ses annonces (§11). Elle peut aussi constituer une infraction pénale (faux, escroquerie) : {brand} conserve les éléments de la demande pendant la durée prévue par la politique de confidentialité et les transmet aux autorités qui les demandent légalement (§9.5).
+**Vos engagements.** Pour demander le statut Pro, pour passer en agence immobilière, en agence de location de voitures ou en agence de location saisonnière, et pour acheter un Pass Boutique, vous acceptez une liste d'engagements propres à votre activité, sous votre seule responsabilité ; {brand} enregistre la version acceptée et sa date. Une fausse déclaration, ou l'usage du nom, de l'ICE ou des documents d'une autre entreprise, entraîne le refus de la demande ou la suspension du compte Pro, et le retrait de ses annonces (§11). Elle peut aussi constituer une infraction pénale (faux, escroquerie) : {brand} conserve les éléments de la demande pendant la durée prévue par la politique de confidentialité et les transmet aux autorités qui les demandent légalement (§9.5).
 
 Un refus est motivé (§10). Vous pouvez le contester (§12) ou déposer une nouvelle demande.
 
@@ -298,7 +298,7 @@ Le nombre d'annonces et de photos est limité. Les limites sont affichées lors 
 - Vous pouvez indiquer que le prix est négociable, ou proposer le bien en don.
 - Pour une location, le prix correspond à la période indiquée dans l'annonce.
 - Un professionnel indique le prix total toutes taxes comprises, frais obligatoires inclus, selon les règles d'information sur les prix.
-- **Prix repère.** Une annonce peut afficher un « Prix repère » : la fourchette habituelle des prix d'annonces comparables publiées sur {brand} (même sous-catégorie et mêmes critères principaux ; même ville, sinon même région, sinon tout le Maroc), sans les prix les plus hauts et les plus bas. C'est une indication automatique, ni une estimation du bien ni une garantie, et vous restez libre de votre prix. Il ne s'affiche pas sous 8 annonces comparables, ni pour certaines catégories, notamment les dons, services, produits du terroir, lots, bétail, locations à la nuit et articles pour adultes.
+- **Prix repère.** Une annonce peut afficher un « Prix repère » : la fourchette habituelle des prix d'annonces comparables publiées sur {brand} (même sous-catégorie et mêmes critères principaux ; même ville, sinon même région, sinon tout le Maroc), sans les prix les plus hauts et les plus bas ; chaque vendeur n'y compte que pour ses 2 prix les plus récents. C'est une indication automatique, ni une estimation du bien ni une garantie, et vous restez libre de votre prix. Il ne s'affiche pas sous 8 annonces comparables ou 5 vendeurs différents, ni pour certaines catégories, notamment les dons, services, produits du terroir, lots, bétail, locations à la nuit et articles pour adultes.
 
 Un prix très éloigné des prix habituels de la catégorie peut entraîner une vérification avant publication (§8.2).
 
@@ -369,6 +369,10 @@ Une annonce pour un objet interdit est bloquée ou mise en vérification au dép
 **Responsabilité.** Une information inexacte, incomplète ou trompeuse engage la seule responsabilité de l'annonceur, envers les autres utilisateurs, les tiers et {brand} (§6.1 et §19.1). {brand} n'en répond que dans les conditions du régime d'hébergeur (§19.2).
 
 **Aucun paiement par {brand}.** Aucun acompte, dépôt de garantie, frais de réservation ou de visite ne passe par {brand} (§15.2). Le dépôt de garantie d'un bail d'habitation ne peut pas dépasser 2 mois de loyer (loi n° 67-12). Ne versez rien avant d'avoir visité le bien et signé un écrit (§15.3).
+
+**Location saisonnière.** Louer un logement à des touristes est encadré par la loi n° 80-14 sur l'hébergement touristique. L'annonceur, particulier ou agence, est seul responsable de ses obligations : l'autorisation d'exploitation et l'assurance de chaque logement, la vérification de l'identité de chaque client et sa déclaration quotidienne aux autorités, la collecte et le reversement de la taxe de séjour à la commune (loi n° 47-06). Une agence de location saisonnière s'y engage en demandant ce statut (§4.4). {brand} ne contrôle pas ces obligations, ne déclare aucun client et ne collecte aucune taxe.
+
+**Demande de séjour.** Depuis l'annonce d'un logement en location saisonnière, un utilisateur peut envoyer à l'annonceur une demande avec ses dates d'arrivée et de départ. Ce n'est qu'une demande : l'annonceur confirme ou non la disponibilité dans la messagerie, et peut alors bloquer ces nuits sur son annonce. Le séjour se conclut directement entre l'annonceur et le client, par un contrat ou une confirmation écrite. Aucun acompte, dépôt de garantie ou paiement ne passe par {brand} (§15.2).
 
 ### 7.11 Location de véhicules {#annonces-11}
 
