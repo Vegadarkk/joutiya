@@ -3,8 +3,8 @@
 import { useId, useState } from "react";
 import { useTranslations } from "next-intl";
 import { inputClassName } from "@/components/ui/input";
-import { dayNumber, dayString, moroccoToday } from "@/lib/listings/rental-availability";
-import { RENTAL_SEARCH_AHEAD_DAYS, RENTAL_SEARCH_DAYS_MAX, type RentalDates } from "@/lib/search/params";
+import { RENTAL_SEARCH_AHEAD_DAYS, RENTAL_SEARCH_DAYS_MAX, dayNumber, dayString, moroccoToday } from "@/lib/listings/rental-availability";
+import type { RentalDates } from "@/lib/search/params";
 import { cn } from "@/lib/utils";
 
 // Pick-up and return days of a car rental search (rental pack §4): native date fields (the

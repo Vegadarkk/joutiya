@@ -207,11 +207,12 @@ export async function sendMessage(actor: MessagingActor, cid: string, text: stri
 }
 
 /**
- * An appointment step (src/lib/appointments): a system message whose text and conversation fields
- * `extend` sets inside the append transaction (same access checks as a message), then what follows
- * every message (the other participant's badge, live events, digest mail).
+ * An appointment or booking request step (src/lib/appointments, src/lib/rental-requests): a system
+ * message whose text and conversation fields `extend` sets inside the append transaction (same
+ * access checks as a message), then what follows every message (the other participant's badge,
+ * live events, digest mail).
  */
-export async function appendAppointmentStep(actor: MessagingActor, cid: string, extend: ConversationExtension, now = new Date()): Promise<string> {
+export async function appendSystemStep(actor: MessagingActor, cid: string, extend: ConversationExtension, now = new Date()): Promise<string> {
   const { messageId } = await append(actor, cid, "", { text: "", flags: [], masked: false }, now, extend);
   return messageId;
 }

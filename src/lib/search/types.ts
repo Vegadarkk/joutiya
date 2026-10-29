@@ -220,7 +220,8 @@ export interface SearchCard {
    * Car rental in a search by dates (rental pack §4): rental days, estimated total in MAD (long-term
    * rate applied, deposit excluded; null without a price) and whether the availability is up to date.
    */
-  rental?: { days: number; total: number | null; fresh: boolean };
+  /** `from`/`to`: the searched days ("YYYY-MM-DD"), carried to the listing page (booking request). */
+  rental?: { days: number; total: number | null; fresh: boolean; from: string; to: string };
 }
 
 export interface SearchFacets {

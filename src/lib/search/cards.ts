@@ -11,7 +11,7 @@ function rentalOf(doc: CardDocument, now: Date, dates: RentalDates): NonNullable
   if (typeof doc.a_rate_7_days === "number") attributes["rate-7-days"] = doc.a_rate_7_days;
   if (typeof doc.a_rate_30_days === "number") attributes["rate-30-days"] = doc.a_rate_30_days;
   const total = typeof doc.price === "number" ? rentalDayRate(attributes, doc.price, days) * days : null;
-  return { days, total, fresh: typeof doc.rentFreshUntil === "number" && doc.rentFreshUntil > now.getTime() };
+  return { days, total, fresh: typeof doc.rentFreshUntil === "number" && doc.rentFreshUntil > now.getTime(), from: dates.from, to: dates.to };
 }
 
 // Engine hit -> results card (design D22): the one card shape of every engine-backed list (search,

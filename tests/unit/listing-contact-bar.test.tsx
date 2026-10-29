@@ -143,6 +143,16 @@ describe("visit request (real estate)", () => {
   });
 });
 
+describe("booking request (car rental)", () => {
+  it("adds the booking request button and opens the plain thread", () => {
+    expect(render()).not.toContain('data-testid="rental-request-button"');
+    const html = render({ rental: true });
+    expect(html).toContain('data-testid="rental-request-button"');
+    expect(html).toContain(fr.ListingPage.contact.rental);
+    expect(threadHref("c123", "rental")).toBe("/messages/c123");
+  });
+});
+
 describe("messageStep", () => {
   const member = { uid: "u2", publicId: "zzzzzzzzzz", role: "individual", phoneVerified: false } as SessionSummary;
   const deps = (viewer: SessionSummary | null, find: (id: string) => Promise<string | null>) => ({ loadSession: async () => viewer, findListingConversation: find });

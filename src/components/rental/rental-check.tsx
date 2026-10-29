@@ -6,6 +6,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { useApiErrorMessage } from "@/components/auth/form-message";
 import { InlineError } from "@/components/feedback/inline-error";
 import { Button } from "@/components/ui/button";
+import { Link } from "@/i18n/navigation";
 import type { RentalCheckView } from "@/lib/contracts/pro";
 import { loadProMe, submitRentalCheck, uploadKybcPiece } from "@/lib/pro/client";
 import { cn } from "@/lib/utils";
@@ -96,7 +97,15 @@ export function RentalCheckPanel({ check, savedRef, onChange }: { check: RentalC
           {check?.status === "verified" ? <p className="text-xs text-foreground-muted text-pretty">{t("verifiedNote")}</p> : null}
         </div>
       </div>
-      <p className="text-xs text-foreground-muted text-pretty">{t("notice")}</p>
+      <p className="text-xs text-foreground-muted text-pretty">
+        {t.rich("notice", {
+          link: (chunks) => (
+            <Link href="/legal/confidentialite#finalites-8" target="_blank" rel="noopener" className="font-medium text-link underline underline-offset-2">
+              {chunks}
+            </Link>
+          ),
+        })}
+      </p>
       <div className="flex flex-wrap items-center gap-3">
         <input
           ref={input}

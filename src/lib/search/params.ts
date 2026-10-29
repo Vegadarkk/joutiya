@@ -1,6 +1,6 @@
 import { CONDITIONS, RENTAL_SUBCATEGORY, categoryById, criterionById, searchCriteria, subcategoryById, type Condition } from "@/config/categories";
 import { cityBySlug, regionByCode } from "@/config/regions";
-import { DAY_PATTERN, dayNumber } from "@/lib/listings/rental-availability";
+import { DAY_PATTERN, RENTAL_SEARCH_DAYS_MAX, dayNumber } from "@/lib/listings/rental-availability";
 import { z } from "@/lib/zod";
 
 // Search parameters (phase 4, design §2): the one whitelist shared by the search page, /api/search,
@@ -26,9 +26,8 @@ export const SELLER_TYPES_FILTER = ["individual", "pro"] as const;
 export type SellerTypeFilter = (typeof SELLER_TYPES_FILTER)[number];
 /** Upper bound of price filters, MAD (PRICE_MAX of listings). */
 export const SEARCH_PRICE_MAX = 100_000_000;
-/** Car rental dates (rental pack §4): at most 60 days of rental, a start within 180 days. */
-export const RENTAL_SEARCH_DAYS_MAX = 60;
-export const RENTAL_SEARCH_AHEAD_DAYS = 180;
+// Car rental dates (rental pack §4): bounds and duration live with the availability rules (no zod there).
+export { RENTAL_SEARCH_AHEAD_DAYS, RENTAL_SEARCH_DAYS_MAX, rentalDuration } from "@/lib/listings/rental-availability";
 
 /** URL parameter names. `breadcrumb.tsx` links use the same names. */
 export const SEARCH_QUERY_KEYS = {
@@ -107,11 +106,6 @@ export interface SearchParams {
 export interface RentalDates {
   from: string;
   to: string;
-}
-
-/** Rental days of a period: the return day minus the pick-up day, at least one. */
-export function rentalDuration(dates: RentalDates): number {
-  return Math.max(1, dayNumber(dates.to) - dayNumber(dates.from));
 }
 
 function validDates(from: string | undefined, to: string | undefined): RentalDates | undefined {

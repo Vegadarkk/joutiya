@@ -157,9 +157,9 @@ describe("runSearch by rental dates", () => {
 describe("rental cards", () => {
   it("estimate the total with the long-term rate and tell the freshness", () => {
     const doc = rental("x", { price: 300, a_rate_7_days: 250, a_rate_30_days: 200, rentFreshUntil: NOW.getTime() + 1 });
-    expect(toSearchCard(doc, NOW, false, DATES).rental).toEqual({ days: 3, total: 900, fresh: true });
-    expect(toSearchCard(doc, NOW, false, { from: "2026-10-20", to: "2026-10-27" }).rental).toEqual({ days: 7, total: 1750, fresh: true });
-    expect(toSearchCard(doc, NOW, false, { from: "2026-10-20", to: "2026-11-19" }).rental).toEqual({ days: 30, total: 6000, fresh: true });
+    expect(toSearchCard(doc, NOW, false, DATES).rental).toEqual({ days: 3, total: 900, fresh: true, ...DATES });
+    expect(toSearchCard(doc, NOW, false, { from: "2026-10-20", to: "2026-10-27" }).rental).toEqual({ days: 7, total: 1750, fresh: true, from: "2026-10-20", to: "2026-10-27" });
+    expect(toSearchCard(doc, NOW, false, { from: "2026-10-20", to: "2026-11-19" }).rental).toEqual({ days: 30, total: 6000, fresh: true, from: "2026-10-20", to: "2026-11-19" });
     expect(toSearchCard({ ...doc, rentFreshUntil: NOW.getTime() }, NOW, false, DATES).rental?.fresh).toBe(false);
     expect(toSearchCard(doc, NOW).rental).toBeUndefined();
     expect(toSearchCard({ ...doc, subcategoryId: "voitures" }, NOW, false, DATES).rental).toBeUndefined();
