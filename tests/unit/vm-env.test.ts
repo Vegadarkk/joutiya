@@ -158,7 +158,7 @@ describe("app.env on the VM", () => {
     writeFileSync(appEnv, "KEEP_ME='kept'\nTURNSTILE_SECRET_KEY='old'\nQUEUE_REDIS_URL='stale'\n");
     expect(parseNames(run(namesScript("staging", dirs)).stdout)).toEqual(new Set(["KEEP_ME", "TURNSTILE_SECRET_KEY", "QUEUE_REDIS_URL"]));
 
-    const results = runAll(envPayload({ LONG_VALUE: "x".repeat(300), MAIL_FROM: "Joutiya <no-reply@notif.joutiya.ma>", TURNSTILE_SECRET_KEY: "new $secret #1" }));
+    const results = runAll(envPayload({ LONG_VALUE: "x".repeat(300), MAIL_FROM: "Aalan <no-reply@notif.joutiya.ma>", TURNSTILE_SECRET_KEY: "new $secret #1" }));
     expect(results.length).toBeGreaterThan(3);
     expect(results.map((result) => result.status)).toEqual(results.map(() => 0));
     const merged = readFileSync(appEnv, "utf8");
@@ -166,7 +166,7 @@ describe("app.env on the VM", () => {
     expect(queue).toMatch(/^[0-9a-f]{64}$/);
     expect(merged.split("\n").filter((line) => line.startsWith("TURNSTILE_SECRET_KEY="))).toEqual(["TURNSTILE_SECRET_KEY='new $secret #1'"]);
     expect(merged).toContain("KEEP_ME='kept'\n");
-    expect(merged).toContain("MAIL_FROM='Joutiya <no-reply@notif.joutiya.ma>'\n");
+    expect(merged).toContain("MAIL_FROM='Aalan <no-reply@notif.joutiya.ma>'\n");
     expect(merged).toContain(`QUEUE_REDIS_URL='redis://:${queue}@valkey-queue:6379'\n`);
     expect(merged).not.toContain("stale");
     expect(merged).toMatch(/^CSRF_SECRET='[0-9a-f]{64}'$/m);

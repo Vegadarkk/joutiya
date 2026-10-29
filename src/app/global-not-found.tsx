@@ -8,7 +8,7 @@ import "@/styles/globals.css";
 
 // URLs no route matches (localized paths have their own 404 inside the site chrome).
 
-export const metadata: Metadata = { title: "Page introuvable · Joutiya", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Page introuvable · Aalan", robots: { index: false, follow: false } };
 
 export default async function GlobalNotFound() {
   const t = await getTranslations({ locale: "fr", namespace: "NotFound" });

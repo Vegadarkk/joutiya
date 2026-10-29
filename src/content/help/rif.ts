@@ -12,7 +12,7 @@ export const HELP_RIF: HelpLocaleContent = {
     messagerie: { title: "Tibratin", description: "Ad taruḍ i umzenzu, ad terreḍ, ad tḥebseḍ yiwen." },
     securite: { title: "Taɣellist", description: "Ad tissineḍ tixriqin d mamec ad tḥedreḍ zzaysent." },
     moderation: { title: "Asmekti d tigtinin", description: "Ad tsmektiḍ x yiwet n tɣawsa, ad tfehmeḍ tagtint, ad tagiḍ fellas." },
-    donnees: { title: "Isefka d tawuri n Joutiya", description: "Isefka nnec, tawuri nneɣ, Amallal n Joutiya." },
+    donnees: { title: "Isefka d tawuri n Aalan", description: "Isefka nnec, tawuri nneɣ, Amallal n Aalan." },
   },
   articles: {
     "creer-un-compte": {
@@ -44,7 +44,7 @@ export const HELP_RIF: HelpLocaleContent = {
           ],
         },
         "Mala tarid awal n uɛeddi ixeṣṣṛen aṭas n tikkal, tukcimt ad tettwaḥbes kra n tesdidin.",
-        { note: "Joutiya werǧin ad dak-d tessuter awal n uɛeddi niɣ code i dak-d yawḍen s SMS niɣ s e-mail." },
+        { note: "Aalan werǧin ad dak-d tessuter awal n uɛeddi niɣ code i dak-d yawḍen s SMS niɣ s e-mail." },
       ],
       keywords: ["mot de passe", "awal n uɛeddi", "tukcimt", "connexion", "tettuḍ"],
     },
@@ -64,7 +64,7 @@ export const HELP_RIF: HelpLocaleContent = {
         },
         "Brouillon nnec yettwaḥraz mala tettaruḍ. Tzemmreḍ ad teḥrezeḍ ar {maxDrafts} n brouillons; brouillon war yettwabeddel {draftPurgeDays} n wussan ad yettwakkes.",
         "S umata, annonce ad tban nican. Kra n annonces ad tent-iɣar umsefrez zzat n usuffeɣ, s umata deg 24 n tsaɛtin.",
-        "Annonce ad teqqim {ttlDays} n wussan. Tiɣawsiwin yettwagedlen deg Joutiya ad tent-tafeḍ deg tasna « Objets interdits ».",
+        "Annonce ad teqqim {ttlDays} n wussan. Tiɣawsiwin yettwagedlen deg Aalan ad tent-tafeḍ deg tasna « Objets interdits ».",
         "Koumiyas d ijenwiyen n tẓeyyent ad ten-tessufɣeḍ ɣas deg taggayt « Koumiyas & poignards décoratifs », i imeqqranen kan (18 n iseggusa d uqqaren): ad tsentmeḍ belli d tɣawsa n tẓeyyent, amsefrez ad iɣar kul annonce zzat n usuffeɣ, d amsawal s tebratin kan.",
       ],
       keywords: ["annonce", "ssuffeɣ", "zzenz", "brouillon", "publier", "koumiya"],
@@ -125,7 +125,7 @@ export const HELP_RIF: HelpLocaleContent = {
     },
     "contacter-un-vendeur": {
       title: "Ad taruḍ i umzenzu",
-      summary: "Tibratin n Joutiya d abrid nni kan ḥima ad tmeslayeḍ d umzenzu.",
+      summary: "Tibratin n Aalan d abrid nni kan ḥima ad tmeslayeḍ d umzenzu.",
       blocks: [
         "Rzem annonce d wet x tqeffalt n tebratin. Ixs ad tiliḍ tkecmeḍ s amiḍan yettwasentmen. Deg tebrat tamezwarut ad dak-d tettwassuter tasenqedt anti-robot.",
         "Assa, tibratin d abrid nni kan: uṭṭun n tilifun n umzenzu war d-yettban.",
@@ -164,7 +164,7 @@ export const HELP_RIF: HelpLocaleContent = {
             "Ssuma ireẓẓan aṭas, niɣ amzenzu war yezmir ad dak-isken tiɣawsa.",
           ],
         },
-        "Mmager amzenzu deg wadeg n medden, s wass. Joutiya war tettekki ca deg udfaɛ, war tessawaḍ ca tiɣawsiwin: win yennan aya d axerraq.",
+        "Mmager amzenzu deg wadeg n medden, s wass. Aalan war tettekki ca deg udfaɛ, war tessawaḍ ca tiɣawsiwin: win yennan aya d axerraq.",
       ],
       keywords: ["arnaque", "taxriqt", "axerraq", "virement", "rib", "iban", "code"],
     },
@@ -216,20 +216,20 @@ export const HELP_RIF: HelpLocaleContent = {
       keywords: ["isefka", "données", "confidentialité", "cookies"],
     },
     "role-de-joutiya": {
-      title: "Tawuri n Joutiya",
-      summary: "Joutiya teṭṭef annonces n medden: war d amzenzu, war d amsaɣ.",
+      title: "Tawuri n Aalan",
+      summary: "Aalan teṭṭef annonces n medden: war d amzenzu, war d amsaɣ.",
       blocks: [
         "Annonces arident-tent imawlan nsent, d nitni i ɣer tella.",
-        "Joutiya war tettekki ca deg uzenzi: war tettaɣ idrimen jar medden, war tessawaḍ, war tettḍemmen tiɣawsiwin, war tegguḍ ca jar umsaɣ d umzenzu.",
-        "Mala yella umennuɣ, ssiwel d umdan nniḍen. Mala d taxriqt, ruḥ ɣer police niɣ ɣer Gendarmerie royale, d smekti x tɣawsa deg Joutiya.",
+        "Aalan war tettekki ca deg uzenzi: war tettaɣ idrimen jar medden, war tessawaḍ, war tettḍemmen tiɣawsiwin, war tegguḍ ca jar umsaɣ d umzenzu.",
+        "Mala yella umennuɣ, ssiwel d umdan nniḍen. Mala d taxriqt, ruḥ ɣer police niɣ ɣer Gendarmerie royale, d smekti x tɣawsa deg Aalan.",
       ],
       keywords: ["litige", "amennuɣ", "remboursement", "garantie"],
     },
     "assistant-joutiya": {
-      title: "Amallal n Joutiya",
+      title: "Amallal n Aalan",
       summary: "Amallal n tmusni tamsnalit (IA) i d-yerran x isteqsiyen nnec zi imagraden n tasna n tallalt.",
       blocks: [
-        "Amallal n Joutiya d IA, war d amdan. Ad d-yerr zi imagraden n tallalt d ad dak-isken min yesxdem.",
+        "Amallal n Aalan d IA, war d amdan. Ad d-yerr zi imagraden n tallalt d ad dak-isken min yesxdem.",
         "Yezmer ad yecceḍ: ɣar amagrad. War yeẓẓar ca amiḍan nnec, war yezmir ad yexdem kra deg umkan nnec.",
         "War t-tfekkeḍ ca isefka nnec: isem, tilifun, e-mail, adres, awal n uɛeddi niɣ code.",
       ],

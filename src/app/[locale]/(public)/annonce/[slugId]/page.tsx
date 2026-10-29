@@ -32,7 +32,7 @@ import { ReportButton } from "@/components/report/report-button";
 import { RENTAL_SUBCATEGORY, VEHICLE_SALE_SUBCATEGORIES, categoryById, datedRental, subcategoryById } from "@/config/categories";
 import { availablePromos } from "@/config/house-promos";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
-import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
+import { CANONICAL_ORIGIN, SITE_NAME, LOCALE_TAGS, type Locale } from "@/config/site";
 import { pageLocale } from "@/i18n/params";
 import { getFlags } from "@/lib/config/runtime";
 import { isolate } from "@/lib/i18n/bidi";
@@ -134,7 +134,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     title,
     description,
     alternates: alternates(locale, path),
-    openGraph: { type: "website", siteName: "Joutiya", locale: LOCALE_TAGS[locale].replace("-", "_"), url: `/${locale}${path}`, title, description, images },
+    openGraph: { type: "website", siteName: SITE_NAME, locale: LOCALE_TAGS[locale].replace("-", "_"), url: `/${locale}${path}`, title, description, images },
     twitter: { card: images ? "summary_large_image" : "summary", title, description, images: images?.map((image) => image.url) },
     // Paused, sold and expired pages stay reachable for buyers who saved them, not for search engines;
     // example listings are not offers.

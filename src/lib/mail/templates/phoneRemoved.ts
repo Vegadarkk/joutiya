@@ -10,7 +10,7 @@ const COPY: Record<MailLocale, { subject: string; title: string; body: (phone: s
     subject: "Ton numéro de téléphone a été retiré de ton compte",
     title: "Numéro retiré",
     body: (phone) => [
-      `Le numéro ${phone} vient d'être vérifié depuis ce téléphone sur un autre compte Joutiya. Il a donc été retiré de ton compte, et tes annonces n'affichent plus le badge « Téléphone vérifié ».`,
+      `Le numéro ${phone} vient d'être vérifié depuis ce téléphone sur un autre compte Aalan. Il a donc été retiré de ton compte, et tes annonces n'affichent plus le badge « Téléphone vérifié ».`,
       "Si c'est bien toi (un second compte, par exemple), tout est en ordre. Tu peux vérifier un autre numéro à tout moment.",
     ],
     button: "Vérifier un numéro",
@@ -20,7 +20,7 @@ const COPY: Record<MailLocale, { subject: string; title: string; body: (phone: s
     subject: "تمت إزالة رقم هاتفك من حسابك",
     title: "تمت إزالة الرقم",
     body: (phone) => [
-      `تم للتو التحقق من الرقم ${phone} من هذا الهاتف على حساب Joutiya آخر. لذلك أُزيل من حسابك، ولم تعد إعلاناتك تعرض شارة «هاتف موثّق».`,
+      `تم للتو التحقق من الرقم ${phone} من هذا الهاتف على حساب Aalan آخر. لذلك أُزيل من حسابك، ولم تعد إعلاناتك تعرض شارة «هاتف موثّق».`,
       "إذا كنت أنت من قام بذلك (حساب ثانٍ مثلًا)، فكل شيء على ما يرام. يمكنك التحقق من رقم آخر في أي وقت.",
     ],
     button: "التحقق من رقم",

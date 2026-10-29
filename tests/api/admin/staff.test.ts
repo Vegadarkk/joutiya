@@ -338,7 +338,7 @@ describe("invitation, password and revocation", () => {
     // Whoever registered that address (and never confirmed it) chose its password: it never becomes staff.
     const squatted = await invite({ email: EMAIL.squatted, displayName: "Squat Test", role: "admin" });
     expect(squatted.status).toBe(409);
-    expect(await response409(squatted)).toBe("a Joutiya account exists with this e-mail");
+    expect(await response409(squatted)).toBe("a Aalan account exists with this e-mail");
     const record = await auth().getUser(uids.squatted);
     expect(record.customClaims ?? {}).toEqual({});
     expect(await readRoster(uids.squatted)).toBeNull();

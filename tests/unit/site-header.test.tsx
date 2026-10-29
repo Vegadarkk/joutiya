@@ -84,7 +84,7 @@ describe("SiteHeader", () => {
   it("names its search landmark and keeps the logo link 44 px or more", () => {
     const html = render(<SiteHeader locale="fr" />);
     expect(html).toContain(`role="search" aria-label="${fr.Nav.searchLabel}"`);
-    expect(html).toMatch(/<a aria-label="Accueil Joutiya" class="flex size-12 [^"]*md:h-13[^"]*" href="\/fr"/);
+    expect(html).toMatch(/<a aria-label="Accueil Aalan" class="flex size-12 [^"]*md:h-13[^"]*" href="\/fr"/);
     expect(html).toContain(`placeholder="${fr.Nav.searchPlaceholder}"`);
     expect(html).toContain('data-testid="header-actions"');
   });

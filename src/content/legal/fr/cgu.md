@@ -2,7 +2,7 @@
 
 Version {version} — en vigueur le {effectiveDate}
 
-Les présentes conditions générales d'utilisation (les « CGU ») encadrent l'utilisation de {brand}, service de petites annonces en ligne édité par {publisher}, {address}. L'identité complète de l'éditeur figure dans les [Mentions légales](/legal/mentions-legales).
+Les présentes conditions générales d'utilisation (les « CGU ») encadrent l'utilisation d'{brand}, service de petites annonces en ligne édité par {publisher}, {address}. L'identité complète de l'éditeur figure dans les [Mentions légales](/legal/mentions-legales).
 
 Lisez-les avant de créer un compte. Les points essentiels :
 
@@ -17,7 +17,7 @@ Lisez-les avant de créer un compte. Les points essentiels :
 
 {brand} permet de publier et de consulter des petites annonces pour vendre, acheter, louer, échanger ou donner des biens, et pour proposer certains services, principalement au Maroc.
 
-Les CGU fixent les règles du service et les droits et obligations de chaque utilisateur et de {brand}.
+Les CGU fixent les règles du service et les droits et obligations de chaque utilisateur et d'{brand}.
 
 ### 1.2 Acceptation {#objet-2}
 
@@ -54,13 +54,13 @@ Les CGU sont rédigées en français, version qui fait foi. Une version en arabe
 
 En cas de doute sur le sens d'une clause, elle s'interprète dans le sens le plus favorable au consommateur.
 
-## 2. Le rôle de {brand} {#role}
+## 2. Le rôle d'{brand} {#role}
 
 ### 2.1 Un service d'hébergement d'annonces {#role-1}
 
 {brand} est un service d'hébergement et une plateforme en ligne au sens du DSA. Elle stocke et rend publics, à votre demande, les annonces et les contenus que vous fournissez. Elle met à votre disposition des outils de recherche, de messagerie et de mise en relation.
 
-### 2.2 Ce que {brand} n'est pas {#role-2}
+### 2.2 Ce qu'{brand} n'est pas {#role-2}
 
 - {brand} n'est ni vendeur, ni acheteur, ni mandataire ou agent de l'un ou de l'autre.
 - Elle n'est pas partie aux contrats conclus entre utilisateurs (§15).
@@ -116,7 +116,7 @@ L'inscription comporte trois cases distinctes, aucune n'est cochée d'avance :
 
 1. **Acceptation des CGU** (obligatoire).
 2. **Consentement exprès aux transferts de données hors du Maroc** (obligatoire), au sens de l'art. 44 de la loi marocaine 09-08. La case nomme chaque prestataire établi aux États-Unis et son rôle : Google (authentification des comptes et connexion avec Google ; publicité, seulement si vous l'acceptez dans la bannière de cookies), Anthropic et OpenAI (aide à la modération), <!--if:whatsappEnabled-->Meta (vérification du téléphone par WhatsApp), <!--endif-->Resend (envoi des e-mails), Cloudflare (diffusion et protection du site, vérification anti-robot, IA de secours), Stripe et RevenueCat (paiements, à l'ouverture des ventes). Le détail figure dans la politique de confidentialité (§18.3).
-3. **E-mails d'information et offres de {brand}** (facultatif). Vous pouvez vous désabonner à tout moment.
+3. **E-mails d'information et offres d'{brand}** (facultatif). Vous pouvez vous désabonner à tout moment.
 
 Chaque consentement est enregistré avec sa version et sa date. Si le texte d'un consentement change, il vous est présenté à nouveau.
 
@@ -130,7 +130,7 @@ Les tentatives de connexion sont limitées ; après plusieurs échecs, un contr�
 
 ### 3.5 Vérification du téléphone {#comptes-5}
 
-Pour afficher votre numéro ou proposer un contact par WhatsApp (§14), vous vérifiez un numéro de mobile marocain (06 ou 07).<!--if:whatsappEnabled--> Vous envoyez vous-même, depuis WhatsApp, un code à usage unique au numéro de {brand}.<!--endif--> {brand} ne vous envoie aucun SMS.
+Pour afficher votre numéro ou proposer un contact par WhatsApp (§14), vous vérifiez un numéro de mobile marocain (06 ou 07).<!--if:whatsappEnabled--> Vous envoyez vous-même, depuis WhatsApp, un code à usage unique au numéro d'{brand}.<!--endif--> {brand} ne vous envoie aucun SMS.
 
 Le badge « téléphone vérifié » indique seulement que le numéro a été confirmé de cette façon. Il ne prouve pas l'identité de la personne.
 
@@ -178,23 +178,23 @@ Le badge « Certifié », lorsqu'il est proposé, signale un professionnel dont 
 
 ### 4.5 Offre de lancement Pro {#roles-5}
 
-Les comptes Pro sont ouverts dès le lancement de {brand}. Tant que les ventes ne sont pas ouvertes, l'offre de lancement est gratuite : un professionnel vérifié bénéficie des quotas de publication et de la boutique de l'offre Essentiel, sans crédits mensuels.
+Les comptes Pro sont ouverts dès le lancement d'{brand}. Tant que les ventes ne sont pas ouvertes, l'offre de lancement est gratuite : un professionnel vérifié bénéficie des quotas de publication et de la boutique de l'offre Essentiel, sans crédits mensuels.
 
 Avant la fin ou toute modification de cette offre, {brand} vous prévient au moins 30 jours à l'avance, par e-mail et dans votre espace. Aucun paiement ne vous sera demandé sans votre accord exprès, donné selon les CGV alors publiées.
 
 À la fin de l'offre, si vous ne souscrivez ni abonnement ni Pass Boutique (§16.2), votre compte reste un compte Pro, mais ses quotas de publication sont réduits. Les annonces au-delà du quota sont mises en pause, les plus anciennes d'abord ; elles ne sont pas supprimées pour ce motif.
 
-### 4.6 Personnel de {brand} {#roles-6}
+### 4.6 Personnel d'{brand} {#roles-6}
 
-Les modérateurs et administrateurs de {brand} utilisent des comptes séparés, sur un espace réservé et protégé par une double authentification. Ils ne publient pas d'annonces et n'écrivent pas dans les conversations entre utilisateurs.
+Les modérateurs et administrateurs d'{brand} utilisent des comptes séparés, sur un espace réservé et protégé par une double authentification. Ils ne publient pas d'annonces et n'écrivent pas dans les conversations entre utilisateurs.
 
-{brand} vous contacte par e-mail ou par une notification dans votre espace. Un message qui prétend venir de {brand} et vous demande un paiement, un mot de passe ou un code est une tentative d'arnaque : signalez-le.
+{brand} vous contacte par e-mail ou par une notification dans votre espace. Un message qui prétend venir d'{brand} et vous demande un paiement, un mot de passe ou un code est une tentative d'arnaque : signalez-le.
 
 ### 4.7 Boutique Pro et liens externes {#roles-7}
 
 La boutique d'un professionnel (nom, présentation, bannière, rayons, horaires, liens) est rédigée par lui, sous sa seule responsabilité, et suit les mêmes règles que les annonces (§6 et §7).
 
-Un professionnel peut y afficher des liens vers ses comptes sur une liste fermée de réseaux sociaux (Instagram, TikTok, Facebook, YouTube, X, LinkedIn, Snapchat) et le lien court de son compte WhatsApp Business. Ces liens figurent seulement sur sa boutique, jamais dans ses annonces, et mènent à des sites que {brand} ne contrôle pas : {brand} ne répond ni de leur contenu ni de ce qui s'y conclut. Un lien trompeur, qui ne mène pas au compte du professionnel, ou qui sert à contourner les règles (coordonnées interdites, paiement en dehors du bouton prévu au §15.2, contenu interdit) peut être signalé. Un modérateur peut alors masquer les liens de la boutique ; le motif est envoyé au professionnel (§10), qui peut contester la mesure (§12).
+Un professionnel peut y afficher des liens vers ses comptes sur une liste fermée de réseaux sociaux (Instagram, TikTok, Facebook, YouTube, X, LinkedIn, Snapchat) et le lien court de son compte WhatsApp Business. Ces liens figurent seulement sur sa boutique, jamais dans ses annonces, et mènent à des sites qu'{brand} ne contrôle pas : {brand} ne répond ni de leur contenu ni de ce qui s'y conclut. Un lien trompeur, qui ne mène pas au compte du professionnel, ou qui sert à contourner les règles (coordonnées interdites, paiement en dehors du bouton prévu au §15.2, contenu interdit) peut être signalé. Un modérateur peut alors masquer les liens de la boutique ; le motif est envoyé au professionnel (§10), qui peut contester la mesure (§12).
 
 ## 5. Règles d'utilisation du service {#utilisation}
 
@@ -208,9 +208,9 @@ Il est interdit :
 
 - d'extraire de façon automatisée les annonces, les profils ou les numéros (robots, aspirateurs de sites), sauf pour les moteurs de recherche autorisés par le fichier robots.txt ;
 - de contourner les limites d'usage, le contrôle anti-robot ou toute autre mesure technique ;
-- de créer des comptes fictifs ou multiples, ou d'usurper l'identité d'une personne, d'une entreprise ou de {brand} ;
+- de créer des comptes fictifs ou multiples, ou d'usurper l'identité d'une personne, d'une entreprise ou d'{brand} ;
 - d'envoyer du spam, des messages en masse ou de la prospection non sollicitée ;
-- de tenter d'accéder sans droit aux systèmes de {brand} ou au compte d'un autre utilisateur, ou d'introduire un code malveillant ;
+- de tenter d'accéder sans droit aux systèmes d'{brand} ou au compte d'un autre utilisateur, ou d'introduire un code malveillant ;
 - de manipuler le classement des annonces, les signalements ou les avis (voir [Avis utilisateurs](/legal/avis-utilisateurs)) ;
 - de vendre, louer ou céder votre compte.
 
@@ -236,7 +236,7 @@ L'annonceur est seul responsable de son annonce et de la transaction qui s'ensui
 
 Vous garantissez que vous avez le droit de publier vos contenus et que les informations données sont exactes.
 
-Ces règles ne changent rien aux obligations propres de {brand}, notamment pour les données personnelles contenues dans les annonces (§18.2).
+Ces règles ne changent rien aux obligations propres d'{brand}, notamment pour les données personnelles contenues dans les annonces (§18.2).
 
 ### 6.2 Droits des tiers {#contenus-2}
 
@@ -251,7 +251,7 @@ Vos contenus ne doivent pas porter atteinte aux droits d'autrui, notamment :
 Vous restez titulaire des droits sur vos contenus. Pour les afficher, vous accordez à {publisher} une licence gratuite et non exclusive, dans les limites suivantes :
 
 - **droits** : reproduire vos contenus, les adapter techniquement (§6.4) et les afficher ;
-- **usages** : sur le site et les services de {brand}, dans les e-mails d'alerte envoyés aux utilisateurs qui suivent une recherche, et dans les liens et aperçus affichés par les moteurs de recherche ;
+- **usages** : sur le site et les services d'{brand}, dans les e-mails d'alerte envoyés aux utilisateurs qui suivent une recherche, et dans les liens et aperçus affichés par les moteurs de recherche ;
 - **territoire** : le monde entier, puisque le site est accessible partout ;
 - **durée** : la durée de mise en ligne du contenu, puis la durée de conservation prévue par la politique de confidentialité, seulement pour la preuve et les procédures en cours.
 
@@ -364,7 +364,7 @@ Une annonce pour un objet interdit est bloquée ou mise en vérification au dép
 
 **Informations déclarées.** Dans une annonce de vente ou de location d'un bien immobilier, l'annonceur déclare lui-même, sous sa seule responsabilité, les informations suivantes : la situation juridique du bien (titre foncier ou autre), le mandat (exclusif ou simple), les honoraires et la référence de l'agence, l'autorisation de construire et l'année de livraison d'un bien vendu sur plan, et le numéro d'autorisation d'hébergement touristique d'une location saisonnière (loi n° 80-14). Il certifie leur exactitude à la publication. {brand} ne les vérifie pas : leur affichage ne vaut ni contrôle, ni garantie, ni recommandation de sa part.
 
-**Autorisations et mandat.** Il appartient au seul annonceur de détenir les autorisations que son activité exige, notamment l'autorisation d'hébergement touristique, ainsi qu'un mandat écrit et valable du propriétaire quand il publie pour le compte d'un tiers. Il doit pouvoir en justifier sur demande de {brand} ou d'une autorité.
+**Autorisations et mandat.** Il appartient au seul annonceur de détenir les autorisations que son activité exige, notamment l'autorisation d'hébergement touristique, ainsi qu'un mandat écrit et valable du propriétaire quand il publie pour le compte d'un tiers. Il doit pouvoir en justifier sur demande d'{brand} ou d'une autorité.
 
 **Responsabilité.** Une information inexacte, incomplète ou trompeuse engage la seule responsabilité de l'annonceur, envers les autres utilisateurs, les tiers et {brand} (§6.1 et §19.1). {brand} n'en répond que dans les conditions du régime d'hébergeur (§19.2).
 
@@ -404,7 +404,7 @@ La modération combine des contrôles automatiques (§8.2 et §8.3) et des déci
 5. **Photos** : détection de la nudité. Les images diffusées sont aussi comparées, par Cloudflare, aux empreintes connues de contenus pédocriminels.
 6. **Agent de modération** (§8.3).
 
-Les contrôles 1 à 5 reposent sur des règles et des modèles exécutés sur les serveurs de {brand}, à l'exception de la comparaison faite par Cloudflare.
+Les contrôles 1 à 5 reposent sur des règles et des modèles exécutés sur les serveurs d'{brand}, à l'exception de la comparaison faite par Cloudflare.
 
 Résultat : publication immédiate, demande de correction (par exemple « Utilisez le bouton Voir le numéro »), examen par un modérateur avant publication, ou refus.
 
@@ -427,7 +427,7 @@ L'agent ne décide jamais seul d'une sanction contre un compte, de la confirmati
 
 ### 8.4 Décisions humaines {#moderation-4}
 
-Les modérateurs de {brand} examinent les annonces mises en vérification, les signalements et les réclamations. Ils acceptent, modifient ou refusent la proposition de l'agent, à partir de modèles de décision.
+Les modérateurs d'{brand} examinent les annonces mises en vérification, les signalements et les réclamations. Ils acceptent, modifient ou refusent la proposition de l'agent, à partir de modèles de décision.
 
 - Toute sanction visant un compte (avertissement, suspension, bannissement) est décidée par une personne.
 - Chaque décision est enregistrée dans un journal d'audit que personne ne peut modifier.
@@ -435,7 +435,7 @@ Les modérateurs de {brand} examinent les annonces mises en vérification, les s
 
 ### 8.5 Contrôles de la messagerie {#moderation-5}
 
-Les messages sont analysés automatiquement, sur les serveurs de {brand}, par des règles simples. Elles repèrent les liens vers d'autres sites, les IBAN et les mots-clés de paiement à distance (« Western Union », « Cash Plus », « acompte », « virement »…). Un numéro ou un lien WhatsApp n'est relevé que s'il accompagne de tels mots-clés.
+Les messages sont analysés automatiquement, sur les serveurs d'{brand}, par des règles simples. Elles repèrent les liens vers d'autres sites, les IBAN et les mots-clés de paiement à distance (« Western Union », « Cash Plus », « acompte », « virement »…). Un numéro ou un lien WhatsApp n'est relevé que s'il accompagne de tels mots-clés.
 
 Effets possibles : lien masqué, bandeau d'alerte (§13.3), examen par un modérateur si les cas se répètent.
 
@@ -524,14 +524,14 @@ En cas de danger immédiat, n'attendez pas : appelez la police (au Maroc : 19 ; 
 
 {brand} vous informe de toute mesure qui vous concerne, au plus tard quand elle prend effet, par e-mail et dans votre espace : refus ou retrait d'un contenu, limitation de sa visibilité, suspension ou fermeture de votre compte, refus ou retrait de la vérification Pro, suspension d'un service payant.
 
-Cette information n'est pas donnée lorsque {brand} ne dispose d'aucun moyen de vous contacter, ou dans les autres cas prévus par la loi, par exemple quand une autorité demande la confidentialité ou pour du spam commercial trompeur envoyé en masse.
+Cette information n'est pas donnée lorsqu'{brand} ne dispose d'aucun moyen de vous contacter, ou dans les autres cas prévus par la loi, par exemple quand une autorité demande la confidentialité ou pour du spam commercial trompeur envoyé en masse.
 
 ### 10.2 Contenu de l'exposé des motifs {#decisions-2}
 
 L'exposé des motifs est clair et précis (art. 17 DSA). Il indique :
 
 - la mesure prise, son étendue (par exemple le pays concerné) et sa durée ;
-- les faits et circonstances, et si la mesure fait suite à un signalement, à une injonction d'une autorité ou à une vérification de {brand} ;
+- les faits et circonstances, et si la mesure fait suite à un signalement, à une injonction d'une autorité ou à une vérification d'{brand} ;
 - si des moyens automatisés ont été utilisés, pour détecter le contenu et pour prendre la décision ;
 - le fondement de la décision : la règle de droit en cause, avec une explication si le contenu est jugé illicite, ou l'article des CGU appliqué (par exemple « CGU §7.2 ») ;
 - les voies de recours : réclamation interne, règlement extrajudiciaire et recours en justice (§12).
@@ -582,7 +582,7 @@ Pendant une suspension :
 - Votre compte est désactivé et vos annonces sont retirées. Vous ne pouvez plus vous connecter.
 - Vous pouvez contester la décision pendant 6 mois, par le lien reçu avec elle (§12.1).
 - Vous pouvez exercer vos droits sur vos données, dont l'accès et la portabilité, en écrivant à {dpo}.
-- Vous ne pouvez pas créer un nouveau compte sans l'accord de {brand}.
+- Vous ne pouvez pas créer un nouveau compte sans l'accord d'{brand}.
 
 ### 11.6 Signalements et réclamations abusifs {#sanctions-6}
 
@@ -603,7 +603,7 @@ Cette décision est motivée (§10) et peut être contestée (§12).
 
 ### 12.1 Réclamation interne {#recours-1}
 
-Vous pouvez contester gratuitement une décision de {brand} pendant 6 mois à compter du jour où elle vous a été notifiée :
+Vous pouvez contester gratuitement une décision d'{brand} pendant 6 mois à compter du jour où elle vous a été notifiée :
 
 - depuis votre espace ;
 - ou par le lien reçu avec la décision, même si votre compte est suspendu ou banni.
@@ -614,7 +614,7 @@ Expliquez pourquoi la décision vous paraît injustifiée et joignez tout élém
 
 ### 12.2 Examen de la réclamation {#recours-2}
 
-- Votre réclamation est réexaminée sur l'ensemble du dossier par un autre modérateur que celui qui a pris la décision, ou par un administrateur de {brand}, qui peut être la personne qui a pris la décision. Chaque examen est enregistré avec son auteur, sa date et ses motifs. L'agent de modération peut aider à préparer l'examen, mais la réponse est toujours décidée par une personne.
+- Votre réclamation est réexaminée sur l'ensemble du dossier par un autre modérateur que celui qui a pris la décision, ou par un administrateur d'{brand}, qui peut être la personne qui a pris la décision. Chaque examen est enregistré avec son auteur, sa date et ses motifs. L'agent de modération peut aider à préparer l'examen, mais la réponse est toujours décidée par une personne.
 - {brand} vous répond en moins de 14 jours, avec ses motifs.
 - Si la réclamation est fondée, la décision est annulée sans délai : le contenu ou le compte est rétabli.
 
@@ -664,7 +664,7 @@ Ce bandeau n'accuse personne. Il vous rappelle les règles de prudence (§15.3).
 
 ### 13.5 Confidentialité des conversations {#messagerie-5}
 
-Vos conversations sont privées. Le personnel de {brand} n'y accède que si la conversation est signalée ou si une autorité le demande légalement. Le motif est enregistré et chaque accès est journalisé.
+Vos conversations sont privées. Le personnel d'{brand} n'y accède que si la conversation est signalée ou si une autorité le demande légalement. Le motif est enregistré et chaque accès est journalisé.
 
 Les messages sont conservés 12 mois après la dernière activité de la conversation, sauf procédure en cours. N'y échangez pas d'informations sensibles.
 
@@ -694,7 +694,7 @@ Le numéro d'un annonceur sert uniquement à discuter de son annonce. Il est int
 
 WhatsApp est un service de Meta, soumis à ses propres conditions. {brand} n'a pas accès à vos échanges sur WhatsApp ni à vos appels, et ne peut donc ni les modérer ni en garder la trace.
 
-En cas de doute, préférez la messagerie de {brand} : ses messages peuvent être signalés et servir de preuve. Méfiez-vous de toute demande de paiement, de code ou de lien reçue par WhatsApp (§15.3).
+En cas de doute, préférez la messagerie d'{brand} : ses messages peuvent être signalés et servir de preuve. Méfiez-vous de toute demande de paiement, de code ou de lien reçue par WhatsApp (§15.3).
 
 ## 15. Transactions entre utilisateurs {#transactions}
 
@@ -721,7 +721,7 @@ Les seuls paiements faits à {brand} seront ceux des options, abonnements et Pas
 - Refusez les paiements par un service de transfert d'argent ou par un lien « pour recevoir l'argent ».
 - Ne communiquez jamais vos codes bancaires ni les codes reçus par SMS.
 - Méfiez-vous d'un prix très inférieur au marché et de toute demande pressante.
-- Restez sur la messagerie de {brand} tant que la transaction n'est pas conclue.
+- Restez sur la messagerie d'{brand} tant que la transaction n'est pas conclue.
 
 Plus de conseils sur la page [Confiance et sécurité](/legal/confiance-et-securite). En cas d'escroquerie, portez plainte auprès de la police et signalez le compte.
 
@@ -752,14 +752,14 @@ Une annonce remontée porte la mention « Remontée » ; une annonce À la Une p
 {brand} peut afficher des publicités fournies par Google (AdSense) sur certaines pages en français et en arabe. Elles portent la mention « Publicité ». Elles ne s'affichent jamais dans la messagerie, dans votre espace, sur les pages de dépôt d'annonce ou de paiement, ni sur les pages légales.
 
 - Les publicités ne sont chargées qu'avec votre accord, et leur personnalisation dépend de vos choix. Voir la page [Gestion des cookies](/legal/cookies) et le lien « Gérer mes cookies » en bas de chaque page.
-- Les messages de {brand} sur ses propres services (par exemple « Déposer une annonce ») portent la mention « {brand} ».
+- Les messages d'{brand} sur ses propres services (par exemple « Déposer une annonce ») portent la mention « {brand} ».
 - Une publicité vous paraît illicite ou inappropriée ? Écrivez à {dsaEmail}.
 
 ## 17. Propriété intellectuelle {#propriete}
 
-### 17.1 Éléments de {brand} {#propriete-1}
+### 17.1 Éléments d'{brand} {#propriete-1}
 
-Le nom et le logo de {brand}, le site, ses textes, son graphisme et son code appartiennent à {publisher} ou à ses partenaires. Vous ne pouvez pas les reproduire ou les utiliser sans autorisation écrite. Partager le lien d'une annonce est bien sûr autorisé.
+Le nom et le logo d'{brand}, le site, ses textes, son graphisme et son code appartiennent à {publisher} ou à ses partenaires. Vous ne pouvez pas les reproduire ou les utiliser sans autorisation écrite. Partager le lien d'une annonce est bien sûr autorisé.
 
 ### 17.2 Base de données des annonces {#propriete-2}
 
@@ -786,7 +786,7 @@ Les traitements qui concernent les personnes situées au Maroc ont fait l'objet 
 - **l'annonceur** choisit ce qu'il publie et s'assure qu'il a le droit de publier les données qui concernent d'autres personnes (§7.6) ;
 - **{brand}** contrôle les annonces avant publication pour repérer les données sensibles et les données de tiers, fait vérifier l'accord de la personne concernée quand il est nécessaire (§7.6), et protège les annonces contre la copie (§18.4).
 
-Une personne dont les données figurent dans une annonce peut exercer ses droits (accès, effacement, opposition) directement auprès de {brand}, à {dpo} ou par le bouton « Signaler », quel que soit l'annonceur.
+Une personne dont les données figurent dans une annonce peut exercer ses droits (accès, effacement, opposition) directement auprès d'{brand}, à {dpo} ou par le bouton « Signaler », quel que soit l'annonceur.
 
 ### 18.3 Transferts hors du Maroc {#donnees-3}
 
@@ -818,7 +818,7 @@ L'annonceur est seul responsable de son annonce et de la transaction qui s'ensui
 
 Pour les contenus fournis par les utilisateurs, {brand} relève du régime des hébergeurs (art. 6 DSA). Sa responsabilité ne peut être engagée du fait de ces contenus que si elle a effectivement connaissance de leur caractère illicite et n'agit pas promptement pour les retirer ou en bloquer l'accès.
 
-Ce régime ne couvre pas les obligations propres de {brand} en matière de données personnelles, notamment pour les données contenues dans les annonces (§18.2).
+Ce régime ne couvre pas les obligations propres d'{brand} en matière de données personnelles, notamment pour les données contenues dans les annonces (§18.2).
 
 ### 19.3 Ce dont {brand} répond {#responsabilite-3}
 
@@ -832,7 +832,7 @@ Ce régime ne couvre pas les obligations propres de {brand} en matière de donn�
 
 ### 19.4 Clause de sauvegarde {#responsabilite-4}
 
-Rien dans les présentes ne limite la responsabilité de {brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.
+Rien dans les présentes ne limite la responsabilité d'{brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.
 
 ## 20. Disponibilité du service {#disponibilite}
 

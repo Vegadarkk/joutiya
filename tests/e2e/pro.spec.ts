@@ -136,7 +136,7 @@ test.describe("Pro accounts", () => {
     await signUpAndIn(page, request, email);
 
     await page.goto("/fr/pro");
-    await expect(page.getByRole("heading", { name: "Ouvrir une boutique Pro sur Joutiya" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Ouvrir une boutique Pro sur Aalan" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Vérifier mon numéro" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Envoyer ma demande" })).toHaveCount(0);
     await seedVerifiedPhone(email);
@@ -184,7 +184,7 @@ test.describe("Pro accounts", () => {
 
     await page.getByRole("link", { name: "Voir ma vitrine" }).click();
     await expect(page.getByRole("heading", { name: shopName, level: 1 })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(/Joutiya n'est pas partie à la vente/)).toBeVisible();
+    await expect(page.getByText(/Aalan n'est pas partie à la vente/)).toBeVisible();
     await page.screenshot({ path: "test-results/pro-storefront-fr.png", fullPage: true });
     const storefront = new URL(page.url()).pathname;
     expect(storefront).toMatch(/^\/fr\/boutique\/[a-z0-9-]+-[a-hj-km-np-z2-9]{8}$/);

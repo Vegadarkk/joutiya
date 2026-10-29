@@ -328,7 +328,7 @@ async function assertAnotherAdmin(targetUid: string): Promise<void> {
 export async function invite(ctx: StaffContext, input: InviteInput, identity: RequestIdentity): Promise<StaffInviteResponse> {
   const existing = await auth().getUserByEmail(input.email).catch(() => null);
   if (existing && existing.uid === ctx.user.uid) throw new HttpError(409, "conflict", "cannot invite yourself");
-  if (existing && !(await isStaffAccount(existing))) throw new HttpError(409, "conflict", "a Joutiya account exists with this e-mail");
+  if (existing && !(await isStaffAccount(existing))) throw new HttpError(409, "conflict", "a Aalan account exists with this e-mail");
   const current = existing ? await getStaff(existing.uid) : null;
   /** The roster role of an active colleague (a revoked entry is a re-invitation, not a role change). */
   const activeRole = current && !current.revokedAt ? current.role : null;

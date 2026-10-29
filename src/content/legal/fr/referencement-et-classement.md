@@ -22,7 +22,7 @@ Le classement ne dépend ni de votre profil ni de votre historique de navigation
 
 ### 1.3 Ce que cette page ne décrit pas {#principe-3}
 
-Les publicités et les promotions de {brand}, qui ne sont pas des annonces et ne participent pas au classement, sont décrites au §5. Le prix et les conditions des options payantes figureront dans les conditions générales de vente.
+Les publicités et les promotions d'{brand}, qui ne sont pas des annonces et ne participent pas au classement, sont décrites au §5. Le prix et les conditions des options payantes figureront dans les conditions générales de vente.
 
 ## 2. Les critères de tri {#tri}
 
@@ -100,7 +100,7 @@ L'info-bulle s'affiche au survol, au toucher et au clavier. Ces mentions ne peuv
 ### 3.4 Ce que les options ne changent pas {#options-4}
 
 - Une annonce mise en avant doit respecter les mêmes règles que les autres : elle peut être refusée, masquée ou retirée (voir les [CGU](/legal/cgu#moderation)).
-- Une option ne garantit pas la vente, et ne fait pas de {brand} une partie à la vente.
+- Une option ne garantit pas la vente, et ne fait pas d'{brand} une partie à la vente.
 - Les critères de tri du §2 restent les mêmes pour tous.
 
 ### 3.5 Autres options {#options-5}
@@ -125,7 +125,7 @@ Le badge « Certifié », lorsqu'il est proposé, signale un professionnel dont 
 
 Particuliers et professionnels sont classés selon les mêmes règles (§2). L'offre de lancement des comptes Pro, gratuite, donne des quotas de publication et une boutique : elle ne donne aucun avantage de classement. Il en va de même des abonnements Pro et du Pass Boutique. Les professionnels peuvent, comme les particuliers, acheter les options du §3, avec les mêmes mentions.
 
-## 5. Publicités et promotions de {brand} {#publicite}
+## 5. Publicités et promotions d'{brand} {#publicite}
 
 ### 5.1 Publicités de tiers {#publicite-1}
 
@@ -138,7 +138,7 @@ Particuliers et professionnels sont classés selon les mêmes règles (§2). L'o
 
 Dans une liste de résultats, une publicité peut s'intercaler entre deux annonces. Sa carte est alors clairement distincte et porte la mention « Publicité ».
 
-### 5.2 Promotions de {brand} {#publicite-2}
+### 5.2 Promotions d'{brand} {#publicite-2}
 
 {brand} affiche aussi des messages sur ses propres services, par exemple « Déposer une annonce », « Créer une alerte de recherche » ou « Passer Pro ». Ils portent la mention « {brand} » et prennent la place d'une publicité quand aucune n'est servie. Un message « Mettre à la Une » n'apparaît qu'à partir de l'ouverture des ventes.
 
@@ -166,7 +166,7 @@ Si votre annonce a été descendue, masquée ou retirée, vous recevez les motif
 
 {brand} tient cette page à jour. Toute option payante nouvelle ou tout changement des critères du §2 y est décrit avant d'entrer en vigueur, avec une nouvelle version et une nouvelle date en tête de page.
 
-## 7. Rôle de {brand} {#role}
+## 7. Rôle d'{brand} {#role}
 
 ### 7.1 Un classement automatique {#role-1}
 
@@ -182,4 +182,4 @@ Le classement des annonces est automatique et suit les règles du §2. {brand} n
 
 ### 7.4 Ce dont {brand} répond {#role-4}
 
-{brand} répond de la bonne exécution des options qu'elle vend et des contenus qu'elle rédige elle-même, dont cette page (voir les [CGU](/legal/cgu#responsabilite-3)). Rien dans les présentes ne limite la responsabilité de {brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.
+{brand} répond de la bonne exécution des options qu'elle vend et des contenus qu'elle rédige elle-même, dont cette page (voir les [CGU](/legal/cgu#responsabilite-3)). Rien dans les présentes ne limite la responsabilité d'{brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.

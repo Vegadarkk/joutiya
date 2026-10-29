@@ -30,7 +30,7 @@ export default async function StaffSignInPage({ searchParams }: { searchParams: 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-8 px-4 py-12">
       <div className="flex items-center justify-between">
-        <Logo label="Joutiya" className="h-9" />
+        <Logo label="Aalan" className="h-9" />
         <Badge variant="pro">Back-office</Badge>
       </div>
       <div className="rounded-lg border border-border border-t-[3px] border-t-structure bg-surface p-6 sm:p-8">

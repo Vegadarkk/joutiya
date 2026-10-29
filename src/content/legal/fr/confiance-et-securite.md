@@ -10,7 +10,7 @@ Cette page vous aide à repérer les arnaques, à vous protéger et à agir si v
 
 ### 1.1 {brand} ne vous demandera jamais de paiement {#essentiel-1}
 
-{brand} ne vous demandera jamais de paiement pour une vente entre utilisateurs, ni par message, e-mail, WhatsApp, SMS ou appel. Elle n'encaisse pas l'argent d'une vente entre utilisateurs, n'organise ni paiement sécurisé ni livraison, et ne vous demandera jamais un code ou un mot de passe. Un message qui le fait ne vient pas de {brand}.
+{brand} ne vous demandera jamais de paiement pour une vente entre utilisateurs, ni par message, e-mail, WhatsApp, SMS ou appel. Elle n'encaisse pas l'argent d'une vente entre utilisateurs, n'organise ni paiement sécurisé ni livraison, et ne vous demandera jamais un code ou un mot de passe. Un message qui le fait ne vient pas d'{brand}.
 
 Les seuls paiements possibles à {brand} sont les options et abonnements que vous choisissez vous-même depuis votre espace connecté, une fois les ventes ouvertes. {brand} n'envoie jamais de lien de paiement par message.
 
@@ -67,7 +67,7 @@ Un message, un e-mail ou un site se fait passer pour {brand}, pour votre banque 
 
 ### 3.2 Pendant l'échange {#conseils-2}
 
-- Restez sur la messagerie de {brand} tant que la transaction n'est pas conclue.
+- Restez sur la messagerie d'{brand} tant que la transaction n'est pas conclue.
 - Méfiez-vous des demandes pressantes ou d'un passage immédiat sur une autre application.
 - N'envoyez pas de copie de votre carte nationale (CNIE), de votre passeport ou de documents bancaires sans raison sérieuse.
 
@@ -125,7 +125,7 @@ Un bandeau d'alerte s'affiche quand un message contient un IBAN, une demande d'a
 - **Plainte pour escroquerie** : déposez-la auprès de la police, de la Gendarmerie royale ou du procureur du Roi. Apportez vos captures d'écran, les numéros de téléphone, les reçus et les adresses des pages.
 - **Paiement déjà fait** : contactez votre banque ou l'agence de transfert d'argent sans attendre, pour demander le blocage ou l'opposition.
 
-### 5.2 Signaler en dehors de {brand} {#autorites-2}
+### 5.2 Signaler en dehors d'{brand} {#autorites-2}
 
 Signalez une escroquerie ou un contenu illicite en ligne sur e-blagh.ma, la plateforme de la Sûreté nationale (DGSN), et le numéro de téléphone frauduleux à votre opérateur. Vous pouvez aussi vous adresser à la police, à la Gendarmerie royale ou au parquet.
 
@@ -137,7 +137,7 @@ Signalez une escroquerie ou un contenu illicite en ligne sur e-blagh.ma, la plat
 
 {brand} répond aux demandes légales des autorités, après avoir vérifié leur origine, et les informe sans retard lorsqu'elle apprend des faits laissant soupçonner une infraction pénale menaçant la vie ou la sécurité de personnes (art. 18 du DSA). Les autorités trouvent le point de contact dédié sur la page [Contact autorités (DSA)](/legal/contact-autorites) ; les conditions sont décrites dans les [CGU](/legal/cgu#signalement-5).
 
-## 6. Rôle de {brand} {#role}
+## 6. Rôle d'{brand} {#role}
 
 ### 6.1 Un hébergeur neutre {#role-1}
 
@@ -147,8 +147,8 @@ Signalez une escroquerie ou un contenu illicite en ligne sur e-blagh.ma, la plat
 
 Les conseils de cette page sont des repères de prudence : ils réduisent le risque, ils ne l'écartent pas. Les badges (§4.1) indiquent qu'une vérification précise a été faite, rien de plus. Chaque utilisateur reste responsable de ses choix et de ses transactions.
 
-### 6.3 Ce que {brand} fait {#role-3}
+### 6.3 Ce qu'{brand} fait {#role-3}
 
 - Elle n'a pas d'obligation générale de surveiller les contenus (art. 8 du DSA), mais elle mène des contrôles ciblés contre les arnaques, les objets interdits et le spam, et traite les signalements dans les délais indiqués aux [CGU](/legal/cgu#moderation-7).
 - Dans la messagerie, des règles automatiques repèrent les liens, les IBAN et les mots-clés de paiement pour afficher une alerte. Une conversation n'est lue par une personne que si elle est signalée ou si une autorité le demande légalement (CGU, [§13.5](/legal/cgu#messagerie-5)).
-- Elle répond de ses propres obligations : traitement des signalements, décisions motivées, protection des données personnelles. Rien dans les présentes ne limite la responsabilité de {brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.
+- Elle répond de ses propres obligations : traitement des signalements, décisions motivées, protection des données personnelles. Rien dans les présentes ne limite la responsabilité d'{brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.

@@ -4,7 +4,7 @@ Version {version} — en vigueur le {effectiveDate}
 
 <!-- Rendu : valeurs entre accolades tirées de config/legal (src/lib/legal/values.ts), marqueurs if/each décrits dans src/lib/legal/template.ts. Une valeur vide n'est jamais remplacée par un texte inventé : chaque section a sa variante « Renseigné avant l'ouverture du site. ». En production, le serveur refuse de démarrer si une mention obligatoire manque (missingLegalMentions). -->
 
-Informations d'identification de l'éditeur, de l'hébergeur et des hébergeurs de données de {brand}, mises à disposition du public conformément à l'article 1-1 de la loi n° 2004-575 du 21 juin 2004 pour la confiance dans l'économie numérique (LCEN).
+Informations d'identification de l'éditeur, de l'hébergeur et des hébergeurs de données d'{brand}, mises à disposition du public conformément à l'article 1-1 de la loi n° 2004-575 du 21 juin 2004 pour la confiance dans l'économie numérique (LCEN).
 
 ## 1. Éditeur du site {#editeur}
 
@@ -98,7 +98,7 @@ Renseigné avant l'ouverture du site.
 Les traitements qui concernent les personnes situées au Maroc ont fait l'objet d'une déclaration auprès de la Commission nationale de contrôle de la protection des données à caractère personnel (CNDP), récépissé n° {cndpReceiptNo}.
 <!--endif-->
 
-## 6. Rôle de {brand} {#role}
+## 6. Rôle d'{brand} {#role}
 
 ### 6.1 Un service d'hébergement d'annonces {#role-1}
 
@@ -108,4 +108,4 @@ Les traitements qui concernent les personnes situées au Maroc ont fait l'objet 
 
 Pour les contenus fournis par les utilisateurs, {brand} relève du régime des hébergeurs : elle n'exerce pas de surveillance générale des contenus (art. 8 du DSA) et agit promptement pour retirer un contenu illicite dont elle a effectivement connaissance. Ce régime ne couvre pas ses obligations propres, notamment en matière de données personnelles. {brand} répond de ses propres obligations et de la bonne exécution des options qu'elle vend (voir les [CGU](/legal/cgu#responsabilite)).
 
-Rien dans les présentes ne limite la responsabilité de {brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.
+Rien dans les présentes ne limite la responsabilité d'{brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.

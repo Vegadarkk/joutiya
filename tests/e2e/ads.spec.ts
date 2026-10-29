@@ -182,7 +182,7 @@ test.describe("ad slots", () => {
     await page.goto(`/fr/recherche?q=${WORD}`);
     const infeed = main(page).locator('[data-ad-slot="search-infeed"]');
     await expect(infeed).toHaveAttribute("data-ad-state", "promo");
-    await expect(infeed).toHaveAttribute("aria-label", "À découvrir sur Joutiya");
+    await expect(infeed).toHaveAttribute("aria-label", "À découvrir sur Aalan");
     await page.waitForLoadState("networkidle");
     expect(requests).toEqual([]);
 

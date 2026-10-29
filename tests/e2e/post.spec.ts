@@ -102,7 +102,7 @@ async function verifyPhone(page: Page, request: APIRequestContext): Promise<void
   const started = page.waitForResponse((response) => response.url().endsWith("/api/auth/phone/start") && response.request().method() === "POST");
   await page.getByRole("button", { name: "Obtenir mon code" }).click();
   const { code } = (await (await started).json()) as { code: string };
-  const hit = signedInbound(`212${digits}`, `JOUTIYA ${code}`, `wamid.e2e.${Date.now()}.post`);
+  const hit = signedInbound(`212${digits}`, `AALAN ${code}`, `wamid.e2e.${Date.now()}.post`);
   const delivered = await request.post("/api/webhooks/whatsapp", { data: hit.raw, headers: { "content-type": "application/json", "x-hub-signature-256": hit.signature } });
   expect(delivered.status()).toBe(200);
   await expect(page.getByRole("heading", { name: "Numéro vérifié" })).toBeVisible({ timeout: 20_000 });
@@ -117,7 +117,7 @@ async function photoWithExif(): Promise<Buffer> {
   return sharp(grid, { raw: { width: 26, height: 19, channels: 3 } })
     .resize(2600, 1950, { kernel: "nearest" })
     .jpeg({ quality: 90 })
-    .withExif({ IFD0: { Make: "Joutiya E2E", Model: "Camera", Copyright: "Joutiya test fixture" } })
+    .withExif({ IFD0: { Make: "Aalan E2E", Model: "Camera", Copyright: "Aalan test fixture" } })
     .toBuffer();
 }
 
@@ -248,7 +248,7 @@ test.describe("posting wizard", () => {
 
     // 8. Contact: messaging only here, even with the verified badge.
     await expect(page).toHaveURL(/\/contact$/);
-    await expect(page.getByText(/uniquement par la messagerie Joutiya/)).toBeVisible();
+    await expect(page.getByText(/uniquement par la messagerie Aalan/)).toBeVisible();
     await expect(page.getByRole("switch", { name: /Afficher mon numéro sur l'annonce/ })).toBeDisabled();
     await next(page);
 

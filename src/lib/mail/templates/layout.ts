@@ -120,13 +120,13 @@ const FOOTER: Record<MailLocale, { auto: string; reply: string; publisher: (who:
     auto: "E-mail automatique, merci de ne pas répondre.",
     reply: "Votre réponse à cet e-mail parvient à notre équipe.",
     publisher: (who) => `Édité par ${who.name} · ${who.address}`,
-    site: "Aller sur Joutiya",
+    site: "Aller sur Aalan",
   },
   ar: {
     auto: "بريد إلكتروني آلي، يرجى عدم الرد عليه.",
     reply: "يصل ردّك على هذا البريد إلى فريقنا.",
     publisher: (who) => `الناشر: ${who.name} · ${who.address}`,
-    site: "الذهاب إلى Joutiya",
+    site: "الذهاب إلى Aalan",
   },
 };
 
@@ -250,7 +250,7 @@ export function renderLayout(input: LayoutInput): BuiltMail {
     `<table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;" dir="${dir}">` +
     // Wordmark
     `<tr><td style="padding:0 8px 20px;text-align:${align};">` +
-    `<span style="font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:700;letter-spacing:0.5px;color:${COLORS.primary};">Joutiya</span>` +
+    `<span style="font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:700;letter-spacing:0.5px;color:${COLORS.primary};">Aalan</span>` +
     `<div style="width:48px;height:3px;margin-top:8px;background:${COLORS.rule};border-radius:2px;${rtl ? "margin-left:auto;" : ""}"></div>` +
     `</td></tr>` +
     // Card

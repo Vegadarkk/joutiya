@@ -127,7 +127,7 @@ export default function AccountDropdown({ session, name, triggerClassName, child
               {t("decisions")}
             </Link>
           </DropdownMenu.Item>
-          {/* Help centre with the Assistant Joutiya open (phase 5 D25); the event opens it when already there. */}
+          {/* Help centre with the Assistant Aalan open (phase 5 D25); the event opens it when already there. */}
           <DropdownMenu.Item asChild>
             <Link href={`/aide${ASSISTANT_HASH}`} className={item} onClick={openAssistant}>
               <CircleHelp aria-hidden="true" />

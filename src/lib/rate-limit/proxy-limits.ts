@@ -101,7 +101,7 @@ export function tooManyPagesHtml(locale: Locale): string {
   return (
     `<!doctype html><html lang="${lang}" dir="${lang === "ar" ? "rtl" : "ltr"}"><head><meta charset="utf-8">` +
     `<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">` +
-    `<title>${text.title} · Joutiya</title><style>${STYLE}</style></head>` +
+    `<title>${text.title} · Aalan</title><style>${STYLE}</style></head>` +
     `<body><main><h1>${text.title}</h1><p>${text.body}</p><p><a href="/${locale}">${text.home}</a></p></main></body></html>`
   );
 }

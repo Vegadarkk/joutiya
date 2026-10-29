@@ -27,7 +27,7 @@ const bounce = (type: string, to: string[] = ["nadia@example.com"]) =>
   JSON.stringify({
     type: "email.bounced",
     created_at: "2026-10-16T10:00:00.000Z",
-    data: { email_id: "56761188-7520-42d8-8898-ff6fc54ce618", from: "Joutiya <no-reply@notif.joutiya.ma>", to, subject: "x", bounce: { message: "m", subType: "General", type }, tags: { template: "verifyEmail" } },
+    data: { email_id: "56761188-7520-42d8-8898-ff6fc54ce618", from: "Aalan <no-reply@notif.joutiya.ma>", to, subject: "x", bounce: { message: "m", subType: "General", type }, tags: { template: "verifyEmail" } },
   });
 
 describe("verifySvix", () => {

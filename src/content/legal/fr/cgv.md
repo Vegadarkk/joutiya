@@ -8,13 +8,13 @@ Version provisoire, avant relecture juridique. Les présentes conditions encadre
 
 Le vendeur est {publisher}, {address}, joignable à {email} et au {phone}. Les conditions couvrent les packs de crédits, les options d'annonce payées en crédits, les abonnements Pro et le Pass Boutique. Elles complètent les conditions générales d'utilisation.
 
-{brand} est un hébergeur neutre : il n'est pas partie aux ventes conclues entre utilisateurs, et une option ne garantit ni une vente ni un contact.
+{brand} est un hébergeur neutre : elle n'est pas partie aux ventes conclues entre utilisateurs, et une option ne garantit ni une vente ni un contact.
 
 ## 2. Crédits {#credits}
 
 Un crédit vaut 1 dirham toutes taxes comprises. Les crédits s'achètent par packs, en dirhams avec une carte marocaine ou en euros avec une carte européenne ; certains packs comprennent des crédits offerts en bonus.
 
-- Les crédits servent uniquement à payer les options de {brand}. Ils ne sont ni transférables à un autre compte, ni convertibles en argent, ni utilisables en dehors de {brand} : ce n'est pas de la monnaie électronique.
+- Les crédits servent uniquement à payer les options d'{brand}. Ils ne sont ni transférables à un autre compte, ni convertibles en argent, ni utilisables en dehors d'{brand} : ce n'est pas de la monnaie électronique.
 - Les crédits achetés n'expirent pas tant que le compte est ouvert.
 - Les crédits mensuels d'un abonnement Pro sont utilisés en premier. Ils ne se cumulent pas : ils sont remis à niveau au début de chaque période, et ceux qui restent sont perdus.
 - Payer une option avec des crédits vaut exécution complète du service acheté avec ces crédits.
@@ -72,4 +72,4 @@ Toute réclamation s'adresse à {email}. En cas de litige non résolu, le consom
 
 Les présentes conditions sont soumises au droit français. Le consommateur garde la protection des règles impératives du pays où il réside : pour un consommateur résidant au Maroc, les dispositions d'ordre public de la loi n° 31-08, notamment celles sur les contrats conclus à distance (articles 25 à 43).
 
-Rien dans les présentes ne limite la responsabilité de {brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.
+Rien dans les présentes ne limite la responsabilité d'{brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.

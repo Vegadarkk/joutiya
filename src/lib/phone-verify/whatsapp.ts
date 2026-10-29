@@ -11,7 +11,7 @@ import type { PhoneVerifier, VerificationChallenge, VerificationState } from "./
 
 /** Click-to-chat link with the prefilled message (number: digits only, no "+"). */
 export function waLink(number: string, code: string): string {
-  return `https://wa.me/${number}?text=${encodeURIComponent(`JOUTIYA ${code}`)}`;
+  return `https://wa.me/${number}?text=${encodeURIComponent(`AALAN ${code}`)}`;
 }
 
 export class WhatsAppInboundVerifier implements PhoneVerifier {

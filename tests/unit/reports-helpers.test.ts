@@ -119,7 +119,7 @@ describe("reportReceived mail (art. 16(4))", () => {
   beforeAll(() => {
     process.env.APP_ENV = "dev";
     process.env.SITE_URL = "https://staging.joutiya.ma";
-    process.env.MAIL_FROM = "Joutiya <no-reply@notif.joutiya.ma>";
+    process.env.MAIL_FROM = "Aalan <no-reply@notif.joutiya.ma>";
     resetServerEnv();
   });
 

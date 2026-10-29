@@ -218,7 +218,7 @@ describe("tax exports", () => {
     const result = await download(admin, "registre-dgi", "2025-Q1");
     expect(result.status).toBe(200);
     expect(result.headers.get("content-type")).toBe("text/csv; charset=utf-8");
-    expect(result.headers.get("content-disposition")).toBe('attachment; filename="joutiya-registre-dgi-2025-T1.csv"');
+    expect(result.headers.get("content-disposition")).toBe('attachment; filename="aalan-registre-dgi-2025-T1.csv"');
     expect(result.headers.get("cache-control")).toBe("no-store");
     const rows = table(result.text);
     expect(rows.slice(1).map((row) => [row[0], row[2], row[3], row[5], row[11]])).toEqual([

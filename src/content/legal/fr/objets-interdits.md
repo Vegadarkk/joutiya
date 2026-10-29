@@ -2,7 +2,7 @@
 
 Version {version} — en vigueur le {effectiveDate}
 
-Ces biens, services et contenus ne peuvent pas être proposés sur {brand}, même depuis un compte Pro. La plupart sont interdits par la loi marocaine, ou réservés par elle à des professionnels agréés dont {brand} ne peut pas vérifier l'agrément ; les autres sont exclus par choix de {brand}, plus stricte que la loi, pour protéger les acheteurs contre un danger ou une fraude. Une annonce qui en contient est refusée ou retirée. Cette liste n'est pas exhaustive : tout bien ou service dont la vente est interdite par la loi marocaine est exclu, ainsi que tout bien ou service que la loi réserve à des professionnels agréés lorsqu'il est proposé par une personne qui ne détient pas l'agrément requis.
+Ces biens, services et contenus ne peuvent pas être proposés sur {brand}, même depuis un compte Pro. La plupart sont interdits par la loi marocaine, ou réservés par elle à des professionnels agréés dont {brand} ne peut pas vérifier l'agrément ; les autres sont exclus par choix d'{brand}, plus stricte que la loi, pour protéger les acheteurs contre un danger ou une fraude. Une annonce qui en contient est refusée ou retirée. Cette liste n'est pas exhaustive : tout bien ou service dont la vente est interdite par la loi marocaine est exclu, ainsi que tout bien ou service que la loi réserve à des professionnels agréés lorsqu'il est proposé par une personne qui ne détient pas l'agrément requis.
 
 Cette page fait partie des [conditions générales d'utilisation](/legal/cgu#annonces-7).
 
@@ -16,7 +16,7 @@ La liste du §2 sert de base à deux contrôles. Au dépôt, un contrôle automa
 
 Tout bien ou service dont la vente est interdite par la loi marocaine, ou réservée par elle à des professionnels agréés, est exclu, même s'il ne figure pas dans cette liste (voir les [CGU](/legal/cgu#annonces-7)).
 
-Une interdiction repose soit sur la loi marocaine applicable au bien ou au service concerné, soit sur les CGU quand la loi ne l'interdit pas. La décision de {brand} indique le fondement retenu (voir les [CGU](/legal/cgu#decisions-2)).
+Une interdiction repose soit sur la loi marocaine applicable au bien ou au service concerné, soit sur les CGU quand la loi ne l'interdit pas. La décision d'{brand} indique le fondement retenu (voir les [CGU](/legal/cgu#decisions-2)).
 
 ### 1.3 Mots à double sens {#principe-3}
 
@@ -24,7 +24,7 @@ Certains mots ont aussi un usage légitime, par exemple un objet de collection o
 
 ### 1.4 La liste de mots du contrôle automatique {#principe-4}
 
-Au dépôt, le contrôle automatique utilise une liste de mots tenue dans la configuration de {brand}. Cette liste n'est qu'un outil de détection : seules les règles de cette page et des CGU fondent un refus ou un retrait. Elle est mise à jour avec cette page ; en cas d'écart, la page est corrigée. Un mot détecté à tort peut être contesté (§5.1). L'absence de blocage ne vaut jamais autorisation : une annonce publiée peut être retirée ensuite.
+Au dépôt, le contrôle automatique utilise une liste de mots tenue dans la configuration d'{brand}. Cette liste n'est qu'un outil de détection : seules les règles de cette page et des CGU fondent un refus ou un retrait. Elle est mise à jour avec cette page ; en cas d'écart, la page est corrigée. Un mot détecté à tort peut être contesté (§5.1). L'absence de blocage ne vaut jamais autorisation : une annonce publiée peut être retirée ensuite.
 
 ## 2. Catégories interdites {#liste}
 

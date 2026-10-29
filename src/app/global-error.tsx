@@ -8,7 +8,7 @@ export default function GlobalError({ retry }: { error: Error & { digest?: strin
   return (
     <html lang="fr-MA" dir="ltr">
       <body className="flex min-h-dvh items-center justify-center bg-background font-sans antialiased">
-        <title>Joutiya</title>
+        <title>Aalan</title>
         <main className="flex max-w-md flex-col items-center gap-3 px-4 py-14 text-center">
           <h1 className="text-xl font-semibold">La page n&apos;a pas pu s&apos;afficher</h1>
           <p lang="ar" dir="rtl" className="text-lg">

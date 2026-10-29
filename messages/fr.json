@@ -1,12 +1,12 @@
 {
   "Metadata": {
-    "title": "Joutiya : petites annonces au Maroc",
-    "titleTemplate": "%s | Joutiya",
+    "title": "Aalan : petites annonces au Maroc",
+    "titleTemplate": "%s | Aalan",
     "description": "Achetez et vendez près de chez vous, partout au Maroc : particuliers et professionnels."
   },
   "Nav": {
     "skip": "Aller au contenu",
-    "home": "Accueil Joutiya",
+    "home": "Accueil Aalan",
     "post": "Déposer une annonce",
     "sell": "Vendre",
     "searchLabel": "Rechercher une annonce",
@@ -70,7 +70,7 @@
     }
   },
   "Welcome": {
-    "title": "Bienvenue sur Joutiya",
+    "title": "Bienvenue sur Aalan",
     "createAccount": "Créer un compte",
     "signIn": "Se connecter",
     "discover": "Découvrir sans compte"
@@ -96,11 +96,11 @@
     "postBody": "Vous pourrez publier une annonce avec ses photos en quelques minutes."
   },
   "Footer": {
-    "about": "Joutiya, la place de marché des petites annonces au Maroc. Une porte ouverte sur le monde.",
+    "about": "Aalan, la place de marché des petites annonces au Maroc. Une porte ouverte sur le monde.",
     "legalTitle": "Informations légales",
     "trustTitle": "Mentions et autorités",
     "help": "Centre d'aide",
-    "disclaimer": "Joutiya héberge les annonces de ses utilisateurs : elle n'est ni vendeur, ni acheteur, ni partie aux ventes conclues entre eux.",
+    "disclaimer": "Aalan héberge les annonces de ses utilisateurs : elle n'est ni vendeur, ni acheteur, ni partie aux ventes conclues entre eux.",
     "copyright": "© {year} {publisher}",
     "links": {
       "cgu": "Conditions générales d'utilisation",
@@ -136,15 +136,15 @@
   },
   "Help": {
     "metaTitle": "Centre d'aide",
-    "metaDescription": "Les réponses aux questions sur Joutiya : compte, annonces, recherche, messagerie, sécurité, signalements et recours.",
+    "metaDescription": "Les réponses aux questions sur Aalan : compte, annonces, recherche, messagerie, sécurité, signalements et recours.",
     "title": "Centre d'aide",
-    "lead": "Votre compte, vos annonces, la messagerie, la sécurité : trouvez la réponse, ou posez la question à l'Assistant Joutiya.",
+    "lead": "Votre compte, vos annonces, la messagerie, la sécurité : trouvez la réponse, ou posez la question à l'Assistant Aalan.",
     "search": {
       "label": "Rechercher dans le centre d'aide",
       "placeholder": "Ex. : renouveler une annonce",
       "clear": "Effacer la recherche",
       "results": "{count, plural, one {# article correspond à votre recherche} other {# articles correspondent à votre recherche}}",
-      "noResults": "Aucun article ne correspond à « {query} ». Essayez d'autres mots, ou posez la question à l'Assistant Joutiya."
+      "noResults": "Aucun article ne correspond à « {query} ». Essayez d'autres mots, ou posez la question à l'Assistant Aalan."
     },
     "browse": "Parcourir par thème",
     "articleCount": "{count, plural, one {# article} other {# articles}}",
@@ -152,7 +152,7 @@
     "breadcrumb": "Fil d'Ariane",
     "related": "Pour aller plus loin",
     "stillTitle": "Votre question reste sans réponse ?",
-    "stillBody": "L'Assistant Joutiya, une intelligence artificielle, vous répond à partir des articles du centre d'aide.",
+    "stillBody": "L'Assistant Aalan, une intelligence artificielle, vous répond à partir des articles du centre d'aide.",
     "pages": {
       "inscription": "Créer un compte",
       "connexion": "Se connecter",
@@ -168,12 +168,12 @@
     },
     "assistant": {
       "open": "Poser une question à l'Assistant",
-      "title": "Assistant Joutiya",
+      "title": "Assistant Aalan",
       "badge": "IA",
       "disclosure": "Vous échangez avec une intelligence artificielle, pas avec une personne. Elle répond à partir du centre d'aide et peut se tromper : vérifiez dans l'article cité.",
       "privacy": "Ne donnez aucune donnée personnelle (nom, téléphone, e-mail, adresse, mot de passe, code). L'assistant n'a pas accès à votre compte et ne peut rien modifier.",
-      "welcome": "Posez votre question sur Joutiya : déposer une annonce, contacter un vendeur, éviter une arnaque, contester une décision…",
-      "conversation": "Conversation avec l'Assistant Joutiya",
+      "welcome": "Posez votre question sur Aalan : déposer une annonce, contacter un vendeur, éviter une arnaque, contester une décision…",
+      "conversation": "Conversation avec l'Assistant Aalan",
       "you": "Vous",
       "label": "Votre question",
       "placeholder": "Écrivez votre question",
@@ -254,7 +254,7 @@
       "waitLater": "dans quelques minutes",
       "brandPromise": "Une porte ouverte sur le monde.",
       "trust": {
-        "messages": "Vos échanges restent dans la messagerie Joutiya.",
+        "messages": "Vos échanges restent dans la messagerie Aalan.",
         "phone": "Votre numéro n'est jamais affiché en clair.",
         "report": "Un signalement se fait en un clic, et il est lu."
       },
@@ -314,14 +314,14 @@
       "sentBody": "Si l'adresse {email} peut être utilisée, un e-mail vient de vous être envoyé. Ouvrez le lien qu'il contient pour activer votre compte. Pensez à regarder dans les indésirables.",
       "sentHelp": "Rien reçu après quelques minutes ?",
       "consentTitle": "Encore une étape",
-      "consentBody": "Pour créer votre compte Joutiya avec cette adresse, acceptez les conditions ci-dessous.",
+      "consentBody": "Pour créer votre compte Aalan avec cette adresse, acceptez les conditions ci-dessous.",
       "consentEmail": "Compte Google",
       "consentSubmit": "Créer mon compte",
       "consentCancel": "Annuler"
     },
     "consents": {
-      "cgu": "J'ai lu et j'accepte les <link>conditions générales d'utilisation</link> de Joutiya.",
-      "transfers": "J'autorise expressément Joutiya à transférer mes données personnelles hors du Maroc, vers l'Union européenne et les États-Unis, aux prestataires listés ci-dessous et pour le rôle indiqué (article 44 de la loi 09-08).",
+      "cgu": "J'ai lu et j'accepte les <link>conditions générales d'utilisation</link> d'Aalan.",
+      "transfers": "J'autorise expressément Aalan à transférer mes données personnelles hors du Maroc, vers l'Union européenne et les États-Unis, aux prestataires listés ci-dessous et pour le rôle indiqué (article 44 de la loi 09-08).",
       "transfersRequired": "Sans cet accord, le compte ne peut pas être créé.",
       "transfersDetails": "Voir les prestataires et leur rôle",
       "transfersEu": "Dans l'Union européenne",
@@ -336,14 +336,14 @@
         "googleAuth": "La connexion et la gestion des comptes.",
         "adsense": "La publicité, quand elle sera activée, et seulement avec votre accord donné à part.",
         "cloudflare": "La diffusion et la protection du site, la vérification anti-robot (Turnstile) et l'IA de secours du contrôle des annonces (Workers AI), sur son réseau mondial.",
-        "anthropic": "L'aide au contrôle des annonces, au tri des signalements et à l'examen des recours, la lecture de la décision d'agrément d'un loueur de voitures, et l'Assistant Joutiya.",
+        "anthropic": "L'aide au contrôle des annonces, au tri des signalements et à l'examen des recours, la lecture de la décision d'agrément d'un loueur de voitures, et l'Assistant Aalan.",
         "openai": "Le contrôle de secours des contenus.",
         "meta": "La vérification de votre numéro de téléphone par WhatsApp.",
         "resend": "L'envoi des e-mails.",
         "stripe": "Les paiements, à l'ouverture des ventes.",
         "revenuecat": "Les abonnements Pro, à l'ouverture des ventes."
       },
-      "marketing": "Je souhaite recevoir par e-mail les nouveautés et les offres de Joutiya. Facultatif, et révocable à tout moment.",
+      "marketing": "Je souhaite recevoir par e-mail les nouveautés et les offres d'Aalan. Facultatif, et révocable à tout moment.",
       "privacy": "Le traitement de vos données est décrit dans la <link>politique de confidentialité</link>.",
       "legend": "Consentements"
     },
@@ -376,7 +376,7 @@
       "verifying": "Confirmation de votre adresse en cours…",
       "checking": "Vérification du lien…",
       "verifiedTitle": "Adresse confirmée",
-      "verifiedBody": "Votre compte est activé et vous êtes connecté. Bienvenue sur Joutiya.",
+      "verifiedBody": "Votre compte est activé et vous êtes connecté. Bienvenue sur Aalan.",
       "verifiedBodyAnonymous": "Votre compte est activé. Connectez-vous pour commencer.",
       "goSettings": "Mes paramètres",
       "goHome": "Découvrir les annonces",
@@ -446,7 +446,7 @@
       "verification": {
         "title": "Vérifications",
         "body": "Un numéro vérifié rassure les acheteurs et vous permet d'être contacté sur WhatsApp.",
-        "bodyClosed": "Une adresse e-mail confirmée rassure les acheteurs. Les échanges passent par la messagerie de Joutiya.",
+        "bodyClosed": "Une adresse e-mail confirmée rassure les acheteurs. Les échanges passent par la messagerie d'Aalan.",
         "email": "Adresse e-mail",
         "emailVerified": "Confirmée",
         "emailPending": "À confirmer",
@@ -470,16 +470,16 @@
     "verifications": {
       "title": "Vérifier mon numéro",
       "lead": "Un numéro vérifié apparaît avec un badge sur vos annonces et permet le contact WhatsApp.",
-      "how": "Vous envoyez un code depuis votre propre WhatsApp au numéro de Joutiya, et c'est tout. Joutiya ne vous envoie jamais de message : ni SMS, ni appel, ni message WhatsApp.",
+      "how": "Vous envoyez un code depuis votre propre WhatsApp au numéro d'Aalan, et c'est tout. Aalan ne vous envoie jamais de message : ni SMS, ni appel, ni message WhatsApp.",
       "phone": "Numéro de mobile",
       "phoneHint": "Mobile marocain, par exemple 06 12 34 56 78 ou +212 6 12 34 56 78.",
       "start": "Obtenir mon code",
       "codeTitle": "Envoyez ce code sur WhatsApp",
-      "codeBody": "Depuis le WhatsApp du {phone}, envoyez le message ci-dessous au numéro de Joutiya.",
+      "codeBody": "Depuis le WhatsApp du {phone}, envoyez le message ci-dessous au numéro d'Aalan.",
       "codeLabel": "Votre code",
       "copyCode": "Copier le code",
       "copied": "Code copié",
-      "joutiyaNumber": "Numéro de Joutiya",
+      "joutiyaNumber": "Numéro d'Aalan",
       "openWhatsApp": "Ouvrir WhatsApp",
       "expiresIn": "Code valable encore {time}",
       "waiting": "En attente de votre message…",
@@ -493,7 +493,7 @@
       "changeNumber": "Changer de numéro",
       "badge": "Téléphone vérifié",
       "backSettings": "Retour aux paramètres",
-      "unavailable": "La vérification du numéro par WhatsApp n'est pas encore ouverte. En attendant, les acheteurs vous écrivent par la messagerie Joutiya.",
+      "unavailable": "La vérification du numéro par WhatsApp n'est pas encore ouverte. En attendant, les acheteurs vous écrivent par la messagerie Aalan.",
       "loadFailedTitle": "L'état de la vérification n'a pas pu être chargé",
       "retry": "Réessayer",
       "alreadyVerified": "Votre compte a déjà un numéro vérifié."
@@ -670,7 +670,7 @@
       "photos": "Des photos nettes, à la lumière du jour, sous plusieurs angles. La première est la couverture.",
       "prix": "Un prix juste se vend vite. Regardez les annonces similaires pour vous situer.",
       "lieu": "Votre ville suffit : votre adresse n'est jamais demandée ni affichée.",
-      "contact": "Les acheteurs vous écrivent par la messagerie Joutiya. Vous choisissez d'afficher aussi votre numéro.",
+      "contact": "Les acheteurs vous écrivent par la messagerie Aalan. Vous choisissez d'afficher aussi votre numéro.",
       "apercu": "Relisez votre annonce avant de la publier."
     },
     "category": {
@@ -728,14 +728,14 @@
       "whatsappHint": "Ajoute un bouton WhatsApp vers votre numéro vérifié."
     },
     "contact": {
-      "messagesAlways": "La messagerie Joutiya est toujours disponible pour les acheteurs, sans rien afficher de personnel.",
+      "messagesAlways": "La messagerie Aalan est toujours disponible pour les acheteurs, sans rien afficher de personnel.",
       "phoneVerified": "Numéro vérifié",
       "phoneNotVerified": "Numéro non vérifié",
       "verifyLink": "Vérifier mon numéro",
       "verifyBody": "Vérifiez votre numéro pour l'afficher sur l'annonce ou proposer WhatsApp. Votre brouillon est conservé.",
-      "verifySoon": "Afficher votre numéro ou proposer WhatsApp demande un numéro vérifié. Cette vérification n'est pas encore ouverte : en attendant, les acheteurs vous écrivent par la messagerie Joutiya.",
+      "verifySoon": "Afficher votre numéro ou proposer WhatsApp demande un numéro vérifié. Cette vérification n'est pas encore ouverte : en attendant, les acheteurs vous écrivent par la messagerie Aalan.",
       "revealNote": "Votre numéro n'apparaît jamais en clair sur la page : il faut être connecté et cliquer pour le voir.",
-      "messagingOnly": "Dans cette catégorie réservée aux majeurs, les acheteurs vous contactent uniquement par la messagerie Joutiya : le téléphone et WhatsApp ne peuvent pas être affichés."
+      "messagingOnly": "Dans cette catégorie réservée aux majeurs, les acheteurs vous contactent uniquement par la messagerie Aalan : le téléphone et WhatsApp ne peuvent pas être affichés."
     },
     "photos": {
       "add": "Ajouter des photos",
@@ -762,7 +762,7 @@
         "too_large": "Cette photo dépasse 10 Mo.",
         "bad_type": "Ce format d'image n'est pas pris en charge.",
         "decode_failed": "Cette image est illisible ou abîmée.",
-        "nsfw": "Cette photo ne respecte pas les règles de Joutiya.",
+        "nsfw": "Cette photo ne respecte pas les règles d'Aalan.",
         "expired": "L'envoi a expiré. Réessayez.",
         "quota": "Le nombre maximal de photos est atteint.",
         "active_content": "Ce fichier contient des éléments actifs et ne peut pas être accepté."
@@ -812,7 +812,7 @@
       "noCity": "Pas encore de ville",
       "noCategory": "Pas encore de catégorie",
       "details": "Détails",
-      "contactMessages": "Messagerie Joutiya",
+      "contactMessages": "Messagerie Aalan",
       "contactPhone": "Numéro affiché",
       "contactWhatsapp": "WhatsApp",
       "photos": "{count, plural, one {# photo} other {# photos}}",
@@ -822,7 +822,7 @@
       "toDiscuss": "À discuter",
       "declarations": "Avant de publier",
       "acceptRules": "Je confirme que mon annonce respecte les <cgu>conditions générales d'utilisation</cgu> et la liste des <interdits>objets et services interdits</interdits>, et qu'elle ne contient ni coordonnées ni données d'autres personnes.",
-      "hostNote": "Joutiya héberge les annonces de ses utilisateurs : elle n'est ni vendeur ni acheteur.",
+      "hostNote": "Aalan héberge les annonces de ses utilisateurs : elle n'est ni vendeur ni acheteur.",
       "publish": "Publier l'annonce",
       "save": "Enregistrer les modifications",
       "turnstileTitle": "Une vérification avant de publier",
@@ -889,7 +889,7 @@
       "accept_rules": "Confirmez que votre annonce respecte les règles pour publier.",
       "turnstile": "La vérification anti-robots n'est pas terminée. Patientez une seconde, puis réessayez.",
       "phone_in_text": "Retirez le numéro de téléphone du texte : les acheteurs vous joignent par la messagerie ou « Voir le numéro ».",
-      "prohibited": "Ce contenu n'est pas autorisé sur Joutiya. Consultez la liste des objets et services interdits.",
+      "prohibited": "Ce contenu n'est pas autorisé sur Aalan. Consultez la liste des objets et services interdits.",
       "sensitive": "Ce texte contient des informations personnelles ou sensibles à retirer.",
       "required": "Ce champ est obligatoire.",
       "unknown": "Cette valeur n'est pas valide.",
@@ -898,7 +898,7 @@
       "donation_not_allowed": "Le don n'est pas possible dans cette sous-catégorie.",
       "donation_price": "Un don ne peut pas avoir de prix : laissez le prix vide.",
       "region_mismatch": "La ville choisie ne se trouve pas dans cette région.",
-      "email_in_text": "Retirez l'adresse e-mail du texte : les acheteurs vous écrivent par la messagerie Joutiya.",
+      "email_in_text": "Retirez l'adresse e-mail du texte : les acheteurs vous écrivent par la messagerie Aalan.",
       "url_in_text": "Retirez le lien du texte : les liens vers d'autres sites ne sont pas autorisés.",
       "invalid": "Cette valeur n'est pas valide.",
       "not_allowed": "Cette information n'est pas autorisée dans cette catégorie.",
@@ -943,7 +943,7 @@
     },
     "catalogue": {
       "title": "Stock et variantes",
-      "hint": "Facultatif. Proposez plusieurs tailles, couleurs ou contenances dans une seule annonce et indiquez votre stock. Joutiya ne vend rien à votre place : mettez le stock à jour quand vous vendez.",
+      "hint": "Facultatif. Proposez plusieurs tailles, couleurs ou contenances dans une seule annonce et indiquez votre stock. Aalan ne vend rien à votre place : mettez le stock à jour quand vous vendez.",
       "mode": "Comment vendez-vous cet article ?",
       "single": "Un seul modèle",
       "multiple": "Plusieurs variantes",
@@ -2816,7 +2816,7 @@
       "whatsapp": "WhatsApp",
       "message": "Envoyer un message",
       "messageShort": "Message",
-      "messageHint": "Votre message arrive dans la messagerie Joutiya du vendeur. Ni votre e-mail ni votre numéro ne lui sont transmis.",
+      "messageHint": "Votre message arrive dans la messagerie Aalan du vendeur. Ni votre e-mail ni votre numéro ne lui sont transmis.",
       "testDrive": "Demander un essai",
       "testDriveHint": "Écrivez au vendeur, puis proposez-lui vos créneaux dans la conversation.",
       "testDriveText": "Bonjour, je souhaite essayer « {title} ». Quels créneaux vous conviennent ?",
@@ -2919,7 +2919,7 @@
         "visitFirst": "Visitez le bien en personne et vérifiez l'identité du propriétaire ou de l'agence.",
         "checkTitle": "Pour un achat, vérifiez le titre foncier auprès de la Conservation foncière (ANCFCC) et signez chez un notaire ou des adouls."
       },
-      "host": "Joutiya héberge les annonces de ses utilisateurs : elle n'est ni vendeur ni acheteur, et n'est partie ni aux transactions ni aux litiges entre eux.",
+      "host": "Aalan héberge les annonces de ses utilisateurs : elle n'est ni vendeur ni acheteur, et n'est partie ni aux transactions ni aux litiges entre eux.",
       "more": "Tous nos conseils de confiance et de sécurité"
     },
     "status": {
@@ -2994,7 +2994,7 @@
     },
     "example": {
       "title": "Annonce exemple",
-      "body": "Joutiya a créé cette annonce pour montrer à quoi ressemble une bonne annonce de ce type : photos nettes, description complète, prix et caractéristiques renseignés. Le vendeur et l'article sont fictifs : on ne peut ni le contacter, ni acheter, ni réserver.",
+      "body": "Aalan a créé cette annonce pour montrer à quoi ressemble une bonne annonce de ce type : photos nettes, description complète, prix et caractéristiques renseignés. Le vendeur et l'article sont fictifs : on ne peut ni le contacter, ni acheter, ni réserver.",
       "cta": "Déposer une annonce",
       "contact": "Contact désactivé : c'est une annonce exemple."
     },
@@ -3064,7 +3064,7 @@
     "newest": "Les {shown} annonces les plus récentes sont affichées.",
     "meta": {
       "title": "Annonces de {name}",
-      "description": "{name}, membre depuis {date} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya."
+      "description": "{name}, membre depuis {date} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Aalan."
     },
     "about": "À propos",
     "seeAll": "Voir toutes ses annonces dans la recherche",
@@ -3184,8 +3184,8 @@
       "subcategoryCity": "{subcategory} à {city}"
     },
     "metaTitle": "{heading} : petites annonces",
-    "metaDescription": "{heading} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya. Achetez et vendez entre particuliers et professionnels, sans afficher votre numéro.",
-    "metaDescriptionEmpty": "{heading} : achetez et vendez entre particuliers et professionnels sur Joutiya. Déposez votre annonce gratuitement.",
+    "metaDescription": "{heading} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Aalan. Achetez et vendez entre particuliers et professionnels, sans afficher votre numéro.",
+    "metaDescriptionEmpty": "{heading} : achetez et vendez entre particuliers et professionnels sur Aalan. Déposez votre annonce gratuitement.",
     "lead": "{count, plural, one {# annonce en ligne} other {# annonces en ligne}}, les plus récentes en premier.",
     "seeOne": "Voir l'annonce",
     "seeAll": "Voir les {count} annonces",
@@ -3552,11 +3552,11 @@
   "Pro": {
     "metaTitle": "Espace Pro",
     "title": "Espace Pro",
-    "lead": "Votre boutique sur Joutiya : la demande, sa vérification, puis votre offre et vos quotas.",
+    "lead": "Votre boutique sur Aalan : la demande, sa vérification, puis votre offre et vos quotas.",
     "loadFailed": "Votre espace Pro n'a pas pu être chargé",
     "retry": "Réessayer",
     "intro": {
-      "title": "Ouvrir une boutique Pro sur Joutiya",
+      "title": "Ouvrir une boutique Pro sur Aalan",
       "lead": "Pour les sociétés, coopératives, commerçants et auto-entrepreneurs : une boutique à votre nom, des annonces marquées Pro et des quotas adaptés à votre activité.",
       "offer": "L'offre Essentiel est offerte aux boutiques validées jusqu'à l'ouverture des ventes. Vous serez prévenu {days} jours avant tout paiement.",
       "how": "Nous vérifions vos identifiants (ICE, registre) et une pièce justificative avant d'ouvrir la boutique, en général sous deux jours ouvrés."
@@ -3873,8 +3873,8 @@
       "sending": "Envoi en cours",
       "hidden": "Message masqué par la modération",
       "maskedLink": "lien masqué",
-      "maskedLinkTitle": "Les liens ne sont pas transmis par la messagerie Joutiya.",
-      "system": "Message de Joutiya",
+      "maskedLinkTitle": "Les liens ne sont pas transmis par la messagerie Aalan.",
+      "system": "Message d'Aalan",
       "actions": "Actions sur la conversation",
       "archive": "Archiver",
       "unarchive": "Désarchiver",
@@ -3917,7 +3917,7 @@
       "title": "Prudence",
       "payment_kw": "Ce message parle de paiement à l'avance (acompte, virement, mandat…). Ne payez jamais avant d'avoir vu l'article.",
       "iban": "Ce message contient des coordonnées bancaires. Ne faites jamais de virement à un inconnu avant d'avoir vu l'article.",
-      "external_url": "Un lien a été masqué. Restez sur Joutiya pour échanger et n'ouvrez pas les liens envoyés par des inconnus.",
+      "external_url": "Un lien a été masqué. Restez sur Aalan pour échanger et n'ouvrez pas les liens envoyés par des inconnus.",
       "contact_with_payment_kw": "Ce message propose de continuer ailleurs, avec un paiement : c'est la méthode d'arnaque la plus courante.",
       "more": "Nos conseils de sécurité"
     },
@@ -4229,7 +4229,7 @@
     "member": "Vous signalez avec votre compte : la décision vous sera envoyée par e-mail.",
     "anonymity": "La personne concernée ne connaîtra pas votre identité.",
     "goodFaith": "Je déclare de bonne foi que les informations de ce signalement sont exactes et complètes.",
-    "host": "Joutiya héberge les contenus de ses utilisateurs sans en être l'auteur. Des signalements manifestement infondés et répétés peuvent entraîner la suspension de vos signalements.",
+    "host": "Aalan héberge les contenus de ses utilisateurs sans en être l'auteur. Des signalements manifestement infondés et répétés peuvent entraîner la suspension de vos signalements.",
     "submit": "Envoyer le signalement",
     "cancel": "Annuler",
     "close": "Fermer",
@@ -4383,7 +4383,7 @@
       "authority": "Cette mesure exécute l'injonction d'une autorité : elle se conteste devant les juridictions de l'État qui l'a émise.",
       "superseded": "Cette décision a été remplacée par une décision ultérieure."
     },
-    "host": "Joutiya héberge les contenus de ses utilisateurs sans en être l'auteur et n'est pas partie aux échanges ni aux transactions entre utilisateurs.",
+    "host": "Aalan héberge les contenus de ses utilisateurs sans en être l'auteur et n'est pas partie aux échanges ni aux transactions entre utilisateurs.",
     "errors": {
       "not_found": "Cette décision n'est plus disponible.",
       "rate_limited": "Trop de tentatives. Réessayez {wait}.",
@@ -4394,11 +4394,11 @@
   "Storefront": {
     "label": "Boutique professionnelle",
     "verified": "Boutique vérifiée",
-    "verifiedNote": "Joutiya a vérifié les identifiants professionnels de cette boutique (ICE, registre). Les ventes se font directement entre vous et la boutique : Joutiya n'est pas partie à la vente et ne garantit pas les produits. La boutique reste tenue de ses obligations de vendeur professionnel envers les consommateurs (loi n° 31-08 sur la protection du consommateur).",
+    "verifiedNote": "Aalan a vérifié les identifiants professionnels de cette boutique (ICE, registre). Les ventes se font directement entre vous et la boutique : Aalan n'est pas partie à la vente et ne garantit pas les produits. La boutique reste tenue de ses obligations de vendeur professionnel envers les consommateurs (loi n° 31-08 sur la protection du consommateur).",
     "about": "Présentation",
     "meta": {
       "title": "{name}, boutique à {city}",
-      "description": "{name}, boutique vérifiée à {city} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya."
+      "description": "{name}, boutique vérifiée à {city} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Aalan."
     },
     "agency": {
       "label": "Agence immobilière",
@@ -4485,9 +4485,9 @@
     "example": {
       "badge": "Boutique exemple",
       "title": "Boutique exemple",
-      "body": "Joutiya a créé cette boutique fictive pour montrer à quoi ressemble la vitrine d'un professionnel. Ses identifiants n'ont pas été vérifiés et ses annonces sont des exemples : on ne peut ni la contacter, ni acheter, ni réserver.",
+      "body": "Aalan a créé cette boutique fictive pour montrer à quoi ressemble la vitrine d'un professionnel. Ses identifiants n'ont pas été vérifiés et ses annonces sont des exemples : on ne peut ni la contacter, ni acheter, ni réserver.",
       "cta": "Créer ma boutique",
-      "note": "Boutique fictive créée par Joutiya à titre d'exemple : aucun identifiant professionnel n'a été vérifié."
+      "note": "Boutique fictive créée par Aalan à titre d'exemple : aucun identifiant professionnel n'a été vérifié."
     },
     "shelves": {
       "label": "Rayons de la boutique",
@@ -4507,7 +4507,7 @@
     "loading": "Chargement des options",
     "failed": "Les options n'ont pas pu être chargées.",
     "retry": "Réessayer",
-    "closed": "Les options payantes ne sont pas encore ouvertes sur Joutiya.",
+    "closed": "Les options payantes ne sont pas encore ouvertes sur Aalan.",
     "notPromotable": "Cette annonce ne peut pas être mise en avant : elle doit être en ligne et visible.",
     "choose": "Choisissez une option.",
     "legend": "Option",
@@ -4576,7 +4576,7 @@
     "allowance": "À la Une inclus",
     "allowanceHint": "À la Une de 7 jours, ce mois-ci",
     "spendOrder": "Une option se paie d'abord avec les crédits de votre offre, puis avec vos crédits achetés.",
-    "closed": "Les achats ne sont pas encore ouverts sur Joutiya. Vos crédits apparaîtront ici dès leur ouverture.",
+    "closed": "Les achats ne sont pas encore ouverts sur Aalan. Vos crédits apparaîtront ici dès leur ouverture.",
     "frozen": "Votre porte-monnaie est bloqué après un remboursement : aucune option ne peut être achetée tant que le solde est négatif.",
     "historyTitle": "Historique",
     "empty": "Aucun mouvement pour l'instant.",
@@ -4585,7 +4585,7 @@
       "plan_grant": "Crédits de votre offre",
       "refund": "Remboursement",
       "refund_reversed": "Remboursement annulé",
-      "admin_adjust": "Ajustement par Joutiya",
+      "admin_adjust": "Ajustement par Aalan",
       "option": "Option"
     },
     "amount": "{count, plural, one {# crédit} other {# crédits}}",
@@ -4607,7 +4607,7 @@
     "loading": "Chargement des packs",
     "failed": "Les packs n'ont pas pu être chargés.",
     "retry": "Réessayer",
-    "closed": "L'achat de crédits n'est pas encore ouvert sur Joutiya.",
+    "closed": "L'achat de crédits n'est pas encore ouvert sur Aalan.",
     "unavailable": "Le paiement n'est pas disponible pour le moment. Réessayez plus tard.",
     "legend": "Choisissez un pack",
     "credits": "{count, plural, one {<n>#</n> crédit} other {<n>#</n> crédits}}",
@@ -4792,7 +4792,7 @@
     "metaTitle": "Mes factures",
     "back": "Mon abonnement",
     "title": "Mes factures",
-    "lead": "Les factures de l'abonnement de votre boutique, émises par Stripe pour Joutiya.",
+    "lead": "Les factures de l'abonnement de votre boutique, émises par Stripe pour Aalan.",
     "loading": "Chargement des factures",
     "failed": "Les factures n'ont pas pu être chargées.",
     "retry": "Réessayer",
@@ -4828,7 +4828,7 @@
       "title": "Fermer mon compte",
       "body": "La fermeture est définitive : un compte fermé ne peut pas être rouvert.",
       "open": "Fermer mon compte",
-      "dialogTitle": "Fermer votre compte Joutiya ?",
+      "dialogTitle": "Fermer votre compte Aalan ?",
       "dialogLead": "Voici ce qui se passe, et ce que la loi nous oblige à conserver puis à supprimer.",
       "now": "Aujourd'hui",
       "nowBody": "Vous êtes déconnecté et ne pouvez plus vous connecter. Vos annonces sont retirées, vos favoris et vos recherches enregistrées supprimés. Les personnes avec qui vous avez échangé peuvent relire vos conversations, sans pouvoir vous écrire.",

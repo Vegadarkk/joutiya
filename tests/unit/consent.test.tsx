@@ -99,7 +99,7 @@ describe("consent banner", () => {
     const arabic = render(<ConsentBanner />, "ar");
     expect(arabic).toContain("Google LLC");
     expect(arabic).toContain("09.08");
-    expect(arabic).toContain("Joutiya");
+    expect(arabic).toContain("Aalan");
   });
 
   it("renders nothing on the server: the choice is read in the browser, so static pages stay static", () => {

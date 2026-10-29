@@ -2,7 +2,7 @@
 
 Version {version} — en vigueur le {effectiveDate}
 
-Cette page explique quels cookies et autres traceurs {brand} utilise, pourquoi, pendant combien de temps, et comment faire vos choix. Elle complète la Politique de confidentialité. Le responsable est {publisherIdentity}, éditeur de {brand}, {address}.
+Cette page explique quels cookies et autres traceurs {brand} utilise, pourquoi, pendant combien de temps, et comment faire vos choix. Elle complète la Politique de confidentialité. Le responsable est {publisherIdentity}, éditeur d'{brand}, {address}.
 
 ## 1. Ce qu'est un cookie ou un traceur {#definition}
 
@@ -14,7 +14,7 @@ Certains cookies sont indispensables au fonctionnement du site, à sa sécurité
 
 Ces cookies servent uniquement au fonctionnement du site, à sa sécurité ou à la connexion que vous demandez. Chacun a une seule finalité. Vous pouvez les bloquer dans votre navigateur, mais la connexion, la recherche ou le dépôt d'annonce risquent alors de ne plus fonctionner.
 
-### 2.1 Cookies et stockage de {brand} {#necessaires-1}
+### 2.1 Cookies et stockage d'{brand} {#necessaires-1}
 
 | Nom | Finalité | Durée |
 |---|---|---|
@@ -55,18 +55,18 @@ Vous pouvez accepter la publicité sans accepter sa personnalisation.
 ### 3.2 Qui dépose ces traceurs {#publicite-2}
 
 Ces traceurs sont déposés et lus par Google (Google LLC, États-Unis, et ses sociétés affiliées). Google peut faire appel à des fournisseurs de technologie publicitaire qu'il autorise ; il en publie la liste. Les cookies utilisés incluent notamment, selon Google :
-- `__gads` et `__gpi`, sur le domaine de {brand} : 13 mois ;
+- `__gads` et `__gpi`, sur le domaine d'{brand} : 13 mois ;
 - `IDE`, sur le domaine doubleclick.net : 13 mois dans l'Espace économique européen, au Royaume-Uni et en Suisse, 24 mois ailleurs.
 
 La liste complète et à jour est publiée par Google : policies.google.com/technologies/cookies.
 
 Ces données sont transmises à Google LLC, aux États-Unis. En acceptant une finalité publicitaire, vous consentez aussi expressément à ce transfert hors du Maroc (loi 09-08, article 44).
 
-{brand} décide de placer le code de Google sur ses pages et répond, avec Google, de la collecte qui en résulte. Google est seul responsable de l'usage qu'il fait ensuite de ces données, décrit dans sa politique de confidentialité (policies.google.com/privacy). Rien dans les présentes ne limite la responsabilité de {brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.
+{brand} décide de placer le code de Google sur ses pages et répond, avec Google, de la collecte qui en résulte. Google est seul responsable de l'usage qu'il fait ensuite de ces données, décrit dans sa politique de confidentialité (policies.google.com/privacy). Rien dans les présentes ne limite la responsabilité d'{brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.
 
 ### 3.3 Si vous refusez {#publicite-3}
 
-Si vous refusez, ou tant que vous n'avez pas fait de choix, aucun traceur publicitaire n'est utilisé et aucune demande publicitaire n'est envoyée à Google. Vous voyez à la place des messages de {brand}, par exemple « Déposer une annonce » ou « Conseils de sécurité ».
+Si vous refusez, ou tant que vous n'avez pas fait de choix, aucun traceur publicitaire n'est utilisé et aucune demande publicitaire n'est envoyée à Google. Vous voyez à la place des messages d'{brand}, par exemple « Déposer une annonce » ou « Conseils de sécurité ».
 
 Refuser n'a aucune autre conséquence : tout le site reste accessible, sans limite.
 <!--else-->
@@ -83,7 +83,7 @@ Votre pays est déterminé à partir de votre adresse IP, au moment de la visite
 <!--if:adsCmpEea-->
 Si vous consultez {brand} depuis l'Espace économique européen, le Royaume-Uni ou la Suisse, votre accord à la publicité est recueilli par le message de Google certifié pour ces pays, à la place de notre bannière. Ce message présente les finalités et les partenaires publicitaires, et vous permet d'accepter, de refuser ou de choisir finalité par finalité. Vous pouvez modifier vos choix à tout moment par le lien « Gérer mes cookies ».
 <!--else-->
-Si vous consultez {brand} depuis l'Espace économique européen, le Royaume-Uni ou la Suisse, aucune publicité de Google ne vous est affichée et aucun traceur publicitaire n'est utilisé : vous voyez uniquement des messages de {brand}.
+Si vous consultez {brand} depuis l'Espace économique européen, le Royaume-Uni ou la Suisse, aucune publicité de Google ne vous est affichée et aucun traceur publicitaire n'est utilisé : vous voyez uniquement des messages d'{brand}.
 <!--endif-->
 <!--else-->
 {brand} n'affiche de publicité dans aucun pays (section 3).
@@ -120,7 +120,7 @@ Votre choix est enregistré dans votre navigateur. Si vous changez d'appareil ou
 
 - **Votre choix,** accord ou refus, est conservé 6 mois. Il vous est ensuite demandé à nouveau.
 - Il vous est demandé plus tôt si nous changeons les finalités ou les partenaires auxquels vous avez répondu.
-- **Les traceurs soumis à votre accord** que {brand} dépose ou contrôle sont limités à 13 mois. Google fixe lui-même la durée des cookies déposés sur ses propres domaines (section 3.2).
+- **Les traceurs soumis à votre accord** qu'{brand} dépose ou contrôle sont limités à 13 mois. Google fixe lui-même la durée des cookies déposés sur ses propres domaines (section 3.2).
 
 ### 6.4 Les réglages de votre navigateur {#choix-4}
 
@@ -133,7 +133,7 @@ Pour toute question sur les cookies ou vos données, écrivez à {dpo}. La Polit
 Vous pouvez adresser une réclamation à la CNIL (www.cnil.fr/fr/plaintes) ou, au Maroc, à la CNDP (www.cndp.ma).
 
 <!--if:cndpCookiesReceiptNo-->
-La gestion des cookies de {brand} a fait l'objet d'une déclaration simplifiée auprès de la CNDP (délibération n° D-939-2025), récépissé n° {cndpCookiesReceiptNo}.
+La gestion des cookies d'{brand} a fait l'objet d'une déclaration simplifiée auprès de la CNDP (délibération n° D-939-2025), récépissé n° {cndpCookiesReceiptNo}.
 <!--endif-->
 
 ## 8. Modifications de cette page {#modifications}

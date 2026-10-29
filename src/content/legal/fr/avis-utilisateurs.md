@@ -14,7 +14,7 @@ Un avis porte sur un vendeur, particulier ou professionnel, et sur l'échange qu
 
 Vous pouvez laisser un avis si toutes ces conditions sont remplies :
 
-- vous avez écrit au vendeur par la messagerie de {brand}, et l'échange a eu lieu : le vendeur vous a écrit un message, ou une offre a été acceptée, un rendez-vous confirmé ou une réservation acceptée (un simple refus ne suffit pas) ;
+- vous avez écrit au vendeur par la messagerie d'{brand}, et l'échange a eu lieu : le vendeur vous a écrit un message, ou une offre a été acceptée, un rendez-vous confirmé ou une réservation acceptée (un simple refus ne suffit pas) ;
 - 24 heures se sont écoulées depuis ce premier échange, le temps de vous rencontrer ;
 - le dernier message de la conversation date de moins de 60 jours ;
 - la conversation n'est ni bloquée ni gelée, et vos deux comptes sont actifs ;
@@ -35,11 +35,11 @@ Un avis comprend une note de 1 à 5 et un texte de 20 à 1 000 caractères. Il d
 
 ### 2.1 Un échange vérifié, pas un achat {#verification-1}
 
-Chaque avis porte la mention « Échange vérifié ». Elle signifie que {brand} a vérifié, par ses propres données, qu'une conversation réelle a eu lieu entre l'auteur et le vendeur, et que le vendeur y a pris part (§1.2). Elle ne signifie pas que l'achat est vérifié.
+Chaque avis porte la mention « Échange vérifié ». Elle signifie qu'{brand} a vérifié, par ses propres données, qu'une conversation réelle a eu lieu entre l'auteur et le vendeur, et que le vendeur y a pris part (§1.2). Elle ne signifie pas que l'achat est vérifié.
 
 Aucun paiement ne passe par {brand} : elle ne peut pas vérifier qu'une vente ou une rencontre a eu lieu. Elle s'appuie sur la déclaration de l'auteur.
 
-### 2.2 Ce que {brand} ne vérifie pas {#verification-2}
+### 2.2 Ce qu'{brand} ne vérifie pas {#verification-2}
 
 {brand} ne vérifie ni l'exactitude du récit, ni la réalité de l'achat, ni l'état de l'objet. L'avis exprime l'opinion de son auteur, qui en est seul responsable.
 
@@ -127,7 +127,7 @@ Un avis publié reste affiché tant que le profil du vendeur est en ligne, sauf 
 
 Un avis supprimé par son auteur, retiré par la modération ou masqué à la fermeture du compte du vendeur est effacé 12 mois plus tard, sauf procédure en cours, recours ou demande d'une autorité. Les signalements et les décisions de modération, avec leurs motifs, sont conservés 5 ans (CGU, [§10.2](/legal/cgu#decisions-2)).
 
-## 7. Rôle de {brand} {#role}
+## 7. Rôle d'{brand} {#role}
 
 ### 7.1 Un hébergeur neutre {#role-1}
 

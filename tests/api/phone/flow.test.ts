@@ -56,7 +56,7 @@ async function member(): Promise<Member> {
   await createAccountDocuments({
     uid,
     email,
-    displayName: "Testeur Joutiya",
+    displayName: "Testeur Aalan",
     locale: "fr",
     consents: { cguVersion: "2026-10", transfersVersion: "2026-10", marketing: false },
     provider: "password",
@@ -284,7 +284,7 @@ describe("POST /api/webhooks/whatsapp", () => {
     expect(audits.docs.map((doc) => doc.get("action"))).toContain("phone.verified");
 
     expect(sendMailMock).toHaveBeenCalledTimes(1);
-    expect(sendMailMock.mock.calls[0]?.[0]).toMatchObject({ template: "phoneVerified", locale: "fr", to: m.email, data: { displayName: "Testeur Joutiya", phone: state.phone } });
+    expect(sendMailMock.mock.calls[0]?.[0]).toMatchObject({ template: "phoneVerified", locale: "fr", to: m.email, data: { displayName: "Testeur Aalan", phone: state.phone } });
   });
 
   it("accepts the bare code as message text", async () => {
@@ -397,7 +397,7 @@ describe("one verified number per account, one account per number", () => {
     expect(await auditActions(alice.uid)).toContain("phone.transferred");
 
     expect(sendMailMock).toHaveBeenCalledTimes(2);
-    expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({ template: "phoneRemoved", locale: "fr", to: alice.email, priority: "security", data: { displayName: "Testeur Joutiya", phone: number.national } }));
+    expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({ template: "phoneRemoved", locale: "fr", to: alice.email, priority: "security", data: { displayName: "Testeur Aalan", phone: number.national } }));
     expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({ template: "phoneVerified", to: bob.email }));
 
     // Alice can verify a new number (or take this one back) afterwards.

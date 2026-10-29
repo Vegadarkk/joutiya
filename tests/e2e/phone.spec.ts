@@ -132,7 +132,7 @@ test.describe("phone verification", () => {
     // The page shows the code, the wa.me link and Joutiya's number, and waits. Both numbers are in
     // the national form, as after a reload.
     await expect(page.getByRole("heading", { name: "Envoyez ce code sur WhatsApp" })).toBeVisible();
-    await expect(page.getByText(`Depuis le WhatsApp du ${inSentence(number.national)}, envoyez le message ci-dessous au numéro de Joutiya.`)).toBeVisible();
+    await expect(page.getByText(`Depuis le WhatsApp du ${inSentence(number.national)}, envoyez le message ci-dessous au numéro d'Aalan.`)).toBeVisible();
     await expect(page.getByText("06 00 00 00 00", { exact: true })).toBeVisible();
     await expect(page.getByText(answer.code, { exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Ouvrir WhatsApp" })).toHaveAttribute("href", answer.waLink);

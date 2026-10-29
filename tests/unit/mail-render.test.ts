@@ -104,7 +104,7 @@ function mail<T extends TemplateId>(template: T, locale: Locale, data: TemplateD
 beforeAll(() => {
   process.env.APP_ENV = "dev";
   process.env.SITE_URL = SITE;
-  process.env.MAIL_FROM = "Joutiya <no-reply@notif.joutiya.ma>";
+  process.env.MAIL_FROM = "Aalan <no-reply@notif.joutiya.ma>";
   resetServerEnv();
 });
 
@@ -128,7 +128,7 @@ describe("renderMail", () => {
       it(`${template} / ${locale}: subject, address, links, no undefined`, () => {
         const rendered = renderMail(mail(template, locale));
         expect(rendered.subject.length).toBeGreaterThan(5);
-        expect(rendered.from).toBe("Joutiya <no-reply@notif.joutiya.ma>");
+        expect(rendered.from).toBe("Aalan <no-reply@notif.joutiya.ma>");
         expect(rendered.to).toBe("nadia@example.com");
         expect(rendered.tags).toEqual({ template, env: "dev" });
         expect(rendered.meta?.template).toBe(template);
@@ -152,7 +152,7 @@ describe("renderMail", () => {
         expect(rendered.html).not.toContain("http://");
         if (locale === "ar") {
           expect(rendered.html).toContain('<html lang="ar" dir="rtl">');
-          expect(rendered.text).toContain("Joutiya");
+          expect(rendered.text).toContain("Aalan");
           expect(rendered.text).toMatch(/[؀-ۿ]/);
         } else {
           expect(rendered.html).toContain('<html lang="fr" dir="ltr">');
@@ -205,8 +205,8 @@ describe("helpers", () => {
   });
 
   it("parseAddress splits a display name", () => {
-    expect(parseAddress("Joutiya <no-reply@notif.joutiya.ma>")).toEqual({ name: "Joutiya", email: "no-reply@notif.joutiya.ma" });
-    expect(parseAddress('"Joutiya Maroc" <no-reply@notif.joutiya.ma>')).toEqual({ name: "Joutiya Maroc", email: "no-reply@notif.joutiya.ma" });
+    expect(parseAddress("Aalan <no-reply@notif.joutiya.ma>")).toEqual({ name: "Aalan", email: "no-reply@notif.joutiya.ma" });
+    expect(parseAddress('"Aalan Maroc" <no-reply@notif.joutiya.ma>')).toEqual({ name: "Aalan Maroc", email: "no-reply@notif.joutiya.ma" });
     expect(parseAddress("no-reply@notif.joutiya.ma")).toEqual({ email: "no-reply@notif.joutiya.ma" });
   });
 

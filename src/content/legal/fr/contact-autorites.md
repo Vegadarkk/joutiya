@@ -100,6 +100,6 @@ Cette notification aux autorités est décidée par une personne, jamais par un 
 - **Contestation d'une décision :** réclamation interne, règlement extrajudiciaire ou recours en justice (voir les [CGU](/legal/cgu#recours)).
 - **Utilisateurs situés dans l'Union européenne :** vous pouvez aussi déposer une plainte auprès du coordinateur pour les services numériques de votre État membre (en France, l'Arcom), au titre du règlement (UE) 2022/2065.
 
-### 4.5 Rôle de {brand} {#limites-5}
+### 4.5 Rôle d'{brand} {#limites-5}
 
 {brand} héberge les annonces publiées par ses utilisateurs. Elle n'est ni vendeur, ni acheteur, ni partie aux contrats conclus entre eux, et n'exerce pas de surveillance générale des contenus (art. 8 du DSA), sans préjudice des contrôles décrits dans les [CGU](/legal/cgu#moderation). Une demande reçue à cette adresse ne vaut pas décision : elle est examinée avant toute mesure.

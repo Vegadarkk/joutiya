@@ -33,11 +33,11 @@ const COPY: Record<MailLocale, Copy> = {
         case "restrict_visibility":
           return `La visibilité de votre annonce${quoted("fr", data.title)} est restreinte`;
         case "warn":
-          return "Avertissement concernant votre compte Joutiya";
+          return "Avertissement concernant votre compte Aalan";
         case "suspend_account":
-          return `Votre compte Joutiya est suspendu jusqu'au ${until}`;
+          return `Votre compte Aalan est suspendu jusqu'au ${until}`;
         case "ban":
-          return "Votre compte Joutiya est fermé";
+          return "Votre compte Aalan est fermé";
       }
     },
     title: { remove: "Contenu retiré", restrict_visibility: "Visibilité restreinte", warn: "Avertissement", suspend_account: "Compte suspendu", ban: "Compte fermé" },
@@ -47,7 +47,7 @@ const COPY: Record<MailLocale, Copy> = {
           if (data.targetType === "review") return `Mesure : votre avis${about("fr", data.title)} a été masqué. Il n'est plus visible et ne compte plus dans la note du vendeur.`;
           return data.targetType === "message"
             ? "Mesure : un de vos messages a été masqué. Votre interlocuteur ne peut plus le lire."
-            : `Mesure : votre annonce${quoted("fr", data.title)} a été retirée. Elle n'est plus visible sur Joutiya.`;
+            : `Mesure : votre annonce${quoted("fr", data.title)} a été retirée. Elle n'est plus visible sur Aalan.`;
         case "restrict_visibility":
           return `Mesure : votre annonce${quoted("fr", data.title)} n'apparaît plus dans les recherches ni sur sa page publique.`;
         case "warn":
@@ -55,7 +55,7 @@ const COPY: Record<MailLocale, Copy> = {
         case "suspend_account":
           return `Mesure : votre compte est suspendu pour ${data.durationDays ?? ""} jours, jusqu'au ${until}. Pendant la suspension, vous pouvez lire vos conversations et contester cette décision ; vos annonces en ligne sont mises en pause et reprendront à la fin de la suspension si elles n'ont pas expiré.`;
         case "ban":
-          return "Mesure : votre compte Joutiya est fermé définitivement. Vos annonces sont retirées et vous ne pouvez plus vous connecter.";
+          return "Mesure : votre compte Aalan est fermé définitivement. Vos annonces sont retirées et vous ne pouvez plus vous connecter.";
       }
     },
     rulesButton: "Lire nos conditions générales",
@@ -69,11 +69,11 @@ const COPY: Record<MailLocale, Copy> = {
         case "restrict_visibility":
           return `تم تقييد ظهور إعلانك${quoted("ar", data.title)}`;
         case "warn":
-          return "إنذار بخصوص حسابك على Joutiya";
+          return "إنذار بخصوص حسابك على Aalan";
         case "suspend_account":
-          return `تم توقيف حسابك على Joutiya إلى غاية ${until}`;
+          return `تم توقيف حسابك على Aalan إلى غاية ${until}`;
         case "ban":
-          return "تم إغلاق حسابك على Joutiya";
+          return "تم إغلاق حسابك على Aalan";
       }
     },
     title: { remove: "سحب محتوى", restrict_visibility: "تقييد الظهور", warn: "إنذار", suspend_account: "توقيف الحساب", ban: "إغلاق الحساب" },
@@ -81,7 +81,7 @@ const COPY: Record<MailLocale, Copy> = {
       switch (data.action) {
         case "remove":
           if (data.targetType === "review") return `الإجراء: تم إخفاء تقييمك${about("ar", data.title)}، ولم يعد ظاهرًا ولا يُحتسب في تقييم البائع.`;
-          return data.targetType === "message" ? "الإجراء: تم إخفاء إحدى رسائلك، ولم يعد بإمكان محاورك قراءتها." : `الإجراء: تم سحب إعلانك${quoted("ar", data.title)}، ولم يعد ظاهرًا على Joutiya.`;
+          return data.targetType === "message" ? "الإجراء: تم إخفاء إحدى رسائلك، ولم يعد بإمكان محاورك قراءتها." : `الإجراء: تم سحب إعلانك${quoted("ar", data.title)}، ولم يعد ظاهرًا على Aalan.`;
         case "restrict_visibility":
           return `الإجراء: لم يعد إعلانك${quoted("ar", data.title)} يظهر في نتائج البحث ولا في صفحته العامة.`;
         case "warn":
@@ -89,7 +89,7 @@ const COPY: Record<MailLocale, Copy> = {
         case "suspend_account":
           return `الإجراء: تم توقيف حسابك لمدة ${arabicDays(data.durationDays ?? 0)} إلى غاية ${until}. خلال التوقيف يمكنك قراءة محادثاتك والطعن في هذا القرار؛ وتُوقف إعلاناتك المنشورة مؤقتًا وتُستأنف عند نهاية التوقيف إن لم تنته صلاحيتها.`;
         case "ban":
-          return "الإجراء: تم إغلاق حسابك على Joutiya نهائيًا. سُحبت إعلاناتك ولم يعد بإمكانك تسجيل الدخول.";
+          return "الإجراء: تم إغلاق حسابك على Aalan نهائيًا. سُحبت إعلاناتك ولم يعد بإمكانك تسجيل الدخول.";
       }
     },
     rulesButton: "قراءة الشروط العامة",

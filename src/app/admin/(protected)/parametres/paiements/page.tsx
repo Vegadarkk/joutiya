@@ -16,7 +16,7 @@ export default async function SellerPaymentsPage() {
       <div>
         <h1 className="text-2xl font-semibold">Paiement chez le vendeur</h1>
         <p className="mt-1 max-w-prose text-sm text-foreground-muted">
-          Les boutiques vérifiées peuvent relier leurs annonces à leur propre page de paiement. Seuls les domaines de cette liste sont affichés ; un nouveau domaine attend votre vérification. Joutiya ne reçoit jamais l&apos;argent et ne prend aucune commission.
+          Les boutiques vérifiées peuvent relier leurs annonces à leur propre page de paiement. Seuls les domaines de cette liste sont affichés ; un nouveau domaine attend votre vérification. Aalan ne reçoit jamais l&apos;argent et ne prend aucune commission.
         </p>
       </div>
       <SellerPaymentsAdmin initial={view} />

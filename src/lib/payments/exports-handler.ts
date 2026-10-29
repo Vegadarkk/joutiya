@@ -50,7 +50,7 @@ export async function handleBillingExport(request: Request, context: Params): Pr
   return new Response(body, {
     headers: {
       "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="joutiya-${report.data}-${period.label}.csv"`,
+      "content-disposition": `attachment; filename="aalan-${report.data}-${period.label}.csv"`,
       "cache-control": "no-store",
     },
   });

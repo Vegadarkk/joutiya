@@ -25,7 +25,7 @@ import { ExampleBanner } from "@/components/listing/example-banner";
 import { RENTAL_SUBCATEGORY, criterionById } from "@/config/categories";
 import { availablePromos } from "@/config/house-promos";
 import { cityBySlug, cityName } from "@/config/regions";
-import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
+import { CANONICAL_ORIGIN, SITE_NAME, LOCALE_TAGS, type Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
 import { numbersLocale, pageLocale } from "@/i18n/params";
 import { getFlags } from "@/lib/config/runtime";
@@ -97,7 +97,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     title,
     description,
     alternates: alternates(locale, path),
-    openGraph: { type: "website", siteName: "Joutiya", locale: LOCALE_TAGS[locale].replace("-", "_"), url: `/${locale}${path}`, title, description },
+    openGraph: { type: "website", siteName: SITE_NAME, locale: LOCALE_TAGS[locale].replace("-", "_"), url: `/${locale}${path}`, title, description },
     // An empty shop has nothing to show search engines yet; an example shop is not a business.
     ...(store.seller.publishedCount > 0 && !store.example ? {} : { robots: { index: false, follow: true } }),
   };
