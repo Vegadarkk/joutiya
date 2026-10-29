@@ -578,7 +578,8 @@
       "adults_only_attestation": "Pour publier dans cette catégorie, confirmez qu'il s'agit d'un objet décoratif vendu uniquement à une personne majeure.",
       "real_estate_attestation": "Pour publier une annonce immobilière, attestez que ses informations sont exactes et sous votre seule responsabilité.",
       "rental_attestation": "Pour publier une location, confirmez la déclaration de votre agence (agrément, immatriculation, assurance).",
-      "rental_agrement_missing": "Pour publier une location, renseignez d'abord le numéro d'agrément de votre agence dans l'espace Pro (Mon agence de location)."
+      "rental_agrement_missing": "Pour publier une location, renseignez d'abord le numéro d'agrément de votre agence dans l'espace Pro (Mon agence de location).",
+      "payment_setup_required": "Activez d'abord « Paiement chez le vendeur » pour votre boutique (espace Pro)."
     },
     "wizard": {
       "title": "Déposer une annonce",
@@ -2669,6 +2670,25 @@
       "labelOf": "Rayon de la boutique : {title}",
       "none": "Sans rayon",
       "saved": "Rayon enregistré."
+    },
+    "paymentLink": {
+      "open": "Lien de paiement",
+      "openOf": "Lien de paiement : {title}",
+      "active": "« Payer chez le vendeur » ouvre le lien propre à l'annonce ({host}).",
+      "pending": "Lien propre vers {host} : actif le {date}.",
+      "title": "Lien de paiement : {title}",
+      "lead": "Par défaut, « Payer chez le vendeur » ouvre le lien de votre boutique. Indiquez ici une page de paiement propre à cette annonce, sur un site de paiement déjà vérifié. Un nouveau lien s'active 24 heures après l'enregistrement et vous êtes prévenu par e-mail.",
+      "label": "Page de paiement de cette annonce",
+      "hint": "Adresse complète en https, sans lien raccourci. Pour un nouveau site de paiement, enregistrez-le d'abord comme lien de votre boutique.",
+      "save": "Enregistrer le lien",
+      "remove": "Revenir au lien de la boutique",
+      "cancel": "Annuler",
+      "saved": "Lien de paiement enregistré.",
+      "savedPending": "Lien enregistré : il s'active dans 24 heures, un e-mail vous a été envoyé.",
+      "removed": "L'annonce utilise de nouveau le lien de votre boutique.",
+      "reauthTitle": "Reconnectez-vous pour changer ce lien",
+      "reauthBody": "Par sécurité, un nouveau lien de paiement demande une connexion de moins de dix minutes.",
+      "reauth": "Me reconnecter"
     }
   },
   "Map": {
@@ -4742,7 +4762,8 @@
           "credentials": "L'adresse ne doit pas contenir d'identifiant ni de mot de passe.",
           "port": "L'adresse ne doit pas indiquer de port.",
           "ip": "Indiquez le nom de domaine de votre prestataire, pas une adresse IP.",
-          "shortener": "Les liens raccourcis ne sont pas acceptés : indiquez l'adresse complète de la page de paiement."
+          "shortener": "Les liens raccourcis ne sont pas acceptés : indiquez l'adresse complète de la page de paiement.",
+          "unlisted": "Ce site de paiement n'est pas encore vérifié : enregistrez-le d'abord comme lien de votre boutique (espace Pro, « Paiement chez le vendeur ») pour qu'il soit vérifié."
         }
       },
       "cash": {

@@ -36,6 +36,7 @@ import {
 } from "@/lib/contracts/appointments";
 import { RENTAL_PICKUP_MAX, RENTAL_REQUEST_EVENTS, RENTAL_REQUEST_STATUSES, rentalRequestIdSchema } from "@/lib/contracts/rental-requests";
 import { REPORT_PRIORITIES, REPORT_REASON_IDS, REPORT_TARGET_TYPES } from "@/config/report-reasons";
+import { PAYMENT_URL_MAX } from "@/config/seller-payments";
 import type { LedgerReason } from "@/lib/payments/wallet";
 
 // The enums shared with the browser are defined in the client-safe contracts (this module is
@@ -308,6 +309,18 @@ export const listingPromoSchema = z
   .strict();
 export type ListingPromo = z.infer<typeof listingPromoSchema>;
 
+const listingPaymentUrl = z.url({ protocol: /^https$/ }).max(PAYMENT_URL_MAX);
+
+/**
+ * The listing's own « Payer chez le vendeur » link (catalogue §6), over the shop's: the same rules
+ * (recent sign-in, owner mailed, active 24 h after saving, host on the allowlist, checked again at
+ * click time). Shown only while the shop's button is.
+ */
+export const listingPaymentLinkSchema = z
+  .object({ url: listingPaymentUrl.optional(), pendingUrl: listingPaymentUrl.optional(), pendingFrom: ts.optional(), updatedAt: ts })
+  .strict();
+export type ListingPaymentLink = z.infer<typeof listingPaymentLinkSchema>;
+
 /**
  * listings/{listingId}: §5 `Listing` plus `slugId`; the id is the document id. A draft (D2) is the
  * same document with `status: "draft"`: the fields the wizard fills step by step (category, texts,
@@ -354,6 +367,8 @@ export const listingSchema = z
     lastPromoEndedAt: ts.optional(),
     /** Section of the shop's storefront (catalogue §5); an id the shop no longer has is ignored. */
     sectionId: sectionIdSchema.optional(),
+    /** Its own payment link (Pro only, catalogue §6). */
+    paymentLink: listingPaymentLinkSchema.optional(),
     /** The number is never here; `showPhone` requires `badges.phoneVerified` at publish. */
     contact: z.object({ messaging: z.literal(true), showPhone: z.boolean(), whatsapp: z.boolean() }).strict(),
     boosts: z.object({ bumpedAt: ts.optional(), featuredUntil: ts.optional(), dailyBumpUntil: ts.optional(), highlightUntil: ts.optional() }).strict(),

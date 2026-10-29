@@ -108,6 +108,20 @@ beforeAll(() => {
 });
 
 describe("renderMail", () => {
+  it("sellerPaymentNotice names the listing of its own link and leads to Mes annonces (catalogue §6)", () => {
+    const data = { ...DATA.sellerPaymentNotice, listingTitle: "Miel de thym 1 kg" };
+    for (const locale of ["fr", "ar"] as const) {
+      const rendered = renderMail(mail("sellerPaymentNotice", locale, data));
+      expect(rendered.text).toContain("Miel de thym 1 kg");
+      expect(rendered.text).toContain("pay.example-bank.ma");
+      expect(rendered.text).toContain("/mes-annonces");
+      expect(rendered.text).not.toContain("undefined");
+    }
+    expect(renderMail(mail("sellerPaymentNotice", "fr", data)).subject).toBe("Nouveau lien de paiement pour une annonce");
+    const removed = renderMail(mail("sellerPaymentNotice", "fr", { displayName: "Nadia", shopName: "Atlas Vélos", kind: "removed", listingTitle: "Miel de thym 1 kg" }));
+    expect(removed.subject).toBe("Lien de paiement retiré d'une annonce");
+  });
+
   for (const template of TEMPLATE_IDS) {
     for (const locale of ["fr", "ar", "rif"] as const) {
       it(`${template} / ${locale}: subject, address, links, no undefined`, () => {

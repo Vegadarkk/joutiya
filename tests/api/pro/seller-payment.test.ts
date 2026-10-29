@@ -22,12 +22,15 @@ vi.mock("@/lib/search/queue", () => ({ notifySearchIndex: vi.fn(async () => unde
 
 import { GET as getSettings, PUT as putSettings } from "@/app/api/pro/me/payment/route";
 import { POST as openPayment } from "@/app/api/shops/[proId]/payment/route";
+import { PUT as putListingLink } from "@/app/api/listings/[id]/payment-link/route";
 import { GET as getHosts, PUT as putHosts } from "@/app/api/admin/seller-payments/route";
 import { POST as reviewHost } from "@/app/api/admin/seller-payments/review/route";
 import { GET as getShopPayment, POST as postShopPayment } from "@/app/api/admin/pros/[proId]/payment/route";
 import { DEFAULT_PRICING } from "@/config/pricing";
+import type { OwnerRowResponse } from "@/lib/contracts/listings";
 import type { OpenPaymentResponse, SellerPaymentsAdminView, SellerPaymentView, ShopPaymentAdminView } from "@/lib/contracts/seller-payment";
 import { getListingStats } from "@/lib/db/repositories/listing-stats";
+import { getListing, listingRef } from "@/lib/db/repositories/listings";
 import { getProProfile, proProfileRef, proProfileToFirestore } from "@/lib/db/repositories/pro-profiles";
 import { db } from "@/lib/firebase/admin";
 import { setClaims } from "@/lib/firebase/claims";
@@ -207,6 +210,79 @@ describe("public click", () => {
     await db().collection("users").doc(owner.uid).update({ status: "active" });
     expect((await open("zzzzzzzz")).status).toBe(404);
     expect((await api(openPayment, "POST", `/api/shops/${proId}/payment`, { body: {}, origin: "https://evil.example", params: { proId } })).status).toBe(403);
+  });
+});
+
+describe("a listing's own link (catalogue §6)", () => {
+  const putLink = (owner: Member, id: string, url: string | null) => api<OwnerRowResponse & ErrorBody>(putListingLink, "PUT", `/api/listings/${id}/payment-link`, { member: owner, body: { url } });
+  async function ageListing(id: string, ms: number): Promise<void> {
+    const listing = await getListing(id);
+    await listingRef(id).update({ "paymentLink.pendingFrom": new Date(listing!.paymentLink!.pendingFrom!.getTime() - ms) });
+  }
+
+  it("opens over the shop's link once 24 hours old, on a checked host, and goes back to it at once", async () => {
+    const owner = await member();
+    const proId = await shop(owner);
+    const { id } = await seedListing(owner, { sellerType: "pro", proId, title: "Miel de thym 1 kg" });
+    expect(code((await putLink(owner, id, "https://paiement.banque-test.ma/thym")).body)).toBe("payment_setup_required");
+
+    expect((await save(owner, { cashOnDelivery: true })).status).toBe(200);
+    vi.mocked(sendMail).mockClear();
+    const unlisted = await putLink(owner, id, "https://psp-inconnu.ma/thym");
+    expect(unlisted.status).toBe(422);
+    expect(unlisted.body.error.details).toEqual({ problem: "unlisted" });
+    recent.seconds = -120;
+    expect(code((await putLink(owner, id, "https://paiement.banque-test.ma/thym")).body)).toBe("recent_auth_required");
+    recent.seconds = 600;
+
+    const saved = await putLink(owner, id, "https://paiement.banque-test.ma/thym");
+    expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+    expect(saved.body.listing.paymentLink).toMatchObject({ url: null, pending: { url: "https://paiement.banque-test.ma/thym", host: "paiement.banque-test.ma" } });
+    expect(vi.mocked(sendMail).mock.calls[0]?.[0]).toMatchObject({ template: "sellerPaymentNotice", data: { kind: "changed", listingTitle: "Miel de thym 1 kg" } });
+    // Pending, and no shop link: no button yet.
+    expect(code((await open(proId, { listingId: id })).body)).toBe("payment_unavailable");
+
+    await ageListing(id, DAY);
+    expect((await open(proId, { listingId: id })).body.url).toBe("https://paiement.banque-test.ma/thym");
+    // The shop's own link serves its other listings and the storefront.
+    await save(owner, { url: "https://paiement.banque-test.ma/miel", cashOnDelivery: true });
+    await age(proId, DAY);
+    expect((await open(proId)).body.url).toBe("https://paiement.banque-test.ma/miel");
+    expect((await open(proId, { listingId: id })).body.url).toBe("https://paiement.banque-test.ma/thym");
+
+    vi.mocked(sendMail).mockClear();
+    const removed = await putLink(owner, id, null);
+    expect(removed.status).toBe(200);
+    expect(removed.body.listing.paymentLink).toEqual({ url: null, pending: null });
+    expect((await getListing(id))?.paymentLink).toBeUndefined();
+    expect(vi.mocked(sendMail).mock.calls[0]?.[0]).toMatchObject({ data: { kind: "removed", listingTitle: "Miel de thym 1 kg" } });
+    expect((await open(proId, { listingId: id })).body.url).toBe("https://paiement.banque-test.ma/miel");
+  });
+
+  it("keeps the delay of the same pending link, and hides a host withdrawn from the list", async () => {
+    const owner = await member();
+    const proId = await shop(owner);
+    await save(owner, { cashOnDelivery: true });
+    const { id } = await seedListing(owner, { sellerType: "pro", proId });
+    await putLink(owner, id, "https://paiement.banque-test.ma/a");
+    await ageListing(id, DAY - 60_000);
+    const again = await putLink(owner, id, "https://paiement.banque-test.ma/a");
+    expect(again.status).toBe(200);
+    await ageListing(id, 60_000);
+    expect((await open(proId, { listingId: id })).body.url).toBe("https://paiement.banque-test.ma/a");
+
+    await db().collection("config").doc("sellerPayments").set({ hosts: [] });
+    const { getSellerPayments } = await import("@/lib/config/runtime");
+    getSellerPayments.invalidate();
+    expect(code((await open(proId, { listingId: id })).body)).toBe("payment_unavailable");
+  });
+
+  it("is for a Pro's listing", async () => {
+    const seller = await member();
+    const { id } = await seedListing(seller);
+    const individual = await putLink(seller, id, "https://paiement.banque-test.ma/a");
+    expect(individual.status).toBe(400);
+    expect(individual.body.error.details).toEqual([{ path: "paymentLink", code: "payment_pro_only" }]);
   });
 });
 

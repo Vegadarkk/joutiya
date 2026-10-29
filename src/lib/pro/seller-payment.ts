@@ -37,6 +37,7 @@ import type { TemplateData } from "@/lib/mail/types";
 import { listingRecipient } from "@/lib/mail/recipients";
 import { consume, firstDegraded } from "@/lib/quota";
 import { consumeLimit } from "@/lib/rate-limit/limiter";
+import type { ListingPaymentLink } from "@/lib/db/schemas";
 import type { SellerPaymentDoc } from "./profile-schema";
 import { effectivePayment, foldPending, paymentEligible, paymentShown } from "./seller-payment-rules";
 
@@ -155,7 +156,8 @@ function revalidateShop(profile: ProProfileRecord): void {
   revalidateListingPaths({ shopSegment: storefrontSegment(profile.slug, profile.proId) });
 }
 
-async function notifyOwner(profile: ProProfileRecord, data: Omit<TemplateData["sellerPaymentNotice"], "displayName" | "shopName">, key: string): Promise<void> {
+/** Tells the shop's owner of a change of its payment button (a listing's own link included). Never throws. */
+export async function notifyOwner(profile: Pick<ProProfileRecord, "proId" | "ownerUid" | "name">, data: Omit<TemplateData["sellerPaymentNotice"], "displayName" | "shopName">, key: string): Promise<void> {
   try {
     const to = await listingRecipient(profile.ownerUid);
     if (!to) return;
@@ -172,22 +174,33 @@ async function notifyOwner(profile: ProProfileRecord, data: Omit<TemplateData["s
   }
 }
 
-/** What a public page shows of the shop's payment, or null (no button, no badge). */
-export function publicShopPayment(profile: ProProfileRecord, config: SellerPaymentsConfig, now: Date): PublicShopPayment | null {
-  const payment = profile.sellerPayment;
-  if (!payment || !paymentShown(profile.lifecycle, profile.plan, payment) || !payment.info) return null;
-  const effective = effectivePayment(payment, config, now);
-  if (!effective.url && !payment.cashOnDelivery) return null;
-  return { proId: profile.proId, shopName: profile.name, ice: profile.legal.ice, online: effective.url !== null, host: effective.host, cashOnDelivery: payment.cashOnDelivery, info: payment.info };
+/**
+ * The link a buyer's click opens: the listing's own one in force (catalogue §6), else the shop's.
+ * Both follow the same rules (24 h delay, host on the allowlist now).
+ */
+function linkInForce(profile: ProProfileRecord, config: SellerPaymentsConfig, now: Date, listingLink?: ListingPaymentLink): { url: string | null; host: string | null } {
+  const own = listingLink ? effectivePayment(listingLink, config, now) : null;
+  if (own?.url) return { url: own.url, host: own.host };
+  const shop = effectivePayment(profile.sellerPayment, config, now);
+  return { url: shop.url, host: shop.host };
 }
 
-/** The shop's payment for a listing or storefront page; never throws (the page renders without it). */
-export async function shopPaymentFor(proId: string | undefined, now = new Date()): Promise<PublicShopPayment | null> {
+/** What a public page shows of the shop's payment, or null (no button, no badge). */
+export function publicShopPayment(profile: ProProfileRecord, config: SellerPaymentsConfig, now: Date, listingLink?: ListingPaymentLink): PublicShopPayment | null {
+  const payment = profile.sellerPayment;
+  if (!payment || !paymentShown(profile.lifecycle, profile.plan, payment) || !payment.info) return null;
+  const link = linkInForce(profile, config, now, listingLink);
+  if (!link.url && !payment.cashOnDelivery) return null;
+  return { proId: profile.proId, shopName: profile.name, ice: profile.legal.ice, online: link.url !== null, host: link.host, cashOnDelivery: payment.cashOnDelivery, info: payment.info };
+}
+
+/** The shop's payment for a listing (with its own link) or storefront page; never throws (the page renders without it). */
+export async function shopPaymentFor(proId: string | undefined, now = new Date(), listingLink?: ListingPaymentLink): Promise<PublicShopPayment | null> {
   if (!proId) return null;
   try {
     const [profile, config] = await Promise.all([getProProfile(proId), getSellerPayments()]);
     if (!profile?.sellerPayment || !(await ownerShown(profile))) return null;
-    return publicShopPayment(profile, config, now);
+    return publicShopPayment(profile, config, now, listingLink);
   } catch (error) {
     logger.warn({ proId, err: (error as Error).message }, "shop payment lookup failed");
     return null;
@@ -202,25 +215,26 @@ async function ownerShown(profile: ProProfileRecord): Promise<boolean> {
 
 /** The link to open now (POST /api/shops/{proId}/payment), checked at click time; `visitor` is the caller's IP bucket. */
 export async function openShopPayment(proId: string, listingId: string | undefined, visitor: string, now = new Date()): Promise<OpenPaymentResponse> {
-  const [profile, config] = await Promise.all([getProProfile(proId), getSellerPayments()]);
+  const [profile, config, listing] = await Promise.all([getProProfile(proId), getSellerPayments(), listingId ? getListing(listingId).catch(() => null) : Promise.resolve(null)]);
   if (!profile) throw notFound();
-  const shown = publicShopPayment(profile, config, now);
-  const effective = effectivePayment(profile.sellerPayment, config, now);
-  if (!shown?.online || !effective.url || !effective.host || !(await ownerShown(profile))) throw new HttpError(404, "payment_unavailable");
-  if (listingId) await countClick(profile, listingId, visitor, now);
-  return { url: effective.url, host: effective.host, shopName: profile.name, ice: profile.legal.ice };
+  // Only the shop's own published listing brings its link (and counts a click).
+  const own = listing && listing.ownerUid === profile.ownerUid && listing.status === "published" ? listing : null;
+  const shown = publicShopPayment(profile, config, now, own?.paymentLink);
+  const link = linkInForce(profile, config, now, own?.paymentLink);
+  if (!shown?.online || !link.url || !link.host || !(await ownerShown(profile))) throw new HttpError(404, "payment_unavailable");
+  if (own) await countClick(own.id, visitor, now);
+  return { url: link.url, host: link.host, shopName: profile.name, ice: profile.legal.ice };
 }
 
 /**
  * One click per visitor, listing and day, on the shop's own published listings, while the write
  * quota is not degraded. Never blocks the payment.
  */
-async function countClick(profile: ProProfileRecord, listingId: string, visitor: string, now: Date): Promise<void> {
+async function countClick(listingId: string, visitor: string, now: Date): Promise<void> {
   try {
     if (!(await consumeLimit("shop.payment.click", `${visitor}:${listingId}`)).ok) return;
     if (await firstDegraded(["firestore.writes"])) return;
-    const listing = await getListing(listingId);
-    if (listing && listing.ownerUid === profile.ownerUid && listing.status === "published") await incrementPaymentClicks(listingId, now);
+    await incrementPaymentClicks(listingId, now);
   } catch (error) {
     logger.warn({ listingId, err: (error as Error).message }, "payment click not counted");
   }

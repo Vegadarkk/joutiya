@@ -1,6 +1,7 @@
 import type { ProPlan } from "@/config/pricing";
 import { isAllowedPaymentHost, PAYMENT_LINK_DELAY_MS, paymentLinkHost, type SellerPaymentsConfig } from "@/config/seller-payments";
 import { storefrontShown, type ProState } from "./lifecycle";
+import type { ListingPaymentLink } from "@/lib/db/schemas";
 import type { SellerPaymentDoc } from "./profile-schema";
 
 // « Payer chez le vendeur » rules (design phase-7/boutique-temporaire.md §2). Pure: the save, the
@@ -45,6 +46,21 @@ export function foldPending(payment: SellerPaymentDoc, config: SellerPaymentsCon
   if (effective.pending) return payment;
   const { pendingUrl, pendingFrom: _from, pendingHost: _host, hostReview: _review, ...rest } = payment;
   return { ...rest, url: pendingUrl };
+}
+
+/**
+ * A listing's own link as its owner sees it (catalogue §6): a pending link counts once 24 h old.
+ * Its host was on the allowlist when saved; the click checks it again.
+ */
+export function ownerPaymentLink(link: Pick<ListingPaymentLink, "url" | "pendingUrl" | "pendingFrom"> | undefined, now: Date): { url: string | null; pending: { url: string; host: string; activeFrom: Date } | null } {
+  if (!link) return { url: null, pending: null };
+  const host = paymentLinkHost(link.pendingUrl);
+  if (link.pendingUrl && host && link.pendingFrom) {
+    const activeFrom = new Date(link.pendingFrom.getTime() + PAYMENT_LINK_DELAY_MS);
+    if (activeFrom.getTime() <= now.getTime()) return { url: link.pendingUrl, pending: null };
+    return { url: link.url ?? null, pending: { url: link.pendingUrl, host, activeFrom } };
+  }
+  return { url: link.url ?? null, pending: null };
 }
 
 /** Whether the shop shows « Payer chez le vendeur » or the cash-on-delivery badge at all. */

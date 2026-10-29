@@ -43,6 +43,7 @@ import { photoUrl } from "@/lib/listings/client/photo-url";
 import { listingJsonLd } from "@/lib/listings/jsonld";
 import { getPublishedBySlugId, getSeller, listingPath, toPublicListing, type PublicListing, type PublicSeller } from "@/lib/listings/public";
 import { logger } from "@/lib/logging/logger";
+import type { ListingPaymentLink } from "@/lib/db/schemas";
 import { shopPaymentFor } from "@/lib/pro/seller-payment";
 import { isIndexable } from "@/lib/search/document";
 import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
@@ -68,6 +69,8 @@ interface Loaded {
   ownerUid: string;
   /** Server side only: the shop of a Pro listing (its payment button). */
   proId: string | undefined;
+  /** Server side only: the listing's own payment link (catalogue §6), never rendered (the click asks for it). */
+  paymentLink: ListingPaymentLink | undefined;
   redirect: boolean;
   /** In the search index (D9), so counted by its deeper category landing pages. */
   indexed: boolean;
@@ -85,6 +88,7 @@ const load = cache(async (segment: string): Promise<Loaded | null> => {
     listing,
     ownerUid: found.listing.ownerUid,
     proId: found.listing.sellerType === "pro" ? found.listing.proId : undefined,
+    paymentLink: found.listing.sellerType === "pro" ? found.listing.paymentLink : undefined,
     redirect: found.redirect,
     indexed: isIndexable(found.listing),
     adsEligible: found.state === "published" && found.listing.adsEligible === true,
@@ -145,7 +149,7 @@ export default async function ListingPage({ params }: { params: Params }) {
   const { listing } = found;
   const [seller, payment, legal, flags, t, names, criteria] = await Promise.all([
     sellerOf(found.ownerUid),
-    listing.state === "published" && !listing.example ? shopPaymentFor(found.proId) : Promise.resolve(null),
+    listing.state === "published" && !listing.example ? shopPaymentFor(found.proId, new Date(), found.paymentLink) : Promise.resolve(null),
     getLegalConfig(),
     getFlags(),
     getTranslations({ locale, namespace: "ListingPage" }),

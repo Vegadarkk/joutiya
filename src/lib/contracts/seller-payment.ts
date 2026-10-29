@@ -66,6 +66,10 @@ export interface PublicShopPayment {
   info: z.infer<typeof sellerInfoInputSchema>;
 }
 
+/** `PUT /api/listings/{id}/payment-link`: the listing's own payment page, or null to go back to the shop's. */
+export const listingPaymentLinkInputSchema = z.object({ url: z.string().max(PAYMENT_URL_MAX).nullable() }).strict();
+export type ListingPaymentLinkInput = z.infer<typeof listingPaymentLinkInputSchema>;
+
 export const openPaymentSchema = z.object({ listingId: z.string().min(1).max(64).optional() }).strict();
 
 /** POST /api/shops/{proId}/payment: the link to open now. */
