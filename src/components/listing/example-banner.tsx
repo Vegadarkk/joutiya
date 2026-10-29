@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
-// Example listing (owner decision of 2026-10-28, src/lib/demo): a listing Joutiya wrote to show what
-// a good listing of its kind looks like. The page says so above the gallery and in place of the
-// contact actions, which the API refuses too (acceptsContact).
+// Example listing or shop (owner decision of 2026-10-28, src/lib/demo): written by Joutiya to show
+// what a good listing or a Pro storefront looks like. The page says so, and the contact actions are
+// gone (the API refuses them too: acceptsContact).
 
-export function ExampleBanner({ className }: { className?: string }) {
-  const t = useTranslations("ListingPage.example");
+export function ExampleBanner({ scope = "listing", className }: { scope?: "listing" | "shop"; className?: string }) {
+  const listing = useTranslations("ListingPage.example");
+  const shop = useTranslations("Storefront.example");
+  const t = (key: "title" | "body" | "cta") => (scope === "shop" ? shop(key) : listing(key));
   return (
     <div
       role="note"
@@ -24,7 +26,7 @@ export function ExampleBanner({ className }: { className?: string }) {
         </div>
       </div>
       <Button asChild variant="outline" className="self-start sm:self-center">
-        <Link href="/deposer">{t("cta")}</Link>
+        <Link href={scope === "shop" ? "/pro" : "/deposer"}>{t("cta")}</Link>
       </Button>
     </div>
   );

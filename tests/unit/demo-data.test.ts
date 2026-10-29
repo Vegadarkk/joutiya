@@ -3,7 +3,8 @@ import { CATEGORIES, criteriaSchema, subcategoryById } from "@/config/categories
 import { REGIONS, cityBySlug } from "@/config/regions";
 import { publishedListingSchema, userSchema } from "@/lib/db/schemas";
 import { DEMO_ENTRIES, DEMO_SELLERS } from "@/lib/demo/catalog";
-import { DEMO_ID_PREFIX, DEMO_LIFETIME_DAYS, DEMO_UID_PREFIX, demoListings, demoPhotoRefs, demoSellers, pexelsUrl } from "@/lib/demo/data";
+import { DEMO_ID_PREFIX, DEMO_LIFETIME_DAYS, DEMO_UID_PREFIX, demoListings, demoPhotoRefs, demoSellers, demoShops, pexelsUrl } from "@/lib/demo/data";
+import { PRO_ID_PATTERN, proProfileSchema } from "@/lib/pro/profile-schema";
 import { LISTING_ID_PATTERN, parseSlugId } from "@/lib/listings/ids";
 import { toSearchDocument } from "@/lib/search/document";
 import { downloadPhoto, parseSeedDemoCli, removeDemo, seedDemo, type SeedDemoTarget } from "../../scripts/seed-demo";
@@ -61,7 +62,7 @@ describe("demo listings", () => {
     for (const { id, ...doc } of listings) {
       expect(LISTING_ID_PATTERN.test(id) && id.startsWith(DEMO_ID_PREFIX), id).toBe(true);
       expect(publishedListingSchema.safeParse(doc).error?.issues ?? [], id).toEqual([]);
-      expect(criteriaSchema(doc.subcategoryId as string).safeParse(doc.attributes).error?.issues ?? [], `${id} ${doc.subcategoryId}`).toEqual([]);
+      expect(criteriaSchema(doc.subcategoryId as string, doc.sellerType).safeParse(doc.attributes).error?.issues ?? [], `${id} ${doc.subcategoryId}`).toEqual([]);
       expect(parseSlugId(doc.slugId as string)?.id).toBe(id);
       expect(doc.ownerUid.startsWith(DEMO_UID_PREFIX)).toBe(true);
       expect(toSearchDocument({ id, ...doc }, NOW), id).not.toBeNull();
@@ -79,8 +80,26 @@ describe("demo listings", () => {
     }
   });
 
+  it("give each Pro seller a valid example shop, never verified, its listings linked to it", () => {
+    const shops = demoShops(NOW);
+    expect(shops.length).toBe(DEMO_SELLERS.filter((seller) => seller.type === "pro").length);
+    for (const { proId, doc } of shops) {
+      expect(PRO_ID_PATTERN.test(proId), proId).toBe(true);
+      expect(proProfileSchema.safeParse(doc).error?.issues ?? [], proId).toEqual([]);
+      expect(doc).toMatchObject({ example: true, kybc: { status: "none" } });
+      expect(doc).not.toHaveProperty("certified");
+    }
+    expect(shops.map((shop) => shop.doc.sector).filter(Boolean).sort()).toEqual(["car_rental", "real_estate"]);
+    const proIds = new Set(shops.map((shop) => shop.proId));
+    for (const listing of demoListings(NOW)) expect(listing.sellerType === "pro" ? proIds.has(listing.proId ?? "") : listing.proId === undefined, listing.id).toBe(true);
+  });
+
   it("belong to valid sellers", () => {
-    for (const { uid, doc } of demoSellers(NOW)) expect(userSchema.safeParse(doc).error?.issues ?? [], uid).toEqual([]);
+    for (const { uid, doc } of demoSellers(NOW)) {
+      expect(userSchema.safeParse(doc).error?.issues ?? [], uid).toEqual([]);
+      // Fictitious: never shown as certified or phone-checked.
+      expect(doc.badges, uid).toMatchObject({ phoneVerified: false, proCertified: false });
+    }
   });
 
   it("fetch photos from Pexels only", () => {
@@ -146,7 +165,7 @@ describe("seed-demo", () => {
     const target = await fakeTarget();
     const photos = demoPhotoRefs().length;
     const result = await seedDemo(target, NOW);
-    expect(result).toEqual({ documents: DEMO_SELLERS.length + DEMO_ENTRIES.length, photos, indexed: DEMO_ENTRIES.length });
+    expect(result).toEqual({ documents: DEMO_SELLERS.length + demoShops(NOW).length + DEMO_ENTRIES.length, photos, indexed: DEMO_ENTRIES.length });
     expect(target.objects.size).toBe(photos * 3);
     const [first] = demoListings(NOW);
     const stored = target.docs.get(`listings/${first?.id}`) as { photos: { id: string; w: number }[] };

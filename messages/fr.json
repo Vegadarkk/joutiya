@@ -3964,6 +3964,13 @@
       "free": "Libre à vos dates",
       "blocked": "Indisponible à vos dates",
       "minDays": "Location de {count, plural, one {# jour} other {# jours}} minimum"
+    },
+    "example": {
+      "badge": "Boutique exemple",
+      "title": "Boutique exemple",
+      "body": "Joutiya a créé cette boutique fictive pour montrer à quoi ressemble la vitrine d'un professionnel. Ses identifiants n'ont pas été vérifiés et ses annonces sont des exemples : on ne peut ni la contacter, ni acheter, ni réserver.",
+      "cta": "Créer ma boutique",
+      "note": "Boutique fictive créée par Joutiya à titre d'exemple : aucun identifiant professionnel n'a été vérifié."
     }
   },
   "Options": {

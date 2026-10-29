@@ -15,6 +15,12 @@ de chaque type. Chacune porte `example: true` :
 - ni « À la Une », ni publicité, ni plan du site, ni données Product pour les moteurs (`noindex`) ;
 - pas d'expiration à 60 jours : une nouvelle pose renouvelle la date.
 
+Les vendeurs professionnels fictifs ont aussi une boutique exemple (`proProfiles`, `example: true`),
+pour voir la vitrine d'un pro, d'une agence immobilière et d'un loueur de voitures : badge « Boutique
+exemple » au lieu de « vérifiée », bandeau qui dit qu'elle est fictive, `noindex`. Rien n'y est
+vérifié : pas de badge « Certifié » ni « téléphone vérifié », identifiants factices (ICE à zéros,
+« EXEMPLE »), KYBC « none ».
+
 Le bandeau doit rester visible : une annonce fictive présentée comme réelle serait une pratique
 commerciale trompeuse. Le contenu est dans `src/lib/demo/catalog.ts`, le script dans
 `scripts/seed-demo.ts`.

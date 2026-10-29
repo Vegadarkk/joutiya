@@ -356,6 +356,8 @@ export interface PublicStorefront {
   payment: PublicShopPayment | null;
   /** The owner's public face and listings, as on /profil. */
   seller: PublicProfileView;
+  /** Example shop (src/lib/demo): labelled, never "vérifiée", not indexed. */
+  example: boolean;
 }
 
 /**
@@ -383,6 +385,7 @@ export async function getPublicStorefront(proId: string, limit = 24): Promise<Pu
     rental: profile.sector === "car_rental" ? (profile.rental ?? null) : null,
     rentalCheckedAt: profile.sector === "car_rental" ? checkedOn(profile) : null,
     seller: await profileView(user, limit),
+    example: profile.example === true,
   };
 }
 
