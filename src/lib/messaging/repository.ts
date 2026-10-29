@@ -150,6 +150,18 @@ export interface NewMessageInput {
 }
 
 /**
+ * Whether this message makes the exchange reciprocal (owner, 29 Oct): a message the seller wrote,
+ * an accepted offer, a confirmed appointment or an accepted booking request, whoever sends the step.
+ * A one-click decline, a withdrawal or a mere proposal opens no review.
+ */
+export function verifiesExchange(input: Pick<NewMessageInput, "senderUid" | "offer" | "appointment" | "rentalRequest">, sellerUid: string): boolean {
+  if (input.offer) return input.offer.event === "accepted";
+  if (input.appointment) return input.appointment.event === "confirmed";
+  if (input.rentalRequest) return input.rentalRequest.event === "accepted";
+  return input.senderUid === sellerUid;
+}
+
+/**
  * Runs inside the append transaction on the conversation as read (src/lib/appointments,
  * src/lib/rental-requests, src/lib/offers): throws to abort, else returns the conversation fields
  * to set with the message (null deletes a field) and, for a system message, its text and
@@ -255,8 +267,8 @@ export async function appendMessage(cid: string, given: NewMessageInput, extend?
       purgeAt: conversationPurgeAt(input.now),
       ...Object.fromEntries(Object.entries(extra).filter(([, value]) => value !== null)),
     });
-    // The seller's first message makes the exchange reciprocal: it opens the buyer's review (vitrine-avis §2).
-    const sellerReplies = input.senderUid === conversation.sellerUid && !conversation.sellerRepliedAt;
+    // The first verified step of the exchange opens the buyer's review (vitrine-avis §2).
+    const sellerReplies = !conversation.sellerRepliedAt && verifiesExchange(input, conversation.sellerUid);
     tx.set(messageRef, toFirestore(message));
     if (evidence) tx.set(evidenceRef(cid, messageRef.id), toFirestore(evidence));
     tx.update(

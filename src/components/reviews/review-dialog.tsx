@@ -104,6 +104,7 @@ export function ReviewDialog({ open, onOpenChange, cid, sellerName, sellerPublic
               <Dialog.Title className="text-xl font-semibold text-balance">{created.status === "published" ? t("publishedTitle") : t("pendingTitle")}</Dialog.Title>
               <Dialog.Description className="max-w-sm text-sm text-pretty text-foreground-muted">
                 {created.status === "published" ? t("publishedBody", { name }) : t("pendingBody")}
+                {created.replaced ? ` ${t("replacedNote")}` : null}
               </Dialog.Description>
               <div className="mt-2 flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
                 <Dialog.Close asChild>
