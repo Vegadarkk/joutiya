@@ -9,7 +9,8 @@ import { composerProblem, sendsOnEnter } from "@/components/messages/composer";
 import { MESSAGING_ERROR_KEYS, messagingErrorKey } from "@/components/messages/errors";
 import { formatDayLabel, formatRowTime } from "@/components/messages/format";
 import { previewText, threadHref } from "@/components/messages/inbox";
-import { firstPage, removeRow, shouldLoadMore, withFreshHead, withPage, withRow, type InboxList } from "@/components/messages/inbox-state";
+import { firstPage, inboxIsEmpty, removeRow, shouldLoadMore, withFreshHead, withPage, withRow, type InboxList } from "@/components/messages/inbox-state";
+import { ThreadPlaceholderView } from "@/components/messages/thread-placeholder";
 import { canReport, MessageItem, textParts, warningsFor } from "@/components/messages/message-item";
 import { badgeText } from "@/components/messages/messages-link";
 import { selectedConversation } from "@/components/messages/messages-shell";
@@ -100,6 +101,23 @@ describe("inbox paging", () => {
     expect(cids(state)).toEqual([cid(5), cid(6)]);
     expect(state.next).toBeUndefined();
     expect(shouldLoadMore(state, true)).toBe(false);
+  });
+
+  it("is empty only once loaded with no row and nothing more to load", () => {
+    expect(inboxIsEmpty({ kind: "loading", archived: false })).toBe(false);
+    expect(inboxIsEmpty({ kind: "failed", archived: false, error: new Error("x") })).toBe(false);
+    expect(inboxIsEmpty({ kind: "ready", ...list([]) })).toBe(true);
+    expect(inboxIsEmpty({ kind: "ready", ...list([], { next: "n1" }) })).toBe(false);
+    expect(inboxIsEmpty({ kind: "ready", ...list([row(1, 90)]) })).toBe(false);
+  });
+
+  it("keeps the thread pane of /messages neutral while the list is empty (one empty state at a time)", () => {
+    const html = (quiet: boolean) => renderToStaticMarkup(<NextIntlClientProvider locale="fr" messages={fr}><ThreadPlaceholderView quiet={quiet} /></NextIntlClientProvider>);
+    expect(html(true)).toContain('data-quiet="1"');
+    expect(html(true)).not.toContain(fr.Messaging.page.selectTitle);
+    expect(html(false)).toContain('data-quiet="0"');
+    expect(html(false)).toContain(fr.Messaging.page.selectTitle);
+    expect(html(false)).toContain(fr.Messaging.page.selectBody.replace(/'/g, "&#x27;"));
   });
 
   it("keeps the fresher version of a row that moved between two pages", () => {
