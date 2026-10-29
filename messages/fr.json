@@ -3690,6 +3690,44 @@
       "save": "Enregistrer les rayons",
       "saved": "Rayons enregistrés.",
       "failed": "Les rayons n'ont pas été enregistrés."
+    },
+    "social": {
+      "title": "Réseaux sociaux",
+      "lead": "Affichez vos comptes sur votre vitrine (jamais sur vos annonces). Tapez votre nom d'utilisateur ou collez l'adresse de votre profil.",
+      "hints": {
+        "instagram": "Votre compte Instagram, par exemple @votreboutique.",
+        "tiktok": "Votre compte TikTok, par exemple @votreboutique.",
+        "facebook": "Votre page Facebook : son nom d'utilisateur ou son adresse.",
+        "youtube": "Votre chaîne YouTube, par son @identifiant.",
+        "x": "Votre compte X (Twitter), par exemple @votreboutique.",
+        "linkedin": "L'adresse de votre page entreprise LinkedIn.",
+        "snapchat": "Votre nom d'utilisateur Snapchat.",
+        "whatsapp": "Le lien court de WhatsApp Business (Outils, Lien court) : il n'affiche pas votre numéro."
+      },
+      "placeholders": {
+        "instagram": "@votreboutique",
+        "tiktok": "@votreboutique",
+        "facebook": "facebook.com/votreboutique",
+        "youtube": "@votrechaine",
+        "x": "@votreboutique",
+        "linkedin": "linkedin.com/company/votreboutique",
+        "snapchat": "votreboutique",
+        "whatsapp": "wa.me/message/…"
+      },
+      "problems": {
+        "invalid": "Ce n'est ni un nom d'utilisateur ni une adresse de profil.",
+        "host": "Cette adresse n'est pas sur le site du réseau. Les liens raccourcis et les pages de liens ne sont pas acceptés.",
+        "profile": "Cette adresse n'est pas celle d'un profil (publication, groupe, partage…). Collez l'adresse de votre page.",
+        "handle": "Ce nom d'utilisateur n'est pas valide pour ce réseau.",
+        "phone": "Pas de numéro de téléphone : vos clients vous écrivent par la messagerie. Pour WhatsApp, utilisez le lien court Business.",
+        "prohibited": "Ce nom contient un terme interdit sur le site."
+      },
+      "rules": "Seuls les profils officiels de ces réseaux sont acceptés, en https. Les liens s'ouvrent dans un nouvel onglet et peuvent être signalés ; un lien trompeur peut être masqué par la modération.",
+      "hiddenTitle": "Liens masqués par la modération",
+      "hiddenBody": "Vos réseaux sociaux n'apparaissent plus sur votre vitrine. Motif : {reason}. Corrigez-les puis répondez à l'e-mail reçu pour demander leur rétablissement.",
+      "save": "Enregistrer les réseaux",
+      "saved": "Réseaux sociaux enregistrés. Votre vitrine est mise à jour.",
+      "failed": "Les réseaux sociaux n'ont pas été enregistrés."
     }
   },
   "Messaging": {
@@ -4353,6 +4391,11 @@
       "all": "Tout",
       "promotions": "Promotions",
       "seeAll": "Voir les {count} annonces"
+    },
+    "social": {
+      "title": "Retrouvez la boutique",
+      "newTab": "(s'ouvre dans un nouvel onglet)",
+      "note": "Liens déclarés par la boutique, vers des sites extérieurs au nôtre. Gardez vos échanges et vos rendez-vous dans la messagerie, et ne versez jamais d'acompte à un compte qui vous contacte en dehors du site."
     }
   },
   "Options": {

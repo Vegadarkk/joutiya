@@ -2,7 +2,7 @@ import { ApiError, apiDelete, apiGet, apiPost, apiPut, uploadToPresignedUrl, typ
 import { KYBC_DECLARED_TYPES, MAX_UPLOAD_BYTES, type KybcDeclaredType } from "@/lib/contracts/media";
 import type { SectionsInput, SectionsResponse } from "@/lib/contracts/catalog";
 import { STOCK_API, type StockImportMode, type StockImportResponse, type StockListResponse } from "@/lib/contracts/stock-import";
-import { PRO_API, type KybcCompleteResponse, type KybcSignInput, type KybcSignResponse, type RentalCheckResponse, type ProAgencyInput, type ProAgencyResponse, type ProRentalInput, type ProRentalResponse, type ProApplyInput, type ProApplyResponse, type ProMeResponse } from "@/lib/contracts/pro";
+import { PRO_API, type KybcCompleteResponse, type KybcSignInput, type KybcSignResponse, type RentalCheckResponse, type ProAgencyInput, type ProAgencyResponse, type ProRentalInput, type ProRentalResponse, type ProSocialInput, type ProSocialResponse, type ProApplyInput, type ProApplyResponse, type ProMeResponse } from "@/lib/contracts/pro";
 
 // Browser side of /api/pro/** (phase 7 design §4): the Pro area state, one KYBC piece end to end
 // (sign, PUT to the presigned URL with progress, complete), the application, the car rental
@@ -13,6 +13,7 @@ export const loadProMe = () => apiGet<ProMeResponse>(PRO_API.me);
 export const saveProAgency = (input: ProAgencyInput) => apiPut<ProAgencyResponse>(PRO_API.agency, input);
 export const saveSections = (input: SectionsInput) => apiPut<SectionsResponse>(PRO_API.sections, input);
 export const saveRentalAgency = (input: ProRentalInput) => apiPut<ProRentalResponse>(PRO_API.rental, input);
+export const saveSocialLinks = (input: ProSocialInput) => apiPut<ProSocialResponse>(PRO_API.social, input);
 
 /** Sends the licence decision (a piece uploaded with `use: "agrement"`) for its check (decision 5). */
 export const submitRentalCheck = (uploadId: string) => apiPost<RentalCheckResponse>(PRO_API.rentalCheck, { uploadId });

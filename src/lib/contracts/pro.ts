@@ -3,6 +3,7 @@ import type { ShopSection } from "@/lib/contracts/catalog";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
 import { citySlugSchema, regionCodeSchema } from "@/lib/contracts/listings";
 import { KYBC_DECLARED_TYPES, MAX_UPLOAD_BYTES, uploadIdSchema, type KybcDeclaredType } from "@/lib/contracts/media";
+import { SOCIAL_INPUT_MAX, SOCIAL_NETWORKS, type SocialNetwork } from "@/config/social-links";
 import { KYBC_MAX_PIECES, KYBC_MIN_PIECES, proLegalSchema } from "@/lib/pro/kybc";
 import {
   AGENCY_FEE_SCHEDULE_MAX,
@@ -18,6 +19,7 @@ import {
   type RentalCheckIssue,
   type RentalCheckStatus,
 } from "@/lib/pro/profile-schema";
+import type { SocialLinkIssue } from "@/lib/pro/social-links-rules";
 
 // Pro application (phase 7 design §4): POST /api/pro/apply. Client-safe contract shared by the
 // wizard and the route. The KYBC pieces are uploads (purpose `kyb`) the applicant signed before.
@@ -227,6 +229,7 @@ export const PRO_API = {
   sections: "/api/pro/me/sections",
   rental: "/api/pro/me/rental",
   rentalCheck: "/api/pro/me/rental/check",
+  social: "/api/pro/me/social",
   kybcSign: "/api/pro/kybc/uploads",
   kybcComplete: (id: string) => `/api/pro/kybc/uploads/${id}/complete`,
   kybcDelete: (id: string) => `/api/pro/kybc/uploads/${id}`,
@@ -241,6 +244,38 @@ export const proAgencySchema = z
   .strict();
 export type ProAgencyInput = z.infer<typeof proAgencySchema>;
 export type ProAgencyResponse = ProAgencyInput;
+
+/**
+ * PUT /api/pro/me/social: the shop's social links, replaced whole; each value is a handle,
+ * "@handle" or the profile address (src/config/social-links.ts). An empty list removes them.
+ */
+export const proSocialSchema = z
+  .object({
+    links: z
+      .array(z.object({ network: z.enum(SOCIAL_NETWORKS), value: z.string().max(SOCIAL_INPUT_MAX) }).strict())
+      .max(SOCIAL_NETWORKS.length)
+      .refine((links) => new Set(links.map((link) => link.network)).size === links.length, "duplicate network"),
+  })
+  .strict();
+export type ProSocialInput = z.infer<typeof proSocialSchema>;
+
+/** The shop's social links as its owner sees them. */
+export interface ProSocialView {
+  links: { network: SocialNetwork; handle: string; href: string }[];
+  /** Hidden by a moderator: the storefront shows none of them until restored. */
+  hidden: { reason: string; at: string } | null;
+}
+export type ProSocialResponse = { social: ProSocialView };
+
+/** A shop's social links in the back office: GET their state, POST a moderator's hiding or restoration (reason required). */
+export const PRO_SOCIAL_ADMIN_API = (proId: string) => `/api/admin/pros/${proId}/social`;
+export const shopSocialActionSchema = z.object({ action: z.enum(["hide", "restore"]), reason: z.string().trim().min(3).max(500) }).strict();
+
+/** 422 `social_link_invalid` details. */
+export interface SocialLinkIssueDetails {
+  network: SocialNetwork;
+  problem: SocialLinkIssue;
+}
 
 /** PUT /api/pro/me/rental (rental pack §5): the car rental agency's settings, replaced whole. */
 export const proRentalSchema = rentalAgencySchema;
@@ -335,4 +370,6 @@ export interface ProSelfView {
   rental: RentalAgency | null;
   /** Check of the licence decision, null until a document is sent (or after the reference changed). */
   rentalCheck: RentalCheckView | null;
+  /** Social links shown on the storefront. */
+  social: ProSocialView;
 }

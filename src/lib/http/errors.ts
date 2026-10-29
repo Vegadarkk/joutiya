@@ -110,6 +110,8 @@ export type ErrorCode =
   | "pass_other_plan"
   /** « Payer chez le vendeur »: a link refused by its shape (details: PaymentLinkIssue). */
   | "payment_link_invalid"
+  /** A shop's social link refused (details: SocialLinkIssueDetails). Messages: Pro.social.problems. */
+  | "social_link_invalid"
   /** The seller information (law 31-08) and the terms are needed to turn the button on. */
   | "payment_info_required"
   /** The shop's button is off now (state, suspension, host withdrawn). */

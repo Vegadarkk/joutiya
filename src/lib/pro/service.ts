@@ -23,6 +23,7 @@ import { iceFormatOk, KYBC_NOTICE_VERSION } from "./kybc";
 import { publishesAsPro, storefrontShown, transition } from "./lifecycle";
 import type { ProProfileDoc } from "./profile-schema";
 import { rentalCheckView } from "./rental-check-rules";
+import { socialView } from "./social-links-rules";
 
 // Pro accounts (architecture §5 lifecycle, §6 "Devenir Pro", phase 7 design §4). The application
 // creates proProfiles/{proId} in `pending_verification`; the account stays `individual` and
@@ -166,6 +167,7 @@ export async function proSelf(auth: AuthContext): Promise<ProMeResponse> {
       sections: profile.sections ?? [],
       rental: profile.rental ?? null,
       rentalCheck: profile.rentalCheck ? rentalCheckView(profile.rentalCheck) : null,
+      social: socialView(profile.social),
     },
   };
 }

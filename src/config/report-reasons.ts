@@ -147,6 +147,15 @@ export const REPORT_REASONS = [
     hint: { fr: "L'avis ne décrit pas un vrai échange, ou parle d'autre chose que la transaction.", ar: "التقييم لا يصف معاملة حقيقية، أو يتحدث عن شيء غير المعاملة." },
     ground: { type: "terms", ref: "CGU, avis utilisateurs" },
   },
+  {
+    // Social links of a shop (2026-10-29): a moderator may hide them all, storefront and listings kept.
+    id: "social_link",
+    priority: "P2",
+    targets: ["user", "pro"],
+    label: { fr: "Lien de réseau social suspect", ar: "رابط شبكة اجتماعية مشبوه" },
+    hint: { fr: "Un lien de la vitrine mène au compte d'un autre vendeur, à une page douteuse ou à un contenu interdit.", ar: "رابط في الواجهة يقود إلى حساب بائع آخر أو إلى صفحة مريبة أو محتوى ممنوع." },
+    ground: { type: "terms", ref: "CGU, vitrines professionnelles" },
+  },
   // P3: 7 days.
   {
     id: "spam",

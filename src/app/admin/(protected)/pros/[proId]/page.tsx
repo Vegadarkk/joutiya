@@ -10,11 +10,13 @@ import { proIdSchema } from "@/lib/pro/profile-schema";
 import type { ProReview as ProReviewView } from "@/lib/contracts/pro";
 import { proReview } from "@/lib/pro/review";
 import { shopPaymentAdmin } from "@/lib/pro/seller-payment";
+import { shopSocialAdmin } from "@/lib/pro/social-links";
 import { ProDecisionForm, ProEffectsRerun } from "../../../_components/pro-decision-form";
 import { IDENTIFIER_LABEL, LEGAL_FORM_LABEL, LIFECYCLE_LABEL, PHONE_OUTCOME_LABEL, RENTAL_CHECK_ISSUE_LABEL, RENTAL_CHECK_STATUS_LABEL, formatIce } from "../../../_components/pro-labels";
 import { ProPhoneCheckForm } from "../../../_components/pro-phone-check-form";
 import { RentalCheckDecisionForm } from "../../../_components/rental-check-decision-form";
 import { ShopPaymentPanel } from "../../../_components/shop-payment-panel";
+import { ShopSocialPanel } from "../../../_components/shop-social-panel";
 
 // Review of one Pro application (phase 7 design §4): the shop, the legal identifiers to check
 // against the registry, the KYBC pieces (each opening is journaled), the applicant's account, the
@@ -72,7 +74,7 @@ export default async function ProReviewPage({ params }: { params: Promise<{ proI
   await requirePageStaff(["moderator", "admin"]);
   const id = proIdSchema.safeParse((await params).proId);
   if (!id.success) notFound();
-  const [review, payment] = await Promise.all([proReview(id.data), shopPaymentAdmin(id.data).catch(() => null)]);
+  const [review, payment, social] = await Promise.all([proReview(id.data), shopPaymentAdmin(id.data).catch(() => null), shopSocialAdmin(id.data).catch(() => null)]);
   if (!review) notFound();
 
   const city = cityBySlug(review.citySlug);
@@ -167,6 +169,11 @@ export default async function ProReviewPage({ params }: { params: Promise<{ proI
           {payment && (payment.url || payment.pendingUrl || payment.cashOnDelivery || payment.suspended) ? (
             <Panel title="Paiement chez le vendeur">
               <ShopPaymentPanel proId={review.proId} initial={payment} />
+            </Panel>
+          ) : null}
+          {social && (social.links.length > 0 || social.hidden) ? (
+            <Panel title="Réseaux sociaux">
+              <ShopSocialPanel proId={review.proId} initial={social} />
             </Panel>
           ) : null}
           <Panel title="Demandeur">

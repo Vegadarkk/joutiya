@@ -42,6 +42,8 @@ export type TemplateId =
   | "launchOfferNotice"
   | "passNotice"
   | "sellerPaymentNotice"
+  // Pro social links (2026-10-29): hidden or restored by a moderator.
+  | "socialLinksNotice"
   // Messaging (phase 5, L5): the grouped new-messages mail (design D21).
   | "newMessages"
   // Appointments in messaging (28 Oct): reminder the day before and 2 hours before a confirmed slot.
@@ -184,6 +186,7 @@ export interface TemplateData {
    * while the host waits for review), `removed`, `suspended` / `restored` by a moderator, or the
    * host `rejected` (`reason`).
    */
+  socialLinksNotice: { displayName: string; shopName: string; kind: "hidden" | "restored"; reason?: string };
   sellerPaymentNotice: { displayName: string; shopName: string; kind: "changed" | "removed" | "contact" | "suspended" | "restored" | "rejected"; host?: string; activeFrom?: string | null; reason?: string; listingTitle?: string };
   /**
    * Grouped new-messages mail (bulk, D21): the unread total and up to 3 conversations (listing

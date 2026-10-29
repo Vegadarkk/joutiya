@@ -157,6 +157,8 @@ export interface AccountExport {
     slug: string;
     description: string;
     website: string | null;
+    /** Social links of the storefront (handles). */
+    social: { network: string; handle: string }[];
     regionCode: string;
     citySlug: string;
     whatsapp: boolean;

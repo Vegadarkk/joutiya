@@ -13,6 +13,7 @@ import { getSellerPayments } from "@/lib/config/runtime";
 import type { PublicShopPayment } from "@/lib/contracts/seller-payment";
 import { getProProfile, type ProProfileRecord } from "@/lib/db/repositories/pro-profiles";
 import { publicShopPayment } from "@/lib/pro/seller-payment";
+import { publicSocialLinks, type PublicSocialLink } from "@/lib/pro/social-links-rules";
 import { db } from "@/lib/firebase/admin";
 import { aggregationReads, consume } from "@/lib/quota";
 import { assertQuotas, PUBLIC_READ_QUOTAS } from "@/lib/quota/gate";
@@ -400,6 +401,8 @@ export interface PublicStorefront {
   example: boolean;
   /** Sections of the storefront (catalogue §5), in display order. */
   sections: ShopSection[];
+  /** The shop's social links (none while a moderator hides them, none for an example shop). */
+  social: PublicSocialLink[];
 }
 
 /**
@@ -429,6 +432,7 @@ export async function getPublicStorefront(proId: string, limit = 24): Promise<Pu
     seller: await profileView(user, limit),
     example: profile.example === true,
     sections: profile.sections ?? [],
+    social: profile.example ? [] : publicSocialLinks(profile.social),
   };
 }
 
