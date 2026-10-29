@@ -14,7 +14,7 @@ export const formatDate = (iso: string | null | undefined) => (iso ? dateOnly.fo
 
 export const plural = (count: number, one: string, many: string) => `${count} ${count > 1 ? many : one}`;
 
-export const TARGET_LABEL: Record<string, string> = { listing: "Annonce", user: "Compte", message: "Message", pro: "Boutique", conversation: "Conversation" };
+export const TARGET_LABEL: Record<string, string> = { listing: "Annonce", user: "Compte", message: "Message", pro: "Boutique", review: "Avis", conversation: "Conversation" };
 
 /** Badge tone of a priority: P0 alarm red, P1 ochre, P2 green, P3 quiet. */
 export const PRIORITY_TONE: Record<ReportPriority, "danger" | "warning" | "pro" | "neutral"> = { P0: "danger", P1: "warning", P2: "pro", P3: "neutral" };

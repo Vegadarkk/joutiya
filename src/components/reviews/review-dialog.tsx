@@ -223,7 +223,10 @@ export function ReviewDialog({ open, onOpenChange, cid, sellerName, sellerPublic
                   </label>
                   {problems.confirm && !confirmed ? <InlineError className="ps-8">{t("problems.confirm")}</InlineError> : null}
                   <p id={`${id}-confirm-hint`} className="ps-8 text-sm text-pretty text-foreground-muted">
-                    {t("confirmHint")}
+                    {t("confirmHint")}{" "}
+                    <Link href="/legal/avis-utilisateurs#regles" target="_blank" rel="noopener" prefetch={false} className="font-medium text-link underline underline-offset-2">
+                      {t("rules")}
+                    </Link>
                   </p>
                 </div>
 

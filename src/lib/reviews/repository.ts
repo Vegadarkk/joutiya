@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { Timestamp, type DocumentSnapshot, type Transaction } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, type DocumentSnapshot, type Transaction } from "firebase-admin/firestore";
 import { REVIEW_PURGE_MONTHS } from "@/config/reviews";
 import { reviewWindow, type ReviewWindow } from "@/lib/contracts/reviews";
 import { COLLECTIONS, reviewSchema, userSchema, type ReviewDoc } from "@/lib/db/schemas";
@@ -183,9 +183,9 @@ export async function replyToReview(id: string, targetUid: string, text: string,
 
 /**
  * Moves a review between `published` and `pending`/`hidden` (moderation), keeping the seller's
- * aggregates exact. Returns the review before the change, or null when it does not exist.
+ * aggregates exact. `hiddenBy`: `decision:{id}` or `report:{id}`. Returns the review before the change, or null when it does not exist.
  */
-export async function setReviewStatus(id: string, status: "published" | "hidden", now: Date, decisionId?: string): Promise<ReviewRecord | null> {
+export async function setReviewStatus(id: string, status: "published" | "hidden", now: Date, hiddenBy?: string): Promise<ReviewRecord | null> {
   const before = await db().runTransaction(async (tx) => {
     const review = reviewFromSnapshot(await tx.get(reviewRef(id)));
     if (!review || review.status === "deleted" || review.status === status) return review;
@@ -193,7 +193,11 @@ export async function setReviewStatus(id: string, status: "published" | "hidden"
     const update: Record<string, unknown> = { status, updatedAt: Timestamp.fromDate(now) };
     if (status === "hidden") {
       update.purgeAt = Timestamp.fromDate(addMonths(now, REVIEW_PURGE_MONTHS));
-      if (decisionId) update.hiddenBy = decisionId;
+      if (hiddenBy) update.hiddenBy = hiddenBy;
+    } else {
+      // Shown again: no purge, no trace of the hide on the public document.
+      update.purgeAt = FieldValue.delete();
+      update.hiddenBy = FieldValue.delete();
     }
     tx.update(reviewRef(id), update);
     if (seller.exists && (review.status === "published" || status === "published")) applyRating(tx, review.targetUid, ratingStatsOf(seller), review.rating, status === "published" ? 1 : -1);
@@ -249,4 +253,23 @@ export async function anonymizeAuthoredReviews(authorUid: string, now: Date): Pr
   }
   void consume("firestore.writes", named.length);
   return [...new Set(named.filter((doc) => doc.get("status") === "published").map((doc) => doc.get("targetPublicId") as string))];
+}
+
+/**
+ * Account closure of a seller: the reviews they received leave public view (their storefront is
+ * gone) and are purged 12 months later like any hidden review, unless legally held. Returns how
+ * many were hidden.
+ */
+export async function hideReceivedReviews(targetUid: string, now: Date): Promise<number> {
+  const snapshot = await reviews().where("targetUid", "==", targetUid).limit(CLOSURE_REVIEWS).get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  const shown = snapshot.docs.filter((doc) => doc.get("status") === "published" || doc.get("status") === "pending");
+  const purgeAt = Timestamp.fromDate(addMonths(now, REVIEW_PURGE_MONTHS));
+  for (let start = 0; start < shown.length; start += 400) {
+    const batch = db().batch();
+    for (const doc of shown.slice(start, start + 400)) batch.update(doc.ref, { status: "hidden", hiddenBy: "account:closed", purgeAt, updatedAt: Timestamp.fromDate(now) });
+    await batch.commit();
+  }
+  void consume("firestore.writes", shown.length);
+  return shown.length;
 }

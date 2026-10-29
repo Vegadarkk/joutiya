@@ -27,7 +27,7 @@ const COPY: Record<MailLocale, Copy> = {
     subject: "Suite donnée à votre signalement",
     title: "Décision sur votre signalement",
     hello: "Bonjour,",
-    target: { listing: "une annonce", user: "un profil", message: "un message", pro: "une boutique" },
+    target: { listing: "une annonce", user: "un profil", message: "un message", pro: "une boutique", review: "un avis" },
     examined: (date, target, reference) => `Nous avons examiné votre signalement du ${date} concernant ${target} (référence ${reference}).`,
     measure: {
       remove: "Décision : le contenu signalé a été retiré.",
@@ -52,7 +52,7 @@ const COPY: Record<MailLocale, Copy> = {
     subject: "مآل تبليغك",
     title: "القرار بشأن تبليغك",
     hello: "مرحبًا،",
-    target: { listing: "إعلان", user: "حساب", message: "رسالة", pro: "متجر" },
+    target: { listing: "إعلان", user: "حساب", message: "رسالة", pro: "متجر", review: "تقييم" },
     examined: (date, target, reference) => `فحصنا تبليغك بتاريخ ${date} بخصوص ${target} (المرجع ${reference}).`,
     measure: {
       remove: "القرار: تم سحب المحتوى المبلَّغ عنه.",

@@ -22,7 +22,7 @@ import { requestTriage } from "./hooks";
 import { createReportTx, listTargetReports, newReportId, OPEN_STATUSES, reportHold, reportPurgeAt, updateReport, withHold, type ReportRecord } from "./repository";
 import { privateAccountRef, readPrivateAccount } from "./reporter";
 import { findDuplicate, hasAutoSignal, hasMultiSignal, isAbusive, isCorroborated, p0Alert, raisePriority, slaHours, strongSignalOf, trustedFromFacts, type StrongSignal } from "./rules";
-import { conversationRef, resolveReportTarget, resolveSystemTarget, type ResolvedTarget, type SystemTargetInput } from "./targets";
+import { conversationRef, reviewDocRef, resolveReportTarget, resolveSystemTarget, type ResolvedTarget, type SystemTargetInput } from "./targets";
 import { afterVisibilityChange, hideTarget, type VisibilityChange } from "./visibility";
 
 // Notice and action (art. 16 DSA, design D10-D12). One transaction writes the report and its effects
@@ -145,6 +145,15 @@ async function commitReport({ id, doc, resolved, signal, now }: CommitInput): Pr
       const legalHold = snapshot.exists ? withHold(Array.isArray(current) ? (current as string[]) : [], hold) : null;
       if (legalHold) {
         tx.update(conversationRef(cid), { legalHold });
+        void consume("firestore.writes", 1);
+      }
+    } else if (target.type === "review") {
+      const snapshot = await tx.get(reviewDocRef(target.id));
+      void consume("firestore.reads", 1);
+      const current: unknown = snapshot.get("legalHold");
+      const legalHold = snapshot.exists ? withHold(Array.isArray(current) ? (current as string[]) : [], hold) : null;
+      if (legalHold) {
+        tx.update(reviewDocRef(target.id), { legalHold });
         void consume("firestore.writes", 1);
       }
     } else if (target.type === "user") {

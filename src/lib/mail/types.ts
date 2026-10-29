@@ -109,7 +109,7 @@ export interface TemplateData {
    * src/config/report-reasons.ts), target delay in hours, reception date (ISO). `displayName` is
    * null for a visitor who gave no name (P0); `urgent` adds the emergency numbers.
    */
-  reportReceived: { displayName: string | null; reportId: string; targetType: "listing" | "user" | "message" | "pro"; reasonId: string; slaHours: number; receivedAt: string; urgent: boolean };
+  reportReceived: { displayName: string | null; reportId: string; targetType: "listing" | "user" | "message" | "pro" | "review"; reasonId: string; slaHours: number; receivedAt: string; urgent: boolean };
   /** Statement of reasons of a restrictive decision (art. 17 DSA), with the signed appeal link (null: authority order). */
   decisionNotice: {
     displayName: string;
@@ -117,8 +117,8 @@ export interface TemplateData {
     /** src/config/decision-templates.ts: facts and ground in the recipient's language. */
     templateId: string;
     action: "remove" | "restrict_visibility" | "warn" | "suspend_account" | "ban";
-    targetType: "listing" | "user" | "message";
-    /** Listing title (listing target), else null. */
+    targetType: "listing" | "user" | "message" | "review";
+    /** Listing title (listing target), the seller's name (review target), else null. */
     title: string | null;
     /** The moderator's own words, quoted as written. */
     details: string | null;
@@ -137,7 +137,7 @@ export interface TemplateData {
     reportId: string;
     /** ISO date of the notice. */
     reportedAt: string;
-    targetType: "listing" | "user" | "message" | "pro";
+    targetType: "listing" | "user" | "message" | "pro" | "review";
     outcome: "actioned" | "dismissed";
     action: "remove" | "restrict_visibility" | "restore" | "no_action" | "warn" | "suspend_account" | "ban";
     automated: DecisionAutomation;
@@ -146,7 +146,7 @@ export interface TemplateData {
     appealDeadline: string;
   };
   /** Hidden content shown again, or an account restriction lifted (report dismissed or appeal granted). */
-  contentRestored: { displayName: string; targetType: "listing" | "user" | "message"; title: string | null; via: "report" | "appeal"; decisionId: string };
+  contentRestored: { displayName: string; targetType: "listing" | "user" | "message" | "review"; title: string | null; via: "report" | "appeal"; decisionId: string };
   /** Appeal received (art. 20 DSA): reference, date (ISO), answer delay. */
   appealReceived: { displayName: string | null; decisionId: string; receivedAt: string; slaDays: number };
   /** Appeal decided by another moderator: upheld or reversed, with the reasons. */

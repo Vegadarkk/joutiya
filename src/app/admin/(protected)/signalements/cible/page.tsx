@@ -31,10 +31,11 @@ import { LiveSlaTimer } from "../../../_components/sla-timer";
 import { aiTemplate, STRIKE_LABEL } from "../../../_components/decide-state";
 import { AiProposalPanel } from "../../../_components/ai-proposal";
 
-// Target view of the report queues (design D24): the reported content as it stands, its open
-// reports with the reporters' accuracy, its history (closed reports, decisions), the agent's
-// latest proposal (advisory) and the decision form. A reported message is shown alone and its
-// reading is journaled (message.read); the whole conversation needs a reason (D18).
+// Target view of the report queues (design D24): the reported content as it stands (a review: its
+// note, text and the seller's reply), its open reports with the reporters' accuracy, its history
+// (closed reports, decisions), the agent's latest proposal (advisory) and the decision form. A
+// reported message is shown alone and its reading is journaled (message.read); the whole
+// conversation needs a reason (D18).
 
 export const metadata: Metadata = { title: "Contenu signalé" };
 
@@ -51,13 +52,15 @@ const LISTING_STATUS: Record<string, string> = {
   removed: "Retirée",
   purged: "Supprimée",
 };
-const DECIDABLE: readonly string[] = ["listing", "user", "message"];
+const DECIDABLE: readonly string[] = ["listing", "user", "message", "review"];
+const REVIEW_STATUS: Record<string, string> = { published: "Publié", pending: "Retenu avant publication", hidden: "Masqué", deleted: "Supprimé par l'auteur" };
 
 function heading(view: ReportTargetView): { title: string; status: string | null } {
   const { snapshot } = view;
   if (snapshot?.type === "listing") return { title: `Annonce « ${snapshot.title || "Sans titre"} »`, status: LISTING_STATUS[snapshot.status] ?? snapshot.status };
   if (snapshot?.type === "user") return { title: `Compte ${snapshot.displayName}`, status: ACCOUNT_STATUS_LABEL[snapshot.status] ?? snapshot.status };
   if (snapshot?.type === "message") return { title: "Message signalé", status: snapshot.hidden ? "Masqué" : "Visible" };
+  if (snapshot?.type === "review") return { title: `Avis sur ${snapshot.seller.displayName}`, status: REVIEW_STATUS[snapshot.status] ?? snapshot.status };
   return { title: `Contenu ${view.target.id}`, status: "Introuvable" };
 }
 
@@ -127,6 +130,46 @@ function Content({ snapshot, site }: { snapshot: TargetSnapshot; site: string })
         <Link href={`/conversations/${snapshot.cid}`} className={`self-start text-sm ${linkClassName}`}>
           Lire toute la conversation (motif demandé, lecture journalisée)
         </Link>
+      </>
+    );
+  }
+  if (snapshot.type === "review") {
+    return (
+      <>
+        <p className="text-lg font-semibold tabular-nums" aria-label={`Note ${snapshot.rating} sur 5`}>
+          {"★".repeat(snapshot.rating)}
+          <span className="text-border-strong">{"★".repeat(5 - snapshot.rating)}</span> {snapshot.rating}/5
+        </p>
+        <blockquote dir="auto" className="rounded-md border-s-4 border-border-strong bg-surface-muted p-3 text-pretty whitespace-pre-line">
+          {snapshot.text}
+        </blockquote>
+        {snapshot.reply ? (
+          <div className="text-sm">
+            <h3 className="mb-1 font-medium text-foreground-muted">Réponse du vendeur</h3>
+            <p dir="auto" className="rounded-md bg-surface-muted p-3 whitespace-pre-line">
+              {snapshot.reply}
+            </p>
+          </div>
+        ) : null}
+        <Facts
+          rows={[
+            ["Auteur", "L'acheteur (compte concerné)"],
+            [
+              "Vendeur noté",
+              <a key="seller" href={`${site}/fr/profil/${snapshot.seller.publicId}#avis`} target="_blank" rel="noopener noreferrer" dir="auto" className={linkClassName}>
+                {snapshot.seller.displayName}
+              </a>,
+            ],
+            ["Annonce", <span key="listing" dir="auto">{snapshot.listingTitle}</span>],
+            ["Écrit le", formatDateTime(snapshot.createdAt)],
+            ["Échange", "Vérifié (conversation avec réponse du vendeur)"],
+          ]}
+        />
+        {snapshot.status === "pending" ? (
+          <p className="rounded-md bg-warning-surface p-3 text-sm text-pretty">
+            Avis retenu avant publication (donnée sensible possible). « Aucune mesure » le publie ; un retrait le refuse avec l&apos;exposé des motifs.
+          </p>
+        ) : null}
       </>
     );
   }

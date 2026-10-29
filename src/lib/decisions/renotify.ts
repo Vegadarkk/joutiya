@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { getListing } from "@/lib/db/repositories/listings";
 import { HttpError, notFound } from "@/lib/http/errors";
 import { consume } from "@/lib/quota";
+import { getReview } from "@/lib/reviews/repository";
 import type { ResendNoticeResponse } from "./contracts";
 import type { DecisionActor } from "./decide";
 import { sendDecisionNotice, type NoticeInput } from "./notify";
@@ -48,7 +49,8 @@ export async function resendDecisionNotice(actor: DecisionActor & { role: "moder
   const targetType = record.target.type as DecisionTargetType;
   if (!DECISION_TARGET_TYPES.includes(targetType)) throw new HttpError(409, "conflict", "this decision's target has no statement mail");
 
-  const title = targetType === "listing" ? ((await getListing(record.target.id))?.title ?? null) : null;
+  const title =
+    targetType === "listing" ? ((await getListing(record.target.id))?.title ?? null) : targetType === "review" ? ((await getReview(record.target.id))?.targetName ?? null) : null;
   const notice: NoticeInput = {
     decisionId: record.id,
     templateId: record.templateId,

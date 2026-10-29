@@ -1,11 +1,12 @@
 import { MessagesSquare } from "lucide-react";
 import type { Locale } from "@/config/site";
+import { Link } from "@/i18n/navigation";
 import { useNumbersTranslations } from "@/i18n/numbers";
 import type { RatingSummary, ReviewPage } from "@/lib/contracts/reviews";
 import { isolate } from "@/lib/i18n/bidi";
 import { intlLocale } from "@/lib/listings/client/format";
 import { MoreReviews, type MoreReviewsLabels } from "./more-reviews";
-import { ReviewItem } from "./review-item";
+import { ReviewItem, type ReviewReportContext } from "./review-item";
 import { Stars } from "./stars";
 
 // The reviews block of a storefront (/profil and /boutique, vitrine-avis §2): the average, the
@@ -16,13 +17,29 @@ export function formatAverage(average: number, locale: Locale): string {
   return new Intl.NumberFormat(intlLocale(locale), { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(average);
 }
 
-export function SellerReviews({ rating, page, publicId, sellerName, locale }: { rating: RatingSummary; page: ReviewPage; publicId: string; sellerName: string; locale: Locale }) {
+export function SellerReviews({
+  rating,
+  page,
+  publicId,
+  sellerName,
+  locale,
+  report,
+}: {
+  rating: RatingSummary;
+  page: ReviewPage;
+  publicId: string;
+  sellerName: string;
+  locale: Locale;
+  /** Each review offers "Signaler l'avis" when given. */
+  report?: ReviewReportContext;
+}) {
   const t = useNumbersTranslations("Reviews");
   const labels: MoreReviewsLabels = {
     stars: [1, 2, 3, 4, 5].map((count) => t("stars", { count })),
     verified: t("verified"),
     verifiedHint: t("verifiedHint"),
     listing: t("listing"),
+    exchangeOn: t("exchangeOn"),
     reply: t("reply", { name: isolate(sellerName) }),
     formerMember: t("formerMember"),
     more: t("more"),
@@ -66,13 +83,18 @@ export function SellerReviews({ rating, page, publicId, sellerName, locale }: { 
                 );
               })}
             </ul>
-            <p className="text-xs text-pretty text-foreground-muted">{t("verifiedHint")}</p>
+            <p className="text-xs text-pretty text-foreground-muted">
+              {t("verifiedHint")}{" "}
+              <Link href="/legal/avis-utilisateurs#verification" prefetch={false} className="font-medium text-link underline underline-offset-2">
+                {t("rules")}
+              </Link>
+            </p>
           </div>
           <div className="flex min-w-0 flex-col divide-y divide-border">
             {page.reviews.map((review) => (
-              <ReviewItem key={review.id} review={review} labels={labels} locale={locale} />
+              <ReviewItem key={review.id} review={review} labels={labels} locale={locale} {...(report ? { report } : {})} />
             ))}
-            {page.next ? <MoreReviews publicId={publicId} next={page.next} labels={labels} locale={locale} /> : null}
+            {page.next ? <MoreReviews publicId={publicId} next={page.next} labels={labels} locale={locale} {...(report ? { report } : {})} /> : null}
           </div>
         </div>
       ) : (
@@ -80,7 +102,12 @@ export function SellerReviews({ rating, page, publicId, sellerName, locale }: { 
           <MessagesSquare className="mt-0.5 size-5 shrink-0 text-foreground-muted" aria-hidden="true" />
           <div className="flex flex-col gap-1">
             <p className="font-medium">{t("emptyTitle")}</p>
-            <p className="text-sm text-pretty text-foreground-muted">{t("emptyBody", { name: isolate(sellerName) })}</p>
+            <p className="text-sm text-pretty text-foreground-muted">
+              {t("emptyBody", { name: isolate(sellerName) })}{" "}
+              <Link href="/legal/avis-utilisateurs#verification" prefetch={false} className="font-medium text-link underline underline-offset-2">
+                {t("rules")}
+              </Link>
+            </p>
           </div>
         </div>
       )}
