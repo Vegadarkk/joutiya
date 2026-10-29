@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { datedRental, type RentalUnit } from "@/config/categories";
+import { getAbuseRules } from "@/lib/config/runtime";
 import { rentalRequestMarker, rentalRequestProblem, type RentalRequestAction, type RentalRequestEvent, type RentalRequestInput, type RentalRequestResponse } from "@/lib/contracts/rental-requests";
 import { getListing, type ListingRecord } from "@/lib/db/repositories/listings";
 import { rentalRequestSchema, type RentalRequestDoc, type RentalRequestEventDoc } from "@/lib/db/schemas";
@@ -10,6 +11,7 @@ import { acceptsContact } from "@/lib/listings/public";
 import { dayNumber, dayString, moroccoToday, type RentalPeriod } from "@/lib/listings/rental-availability";
 import { ConversationAccessError, getParticipantConversation, type ConversationRecord } from "@/lib/messaging/repository";
 import { screenPlace } from "@/lib/messaging/place";
+import type { MessageKeywords } from "@/lib/messaging/risk";
 import { appendSystemStep, type MessagingActor } from "@/lib/messaging/service";
 import { rentalRequestView } from "./views";
 
@@ -41,16 +43,18 @@ export interface RentalStepOptions {
   blocked?: boolean;
   /** request: the listing's unit (a holiday home is rented by nights). */
   unit?: RentalUnit;
+  /** request: the message keywords of config/abuse for the pickup place (default: the committed ones). */
+  keywords?: MessageKeywords;
 }
 
 /** The next state of `current` after `action` by the participant in `role` at `now`; throws when the action does not apply. */
-export function nextRentalStep(current: RentalRequestDoc | undefined, action: RentalRequestAction, role: RentalRole, now: Date, { blocked = false, unit = "day" }: RentalStepOptions = {}): RentalStep {
+export function nextRentalStep(current: RentalRequestDoc | undefined, action: RentalRequestAction, role: RentalRole, now: Date, { blocked = false, unit = "day", keywords }: RentalStepOptions = {}): RentalStep {
   const today = moroccoToday(now);
   if (action.action === "request") {
     if (role !== "buyer") throw new HttpError(403, "forbidden", "only the renter sends a booking request");
     const problem = rentalRequestProblem(action, today, unit);
     if (problem) invalidDates(problem);
-    const pickup = action.pickup ? screenPlace(action.pickup) : undefined;
+    const pickup = action.pickup ? screenPlace(action.pickup, keywords) : undefined;
     const request = rentalRequestSchema.parse({
       id: newRequestId(),
       status: "requested",
@@ -113,12 +117,14 @@ async function participantConversation(cid: string, uid: string): Promise<Conver
 export async function actOnRentalRequest(actor: MessagingActor, cid: string, action: RentalRequestAction, now = new Date(), listing?: ListingRecord): Promise<RentalRequestResponse> {
   let blocked: boolean | null = null;
   let unit: RentalUnit = "day";
+  let keywords: MessageKeywords | undefined;
   if (action.action === "request") {
     if (!listing) {
       const conversation = await participantConversation(cid, actor.uid);
       listing = (await getListing(conversation.listingId)) ?? undefined;
     }
     unit = rentalListingUnit(listing ?? null);
+    if (action.pickup) keywords = (await getAbuseRules()).messaging;
   } else if (action.action === "accept" && action.block) {
     const conversation = await participantConversation(cid, actor.uid);
     const current = conversation.rentalRequest;
@@ -132,7 +138,7 @@ export async function actOnRentalRequest(actor: MessagingActor, cid: string, act
     cid,
     (conversation) => {
       const role = roleOf(conversation, actor.uid);
-      const step = nextRentalStep(conversation.rentalRequest, action, role, now, { blocked: blocked === true, unit });
+      const step = nextRentalStep(conversation.rentalRequest, action, role, now, { blocked: blocked === true, unit, keywords });
       result = { request: step.request, role };
       const rentalRequest: RentalRequestEventDoc = {
         id: step.request.id,

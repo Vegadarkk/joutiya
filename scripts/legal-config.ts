@@ -14,6 +14,7 @@ import { missingLegalMentions, resolveLegalConfig, type LegalConfig } from "../s
 import { validateTargets, type Targets } from "./assert-target.ts";
 import { gcloudAccessToken } from "./google-wif.ts";
 import { requireEnvProxy } from "./env-proxy.ts";
+import { firestoreFields, firestoreValue } from "./firestore-rest.ts";
 
 export interface LegalPlan {
   config: LegalConfig;
@@ -29,20 +30,7 @@ export function planLegal(stored: unknown): LegalPlan {
   return { config, errors, missing: errors.length > 0 ? [] : missingLegalMentions(config) };
 }
 
-/** A JSON value as a Firestore REST value (config/legal holds strings, numbers, booleans, lists, maps). */
-export function firestoreValue(value: unknown): Record<string, unknown> {
-  if (value === null) return { nullValue: null };
-  if (typeof value === "string") return { stringValue: value };
-  if (typeof value === "boolean") return { booleanValue: value };
-  if (typeof value === "number") return Number.isSafeInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
-  if (Array.isArray(value)) return { arrayValue: value.length === 0 ? {} : { values: value.map(firestoreValue) } };
-  if (typeof value === "object") return { mapValue: { fields: firestoreFields(value as Record<string, unknown>) } };
-  throw new Error(`cannot store ${typeof value} in Firestore`);
-}
-
-export function firestoreFields(object: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(object).map(([key, value]) => [key, firestoreValue(value)]));
-}
+export { firestoreFields, firestoreValue };
 
 async function main(): Promise<void> {
   requireEnvProxy();

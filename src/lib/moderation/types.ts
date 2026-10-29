@@ -1,4 +1,5 @@
 import type { AiConfig } from "@/config/ai";
+import type { AbuseRules } from "@/lib/moderation/abuse";
 import type { FieldIssue, ModerationFlag, SensitiveDeclarationKind } from "@/lib/contracts/listings";
 
 // Types of the pre-moderation screen (architecture §7 steps 1-5, design D8). Pure data: the
@@ -53,6 +54,8 @@ export interface ScreenInput {
 
 export interface ScreenContext {
   ai: AiConfig;
+  /** Firestore `config/abuse` compiled (risk thresholds and weights, extra prohibited terms); absent: the committed values. */
+  abuse?: Pick<AbuseRules, "risk" | "prohibited">;
   /** Reserved for time-based rules; the screen is otherwise independent of the clock. */
   now?: Date;
 }

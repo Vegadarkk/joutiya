@@ -1,10 +1,12 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { appointmentMarker, type AppointmentAction, type AppointmentEvent, type AppointmentResponse } from "@/lib/contracts/appointments";
+import { getAbuseRules } from "@/lib/config/runtime";
 import { appointmentSchema, type AppointmentDoc, type AppointmentEventDoc, type StoredSlot } from "@/lib/db/schemas";
 import { HttpError } from "@/lib/http/errors";
 import { appendSystemStep, type MessagingActor } from "@/lib/messaging/service";
 import { screenPlace } from "@/lib/messaging/place";
+import type { MessageKeywords } from "@/lib/messaging/risk";
 import { isActive, nextReminderAt, slotsProblem, sortSlots } from "./rules";
 import { appointmentView } from "./views";
 
@@ -37,13 +39,13 @@ interface Step {
  * The next state of `current` after `action` by `uid` at `now`; throws when the action does not apply.
  * `sellerUid` is the conversation's seller: only the seller cancels because the item is gone (#167).
  */
-export function nextStep(current: AppointmentDoc | undefined, action: AppointmentAction, uid: string, now: Date, sellerUid?: string): Step {
+export function nextStep(current: AppointmentDoc | undefined, action: AppointmentAction, uid: string, now: Date, sellerUid?: string, keywords?: MessageKeywords): Step {
   const at = now.getTime();
   if (action.action === "propose") {
     const slots = sortSlots(action.slots);
     const problem = slotsProblem(action.slots, at);
     if (problem) invalidSlot(...problem);
-    const place = action.place ? screenPlace(action.place) : undefined;
+    const place = action.place ? screenPlace(action.place, keywords) : undefined;
     const rescheduled = current !== undefined && isActive(viewOf(current), at);
     const appointment = appointmentSchema.parse({
       id: newAppointmentId(),
@@ -94,11 +96,12 @@ function viewOf(appointment: AppointmentDoc) {
 /** One appointment step in `cid` by `actor` (the route handler authenticated, limited and gated it). */
 export async function actOnAppointment(actor: MessagingActor, cid: string, action: AppointmentAction, now = new Date()): Promise<AppointmentResponse> {
   let result: AppointmentDoc | undefined;
+  const keywords = action.action === "propose" && action.place ? (await getAbuseRules()).messaging : undefined;
   const messageId = await appendSystemStep(
     actor,
     cid,
     (conversation) => {
-      const step = nextStep(conversation.appointment, action, actor.uid, now, conversation.sellerUid);
+      const step = nextStep(conversation.appointment, action, actor.uid, now, conversation.sellerUid, keywords);
       result = step.appointment;
       const appointment: AppointmentEventDoc = {
         id: step.appointment.id,

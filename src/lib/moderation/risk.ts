@@ -1,3 +1,4 @@
+import { DEFAULT_ABUSE, type AbuseRiskConfig } from "@/config/abuse";
 import { MODERATION_FLAGS, type ModerationFlag } from "@/lib/contracts/listings";
 import type { ScreenState } from "@/lib/moderation/types";
 
@@ -24,6 +25,8 @@ import type { ScreenState } from "@/lib/moderation/types";
 // - promo_check 0: a promotion of more than 70 % (catalogue §4), raised by the promotion service
 //   itself, never by the pre-moderation screen; the listing is held until a moderator checks it.
 // - previous rejections: +10 each, max 30, no flag (history, not content).
+// Live values: Firestore `config/abuse` `risk` (src/config/abuse.ts) overrides the thresholds, the
+// weights and the rejection terms through `riskRules`; the committed values here are the defaults.
 
 export interface RiskWeight {
   weight: number;
@@ -49,8 +52,8 @@ export const RISK_WEIGHTS: Readonly<Record<ModerationFlag, RiskWeight>> = {
   promo_check: { weight: 0, reason: "promotion cutting more than 70 % off the struck-out price, human check of the starting price required" },
 };
 
-export const PREVIOUS_REJECTION_WEIGHT = 10;
-export const PREVIOUS_REJECTION_CAP = 30;
+export const PREVIOUS_REJECTION_WEIGHT = DEFAULT_ABUSE.risk.previousRejectionWeight;
+export const PREVIOUS_REJECTION_CAP = DEFAULT_ABUSE.risk.previousRejectionCap;
 
 /** Flags that send the listing to review whatever the score (step 2 soft hits, step 3 legal review, step 5 nudity). */
 export const ALWAYS_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["prohibited_kw", "prohibited_soft", "sensitive_text", "third_party_phone", "nsfw_review", "restricted_category", "face", "credit_ad", "sanitary_check", "rental_review", "promo_check"]);
@@ -59,9 +62,25 @@ export const ALWAYS_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<Moderati
 export const HUMAN_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["restricted_category", "face", "sanitary_check", "promo_check"]);
 
 /** `accountAgeDays` below which `new_account` is raised (lot decision; architecture §7 cites 7 days for the AI agent context). */
-export const NEW_ACCOUNT_DAYS = 1;
+export const NEW_ACCOUNT_DAYS = DEFAULT_ABUSE.risk.newAccountDays;
 /** `listingsLast24h` from which `volume` is raised. */
-export const VOLUME_PER_DAY = 3;
+export const VOLUME_PER_DAY = DEFAULT_ABUSE.risk.volumePerDay;
+
+/** Effective risk settings: the committed weights and thresholds under the `config/abuse` overrides. */
+export interface RiskRules {
+  weights: Readonly<Record<ModerationFlag, number>>;
+  previousRejectionWeight: number;
+  previousRejectionCap: number;
+  newAccountDays: number;
+  volumePerDay: number;
+}
+
+export function riskRules(risk: AbuseRiskConfig = DEFAULT_ABUSE.risk): RiskRules {
+  const weights = Object.fromEntries(MODERATION_FLAGS.map((flag) => [flag, risk.weights[flag] ?? RISK_WEIGHTS[flag].weight])) as Record<ModerationFlag, number>;
+  return { weights, previousRejectionWeight: risk.previousRejectionWeight, previousRejectionCap: risk.previousRejectionCap, newAccountDays: risk.newAccountDays, volumePerDay: risk.volumePerDay };
+}
+
+export const DEFAULT_RISK_RULES: RiskRules = riskRules();
 
 export interface RiskTerm {
   reason: string;
@@ -75,17 +94,16 @@ export interface RiskScore {
 }
 
 /** Weighted sum of the flags and the rejection history, capped at 100. Deterministic for a given input. */
-export function riskScore(flags: Iterable<ModerationFlag>, history: { previousRejections?: number } = {}): RiskScore {
+export function riskScore(flags: Iterable<ModerationFlag>, history: { previousRejections?: number } = {}, rules: RiskRules = DEFAULT_RISK_RULES): RiskScore {
   const unique = new Set(flags);
   const terms: RiskTerm[] = [];
   for (const flag of MODERATION_FLAGS) {
     if (!unique.has(flag)) continue;
-    const { weight, reason } = RISK_WEIGHTS[flag];
-    terms.push({ reason, points: weight });
+    terms.push({ reason: RISK_WEIGHTS[flag].reason, points: rules.weights[flag] });
   }
   const rejections = Math.max(0, Math.floor(history.previousRejections ?? 0));
   if (rejections > 0) {
-    terms.push({ reason: `${rejections} previous rejection(s)`, points: Math.min(PREVIOUS_REJECTION_CAP, rejections * PREVIOUS_REJECTION_WEIGHT) });
+    terms.push({ reason: `${rejections} previous rejection(s)`, points: Math.min(rules.previousRejectionCap, rejections * rules.previousRejectionWeight) });
   }
   const total = terms.reduce((sum, term) => sum + term.points, 0);
   return { score: Math.min(100, total), terms };

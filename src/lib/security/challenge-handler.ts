@@ -1,11 +1,10 @@
 import "server-only";
 import { NextResponse } from "next/server";
-import { RATE_LIMITS } from "@/config/rate-limits";
 import { challengePassSchema } from "@/lib/contracts/search";
 import { serverEnv } from "@/lib/env";
 import { HttpError, rateLimited } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
-import { consumeLimit, limitState } from "@/lib/rate-limit/limiter";
+import { consumeLimit, limitState, rateLimitDefinition } from "@/lib/rate-limit/limiter";
 import { requestIdentity, type RequestIdentity } from "@/lib/rate-limit/keys";
 import { challengePassCookie } from "./challenge-pass";
 import { setDeviceCookie } from "./cookies";
@@ -27,17 +26,22 @@ import { verifyTurnstile } from "./turnstile";
 
 /** Throws 429 when this client spent its failed checks (none spent: always checked). */
 export async function assertChallengeBudget(identity: RequestIdentity): Promise<void> {
-  const [device, ip, hard, network] = await Promise.all([
+  const [device, ip, hard, network, deviceLimit, ipLimit, hardLimit, networkLimit] = await Promise.all([
     limitState("challenge.device", identity.deviceKey),
     limitState("challenge.ip", identity.ipBucket),
     limitState("challenge.ip.hard", identity.ipBucket),
     identity.ip48 ? limitState("challenge.ip48.hard", identity.ip48) : null,
+    // Ceilings as applied (config/abuse overrides included).
+    rateLimitDefinition("challenge.device"),
+    rateLimitDefinition("challenge.ip"),
+    rateLimitDefinition("challenge.ip.hard"),
+    rateLimitDefinition("challenge.ip48.hard"),
   ]);
-  if (hard && hard.consumedPoints >= RATE_LIMITS["challenge.ip.hard"].points) throw rateLimited(hard.msBeforeNext / 1000);
-  if (network && network.consumedPoints >= RATE_LIMITS["challenge.ip48.hard"].points) throw rateLimited(network.msBeforeNext / 1000);
+  if (hard && hard.consumedPoints >= hardLimit.points) throw rateLimited(hard.msBeforeNext / 1000);
+  if (network && network.consumedPoints >= networkLimit.points) throw rateLimited(network.msBeforeNext / 1000);
   if (!device) return;
-  if (device.consumedPoints >= RATE_LIMITS["challenge.device"].points) throw rateLimited(device.msBeforeNext / 1000);
-  if (device.consumedPoints > 0 && ip && ip.consumedPoints >= RATE_LIMITS["challenge.ip"].points) throw rateLimited(ip.msBeforeNext / 1000);
+  if (device.consumedPoints >= deviceLimit.points) throw rateLimited(device.msBeforeNext / 1000);
+  if (device.consumedPoints > 0 && ip && ip.consumedPoints >= ipLimit.points) throw rateLimited(ip.msBeforeNext / 1000);
 }
 
 /** Counts a refused token. siteverify unreachable or failing is not the client's failure. */

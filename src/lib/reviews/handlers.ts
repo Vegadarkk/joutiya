@@ -1,6 +1,7 @@
 import "server-only";
 import { REVIEWS_PAGE } from "@/config/reviews";
 import { requireUser } from "@/lib/auth/guards";
+import { getAbuseRules } from "@/lib/config/runtime";
 import { publicIdSchema } from "@/lib/db/schemas";
 import { reviewIdSchema, reviewInputSchema, reviewReplySchema } from "@/lib/contracts/review-schemas";
 import type { MyReviews, MyReviewView, ReviewCreated } from "@/lib/contracts/reviews";
@@ -88,8 +89,8 @@ async function reviewIdOf(params: Params): Promise<string> {
 }
 
 /** The text screen of a review or a reply: contact details and hard prohibited words refused. */
-function screened(text: string, field: "text"): { sensitive: boolean } {
-  const screen = screenFreeText(text);
+async function screened(text: string, field: "text"): Promise<{ sensitive: boolean }> {
+  const screen = screenFreeText(text, (await getAbuseRules()).prohibited);
   const issue = screen.blockers[0];
   if (issue) throw new HttpError(422, "invalid_text", "review text refused by the screen", { details: { field, issue } });
   return { sensitive: screen.sensitive };
@@ -102,7 +103,7 @@ export async function handleCreateReview(request: Request): Promise<Response> {
   await enforceLimit("review.create.uid", user.uid);
   await assertQuotas(REVIEW_QUOTAS);
   // Sensitive data (Russmedia): held for a moderator instead of refused.
-  const { sensitive } = screened(input.text, "text");
+  const { sensitive } = await screened(input.text, "text");
   const review = await createReview({ cid: input.cid, authorUid: user.uid, rating: input.rating, text: input.text, status: sensitive ? "pending" : "published", now: new Date() }).catch(reviewErrorToHttp);
   if (review.status === "published") {
     revalidateListingPaths({ publicId: review.targetPublicId });
@@ -131,7 +132,7 @@ export async function handleReplyReview(request: Request, params: Params): Promi
   const input = await readJson(request, reviewReplySchema);
   await enforceLimit("review.mutation.uid", user.uid);
   await assertQuotas(REVIEW_QUOTAS);
-  if (screened(input.text, "text").sensitive) throw new HttpError(422, "invalid_text", "reply holds sensitive data", { details: { field: "text", issue: "sensitive" } });
+  if ((await screened(input.text, "text")).sensitive) throw new HttpError(422, "invalid_text", "reply holds sensitive data", { details: { field: "text", issue: "sensitive" } });
   const review = await replyToReview(id, user.uid, input.text, new Date()).catch(reviewErrorToHttp);
   revalidateListingPaths({ publicId: review.targetPublicId });
   return json(reviewView(review));
