@@ -847,6 +847,7 @@
       "criterion_max": "القيمة القصوى هي {max}.",
       "criterion_integer": "أدخل عددًا صحيحًا.",
       "criterion_text_max": "لا يمكن أن يتجاوز هذا الحقل {max} حرفًا.",
+      "criterion_format_onssa": "الصيغة المطلوبة: حروف ثم الإقليم والرقم والسنة مفصولة بنقط، مثلا ⁦M.07.113.20⁩.",
       "condition_required": "حدّد الحالة.",
       "title_min": "يجب أن يتكوّن العنوان من {min} أحرف على الأقل.",
       "title_max": "لا يمكن أن يتجاوز العنوان {max} حرفًا.",
@@ -962,7 +963,20 @@
         "tenues-traditionnelles": "ملابس تقليدية",
         "chaussures": "أحذية",
         "sacs-accessoires": "حقائب وإكسسوارات",
-        "montres-bijoux": "ساعات ومجوهرات"
+        "montres-bijoux": "ساعات ومجوهرات",
+        "beaute-soins": "تجميل وعناية"
+      }
+    },
+    "terroir": {
+      "name": "منتجات مجالية",
+      "sub": {
+        "huile-olive": "زيت الزيتون",
+        "huile-argan-alimentaire": "زيت أركان غذائي",
+        "miel": "عسل",
+        "amlou-pates-a-tartiner": "أملو ومعاجين الدهن",
+        "dattes-fruits-secs": "تمور وفواكه جافة",
+        "epices-herbes": "توابل وأعشاب",
+        "autres-produits-terroir": "منتجات مجالية أخرى"
       }
     },
     "famille": {
@@ -2269,6 +2283,85 @@
     },
     "delivery-year": {
       "label": "التسليم المتوقع (السنة)"
+    },
+    "beauty-product-type": {
+      "label": "نوع المنتج",
+      "options": {
+        "huile-argan": "زيت أركان تجميلي",
+        "savon-noir": "صابون بلدي",
+        "ghassoul": "غاسول",
+        "eau-de-rose": "ماء الورد",
+        "henne": "حناء",
+        "parfum": "عطر",
+        "maquillage": "مكياج",
+        "soin-visage-corps": "عناية بالوجه والجسم",
+        "soin-cheveux": "عناية بالشعر",
+        "autre": "أخرى"
+      }
+    },
+    "onssa-number": {
+      "label": "رقم الاعتماد أو الترخيص الصحي (ONSSA)"
+    },
+    "olive-oil-grade": {
+      "label": "الصنف",
+      "options": {
+        "vierge-extra": "بكر ممتاز",
+        "vierge": "بكر",
+        "vierge-courante": "بكر عادي"
+      }
+    },
+    "honey-type": {
+      "label": "نوع العسل",
+      "options": {
+        "euphorbe": "الدغموس",
+        "thym": "الزعتر",
+        "jujubier": "السدر",
+        "oranger": "زهر الليمون",
+        "eucalyptus": "الكاليبتوس",
+        "romarin": "إكليل الجبل",
+        "lavande": "الخزامى",
+        "caroube": "الخروب",
+        "toutes-fleurs": "متعدد الأزهار",
+        "autre": "أخرى"
+      }
+    },
+    "date-variety": {
+      "label": "الصنف",
+      "options": {
+        "mejhoul": "المجهول",
+        "boufeggous": "بوفقوس",
+        "jihel": "الجيهل",
+        "aziza": "عزيزة",
+        "bouskri": "بوسكري",
+        "najda": "النجدة",
+        "autre": "أخرى"
+      }
+    },
+    "spice-type": {
+      "label": "التابل",
+      "options": {
+        "safran": "زعفران",
+        "ras-el-hanout": "رأس الحانوت",
+        "cumin": "كمون",
+        "paprika": "فلفل أحمر مطحون",
+        "gingembre": "سكينجبير",
+        "curcuma": "خرقوم",
+        "poivre": "إبزار",
+        "cannelle": "قرفة",
+        "herbes-aromatiques": "أعشاب عطرية",
+        "autre": "أخرى"
+      }
+    },
+    "terroir-type": {
+      "label": "نوع المنتج",
+      "options": {
+        "couscous-pates": "كسكس وعجائن",
+        "olives": "زيتون",
+        "conserves-confitures": "مصبرات ومربيات",
+        "the-infusions": "شاي ومنقوعات",
+        "farines-semoules": "دقيق وسميد",
+        "autre": "أخرى"
+      }
     },
     "rental-class": {
       "label": "فئة السيارة",

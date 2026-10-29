@@ -9,7 +9,7 @@ import type { SearchParams } from "@/lib/search/params";
 import { SearchUnavailableError, type SearchCard } from "@/lib/search/types";
 
 // The home page module (lot L3b, D21): ISR every 5 minutes, search panel with the location
-// combobox, the eleven category tiles, À la Une (8) and the 12 newest listings; an engine failure
+// combobox, the twelve category tiles, À la Une (8) and the 12 newest listings; an engine failure
 // leaves the listing sections out and the page still renders. French and Arabic.
 
 const mocks = vi.hoisted(() => ({
@@ -101,7 +101,7 @@ describe("home page", () => {
     expect(html).toContain('role="combobox"');
     expect(html).toContain('name="q"');
     expect(html).toContain('data-testid="home-categories"');
-    expect(CATEGORIES).toHaveLength(11);
+    expect(CATEGORIES).toHaveLength(12);
     for (const category of CATEGORIES) expect(html).toContain(`href="/fr/c/${category.id}"`);
     expect(html).toContain(fr.Home.categories.title);
     expect(html).toContain('data-testid="home-featured"');

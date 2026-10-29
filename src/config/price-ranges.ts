@@ -48,6 +48,15 @@ export const PRICE_RANGES: Readonly<Record<string, PriceRange>> = {
   chaussures: { min: 30, max: 15_000 },
   "sacs-accessoires": { min: 20, max: 50_000 },
   "montres-bijoux": { min: 50, max: 500_000 },
+  "beaute-soins": { min: 10, max: 10_000 },
+  // terroir (retail jar to a producer's bulk lot)
+  "huile-olive": { min: 30, max: 100_000 },
+  "huile-argan-alimentaire": { min: 50, max: 100_000 },
+  miel: { min: 30, max: 100_000 },
+  "amlou-pates-a-tartiner": { min: 20, max: 30_000 },
+  "dattes-fruits-secs": { min: 20, max: 100_000 },
+  "epices-herbes": { min: 10, max: 50_000 },
+  "autres-produits-terroir": { min: 10, max: 50_000 },
   // famille
   "equipement-bebe": { min: 20, max: 15_000 },
   "vetements-enfant": { min: 10, max: 3_000 },

@@ -2,7 +2,7 @@ import "server-only";
 import { FieldPath, FieldValue, Timestamp, type DocumentSnapshot, type Transaction } from "firebase-admin/firestore";
 import { db } from "@/lib/firebase/admin";
 import { consume } from "@/lib/quota";
-import { proProfileSchema, type ProProfileDoc } from "@/lib/pro/profile-schema";
+import { SANITARY_NUMBERS_MAX, proProfileSchema, type ProProfileDoc } from "@/lib/pro/profile-schema";
 import { COLLECTIONS } from "../schemas";
 import { datesToTimestamps, timestampsToDates } from "./timestamps";
 
@@ -93,6 +93,17 @@ export async function listPassProfiles(after: string | null, limit: number): Pro
 /** Date of the last notice mailed before the end of the shop's pass. */
 export async function markPassNotice(proId: string, now: Date): Promise<void> {
   await proProfileRef(proId).update({ passNoticeSentAt: Timestamp.fromDate(now) });
+  void consume("firestore.writes", 1);
+}
+
+/**
+ * Adds an ONSSA number a moderator just checked to the shop (read with `getProProfile(…, tx)`
+ * before any write of the transaction). No-op when it is known already or the list is full.
+ */
+export function recordSanitaryNumberTx(tx: Transaction, profile: ProProfileRecord, number: string, now: Date): void {
+  const known = profile.sanitaryNumbers ?? [];
+  if (known.includes(number) || known.length >= SANITARY_NUMBERS_MAX) return;
+  tx.update(proProfileRef(profile.proId), { sanitaryNumbers: [...known, number], updatedAt: Timestamp.fromDate(now) });
   void consume("firestore.writes", 1);
 }
 

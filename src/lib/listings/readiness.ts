@@ -23,6 +23,7 @@ export const READINESS_CODES = [
   "criterion_pro_only",
   "criterion_required",
   "criterion_invalid",
+  "criterion_format_onssa",
   "condition_required",
   "price_required",
   "price_invalid",
@@ -93,7 +94,9 @@ function attributeIssues(attributes: Candidate["attributes"], subcategory: Subca
     const value = attributes[key];
     const required = subcategory.criteria.find((criterion) => criterion.id === key)?.required === true;
     const missing = value === undefined || (required && typeof value === "string" && value.trim() === "");
-    const code: ReadinessCode = missing ? "criterion_required" : "criterion_invalid";
+    // A checked text (ONSSA number) carries its own code in the refinement's message.
+    const format = problem.code === "custom" && problem.message === "criterion_format_onssa" ? problem.message : undefined;
+    const code: ReadinessCode = missing ? "criterion_required" : (format ?? "criterion_invalid");
     if (!seen.has(path) || code === "criterion_required") seen.set(path, code);
   }
   return [...seen].map(([path, code]) => issue(path, code));

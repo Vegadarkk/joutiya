@@ -289,7 +289,7 @@ test.describe("category landing pages", () => {
 test.describe("home and crawler files", () => {
   test("shows the category grid and the recent listings", async ({ page }) => {
     await page.goto("/fr");
-    await expect(page.getByTestId("home-categories").getByRole("link")).toHaveCount(11);
+    await expect(page.getByTestId("home-categories").getByRole("link")).toHaveCount(12);
     await expect(page.getByTestId("home-categories").getByRole("link").first()).toHaveAttribute("href", /\/fr\/c\//);
   });
 

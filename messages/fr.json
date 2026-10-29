@@ -857,6 +857,7 @@
       "criterion_max": "La valeur maximale est {max}.",
       "criterion_integer": "Entrez un nombre entier.",
       "criterion_text_max": "Ce champ ne peut pas dépasser {max} caractères.",
+      "criterion_format_onssa": "Format attendu : lettres, province, numéro et année séparés par des points, par exemple M.07.113.20.",
       "condition_required": "Indiquez l'état.",
       "title_min": "Le titre doit faire au moins {min} caractères.",
       "title_max": "Le titre ne peut pas dépasser {max} caractères.",
@@ -972,7 +973,20 @@
         "tenues-traditionnelles": "Tenues traditionnelles",
         "chaussures": "Chaussures",
         "sacs-accessoires": "Sacs & accessoires",
-        "montres-bijoux": "Montres & bijoux"
+        "montres-bijoux": "Montres & bijoux",
+        "beaute-soins": "Beauté et soins"
+      }
+    },
+    "terroir": {
+      "name": "Produits du terroir",
+      "sub": {
+        "huile-olive": "Huile d'olive",
+        "huile-argan-alimentaire": "Huile d'argan alimentaire",
+        "miel": "Miel",
+        "amlou-pates-a-tartiner": "Amlou et pâtes à tartiner",
+        "dattes-fruits-secs": "Dattes et fruits secs",
+        "epices-herbes": "Épices et herbes",
+        "autres-produits-terroir": "Autres produits du terroir"
       }
     },
     "famille": {
@@ -2279,6 +2293,85 @@
     },
     "delivery-year": {
       "label": "Livraison prévue (année)"
+    },
+    "beauty-product-type": {
+      "label": "Type de produit",
+      "options": {
+        "huile-argan": "Huile d'argan cosmétique",
+        "savon-noir": "Savon noir",
+        "ghassoul": "Ghassoul",
+        "eau-de-rose": "Eau de rose",
+        "henne": "Henné",
+        "parfum": "Parfum",
+        "maquillage": "Maquillage",
+        "soin-visage-corps": "Soin du visage et du corps",
+        "soin-cheveux": "Soin des cheveux",
+        "autre": "Autre"
+      }
+    },
+    "onssa-number": {
+      "label": "N° d'agrément ou d'autorisation ONSSA"
+    },
+    "olive-oil-grade": {
+      "label": "Catégorie",
+      "options": {
+        "vierge-extra": "Vierge extra",
+        "vierge": "Vierge",
+        "vierge-courante": "Vierge courante"
+      }
+    },
+    "honey-type": {
+      "label": "Variété de miel",
+      "options": {
+        "euphorbe": "Euphorbe (daghmous)",
+        "thym": "Thym (zaatar)",
+        "jujubier": "Jujubier (sedra)",
+        "oranger": "Fleur d'oranger",
+        "eucalyptus": "Eucalyptus",
+        "romarin": "Romarin",
+        "lavande": "Lavande",
+        "caroube": "Caroubier",
+        "toutes-fleurs": "Toutes fleurs",
+        "autre": "Autre"
+      }
+    },
+    "date-variety": {
+      "label": "Variété",
+      "options": {
+        "mejhoul": "Mejhoul",
+        "boufeggous": "Boufeggous",
+        "jihel": "Jihel",
+        "aziza": "Aziza",
+        "bouskri": "Bouskri",
+        "najda": "Najda",
+        "autre": "Autre"
+      }
+    },
+    "spice-type": {
+      "label": "Épice",
+      "options": {
+        "safran": "Safran",
+        "ras-el-hanout": "Ras el hanout",
+        "cumin": "Cumin",
+        "paprika": "Paprika",
+        "gingembre": "Gingembre",
+        "curcuma": "Curcuma",
+        "poivre": "Poivre",
+        "cannelle": "Cannelle",
+        "herbes-aromatiques": "Herbes aromatiques",
+        "autre": "Autre"
+      }
+    },
+    "terroir-type": {
+      "label": "Type de produit",
+      "options": {
+        "couscous-pates": "Couscous et pâtes",
+        "olives": "Olives",
+        "conserves-confitures": "Conserves et confitures",
+        "the-infusions": "Thé et infusions",
+        "farines-semoules": "Farines et semoules",
+        "autre": "Autre"
+      }
     },
     "rental-class": {
       "label": "Catégorie de véhicule",

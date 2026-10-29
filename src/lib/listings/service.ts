@@ -87,6 +87,8 @@ export interface SellerContext {
   user: UserRecord;
   seller: Seller;
   quotas: ListingQuotas;
+  /** ONSSA numbers a moderator already checked for the shop (Produits du terroir); none for an individual. */
+  sanitaryNumbers?: readonly string[];
   /** A car rental agency's licence reference (rental pack decision 3), when its settings hold one. */
   rentalAgrementRef?: string;
 }
@@ -102,8 +104,10 @@ export async function sellerOf(auth: AuthContext): Promise<SellerContext> {
   const profile = proId ? await getProProfile(proId) : null;
   const plan = profile && profile.ownerUid === user.uid && publishesAsPro(profile.lifecycle) ? profile.plan : "none";
   const seller: Seller = { type: "pro", plan };
-  const agrementRef = profile && profile.ownerUid === user.uid ? profile.rental?.agrementRef : undefined;
-  return { user, seller, quotas: listingQuotas(seller, pricing), ...(agrementRef ? { rentalAgrementRef: agrementRef } : {}) };
+  const own = profile && profile.ownerUid === user.uid ? profile : null;
+  const sanitaryNumbers = own ? (own.sanitaryNumbers ?? []) : [];
+  const agrementRef = own?.rental?.agrementRef;
+  return { user, seller, quotas: listingQuotas(seller, pricing), sanitaryNumbers, ...(agrementRef ? { rentalAgrementRef: agrementRef } : {}) };
 }
 
 async function lifetime(): Promise<Lifetime> {
@@ -308,6 +312,7 @@ async function screenFor(listing: ListingDoc & { id: string }, seller: SellerCon
     phoneVerified: seller.user.badges.phoneVerified,
     others: others.filter((other) => other.id !== listing.id),
     selfRejected: rejectedByModerator(listing),
+    sanitaryNumbers: seller.sanitaryNumbers,
     now,
   });
   return screen({ listing, uploads, seller: facts, others: others.filter((other) => other.status !== "rejected") }, listing.id);

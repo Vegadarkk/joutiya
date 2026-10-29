@@ -1,4 +1,5 @@
 import { z } from "@/lib/zod";
+import { CRITERION_FORMATS } from "@/config/categories";
 import { PRO_PLANS, listingQuotasSchema } from "@/config/pricing";
 import { AIRPORT_IDS } from "@/config/airports";
 import { PAYMENT_URL_MAX } from "@/config/seller-payments";
@@ -17,6 +18,8 @@ export const proIdSchema = z.string().regex(PRO_ID_PATTERN);
 export const PRO_NAME_MAX = 80;
 export const PRO_DESCRIPTION_MAX = 2000;
 export const PRO_SLUG_MAX = 60;
+/** ONSSA numbers kept per shop once checked: a producer rarely holds more than a few. */
+export const SANITARY_NUMBERS_MAX = 50;
 
 /**
  * Business sector (Agence pack design §3): "real_estate" makes the storefront an agency's,
@@ -199,6 +202,11 @@ export const proProfileSchema = z
     passNoticeSentAt: ts.optional(),
     /** « Payer chez le vendeur » (design phase-7/boutique-temporaire.md §2); absent until the owner sets it. */
     sellerPayment: sellerPaymentSchema.optional(),
+    /**
+     * ONSSA numbers a moderator checked on an approved listing of the shop (Produits du terroir):
+     * a later listing with one of them is not held for that reason again.
+     */
+    sanitaryNumbers: z.array(z.string().regex(CRITERION_FORMATS.onssa)).max(SANITARY_NUMBERS_MAX).optional(),
     /** Derived from config/pricing for `plan`. */
     quotas: listingQuotasSchema,
     /**

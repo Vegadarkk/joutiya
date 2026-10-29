@@ -1,6 +1,6 @@
 "use client";
 
-import { Baby, Building2, Car, Check, ChevronRight, Dumbbell, Handshake, Package, PawPrint, Shirt, Smartphone, Sofa, Wrench, type LucideIcon } from "lucide-react";
+import { Baby, Building2, Car, Check, ChevronRight, Dumbbell, Handshake, Package, PawPrint, Shirt, Smartphone, Sofa, Wheat, Wrench, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   electronique: Smartphone,
   "maison-jardin": Sofa,
   mode: Shirt,
+  terroir: Wheat,
   famille: Baby,
   loisirs: Dumbbell,
   animaux: PawPrint,
@@ -32,7 +33,7 @@ interface CategoryPickerProps {
   isPro?: boolean;
 }
 
-/** Step 1: the eleven categories as a grid of tiles, then the subcategories of the chosen one. */
+/** Step 1: the twelve categories as a grid of tiles, then the subcategories of the chosen one. */
 export function CategoryPicker({ categoryId, subcategoryId, onCategory, onSubcategory, isPro = false }: CategoryPickerProps) {
   const t = useTranslations("Listing.category");
   const names = useCategoryLabels();

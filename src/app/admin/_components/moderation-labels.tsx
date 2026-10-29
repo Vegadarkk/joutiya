@@ -160,6 +160,9 @@ export function evidenceLabel(line: string, labels: Pick<CatalogLabels, "categor
   }
   if ((match = /^(\d+) listings in 24h$/.exec(line))) return `${plural(Number(match[1]), "annonce", "annonces")} en 24 h`;
   if ((match = /^(\d+) previous rejection\(s\)$/.exec(line))) return `${plural(Number(match[1]), "refus antérieur", "refus antérieurs")}`;
+  if ((match = /^ONSSA number (\S+) not yet checked for this shop$/.exec(line))) {
+    return `N° ONSSA ${match[1]} encore jamais vérifié pour cette boutique : cherchez-le dans les listes de l'ONSSA (onssa.gov.ma, établissements agréés ou autorisés). Absent des listes, demandez le justificatif au Pro avant de refuser, les listes ont du retard.`;
+  }
   if ((match = /^declaration (\w+)$/.exec(line))) return `Déclaration du vendeur : ${DECLARATION_LABEL[match[1]!] ?? match[1]}`;
   return line;
 }

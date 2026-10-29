@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { InlineError } from "@/components/feedback/inline-error";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { CONDITIONS, CRITERION_GROUPS, CRITERION_TEXT_MAX, criteriaFor, criterionApplies, type Condition, type Criterion, type CriterionGroup, type Subcategory } from "@/config/categories";
+import { CONDITIONS, CRITERION_GROUPS, CRITERION_TEXT_MAX, criteriaFor, criterionApplies, type Condition, type Criterion, type CriterionFormat, type CriterionGroup, type Subcategory } from "@/config/categories";
 import type { ListingAttributes } from "@/lib/contracts/listings";
 import { cn } from "@/lib/utils";
 import { ChipCheckboxGroup, ChipRadioGroup } from "./controls/chips";
@@ -23,6 +23,9 @@ import { useCriteriaLabels } from "./labels";
 // warranty's duration) once the criterion they depend on opens them.
 
 export type AttributeValue = ListingAttributes[string];
+
+/** Placeholder of a checked text field: one real-shaped value. */
+const FORMAT_EXAMPLES: Record<CriterionFormat, string> = { onssa: "M.07.113.20" };
 
 interface CriteriaFieldsProps {
   subcategory: Subcategory;
@@ -208,7 +211,12 @@ function CriterionField({ criterion, value, error, label, optionLabel, unit, opt
     case "text":
       return (
         <Field label={label} hint={required ? undefined : optionalLabel} error={error} required={required}>
-          <Input type="text" value={typeof value === "string" ? value : ""} maxLength={CRITERION_TEXT_MAX} autoComplete="off" onChange={(event) => onChange(event.target.value || undefined)} />
+          {criterion.format ? (
+            // A registry number (ONSSA): Latin letters and digits, typed upper case, read left to right.
+            <Input type="text" dir="ltr" value={typeof value === "string" ? value : ""} maxLength={CRITERION_TEXT_MAX} autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder={FORMAT_EXAMPLES[criterion.format]} onChange={(event) => onChange(event.target.value.toUpperCase() || undefined)} />
+          ) : (
+            <Input type="text" value={typeof value === "string" ? value : ""} maxLength={CRITERION_TEXT_MAX} autoComplete="off" onChange={(event) => onChange(event.target.value || undefined)} />
+          )}
         </Field>
       );
   }
