@@ -14,8 +14,11 @@ const BOTTOM_BAR_PATHS = ["/annonce", "/pro"];
 /** The search page (lot 2): its own filters and category shortcuts sit beside the results. */
 const SEARCH_PATHS = ["/recherche"];
 
+/** The home page (lot 3): the twelve categories are in its own panel (map) or arcade (list). */
+const HOME_PATH = "/";
+
 export function showsCategoryRow(pathname: string): boolean {
-  return !under(pathname, FOCUSED_PATHS) && !under(pathname, SEARCH_PATHS);
+  return pathname !== HOME_PATH && !under(pathname, FOCUSED_PATHS) && !under(pathname, SEARCH_PATHS);
 }
 
 export function showsSellButton(pathname: string): boolean {

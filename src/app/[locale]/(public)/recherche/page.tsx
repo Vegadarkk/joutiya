@@ -12,6 +12,7 @@ import { FeaturedRow, withoutFeatured } from "@/components/search/featured-row";
 import { FiltersSheet } from "@/components/search/filters-sheet";
 import { DetailPanel } from "@/components/search/map/detail-panel";
 import { HeaderSearchBridge, PanelHandle, RowsArea, SheetHandle, ViewToggle } from "@/components/search/map/map-controls";
+import { mapListingLabels } from "@/components/search/map/map-labels";
 import { buildMapListings, type MapListing } from "@/components/search/map/map-listings";
 import { MapFailedNotice, MapStage } from "@/components/search/map/map-stage";
 import { PanelLegal } from "@/components/search/map/panel-legal";
@@ -31,10 +32,9 @@ import { availablePromos, type HousePromo } from "@/config/house-promos";
 import type { Locale } from "@/config/site";
 import { PUBLIC_CLIENT_NAMESPACES, SEARCH_PAGE_CLIENT_NAMESPACES, pickMessages } from "@/i18n/client-messages";
 import { numbersLocale, pageLocale } from "@/i18n/params";
-import { MAP_ATTRIBUTION } from "@/lib/config/public";
+import { searchMapConfig } from "@/lib/config/public";
 import type { PublicMapConfig } from "@/lib/config/public-types";
 import { getFlags } from "@/lib/config/runtime";
-import { serverEnv } from "@/lib/env";
 import { getLegalConfig } from "@/lib/legal/config";
 import { parseSearchParams, SEARCH_MAX_TOTAL_HITS, SEARCH_PATH, searchPath } from "@/lib/search/params";
 import type { SearchCard, SearchResponse } from "@/lib/search/types";
@@ -76,12 +76,6 @@ function resultsAdsEligible(response: SearchResponse, organic: readonly SearchCa
   return response.hits.every((card) => subcategoryAllowsAds(card.subcategoryId ?? undefined));
 }
 
-/** The runtime basemap (dynamic page: read per request, never baked into the build). */
-function mapConfig(): PublicMapConfig | null {
-  const url = serverEnv().MAP_PMTILES_URL;
-  return url ? { pmtilesUrl: url, attribution: MAP_ATTRIBUTION } : null;
-}
-
 interface ResultsProps {
   response: SearchResponse;
   locale: Locale;
@@ -95,38 +89,23 @@ interface ResultsProps {
 
 /** Loaded by the page: Results stays a synchronous component (rendered alone in the unit tests). */
 async function resultsTranslators(locale: Locale) {
-  const [t, own, card, units] = await Promise.all([
+  const [t, own, labels] = await Promise.all([
     getTranslations({ locale, namespace: "SearchPage" }),
     getTranslations({ locale, namespace: "SearchMap" }),
-    getTranslations({ locale: numbersLocale(locale), namespace: "ListingCard" }),
-    getTranslations({ locale, namespace: "SearchMap.pin.per" }),
+    mapListingLabels(locale),
   ]);
-  return { t, own, card, units };
+  return { t, own, labels };
 }
 type ResultsTranslators = Awaited<ReturnType<typeof resultsTranslators>>;
 
 function Results({ response, locale, title, count, promos, map, publisher, translators }: ResultsProps) {
-  const { t, own, card, units } = translators;
+  const { t, own, labels } = translators;
   const { params, hits, featured } = response;
   const organic = withoutFeatured(hits, featured);
   const adsEligible = resultsAdsEligible(response, organic);
   const seed = `${searchPath(params)}:${response.page}`;
   const serverView = map ? "map" : "list";
-  const listings = buildMapListings({
-    featured,
-    hits: organic,
-    locale,
-    media: mediaBaseUrl(),
-    now: new Date(),
-    labels: {
-      donation: card("donation"),
-      toDiscuss: card("toDiscuss"),
-      today: own("today"),
-      per: (unit) => card(`per.${unit}`),
-      pinPer: (unit) => units(unit),
-      fact: (id, value) => (card.has(`facts.${id as "surface"}`) ? card(`facts.${id as "surface"}`, { count: value }) : null),
-    },
-  });
+  const listings = buildMapListings({ featured, hits: organic, locale, media: mediaBaseUrl(), now: new Date(), labels });
   const cards = new Map([...hits, ...featured].map((each) => [each.id, each]));
   const featuredRows = listings.filter((listing) => listing.featured);
   const organicRows = listings.filter((listing) => !listing.featured);
@@ -264,7 +243,7 @@ export default async function SearchPage({ params, searchParams }: Props) {
             title={title}
             count={total >= SEARCH_MAX_TOTAL_HITS ? t("countAtLeast", { count: SEARCH_MAX_TOTAL_HITS }) : t("count", { count: total })}
             promos={promos}
-            map={mapConfig()}
+            map={searchMapConfig()}
             publisher={legal.companyName}
             translators={translators}
           />

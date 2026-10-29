@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { publicConfig } from "@/lib/config/public";
+import { publicConfig, searchMapConfig } from "@/lib/config/public";
 import { parseEnv, resetServerEnv } from "@/lib/env";
 
 // The /api/config payload (§2: runtime configuration, no NEXT_PUBLIC_*): public values only.
@@ -113,6 +113,14 @@ describe("publicConfig", () => {
       appId: "",
       authDomain: "auth.joutiya.ma",
     });
+  });
+
+  it("gives the search and home maps the same runtime basemap as the browser config", () => {
+    const env = parseEnv(configured).env;
+    expect(searchMapConfig(env)).toEqual(publicConfig(env).map);
+    expect(searchMapConfig(env)?.pmtilesUrl).toBe("https://media-staging.joutiya.ma/maps/morocco.pmtiles");
+    // No archive configured: no map, the pages stay lists.
+    expect(searchMapConfig(parseEnv({}).env)).toBeNull();
   });
 
   it("names the Auth emulator in dev only", () => {

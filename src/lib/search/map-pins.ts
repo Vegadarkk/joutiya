@@ -66,6 +66,20 @@ export function boundsOf(points: readonly LatLng[]): { sw: LatLng; ne: LatLng } 
   return { sw: { lat: south, lng: west }, ne: { lat: north, lng: east } };
 }
 
+/**
+ * Bounds of where most points stand (home page's map, lot 3): the outer 5 % on each side of each
+ * axis left out from 10 points on, so that one listing in Dakhla does not shrink the whole north
+ * to a corner of a phone. Fewer points: all of them (boundsOf).
+ */
+export function coreBounds(points: readonly LatLng[]): { sw: LatLng; ne: LatLng } | null {
+  if (points.length < 10) return boundsOf(points);
+  const drop = Math.floor(points.length * 0.05);
+  const lats = points.map((point) => point.lat).sort((a, b) => a - b);
+  const lngs = points.map((point) => point.lng).sort((a, b) => a - b);
+  const last = points.length - 1 - drop;
+  return { sw: { lat: lats[drop]!, lng: lngs[drop]! }, ne: { lat: lats[last]!, lng: lngs[last]! } };
+}
+
 const EARTH_RADIUS_KM = 6371;
 
 /** Great-circle distance, km. */

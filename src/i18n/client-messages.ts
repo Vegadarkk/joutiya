@@ -68,6 +68,12 @@ export const SEARCH_PAGE_CLIENT_NAMESPACES = [
 ] as const;
 
 /**
+ * Added on the home page only (its own NextIntlClientProvider): the living map (Carte vivante, lot
+ * 3) shares the search page's map islands (switch, sheet, pins, detail panel).
+ */
+export const HOME_PAGE_CLIENT_NAMESPACES = ["SearchMap"] as const;
+
+/**
  * Added on the help centre pages only (src/app/[locale]/(public)/aide/layout.tsx): the article
  * search box and the Assistant Joutiya widget (design phase-5 D25).
  */

@@ -883,21 +883,43 @@ html[data-welcome]:has(#main:target) .welcome {
   outline: 2px solid var(--ring);
   outline-offset: -4px;
 }
-.search-legend {
+/* Foot of the map between the panels: the OSM credits on the bottom line at the end side (never
+   covered: ODbL), the legend beside them, or on the line above when the room is short (row-reverse
+   + wrap-reverse: the first item, the credits, takes the bottom line's end). */
+.search-mapfoot {
   position: fixed;
   z-index: 10;
-  bottom: 1rem;
-  inset-inline-start: 27rem;
+  bottom: 0.375rem;
+  inset-inline: 27rem 1rem;
   display: flex;
+  flex-direction: row-reverse;
+  flex-wrap: wrap-reverse;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+  pointer-events: none;
+  transition: inset-inline-start 0.35s var(--ease-door);
+}
+.search-mapfoot > * {
+  pointer-events: auto;
+}
+[data-search-panel="collapsed"] .search-mapfoot {
+  inset-inline-start: 1rem;
+}
+.search-legend {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.875rem;
+  gap: 0.25rem 0.875rem;
+  /* Alone on its line it keeps to the start side. */
+  margin-inline-end: auto;
+  margin-bottom: 0.625rem;
   border-radius: 0.875rem;
   padding: 0.5rem 0.875rem;
   font-size: var(--text-xs);
-  transition: inset-inline-start 0.35s var(--ease-door);
 }
-[data-search-panel="collapsed"] .search-legend {
-  inset-inline-start: 1rem;
+/* The detail panel narrows the map: it says what the open pin is, the legend steps aside. */
+[data-search-detail="open"] .search-legend {
+  display: none;
 }
 .search-zoom {
   position: fixed;
@@ -924,10 +946,8 @@ html[data-welcome]:has(#main:target) .welcome {
   color: var(--color-cream-100);
 }
 .search-attribution {
-  position: fixed;
-  z-index: 10;
-  bottom: 0.375rem;
-  inset-inline-end: 1rem;
+  flex: none;
+  max-width: 100%;
   border-radius: 999px;
   background: color-mix(in srgb, var(--surface) 82%, transparent);
   padding: 0.125rem 0.5rem;
@@ -946,7 +966,7 @@ html[data-welcome]:has(#main:target) .welcome {
 [data-search-panel="collapsed"] .search-zone-slot {
   inset-inline-start: 1rem;
 }
-[data-search-detail="open"] :is(.search-zone-slot, .search-attribution) {
+[data-search-detail="open"] :is(.search-zone-slot, .search-mapfoot) {
   inset-inline-end: 26rem;
 }
 .search-zone-button {
@@ -978,14 +998,17 @@ html[data-welcome]:has(#main:target) .welcome {
     top: 7.75rem;
     inset-inline: 1rem;
   }
-  .search-attribution {
+  .search-mapfoot {
     bottom: calc(var(--search-sheet) + 0.375rem);
-    inset-inline-end: auto;
-    inset-inline-start: 0.75rem;
+    inset-inline: 0.75rem;
+    flex-direction: row;
     transition: bottom 0.3s var(--ease-door);
   }
+  .search-legend {
+    display: none;
+  }
   /* A full sheet hides the map: its credits go with it. */
-  :root[data-search-snap="full"] .search-attribution {
+  :root[data-search-snap="full"] .search-mapfoot {
     visibility: hidden;
   }
 }
@@ -1186,3 +1209,64 @@ html[data-welcome]:has(#main:target) .welcome {
   }
 }
 /* ── end search map ── */
+
+/* ── Home page, the living map (Carte vivante, lot 3) ──
+ * The search page's map layout with the home page's panel (data-search-variant="home"): its head is
+ * the door's lintel, cream on the gold threshold, under which the categories, the rows and the rest
+ * scroll. The Carte/Liste switch floats at the top end of the map (in the head of the list view).
+ * Phones open the sheet half way, before hydration too.
+ */
+:root:not([data-search-snap]):has([data-search-start="half"]) {
+  --search-sheet: 50dvh;
+}
+:is(:root[data-theme] [data-search-view="map"], [data-search-view="map"][data-search-enhanced])[data-search-variant="home"] {
+  & .home-panel-head {
+    padding: 1rem 1.125rem 1.125rem;
+    background: var(--surface-brand);
+    box-shadow: inset 0 -3px 0 var(--featured);
+  }
+  & .home-panel-head h1 {
+    font-size: var(--text-xl);
+    line-height: var(--text-xl--line-height);
+  }
+  & .home-panel-head p {
+    margin-top: 0.25rem;
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
+  }
+  & .home-rows {
+    gap: 1.5rem;
+    padding: 1rem 0.5rem 1.25rem;
+  }
+  & .home-view-toggle {
+    position: fixed;
+    z-index: 20;
+    top: 5.25rem;
+    inset-inline-end: 1rem;
+    transition: inset-inline-end 0.35s var(--ease-door);
+  }
+  &[data-search-detail="open"] .home-view-toggle {
+    inset-inline-end: 26rem;
+  }
+  @media (width < 64rem) {
+    & .home-panel-head {
+      padding-top: 0.25rem;
+    }
+    & .home-panel-head h1 {
+      font-size: var(--text-lg);
+      line-height: var(--text-lg--line-height);
+    }
+    & .search-sheet-handle {
+      background: var(--surface-brand);
+    }
+    & .home-view-toggle {
+      top: 4.5rem;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    & .home-view-toggle {
+      transition: none;
+    }
+  }
+}
+/* ── end home map ── */

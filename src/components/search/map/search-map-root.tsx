@@ -9,14 +9,16 @@ import type { MapListing } from "./map-listings";
 import { SHEET_SNAPS, type SheetSnap } from "./sheet";
 import { browserViewContext, initialView, mapPossible, rememberView, type SearchView } from "./view-mode";
 
-// Client root of the map-first search (Carte vivante, lot 2). The server renders the whole list
-// (rows, grid, filters) inside it; this island only holds the view state: map or list, the result
-// under the pointer, the one open in the detail panel (desktop), the list panel folded or not, the
-// height of the phone sheet. The CSS reads it from data attributes (globals.css, `search-map`).
+// Client root of the map-first search (Carte vivante, lot 2) and of the home page's living map (lot
+// 3). The server renders the whole panel (rows, grid, filters) inside it; this island only holds the
+// view state: map or list, the result under the pointer, the one open in the detail panel (desktop),
+// the list panel folded or not, the height of the phone sheet. The CSS reads it from data attributes
+// (globals.css, `search-map`).
 
 export const DESKTOP_QUERY = "(min-width: 64rem)";
 
 interface SearchMapState {
+  variant: SearchMapVariant;
   view: SearchView;
   setView: (view: SearchView) => void;
   /** Hydrated: the client decided the view. */
@@ -85,9 +87,15 @@ function useRowMarks(highlighted: string | null, selected: string | null) {
   }, [highlighted, selected]);
 }
 
+/** Which page the map serves: the search results, or the home page's recent listings (lot 3). */
+export type SearchMapVariant = "search" | "home";
+
 export interface SearchMapRootProps {
   /** Server's guess: "map" when a basemap is configured (the client checks WebGL2 and the link). */
   serverView: SearchView;
+  variant?: SearchMapVariant;
+  /** Height of the phone sheet on arrival (the home page opens it half way). */
+  startSnap?: SheetSnap;
   map: PublicMapConfig | null;
   listings: readonly MapListing[];
   params: SearchParams;
@@ -95,7 +103,7 @@ export interface SearchMapRootProps {
   children: ReactNode;
 }
 
-export function SearchMapRoot({ serverView, map, listings, params, className, children }: SearchMapRootProps) {
+export function SearchMapRoot({ serverView, variant = "search", startSnap = "peek", map, listings, params, className, children }: SearchMapRootProps) {
   const navigation = useSearchNavigation();
   const webgl2 = useSyncExternalStore(subscribeNever, supportsWebGL2, () => false);
   const desktop = useDesktop();
@@ -108,7 +116,7 @@ export function SearchMapRoot({ serverView, map, listings, params, className, ch
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ id: string; opener: HTMLElement | null } | null>(null);
   const [collapsed, setCollapsed] = useState(false);
-  const [snap, setSnap] = useState<SheetSnap>("peek");
+  const [snap, setSnap] = useState<SheetSnap>(startSnap);
 
   const wanted = chosen ?? autoView ?? serverView;
   const view: SearchView = enhanced && !canMap ? "list" : wanted;
@@ -142,10 +150,11 @@ export function SearchMapRoot({ serverView, map, listings, params, className, ch
 
   const searchZone = useCallback(
     (zone: SearchZone) => {
+      // From the home page this opens the search page on that zone (its params are empty).
       const next = canonicalSearchParams({ ...params, zone, page: undefined });
-      navigation?.navigate(next, { scroll: false });
+      navigation?.navigate(next, { scroll: variant === "home" });
     },
-    [navigation, params],
+    [navigation, params, variant],
   );
 
   useRowMarks(highlighted, selected?.id ?? null);
@@ -161,6 +170,7 @@ export function SearchMapRoot({ serverView, map, listings, params, className, ch
 
   const value = useMemo<SearchMapState>(
     () => ({
+      variant,
       view,
       setView,
       enhanced,
@@ -181,13 +191,15 @@ export function SearchMapRoot({ serverView, map, listings, params, className, ch
       setSnap: (next: SheetSnap) => setSnap(SHEET_SNAPS.includes(next) ? next : "peek"),
       searchZone,
     }),
-    [view, setView, enhanced, canMap, failed, map, desktop, listings, params, highlighted, selected, select, collapsed, snap, searchZone],
+    [variant, view, setView, enhanced, canMap, failed, map, desktop, listings, params, highlighted, selected, select, collapsed, snap, searchZone],
   );
 
   return (
     <SearchMapContext.Provider value={value}>
       <div
         data-search-root=""
+        data-search-variant={variant}
+        data-search-start={startSnap}
         data-search-view={view}
         data-search-enhanced={enhanced ? "" : undefined}
         data-search-panel={collapsed ? "collapsed" : "open"}

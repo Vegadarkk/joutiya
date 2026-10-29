@@ -3392,13 +3392,13 @@
     "legend": {
       "label": "Légende de la carte",
       "price": "Prix",
-      "featured": "À la Une",
+      "featured": "À la Une · Sponsorisé",
       "today": "Nouveau aujourd'hui",
       "approximate": "Positions approximatives"
     },
     "pin": {
       "label": "{title}, {price}",
-      "featured": "À la Une",
+      "featured": "À la Une · Sponsorisé",
       "today": "publiée aujourd'hui",
       "cluster": "{count, plural, one {# annonce} other {# annonces}} ici, zoomer pour les voir",
       "per": {
@@ -4917,7 +4917,8 @@
     "home": {
       "title": "Louer une voiture",
       "body": "Choisissez la ville et vos dates : les agences affichent les véhicules libres sur toute la période.",
-      "submit": "Trouver une voiture"
+      "submit": "Trouver une voiture",
+      "open": "Choisissez la ville et vos dates"
     },
     "airport": "{city} ({code})"
   },

@@ -325,6 +325,21 @@ test.describe("home and crawler files", () => {
     await expect(page.getByTestId("home-categories").getByRole("link").first()).toHaveAttribute("href", /\/fr\/c\//);
   });
 
+  test("falls back to the list page without a basemap: no map, no switch, one row of categories", { tag: "@mobile" }, async ({ page }) => {
+    await page.goto("/fr");
+    await expect(page.locator("[data-search-root]")).toHaveAttribute("data-search-view", "list");
+    await expect(page.locator("[data-search-root]")).toHaveAttribute("data-search-enhanced", "");
+    await expect(page.getByTestId("search-stage")).toHaveCount(0);
+    await expect(page.getByTestId("view-toggle")).toHaveCount(0);
+    // The header's chip row steps aside: the page shows the twelve categories itself (lot 3).
+    await expect(page.getByTestId("category-chips")).toHaveCount(0);
+    await expect(page.getByTestId("home-rent-car")).toBeVisible();
+    await expect(page.getByTestId("panel-legal")).toBeHidden();
+    await expect(page.getByRole("contentinfo").last()).toBeVisible();
+    await page.goto("/fr/c/vehicules");
+    await expect(page.getByTestId("category-chips")).toBeVisible();
+  });
+
   test("keeps sitemaps out of development and disallows everything in robots.txt", async ({ request }) => {
     expect((await request.get("/sitemap.xml")).status()).toBe(404);
     expect(await (await request.get("/robots.txt")).text()).toContain("Disallow: /");
