@@ -271,7 +271,7 @@ export function ProApplicationForm({ previous, needsPhone, onDone }: ProApplicat
       {failure ? <FormMessage error={failure} title={failureText(failure)} /> : null}
 
       <div className="flex justify-end border-t border-border pt-6">
-        <Button type="submit" variant="structure" loading={pending} className="w-full sm:w-auto">
+        <Button type="submit" loading={pending} className="w-full sm:w-auto">
           {previous ? t("resubmit") : t("submit")}
         </Button>
       </div>

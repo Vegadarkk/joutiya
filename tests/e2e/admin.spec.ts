@@ -197,6 +197,11 @@ test("staff sign in with their password, see the quota board and the roster, the
   await expect(page.getByRole("table").getByText(email)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Inviter un membre" })).toBeVisible();
 
+  // An unknown admin path shows the back office's own "Page introuvable", inside the shell.
+  await page.goto(`${admin}/page-inconnue`);
+  await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Personnel" })).toBeVisible();
+
   await page.getByRole("button", { name: "Se déconnecter" }).click();
   await expect(page).toHaveURL(`${admin}/connexion`);
   await page.goto(`${admin}/`);

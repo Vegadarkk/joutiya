@@ -119,7 +119,7 @@ export function KybcPieces({ pieces, onChange, error }: KybcPiecesProps) {
         </ul>
       ) : null}
       <div>
-        <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png" multiple className="sr-only" tabIndex={-1} onChange={(event) => choose(event.target.files)} />
+        <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png" multiple aria-label={t("addPiece")} className="sr-only" tabIndex={-1} onChange={(event) => choose(event.target.files)} />
         <Button type="button" variant="outline" disabled={kept >= KYBC_MAX_PIECES} onClick={() => input.current?.click()}>
           {busy > 0 ? <Paperclip aria-hidden="true" /> : <FileText aria-hidden="true" />}
           {t("addPiece")}
