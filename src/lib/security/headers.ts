@@ -13,7 +13,8 @@ export const PERMISSIONS_POLICY = [
   "browsing-topics=()",
   "camera=()",
   "display-capture=()",
-  "geolocation=()",
+  // « Utiliser ma position » of the search page (Carte vivante, lot 4): this origin only, after a click.
+  "geolocation=(self)",
   "gyroscope=()",
   "hid=()",
   "magnetometer=()",

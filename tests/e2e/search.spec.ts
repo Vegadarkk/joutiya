@@ -282,6 +282,54 @@ test.describe("search page", () => {
     await expect(results(page).getByTestId("search-count")).toHaveText("1 annonce");
   });
 
+  test("reads a sentence typed in the header pill as removable filters", async ({ page }) => {
+    await page.goto(`/fr/recherche?q=${WORD}`);
+    const pill = page.getByRole("banner").getByRole("search");
+    // Under load the first keystrokes can land before hydration resets the field: retry until the search runs.
+    await expect(async () => {
+      await pill.locator("#header-search").fill(`vélo moins de 3000 dh pas cher à côté ${WORD}`);
+      await pill.locator("#header-search").press("Enter");
+      await expect(page).toHaveURL(/q=v%C3%A9lo\+moins/, { timeout: 2_000 });
+    }).toPass({ timeout: 15_000 });
+    const understood = results(page).getByTestId("understood");
+    await expect(understood.getByRole("link", { name: "Retirer « Vélos »" })).toBeVisible();
+    await expect(understood.getByRole("link", { name: /Retirer « Jusqu.à 3.000 DH »/ })).toBeVisible();
+    await expect(understood.getByRole("link", { name: "Retirer « Les moins chers d'abord »" })).toBeVisible();
+    await expect(understood.getByRole("button", { name: "Utiliser ma position" })).toBeVisible();
+    // The sentence stays in the URL and the pill; the words left are searched.
+    await expect(page).toHaveURL(/q=v%C3%A9lo\+moins/);
+    await expect(pill.locator("#header-search")).toHaveValue(`vélo moins de 3000 dh pas cher à côté ${WORD}`);
+    await expect(results(page).getByTestId("search-count")).toHaveText("1 annonce");
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+
+    // Removing one: the other filters stay, the words are no longer interpreted.
+    await understood.getByRole("link", { name: /Jusqu.à 3.000 DH/ }).click();
+    await expect(page).toHaveURL(/brut=1/);
+    await expect(page).not.toHaveURL(/prix-max/);
+    await expect(page).toHaveURL(/sous-categorie=velos/);
+    await expect(results(page).getByTestId("understood")).toHaveCount(0);
+    await expect(results(page).getByTestId("search-count")).toHaveText("1 annonce");
+  });
+
+  test("turns « à côté » into a small zone around the visitor after a click only", async ({ page, context }) => {
+    await context.grantPermissions(["geolocation"]);
+    await context.setGeolocation({ latitude: 33.59921, longitude: -7.62004 });
+    await page.goto(`/fr/recherche?q=${encodeURIComponent(`vélo à côté ${WORD}`)}`);
+    await expect(page).not.toHaveURL(/zone=/);
+    // The button acts once hydrated: retry the click until the zone lands in the URL.
+    await expect(async () => {
+      await results(page).getByTestId("near-me").click();
+      await expect(page).toHaveURL(/zone=33\.599%2C-7\.62%2C3/, { timeout: 2_000 });
+    }).toPass({ timeout: 15_000 });
+    const understood = results(page).getByTestId("understood");
+    await expect(understood.getByRole("link", { name: "Retirer « À 3 km de vous »" })).toBeVisible();
+    await expect(results(page).getByTestId("search-count")).toHaveText("1 annonce");
+    // « Chercher le texte exact »: the whole sentence as words, nothing interpreted.
+    await understood.getByTestId("search-exact").click();
+    await expect(page).toHaveURL(/brut=1/);
+    await expect(results(page).getByTestId("understood")).toHaveCount(0);
+  });
+
   test("reads right to left in Arabic", { tag: "@mobile" }, async ({ page }) => {
     await page.goto(`/ar/recherche?q=${WORD}`);
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");

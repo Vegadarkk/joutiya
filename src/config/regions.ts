@@ -100,6 +100,26 @@ export function searchCities(query: string, locale: Locale, limit = 12): City[] 
     .map((s) => s.city);
 }
 
+/**
+ * City closest to a point (great-circle distance): names a map zone in words ("12 km autour de
+ * Casablanca") without its coordinates.
+ */
+export function nearestCity(lat: number, lng: number): City | undefined {
+  const rad = Math.PI / 180;
+  let best: City | undefined;
+  let bestDistance = Infinity;
+  for (const city of CITIES) {
+    const dLat = (city.lat - lat) * rad;
+    const dLng = (city.lng - lng) * rad;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat * rad) * Math.cos(city.lat * rad) * Math.sin(dLng / 2) ** 2;
+    if (h < bestDistance) {
+      bestDistance = h;
+      best = city;
+    }
+  }
+  return best;
+}
+
 /** Deterministic position for an approximate marker: the city centroid shifted by at most ~700 m, from a seed. */
 export function approximatePosition(city: City, seed: string): { lat: number; lng: number } {
   let h = 2166136261;

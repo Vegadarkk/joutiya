@@ -54,6 +54,12 @@ describe("SaveSearchButton", () => {
     expect(html).toContain('data-testid="save-search-button"');
     expect(text(render(<SaveSearchButton params={{ subcategory: "velos", category: "vehicules" }} />, "ar"))).toBe(ar.SavedSearches.button.save);
   });
+
+  it("offers an alert of the map zone when the search has one", () => {
+    const zone = { lat: 33.6, lng: -7.62, km: 3 };
+    expect(text(render(<SaveSearchButton params={{ zone }} />))).toBe("M'alerter des nouvelles annonces ici");
+    expect(text(render(<SaveSearchButton params={{ zone }} />, "ar"))).toBe(ar.SavedSearches.button.saveZone);
+  });
 });
 
 describe("search summary", () => {
@@ -66,6 +72,14 @@ describe("search summary", () => {
     expect(html).toMatch(/data-name="vélo électrique, [^"]+"/);
     const arabic = text(render(<Summary params={{ city: "casablanca" }} />, "ar"));
     expect(arabic).toContain("الدار البيضاء");
+  });
+
+  it("names a map zone by its radius around the nearest city, never by coordinates", () => {
+    const html = render(<Summary params={{ subcategory: "velos", category: "vehicules", zone: { lat: 34.02, lng: -6.84, km: 12 } }} />);
+    expect(text(html)).toContain("Zone de la carte · 12 km autour de Rabat");
+    expect(html).toContain('data-name="Vélos, Zone de la carte · 12 km autour de Rabat"');
+    expect(html).not.toContain("34.02");
+    expect(text(render(<Summary params={{ zone: { lat: 34.02, lng: -6.84, km: 12 } }} />, "ar"))).toContain("منطقة الخريطة · 12 كلم حول الرباط");
   });
 
   it("proposes a name that fits 60 characters, else the fallback", () => {

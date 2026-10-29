@@ -65,7 +65,8 @@ export function SaveSearchButton({ params, className }: SaveSearchButtonProps) {
     <>
       <Button type="button" variant="outline" loading={checking} onClick={() => void onClick()} className={cn(COMPACT, className)} data-testid="save-search-button">
         {checking ? null : <BellPlus aria-hidden="true" />}
-        <span className="max-md:sr-only">{t("save")}</span>
+        {/* A map zone: an alert of what is published there (Carte vivante, lot 4). */}
+        <span className="max-md:sr-only">{params.zone ? t("saveZone") : t("save")}</span>
       </Button>
       {open ? (
         <SaveSearchDialog

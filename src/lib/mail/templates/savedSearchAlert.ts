@@ -17,6 +17,7 @@ interface Copy {
   leadOne: string;
   leadMany: (searches: number) => string;
   count: (total: number) => string;
+  zone: (km: number, city: string) => string;
   seeAll: (total: number) => string;
   seeSearch: string;
   donation: string;
@@ -41,6 +42,7 @@ const COPY: Record<MailLocale, Copy> = {
     leadOne: "Depuis notre dernier e-mail, de nouvelles annonces correspondent à votre recherche sauvegardée.",
     leadMany: (searches) => `Depuis notre dernier e-mail, de nouvelles annonces correspondent à ${searches} de vos recherches sauvegardées.`,
     count: (total) => (total === 1 ? "1 nouvelle annonce" : `${total} nouvelles annonces`),
+    zone: (km, city) => `Zone de la carte · ${km} km autour de ${city}`,
     seeAll: (total) => `Voir les ${total} annonces`,
     seeSearch: "Voir la recherche",
     donation: "Don",
@@ -63,6 +65,7 @@ const COPY: Record<MailLocale, Copy> = {
     leadOne: "منذ رسالتنا الأخيرة، نُشرت إعلانات جديدة تطابق بحثك المحفوظ.",
     leadMany: (searches) => `منذ رسالتنا الأخيرة، نُشرت إعلانات جديدة تطابق ${searches} من عمليات البحث المحفوظة.`,
     count: (total) => `عدد الإعلانات الجديدة: ${total}`,
+    zone: (km, city) => `منطقة الخريطة · ${km} كلم حول ${city}`,
     seeAll: (total) => `عرض كل الإعلانات (${total})`,
     seeSearch: "عرض نتائج البحث",
     donation: "مجانًا",
@@ -92,9 +95,11 @@ function detailOf(listing: SavedSearchAlertListing, copy: Copy, lang: MailLocale
 }
 
 function sectionOf(search: SavedSearchAlertSection, copy: Copy, lang: MailLocale): MailSection {
+  const zoneCity = search.zone ? cityBySlug(search.zone.citySlug) : undefined;
   return {
     heading: search.name,
-    note: copy.count(search.total),
+    // A map zone says where it is: the name may be the visitor's own.
+    note: search.zone && zoneCity ? `${copy.count(search.total)} — ${copy.zone(search.zone.km, cityName(zoneCity, lang))}` : copy.count(search.total),
     items: search.listings.map((listing) => ({ title: listing.title, detail: detailOf(listing, copy, lang), url: listing.url })),
     more: { label: search.total > search.listings.length ? copy.seeAll(search.total) : copy.seeSearch, url: search.url },
   };

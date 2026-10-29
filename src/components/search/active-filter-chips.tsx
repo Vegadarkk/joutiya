@@ -16,10 +16,12 @@ export const chipClassName = cn(
   "transition-[background-color,border-color,scale] duration-150 ease-door hover:border-structure/60 hover:bg-cream-300/60 dark:hover:bg-bab-700 active:scale-[0.98]",
 );
 
-export function ActiveFilterChips({ params, locale, className }: { params: SearchParams; locale: Locale; className?: string }) {
+/** `hide`: filters shown elsewhere (the understood words of a typed sentence, understood-chips.tsx). */
+export function ActiveFilterChips({ params, locale, hide, className }: { params: SearchParams; locale: Locale; hide?: readonly string[]; className?: string }) {
   const t = useTranslations("SearchFilters");
   const labels = useFilterLabels();
-  const filters = describeFilters(params, locale, labels);
+  const all = describeFilters(params, locale, labels);
+  const filters = hide ? all.filter((filter) => !hide.includes(filter.key)) : all;
   if (filters.length === 0) return null;
   return (
     <ul aria-label={t("active")} className={cn("flex flex-wrap items-center gap-2", className)}>
@@ -31,7 +33,7 @@ export function ActiveFilterChips({ params, locale, className }: { params: Searc
           </SearchLink>
         </li>
       ))}
-      {filters.length > 1 ? (
+      {all.length > 1 && filters.length > 0 ? (
         <li>
           <SearchLink params={clearFilters(params)} scroll={false} className={cn("inline-flex min-h-11 items-center rounded-sm px-2 text-sm font-medium text-link sm:min-h-9", textLinkClassName)}>
             {t("clearAll")}

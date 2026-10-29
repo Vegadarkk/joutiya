@@ -17,11 +17,11 @@ import { useSearchNavigation } from "./search-navigation";
 // transition and keeps every other filter. A new place drops the radius and district of the old one.
 
 /** URL keys the bar itself sets: everything else is carried over unchanged. */
-const OWN_KEYS: readonly string[] = [SEARCH_QUERY_KEYS.q, SEARCH_QUERY_KEYS.city, SEARCH_QUERY_KEYS.region, SEARCH_QUERY_KEYS.radius, SEARCH_QUERY_KEYS.district, SEARCH_QUERY_KEYS.page];
+const OWN_KEYS: readonly string[] = [SEARCH_QUERY_KEYS.q, SEARCH_QUERY_KEYS.raw, SEARCH_QUERY_KEYS.city, SEARCH_QUERY_KEYS.region, SEARCH_QUERY_KEYS.radius, SEARCH_QUERY_KEYS.district, SEARCH_QUERY_KEYS.page];
 
-/** The search after the bar was submitted with these words and this place. */
+/** The search after the bar was submitted with these words and this place (typed words are interpreted again: no `raw`). */
 export function submittedParams(current: SearchParams, q: string, location: LocationValue): SearchParams {
-  const next: SearchParams = { ...current, q: q.replace(/\s+/g, " ").trim() || undefined, page: undefined };
+  const next: SearchParams = { ...current, q: q.replace(/\s+/g, " ").trim() || undefined, raw: undefined, page: undefined };
   if (!sameLocation(locationOf(current), location)) {
     next.city = location.city;
     next.region = location.city ? undefined : location.region;

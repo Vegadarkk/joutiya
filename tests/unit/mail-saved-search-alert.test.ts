@@ -85,6 +85,12 @@ describe("savedSearchAlert", () => {
     expect(renderMail(mail("ar", { ...DATA, searches: [], favorites: favorites.slice(0, 1) })).subject).toBe("أحد إعلاناتك المفضلة عليه تخفيض");
   });
 
+  it("names a map zone by its radius and nearest city, in French and Arabic", () => {
+    const zoned: TemplateData["savedSearchAlert"] = { ...DATA, searches: [{ ...(DATA.searches[0] as TemplateData["savedSearchAlert"]["searches"][number]), name: "Ma zone", zone: { km: 12, citySlug: "casablanca" } }] };
+    expect(renderMail(mail("fr", zoned)).text).toContain("12 nouvelles annonces — Zone de la carte · 12 km autour de Casablanca");
+    expect(renderMail(mail("ar", zoned)).text).toContain("منطقة الخريطة · 12 كلم حول الدار البيضاء");
+  });
+
   it("names the only search in the subject and writes Arabic right to left", () => {
     const one = { ...DATA, searches: [DATA.searches[0]!] };
     expect(renderMail(mail("fr", one)).subject).toBe("12 nouvelles annonces pour « Vélos <Casa> & co »");

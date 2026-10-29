@@ -11,6 +11,7 @@
     "sell": "Vendre",
     "searchLabel": "Rechercher une annonce",
     "searchPlaceholder": "Que cherchez-vous ?",
+    "searchPlaceholderLong": "Que cherchez-vous ? Écrivez comme vous parlez",
     "searchPlace": "Lieu de la recherche",
     "searchSubmit": "Rechercher",
     "signIn": "Se connecter",
@@ -3210,6 +3211,7 @@
   "SavedSearches": {
     "button": {
       "save": "Sauvegarder la recherche",
+      "saveZone": "M'alerter des nouvelles annonces ici",
       "saved": "Recherche sauvegardée",
       "done": "Recherche sauvegardée",
       "exists": "Cette recherche était déjà sauvegardée",
@@ -3489,6 +3491,7 @@
       "priceTo": "Jusqu'à {max}",
       "radius": "{place} + {km} km",
       "zone": "Zone de la carte · {km} km",
+      "zoneNear": "Zone de la carte · {km} km autour de {place}",
       "district": "Quartier {district}",
       "sellerIndividual": "Particuliers",
       "sellerPro": "Professionnels",
@@ -5102,6 +5105,24 @@
       "rental_request_changed": "Cette demande a changé entre-temps : voici sa dernière version.",
       "rental_request_past": "Le jour de prise en charge est passé : le locataire doit demander d'autres dates.",
       "rental_request_unavailable": "Cette annonce ne prend plus de demande de location."
+    }
+  },
+  "SearchInterpret": {
+    "label": "Compris dans votre recherche",
+    "understood": "Compris",
+    "sortCheap": "Les moins chers d'abord",
+    "nearAsk": "Près de vous",
+    "nearZone": "À {km} km de vous",
+    "useLocation": "Utiliser ma position",
+    "locating": "Localisation…",
+    "privacy": "Votre position est arrondie à 100 m environ et sert seulement à cette recherche. Elle n'est pas enregistrée.",
+    "remove": "Retirer « {filter} »",
+    "from": "Compris dans « {words} »",
+    "exact": "Chercher le texte exact",
+    "errors": {
+      "denied": "Position refusée : choisissez une ville dans les filtres.",
+      "unavailable": "Position introuvable pour le moment : choisissez une ville dans les filtres.",
+      "outside": "Votre position est hors du Maroc : choisissez une ville dans les filtres."
     }
   }
 }
