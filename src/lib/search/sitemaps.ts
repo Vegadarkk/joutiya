@@ -5,7 +5,7 @@ import { CANONICAL_ORIGIN, HREFLANG_LOCALES } from "@/config/site";
 import { serverEnv, type ServerEnv } from "@/lib/env";
 import { alternates } from "@/lib/i18n/metadata";
 import { searchEngine } from "@/lib/search/engine";
-import { buildFilter } from "@/lib/search/service";
+import { buildFilter, NOT_EXAMPLE } from "@/lib/search/service";
 import { SEO_MIN_LISTINGS, seoPath, seoSearchParams, type SeoTarget } from "./seo";
 import { SITEMAP_SHARDS, SearchUnavailableError, type EngineQuery, type SearchDocument } from "./types";
 
@@ -68,8 +68,10 @@ export function sitemapIndex(files: readonly string[]): string {
   );
 }
 
+/** Real listings only: example listings never make a landing page indexable (same rule as seoCounts). */
 function countQuery(target: SeoTarget, facet: string): EngineQuery {
-  return { q: "", filter: buildFilter(seoSearchParams(target), new Date()), page: 1, hitsPerPage: 1, facets: [facet], fields: ["id"] };
+  const scope = buildFilter(seoSearchParams(target), new Date());
+  return { q: "", filter: scope ? { and: [scope, NOT_EXAMPLE] } : NOT_EXAMPLE, page: 1, hitsPerPage: 1, facets: [facet], fields: ["id"] };
 }
 
 /** Shards holding at least one document. */

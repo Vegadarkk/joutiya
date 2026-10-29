@@ -48,7 +48,7 @@ const load = cache(async (category: string, restKey: string) => {
     seoCounts(target),
   ]);
   const total = Math.max(counts.total, response.total);
-  return { target, response, counts, total, verdict: seoVerdict(target, total) };
+  return { target, response, counts, total, verdict: seoVerdict(target, total, counts.indexable) };
 });
 
 interface Labels {

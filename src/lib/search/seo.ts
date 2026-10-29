@@ -2,7 +2,7 @@ import "server-only";
 import { categoryById, subcategoryById } from "@/config/categories";
 import { CITIES, cityBySlug, type City } from "@/config/regions";
 import { searchEngine } from "@/lib/search/engine";
-import { buildFilter } from "@/lib/search/service";
+import { buildFilter, NOT_EXAMPLE } from "@/lib/search/service";
 import type { SearchParams } from "./params";
 import { SearchUnavailableError, type EngineQuery } from "./types";
 
@@ -55,9 +55,10 @@ export type SeoVerdict = "index" | "noindex" | "notFound";
 /**
  * D15: /c/{category} always answers 200 (the home links it), noindex below SEO_MIN_LISTINGS.
  * Deeper pages: 0 listings = 404 (Google: 404 for empty facets), 1-2 = noindex, follow.
+ * `indexable`: the real listings among `total` (example listings never make a page indexable).
  */
-export function seoVerdict(target: SeoTarget, total: number): SeoVerdict {
-  if (total >= SEO_MIN_LISTINGS) return "index";
+export function seoVerdict(target: SeoTarget, total: number, indexable = total): SeoVerdict {
+  if (indexable >= SEO_MIN_LISTINGS) return "index";
   const deeper = Boolean(target.subcategory || target.city);
   return deeper && total === 0 ? "notFound" : "noindex";
 }
@@ -95,6 +96,8 @@ export interface SeoCounts {
   cities: Record<string, number>;
   /** Exact listings of the page's own scope (facet sums are not capped by maxTotalHits). */
   total: number;
+  /** Listings of the page's own scope without the example listings: the D15 index threshold. */
+  indexable: number;
 }
 
 function positive(distribution: Record<string, number> | undefined): Record<string, number> {
@@ -105,19 +108,26 @@ function facetQuery(params: SearchParams, field: string, now: Date): EngineQuery
   return { q: "", filter: buildFilter(params, now), page: 1, hitsPerPage: 1, facets: [field], fields: ["id"] };
 }
 
-/** Chips and city links of a landing page: two facet queries in one engine round trip. */
+/** Real listings of the page's own scope (exhaustive totalHits). */
+function realQuery(params: SearchParams, now: Date): EngineQuery {
+  const scope = buildFilter(params, now);
+  return { q: "", filter: scope ? { and: [scope, NOT_EXAMPLE] } : NOT_EXAMPLE, page: 1, hitsPerPage: 1, fields: ["id"] };
+}
+
+/** Chips, city links and the index threshold of a landing page: three queries in one engine round trip. */
 export async function seoCounts(target: SeoTarget, now = new Date()): Promise<SeoCounts> {
   const { subcategory: _subcategory, ...withoutSubcategory } = target;
   const { city: _city, ...withoutCity } = target;
-  const [subs, cities] = await searchEngine().search([
+  const [subs, cities, real] = await searchEngine().search([
     facetQuery(seoSearchParams(withoutSubcategory), "subcategoryId", now),
     facetQuery(seoSearchParams(withoutCity), "citySlug", now),
+    realQuery(seoSearchParams(target), now),
   ]);
-  if (!subs || !cities) throw new SearchUnavailableError("engine returned no result");
+  if (!subs || !cities || !real) throw new SearchUnavailableError("engine returned no result");
   const subcategories = positive(subs.facetDistribution?.subcategoryId);
   const cityCounts = positive(cities.facetDistribution?.citySlug);
   const total = target.subcategory
     ? (subcategories[target.subcategory] ?? 0)
     : Object.values(subcategories).reduce((sum, count) => sum + count, 0);
-  return { subcategories, cities: cityCounts, total };
+  return { subcategories, cities: cityCounts, total, indexable: real.totalHits };
 }

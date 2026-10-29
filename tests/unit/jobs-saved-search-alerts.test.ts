@@ -58,7 +58,10 @@ vi.mock("@/lib/saved-searches/repository", () => ({
 const favoriteIds = new Map<string, string[]>();
 vi.mock("@/lib/favorites/service", () => ({ favoriteIdsOf: vi.fn(async (uid: string) => favoriteIds.get(uid) ?? []) }));
 
-vi.mock("@/lib/search/service", async (importOriginal) => ({ activeRentalDates: (await importOriginal<typeof SearchService>()).activeRentalDates, runSearch: vi.fn() }));
+vi.mock("@/lib/search/service", async (importOriginal) => {
+  const actual = await importOriginal<typeof SearchService>();
+  return { activeRentalDates: actual.activeRentalDates, NOT_EXAMPLE: actual.NOT_EXAMPLE, runSearch: vi.fn() };
+});
 
 const repository = await import("@/lib/saved-searches/repository");
 const { runSearch } = await import("@/lib/search/service");
@@ -136,7 +139,7 @@ beforeEach(() => {
   vi.mocked(runSearch)
     .mockReset()
     .mockImplementation(async (params, options = {}) => {
-      const bounds = (options.extraFilter as { and: { op: "gt" | "lte"; value: number }[] }).and;
+      const bounds = (options.extraFilter as { and: { op?: string; value: number }[] }).and.filter((item) => item.op === "gt" || item.op === "lte");
       const inWindow = (sortAt: number) => bounds.every((bound) => (bound.op === "gt" ? sortAt > bound.value : sortAt <= bound.value));
       const id = params.district ?? "";
       const matching = [...(listings.get(id) ?? [])].filter((hit) => inWindow(Date.parse(hit.sortAt))).sort((a, b) => b.sortAt.localeCompare(a.sortAt));
@@ -181,6 +184,8 @@ describe("sendSavedSearchAlerts", () => {
     expect(vi.mocked(runSearch).mock.calls[0]?.[0]).toMatchObject({ sort: "recent", subcategory: "velos" });
     expect(vi.mocked(runSearch).mock.calls[0]?.[1]).toMatchObject({ hitsPerPage: 5, featured: false, facets: false, approximate: false, now: NOW });
     expect(window()).toEqual({ after: LAST, until: NOW.getTime() - ALERT_INDEXING_MARGIN_MS });
+    // Example listings (a seed dates them "now") are never announced.
+    expect(vi.mocked(runSearch).mock.calls[0]?.[1]?.extraFilter).toMatchObject({ and: expect.arrayContaining([{ not: { field: "isExample", op: "eq", value: true } }]) });
     expect(repository.markSearchesNotified).toHaveBeenCalledTimes(1);
     expect(vi.mocked(repository.markSearchesNotified).mock.calls[0]?.[0]).toEqual([
       { uid: "ar-amine", id: "s1", lastNotifiedSortAt: LAST + 7 * 60_000 },
@@ -215,6 +220,7 @@ describe("sendSavedSearchAlerts", () => {
         { field: "id", op: "in", values: ["fav00001", "fav00002"] },
         { field: "promoStartsAt", op: "gt", value: NOW.getTime() - 86_400_000 },
         { field: "promoStartsAt", op: "lte", value: NOW.getTime() - ALERT_INDEXING_MARGIN_MS },
+        { not: { field: "isExample", op: "eq", value: true } },
       ],
     });
     // No search moved: their listings are still to come.
