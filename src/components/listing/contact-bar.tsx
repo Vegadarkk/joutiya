@@ -3,11 +3,12 @@
 import { useId, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { CalendarClock, CalendarRange, CarFront, HandCoins, LogIn, MessageCircle, MessageSquare, Phone, RotateCw, Settings2 } from "lucide-react";
+import { BedDouble, CalendarClock, CalendarRange, CarFront, HandCoins, LogIn, MessageCircle, MessageSquare, Phone, RotateCw, Settings2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { InlineError } from "@/components/feedback/inline-error";
 import { loadWithRetry } from "@/components/layout/chunk-retry";
 import { Button } from "@/components/ui/button";
+import type { RentalUnit } from "@/config/categories";
 import { getPathname, Link } from "@/i18n/navigation";
 import { ApiError, apiPost, loadSession, useSession } from "@/lib/auth/client";
 import type { SessionSummary } from "@/lib/contracts/auth";
@@ -87,11 +88,12 @@ export interface ContactBarProps {
    */
   testDrive?: boolean;
   /**
-   * A car rental (rental pack §6): "Demander une réservation" always opens the first-message dialog
-   * with the days and the pick-up place (an existing conversation takes the request too); the
-   * agency answers on the request's card in the thread.
+   * A car rental (rental pack §6, `day`): "Demander une réservation" always opens the first-message
+   * dialog with the days and the pick-up place (an existing conversation takes the request too); the
+   * agency answers on the request's card in the thread. A holiday home (`night`): "Demander un
+   * séjour", arrival and departure, the host answers the same way.
    */
-  rental?: boolean;
+  rental?: RentalUnit;
   /**
    * A price offer is possible (Carte vivante lot 5): "Faire une offre" writes the first message with
    * the amount, or opens the existing conversation on the offer dialog (`?offre=1`). The price is
@@ -162,8 +164,9 @@ function BarSpacer() {
   return mounted ? createPortal(<div aria-hidden="true" data-testid="contact-bar-spacer" className="h-24 lg:hidden" />, document.body) : null;
 }
 
-export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, listingTitle, showPhone, whatsapp, adultsOnly = false, visit = false, testDrive = false, rental = false, offer = null }: ContactBarProps) {
+export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, listingTitle, showPhone, whatsapp, adultsOnly = false, visit = false, testDrive = false, rental, offer = null }: ContactBarProps) {
   const t = useTranslations("ListingPage.contact");
+  const stay = rental === "night";
   const offers = useTranslations("Offers.listing");
   const locale = useLocale();
   const { status, session } = useSession();
@@ -316,7 +319,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
         <RevealChallenge failed={state.failed} onToken={(token) => void reveal(token)} />
       ) : null
     ) : compose === "signin" ? (
-      signIn(intent === "visit" ? t("signInVisit") : intent === "rental" ? t("signInRental") : intent === "offer" ? offers("signIn") : t("signInMessage"))
+      signIn(intent === "visit" ? t("signInVisit") : intent === "rental" ? t(stay ? "home.signInRental" : "signInRental") : intent === "offer" ? offers("signIn") : t("signInMessage"))
     ) : state.kind === "signin" ? (
       signIn(t("signInBody"))
     ) : state.kind === "error" ? (
@@ -350,10 +353,10 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
             data-testid="rental-request-button"
             className="w-full"
           >
-            <CalendarRange aria-hidden="true" />
-            {t("rental")}
+            {stay ? <BedDouble aria-hidden="true" /> : <CalendarRange aria-hidden="true" />}
+            {t(stay ? "home.rental" : "rental")}
           </Button>
-          <p className="text-xs text-foreground-muted text-pretty">{t("rentalHint")}</p>
+          <p className="text-xs text-foreground-muted text-pretty">{t(stay ? "home.rentalHint" : "rentalHint")}</p>
         </div>
       ) : null}
       {offer ? (
@@ -402,6 +405,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
           key={`${intent}:${variant ?? ""}`}
           intent={intent === "visit" || intent === "rental" || intent === "offer" ? intent : "message"}
           offerPrice={offer?.price}
+          rentalUnit={rental}
           open={compose === "open"}
           onOpenChange={(open) => setCompose(open ? "open" : "closed")}
           listingId={listingId}

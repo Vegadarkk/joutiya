@@ -657,13 +657,15 @@ export type AppointmentEventDoc = z.infer<typeof appointmentEventSchema>;
 
 const rentalDay = z.string().regex(DAY_PATTERN);
 
-/** Conversation.rentalRequest: the renter's current booking request of a car rental (rental pack §6). */
+/** Conversation.rentalRequest: the renter's current booking request of a car rental (rental pack §6) or a holiday home's stay. */
 export const rentalRequestSchema = z
   .object({
     id: rentalRequestIdSchema,
     status: z.enum(RENTAL_REQUEST_STATUSES),
     from: rentalDay,
     to: rentalDay,
+    /** A holiday home's stay: `from` arrival, `to` departure (nights); absent for a car rental (days). */
+    unit: z.literal("night").optional(),
     /** Links masked like a message (URL_MARKER). */
     pickup: z.string().max(RENTAL_PICKUP_MAX + 40).optional(),
     /** Accepted with the days written on the listing as unavailable. */
@@ -676,7 +678,14 @@ export type RentalRequestDoc = z.infer<typeof rentalRequestSchema>;
 
 /** Message.rentalRequest: the step a booking request system message shows. */
 export const rentalRequestEventSchema = z
-  .object({ id: rentalRequestIdSchema, event: z.enum(RENTAL_REQUEST_EVENTS), from: rentalDay, to: rentalDay, pickup: z.string().max(RENTAL_PICKUP_MAX + 40).optional() })
+  .object({
+    id: rentalRequestIdSchema,
+    event: z.enum(RENTAL_REQUEST_EVENTS),
+    from: rentalDay,
+    to: rentalDay,
+    unit: z.literal("night").optional(),
+    pickup: z.string().max(RENTAL_PICKUP_MAX + 40).optional(),
+  })
   .strict();
 export type RentalRequestEventDoc = z.infer<typeof rentalRequestEventSchema>;
 

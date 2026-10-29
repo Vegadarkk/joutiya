@@ -2882,7 +2882,18 @@
         "rentalDraftPickup": "Bonjour, je souhaite louer « {title} » du {from} au {to} ({days, plural, one {# jour} other {# jours}}), remise à {pickup}. Est-ce disponible ?",
         "rentalDatesMissing": "Choisissez les dates de prise en charge et de retour.",
         "rentalSafety": "La location se conclut par le contrat écrit de l'agence : ne versez ni acompte ni caution sur le site ou avant d'avoir vu le véhicule.",
-        "rentalSend": "Envoyer la demande"
+        "rentalSend": "Envoyer la demande",
+        "home": {
+          "rentalTitle": "Demande de séjour à {name}",
+          "rentalTitleFallback": "Demande de séjour",
+          "rentalDates": "Dates du séjour",
+          "rentalPickup": "Précisions (facultatif)",
+          "rentalPickupPlaceholder": "Ex. : 2 adultes et 1 enfant, arrivée vers 18 h",
+          "rentalDraft": "Bonjour, je souhaite séjourner à « {title} » du {from} au {to} ({days, plural, one {# nuit} other {# nuits}}). Est-ce disponible ?",
+          "rentalDraftPickup": "Bonjour, je souhaite séjourner à « {title} » du {from} au {to} ({days, plural, one {# nuit} other {# nuits}}) : {pickup}. Est-ce disponible ?",
+          "rentalDatesMissing": "Choisissez les dates d'arrivée et de départ.",
+          "rentalSafety": "Le séjour se conclut directement avec l'annonceur. {site} ne prend ni acompte ni caution : ne versez rien avant d'avoir vérifié l'annonceur et le logement."
+        }
       },
       "visit": "Demander une visite",
       "visitShort": "Visite",
@@ -2890,6 +2901,11 @@
       "rental": "Demander une réservation",
       "rentalHint": "Envoyez vos dates à l'agence : elle confirme la disponibilité dans la messagerie. Rien ne se paie sur le site.",
       "signInRental": "Connectez-vous pour envoyer une demande de réservation. Vous reviendrez ensuite sur cette annonce.",
+      "home": {
+        "rental": "Demander un séjour",
+        "rentalHint": "Envoyez vos dates d'arrivée et de départ : l'annonceur confirme la disponibilité dans la messagerie. Rien ne se paie sur le site.",
+        "signInRental": "Connectez-vous pour envoyer une demande de séjour. Vous reviendrez ensuite sur cette annonce."
+      },
       "variantText": "Bonjour, « {title} » en {variant} est-il toujours disponible ?"
     },
     "safety": {
@@ -3668,6 +3684,7 @@
       "newTab": "(s'ouvre dans un nouvel onglet)",
       "guideNote": "Le guide des démarches renvoie vers les sites des administrations, seuls à faire foi. Règles des comptes Pro :",
       "termsLink": "CGU, article 4",
+      "termsHoliday": "location saisonnière, article 7.10",
       "accept": {
         "shop": "Je certifie que ces informations sont exactes et j'accepte ces engagements, sous ma seule responsabilité.",
         "pass": "J'accepte ces engagements pour toute la durée de ma boutique temporaire, sous ma seule responsabilité.",
@@ -5285,7 +5302,19 @@
       "acceptedTheirs": "{name} confirme la disponibilité",
       "blockedNote": "Dates bloquées sur l'annonce.",
       "pickupAppointment": "Proposer la remise du véhicule",
-      "safety": "La location se conclut par le contrat écrit de l'agence. {site} ne prend ni acompte ni caution : ne versez rien avant d'avoir vu le véhicule et signé le contrat."
+      "safety": "La location se conclut par le contrat écrit de l'agence. {site} ne prend ni acompte ni caution : ne versez rien avant d'avoir vu le véhicule et signé le contrat.",
+      "home": {
+        "period": "Du {from} au {to} · {days, plural, one {# nuit} other {# nuits}}",
+        "pickup": "Précisions : {place}",
+        "waiting": "En attente de la réponse de l'annonceur.",
+        "requestedTheirs": "{name} demande un séjour",
+        "block": "Bloquer ces nuits sur l'annonce",
+        "blockHint": "Cochez si le logement n'est plus libre ces nuits-là : l'annonce sortira des recherches à ces dates (le jour du départ reste libre).",
+        "blockFailed": "La disponibilité est confirmée, mais les nuits n'ont pas pu être bloquées. Mettez vos disponibilités à jour.",
+        "planning": "Ouvrir mes annonces",
+        "blockedNote": "Nuits bloquées sur l'annonce.",
+        "safety": "Le séjour se conclut directement avec l'annonceur, par un contrat ou une confirmation écrite. {site} ne prend ni acompte ni caution : ne versez rien avant d'avoir vérifié l'annonceur et le logement."
+      }
     },
     "event": {
       "period": "du {from} au {to}",
@@ -5309,18 +5338,29 @@
         "mine": "Vous avez retiré votre demande",
         "theirs": "{name} a retiré sa demande"
       },
-      "pickup": "remise : {place}"
+      "pickup": "remise : {place}",
+      "home": {
+        "requested": {
+          "mine": "Vous avez demandé un séjour {period}",
+          "theirs": "{name} demande un séjour {period}"
+        },
+        "declined": {
+          "mine": "Vous avez répondu « pas disponible » {period}",
+          "theirs": "{name} n'est pas disponible {period}"
+        },
+        "pickup": "précisions : {place}"
+      }
     },
     "preview": {
       "requested": "Demande de location",
       "changed": "Demande de location modifiée",
       "accepted": "Disponibilité confirmée",
-      "declined": "Pas de véhicule disponible",
+      "declined": "Pas disponible aux dates demandées",
       "withdrawn": "Demande de location retirée"
     },
     "errors": {
       "rental_request_changed": "Cette demande a changé entre-temps : voici sa dernière version.",
-      "rental_request_past": "Le jour de prise en charge est passé : le locataire doit demander d'autres dates.",
+      "rental_request_past": "Le premier jour demandé est passé : il faut demander d'autres dates.",
       "rental_request_unavailable": "Cette annonce ne prend plus de demande de location.",
       "place_payment_details": "Le lieu ne peut contenir ni coordonnées bancaires ni conditions de paiement. Indiquez seulement le lieu ; le reste se discute dans la conversation."
     }

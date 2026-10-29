@@ -73,4 +73,14 @@ describe("ProCommitments", () => {
     expect(markup).not.toContain('role="alert"');
     expect(html("Cochez la case")).toContain('aria-invalid="true"');
   });
+
+  it("links a seasonal rental agency to the CGU's real-estate listings rules", () => {
+    const markup = renderToStaticMarkup(
+      <NextIntlClientProvider locale="fr" messages={fr} timeZone="Africa/Casablanca">
+        <ProCommitments scope="holiday_rental" checked={false} onCheckedChange={() => undefined} />
+      </NextIntlClientProvider>,
+    );
+    expect(markup).toContain('href="/fr/legal/cgu#annonces-10"');
+    expect(markup).toContain('href="/fr/demarches/immobilier#procedure-immo-location-touristique"');
+  });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useId, useState } from "react";
-import { CalendarCheck, CalendarRange, CalendarX, CarFront, MapPin, Package, ShieldCheck } from "lucide-react";
+import { BedDouble, CalendarCheck, CalendarRange, CalendarX, CarFront, MapPin, NotebookPen, Package, ShieldCheck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { InlineError } from "@/components/feedback/inline-error";
@@ -19,12 +19,17 @@ import { cn } from "@/lib/utils";
 import { formatRentalDay } from "./rental-day";
 
 // The conversation's current booking request of a car rental, pinned under the thread header while
-// it is open (rental pack §6). For the agency: the renter's days and pick-up place, "Disponible"
+// it is open (rental pack §6); a holiday home's stay reads by nights, with the guest's note, and has
+// no pick-up appointment (seasonal rental conception §3). For the agency: the renter's days and pick-up place, "Disponible"
 // (optionally blocking the days on the listing) or "Pas disponible". For the renter: the request
 // sent, withdraw it. Once accepted: the days, and the pick-up appointment of the messaging. The
 // card always says that nothing is paid through the site.
 
 const ERROR_KEYS = ["rental_request_changed", "rental_request_past", "rental_request_unavailable", "place_payment_details"] as const;
+
+/** Texts of a stay (RentalRequest.card.home), the car rental's otherwise. */
+type HomeKey = "period" | "pickup" | "waiting" | "requestedTheirs" | "block" | "blockHint" | "blockFailed" | "planning" | "blockedNote" | "safety";
+export const rentalCardKey = <K extends HomeKey>(key: K, unit: RentalRequestView["unit"]) => (unit === "night" ? (`home.${key}` as const) : key);
 
 export function useRentalRequestErrorMessage(): (error: unknown) => string {
   const t = useTranslations("RentalRequest.errors");
@@ -65,6 +70,8 @@ export function RentalRequestCard({ cid, request, counterpartName, writable, now
   if (!rentalRequestOpen(request, moroccoToday(now))) return null;
   const name = isolate(counterpartName);
   const agency = !request.requestedByMe;
+  const stay = request.unit === "night";
+  const k = <K extends HomeKey>(key: K) => rentalCardKey(key, request.unit);
 
   async function act(action: RentalRequestAction, done: string) {
     setBusy(action.action);
@@ -84,19 +91,20 @@ export function RentalRequestCard({ cid, request, counterpartName, writable, now
   const period = (
     <p className="flex items-center gap-1.5 text-sm font-medium">
       <CalendarRange className="size-4 shrink-0 text-structure dark:text-gold-300" aria-hidden="true" />
-      <span className="tabular-nums">{t("period", { from: formatRentalDay(request.from, locale), to: formatRentalDay(request.to, locale), days: rentalDuration(request) })}</span>
+      <span className="tabular-nums">{t(k("period"), { from: formatRentalDay(request.from, locale), to: formatRentalDay(request.to, locale), days: rentalDuration(request) })}</span>
     </p>
   );
+  const PickupIcon = stay ? NotebookPen : MapPin;
   const pickup = request.pickup ? (
     <p dir="auto" className="flex items-center gap-1.5 text-sm text-foreground-muted">
-      <MapPin className="size-4 shrink-0" aria-hidden="true" />
-      <span className="min-w-0 break-words">{t("pickup", { place: isolate(request.pickup.split(URL_MARKER).join(t("maskedLink"))) })}</span>
+      <PickupIcon className="size-4 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 break-words">{t(k("pickup"), { place: isolate(request.pickup.split(URL_MARKER).join(t("maskedLink"))) })}</span>
     </p>
   ) : null;
   const safety = (
     <p className="flex gap-1.5 text-xs text-foreground-muted text-pretty">
       <ShieldCheck className="mt-px size-3.5 shrink-0 text-success" aria-hidden="true" />
-      {t("safety", { site: SITE_NAME })}
+      {t(k("safety"), { site: SITE_NAME })}
     </p>
   );
   const frame = "mx-3 mt-3 flex flex-col gap-3 rounded-lg border border-border bg-surface p-3.5 shadow-sm lg:mx-5";
@@ -108,7 +116,7 @@ export function RentalRequestCard({ cid, request, counterpartName, writable, now
         accepted ? "bg-success-surface text-success" : agency ? "bg-primary text-primary-foreground" : "bg-primary/12 text-primary",
       )}
     >
-      {accepted ? <CalendarCheck className="size-4.5" /> : <CarFront className="size-4.5" />}
+      {accepted ? <CalendarCheck className="size-4.5" /> : stay ? <BedDouble className="size-4.5" /> : <CarFront className="size-4.5" />}
     </span>
   );
 
@@ -123,18 +131,18 @@ export function RentalRequestCard({ cid, request, counterpartName, writable, now
             </h3>
             {period}
             {pickup}
-            {request.blocked ? <p className="text-xs text-foreground-muted">{t("blockedNote")}</p> : null}
+            {request.blocked ? <p className="text-xs text-foreground-muted">{t(k("blockedNote"))}</p> : null}
           </div>
         </div>
         {blockFailed ? (
           <div className="flex flex-col items-start gap-2">
-            <InlineError>{t("blockFailed")}</InlineError>
+            <InlineError>{t(k("blockFailed"))}</InlineError>
             <Button asChild variant="outline" size="sm" className="max-sm:h-11">
-              <Link href="/pro/flotte">{t("planning")}</Link>
+              <Link href={stay ? "/mes-annonces" : "/pro/flotte"}>{t(k("planning"))}</Link>
             </Button>
           </div>
         ) : null}
-        {writable && onPickup ? (
+        {writable && onPickup && !stay ? (
           <Button type="button" variant="outline" size="sm" className="self-start max-sm:h-11" onClick={onPickup} data-testid="rental-request-pickup">
             <Package aria-hidden="true" />
             {t("pickupAppointment")}
@@ -156,7 +164,7 @@ export function RentalRequestCard({ cid, request, counterpartName, writable, now
             </h3>
             {period}
             {pickup}
-            <p className="text-sm text-foreground-muted">{t("waiting")}</p>
+            <p className="text-sm text-foreground-muted">{t(k("waiting"))}</p>
           </div>
         </div>
         {writable ? (
@@ -183,7 +191,7 @@ export function RentalRequestCard({ cid, request, counterpartName, writable, now
         {badge(false)}
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <h3 id={`${id}-title`} className="font-semibold text-pretty">
-            {t("requestedTheirs", { name })}
+            {t(k("requestedTheirs"), { name })}
           </h3>
           {period}
           {pickup}
@@ -202,9 +210,9 @@ export function RentalRequestCard({ cid, request, counterpartName, writable, now
               className="mt-0.5 size-4 shrink-0 accent-[var(--color-structure)]"
             />
             <span className="flex flex-col gap-0.5">
-              <span className="text-sm font-medium">{t("block")}</span>
+              <span className="text-sm font-medium">{t(k("block"))}</span>
               <span id={`${id}-block-hint`} className="text-xs text-foreground-muted text-pretty">
-                {t("blockHint")}
+                {t(k("blockHint"))}
               </span>
             </span>
           </label>

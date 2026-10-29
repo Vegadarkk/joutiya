@@ -1,19 +1,20 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { RENTAL_SUBCATEGORY } from "@/config/categories";
+import { datedRental, type RentalUnit } from "@/config/categories";
 import { rentalRequestMarker, rentalRequestProblem, type RentalRequestAction, type RentalRequestEvent, type RentalRequestInput, type RentalRequestResponse } from "@/lib/contracts/rental-requests";
 import { getListing, type ListingRecord } from "@/lib/db/repositories/listings";
 import { rentalRequestSchema, type RentalRequestDoc, type RentalRequestEventDoc } from "@/lib/db/schemas";
 import { HttpError, notFound } from "@/lib/http/errors";
 import { blockRentalDates } from "@/lib/listings/availability";
 import { acceptsContact } from "@/lib/listings/public";
-import { dayNumber, moroccoToday } from "@/lib/listings/rental-availability";
+import { dayNumber, dayString, moroccoToday, type RentalPeriod } from "@/lib/listings/rental-availability";
 import { ConversationAccessError, getParticipantConversation, type ConversationRecord } from "@/lib/messaging/repository";
 import { screenPlace } from "@/lib/messaging/place";
 import { appendSystemStep, type MessagingActor } from "@/lib/messaging/service";
 import { rentalRequestView } from "./views";
 
-// Booking request steps of a car rental (rental pack §6). The renter (the conversation's buyer)
+// Booking request steps of a car rental (rental pack §6), and of a holiday home's stay by nights
+// (seasonal rental conception §3: arrival and departure, the host answers). The renter (the conversation's buyer)
 // asks for a period and a pick-up place, or replaces an unanswered request; the agency (the seller)
 // accepts, writing the days on the listing as unavailable when asked first, or declines; the renter
 // may withdraw an unanswered request. Each step is one system message appended in the message
@@ -35,15 +36,31 @@ export interface RentalStep {
   event: RentalRequestEvent;
 }
 
+export interface RentalStepOptions {
+  /** accept: the days were written on the listing. */
+  blocked?: boolean;
+  /** request: the listing's unit (a holiday home is rented by nights). */
+  unit?: RentalUnit;
+}
+
 /** The next state of `current` after `action` by the participant in `role` at `now`; throws when the action does not apply. */
-export function nextRentalStep(current: RentalRequestDoc | undefined, action: RentalRequestAction, role: RentalRole, now: Date, blocked = false): RentalStep {
+export function nextRentalStep(current: RentalRequestDoc | undefined, action: RentalRequestAction, role: RentalRole, now: Date, { blocked = false, unit = "day" }: RentalStepOptions = {}): RentalStep {
   const today = moroccoToday(now);
   if (action.action === "request") {
     if (role !== "buyer") throw new HttpError(403, "forbidden", "only the renter sends a booking request");
-    const problem = rentalRequestProblem(action, today);
+    const problem = rentalRequestProblem(action, today, unit);
     if (problem) invalidDates(problem);
     const pickup = action.pickup ? screenPlace(action.pickup) : undefined;
-    const request = rentalRequestSchema.parse({ id: newRequestId(), status: "requested", from: action.from, to: action.to, ...(pickup ? { pickup } : {}), createdAt: now, updatedAt: now });
+    const request = rentalRequestSchema.parse({
+      id: newRequestId(),
+      status: "requested",
+      from: action.from,
+      to: action.to,
+      ...(unit === "night" ? { unit } : {}),
+      ...(pickup ? { pickup } : {}),
+      createdAt: now,
+      updatedAt: now,
+    });
     return { request, event: current?.status === "requested" ? "changed" : "requested" };
   }
   if (!current || current.id !== action.id || current.status !== "requested") throw changed();
@@ -64,11 +81,18 @@ export function nextRentalStep(current: RentalRequestDoc | undefined, action: Re
 
 const roleOf = (conversation: Pick<ConversationRecord, "buyerUid">, uid: string): RentalRole => (conversation.buyerUid === uid ? "buyer" : "seller");
 
-/** The listing a booking request is about: a published car rental that takes contact, else 409. */
-export function assertRentalListing(listing: ListingRecord | null): asserts listing is ListingRecord {
-  if (!listing || listing.subcategoryId !== RENTAL_SUBCATEGORY || listing.status !== "published" || listing.moderation.hiddenBy || !acceptsContact(listing)) {
+/** The unit of the listing a booking request is about: a published car rental or holiday home that takes contact, else 409. */
+export function rentalListingUnit(listing: ListingRecord | null): RentalUnit {
+  const rental = datedRental(listing?.subcategoryId);
+  if (!listing || !rental || listing.status !== "published" || listing.moderation.hiddenBy || !acceptsContact(listing)) {
     throw new HttpError(409, "rental_request_unavailable");
   }
+  return rental.unit;
+}
+
+/** The listing days a request takes: a stay's nights leave its departure day free. */
+export function requestedPeriod(request: Pick<RentalRequestDoc, "from" | "to" | "unit">): RentalPeriod {
+  return request.unit === "night" ? { from: request.from, to: dayString(dayNumber(request.to) - 1) } : { from: request.from, to: request.to };
 }
 
 async function participantConversation(cid: string, uid: string): Promise<ConversationRecord> {
@@ -88,18 +112,19 @@ async function participantConversation(cid: string, uid: string): Promise<Conver
  */
 export async function actOnRentalRequest(actor: MessagingActor, cid: string, action: RentalRequestAction, now = new Date(), listing?: ListingRecord): Promise<RentalRequestResponse> {
   let blocked: boolean | null = null;
+  let unit: RentalUnit = "day";
   if (action.action === "request") {
     if (!listing) {
       const conversation = await participantConversation(cid, actor.uid);
       listing = (await getListing(conversation.listingId)) ?? undefined;
     }
-    assertRentalListing(listing ?? null);
+    unit = rentalListingUnit(listing ?? null);
   } else if (action.action === "accept" && action.block) {
     const conversation = await participantConversation(cid, actor.uid);
     const current = conversation.rentalRequest;
     // Checked again in the transaction; the days are only written for a request still open.
     nextRentalStep(current, action, roleOf(conversation, actor.uid), now);
-    if (current) blocked = await blockRentalDates(actor, conversation.listingId, { from: current.from, to: current.to }, now);
+    if (current) blocked = await blockRentalDates(actor, conversation.listingId, requestedPeriod(current), now);
   }
   let result: { request: RentalRequestDoc; role: RentalRole } | undefined;
   const messageId = await appendSystemStep(
@@ -107,13 +132,14 @@ export async function actOnRentalRequest(actor: MessagingActor, cid: string, act
     cid,
     (conversation) => {
       const role = roleOf(conversation, actor.uid);
-      const step = nextRentalStep(conversation.rentalRequest, action, role, now, blocked === true);
+      const step = nextRentalStep(conversation.rentalRequest, action, role, now, { blocked: blocked === true, unit });
       result = { request: step.request, role };
       const rentalRequest: RentalRequestEventDoc = {
         id: step.request.id,
         event: step.event,
         from: step.request.from,
         to: step.request.to,
+        ...(step.request.unit ? { unit: step.request.unit } : {}),
         // The renter's own words travel with the request only: that message is the one a member reports (A-02).
         ...(step.request.pickup && (step.event === "requested" || step.event === "changed") ? { pickup: step.request.pickup } : {}),
       };
