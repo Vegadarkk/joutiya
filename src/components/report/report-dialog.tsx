@@ -41,7 +41,7 @@ export interface ReportDialogProps {
   context: ReportContext;
   /** Listing title (listing) or the person's display name (profile, conversation, message). */
   subject?: string;
-  /** The reported message, as its reader sees it (message context). */
+  /** The reported message or review, as its reader sees it. */
   quote?: string;
   /** DSA point of contact (config/legal), offered when the form cannot send. */
   fallbackEmail?: string;

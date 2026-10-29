@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Camera, ImageOff } from "lucide-react";
+import { rentalFragment } from "@/components/rental/rental-day";
 import { BoostBadge } from "@/components/search/boost-badge";
 import type { CardBadge } from "@/components/search/filter-model";
 import { quietLinkClassName } from "@/components/ui/text-link";
@@ -65,7 +66,7 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
       {/* Physical alignment on the heading: the dir="auto" title inherits the page side, not its own start. */}
       <Heading className="text-sm font-medium leading-snug ltr:text-left rtl:text-right">
         <Link
-          href={`/annonce/${listing.slugId}`}
+          href={listing.rental ? `/annonce/${listing.slugId}${rentalFragment(listing.rental)}` : `/annonce/${listing.slugId}`}
           prefetch={false}
           dir="auto"
           className={cn("line-clamp-2 break-words outline-none", quietLinkClassName, "group-hover:decoration-current after:absolute after:inset-0 after:rounded-lg")}

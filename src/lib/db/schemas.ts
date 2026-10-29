@@ -17,6 +17,7 @@ import {
   regionCodeSchema,
   slugIdSchema,
 } from "@/lib/contracts/listings";
+import { listingVariantsSchema, stockSchema, variantItemSchema } from "@/lib/contracts/catalog";
 import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, UPLOAD_DOC_DECLARED_TYPES, UPLOAD_REJECT_REASONS, UPLOAD_STATUSES, listingPhotoSchema, uploadIdSchema } from "@/lib/contracts/media";
 import { ROLES } from "@/lib/firebase/claims";
 import { DAY_PATTERN, RENTAL_PERIODS_MAX } from "@/lib/listings/rental-availability";
@@ -33,6 +34,7 @@ import {
   appointmentIdSchema,
   slotSchema,
 } from "@/lib/contracts/appointments";
+import { RENTAL_PICKUP_MAX, RENTAL_REQUEST_EVENTS, RENTAL_REQUEST_STATUSES, rentalRequestIdSchema } from "@/lib/contracts/rental-requests";
 import { REPORT_PRIORITIES, REPORT_REASON_IDS, REPORT_TARGET_TYPES } from "@/config/report-reasons";
 import type { LedgerReason } from "@/lib/payments/wallet";
 
@@ -275,6 +277,13 @@ export const moderationSchema = z
   .strict();
 export type ListingModeration = z.infer<typeof moderationSchema>;
 
+/** Points of `priceLog`: a change a day for a month on 6 prices, beyond any real use. */
+export const PRICE_LOG_MAX = 200;
+export const priceLogEntrySchema = z
+  .object({ at: ts, price: z.number().int().min(0).max(PRICE_MAX).nullable(), key: variantItemSchema.shape.key.optional() })
+  .strict();
+export type PriceLogEntry = z.infer<typeof priceLogEntrySchema>;
+
 /**
  * listings/{listingId}: §5 `Listing` plus `slugId`; the id is the document id. A draft (D2) is the
  * same document with `status: "draft"`: the fields the wizard fills step by step (category, texts,
@@ -306,6 +315,15 @@ export const listingSchema = z
     location: listingLocationSchema.optional(),
     /** Order = display order; <= quotas.photosPerListing. */
     photos: z.array(listingPhotoSchema).max(50),
+    /** Pro catalogue (lot 4, catalogue-boutique.md §2-3): variants, or the declared stock without them. */
+    variants: listingVariantsSchema.optional(),
+    stock: stockSchema.optional(),
+    /**
+     * Prices of the last 31 days, a point per change once published (`key`: a combination's own
+     * price; absent: the listing's): the struck-out price of a promotion is their lowest (art. 54
+     * of law 31-08). The point in force when the window opens is kept too.
+     */
+    priceLog: z.array(priceLogEntrySchema).max(PRICE_LOG_MAX).optional(),
     /** The number is never here; `showPhone` requires `badges.phoneVerified` at publish. */
     contact: z.object({ messaging: z.literal(true), showPhone: z.boolean(), whatsapp: z.boolean() }).strict(),
     boosts: z.object({ bumpedAt: ts.optional(), featuredUntil: ts.optional(), dailyBumpUntil: ts.optional(), highlightUntil: ts.optional() }).strict(),
@@ -584,6 +602,31 @@ export const appointmentEventSchema = z
   .strict();
 export type AppointmentEventDoc = z.infer<typeof appointmentEventSchema>;
 
+const rentalDay = z.string().regex(DAY_PATTERN);
+
+/** Conversation.rentalRequest: the renter's current booking request of a car rental (rental pack §6). */
+export const rentalRequestSchema = z
+  .object({
+    id: rentalRequestIdSchema,
+    status: z.enum(RENTAL_REQUEST_STATUSES),
+    from: rentalDay,
+    to: rentalDay,
+    /** Links masked like a message (URL_MARKER). */
+    pickup: z.string().max(RENTAL_PICKUP_MAX + 40).optional(),
+    /** Accepted with the days written on the listing as unavailable. */
+    blocked: z.boolean().optional(),
+    createdAt: ts,
+    updatedAt: ts,
+  })
+  .strict();
+export type RentalRequestDoc = z.infer<typeof rentalRequestSchema>;
+
+/** Message.rentalRequest: the step a booking request system message shows. */
+export const rentalRequestEventSchema = z
+  .object({ id: rentalRequestIdSchema, event: z.enum(RENTAL_REQUEST_EVENTS), from: rentalDay, to: rentalDay, pickup: z.string().max(RENTAL_PICKUP_MAX + 40).optional() })
+  .strict();
+export type RentalRequestEventDoc = z.infer<typeof rentalRequestEventSchema>;
+
 /** conversations/{cid}: one per (listing, buyer); cid derived on the server (D1). Served to participants by the API (D2). */
 export const conversationSchema = z
   .object({
@@ -630,6 +673,8 @@ export const conversationSchema = z
     appointment: appointmentSchema.optional(),
     /** Due time of the confirmed appointment's next reminder (job appointment-reminders). */
     appointmentRemindAt: ts.optional(),
+    /** The current booking request of a car rental (requested, answered or withdrawn); the thread keeps every step. */
+    rentalRequest: rentalRequestSchema.optional(),
     /** The buyer reviewed the seller from this conversation (once, even if the review is deleted later). */
     reviewedAt: ts.optional(),
     /** The seller's first message: the exchange is reciprocal, a review opens 24 h later (vitrine-avis §2). */
@@ -651,6 +696,8 @@ export const messageSchema = z
     hidden: z.boolean().optional(),
     /** Appointment system message: its text is the appointmentMarker of the event. */
     appointment: appointmentEventSchema.optional(),
+    /** Booking request system message: its text is the rentalRequestMarker of the event. */
+    rentalRequest: rentalRequestEventSchema.optional(),
     createdAt: ts,
     readAt: ts.optional(),
   })

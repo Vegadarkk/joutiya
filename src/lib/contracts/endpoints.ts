@@ -58,6 +58,8 @@ export const LISTING_API = {
   availability: (id: string) => `/api/listings/${id}/availability`,
   /** GET a car rental agency's fleet planning, PUT its changes (rental pack §3). */
   fleet: "/api/pro/fleet",
+  /** PUT the declared stock alone (Pro catalogue). */
+  stock: (id: string) => `/api/listings/${id}/stock`,
 } as const;
 
 // Phase 5 (design phase-5 §3, §4).
@@ -77,6 +79,8 @@ export const MESSAGING_API = {
   state: (cid: string) => `/api/conversations/${cid}/state`,
   /** POST AppointmentAction -> 201 AppointmentResponse (contracts/appointments.ts). */
   appointment: (cid: string) => `/api/conversations/${cid}/appointment`,
+  /** POST RentalRequestAction -> 201 RentalRequestResponse (contracts/rental-requests.ts). */
+  rentalRequest: (cid: string) => `/api/conversations/${cid}/rental-request`,
   /** GET { total } (Valkey). */
   unread: "/api/messages/unread",
   /** GET text/event-stream of MessagingEvent (session cookie; one per tab, D2). */

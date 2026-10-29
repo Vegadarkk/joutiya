@@ -68,6 +68,8 @@ export function toOwnerListing(listing: ListingRecord, uploads: readonly UploadR
     photos: mergePhotos(listing, uploads),
     contact: { showPhone: listing.contact.showPhone, whatsapp: listing.contact.whatsapp },
     sensitiveDeclaration: listing.moderation.sensitiveDeclaration ? { kind: listing.moderation.sensitiveDeclaration.kind, at: listing.moderation.sensitiveDeclaration.at.toISOString() } : null,
+    variants: listing.variants ?? null,
+    stock: listing.stock ?? null,
     moderation: { state: listing.moderation.state, flags: listing.moderation.flags },
     version: listing.version,
     createdAt: listing.createdAt.toISOString(),

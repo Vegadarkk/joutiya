@@ -1,5 +1,5 @@
 import "server-only";
-import { subcategoryAllowsAds } from "@/config/categories";
+import { sanitaryNumber, subcategoryAllowsAds } from "@/config/categories";
 import { listingLifetime } from "@/config/pricing";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { StaffContext } from "@/lib/auth/guards";
@@ -8,6 +8,7 @@ import type { ListingStatus, ModerationFlag, ModerationState, SensitiveDeclarati
 import type { ListingPhoto, UploadStatus } from "@/lib/contracts/media";
 import { ACTIVE_STATUSES, ListingVersionError, applyPatch, getListing, getListingTx, listOwnerListingsByStatus, updateListingTx, type ListingRecord } from "@/lib/db/repositories/listings";
 import { getModerationDecision, listDecisionsForUser, listPendingReview, recordModerationDecisionTx, type ModerationDecisionInput } from "@/lib/db/repositories/moderation-decisions";
+import { getProProfile, recordSanitaryNumberTx } from "@/lib/db/repositories/pro-profiles";
 import { getUserRecord, type UserRecord } from "@/lib/db/repositories/profiles";
 import { enqueueSearchOutboxTx } from "@/lib/db/repositories/search-outbox";
 import { getUploads } from "@/lib/db/repositories/uploads";
@@ -156,19 +157,21 @@ export async function moderationQueue(limit = QUEUE_PAGE): Promise<ModerationQue
 export async function moderationReview(id: string, now = new Date()): Promise<ModerationReview | null> {
   const listing = await getListing(id);
   if (!listing || !REVIEWABLE.includes(listing.status)) return null;
-  const [user, uploads, others, decisions, lastDecision] = await Promise.all([
+  const [user, uploads, others, decisions, lastDecision, shop] = await Promise.all([
     getUserRecord(listing.ownerUid),
     getUploads(listing.photos.map((photo) => photo.id)),
     listOwnerListingsByStatus(listing.ownerUid, [...ACTIVE_STATUSES, "paused", "rejected"]),
     listDecisionsForUser(listing.ownerUid, 10),
     listing.moderation.lastDecisionId ? getModerationDecision(listing.moderation.lastDecisionId) : Promise.resolve(null),
+    listing.proId && sanitaryNumber(listing.subcategoryId, listing.attributes) ? getProProfile(listing.proId) : Promise.resolve(null),
   ]);
+  const sanitaryNumbers = shop && shop.ownerUid === listing.ownerUid ? (shop.sanitaryNumbers ?? []) : [];
   const uploadById = new Map(uploads.map((upload) => [upload.id, upload]));
   const otherListings = others.filter((other) => other.id !== listing.id);
 
   let screening: ModerationReview["screening"] = null;
   try {
-    const facts = sellerFacts({ accountCreatedAt: user?.createdAt ?? listing.createdAt, phoneVerified: user?.badges.phoneVerified ?? false, others: otherListings, now });
+    const facts = sellerFacts({ accountCreatedAt: user?.createdAt ?? listing.createdAt, phoneVerified: user?.badges.phoneVerified ?? false, others: otherListings, sanitaryNumbers, now });
     const result = await screen({ listing, uploads, seller: facts, others: otherListings.filter((other) => other.status !== "rejected") }, listing.id);
     screening = { state: result.state, score: result.score, flags: result.flags, evidence: result.evidence };
   } catch (error) {
@@ -296,7 +299,11 @@ export async function decide(staff: StaffContext, id: string, input: ModerationD
     await db().runTransaction(async (tx) => {
       const current = await getListingTx(tx, id);
       if (!current || current.status !== "pending_review" || current.version !== input.version) throw new ListingVersionError();
+      // An approval vouches for the ONSSA number it checked: the shop's later listings with it are not held for it.
+      const sanitary = approve ? sanitaryNumber(current.subcategoryId, current.attributes) : undefined;
+      const shop = sanitary && current.proId ? await getProProfile(current.proId, tx) : null;
       decisionId = recordModerationDecisionTx(tx, record);
+      if (sanitary && shop && shop.ownerUid === current.ownerUid) recordSanitaryNumberTx(tx, shop, sanitary, now);
       patch.moderation = { ...current.moderation, state: approve ? "human_ok" : "human_rejected", reviewedBy: staff.user.uid, reviewedAt: now, lastDecisionId: decisionId };
       patch.adsEligible = approve && current.moderation.openReports === 0 && !current.moderation.hiddenBy && subcategoryAllowsAds(current.subcategoryId);
       updateListingTx(tx, id, patch);

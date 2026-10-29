@@ -16,7 +16,7 @@ export type SanctionAction = (typeof SANCTION_ACTIONS)[number];
 export const SUSPENSION_DAYS = [7, 30] as const;
 export type SuspensionDays = (typeof SUSPENSION_DAYS)[number];
 
-export const DECISION_TARGET_TYPES = ["listing", "user", "message"] as const;
+export const DECISION_TARGET_TYPES = ["listing", "user", "message", "review"] as const;
 export type DecisionTargetType = (typeof DECISION_TARGET_TYPES)[number];
 
 export interface DecisionText {
@@ -56,12 +56,14 @@ export const DETAILS_MAX = 1000;
 const LISTING: readonly DecisionTargetType[] = ["listing"];
 const MESSAGE: readonly DecisionTargetType[] = ["message"];
 const USER: readonly DecisionTargetType[] = ["user"];
-const ALL: readonly DecisionTargetType[] = ["listing", "user", "message"];
+const REVIEW: readonly DecisionTargetType[] = ["review"];
+const ALL: readonly DecisionTargetType[] = ["listing", "user", "message", "review"];
 
 const RULES = "CGU, règles de publication";
 const PROHIBITED = "CGU, objets et services interdits";
 const CONDUCT = "CGU, comportement des utilisateurs";
 const SANCTIONS = "CGU, sanctions graduées";
+const REVIEWS = "CGU, avis utilisateurs";
 
 const NO_BREACH: DecisionText = {
   fr: "après examen, le contenu signalé ne nous paraît ni illicite ni contraire à nos conditions générales d'utilisation",
@@ -317,6 +319,106 @@ export const DECISION_TEMPLATES = [
     outcome: "unfounded",
     defaultSanction: "none",
   },
+  // ---- Reviews (vitrine-avis §3): a hidden review leaves the seller's average --------------------
+  {
+    id: "review.remove.personal_data",
+    label: "Avis masqué : données personnelles ou sensibles",
+    action: "remove",
+    targets: REVIEW,
+    ground: { type: "terms", ref: `${REVIEWS} (données personnelles)` },
+    facts: {
+      fr: "l'avis contient des données personnelles ou sensibles (numéro, adresse, santé, religion ou opinions d'une personne)",
+      ar: "يحتوي التقييم على معطيات شخصية أو حساسة (رقم، عنوان، صحة، دين أو آراء شخص)",
+    },
+    explanation: {
+      fr: "nos conditions générales interdisent de publier dans un avis des données personnelles ou sensibles",
+      ar: "تمنع شروطنا العامة نشر معطيات شخصية أو حساسة في تقييم",
+    },
+    outcome: "founded",
+    defaultSanction: "none",
+  },
+  {
+    id: "review.remove.abuse",
+    label: "Avis masqué : insultes, haine ou dénigrement",
+    action: "remove",
+    targets: REVIEW,
+    ground: { type: "terms", ref: `${REVIEWS} (respect)` },
+    facts: {
+      fr: "l'avis contient des insultes, des propos haineux ou des accusations sans rapport avec l'échange",
+      ar: "يحتوي التقييم على سب أو خطاب كراهية أو اتهامات لا علاقة لها بالمعاملة",
+    },
+    explanation: {
+      fr: "nos conditions générales exigent un avis courtois, qui décrit l'échange sans attaquer la personne",
+      ar: "تشترط شروطنا العامة تقييمًا لائقًا يصف المعاملة دون التهجم على الشخص",
+    },
+    outcome: "founded",
+    defaultSanction: "next",
+  },
+  {
+    id: "review.remove.fake",
+    label: "Avis masqué : faux avis ou hors sujet",
+    action: "remove",
+    targets: REVIEW,
+    ground: { type: "terms", ref: `${REVIEWS} (authenticité)` },
+    facts: {
+      fr: "l'avis ne décrit pas l'échange réalisé avec ce membre (avis de complaisance, contrepartie, hors sujet)",
+      ar: "لا يصف التقييم المعاملة التي تمت مع هذا العضو (تقييم مجاملة، مقابل، خارج الموضوع)",
+    },
+    explanation: {
+      fr: "nos conditions générales n'acceptent que des avis sincères sur un échange réel",
+      ar: "لا تقبل شروطنا العامة إلا تقييمات صادقة عن معاملة حقيقية",
+    },
+    outcome: "founded",
+    defaultSanction: "none",
+  },
+  {
+    id: "review.remove.spam",
+    label: "Avis masqué : publicité, lien ou coordonnées",
+    action: "remove",
+    targets: REVIEW,
+    ground: { type: "terms", ref: `${REVIEWS} (publicité)` },
+    facts: { fr: "l'avis contient de la publicité, un lien ou des coordonnées", ar: "يحتوي التقييم على إشهار أو رابط أو معلومات اتصال" },
+    explanation: { fr: "nos conditions générales réservent les avis à la description de l'échange", ar: "تخصص شروطنا العامة التقييمات لوصف المعاملة" },
+    outcome: "founded",
+    defaultSanction: "none",
+  },
+  {
+    id: "review.remove.p0",
+    label: "Avis masqué P0 confirmé : contenu illicite grave (bannissement)",
+    action: "remove",
+    targets: REVIEW,
+    ground: { type: "illegal", ref: "Code pénal (contenu illicite grave)" },
+    facts: {
+      fr: "l'avis contient un contenu illicite grave (mise en danger de mineurs, terrorisme ou menace de violence)",
+      ar: "يحتوي التقييم على محتوى غير قانوني خطير (تعريض قاصرين للخطر أو إرهاب أو تهديد بالعنف)",
+    },
+    explanation: { fr: "ce contenu est interdit par la loi et par nos conditions générales", ar: "هذا المحتوى ممنوع بموجب القانون وبموجب شروطنا العامة" },
+    outcome: "founded",
+    defaultSanction: "ban",
+    p0: true,
+  },
+  {
+    id: "review.restore",
+    label: "Avis rétabli : signalement non fondé",
+    action: "restore",
+    targets: REVIEW,
+    ground: { type: "terms", ref: REVIEWS },
+    facts: { fr: "après examen du signalement, l'avis respecte nos règles", ar: "بعد فحص التبليغ، يحترم التقييم قواعدنا" },
+    explanation: NO_BREACH,
+    outcome: "unfounded",
+    defaultSanction: "none",
+  },
+  {
+    id: "review.no_action",
+    label: "Aucune mesure : l'avis est publié",
+    action: "no_action",
+    targets: REVIEW,
+    ground: { type: "terms", ref: REVIEWS },
+    facts: { fr: "après examen, l'avis respecte nos règles et reste publié", ar: "بعد الفحص، يحترم التقييم قواعدنا ويبقى منشورًا" },
+    explanation: NO_BREACH,
+    outcome: "unfounded",
+    defaultSanction: "none",
+  },
   // ---- Accounts (sanctions ladder, D14) ---------------------------------------------------------
   {
     id: "user.warn",
@@ -421,7 +523,7 @@ export const DECISION_TEMPLATES = [
     id: "authority.remove",
     label: "Retrait sur injonction d'une autorité",
     action: "remove",
-    targets: ["listing", "message"],
+    targets: ["listing", "message", "review"],
     ground: { type: "illegal", ref: "Injonction d'une autorité" },
     facts: { fr: "une autorité compétente nous a ordonné de retirer ce contenu", ar: "أمرتنا سلطة مختصة بسحب هذا المحتوى" },
     explanation: { fr: "le retrait exécute cette injonction", ar: "يُنفِّذ السحبُ هذا الأمر" },

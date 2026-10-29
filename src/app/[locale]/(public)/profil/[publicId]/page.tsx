@@ -175,7 +175,14 @@ export default async function ProfilePage({ params }: { params: Params }) {
         ) : null}
       </section>
 
-      <SellerReviews rating={profile.rating} page={profile.reviews} publicId={profile.publicId} sellerName={profile.displayName} locale={locale} />
+      <SellerReviews
+        rating={profile.rating}
+        page={profile.reviews}
+        publicId={profile.publicId}
+        sellerName={profile.displayName}
+        locale={locale}
+        report={{ email: legal.dsaContactEmail, url: `${CANONICAL_ORIGIN}${profilePath(locale, profile.publicId)}#avis` }}
+      />
 
       {/* Profiles stay out of the ad inventory (AF §8 table): house promotion only. */}
       <AdSlot placement="profile-bottom" eligible={false} promos={availablePromos(flags)} seed={publicId} />

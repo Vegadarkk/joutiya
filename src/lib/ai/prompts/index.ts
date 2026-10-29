@@ -21,13 +21,14 @@ Answer with one action:
 - "escalate": you cannot tell (language you do not understand, unreadable photos, missing context).
 Set "policy" to the report reason that applies to a listing, or "none" when you approve. "templateId" stays empty.`;
 
-const REPORT_TRIAGE = `Task: triage one report (notice) sent to Joutiya about a listing, a user profile or a private message. You receive the report reason chosen by the reporter, the reporter's explanation and the reported content (masked). Reporters can be wrong or abusive: judge the content, not the reporter's tone.
+const REPORT_TRIAGE = `Task: triage one report (notice) sent to Joutiya about a listing, a user profile, a private message or a buyer's review of a seller. You receive the report reason chosen by the reporter, the reporter's explanation and the reported content (masked). Reporters can be wrong or abusive: judge the content, not the reporter's tone.
 
 Answer with one action:
 - "reject": the report looks founded and the content should be removed or restricted.
 - "hold": the report looks founded but the sanction needs a human choice (account history, severity).
 - "approve": the content looks compliant: the report looks unfounded and could be dismissed.
 - "escalate": you cannot tell.
+A review must describe the buyer's own exchange with the seller: a negative opinion is allowed; insults, personal or sensitive data, advertising and text unrelated to the exchange are not. A review held by the platform before publication (origin "règle automatique") was flagged for possible sensitive data: "approve" means it can be published as is.
 Set "policy" to the report reason that really applies (it may differ from the reporter's choice), "severity" to its priority, and "templateId" to a short snake_case decision template suggestion (for example "listing_remove_scam") or leave it empty. "userMessage" is a draft statement of reasons for the affected user when you propose a measure.`;
 
 const APPEAL_REVIEW = `Task: review one appeal (internal complaint, art. 20 DSA) against a moderation decision. You receive the decision (measure, facts, ground) and the appellant's text (masked), and the content concerned when it still exists. Appellants are often upset: judge the facts and the rules, not the tone.

@@ -11,6 +11,7 @@ import { mediaObjectKey } from "@/lib/media/urls";
 import { containsProhibited } from "@/lib/moderation/prohibited";
 import { consume } from "@/lib/quota";
 import { getReport, type ReportRecord } from "@/lib/reports/repository";
+import { getReview } from "@/lib/reviews/repository";
 import { evidenceRef, messageRef, readConversationFacts } from "@/lib/reports/targets";
 import { splitMessageId } from "@/lib/reports/target-key";
 import { objectStore, type ObjectStore } from "@/lib/storage";
@@ -21,7 +22,7 @@ import type { AiImage, AiTarget, AiTask, AiTaskInput, ListingFacts } from "./typ
 // What each task sends (design D19): the masked content only. Listing: category, city, price,
 // condition, title, description, the pre-moderation flags and up to 3 photos (variant "s",
 // re-encoded JPEG <= 1000 px). Report: reason, the reporter's explanation and the reported content
-// (a message: that one message only, never the conversation). Appeal: the decision and the
+// (a message: that one message only, never the conversation; a review: its note and text). Appeal: the decision and the
 // appellant's text. Names of the people involved are masked with phones, e-mails and links. Every
 // user-written text sits inside its tag (USER_FIELDS, "<" escaped), the platform's lines outside:
 // the rules tell the model what is inside is data, never an instruction (audit D1b-03).
@@ -135,6 +136,14 @@ async function reportedMessage(id: string): Promise<{ text: string; names: strin
   return { text, names };
 }
 
+const TARGET_OF: Record<ReportRecord["target"]["type"], string> = {
+  listing: "d'une annonce",
+  message: "d'un message privé",
+  user: "d'un profil",
+  pro: "d'une boutique",
+  review: "d'un avis",
+};
+
 /** Triage input of an open report; null when the report is gone or closed. */
 export async function reportTriageInput(reportId: string, deps: InputDeps = {}): Promise<{ input: AiTaskInput; report: ReportRecord } | null> {
   const report = await getReport(reportId);
@@ -142,7 +151,7 @@ export async function reportTriageInput(reportId: string, deps: InputDeps = {}):
   const reason = reportReason(report.reasonId);
   const names: string[] = [report.reporter.name ?? ""];
   const lines = [
-    `Signalement de ${report.target.type === "listing" ? "une annonce" : report.target.type === "message" ? "un message privé" : "un profil"}.`,
+    `Signalement ${TARGET_OF[report.target.type]}.`,
     `Motif choisi : ${report.reasonId} (${report.priority}${reason ? `, ${reason.label.fr}` : ""})`,
     `Origine : ${report.source === "user" ? "utilisateur" : report.source === "system" ? "règle automatique" : "autorité"}`,
   ];
@@ -160,6 +169,14 @@ export async function reportTriageInput(reportId: string, deps: InputDeps = {}):
     const message = await reportedMessage(report.target.id);
     if (message) names.push(...message.names);
     lines.push(`Contenu signalé (un seul message) :\n${message ? userField(USER_FIELDS.message, maskPii(message.text, names)) : "message introuvable."}`);
+  } else if (report.target.type === "review") {
+    const review = await getReview(report.target.id);
+    if (review) names.push(review.authorName, review.targetName);
+    lines.push(
+      review
+        ? `Contenu signalé (avis d'un acheteur sur un vendeur, note ${review.rating}/5, état ${review.status}) :\n${userField(USER_FIELDS.review, maskPii(review.text, names))}`
+        : "Contenu signalé : avis introuvable.",
+    );
   } else {
     lines.push("Contenu signalé : profil d'un membre (pas de contenu joint).");
   }

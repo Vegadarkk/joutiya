@@ -180,6 +180,7 @@ export function buildDecideRequest(target: string, draft: DecideDraft & { templa
 const CONFIRM: Record<DecisionTargetType, Partial<Record<DecisionAction, string>>> = {
   listing: { remove: "Retirer l'annonce", restrict_visibility: "Restreindre l'annonce", restore: "Rétablir l'annonce", no_action: "Classer sans suite" },
   message: { remove: "Masquer le message", restore: "Rétablir le message", no_action: "Classer sans suite" },
+  review: { remove: "Masquer l'avis", restore: "Rétablir l'avis", no_action: "Publier l'avis" },
   user: { warn: "Avertir le compte", suspend_account: "Suspendre le compte", ban: "Fermer le compte", restore: "Rétablir le compte", no_action: "Classer sans suite" },
 };
 

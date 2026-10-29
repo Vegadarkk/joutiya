@@ -20,6 +20,7 @@ export const SEARCH_QUERY_KEYS = {
   shop: "boutique",
   donation: "don",
   withPhoto: "photo",
+  includeSoldOut: "epuises",
   conditions: "etat",
   rentFrom: "du",
   rentTo: "au",

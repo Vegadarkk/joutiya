@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Container } from "./container";
 import { showsCategoryRow } from "./shell-paths";
 
-// The category row under the header (Carte vivante, lot 1): the eleven category pages as floating
+// The category row under the header (Carte vivante, lot 1): the category pages as floating
 // chips, then the admin procedures guide. One scrolling line at every width, bleeding to the screen
 // edge below lg and fading out at the container's end from lg (room after the last chip so that it
 // scrolls clear of the fade). Each link is a 44 px target around a 36 px chip. Labels come from the server

@@ -858,6 +858,7 @@
       "criterion_max": "La valeur maximale est {max}.",
       "criterion_integer": "Entrez un nombre entier.",
       "criterion_text_max": "Ce champ ne peut pas dépasser {max} caractères.",
+      "criterion_format_onssa": "Format attendu : lettres, province, numéro et année séparés par des points, par exemple M.07.113.20.",
       "condition_required": "Indiquez l'état.",
       "title_min": "Le titre doit faire au moins {min} caractères.",
       "title_max": "Le titre ne peut pas dépasser {max} caractères.",
@@ -894,7 +895,13 @@
       "deposit_max": "Le dépôt de garantie ne peut pas dépasser 2 mois de loyer (loi 67-12).",
       "real_estate_attestation": "Pour publier une annonce immobilière, attestez que ses informations sont exactes et sous votre seule responsabilité.",
       "rental_rate_max": "Un tarif longue durée ne peut pas dépasser le prix par jour (ni celui à 7 jours pour le tarif à 30 jours).",
-      "rental_attestation": "Confirmez la déclaration de votre agence pour publier une location."
+      "rental_attestation": "Confirmez la déclaration de votre agence pour publier une location.",
+      "variants_pro_only": "Les variantes (tailles, couleurs, contenances) sont réservées aux boutiques Pro.",
+      "variants_donation": "Un don ne peut pas avoir de variantes.",
+      "variants_axis_invalid": "Ce critère ne s'applique pas à cette sous-catégorie : choisissez un autre axe de variante.",
+      "stock_pro_only": "Le suivi du stock est réservé aux boutiques Pro.",
+      "stock_with_variants": "Avec des variantes, le stock se saisit pour chaque combinaison.",
+      "no_variants": "Cette annonce n'a pas de variantes."
     },
     "status": {
       "draft": "Brouillon",
@@ -973,7 +980,20 @@
         "tenues-traditionnelles": "Tenues traditionnelles",
         "chaussures": "Chaussures",
         "sacs-accessoires": "Sacs & accessoires",
-        "montres-bijoux": "Montres & bijoux"
+        "montres-bijoux": "Montres & bijoux",
+        "beaute-soins": "Beauté et soins"
+      }
+    },
+    "terroir": {
+      "name": "Produits du terroir",
+      "sub": {
+        "huile-olive": "Huile d'olive",
+        "huile-argan-alimentaire": "Huile d'argan alimentaire",
+        "miel": "Miel",
+        "amlou-pates-a-tartiner": "Amlou et pâtes à tartiner",
+        "dattes-fruits-secs": "Dattes et fruits secs",
+        "epices-herbes": "Épices et herbes",
+        "autres-produits-terroir": "Autres produits du terroir"
       }
     },
     "famille": {
@@ -2281,6 +2301,85 @@
     "delivery-year": {
       "label": "Livraison prévue (année)"
     },
+    "beauty-product-type": {
+      "label": "Type de produit",
+      "options": {
+        "huile-argan": "Huile d'argan cosmétique",
+        "savon-noir": "Savon noir",
+        "ghassoul": "Ghassoul",
+        "eau-de-rose": "Eau de rose",
+        "henne": "Henné",
+        "parfum": "Parfum",
+        "maquillage": "Maquillage",
+        "soin-visage-corps": "Soin du visage et du corps",
+        "soin-cheveux": "Soin des cheveux",
+        "autre": "Autre"
+      }
+    },
+    "onssa-number": {
+      "label": "N° d'agrément ou d'autorisation ONSSA"
+    },
+    "olive-oil-grade": {
+      "label": "Catégorie",
+      "options": {
+        "vierge-extra": "Vierge extra",
+        "vierge": "Vierge",
+        "vierge-courante": "Vierge courante"
+      }
+    },
+    "honey-type": {
+      "label": "Variété de miel",
+      "options": {
+        "euphorbe": "Euphorbe (daghmous)",
+        "thym": "Thym (zaatar)",
+        "jujubier": "Jujubier (sedra)",
+        "oranger": "Fleur d'oranger",
+        "eucalyptus": "Eucalyptus",
+        "romarin": "Romarin",
+        "lavande": "Lavande",
+        "caroube": "Caroubier",
+        "toutes-fleurs": "Toutes fleurs",
+        "autre": "Autre"
+      }
+    },
+    "date-variety": {
+      "label": "Variété",
+      "options": {
+        "mejhoul": "Mejhoul",
+        "boufeggous": "Boufeggous",
+        "jihel": "Jihel",
+        "aziza": "Aziza",
+        "bouskri": "Bouskri",
+        "najda": "Najda",
+        "autre": "Autre"
+      }
+    },
+    "spice-type": {
+      "label": "Épice",
+      "options": {
+        "safran": "Safran",
+        "ras-el-hanout": "Ras el hanout",
+        "cumin": "Cumin",
+        "paprika": "Paprika",
+        "gingembre": "Gingembre",
+        "curcuma": "Curcuma",
+        "poivre": "Poivre",
+        "cannelle": "Cannelle",
+        "herbes-aromatiques": "Herbes aromatiques",
+        "autre": "Autre"
+      }
+    },
+    "terroir-type": {
+      "label": "Type de produit",
+      "options": {
+        "couscous-pates": "Couscous et pâtes",
+        "olives": "Olives",
+        "conserves-confitures": "Conserves et confitures",
+        "the-infusions": "Thé et infusions",
+        "farines-semoules": "Farines et semoules",
+        "autre": "Autre"
+      }
+    },
     "rental-class": {
       "label": "Catégorie de véhicule",
       "options": {
@@ -2602,18 +2701,32 @@
           "rate_limited": "Vous avez envoyé beaucoup de messages. Réessayez {wait}.",
           "later": "plus tard",
           "quota_exhausted": "La messagerie est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc).",
-          "adult_confirmation_required": "Cet article est réservé aux personnes majeures : confirmez avoir 18 ans ou plus pour écrire au vendeur."
+          "adult_confirmation_required": "Cet article est réservé aux personnes majeures : confirmez avoir 18 ans ou plus pour écrire au vendeur.",
+          "rental_request_unavailable": "Cette annonce ne prend plus de demande de location."
         },
         "adultConfirm": "Je confirme avoir 18 ans ou plus.",
         "adultMissing": "Confirmez avoir 18 ans ou plus pour écrire au vendeur.",
         "visitTitle": "Demander une visite à {name}",
         "visitTitleFallback": "Demander une visite",
         "visitDraft": "Bonjour, votre bien m'intéresse et je souhaiterais le visiter. Quelles sont vos disponibilités ?",
-        "visitSafety": "Une visite ne se paie jamais : ne versez ni acompte ni frais de réservation avant d'avoir vu le bien et signé un contrat. Après l'envoi, proposez vos créneaux dans la conversation."
+        "visitSafety": "Une visite ne se paie jamais : ne versez ni acompte ni frais de réservation avant d'avoir vu le bien et signé un contrat. Après l'envoi, proposez vos créneaux dans la conversation.",
+        "rentalTitle": "Demande de réservation à {name}",
+        "rentalTitleFallback": "Demande de réservation",
+        "rentalDates": "Dates de location",
+        "rentalPickup": "Lieu de remise (facultatif)",
+        "rentalPickupPlaceholder": "Ex. : aéroport Mohammed V, agence de Maârif",
+        "rentalDraft": "Bonjour, je souhaite louer « {title} » du {from} au {to} ({days, plural, one {# jour} other {# jours}}). Est-ce disponible ?",
+        "rentalDraftPickup": "Bonjour, je souhaite louer « {title} » du {from} au {to} ({days, plural, one {# jour} other {# jours}}), remise à {pickup}. Est-ce disponible ?",
+        "rentalDatesMissing": "Choisissez les dates de prise en charge et de retour.",
+        "rentalSafety": "La location se conclut par le contrat écrit de l'agence : ne versez ni acompte ni caution sur le site ou avant d'avoir vu le véhicule.",
+        "rentalSend": "Envoyer la demande"
       },
       "visit": "Demander une visite",
       "visitShort": "Visite",
-      "signInVisit": "Connectez-vous pour demander une visite. Vous reviendrez ensuite sur cette annonce."
+      "signInVisit": "Connectez-vous pour demander une visite. Vous reviendrez ensuite sur cette annonce.",
+      "rental": "Demander une réservation",
+      "rentalHint": "Envoyez vos dates à l'agence : elle confirme la disponibilité dans la messagerie. Rien ne se paie sur le site.",
+      "signInRental": "Connectez-vous pour envoyer une demande de réservation. Vous reviendrez ensuite sur cette annonce."
     },
     "safety": {
       "title": "Conseils de sécurité",
@@ -2775,7 +2888,9 @@
     "spreadRow": "{stars, plural, one {# étoile} other {# étoiles}} : {count, plural, one {# avis} other {# avis}}",
     "verified": "Échange vérifié",
     "verifiedHint": "Seuls les acheteurs qui ont échangé avec ce vendeur par la messagerie du site peuvent donner un avis.",
+    "rules": "Comment fonctionnent les avis",
     "listing": "Annonce :",
+    "exchangeOn": "Échange du",
     "reply": "Réponse de {name}",
     "formerMember": "Ancien membre",
     "more": "Voir plus d'avis",
@@ -2799,6 +2914,7 @@
       "count": "{count} / {max}",
       "confirm": "Nous avons conclu un échange ou une rencontre",
       "confirmHint": "Un avis porte sur un échange réel. Un faux avis est retiré et peut entraîner la suspension du compte.",
+      "rules": "Règles des avis",
       "public": "Votre nom affiché et votre avis seront visibles sur la vitrine du vendeur, qui pourra y répondre une fois. Vous pourrez supprimer votre avis à tout moment depuis « Mes avis ».",
       "submit": "Publier mon avis",
       "cancel": "Annuler",
@@ -3556,20 +3672,23 @@
       "listing": "Signaler l'annonce",
       "user": "Signaler ce profil",
       "conversation": "Signaler {name}",
-      "message": "Signaler ce message"
+      "message": "Signaler ce message",
+      "review": "Signaler l'avis"
     },
     "hint": "Contenu illégal ou contraire à nos règles ? Un modérateur examinera votre signalement.",
     "title": {
       "listing": "Signaler cette annonce",
       "user": "Signaler ce profil",
       "conversation": "Signaler {name}",
-      "message": "Signaler ce message"
+      "message": "Signaler ce message",
+      "review": "Signaler cet avis"
     },
     "subject": {
       "listing": "Annonce « {title} »",
       "user": "Profil de {name}",
       "conversation": "Profil de {name}, à propos de cette conversation",
-      "message": "Message de {name}"
+      "message": "Message de {name}",
+      "review": "Avis de {name}"
     },
     "reasonLegend": "Pourquoi signalez-vous ce contenu ?",
     "group": {
@@ -3654,6 +3773,7 @@
     "mail": {
       "listing": "Signalement de l'annonce {id}",
       "user": "Signalement du profil {id}",
+      "review": "Signalement de l'avis {id}",
       "body": "Adresse de la page : {url}\n\nMotif du signalement :\n"
     }
   },
@@ -4623,7 +4743,7 @@
       "verified": "Agrément contrôlé sur document le {date}.",
       "verifiedNote": "La mention s'affiche sur votre vitrine. Elle disparaît si vous changez de numéro d'agrément.",
       "rejected": "Document refusé. Envoyez une décision d'agrément lisible, à jour et au nom de votre société.",
-      "notice": "Le document est lu par un outil d'intelligence artificielle (Claude, d'Anthropic), qui en relève le numéro, la raison sociale, l'ICE et la date, puis, en cas de doute, par notre équipe de modération. Il est conservé dans un espace privé tant que votre compte Pro est actif, puis 6 mois. Masquez tout numéro de CNIE avant l'envoi.",
+      "notice": "Le document est lu par un outil d'intelligence artificielle (Claude, d'Anthropic), qui en relève le numéro, la raison sociale, l'ICE et la date, puis, en cas de doute, par notre équipe de modération. Il est conservé dans un espace privé tant que votre compte Pro est actif, puis 6 mois. Masquez tout numéro de CNIE avant l'envoi. <link>En savoir plus</link>",
       "send": "Envoyer ma décision d'agrément",
       "sendAnother": "Envoyer un autre document",
       "refresh": "Actualiser",
@@ -4635,6 +4755,68 @@
         "active_content": "Ce PDF contient du contenu actif (script, formulaire) : exportez-le à nouveau en PDF simple.",
         "expired": "L'envoi n'a pas abouti à temps. Réessayez."
       }
+    }
+  },
+  "RentalRequest": {
+    "card": {
+      "title": "Demande de location",
+      "period": "Du {from} au {to} · {days, plural, one {# jour} other {# jours}}",
+      "pickup": "Remise : {place}",
+      "maskedLink": "[lien masqué]",
+      "requestedMine": "Demande envoyée à {name}",
+      "waiting": "En attente de la réponse de l'agence.",
+      "withdraw": "Retirer ma demande",
+      "withdrawnToast": "Demande retirée",
+      "requestedTheirs": "{name} demande ce véhicule",
+      "block": "Bloquer ces dates sur l'annonce",
+      "blockHint": "Cochez si plus aucun véhicule de ce modèle n'est libre sur la période : l'annonce sortira des recherches à ces dates.",
+      "accept": "Disponible",
+      "acceptedToast": "Disponibilité confirmée",
+      "blockFailed": "La disponibilité est confirmée, mais les dates n'ont pas pu être bloquées. Mettez votre planning à jour.",
+      "planning": "Ouvrir mon planning",
+      "decline": "Pas disponible",
+      "declinedToast": "Réponse envoyée : pas disponible",
+      "acceptedMine": "Vous avez confirmé la disponibilité",
+      "acceptedTheirs": "{name} confirme la disponibilité",
+      "blockedNote": "Dates bloquées sur l'annonce.",
+      "pickupAppointment": "Proposer la remise du véhicule",
+      "safety": "La location se conclut par le contrat écrit de l'agence. {site} ne prend ni acompte ni caution : ne versez rien avant d'avoir vu le véhicule et signé le contrat."
+    },
+    "event": {
+      "period": "du {from} au {to}",
+      "requested": {
+        "mine": "Vous avez demandé ce véhicule {period}",
+        "theirs": "{name} demande ce véhicule {period}"
+      },
+      "changed": {
+        "mine": "Vous avez modifié votre demande : {period}",
+        "theirs": "{name} a modifié sa demande : {period}"
+      },
+      "accepted": {
+        "mine": "Vous avez confirmé la disponibilité {period}",
+        "theirs": "{name} confirme la disponibilité {period}"
+      },
+      "declined": {
+        "mine": "Vous avez répondu « pas disponible » {period}",
+        "theirs": "{name} n'a pas de véhicule disponible {period}"
+      },
+      "withdrawn": {
+        "mine": "Vous avez retiré votre demande",
+        "theirs": "{name} a retiré sa demande"
+      },
+      "pickup": "remise : {place}"
+    },
+    "preview": {
+      "requested": "Demande de location",
+      "changed": "Demande de location modifiée",
+      "accepted": "Disponibilité confirmée",
+      "declined": "Pas de véhicule disponible",
+      "withdrawn": "Demande de location retirée"
+    },
+    "errors": {
+      "rental_request_changed": "Cette demande a changé entre-temps : voici sa dernière version.",
+      "rental_request_past": "Le jour de prise en charge est passé : le locataire doit demander d'autres dates.",
+      "rental_request_unavailable": "Cette annonce ne prend plus de demande de location."
     }
   }
 }

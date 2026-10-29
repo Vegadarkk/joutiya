@@ -132,12 +132,12 @@ describe("header search pill", () => {
 });
 
 describe("CategoryGrid", () => {
-  it("sizes the tiles on the row width below lg, so part of the next tile shows", () => {
+  it("sizes the tiles on the row width below xl, so part of the next tile shows", () => {
     const html = render(<CategoryGrid />);
     const tile = classOf(html, /<li[^>]*class="([^"]*)"/);
     expect(tile).toContain("w-[max(5.75rem,calc((100%_-_0.75rem)/3.5))]");
     expect(tile).toContain("sm:w-[max(5.75rem,calc((100%_-_1.5rem)/6.5))]");
-    expect(tile).toContain("lg:w-auto");
+    expect(tile).toContain("xl:w-auto");
     expect(classOf(html, /<ul[^>]*class="([^"]*)"/)).toEqual(expect.arrayContaining(["scroll-px-4", "sm:scroll-px-6"]));
   });
 });

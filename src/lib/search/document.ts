@@ -1,6 +1,7 @@
 import "server-only";
 import { criterionById, subcategoryById } from "@/config/categories";
 import { cityBySlug, regionByCode } from "@/config/regions";
+import { availableValues, isSoldOut, isVariantCriterion, priceRange } from "@/lib/contracts/catalog";
 import type { ListingStatus, ModerationState } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import ar from "../../../messages/ar.json";
@@ -157,6 +158,19 @@ export function toSearchDocument(listing: ListingRecord, now: Date = new Date())
     if (filterable !== undefined) attributes[attributeField(criterion.id)] = filterable;
   }
   if (listing.condition) attrsText.push(...labels(["Criteria", "condition", "options", listing.condition]));
+  // Variants (Pro catalogue §2): a criterion axis filters on the values still sold (« taille 42
+  // disponible »), a free axis is searchable text (« 500 g »).
+  for (const axis of listing.variants?.axes ?? []) {
+    if (isVariantCriterion(axis.id)) {
+      if (!criteria.some((criterion) => criterion.id === axis.id)) continue;
+      const sold = availableValues(listing.variants!, axis.id);
+      const values = sold.length > 0 ? sold : axis.values;
+      attrsText.push(...values.filter((value) => !SILENT_OPTIONS.has(value)).flatMap((value) => labels(["Criteria", axis.id, "options", value])));
+      attributes[attributeField(axis.id)] = values;
+    } else {
+      attrsText.push(axis.label ?? "", ...axis.values);
+    }
+  }
   // Queries fold Arabic-Indic digits (normalizeQuery): index a folded copy of a title that has any,
   // and keep the displayed title as written. Free text (criteria, district) is folded below.
   const title = listing.title.trim();
@@ -165,7 +179,8 @@ export function toSearchDocument(listing: ListingRecord, now: Date = new Date())
 
   const photo = listing.photos[0];
   const featuredUntil = listing.boosts.featuredUntil?.getTime();
-  const price = listing.price !== null && !listing.isDonation ? listing.price : undefined;
+  const range = priceRange(listing);
+  const price = range?.min;
   // Car rentals (rental pack §4): blocked days from today on, and the end of the fresh window.
   const rentalDays = listing.rental ? blockedDays(listing.rental.unavailable, moroccoToday(now)) : [];
 
@@ -200,6 +215,8 @@ export function toSearchDocument(listing: ListingRecord, now: Date = new Date())
     ...(listing.example ? { isExample: true as const } : {}),
     ...(rentalDays.length ? { rentUnavailableDays: rentalDays } : {}),
     ...(listing.rental ? { rentFreshUntil: freshUntil(listing.rental.updatedAt) } : {}),
+    ...(isSoldOut(listing) ? { soldOut: true as const } : {}),
+    ...(range && range.max > range.min ? { priceFrom: true as const } : {}),
     _geo: { lat: roundGeo(location.geo.lat), lng: roundGeo(location.geo.lng) },
     version: listing.version,
     ...attributes,

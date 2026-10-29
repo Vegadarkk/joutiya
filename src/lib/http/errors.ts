@@ -139,6 +139,12 @@ export type ErrorCode =
   | "appointment_changed"
   /** The chosen slot has started or passed (409). */
   | "appointment_slot_past"
+  /** The booking request changed since the caller saw it (answered, withdrawn, replaced; 409). */
+  | "rental_request_changed"
+  /** The requested pick-up day has passed: the agency can no longer accept (409). */
+  | "rental_request_past"
+  /** A booking request about a listing that is no published car rental (409). */
+  | "rental_request_unavailable"
   /** Reporter abusive (art. 23) or target not reportable by this account (403). */
   | "report_not_allowed"
   /** The reported target does not exist or is not visible to the reporter (404 semantics, 422). */

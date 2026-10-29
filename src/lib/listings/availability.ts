@@ -7,7 +7,7 @@ import { enqueueSearchOutboxTx } from "@/lib/db/repositories/search-outbox";
 import { db } from "@/lib/firebase/admin";
 import { HttpError, notFound } from "@/lib/http/errors";
 import { notifySearchIndex } from "@/lib/search/queue";
-import { moroccoToday, normalizePeriods } from "./rental-availability";
+import { moroccoToday, normalizePeriods, type RentalPeriod } from "./rental-availability";
 import { revalidateListingPaths } from "./revalidate";
 
 // A car rental's availability (rental pack §3): the agency replaces its blocked periods, or saves
@@ -50,4 +50,31 @@ export async function setRentalAvailability(auth: AuthContext, id: string, input
   if (indexed) await notifySearchIndex([id]);
   if (listing.slugId) revalidateListingPaths({ slugId: listing.slugId });
   return rentalAvailabilityOf({ rental });
+}
+
+/**
+ * A booking request accepted with its days blocked (rental pack §6): the period joins the listing's
+ * blocked ones, merged, in one transaction (no `since` lock: the agency's planning page then gets
+ * its 409 and reloads). False when the days cannot be written: no longer the caller's car rental,
+ * or more than RENTAL_PERIODS_MAX periods once merged.
+ */
+export async function blockRentalDates(actor: Pick<AuthContext["user"], "uid" | "claims">, id: string, period: RentalPeriod, now = new Date()): Promise<boolean> {
+  let indexed = false;
+  let slugId: string | undefined;
+  const written = await db().runTransaction(async (tx) => {
+    const current = await getListingTx(tx, id);
+    if (!current || current.subcategoryId !== RENTAL_SUBCATEGORY || !CALENDAR_STATUSES.includes(current.status)) return false;
+    if (current.ownerUid !== actor.uid && !(current.proId && current.proId === actor.claims.proId)) return false;
+    const normalized = normalizePeriods([...(current.rental?.unavailable ?? []), period], moroccoToday(now));
+    if ("problem" in normalized) return false;
+    const version = current.version + 1;
+    updateListingTx(tx, id, { rental: { unavailable: normalized.periods, updatedAt: now }, version, updatedAt: now });
+    indexed = current.status === "published";
+    if (indexed) enqueueSearchOutboxTx(tx, id, "upsert", version, now);
+    slugId = current.slugId;
+    return true;
+  });
+  if (indexed) await notifySearchIndex([id]);
+  if (slugId) revalidateListingPaths({ slugId });
+  return written;
 }

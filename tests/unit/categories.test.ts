@@ -30,8 +30,8 @@ type Labels = { Categories: Record<string, { name: string; sub: Record<string, s
 const messages: Record<"fr" | "ar", Labels> = { fr: fr as unknown as Labels, ar: ar as unknown as Labels };
 
 describe("category tree", () => {
-  it("has the 11 categories of the product research, each with subcategories", () => {
-    expect(CATEGORY_IDS).toEqual(["vehicules", "immobilier", "electronique", "maison-jardin", "mode", "famille", "loisirs", "animaux", "materiel-pro", "services", "divers"]);
+  it("has the 11 categories of the product research plus the Pros' terroir, each with subcategories", () => {
+    expect(CATEGORY_IDS).toEqual(["vehicules", "immobilier", "electronique", "maison-jardin", "mode", "terroir", "famille", "loisirs", "animaux", "materiel-pro", "services", "divers"]);
     for (const category of CATEGORIES) expect(category.subcategories.length, category.id).toBeGreaterThan(0);
     expect(SUBCATEGORY_IDS.length).toBeGreaterThanOrEqual(50);
   });

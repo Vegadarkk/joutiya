@@ -257,6 +257,7 @@ export default async function ListingPage({ params }: { params: Params }) {
                     adultsOnly={Boolean(subcategory?.adultsOnly)}
                     visit={realEstate}
                     testDrive={listing.seller.type === "pro" && VEHICLE_SALE_SUBCATEGORIES.includes(listing.subcategoryId)}
+                    rental={listing.subcategoryId === RENTAL_SUBCATEGORY}
                   />
                 ) : null}
                 {contactable && payment ? <PayAtSeller payment={payment} listingId={listing.id} /> : null}

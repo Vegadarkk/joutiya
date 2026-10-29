@@ -1,6 +1,6 @@
 import { CONDITIONS, RENTAL_SUBCATEGORY, categoryById, criterionById, searchCriteria, subcategoryById, type Condition } from "@/config/categories";
 import { cityBySlug, regionByCode } from "@/config/regions";
-import { DAY_PATTERN, dayNumber } from "@/lib/listings/rental-availability";
+import { DAY_PATTERN, RENTAL_SEARCH_DAYS_MAX, dayNumber } from "@/lib/listings/rental-availability";
 import { z } from "@/lib/zod";
 import { SEARCH_PATH, SEARCH_Q_MAX, SEARCH_QUERY_KEYS } from "./url-keys";
 
@@ -27,9 +27,8 @@ export const SELLER_TYPES_FILTER = ["individual", "pro"] as const;
 export type SellerTypeFilter = (typeof SELLER_TYPES_FILTER)[number];
 /** Upper bound of price filters, MAD (PRICE_MAX of listings). */
 export const SEARCH_PRICE_MAX = 100_000_000;
-/** Car rental dates (rental pack §4): at most 60 days of rental, a start within 180 days. */
-export const RENTAL_SEARCH_DAYS_MAX = 60;
-export const RENTAL_SEARCH_AHEAD_DAYS = 180;
+// Car rental dates (rental pack §4): bounds and duration live with the availability rules (no zod there).
+export { RENTAL_SEARCH_AHEAD_DAYS, RENTAL_SEARCH_DAYS_MAX, rentalDuration } from "@/lib/listings/rental-availability";
 
 
 /** Criterion filters: `f-<criterionId>=a,b` (select, multiselect), `f-<id>-min` / `-max` (number), `f-<id>=1` (boolean). */
@@ -68,6 +67,8 @@ export interface SearchParams {
   shop?: string;
   donation?: true;
   withPhoto?: true;
+  /** Sold-out Pro listings too (owner decision 1: out of the default results, still online). */
+  includeSoldOut?: true;
   conditions?: Condition[];
   /** Only for criteria of `subcategory` (select, multiselect, number, boolean). */
   criteria?: Record<string, CriterionFilter>;
@@ -86,11 +87,6 @@ export interface SearchParams {
 export interface RentalDates {
   from: string;
   to: string;
-}
-
-/** Rental days of a period: the return day minus the pick-up day, at least one. */
-export function rentalDuration(dates: RentalDates): number {
-  return Math.max(1, dayNumber(dates.to) - dayNumber(dates.from));
 }
 
 function validDates(from: string | undefined, to: string | undefined): RentalDates | undefined {
@@ -185,6 +181,7 @@ export function parseSearchParams(source: Source): SearchParams {
   if (shop && PUBLIC_ID.test(shop)) params.shop = shop;
   if (read(source, k.donation) === "1") params.donation = true;
   if (read(source, k.withPhoto) === "1") params.withPhoto = true;
+  if (read(source, k.includeSoldOut) === "1") params.includeSoldOut = true;
   const conditions = list(read(source, k.conditions)).filter((value): value is Condition => (CONDITIONS as readonly string[]).includes(value));
   if (conditions.length) params.conditions = conditions;
   const dates = validDates(read(source, k.rentFrom), read(source, k.rentTo));
@@ -325,6 +322,7 @@ export function searchParamsToQuery(input: SearchParams): URLSearchParams {
   if (params.shop) query.set(k.shop, params.shop);
   if (params.donation) query.set(k.donation, "1");
   if (params.withPhoto) query.set(k.withPhoto, "1");
+  if (params.includeSoldOut) query.set(k.includeSoldOut, "1");
   if (params.conditions?.length) query.set(k.conditions, params.conditions.join(","));
   for (const [id, filter] of Object.entries(params.criteria ?? {})) {
     if (filter.kind === "options") query.set(`${CRITERION_PARAM_PREFIX}${id}`, filter.values.join(","));
@@ -354,9 +352,9 @@ export function searchPath(params: SearchParams): string {
   return query ? `${SEARCH_PATH}?${query}` : SEARCH_PATH;
 }
 
-/** True when nothing narrows the search (no words, no filter). Page and sort do not count. */
+/** True when nothing narrows the search (no words, no filter). Page, sort and the sold-out switch do not count. */
 export function isBlankSearch(params: SearchParams): boolean {
-  const { sort: _sort, page: _page, ...rest } = canonicalSearchParams(params);
+  const { sort: _sort, page: _page, includeSoldOut: _soldOut, ...rest } = canonicalSearchParams(params);
   return Object.keys(rest).length === 0;
 }
 
@@ -386,6 +384,7 @@ export const storedSearchParamsSchema = z
     shop: z.string().regex(PUBLIC_ID).optional(),
     donation: z.literal(true).optional(),
     withPhoto: z.literal(true).optional(),
+    includeSoldOut: z.literal(true).optional(),
     conditions: z.array(z.enum(CONDITIONS)).min(1).max(CONDITIONS.length).optional(),
     criteria: z
       .record(

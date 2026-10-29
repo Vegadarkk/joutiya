@@ -1,4 +1,4 @@
-import { subcategoryById } from "@/config/categories";
+import { sanitaryNumber, subcategoryById } from "@/config/categories";
 import { cityBySlug } from "@/config/regions";
 import type { ListingPhoto } from "@/lib/contracts/media";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
@@ -108,8 +108,8 @@ export function demoListing(entry: DemoEntry, index: number, now: Date, photos: 
     boosts: {},
     sortAt: at,
     sortSource: "publish",
-    // Restricted goods are reviewed by a moderator before publication: shown as reviewed.
-    moderation: { state: sub.adultsOnly ? "human_ok" : "auto_ok", score: 0, flags: [], openReports: 0 },
+    // Restricted goods, and food with its ONSSA number, are reviewed by a moderator before publication: shown as reviewed.
+    moderation: { state: sub.adultsOnly || sanitaryNumber(sub.id, entry.attributes) ? "human_ok" : "auto_ok", score: 0, flags: [], openReports: 0 },
     example: true,
     // Rentals: periods counted from the seed day, confirmed on that day (fresh for 14 days).
     ...(entry.rentalBlocked ? { rental: { unavailable: entry.rentalBlocked.map(([from, to]) => ({ from: dayString(moroccoToday(now) + from), to: dayString(moroccoToday(now) + to) })), updatedAt: now } } : {}),

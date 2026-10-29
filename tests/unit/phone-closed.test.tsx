@@ -64,6 +64,8 @@ const listing: OwnerListing = {
   photos: [],
   contact: { showPhone: false, whatsapp: false },
   sensitiveDeclaration: null,
+  variants: null,
+  stock: null,
   moderation: { state: "auto_ok", flags: [] },
   version: 1,
   createdAt: "2026-10-19T00:00:00.000Z",

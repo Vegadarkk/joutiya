@@ -17,6 +17,8 @@ interface Copy {
 }
 
 const quoted = (lang: MailLocale, title: string | null) => (title ? (lang === "fr" ? ` « ${title} »` : ` «${title}»`) : "");
+/** " sur Salma" / " عن Salma": the seller a hidden review was about. */
+const about = (lang: MailLocale, name: string | null) => (name ? (lang === "fr" ? ` sur ${name}` : ` عن ${name}`) : "");
 
 /** "7 أيام", "30 يومًا" (Arabic plural of the counted noun). */
 const arabicDays = (days: number) => `${days} ${days >= 3 && days <= 10 ? "أيام" : "يومًا"}`;
@@ -26,6 +28,7 @@ const COPY: Record<MailLocale, Copy> = {
     subject: (data, until) => {
       switch (data.action) {
         case "remove":
+          if (data.targetType === "review") return `Votre avis${about("fr", data.title)} a été masqué`;
           return data.targetType === "message" ? "Un de vos messages a été masqué" : `Votre annonce${quoted("fr", data.title)} a été retirée`;
         case "restrict_visibility":
           return `La visibilité de votre annonce${quoted("fr", data.title)} est restreinte`;
@@ -41,6 +44,7 @@ const COPY: Record<MailLocale, Copy> = {
     measure: (data, until) => {
       switch (data.action) {
         case "remove":
+          if (data.targetType === "review") return `Mesure : votre avis${about("fr", data.title)} a été masqué. Il n'est plus visible et ne compte plus dans la note du vendeur.`;
           return data.targetType === "message"
             ? "Mesure : un de vos messages a été masqué. Votre interlocuteur ne peut plus le lire."
             : `Mesure : votre annonce${quoted("fr", data.title)} a été retirée. Elle n'est plus visible sur Joutiya.`;
@@ -60,6 +64,7 @@ const COPY: Record<MailLocale, Copy> = {
     subject: (data, until) => {
       switch (data.action) {
         case "remove":
+          if (data.targetType === "review") return `تم إخفاء تقييمك${about("ar", data.title)}`;
           return data.targetType === "message" ? "تم إخفاء إحدى رسائلك" : `تم سحب إعلانك${quoted("ar", data.title)}`;
         case "restrict_visibility":
           return `تم تقييد ظهور إعلانك${quoted("ar", data.title)}`;
@@ -75,6 +80,7 @@ const COPY: Record<MailLocale, Copy> = {
     measure: (data, until) => {
       switch (data.action) {
         case "remove":
+          if (data.targetType === "review") return `الإجراء: تم إخفاء تقييمك${about("ar", data.title)}، ولم يعد ظاهرًا ولا يُحتسب في تقييم البائع.`;
           return data.targetType === "message" ? "الإجراء: تم إخفاء إحدى رسائلك، ولم يعد بإمكان محاورك قراءتها." : `الإجراء: تم سحب إعلانك${quoted("ar", data.title)}، ولم يعد ظاهرًا على Joutiya.`;
         case "restrict_visibility":
           return `الإجراء: لم يعد إعلانك${quoted("ar", data.title)} يظهر في نتائج البحث ولا في صفحته العامة.`;

@@ -83,6 +83,9 @@ export const RATE_LIMITS = {
   // 50 000 reads a day). POST /api/listings (a new draft; the 5 above count publications, at
   // publish): 20 per day per account. MAX_DRAFTS caps live drafts, this caps create-delete loops.
   "listing.new.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
+  // PUT /api/listings/{id}/stock (catalogue §7): the declared stock alone, one write and a
+  // grouped re-index, no screening. 2 000 per day per account (a shop of 1 000 listings twice).
+  "listing.stock.uid": { points: 2000, duration: DAY, policy: "open", key: "uid" },
   // POST /api/pro/apply (phase 7): a few attempts a day per account (reads the account, the
   // owner's shop and up to 6 uploads, then one transaction).
   "pro.apply.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },
@@ -226,6 +229,8 @@ export const RATE_LIMITS = {
   "message.send.thread": { points: 60, duration: HOUR, policy: "open", key: "uid+cid" },
   // Appointment steps (propose, confirm, decline, withdraw, cancel), on top of the send limiters.
   "appointment.uid": { points: 30, duration: HOUR, policy: "open", key: "uid" },
+  // Car rental booking requests (rental pack §6): 20 new requests a day per renter, on top of the send limiters.
+  "rental.request.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
   "conversation.new.uid": { points: 50, duration: DAY, policy: "open", key: "uid" },
   "conversation.new.young.uid": { points: 10, duration: DAY, policy: "open", key: "uid" },
   // Read, archive, hide, block calls of the inbox, and the unread badge.

@@ -20,7 +20,7 @@ import { revalidateListingPaths } from "@/lib/listings/revalidate";
 import { logger } from "@/lib/logging/logger";
 import { sendMail } from "@/lib/mail";
 import { closeAccountConversations, publishRevoked } from "@/lib/messaging";
-import { anonymizeAuthoredReviews } from "@/lib/reviews/repository";
+import { anonymizeAuthoredReviews, hideReceivedReviews } from "@/lib/reviews/repository";
 import { assertQuotas } from "@/lib/quota/gate";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { requestIdentity } from "@/lib/rate-limit/keys";
@@ -141,8 +141,9 @@ async function deleteFavorites(uid: string): Promise<number> {
 async function anonymizeReviews(uid: string, now: Date): Promise<void> {
   try {
     for (const publicId of await anonymizeAuthoredReviews(uid, now)) revalidateListingPaths({ publicId });
+    await hideReceivedReviews(uid, now);
   } catch (error) {
-    logger.warn({ err: (error as Error).message }, "account closure: reviews not anonymized");
+    logger.warn({ err: (error as Error).message }, "account closure: reviews not anonymized or hidden");
   }
 }
 

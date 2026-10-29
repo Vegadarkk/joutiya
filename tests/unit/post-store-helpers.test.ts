@@ -27,6 +27,8 @@ function listing(overrides: Partial<OwnerListing> = {}): OwnerListing {
     photos: [],
     contact: { showPhone: false, whatsapp: false },
     sensitiveDeclaration: null,
+    variants: null,
+    stock: null,
     moderation: { state: "auto_ok", flags: [] },
     version: 1,
     createdAt: "2026-10-16T00:00:00.000Z",

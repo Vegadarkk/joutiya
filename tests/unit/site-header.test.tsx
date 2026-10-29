@@ -103,7 +103,7 @@ describe("SiteHeader", () => {
     expect(sell?.[1]).toContain(`${fr.Nav.sell}<span class="sr-only">, ${fr.Nav.post}</span>`);
   });
 
-  it("lists the eleven category pages and the procedures guide in a named row", () => {
+  it("lists the category pages and the procedures guide in a named row", () => {
     const html = render(<SiteHeader locale="fr" />);
     const row = /<nav aria-label="([^"]+)" data-testid="category-chips">([\s\S]*?)<\/nav>/.exec(html);
     expect(row?.[1]).toBe(fr.Nav.categories);

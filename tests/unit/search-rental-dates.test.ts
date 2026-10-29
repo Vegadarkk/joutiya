@@ -88,7 +88,7 @@ describe("rental dates filter", () => {
 
   it("keeps rentals free on every day, pick-up and return included, whose minimum fits", () => {
     const from = dayNumber(DATES.from);
-    const filter = buildFilter({ subcategory: "location-voitures", dates: DATES }, NOW) as { and: FilterExpr[] };
+    const filter = buildFilter({ subcategory: "location-voitures", dates: DATES, includeSoldOut: true }, NOW) as { and: FilterExpr[] };
     expect(filter.and.at(-1)).toEqual({
       and: [
         { not: { field: "rentUnavailableDays", op: "in", values: [from, from + 1, from + 2, from + 3] } },
@@ -96,7 +96,7 @@ describe("rental dates filter", () => {
       ],
     });
     // Past dates (a stale link) do not filter.
-    expect(buildFilter({ subcategory: "location-voitures", dates: { from: "2026-10-01", to: "2026-10-03" } }, NOW)).toEqual({
+    expect(buildFilter({ subcategory: "location-voitures", dates: { from: "2026-10-01", to: "2026-10-03" }, includeSoldOut: true }, NOW)).toEqual({
       and: [
         { field: "categoryId", op: "eq", value: "vehicules" },
         { field: "subcategoryId", op: "eq", value: "location-voitures" },
@@ -157,9 +157,9 @@ describe("runSearch by rental dates", () => {
 describe("rental cards", () => {
   it("estimate the total with the long-term rate and tell the freshness", () => {
     const doc = rental("x", { price: 300, a_rate_7_days: 250, a_rate_30_days: 200, rentFreshUntil: NOW.getTime() + 1 });
-    expect(toSearchCard(doc, NOW, false, DATES).rental).toEqual({ days: 3, total: 900, fresh: true });
-    expect(toSearchCard(doc, NOW, false, { from: "2026-10-20", to: "2026-10-27" }).rental).toEqual({ days: 7, total: 1750, fresh: true });
-    expect(toSearchCard(doc, NOW, false, { from: "2026-10-20", to: "2026-11-19" }).rental).toEqual({ days: 30, total: 6000, fresh: true });
+    expect(toSearchCard(doc, NOW, false, DATES).rental).toEqual({ days: 3, total: 900, fresh: true, ...DATES });
+    expect(toSearchCard(doc, NOW, false, { from: "2026-10-20", to: "2026-10-27" }).rental).toEqual({ days: 7, total: 1750, fresh: true, from: "2026-10-20", to: "2026-10-27" });
+    expect(toSearchCard(doc, NOW, false, { from: "2026-10-20", to: "2026-11-19" }).rental).toEqual({ days: 30, total: 6000, fresh: true, from: "2026-10-20", to: "2026-11-19" });
     expect(toSearchCard({ ...doc, rentFreshUntil: NOW.getTime() }, NOW, false, DATES).rental?.fresh).toBe(false);
     expect(toSearchCard(doc, NOW).rental).toBeUndefined();
     expect(toSearchCard({ ...doc, subcategoryId: "voitures" }, NOW, false, DATES).rental).toBeUndefined();

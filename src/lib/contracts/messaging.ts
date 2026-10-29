@@ -3,6 +3,7 @@ import { turnstileTokenSchema } from "@/lib/contracts/auth";
 import { MESSAGE_TEXT_MAX } from "@/lib/contracts/endpoints";
 import { listingIdSchema } from "@/lib/contracts/listings";
 import type { AppointmentEventView, AppointmentView } from "@/lib/contracts/appointments";
+import type { RentalRequestEventView, RentalRequestView } from "@/lib/contracts/rental-requests";
 
 // Messaging contracts shared by the browser and the route handlers (design D1-D7). Messages are plain
 // text; the server masks URLs before storage and the reader renders the markers below as chips.
@@ -117,6 +118,8 @@ export interface ConversationView {
   counterpartClosed: boolean;
   /** The current appointment (src/lib/contracts/appointments.ts), active or ended; null when none. */
   appointment?: AppointmentView | null;
+  /** The current booking request of a car rental (src/lib/contracts/rental-requests.ts); null when none. */
+  rentalRequest?: RentalRequestView | null;
   updatedAt: number;
   /** What the buyer's review window needs (vitrine-avis §2, `reviewWindow`): epoch ms or null. */
   review: { sellerRepliedAt: number | null; reviewedAt: number | null };
@@ -131,6 +134,7 @@ export interface MessageView {
   hidden: boolean;
   /** Appointment system message: the step it shows. */
   appointment?: AppointmentEventView;
+  rentalRequest?: RentalRequestEventView;
   createdAt: number;
   readAt: number | null;
 }

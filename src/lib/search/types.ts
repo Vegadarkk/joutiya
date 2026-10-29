@@ -64,6 +64,10 @@ export interface SearchDocument {
   rentUnavailableDays?: number[];
   /** Car rental: epoch ms until which the availability counts as up to date (last save + 14 days). */
   rentFreshUntil?: number;
+  /** Pro catalogue: declared stock 0 everywhere (decision 1: online, out of the default results). */
+  soldOut?: true;
+  /** Combinations at different prices: `price` is the lowest (« à partir de »). */
+  priceFrom?: true;
   /** Rounded city (later district) centroid. */
   _geo: { lat: number; lng: number };
   version: number;
@@ -220,7 +224,8 @@ export interface SearchCard {
    * Car rental in a search by dates (rental pack §4): rental days, estimated total in MAD (long-term
    * rate applied, deposit excluded; null without a price) and whether the availability is up to date.
    */
-  rental?: { days: number; total: number | null; fresh: boolean };
+  /** `from`/`to`: the searched days ("YYYY-MM-DD"), carried to the listing page (booking request). */
+  rental?: { days: number; total: number | null; fresh: boolean; from: string; to: string };
 }
 
 export interface SearchFacets {

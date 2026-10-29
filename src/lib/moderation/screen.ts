@@ -1,4 +1,4 @@
-import { criteriaSchema, subcategoryById } from "@/config/categories";
+import { criteriaSchema, sanitaryNumber, subcategoryById } from "@/config/categories";
 import { isPriceOutlier, priceRange } from "@/config/price-ranges";
 import type { ModerationFlag } from "@/lib/contracts/listings";
 import { findContacts } from "@/lib/moderation/contacts";
@@ -27,7 +27,7 @@ function pushIssue(blockers: FieldIssue[], next: FieldIssue): void {
   if (!blockers.some((b) => b.path === next.path && b.code === next.code)) blockers.push(next);
 }
 
-/** Title, description, the free-text attributes in key order, then the district. */
+/** Title, description, the free-text attributes in key order, the district, then the free variant axes. */
 function textFields(input: ScreenInput): TextField[] {
   const fields: TextField[] = [
     { path: "title", text: input.title ?? "" },
@@ -38,6 +38,10 @@ function textFields(input: ScreenInput): TextField[] {
     if (typeof value === "string" && value.trim() !== "") fields.push({ path: `attributes.${key}`, text: value });
   }
   if (input.district && input.district.trim() !== "") fields.push({ path: "location.district", text: input.district });
+  (input.variantAxes ?? []).forEach((axis, index) => {
+    if (axis.label) fields.push({ path: `variants.axes.${index}.label`, text: axis.label });
+    axis.values.forEach((value, at) => fields.push({ path: `variants.axes.${index}.values.${at}`, text: value }));
+  });
   return fields;
 }
 
@@ -103,6 +107,13 @@ export function screenListing(input: ScreenInput, ctx: ScreenContext): ScreenRes
   if (adultsOnly) {
     flags.add("restricted_category");
     note(`adults-only subcategory ${input.subcategoryId}`);
+  }
+
+  // Food from producers: a moderator checks an ONSSA number the first time the shop uses it.
+  const sanitary = sanitaryNumber(input.subcategoryId, input.attributes ?? {});
+  if (sanitary && !(input.seller.sanitaryNumbers ?? []).includes(sanitary)) {
+    flags.add("sanitary_check");
+    note(`ONSSA number ${sanitary} not yet checked for this shop`);
   }
 
   // Steps 2-3 on every free text: phones, e-mails / links, prohibited keywords, sensitive data.

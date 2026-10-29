@@ -8,10 +8,11 @@ import { HttpError } from "@/lib/http/errors";
 import { isListingId } from "@/lib/listings/ids";
 import { PUBLIC_STATES } from "@/lib/listings/public";
 import { consume } from "@/lib/quota";
+import { getReview } from "@/lib/reviews/repository";
 import { splitMessageId } from "./target-key";
 
 // What a report points at (design D10): the browser names a listing id, a profile publicId or a
-// `{cid}/{mid}` message; the server resolves the owner (the person a decision would affect) and
+// `{cid}/{mid}` message or a review id; the server resolves the owner (the person a decision would affect) and
 // refuses what the reporter cannot see: 422 `report_target_invalid` (missing, never public, not a
 // participant of the conversation), 403 `report_not_allowed` (one's own listing, profile, message).
 
@@ -29,6 +30,7 @@ const notAllowed = () => new HttpError(403, "report_not_allowed", "own content")
 export const conversationRef = (cid: string) => db().collection(COLLECTIONS.conversations).doc(cid);
 export const messageRef = (cid: string, mid: string) => conversationRef(cid).collection(COLLECTIONS.messages).doc(mid);
 export const evidenceRef = (cid: string, mid: string) => conversationRef(cid).collection(COLLECTIONS.evidence).doc(mid);
+export const reviewDocRef = (id: string) => db().collection(COLLECTIONS.reviews).doc(id);
 
 export interface ConversationFacts {
   participants: string[];
@@ -97,6 +99,14 @@ async function resolveMessage(id: string, reporterUid: string | null): Promise<R
   return { target: { type: "message", id: `${ids.cid}/${ids.mid}`, ownerUid: message.senderUid, listingId: conversation.listingId } };
 }
 
+/** A published review, reported by anyone but its author (the seller it is about included). */
+async function resolveReview(id: string, reporterUid: string | null): Promise<ResolvedTarget> {
+  const review = await getReview(id);
+  if (!review || review.status !== "published") throw invalidTarget();
+  if (reporterUid && review.authorUid === reporterUid) throw notAllowed();
+  return { target: { type: "review", id: review.id, ownerUid: review.authorUid, listingId: review.listingId } };
+}
+
 /** The reported target of a notice, as stored; throws the refusals above. */
 export async function resolveReportTarget(input: ReportTargetInput, reporterUid: string | null): Promise<ResolvedTarget> {
   switch (input.type) {
@@ -109,12 +119,14 @@ export async function resolveReportTarget(input: ReportTargetInput, reporterUid:
     case "pro":
       // Shops arrive with phase 7.
       throw invalidTarget();
+    case "review":
+      return resolveReview(input.id, reporterUid);
   }
 }
 
 export interface SystemTargetInput {
   type: StoredTarget["type"];
-  /** Stored id: listing id, uid, `{cid}/{mid}`. */
+  /** Stored id: listing id, uid, `{cid}/{mid}`, review id. */
   id: string;
   ownerUid?: string;
   publicId?: string;
@@ -145,5 +157,11 @@ export async function resolveSystemTarget(input: SystemTargetInput): Promise<Res
     }
     case "pro":
       throw invalidTarget();
+    case "review": {
+      // Any state but deleted: a review held for a moderator is reported by the system itself.
+      const review = await getReview(input.id);
+      if (!review || review.status === "deleted") throw invalidTarget();
+      return { target: { type: "review", id: review.id, ownerUid: review.authorUid, listingId: review.listingId } };
+    }
   }
 }
