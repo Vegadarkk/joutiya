@@ -83,11 +83,20 @@ export const RATE_LIMITS = {
   // 50 000 reads a day). POST /api/listings (a new draft; the 5 above count publications, at
   // publish): 20 per day per account. MAX_DRAFTS caps live drafts, this caps create-delete loops.
   "listing.new.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
+  // PUT /api/listings/{id}/stock (catalogue §7): the declared stock alone, one write and a
+  // grouped re-index, no screening. 2 000 per day per account (a shop of 1 000 listings twice).
+  "listing.stock.uid": { points: 2000, duration: DAY, policy: "open", key: "uid" },
   // POST /api/pro/apply (phase 7): a few attempts a day per account (reads the account, the
   // owner's shop and up to 6 uploads, then one transaction).
   "pro.apply.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },
   // GET /api/pro/me (3 to 4 reads: account, shop, active count): the Pro area's page loads.
   "pro.read.uid": { points: 300, duration: HOUR, policy: "open", key: "uid" },
+  // PUT /api/pro/me/agency and /api/pro/me/rental (1 read, 1 write, a storefront revalidation):
+  // 20 per day per account, shared.
+  "pro.agency.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
+  // POST /api/pro/me/rental/check (decision 5): each document sent costs one Claude call under the
+  // monthly cap. Closed: 5 per day per account.
+  "pro.rental.check.uid": { points: 5, duration: DAY, policy: "closed", key: "uid" },
   // POST /api/listings/{id}/options (phase 7): a paid option, ~4 reads and 4 writes. Closed: it
   // debits credits. 30 per day per account.
   "listing.options.uid": { points: 30, duration: DAY, policy: "closed", key: "uid" },
@@ -110,6 +119,10 @@ export const RATE_LIMITS = {
   // DELETE /api/listings/{id} and pause / resume / sold / renew (~4 writes and an ISR
   // revalidation each): 120 per day per account (an individual has at most 20 active listings).
   "listing.status.uid": { points: 120, duration: DAY, policy: "open", key: "uid" },
+  // PUT /api/listings/{id}/availability and each vehicle of a PUT /api/pro/fleet (one read, one
+  // write, a re-index and an ISR revalidation per vehicle): 600 per hour per account, an agency
+  // confirming its whole fleet (200 vehicles at most) and still editing it.
+  "rental.availability.uid": { points: 600, duration: HOUR, policy: "open", key: "uid" },
   // POST /api/listings/{id}/publish, every attempt (a refused one still reads the listing, the
   // account and the seller's other listings for the screening): 60 per day per account, before
   // any read. The 5 publications a day (listing.create.uid) are counted inside, at the transition.
@@ -216,6 +229,8 @@ export const RATE_LIMITS = {
   "message.send.thread": { points: 60, duration: HOUR, policy: "open", key: "uid+cid" },
   // Appointment steps (propose, confirm, decline, withdraw, cancel), on top of the send limiters.
   "appointment.uid": { points: 30, duration: HOUR, policy: "open", key: "uid" },
+  // Car rental booking requests (rental pack §6): 20 new requests a day per renter, on top of the send limiters.
+  "rental.request.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
   "conversation.new.uid": { points: 50, duration: DAY, policy: "open", key: "uid" },
   "conversation.new.young.uid": { points: 10, duration: DAY, policy: "open", key: "uid" },
   // Read, archive, hide, block calls of the inbox, and the unread badge.
@@ -235,6 +250,14 @@ export const RATE_LIMITS = {
   "report.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
   "report.device": { points: 5, duration: HOUR, policy: "open", key: "device" },
   "report.ip": { points: 20, duration: HOUR, policy: "open", key: "ip" },
+  // --- Reviews (vitrine-avis §2) --------------------------------------------------------------
+  // POST /api/reviews: 5 per day per account (one transaction: conversation, review, seller).
+  "review.create.uid": { points: 5, duration: DAY, policy: "closed", key: "uid" },
+  // Delete or reply (one transaction each), "Mes avis" reads (up to 2 x 50 reads).
+  "review.mutation.uid": { points: 30, duration: HOUR, policy: "open", key: "uid" },
+  "review.mine.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
+  // GET /api/reviews (storefront "more"): a page of 10 reads, metered like a profile view.
+  "review.read.ip": { points: 120, duration: HOUR, policy: "open", key: "ip" },
   "report.p0.uid": { points: 3, duration: DAY, policy: "open", key: "uid" },
   "report.p0.device": { points: 2, duration: DAY, policy: "open", key: "device" },
   "report.p0.ip": { points: 5, duration: DAY, policy: "open", key: "ip" },
@@ -253,6 +276,8 @@ export const RATE_LIMITS = {
   // Back-office reads (queues, target views, stats) and the staff conversation view (D18).
   "admin.read.uid": { points: 3000, duration: HOUR, policy: "open", key: "uid" },
   "admin.conversation.uid": { points: 60, duration: HOUR, policy: "closed", key: "uid" },
+  // Staff "verified" on a link of the admin procedures guide (guide-demarches G4): a weekly review.
+  "admin.guide.uid": { points: 120, duration: HOUR, policy: "closed", key: "uid" },
 } as const satisfies Record<string, RateLimitDefinition>;
 
 export type RateLimitId = keyof typeof RATE_LIMITS;

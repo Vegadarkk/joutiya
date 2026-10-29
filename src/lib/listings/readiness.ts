@@ -1,9 +1,11 @@
 import { criteriaSchema, criterionApplies, subcategoryById, type Subcategory } from "@/config/categories";
 import { listingQuotas, type Seller } from "@/config/pricing";
 import { cityBySlug } from "@/config/regions";
+import { isVariantCriterion, withVariantAnswers } from "@/lib/contracts/catalog";
 import { descriptionSchema, titleSchema, type FieldIssue } from "@/lib/contracts/listings";
 import type { ListingDoc } from "@/lib/db/schemas";
 import { realEstateIssues } from "./real-estate";
+import { rentalIssues } from "./rental";
 
 // Publish readiness (architecture §7 step 1, design D4/D8): the hard blockers a listing must clear
 // before the pre-moderation runs. Pure: config and contracts only, so the matrix is unit-tested on
@@ -22,10 +24,12 @@ export const READINESS_CODES = [
   "criterion_pro_only",
   "criterion_required",
   "criterion_invalid",
+  "criterion_format_onssa",
   "condition_required",
   "price_required",
   "price_invalid",
   "deposit_max",
+  "rental_rate_max",
   "donation_not_allowed",
   "donation_price",
   "city_required",
@@ -34,6 +38,11 @@ export const READINESS_CODES = [
   "photos_max",
   "phone_required",
   "messaging_only",
+  "variants_pro_only",
+  "variants_donation",
+  "variants_axis_invalid",
+  "stock_pro_only",
+  "stock_with_variants",
   "unknown",
 ] as const;
 export type ReadinessCode = (typeof READINESS_CODES)[number];
@@ -43,7 +52,8 @@ export interface SellerFacts {
   phoneVerified: boolean;
 }
 
-type Candidate = Pick<ListingDoc, "title" | "description" | "categoryId" | "subcategoryId" | "attributes" | "condition" | "price" | "isDonation" | "location" | "photos" | "contact">;
+type Candidate = Pick<ListingDoc, "title" | "description" | "categoryId" | "subcategoryId" | "attributes" | "condition" | "price" | "isDonation" | "location" | "photos" | "contact"> &
+  Partial<Pick<ListingDoc, "variants" | "stock">>;
 
 const issue = (path: string, code: ReadinessCode): FieldIssue => ({ path, code });
 
@@ -91,7 +101,9 @@ function attributeIssues(attributes: Candidate["attributes"], subcategory: Subca
     const value = attributes[key];
     const required = subcategory.criteria.find((criterion) => criterion.id === key)?.required === true;
     const missing = value === undefined || (required && typeof value === "string" && value.trim() === "");
-    const code: ReadinessCode = missing ? "criterion_required" : "criterion_invalid";
+    // A checked text (ONSSA number) carries its own code in the refinement's message.
+    const format = problem.code === "custom" && problem.message === "criterion_format_onssa" ? problem.message : undefined;
+    const code: ReadinessCode = missing ? "criterion_required" : (format ?? "criterion_invalid");
     if (!seen.has(path) || code === "criterion_required") seen.set(path, code);
   }
   return [...seen].map(([path, code]) => issue(path, code));
@@ -105,6 +117,24 @@ function dossierIssues(attributes: Candidate["attributes"], subcategory: Subcate
     if (criterion.proOnly && seller.type !== "pro") issues.push(issue(`attributes.${criterion.id}`, "criterion_pro_only"));
     else if (!criterionApplies(criterion, attributes)) issues.push(issue(`attributes.${criterion.id}`, "criterion_invalid"));
   }
+  return issues;
+}
+
+/**
+ * The Pro catalogue (lot 4, owner decision 5: Pros only): variants on a criterion of the
+ * subcategory or on a free axis, no variants on a donation, the stock per combination then.
+ */
+function catalogueIssues(listing: Candidate, subcategory: Subcategory, seller: Seller): FieldIssue[] {
+  const issues: FieldIssue[] = [];
+  if (listing.stock !== undefined && seller.type !== "pro") issues.push(issue("stock", "stock_pro_only"));
+  if (!listing.variants) return issues;
+  if (seller.type !== "pro") issues.push(issue("variants", "variants_pro_only"));
+  if (listing.isDonation) issues.push(issue("variants", "variants_donation"));
+  if (listing.stock !== undefined) issues.push(issue("stock", "stock_with_variants"));
+  const criteria = new Set(subcategory.criteria.map((criterion) => criterion.id));
+  listing.variants.axes.forEach((axis, index) => {
+    if (isVariantCriterion(axis.id) && !criteria.has(axis.id)) issues.push(issue(`variants.axes.${index}`, "variants_axis_invalid"));
+  });
   return issues;
 }
 
@@ -142,11 +172,13 @@ export function assessReadiness(listing: Candidate, facts: SellerFacts): FieldIs
   const tree = treeIssues(listing, facts.seller);
   issues.push(...tree.issues);
   if (tree.subcategory) {
-    issues.push(...attributeIssues(listing.attributes, tree.subcategory, facts.seller));
+    issues.push(...attributeIssues(withVariantAnswers(listing.attributes, listing.variants, tree.subcategory.criteria.map((criterion) => criterion.id)), tree.subcategory, facts.seller));
     issues.push(...dossierIssues(listing.attributes, tree.subcategory, facts.seller));
     issues.push(...realEstateIssues(listing, tree.subcategory));
+    issues.push(...rentalIssues(listing, tree.subcategory));
     if (tree.subcategory.condition === "required" && !listing.condition) issues.push(issue("condition", "condition_required"));
     issues.push(...priceIssues(listing, tree.subcategory));
+    issues.push(...catalogueIssues(listing, tree.subcategory, facts.seller));
   }
   issues.push(...locationIssues(listing));
   const quotas = listingQuotas(facts.seller);

@@ -79,7 +79,7 @@ describe("assessReadiness", () => {
   it("checks the category tree: unknown, mismatch, Pro-only", () => {
     expect(codes(ready({ subcategoryId: "licornes" })).get("subcategoryId")).toEqual(["unknown"]);
     expect(codes(ready({ categoryId: "mode", subcategoryId: "velos" })).get("subcategoryId")).toEqual(["subcategory_mismatch"]);
-    const rental = ready({ subcategoryId: "location-voitures", attributes: { "car-brand": "dacia", model: "Logan", gearbox: "manuelle" }, price: 300, condition: undefined });
+    const rental = ready({ subcategoryId: "location-voitures", attributes: { "rental-class": "berline", "car-brand": "dacia", model: "Logan", gearbox: "manuelle", fuel: "diesel" }, price: 300, condition: undefined });
     expect(codes(rental).get("subcategoryId")).toEqual(["pro_only"]);
     expect(codes(rental, PRO).has("subcategoryId")).toBe(false);
   });
@@ -113,12 +113,21 @@ describe("assessReadiness", () => {
           else if (criterion.type === "multiselect") attributes[criterion.id] = [criterion.options![0]!];
           else if (criterion.type === "number") attributes[criterion.id] = criterion.min ?? 1;
           else if (criterion.type === "boolean") attributes[criterion.id] = true;
-          else attributes[criterion.id] = "ok";
+          else attributes[criterion.id] = criterion.format === "onssa" ? "M.07.113.20" : "ok";
         }
         const filled = assessReadiness(ready({ categoryId: category.id, subcategoryId: subcategory.id, attributes, condition: "good", price: 1000 }), PRO);
         expect(filled.filter((issue) => issue.path.startsWith("attributes")), subcategory.id).toEqual([]);
       }
     }
+  });
+
+  it("keeps food to Pros, with an ONSSA number of the right shape", () => {
+    const honey = (number: string) => ready({ categoryId: "terroir", subcategoryId: "miel", attributes: { "onssa-number": number, "honey-type": "thym" }, condition: undefined, price: 220 });
+    expect(codes(honey("M.07.113.20")).get("subcategoryId")).toEqual(["pro_only"]);
+    expect(codes(honey("M.07.113.20"), PRO).size).toBe(0);
+    expect(codes(honey("HFO.24.07.15"), PRO).size).toBe(0);
+    for (const bad of ["M07113", "m.07.113.20", "M.07.113.2026", "MIEL.07.113", "ABCDEFG.1.1.20"]) expect(codes(honey(bad), PRO).get("attributes.onssa-number"), bad).toEqual(["criterion_format_onssa"]);
+    expect(codes(honey(""), PRO).get("attributes.onssa-number")).toEqual(["criterion_required"]);
   });
 
   it("requires the condition where the subcategory says so", () => {

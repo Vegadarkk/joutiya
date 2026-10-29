@@ -5,7 +5,7 @@
 export const REPORT_PRIORITIES = ["P0", "P1", "P2", "P3"] as const;
 export type ReportPriority = (typeof REPORT_PRIORITIES)[number];
 
-export const REPORT_TARGET_TYPES = ["listing", "user", "message", "pro"] as const;
+export const REPORT_TARGET_TYPES = ["listing", "user", "message", "pro", "review"] as const;
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
 
 const MINUTE = 60_000;
@@ -26,8 +26,8 @@ export interface ReportReason {
   ground: { type: "illegal" | "terms"; ref: string };
 }
 
-const ALL: readonly ReportTargetType[] = ["listing", "user", "message", "pro"];
-const PEOPLE: readonly ReportTargetType[] = ["user", "message", "pro"];
+const ALL: readonly ReportTargetType[] = ["listing", "user", "message", "pro", "review"];
+const PEOPLE: readonly ReportTargetType[] = ["user", "message", "pro", "review"];
 const CONTENT: readonly ReportTargetType[] = ["listing", "pro"];
 
 export const REPORT_REASONS = [
@@ -138,6 +138,14 @@ export const REPORT_REASONS = [
     label: { fr: "Harcèlement ou insultes", ar: "تحرش أو سب" },
     hint: { fr: "Messages répétés, insultes, pression.", ar: "رسائل متكررة، سب، ضغط." },
     ground: { type: "terms", ref: "CGU, comportement" },
+  },
+  {
+    id: "fake_review",
+    priority: "P2",
+    targets: ["review"],
+    label: { fr: "Avis faux ou sans rapport avec l'échange", ar: "تقييم كاذب أو لا علاقة له بالمعاملة" },
+    hint: { fr: "L'avis ne décrit pas un vrai échange, ou parle d'autre chose que la transaction.", ar: "التقييم لا يصف معاملة حقيقية، أو يتحدث عن شيء غير المعاملة." },
+    ground: { type: "terms", ref: "CGU, avis utilisateurs" },
   },
   // P3: 7 days.
   {

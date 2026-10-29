@@ -2,9 +2,9 @@ import "server-only";
 import { launchOfferOpen, listingQuotas } from "@/config/pricing";
 import type { AuthContext } from "@/lib/auth/guards";
 import { getFlags, getPricing } from "@/lib/config/runtime";
-import type { ProApplyInput, ProMeResponse } from "@/lib/contracts/pro";
+import type { ProAgencyInput, ProAgencyResponse, ProApplyInput, ProMeResponse, ProRentalInput, ProRentalResponse } from "@/lib/contracts/pro";
 import { db } from "@/lib/firebase/admin";
-import { Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { countActive } from "@/lib/db/repositories/listings";
 import { getProProfile, proProfileFromSnapshot, proProfileRef, proProfileToFirestore, type ProProfileRecord } from "@/lib/db/repositories/pro-profiles";
 import { COLLECTIONS, type UserDoc } from "@/lib/db/schemas";
@@ -12,12 +12,15 @@ import { getUploads } from "@/lib/db/repositories/uploads";
 import { getUser } from "@/lib/db/repositories/users";
 import { HttpError } from "@/lib/http/errors";
 import { newListingId, slugify } from "@/lib/listings/ids";
+import { revalidateListingPaths } from "@/lib/listings/revalidate";
+import { firstStrictIssue } from "@/lib/moderation/free-text";
 import { isPhoneVerificationConfigured } from "@/lib/phone-verify/config";
 import { normalizeMoroccanMobile } from "@/lib/phone/normalize";
 import { consume } from "@/lib/quota";
 import { iceFormatOk, KYBC_NOTICE_VERSION } from "./kybc";
-import { storefrontShown, transition } from "./lifecycle";
+import { publishesAsPro, storefrontShown, transition } from "./lifecycle";
 import type { ProProfileDoc } from "./profile-schema";
+import { rentalCheckView } from "./rental-check-rules";
 
 // Pro accounts (architecture §5 lifecycle, §6 "Devenir Pro", phase 7 design §4). The application
 // creates proProfiles/{proId} in `pending_verification`; the account stays `individual` and
@@ -156,6 +159,64 @@ export async function proSelf(auth: AuthContext): Promise<ProMeResponse> {
       activeListings: active,
       launchOffer: profile.planSource === "launch_offer" ? { endsAt: pricing.launchOffer.endsAt, noticeDays: pricing.launchOffer.noticeDays } : null,
       storefront: storefrontShown(profile.lifecycle, profile.plan) ? `${profile.slug}-${profile.proId}` : null,
+      sector: profile.sector ?? "general",
+      feeSchedule: profile.agency?.feeSchedule ?? "",
+      rental: profile.rental ?? null,
+      rentalCheck: profile.rentalCheck ? rentalCheckView(profile.rentalCheck) : null,
     },
   };
+}
+
+/**
+ * PUT /api/pro/me/agency (Agence pack design §3): the owner sets the shop's sector and, for a
+ * real-estate agency, its fee schedule. The owner of a verified shop that publishes (not
+ * suspended), from the session claims; the storefront is revalidated when shown.
+ */
+export async function updateAgency(auth: AuthContext, input: ProAgencyInput, now = new Date()): Promise<ProAgencyResponse> {
+  const profile = await ownedPublishingShop(auth);
+  const feeSchedule = input.sector === "real_estate" ? input.feeSchedule : "";
+  // The listing text rules, sensitive data refused outright (as a member's storefront bio).
+  const issue = feeSchedule ? firstStrictIssue(feeSchedule) : null;
+  if (issue) throw new HttpError(422, "invalid_text", "fee schedule refused by the text screen", { details: { field: "feeSchedule", issue } });
+  await proProfileRef(profile.proId).update({
+    sector: input.sector,
+    agency: feeSchedule ? { feeSchedule } : FieldValue.delete(),
+    updatedAt: Timestamp.fromDate(now),
+  });
+  void consume("firestore.reads", 1);
+  void consume("firestore.writes", 1);
+  if (storefrontShown(profile.lifecycle, profile.plan)) revalidateListingPaths({ shopSegment: `${profile.slug}-${profile.proId}` });
+  return { sector: input.sector, feeSchedule };
+}
+
+/** The owner's shop, verified and publishing (not suspended), from the session claims; else 409/403. */
+export async function ownedPublishingShop(auth: AuthContext): Promise<ProProfileRecord> {
+  const { proId, proRole } = auth.user.claims;
+  if (!proId) throw new HttpError(409, "pro_not_verified");
+  if (proRole !== "owner") throw new HttpError(403, "forbidden");
+  const profile = await getProProfile(proId);
+  if (!profile || profile.ownerUid !== auth.user.uid || !publishesAsPro(profile.lifecycle)) throw new HttpError(409, "pro_not_verified");
+  return profile;
+}
+
+/**
+ * PUT /api/pro/me/rental (rental pack §5): the car rental agency's settings, replaced whole. The
+ * branch addresses and the hours pass the storefront text screen (no contact detail, prohibited
+ * term or sensitive data); the storefront is revalidated when shown. A new licence reference drops
+ * the document check made against the previous one (decision 5).
+ */
+export async function updateRentalAgency(auth: AuthContext, input: ProRentalInput, now = new Date()): Promise<ProRentalResponse> {
+  const profile = await ownedPublishingShop(auth);
+  const texts: [string, string][] = [["hours", input.hours], ...input.branches.map((branch, index): [string, string] => [`branches.${index}.address`, branch.address])];
+  for (const [field, text] of texts) {
+    const issue = text ? firstStrictIssue(text) : null;
+    if (issue) throw new HttpError(422, "invalid_text", "rental settings refused by the text screen", { details: { field, issue } });
+  }
+  // The licence check was made against the previous reference: a new one needs a new document.
+  const dropCheck = profile.rentalCheck !== undefined && profile.rentalCheck.agrementRef !== input.agrementRef;
+  await proProfileRef(profile.proId).update({ rental: input, ...(dropCheck ? { rentalCheck: FieldValue.delete() } : {}), updatedAt: Timestamp.fromDate(now) });
+  void consume("firestore.reads", 1);
+  void consume("firestore.writes", 1);
+  if (storefrontShown(profile.lifecycle, profile.plan)) revalidateListingPaths({ shopSegment: `${profile.slug}-${profile.proId}` });
+  return { rental: input };
 }

@@ -205,6 +205,16 @@ export async function listOwnerListingsByStatus(uid: string, statuses: readonly 
   return snapshot.docs.map(fromSnapshot).filter((record): record is ListingRecord => record !== null);
 }
 
+/**
+ * A seller's listings of one subcategory in some statuses, unordered (fleet planning of a car rental
+ * agency; index ownerUid, subcategoryId, status).
+ */
+export async function listOwnerListingsOf(uid: string, subcategoryId: string, statuses: readonly ListingStatus[], limit: number): Promise<ListingRecord[]> {
+  const snapshot = await listings().where("ownerUid", "==", uid).where("subcategoryId", "==", subcategoryId).where("status", "in", [...statuses]).limit(limit).get();
+  void consume("firestore.reads", Math.max(1, snapshot.size));
+  return snapshot.docs.map(fromSnapshot).filter((record): record is ListingRecord => record !== null);
+}
+
 /** Partial update outside a transaction: `version` + 1, `updatedAt` = now. */
 export async function updateListing(id: string, patch: ListingFieldPatch, now = new Date()): Promise<void> {
   await listingRef(id).update({ ...toUpdate(patch), version: FieldValue.increment(1), updatedAt: Timestamp.fromDate(now) });

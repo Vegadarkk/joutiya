@@ -1,15 +1,7 @@
 import { apiGet, apiPost } from "@/lib/auth/client";
 import { MESSAGING_API } from "@/lib/contracts/endpoints";
-import type {
-  ConversationResponse,
-  ConversationsPage,
-  ConversationStateRequest,
-  MessagesPage,
-  SendMessageResponse,
-  StartConversationRequest,
-  StartConversationResponse,
-  UnreadResponse,
-} from "@/lib/contracts/messaging";
+import type { ConversationResponse, ConversationsPage, ConversationStateRequest, MessagesPage, SendMessageResponse, StartConversationResponse, UnreadResponse } from "@/lib/contracts/messaging";
+import type { StartConversationWithRequest } from "@/lib/contracts/rental-requests";
 
 // Browser side of the messaging API (design phase-5 D2-D9): same-origin JSON calls with the CSRF
 // header (lib/auth/client). The browser never reads Firestore; live changes arrive as event ids on
@@ -49,7 +41,7 @@ export function fetchThread(cid: string, range: { cursor?: string; after?: strin
 }
 
 /** POST the first message about a listing (Turnstile token of the "message" action). */
-export function startConversation(input: StartConversationRequest): Promise<StartConversationResponse> {
+export function startConversation(input: StartConversationWithRequest): Promise<StartConversationResponse> {
   return apiPost<StartConversationResponse>(MESSAGING_API.conversations, input);
 }
 

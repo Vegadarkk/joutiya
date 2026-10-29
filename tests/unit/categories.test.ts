@@ -8,6 +8,7 @@ import {
   CONDITIONS,
   CRITERIA,
   CRITERION_IDS,
+  CRITERION_GROUPS,
   CRITERION_TEXT_MAX,
   CRITERION_TYPES,
   CRITERION_UNITS,
@@ -29,8 +30,8 @@ type Labels = { Categories: Record<string, { name: string; sub: Record<string, s
 const messages: Record<"fr" | "ar", Labels> = { fr: fr as unknown as Labels, ar: ar as unknown as Labels };
 
 describe("category tree", () => {
-  it("has the 11 categories of the product research, each with subcategories", () => {
-    expect(CATEGORY_IDS).toEqual(["vehicules", "immobilier", "electronique", "maison-jardin", "mode", "famille", "loisirs", "animaux", "materiel-pro", "services", "divers"]);
+  it("has the 11 categories of the product research plus the Pros' terroir, each with subcategories", () => {
+    expect(CATEGORY_IDS).toEqual(["vehicules", "immobilier", "electronique", "maison-jardin", "mode", "terroir", "famille", "loisirs", "animaux", "materiel-pro", "services", "divers"]);
     for (const category of CATEGORIES) expect(category.subcategories.length, category.id).toBeGreaterThan(0);
     expect(SUBCATEGORY_IDS.length).toBeGreaterThanOrEqual(50);
   });
@@ -75,7 +76,7 @@ describe("category tree", () => {
         const main = subcategory.criteria.filter((criterion) => !criterion.group);
         expect(main.filter((criterion) => !criterion.proOnly).length, subcategory.id).toBeLessThanOrEqual(MAIN_CRITERIA_MAX);
         expect(main.filter((criterion) => criterion.proOnly).length, subcategory.id).toBeLessThanOrEqual(PRO_CRITERIA_MAX);
-        expect(subcategory.criteria.filter((criterion) => criterion.group === "dossier").length, subcategory.id).toBeLessThanOrEqual(DOSSIER_CRITERIA_MAX);
+        for (const group of CRITERION_GROUPS) expect(subcategory.criteria.filter((criterion) => criterion.group === group).length, `${subcategory.id} ${group}`).toBeLessThanOrEqual(DOSSIER_CRITERIA_MAX);
         for (const criterion of subcategory.criteria) used.add(criterion.id);
         if (subcategory.priceUnit) expect(PRICE_UNITS).toContain(subcategory.priceUnit);
       }

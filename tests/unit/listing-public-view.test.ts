@@ -118,6 +118,7 @@ describe("toPublicListing", () => {
       contact: { showPhone: true, whatsapp: false },
       seller: { publicId: "abcdefghjk", name: "Salma", type: "individual" },
       example: false,
+      rental: null,
       publishedAt: NOW.toISOString(),
       sortAt: NOW.toISOString(),
       updatedAt: NOW.toISOString(),
@@ -172,6 +173,7 @@ describe("getSeller", () => {
       publishedCount: 7,
       bio: null,
       bannerKey: "zellige",
+      rating: { count: 0, average: null, histogram: [0, 0, 0, 0, 0] },
     });
     expect(repo.where).toHaveBeenCalledWith("ownerUid", "==", "uid-secret-1");
     expect(repo.where).toHaveBeenCalledWith("status", "==", "published");

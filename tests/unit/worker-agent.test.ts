@@ -6,7 +6,8 @@ import type * as AgentQueue from "@/lib/ai/queue";
 // start-up, closed on SIGTERM with the others together with the producer (closeAgentQueue); the
 // billing queue (phase 7) likewise, one consumer at concurrency 1, Sentry on its last attempt. And
 // the consumer itself (src/worker/jobs/agent.ts): queue "agent", concurrency 1, a malformed
-// payload never retries, `final` on the last attempt, Sentry on the final failure only.
+// payload never retries, `final` on the last attempt, Sentry on the final failure only; the car
+// rental licence check rides it under its own job name.
 // Everything below BullMQ is mocked: no Valkey, no Firestore, no provider.
 
 const mocks = vi.hoisted(() => {
@@ -47,6 +48,7 @@ const mocks = vi.hoisted(() => {
     captureServerException: vi.fn(),
     closeAgentQueue: vi.fn(async () => undefined),
     runAgentTask: vi.fn(async () => ({ status: "done" })),
+    runRentalCheck: vi.fn(async () => ({ status: "done" })),
     onBillingJobFailed: vi.fn(async (job: { attemptsMade: number; opts: { attempts?: number } }) => job.attemptsMade >= (job.opts.attempts ?? 1)),
     outboxWatch: { stop: vi.fn() },
   };
@@ -79,6 +81,7 @@ vi.mock("@/lib/help/search", () => ({ syncHelpIndex: vi.fn(async () => false) })
 vi.mock("@/lib/valkey/clients", () => ({ clientOptions: (_role: string, overrides: object) => ({ ...overrides }) }));
 vi.mock("@/lib/ai/queue", async (importOriginal) => ({ ...(await importOriginal<typeof AgentQueue>()), closeAgentQueue: mocks.closeAgentQueue }));
 vi.mock("@/lib/ai/run", () => ({ runAgentTask: mocks.runAgentTask }));
+vi.mock("@/lib/pro/rental-check", () => ({ runRentalCheck: mocks.runRentalCheck }));
 // The real agent consumer, without the other job modules (Firestore, storage, mail).
 vi.mock("@/worker/jobs", async () => {
   const agent = await import("@/worker/jobs/agent");
@@ -162,6 +165,16 @@ describe("worker bootstrap", () => {
     expect(mocks.runAgentTask).toHaveBeenLastCalledWith(data, { final: true });
     await expect(processAgentJob(job({ task: "listing_screen", target: { type: "report", id: "r1" } }, 0) as never)).rejects.toBeInstanceOf(mocks.UnrecoverableError);
     expect(mocks.runAgentTask).toHaveBeenCalledTimes(2);
+  });
+
+  it("runs a car rental licence check by its job name, a malformed one never retried", async () => {
+    const job = (data: unknown, attemptsMade: number) => ({ id: "j2", name: "rental-check", data, attemptsMade, opts: { attempts: 3 } });
+    const data = { proId: "abcdefgh", submittedAt: 1_793_000_000_000 };
+    await processAgentJob(job(data, 2) as never);
+    expect(mocks.runRentalCheck).toHaveBeenLastCalledWith(data, { final: true });
+    await expect(processAgentJob(job({ proId: "../x", submittedAt: 1 }, 0) as never)).rejects.toBeInstanceOf(mocks.UnrecoverableError);
+    expect(mocks.runRentalCheck).toHaveBeenCalledTimes(1);
+    expect(mocks.runAgentTask).not.toHaveBeenCalledWith(data, expect.anything());
   });
 
   it("closes the agent consumer and producer with the others on SIGTERM", async () => {

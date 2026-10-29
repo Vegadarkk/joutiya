@@ -21,6 +21,7 @@ import {
   type WizardStep,
 } from "@/lib/contracts/listings";
 import { MAX_PHOTOS_PRO } from "@/lib/contracts/media";
+import { rentalIssues } from "@/lib/listings/rental";
 
 // Per-step readiness of the posting wizard (design D3), derived from the shared contracts so the
 // browser and the API agree. Pure and client-safe: used by the step forms (zod resolver), the
@@ -237,13 +238,19 @@ export interface IssueOptions {
 }
 
 /** The blocking issues of one step (empty = the step is complete). The review step has none of its own. */
+/** Rules across criteria the server's readiness applies too (car rental rates and mileage), shown under their field. */
+function crossFieldIssues(draft: DraftLike): FieldIssue[] {
+  const subcategory = draft.subcategoryId ? subcategoryById(draft.subcategoryId) : undefined;
+  return subcategory ? rentalIssues({ attributes: draft.attributes, price: draft.price }, subcategory) : [];
+}
+
 export function stepIssues(step: WizardStep, draft: DraftLike, options: IssueOptions = {}): FieldIssue[] {
   const values = stepValues(step, draft);
   switch (step) {
     case "categorie":
       return toIssues(categoryStepSchema.safeParse(values), values);
     case "criteres":
-      return draft.subcategoryId ? toIssues(criteriaStepSchema(draft.subcategoryId, draft.sellerType).safeParse(values), values) : [{ path: "subcategoryId", code: "subcategory_required" }];
+      return draft.subcategoryId ? [...toIssues(criteriaStepSchema(draft.subcategoryId, draft.sellerType).safeParse(values), values), ...crossFieldIssues(draft)] : [{ path: "subcategoryId", code: "subcategory_required" }];
     case "titre":
       return toIssues(titleStepSchema.safeParse(values), values);
     case "description":

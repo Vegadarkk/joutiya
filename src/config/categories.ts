@@ -19,11 +19,22 @@ export type Condition = (typeof CONDITIONS)[number];
 export const CRITERION_TYPES = ["select", "multiselect", "number", "boolean", "text"] as const;
 export type CriterionType = (typeof CRITERION_TYPES)[number];
 
-export const CRITERION_UNITS = ["km", "cv", "m2", "an", "go", "nuit", "mois"] as const;
+export const CRITERION_UNITS = ["km", "cv", "m2", "an", "go", "nuit", "mois", "jour", "ans", "mad"] as const;
 export type CriterionUnit = (typeof CRITERION_UNITS)[number];
 
 /** Max length of a free-text criterion (model, brand, breed). */
 export const CRITERION_TEXT_MAX = 80;
+
+/**
+ * Checked shapes of a free-text criterion. `onssa`: the sanitary number of a food business (ONSSA
+ * approval or authorisation, decree 2-10-473 art. 13): activity letters, province code, filing
+ * number and year, dot-separated ("M.07.113.20", "HFO.24.07.15"); every number of the ONSSA lists
+ * matches it. Letters are upper case: the form upper-cases what is typed.
+ */
+export const CRITERION_FORMATS = {
+  onssa: /^[A-Z]{1,6}\.\d{1,2}\.\d{1,4}\.\d{2}$/,
+} as const;
+export type CriterionFormat = keyof typeof CRITERION_FORMATS;
 
 export interface Criterion {
   id: string;
@@ -37,8 +48,9 @@ export interface Criterion {
   unit?: CriterionUnit;
   step?: number;
   /**
-   * `dossier`: history, papers, warranty and equipment of a vehicle (Concession pack, 2026-10-28):
-   * a folded block of the wizard, its own section on the listing page. Absent = main criteria.
+   * `dossier`: history, papers, warranty and equipment of a vehicle (Concession pack, 2026-10-28);
+   * `rental`: the terms of a car rental (insurance, deposit, driver, handover; rental pack,
+   * 2026-10-28). A folded block of the wizard, its own section on the listing page. Absent = main criteria.
    */
   group?: CriterionGroup;
   /** A dossier criterion offered as a search filter (main criteria always are, text excepted). */
@@ -51,9 +63,11 @@ export interface Criterion {
   proOnly?: boolean;
   /** Shown and accepted only while criterion `id` holds one of `values` (a warranty's duration). */
   showIf?: { id: string; values: readonly string[] };
+  /** text: the value must match `CRITERION_FORMATS[format]` (refused as `criterion_format_<format>`). */
+  format?: CriterionFormat;
 }
 
-export const CRITERION_GROUPS = ["dossier"] as const;
+export const CRITERION_GROUPS = ["dossier", "rental"] as const;
 export type CriterionGroup = (typeof CRITERION_GROUPS)[number];
 
 /**
@@ -62,6 +76,7 @@ export type CriterionGroup = (typeof CRITERION_GROUPS)[number];
  */
 export const MAIN_CRITERIA_MAX = 12;
 export const PRO_CRITERIA_MAX = 8;
+/** Cap of each folded group (vehicle dossier, rental terms). */
 export const DOSSIER_CRITERIA_MAX = 12;
 
 /** Price per unit shown next to the amount; the amount itself stays an integer MAD (D4). */
@@ -99,6 +114,8 @@ export interface Category {
    * field never matches a filter on it.
    */
   sharedFilters?: readonly CriterionId[];
+  /** Number criteria shown on result cards under the title, in order ("95 m² · 5 pièces"). */
+  cardFacts?: readonly CriterionId[];
 }
 
 /** Car brands common in Morocco, plus `autre`; the model stays free text. */
@@ -141,6 +158,23 @@ const FIELDS = {
   "financing": { id: "financing", type: "boolean" },
   "car-equipment": { id: "car-equipment", type: "multiselect", options: ["climatisation", "gps", "camera-recul", "radar-recul", "carplay-android-auto", "regulateur", "toit-ouvrant", "sieges-cuir", "jantes-alu", "transmission-4x4"] },
   "stock-ref": { id: "stock-ref", type: "text", proOnly: true },
+  // Car rental (rental pack, location-voitures/location-voitures.md §2): declared by the agency.
+  "rental-class": { id: "rental-class", type: "select", options: ["economique", "citadine", "compacte", "berline", "suv-4x4", "monospace", "utilitaire", "minibus", "cabriolet", "luxe"] },
+  "seats": { id: "seats", type: "number", min: 2, max: 9 },
+  "min-rental-days": { id: "min-rental-days", type: "number", min: 1, max: 90, unit: "jour" },
+  "mileage-policy": { id: "mileage-policy", type: "select", options: ["illimite", "limite"] },
+  "km-per-day": { id: "km-per-day", type: "number", min: 50, max: 2000, unit: "km", showIf: { id: "mileage-policy", values: ["limite"] } },
+  "rental-insurance": { id: "rental-insurance", type: "select", options: ["rc", "tous-risques-franchise", "tous-risques-sans-franchise"] },
+  "insurance-excess": { id: "insurance-excess", type: "number", min: 0, max: 200000, unit: "mad", showIf: { id: "rental-insurance", values: ["tous-risques-franchise"] } },
+  "rental-deposit": { id: "rental-deposit", type: "number", min: 0, max: 200000, unit: "mad" },
+  "driver-min-age": { id: "driver-min-age", type: "number", min: 18, max: 30, unit: "ans" },
+  "licence-years": { id: "licence-years", type: "number", min: 0, max: 10, unit: "ans" },
+  "vehicle-handover": { id: "vehicle-handover", type: "multiselect", options: ["agence", "aeroport", "livraison", "gare"] },
+  "one-way": { id: "one-way", type: "boolean" },
+  "rental-extras": { id: "rental-extras", type: "multiselect", options: ["siege-bebe", "rehausseur", "conducteur-additionnel", "gps", "wifi"] },
+  "rate-7-days": { id: "rate-7-days", type: "number", min: 1, max: 100000, unit: "mad" },
+  "rate-30-days": { id: "rate-30-days", type: "number", min: 1, max: 100000, unit: "mad" },
+  "fleet-units": { id: "fleet-units", type: "number", min: 1, max: 200 },
   "moto-brand": { id: "moto-brand", type: "select", options: ["yamaha", "honda", "suzuki", "kawasaki", "bmw", "ktm", "ducati", "piaggio", "vespa", "sym", "kymco", "peugeot", "aprilia", "triumph", "harley-davidson", "docker", "becane", "haojue", "lifan", "autre"] },
   "engine-size": { id: "engine-size", type: "select", options: ["moins-50", "50-125", "126-250", "251-500", "501-750", "plus-750"] },
   "bike-type": { id: "bike-type", type: "select", options: ["vtt", "route", "ville", "electrique", "enfant", "bmx", "pliant", "autre"] },
@@ -251,6 +285,14 @@ const FIELDS = {
   "frequency": { id: "frequency", type: "select", options: ["ponctuel", "hebdomadaire", "quotidien"] },
   "event-service": { id: "event-service", type: "select", options: ["traiteur", "neggafa", "photographe-video", "dj-animation", "location-salle", "decoration", "location-materiel", "autre"] },
   "beauty-service": { id: "beauty-service", type: "select", options: ["coiffure", "maquillage", "esthetique", "henne", "onglerie", "autre"] },
+  "beauty-product-type": { id: "beauty-product-type", type: "select", options: ["huile-argan", "savon-noir", "ghassoul", "eau-de-rose", "henne", "parfum", "maquillage", "soin-visage-corps", "soin-cheveux", "autre"] },
+  // Produits du terroir (owner decision of 2026-10-28, design phase-7/boutique-temporaire.md §3).
+  "onssa-number": { id: "onssa-number", type: "text", format: "onssa" },
+  "olive-oil-grade": { id: "olive-oil-grade", type: "select", options: ["vierge-extra", "vierge", "vierge-courante"] },
+  "honey-type": { id: "honey-type", type: "select", options: ["euphorbe", "thym", "jujubier", "oranger", "eucalyptus", "romarin", "lavande", "caroube", "toutes-fleurs", "autre"] },
+  "date-variety": { id: "date-variety", type: "select", options: ["mejhoul", "boufeggous", "jihel", "aziza", "bouskri", "najda", "autre"] },
+  "spice-type": { id: "spice-type", type: "select", options: ["safran", "ras-el-hanout", "cumin", "paprika", "gingembre", "curcuma", "poivre", "cannelle", "herbes-aromatiques", "autre"] },
+  "terroir-type": { id: "terroir-type", type: "select", options: ["couscous-pates", "olives", "conserves-confitures", "the-infusions", "farines-semoules", "autre"] },
 } as const satisfies Record<string, FieldDef>;
 
 export type CriterionId = keyof typeof FIELDS;
@@ -276,6 +318,27 @@ const VEHICLE_DOSSIER = [
   dossier("financing"),
   dossier("stock-ref"),
 ] as const;
+const rental = (id: CriterionId, options: { filter?: true } = {}): Criterion => ({ ...FIELDS[id], group: "rental", ...options });
+
+/** Car rental by Pro agencies (rental pack): rental terms, availability by dates, fleet storefront. */
+export const RENTAL_SUBCATEGORY = "location-voitures";
+
+const RENTAL_TERMS = [
+  rental("rental-insurance", { filter: true }),
+  rental("insurance-excess"),
+  rental("rental-deposit"),
+  rental("driver-min-age"),
+  rental("licence-years"),
+  rental("vehicle-handover", { filter: true }),
+  rental("one-way", { filter: true }),
+  rental("rental-extras"),
+  rental("rate-7-days"),
+  rental("rate-30-days"),
+  rental("fleet-units"),
+  // The agency's own reference: matches a stock file's lines (fleet import, rental pack §3).
+  rental("stock-ref"),
+];
+
 const proRequired = (id: CriterionId): Criterion => ({ ...FIELDS[id], required: true, proOnly: true });
 const proOptional = (id: CriterionId): Criterion => ({ ...FIELDS[id], proOnly: true });
 
@@ -284,7 +347,7 @@ export const CATEGORIES: readonly Category[] = [
     id: "vehicules",
     subcategories: [
       { id: "voitures", categoryId: "vehicules", condition: "optional", criteria: [required("car-brand"), required("model"), required("year"), required("mileage"), required("fuel"), required("gearbox"), optional("fiscal-power"), optional("origin"), optional("body-type"), optional("doors"), optional("color"), ...VEHICLE_DOSSIER, dossier("car-equipment")] },
-      { id: "location-voitures", categoryId: "vehicules", priceOptional: true, priceUnit: "day", proOnly: true, criteria: [required("car-brand"), required("model"), optional("year"), required("gearbox"), optional("fuel")] },
+      { id: "location-voitures", categoryId: "vehicules", priceUnit: "day", proOnly: true, criteria: [required("rental-class"), required("car-brand"), required("model"), optional("year"), required("gearbox"), required("fuel"), optional("seats"), optional("min-rental-days"), optional("mileage-policy"), optional("km-per-day"), ...RENTAL_TERMS] },
       { id: "motos-scooters", categoryId: "vehicules", condition: "optional", criteria: [required("moto-brand"), optional("model"), required("year"), optional("mileage"), required("engine-size"), ...VEHICLE_DOSSIER] },
       { id: "velos", categoryId: "vehicules", condition: "required", donationAllowed: true, criteria: [required("bike-type"), optional("bike-size"), optional("brand")] },
       { id: "utilitaires-camions", categoryId: "vehicules", condition: "optional", criteria: [required("utility-type"), required("car-brand"), optional("model"), required("year"), required("mileage"), required("fuel"), optional("gearbox"), ...VEHICLE_DOSSIER] },
@@ -295,6 +358,7 @@ export const CATEGORIES: readonly Category[] = [
   {
     id: "immobilier",
     sharedFilters: ["property-type", "surface", "rooms", "bedrooms"],
+    cardFacts: ["surface", "rooms", "bedrooms"],
     subcategories: [
       { id: "vente", categoryId: "immobilier", criteria: [required("property-type"), required("surface"), optional("rooms"), optional("bedrooms"), optional("living-rooms"), optional("bathrooms"), optional("floor"), optional("standing"), optional("property-age"), optional("property-title"), optional("furnished"), optional("amenities"), proOptional("off-plan"), proOptional("building-permit"), proOptional("delivery-year"), proRequired("mandate"), proOptional("agency-reference"), proRequired("agency-fees"), proOptional("agency-fees-amount")] },
       { id: "location", categoryId: "immobilier", priceOptional: true, priceUnit: "month", criteria: [required("property-type"), required("surface"), optional("rooms"), optional("bedrooms"), optional("living-rooms"), optional("bathrooms"), optional("floor"), required("furnished"), optional("amenities"), optional("deposit"), optional("availability"), proRequired("mandate"), proOptional("agency-reference"), proRequired("agency-fees"), proOptional("agency-fees-amount")] },
@@ -334,6 +398,22 @@ export const CATEGORIES: readonly Category[] = [
       { id: "chaussures", categoryId: "mode", condition: "required", donationAllowed: true, criteria: [required("audience"), required("shoe-type"), required("shoe-size"), optional("brand"), optional("color")] },
       { id: "sacs-accessoires", categoryId: "mode", condition: "required", donationAllowed: true, criteria: [required("fashion-accessory-type"), optional("audience"), optional("brand"), optional("color")] },
       { id: "montres-bijoux", categoryId: "mode", condition: "required", criteria: [required("jewelry-type"), optional("jewelry-material"), optional("audience"), optional("brand")] },
+      // Cosmetics (cosmetic argan oil included) fall under the cosmetics rules, not ONSSA: no sanitary number.
+      { id: "beaute-soins", categoryId: "mode", condition: "required", criteria: [required("beauty-product-type"), optional("brand")] },
+    ],
+  },
+  {
+    // Food from producers: verified Pros only, with their ONSSA sanitary number, shown on the listing
+    // (decree 2-10-473 art. 14: on advertising) and checked by a moderator the first time a shop uses it.
+    id: "terroir",
+    subcategories: [
+      { id: "huile-olive", categoryId: "terroir", proOnly: true, criteria: [required("onssa-number"), required("olive-oil-grade")] },
+      { id: "huile-argan-alimentaire", categoryId: "terroir", proOnly: true, criteria: [required("onssa-number")] },
+      { id: "miel", categoryId: "terroir", proOnly: true, criteria: [required("onssa-number"), required("honey-type")] },
+      { id: "amlou-pates-a-tartiner", categoryId: "terroir", proOnly: true, criteria: [required("onssa-number")] },
+      { id: "dattes-fruits-secs", categoryId: "terroir", proOnly: true, criteria: [required("onssa-number"), optional("date-variety")] },
+      { id: "epices-herbes", categoryId: "terroir", proOnly: true, criteria: [required("onssa-number"), required("spice-type")] },
+      { id: "autres-produits-terroir", categoryId: "terroir", proOnly: true, criteria: [required("onssa-number"), required("terroir-type")] },
     ],
   },
   {
@@ -422,6 +502,18 @@ export function criterionApplies(criterion: Pick<Criterion, "showIf">, attribute
   return typeof value === "string" && criterion.showIf.values.includes(value);
 }
 
+/**
+ * The ONSSA number of a listing in a food subcategory, when well-formed (trimmed); undefined for
+ * any other subcategory. A moderator checks a number the first time a shop uses it.
+ */
+export function sanitaryNumber(subcategoryId: string | undefined, attributes: Readonly<Record<string, unknown>>): string | undefined {
+  const criterion = subcategoryId ? subcategoryById(subcategoryId)?.criteria.find((candidate) => candidate.format === "onssa") : undefined;
+  const value = criterion ? attributes[criterion.id] : undefined;
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return CRITERION_FORMATS.onssa.test(trimmed) ? trimmed : undefined;
+}
+
 export function criterionById(id: string): FieldDef | undefined {
   return Object.hasOwn(FIELDS, id) ? FIELDS[id as CriterionId] : undefined;
 }
@@ -448,7 +540,9 @@ function criterionSchema(criterion: Criterion): z.ZodType {
       return z.boolean();
     case "text": {
       const text = z.string().trim().max(CRITERION_TEXT_MAX);
-      return criterion.required ? text.min(1) : text;
+      const sized = criterion.required ? text.min(1) : text;
+      const pattern = criterion.format ? CRITERION_FORMATS[criterion.format] : undefined;
+      return pattern ? sized.refine((value) => value === "" || pattern.test(value), { message: `criterion_format_${criterion.format}` }) : sized;
     }
   }
 }

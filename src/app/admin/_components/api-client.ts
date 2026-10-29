@@ -16,6 +16,7 @@ export const ADMIN_API = {
   exports: "/api/admin/exports",
   users: "/api/admin/users",
   legal: "/api/admin/legal",
+  guideLinks: "/api/admin/guide/links",
 } as const;
 
 const CSRF_COOKIE = "__Host-csrf";

@@ -4,7 +4,6 @@ import {
   cidSchema,
   conversationStateSchema,
   sendMessageSchema,
-  startConversationSchema,
   type ConversationResponse,
   type ConversationsPage,
   type MessagesPage,
@@ -12,6 +11,8 @@ import {
   type StartConversationResponse,
   type UnreadResponse,
 } from "@/lib/contracts/messaging";
+import { rentalRequestProblem, startConversationRequestSchema } from "@/lib/contracts/rental-requests";
+import { getListing } from "@/lib/db/repositories/listings";
 import { serverEnv } from "@/lib/env";
 import { HttpError, notFound } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
@@ -20,6 +21,8 @@ import type { RateLimitId } from "@/config/rate-limits";
 import { assertQuotas } from "@/lib/quota/gate";
 import { requestIdentity } from "@/lib/rate-limit/keys";
 import { assertLimit, consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
+import { moroccoToday } from "@/lib/listings/rental-availability";
+import { actOnRentalRequest, assertRentalListing, requestAction } from "@/lib/rental-requests/service";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 import { conversationId } from "./ids";
 import { MESSAGING_READ_QUOTAS, conversationRow, inboxPage, threadPage, type Charged } from "./reads";
@@ -122,17 +125,34 @@ export async function handleThread(request: Request, params: Params): Promise<Re
   return json(body);
 }
 
-/** POST /api/conversations {listingId, text, turnstileToken, adultConfirmed?} -> 201 StartConversationResponse. */
+/**
+ * POST /api/conversations {listingId, text, turnstileToken, adultConfirmed?, rentalRequest?} -> 201
+ * StartConversationResponse. With a car rental's booking request (rental pack §6): its dates are
+ * checked and the request limiter consumed before Turnstile, the listing read after it, then the
+ * message and the request's system step.
+ */
 export async function handleStart(request: Request): Promise<Response> {
   const auth = await requireUser(request, { mutation: true, checkRevoked: true });
-  const input = await readJson(request, startConversationSchema, MESSAGE_BODY_MAX);
+  const input = await readJson(request, startConversationRequestSchema, MESSAGE_BODY_MAX);
+  const now = new Date();
+  const rental = input.rentalRequest;
+  if (rental) {
+    const problem = rentalRequestProblem(rental, moroccoToday(now));
+    if (problem) throw new HttpError(400, "invalid_body", undefined, { details: [{ path: "rentalRequest.from", code: problem }] });
+    assertLimit("rental.request.uid", await consumeLimit("rental.request.uid", auth.user.uid));
+  }
   await enforceSendLimits(auth.user.uid, conversationId(input.listingId, auth.user.uid));
   await assertQuotas(MESSAGING_QUOTAS);
   // Turnstile on every first message (AF §6), before any read: the token is single use.
   const identity = requestIdentity(request.headers);
   const check = await verifyTurnstile(input.turnstileToken, { action: "message", remoteIp: identity.ip, hostname: new URL(serverEnv().SITE_URL).hostname });
   if (!check.ok) throw new HttpError(403, "turnstile_failed", undefined, { details: { codes: check.codes } });
-  const body: StartConversationResponse = await startConversation(actorOf(auth), { listingId: input.listingId, text: input.text, adultConfirmed: input.adultConfirmed === true });
+  const listing = rental ? await getListing(input.listingId) : null;
+  if (rental) assertRentalListing(listing);
+  const actor = actorOf(auth);
+  const body: StartConversationResponse = await startConversation(actor, { listingId: input.listingId, text: input.text, adultConfirmed: input.adultConfirmed === true }, now);
+  // One millisecond later: the request's step reads after the message in the thread.
+  if (rental && listing) await actOnRentalRequest(actor, body.cid, requestAction(rental), new Date(now.getTime() + 1), listing);
   return json(body, { status: 201 });
 }
 

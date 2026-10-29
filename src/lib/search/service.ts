@@ -5,8 +5,9 @@ import { searchEngine } from "@/lib/search/engine";
 import { normalizeQuery } from "@/lib/search/normalize";
 import { toSearchCard } from "./cards";
 import { FEATURED_POOL_SIZE, FEATURED_SEARCH_SLOTS, drawFeatured } from "./featured";
-import { SEARCH_MAX_PAGE, SEARCH_MAX_TOTAL_HITS, SEARCH_PAGE_SIZE, canonicalSearchParams, effectiveSort, type SearchParams, type SearchSort } from "./params";
-import { SearchUnavailableError, attributeField, type EngineQuery, type EngineResult, type FilterExpr, type SearchCard, type SearchFacets, type SearchResponse, type SortSpec } from "./types";
+import { dayNumber, moroccoToday } from "@/lib/listings/rental-availability";
+import { RENTAL_SEARCH_AHEAD_DAYS, SEARCH_MAX_PAGE, SEARCH_MAX_TOTAL_HITS, SEARCH_PAGE_SIZE, canonicalSearchParams, effectiveSort, rentalDuration, type RentalDates, type SearchParams, type SearchSort } from "./params";
+import { SearchUnavailableError, attributeField, type EngineQuery, type EngineResult, type FilterExpr, type SearchCard, type SearchEngine, type SearchFacets, type SearchResponse, type SortSpec } from "./types";
 
 // Search service (design D5-D8): SearchParams -> engine queries -> cards. Shared by /api/search, the
 // /recherche page, the /c pages, the home sections and the saved-search alerts. Engine down or not
@@ -58,12 +59,44 @@ function scopeFilters(params: SearchParams): FilterExpr[] {
 }
 
 /**
+ * The rental dates a search applies at `now`: a pick-up from today (Morocco) to 180 days ahead;
+ * other dates (a stale link, a saved search whose period passed) are ignored.
+ */
+export function activeRentalDates(params: Pick<SearchParams, "dates">, now: Date): RentalDates | undefined {
+  if (!params.dates) return undefined;
+  const today = moroccoToday(now);
+  const from = dayNumber(params.dates.from);
+  return from >= today && from <= today + RENTAL_SEARCH_AHEAD_DAYS ? params.dates : undefined;
+}
+
+/**
+ * Car rentals free on every day from pick-up to return (rental pack §4) and whose minimum rental
+ * fits the duration (none declared = any).
+ */
+function rentalDatesFilter(dates: RentalDates): FilterExpr {
+  const from = dayNumber(dates.from);
+  const days = Array.from({ length: dayNumber(dates.to) - from + 1 }, (_, index) => from + index);
+  const minDays = attributeField("min-rental-days");
+  return {
+    and: [
+      { not: { field: "rentUnavailableDays", op: "in", values: days } },
+      { or: [{ field: minDays, op: "lte", value: rentalDuration(dates) }, { not: { field: minDays, op: "exists" } }] },
+    ],
+  };
+}
+
+/** Availability confirmed within 14 days (rental pack §4, owner decision 4: the others come after). */
+export function rentalFreshFilter(now: Date): FilterExpr {
+  return { field: "rentFreshUntil", op: "gt", value: now.getTime() };
+}
+
+/**
  * Engine filter of a search (every parameter but `q`, `sort` and `page`), or undefined when nothing
  * narrows it. Canonicalizes first, so contradictory input (district without city, criteria of
- * another subcategory) is ignored the way the URL parser ignores it. `now` is the request clock,
- * kept in the signature for time-bound filters; the main results never read `featuredUntil` (D8).
+ * another subcategory) is ignored the way the URL parser ignores it. `now` is the request clock for
+ * time-bound filters (rental dates); the main results never read `featuredUntil` (D8).
  */
-export function buildFilter(input: SearchParams, _now: Date): FilterExpr | undefined {
+export function buildFilter(input: SearchParams, now: Date): FilterExpr | undefined {
   const params = canonicalSearchParams(input);
   const parts = scopeFilters(params);
   if (params.district && params.city && !params.radiusKm) parts.push(eq("district", params.district));
@@ -74,6 +107,8 @@ export function buildFilter(input: SearchParams, _now: Date): FilterExpr | undef
   if (params.shop) parts.push(eq("sellerPublicId", params.shop));
   if (params.donation) parts.push(eq("isDonation", true));
   if (params.withPhoto) parts.push(eq("hasPhoto", true));
+  // Sold-out listings stay online but leave the default results (owner decision 1, 2026-10-28).
+  if (!params.includeSoldOut) parts.push({ not: eq("soldOut", true) });
   if (params.conditions?.length) parts.push({ field: "condition", op: "in", values: [...params.conditions] });
   for (const [id, filter] of Object.entries(params.criteria ?? {})) {
     const field = attributeField(id);
@@ -84,6 +119,8 @@ export function buildFilter(input: SearchParams, _now: Date): FilterExpr | undef
       if (filter.max !== undefined) parts.push({ field, op: "lte", value: filter.max });
     }
   }
+  const dates = activeRentalDates(params, now);
+  if (dates) parts.push(rentalDatesFilter(dates));
   return and(parts);
 }
 
@@ -151,6 +188,60 @@ function firstResult(results: EngineResult[], index = 0): EngineResult {
   return result;
 }
 
+function sumDistributions(a: EngineResult["facetDistribution"], b: EngineResult["facetDistribution"]): EngineResult["facetDistribution"] {
+  if (!a && !b) return undefined;
+  const sum: Record<string, Record<string, number>> = {};
+  for (const distribution of [a, b]) {
+    for (const [field, values] of Object.entries(distribution ?? {})) {
+      const into = (sum[field] ??= {});
+      for (const [value, count] of Object.entries(values)) into[value] = (into[value] ?? 0) + count;
+    }
+  }
+  return sum;
+}
+
+/**
+ * The main query and the `extra` ones in one round trip. With `fresh` (rental dates), the results
+ * are the listings matching it, then the others, each group in the query's sort: the fresh page
+ * and the count of the others first, then, when the page is not full, the one or two pages of the
+ * others it continues with. Facets and totals add both groups up.
+ */
+async function mainSearch(engine: SearchEngine, main: EngineQuery, fresh: FilterExpr | undefined, extra: EngineQuery[]): Promise<{ result: EngineResult; extra: EngineResult[] }> {
+  if (!fresh) {
+    const results = await engine.search([main, ...extra]);
+    return { result: firstResult(results), extra: results.slice(1) };
+  }
+  const size = main.hitsPerPage;
+  const staleFilter = and([main.filter, { not: fresh }]) ?? { not: fresh };
+  const results = await engine.search([{ ...main, filter: and([main.filter, fresh]) ?? fresh }, { ...main, filter: staleFilter, page: 1, hitsPerPage: 0 }, ...extra]);
+  const top = firstResult(results);
+  const stale = firstResult(results, 1);
+  const hits = [...top.hits];
+  if (size > 0 && hits.length < size && stale.totalHits > 0) {
+    const from = Math.max(0, (main.page - 1) * size - top.totalHits);
+    const skip = from % size;
+    const need = size - hits.length;
+    const firstPage = Math.floor(from / size) + 1;
+    const pages = skip + need > size ? [firstPage, firstPage + 1] : [firstPage];
+    const { facets: _facets, ...plain } = main;
+    const more = await engine.search(pages.map((page) => ({ ...plain, filter: staleFilter, page, hitsPerPage: size })));
+    hits.push(...more.flatMap((each) => each.hits).slice(skip, skip + need));
+  }
+  const totalHits = top.totalHits + stale.totalHits;
+  const facetDistribution = sumDistributions(top.facetDistribution, stale.facetDistribution);
+  return {
+    result: {
+      hits,
+      totalHits,
+      totalPages: size > 0 ? Math.ceil(Math.min(totalHits, SEARCH_MAX_TOTAL_HITS) / size) : 0,
+      page: main.page,
+      ...(facetDistribution ? { facetDistribution } : {}),
+      processingTimeMs: top.processingTimeMs + stale.processingTimeMs,
+    },
+    extra: results.slice(2),
+  };
+}
+
 /**
  * One search (D5-D8). Main query (`matchingStrategy: "all"`), on page 1 the À la Une pool, and with
  * a chosen district its facet query in ONE engine round trip; no hit with two words or more -> one
@@ -184,25 +275,27 @@ export async function runSearch(input: SearchParams, options: RunSearchOptions =
     : undefined;
   const withFeatured = options.featured !== false && page === 1;
   const engine = searchEngine();
-  const queries = [main, ...(withFeatured ? [featuredQuery(params, now)] : []), ...(districtQuery ? [districtQuery] : [])];
-  const results = await engine.search(queries);
-  let result = firstResult(results);
-  let districts = districtQuery ? firstResult(results, queries.indexOf(districtQuery)) : result;
+  // Car rentals by dates: up-to-date availabilities first, then the ones to confirm (decision 4).
+  const dates = activeRentalDates(params, now);
+  const fresh = dates ? rentalFreshFilter(now) : undefined;
+  const extra = [...(withFeatured ? [featuredQuery(params, now)] : []), ...(districtQuery ? [districtQuery] : [])];
+  const first = await mainSearch(engine, main, fresh, extra);
+  let result = first.result;
+  let districts = districtQuery ? firstResult(first.extra, extra.indexOf(districtQuery)) : result;
   let approximate = false;
   if (options.approximate !== false && result.totalHits === 0 && wordCount(q) >= 2) {
-    const retries = await engine.search([{ ...main, matchingStrategy: "last" }, ...(districtQuery ? [{ ...districtQuery, matchingStrategy: "last" as const }] : [])]);
-    const retry = firstResult(retries);
-    if (retry.totalHits > 0) {
-      result = retry;
-      districts = districtQuery ? firstResult(retries, 1) : retry;
+    const retries = await mainSearch(engine, { ...main, matchingStrategy: "last" }, fresh, districtQuery ? [{ ...districtQuery, matchingStrategy: "last" as const }] : []);
+    if (retries.result.totalHits > 0) {
+      result = retries.result;
+      districts = districtQuery ? firstResult(retries.extra) : retries.result;
       approximate = true;
     }
   }
-  const pool = withFeatured ? firstResult(results, 1).hits : [];
+  const pool = withFeatured ? firstResult(first.extra).hits : [];
   return {
     params,
     sort,
-    hits: result.hits.map((doc) => toSearchCard(doc, now)),
+    hits: result.hits.map((doc) => toSearchCard(doc, now, false, dates)),
     featured: drawFeatured(pool, FEATURED_SEARCH_SLOTS, options.seed ?? randomUUID()).map((doc) => toSearchCard(doc, now, true)),
     total: result.totalHits,
     page,

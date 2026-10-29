@@ -26,7 +26,7 @@ import { KybcPieces, type PieceState } from "./kybc-pieces";
 // Turnstile check. Checked here as the server checks it (src/lib/pro/kybc.ts), so a refusal is
 // shown on its field before anything is sent; the server stays the judge.
 
-type Identifier = "ice" | "rc" | "if" | "aeNumber" | "tp";
+type Identifier = "ice" | "rc" | "if" | "aeNumber" | "tp" | "coopNumber";
 type FieldKey = "name" | "city" | "form" | Identifier | "phone" | "pieces" | "commitment" | "challenge";
 
 /** Identifier inputs per legal form, in reading order; `commercant` needs rc or tp. */
@@ -34,6 +34,7 @@ const IDENTIFIERS: Record<LegalForm, readonly Identifier[]> = {
   societe: ["ice", "rc", "if"],
   auto_entrepreneur: ["ice", "aeNumber"],
   commercant: ["ice", "rc", "tp"],
+  cooperative: ["ice", "coopNumber"],
 };
 
 const REGISTRY = /^[A-Z0-9/]{1,30}$/;
@@ -60,7 +61,7 @@ export function initialDraft(previous: ProSelfView | null): Draft {
     city: previous ? (cityBySlug(previous.citySlug) ?? null) : null,
     form,
     // The registry numbers of a rejected application are not sent back (only the ICE is shown).
-    ids: { ice: previous?.ice ?? "", rc: "", if: "", aeNumber: "", tp: "" },
+    ids: { ice: previous?.ice ?? "", rc: "", if: "", aeNumber: "", tp: "", coopNumber: "" },
     phone: "",
     commitment: false,
   };
@@ -102,6 +103,7 @@ function legalOf(draft: Draft & { form: LegalForm }): ProApplyInput["legal"] {
   const id = (key: Identifier) => normalizeIdentifier(draft.ids[key]);
   if (draft.form === "societe") return { form: "societe", ice: id("ice"), rc: id("rc"), if: id("if") };
   if (draft.form === "auto_entrepreneur") return { form: "auto_entrepreneur", ice: id("ice"), aeNumber: id("aeNumber") };
+  if (draft.form === "cooperative") return { form: "cooperative", ice: id("ice"), coopNumber: id("coopNumber") };
   return { form: "commercant", ice: id("ice"), ...(id("rc") ? { rc: id("rc") } : {}), ...(id("tp") ? { tp: id("tp") } : {}) };
 }
 

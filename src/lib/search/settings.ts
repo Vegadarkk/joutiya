@@ -24,12 +24,14 @@ const EQUALITY_BASE = [
   "sellerPublicId",
   "isDonation",
   "hasPhoto",
+  "soldOut",
   "condition",
   "sitemapShard",
+  "rentUnavailableDays",
 ] as const;
 
 /** Numeric fields that also take `<`, `<=`, `>`, `>=`. */
-const COMPARISON_BASE = ["price", "sortAt", "featuredUntil"] as const;
+const COMPARISON_BASE = ["price", "sortAt", "featuredUntil", "rentFreshUntil"] as const;
 
 const criteria = Object.values(CRITERIA);
 /** `a_*` fields of select, multiselect and boolean criteria (free-text criteria stay searchable only). */

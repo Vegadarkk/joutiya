@@ -9,19 +9,25 @@ import { AdSlot } from "@/components/ads/ad-slot";
 import { Breadcrumb, landingHref } from "@/components/listing/breadcrumb";
 import { ContactBar } from "@/components/listing/contact-bar";
 import { CriteriaSection } from "@/components/listing/criteria-grid";
+import { PROPERTY_TERM_FIELDS, PropertyTerms } from "@/components/listing/property-terms";
 import { VehicleBuyingGuide } from "@/components/listing/vehicle-buying-guide";
 import { VehicleDossier } from "@/components/listing/vehicle-dossier";
+import { RentalGuide } from "@/components/listing/rental-guide";
+import { RentalTerms } from "@/components/listing/rental-terms";
+import { ListingAvailability } from "@/components/rental/listing-availability";
 import { Gallery } from "@/components/listing/gallery";
 import { JsonLd } from "@/components/listing/json-ld";
 import { ExampleBanner, ExampleContactNotice } from "@/components/listing/example-banner";
 import { ListingStatusBanner } from "@/components/listing/listing-status-banner";
 import { PriceTag } from "@/components/listing/price-tag";
 import { SafetyTips } from "@/components/listing/safety-tips";
+import { GuideCategoryLink } from "@/components/guide/category-link";
+import { rubricForCategory } from "@/content/guide/catalog";
 import { PayAtSeller } from "@/components/listing/pay-at-seller";
 import { SellerCard } from "@/components/listing/seller-card";
 import { ListingMapBlock } from "@/components/map/listing-map-block";
 import { ReportButton } from "@/components/report/report-button";
-import { VEHICLE_SALE_SUBCATEGORIES, categoryById, subcategoryById } from "@/config/categories";
+import { RENTAL_SUBCATEGORY, VEHICLE_SALE_SUBCATEGORIES, categoryById, subcategoryById } from "@/config/categories";
 import { availablePromos } from "@/config/house-promos";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
@@ -145,6 +151,7 @@ export default async function ListingPage({ params }: { params: Params }) {
   ]);
   const media = mediaBaseUrl();
   const category = categoryById(listing.categoryId);
+  const guideRubric = rubricForCategory(listing.categoryId);
   const subcategory = subcategoryById(listing.subcategoryId);
   const city = cityBySlug(listing.location.citySlug);
   const region = regionByCode(listing.location.regionCode);
@@ -160,6 +167,8 @@ export default async function ListingPage({ params }: { params: Params }) {
   const canonicalUrl = `${CANONICAL_ORIGIN}${listingPath(locale, listing.slugId)}`;
   const images = listing.photos.map((photo) => photoUrl(media, listing.id, photo.id, "l")).filter((url): url is string => url !== null);
   const published = listing.state === "published";
+  // Real estate: the mandate and fees under the price, a visit request, property safety tips.
+  const realEstate = listing.categoryId === "immobilier";
   // An example listing (src/lib/demo) shows the page of an offer without being one: no contact, no
   // favorite, no Product markup.
   const contactable = published && !listing.example;
@@ -208,6 +217,7 @@ export default async function ListingPage({ params }: { params: Params }) {
               {listing.title}
             </h1>
             <PriceTag price={listing.price} isDonation={listing.isDonation} negotiable={listing.priceNegotiable} unit={subcategory?.priceUnit} locale={locale} size="lg" />
+            {realEstate ? <PropertyTerms attributes={listing.attributes} locale={locale} className="self-stretch sm:max-w-xl" /> : null}
             {subcategory?.adultsOnly ? (
               <p data-testid="adults-only-notice" className="flex items-start gap-2 self-start rounded-md border border-warning/30 bg-warning-surface px-3 py-2 text-sm text-foreground text-pretty">
                 <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
@@ -245,6 +255,9 @@ export default async function ListingPage({ params }: { params: Params }) {
                     showPhone={listing.contact.showPhone}
                     whatsapp={listing.contact.whatsapp}
                     adultsOnly={Boolean(subcategory?.adultsOnly)}
+                    visit={realEstate}
+                    testDrive={listing.seller.type === "pro" && VEHICLE_SALE_SUBCATEGORIES.includes(listing.subcategoryId)}
+                    rental={listing.subcategoryId === RENTAL_SUBCATEGORY}
                   />
                 ) : null}
                 {contactable && payment ? <PayAtSeller payment={payment} listingId={listing.id} /> : null}
@@ -253,8 +266,10 @@ export default async function ListingPage({ params }: { params: Params }) {
           </aside>
 
           <div className="flex min-w-0 flex-col gap-10 lg:[grid-area:body]">
-            <CriteriaSection title={t("criteriaTitle")} subcategoryId={listing.subcategoryId} attributes={listing.attributes} condition={listing.condition} />
+            <CriteriaSection title={t("criteriaTitle")} subcategoryId={listing.subcategoryId} attributes={listing.attributes} condition={listing.condition} exclude={realEstate ? PROPERTY_TERM_FIELDS : undefined} />
             <VehicleDossier subcategoryId={listing.subcategoryId} attributes={listing.attributes} />
+            <RentalTerms subcategoryId={listing.subcategoryId} attributes={listing.attributes} locale={locale} />
+            {listing.rental ? <ListingAvailability rental={listing.rental} locale={locale} /> : null}
 
             <section aria-labelledby="description-title" className="flex flex-col gap-3">
               <h2 id="description-title" className="text-lg font-semibold">
@@ -276,11 +291,13 @@ export default async function ListingPage({ params }: { params: Params }) {
             </section>
 
             {VEHICLE_SALE_SUBCATEGORIES.includes(listing.subcategoryId) ? <VehicleBuyingGuide attributes={listing.attributes} sellerType={listing.seller.type} /> : null}
+            {guideRubric ? <GuideCategoryLink rubric={guideRubric} locale={locale} /> : null}
+            {listing.subcategoryId === RENTAL_SUBCATEGORY ? <RentalGuide /> : null}
 
             {/* Report link, then the safety tips: a non-interactive block always stands between the ad
                 and the contact or report controls (D6). */}
             <ReportButton target={{ type: "listing", id: listing.id }} subject={listing.title} ownerPublicId={listing.seller.publicId} email={legal.dsaContactEmail} url={canonicalUrl} />
-            <SafetyTips />
+            <SafetyTips variant={realEstate ? "realEstate" : "goods"} />
             <AdSlot placement="listing-bottom" eligible={found.adsEligible} promos={availablePromos(flags)} seed={listing.id} />
           </div>
         </div>

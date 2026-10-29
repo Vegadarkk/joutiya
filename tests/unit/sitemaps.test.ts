@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { subcategoryById } from "@/config/categories";
+import { GUIDE_RUBRICS } from "@/content/guide";
 import { cityBySlug } from "@/config/regions";
 import { parseEnv, resetServerEnv, type ServerEnv } from "@/lib/env";
 import { resetSearchEngine, setSearchEngineForTests } from "@/lib/search/engine";
@@ -140,7 +141,7 @@ describe("buildSitemapFile", () => {
     expect(SITEMAP_LISTINGS_MAX * 2).toBeLessThanOrEqual(50_000);
   });
 
-  it("lists home and the landing pages with at least 3 listings", async () => {
+  it("lists home, the guide and the landing pages with at least 3 listings", async () => {
     await engine.upsert([
       // vehicules/voitures: 3 in Casablanca, 1 in Rabat; vehicules/velos: 2 in Casablanca.
       doc("a2345678", "voitures", "casablanca"),
@@ -155,7 +156,7 @@ describe("buildSitemapFile", () => {
     ]);
     const xml = (await buildSitemapFile("pages.xml", PROD)) ?? "";
     const paths = [...xml.matchAll(/<loc>https:\/\/joutiya\.ma\/fr([^<]*)<\/loc>/g)].map((match) => match[1]);
-    expect(paths.sort()).toEqual(["", "/c/vehicules", "/c/vehicules/casablanca", "/c/vehicules/voitures", "/c/vehicules/voitures/casablanca"].sort());
+    expect(paths.sort()).toEqual(["", "/c/vehicules", "/c/vehicules/casablanca", "/c/vehicules/voitures", "/c/vehicules/voitures/casablanca", "/demarches", ...GUIDE_RUBRICS.map((rubric) => `/demarches/${rubric}`)].sort());
     expect(xml.match(/<url>/g)).toHaveLength(paths.length * 2);
   });
 });

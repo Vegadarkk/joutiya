@@ -1,5 +1,7 @@
 import { z } from "@/lib/zod";
+import { CRITERION_FORMATS } from "@/config/categories";
 import { PRO_PLANS, listingQuotasSchema } from "@/config/pricing";
+import { AIRPORT_IDS } from "@/config/airports";
 import { PAYMENT_URL_MAX } from "@/config/seller-payments";
 import { sellerInfoInputSchema } from "@/lib/contracts/seller-payment";
 import { citySlugSchema, regionCodeSchema } from "@/lib/contracts/listings";
@@ -16,9 +18,94 @@ export const proIdSchema = z.string().regex(PRO_ID_PATTERN);
 export const PRO_NAME_MAX = 80;
 export const PRO_DESCRIPTION_MAX = 2000;
 export const PRO_SLUG_MAX = 60;
+/** ONSSA numbers kept per shop once checked: a producer rarely holds more than a few. */
+export const SANITARY_NUMBERS_MAX = 50;
+
+/**
+ * Business sector (Agence pack design §3): "real_estate" makes the storefront an agency's,
+ * "car_rental" a car rental agency's with its fleet (rental pack §5); absent reads "general".
+ */
+export const PRO_SECTORS = ["general", "real_estate", "car_rental"] as const;
+export type ProSector = (typeof PRO_SECTORS)[number];
+/** The agency's fee schedule shown on its storefront (free text, no contact details). */
+export const AGENCY_FEE_SCHEDULE_MAX = 500;
+
+/** Car rental agency settings (rental pack §5): branches, free-text lengths, payments on site. */
+export const RENTAL_BRANCHES_MAX = 5;
+export const RENTAL_ADDRESS_MAX = 160;
+export const RENTAL_HOURS_MAX = 200;
+export const RENTAL_PAYMENTS = ["cash", "card", "transfer"] as const;
+export type RentalPayment = (typeof RENTAL_PAYMENTS)[number];
+/** Ministry of Transport licence reference as the agency writes it: 3 to 40 Latin letters, digits, spaces and . / - _, one digit at least. */
+export const RENTAL_AGREMENT_PATTERN = /^(?=.*\d)[A-Za-z0-9][A-Za-z0-9 ./_-]{1,38}[A-Za-z0-9]$/;
+
+const unique = <T>(items: readonly T[]) => new Set(items).size === items.length;
+
+/**
+ * The car rental agency's settings (decision 3: the licence reference is required to publish a
+ * rental, shown « déclarée par l'agence »). Branch addresses are the agency's professional ones.
+ */
+export const rentalAgencySchema = z
+  .object({
+    agrementRef: z.string().trim().regex(RENTAL_AGREMENT_PATTERN),
+    branches: z
+      .array(z.object({ citySlug: citySlugSchema, address: z.string().trim().min(5).max(RENTAL_ADDRESS_MAX) }).strict())
+      .max(RENTAL_BRANCHES_MAX)
+      .refine((branches) => unique(branches.map((branch) => `${branch.citySlug}|${branch.address.toLowerCase()}`)), "duplicate branch"),
+    hours: z.string().trim().max(RENTAL_HOURS_MAX),
+    payments: z.array(z.enum(RENTAL_PAYMENTS)).max(RENTAL_PAYMENTS.length).refine(unique, "duplicate payment"),
+    airports: z.array(z.enum(AIRPORT_IDS)).max(AIRPORT_IDS.length).refine(unique, "duplicate airport"),
+  })
+  .strict();
+export type RentalAgency = z.infer<typeof rentalAgencySchema>;
 
 const uid = z.string().min(1).max(128);
 const ts = z.date();
+
+/**
+ * Check of the agency's licence decision (decision 5): Claude reads the uploaded document, the
+ * server compares what it read with the declared reference and the verified ICE or name; all
+ * consistent gives the badge « agrément contrôlé sur document », any doubt goes to a moderator.
+ * The agency stays solely responsible for its declaration (no online authentication exists).
+ */
+export const RENTAL_CHECK_STATUSES = ["pending", "verified", "review", "rejected"] as const;
+export type RentalCheckStatus = (typeof RENTAL_CHECK_STATUSES)[number];
+/** Why a document went to a moderator: not a licence decision, unreadable, reference, company or date not matching, signs of editing, low confidence, Claude unavailable. */
+export const RENTAL_CHECK_ISSUES = ["not_agrement", "unreadable", "reference", "company", "date", "tampering", "low_confidence", "ai_unavailable"] as const;
+export type RentalCheckIssue = (typeof RENTAL_CHECK_ISSUES)[number];
+export const RENTAL_CHECK_REASON_MAX = 500;
+export const RENTAL_CHECK_SIGNS_MAX = 5;
+
+export const rentalCheckSchema = z
+  .object({
+    status: z.enum(RENTAL_CHECK_STATUSES),
+    /** The document (uploads purpose `kyb`, private bucket), kept with the profile like the KYBC pieces. */
+    uploadId: z.string().min(1).max(64),
+    /** Reference the document was checked against: a new reference in the settings drops the check. */
+    agrementRef: z.string().max(40),
+    submittedAt: ts,
+    checkedAt: ts.optional(),
+    method: z.enum(["ai", "staff"]).optional(),
+    /** The moderator who decided (method "staff"). */
+    by: uid.optional(),
+    issues: z.array(z.enum(RENTAL_CHECK_ISSUES)).max(RENTAL_CHECK_ISSUES.length),
+    /** What Claude read on the document (business identifiers only), for the moderator. */
+    extracted: z
+      .object({
+        companyName: z.string().max(200),
+        ice: z.string().max(40),
+        reference: z.string().max(80),
+        decisionDate: z.string().max(20),
+        signs: z.array(z.string().max(200)).max(RENTAL_CHECK_SIGNS_MAX),
+        note: z.string().max(500),
+      })
+      .strict()
+      .optional(),
+    /** The moderator's reason for a refusal, shown to the agency. */
+    reason: z.string().max(RENTAL_CHECK_REASON_MAX).optional(),
+  })
+  .strict();
+export type RentalCheck = z.infer<typeof rentalCheckSchema>;
 /** Moroccan mobile in E.164, as users/{uid}/private/account.phoneE164 (src/lib/db/schemas.ts). */
 const mobileE164 = z.string().regex(/^\+212[67]\d{8}$/);
 
@@ -77,7 +164,7 @@ export const proProfileSchema = z
       .object({
         status: z.enum(KYBC_STATUSES),
         iceFormatOk: z.boolean(),
-        registryCheck: z.object({ source: z.enum(["ompic", "directinfo"]), at: ts, by: uid }).strict().optional(),
+        registryCheck: z.object({ source: z.enum(["ompic", "directinfo", "odco"]), at: ts, by: uid }).strict().optional(),
         /** Pieces in the private bucket (uploads purpose `kyb`), purged 6 months after the relationship ends. */
         uploadIds: z.array(z.string().min(1).max(64)).max(KYBC_MAX_PIECES),
         complianceCommitmentAt: ts.optional(),
@@ -94,6 +181,13 @@ export const proProfileSchema = z
       .strict(),
     /** Badge « Certifié »: pieces checked in detail (Business). */
     certified: z.object({ at: ts, by: uid }).strict().optional(),
+    sector: z.enum(PRO_SECTORS).optional(),
+    /** Real-estate agency details (sector "real_estate"), set by the owner (PUT /api/pro/me/agency). */
+    agency: z.object({ feeSchedule: z.string().trim().max(AGENCY_FEE_SCHEDULE_MAX) }).strict().optional(),
+    /** Car rental agency settings, set by the owner (PUT /api/pro/me/rental). */
+    rental: rentalAgencySchema.optional(),
+    /** Check of the licence decision (POST /api/pro/me/rental/check, then the agent queue or a moderator). */
+    rentalCheck: rentalCheckSchema.optional(),
     lifecycle: z.enum(PRO_STATES),
     /** Copy of subscriptions/pro_{proId}, or the launch offer's plan. */
     plan: z.enum(PRO_PLANS),
@@ -108,6 +202,11 @@ export const proProfileSchema = z
     passNoticeSentAt: ts.optional(),
     /** « Payer chez le vendeur » (design phase-7/boutique-temporaire.md §2); absent until the owner sets it. */
     sellerPayment: sellerPaymentSchema.optional(),
+    /**
+     * ONSSA numbers a moderator checked on an approved listing of the shop (Produits du terroir):
+     * a later listing with one of them is not held for that reason again.
+     */
+    sanitaryNumbers: z.array(z.string().regex(CRITERION_FORMATS.onssa)).max(SANITARY_NUMBERS_MAX).optional(),
     /** Derived from config/pricing for `plan`. */
     quotas: listingQuotasSchema,
     /**

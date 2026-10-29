@@ -6,6 +6,7 @@ import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { CategoryGrid } from "@/components/home/category-grid";
 import { FeaturedCarousel } from "@/components/home/featured-carousel";
 import { SearchPanel } from "@/components/home/search-panel";
+import { RentCarModule } from "@/components/rental/rent-car-module";
 import { Container } from "@/components/layout/container";
 import { ResultsGrid } from "@/components/search/results-grid";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ import type { SearchCard } from "@/lib/search/types";
 
 const favoriteAction = (card: SearchCard) => <FavoriteButton listingId={card.id} />;
 
-// Home (design D21): search hero, the eleven categories, À la Une (8 drawn) and the 12 newest
+// Home (design D21): search hero, the twelve categories, À la Une (8 drawn) and the 12 newest
 // listings, behind the welcome threshold of a first visit (design C7). ISR every 5 minutes; an
 // engine failure hides the two listing sections (D2) and the page still renders.
 
@@ -82,6 +83,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         {/* Desktop only (AF §8 table): no ad on the phone home page. */}
         <AdSlot placement="home-leaderboard" eligible promos={availablePromos(flags)} seed="home" />
         <CategoryGrid />
+        <RentCarModule locale={locale} />
         {featured && featured.length > 0 ? <FeaturedCarousel cards={featured} locale={locale} renderAction={favoriteAction} /> : null}
         {recent && recent.length > 0 ? (
           <section aria-labelledby="home-recent" data-testid="home-recent" className="flex flex-col gap-5">

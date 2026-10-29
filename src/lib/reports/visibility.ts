@@ -11,6 +11,7 @@ import { PUBLIC_STATES } from "@/lib/listings/public";
 import { revalidateListingPaths } from "@/lib/listings/revalidate";
 import { hideMessage, unhideMessage } from "@/lib/messaging";
 import { consume } from "@/lib/quota";
+import { setReviewVisibility } from "@/lib/reviews/moderation";
 import { notifySearchIndex } from "@/lib/search/queue";
 import { listTargetReports } from "./repository";
 import type { StrongSignal } from "./rules";
@@ -20,9 +21,9 @@ import { splitMessageId, type TargetRef } from "./target-key";
 // `moderation.hiddenBy` (search outbox + fast lane, ISR revalidation; the public page and the index
 // treat it as unavailable), an account becomes `restricted` and each of its published listings is
 // hidden, a message is replaced by HIDDEN_MARKER (messaging lot's hideMessage; messaging reaches this
-// module only lazily, so the static import makes no cycle). `unhideTarget` undoes it (restore,
-// D13). Every change bumps the listing version: a concurrent owner save then retries instead of
-// writing back a stale `moderation`.
+// module only lazily, so the static import makes no cycle), a review leaves the storefront and the
+// seller's average. `unhideTarget` undoes it (restore, D13). Every change bumps the listing version:
+// a concurrent owner save then retries instead of writing back a stale `moderation`.
 
 /** Listings hidden with a restricted account (one transaction each, D11 "<= 50 writes"). */
 export const USER_HIDE_LISTINGS_MAX = 50;
@@ -174,6 +175,8 @@ export async function hideTarget(target: TargetRef, signal: StrongSignal, report
     case "pro":
       logger.warn({ target: target.type }, "reports: shop targets cannot be hidden before phase 7");
       return false;
+    case "review":
+      return setReviewVisibility(target.id, false, now, `report:${reportId}`);
   }
 }
 
@@ -193,5 +196,7 @@ export async function unhideTarget(target: TargetRef, now = new Date()): Promise
     }
     case "pro":
       return false;
+    case "review":
+      return setReviewVisibility(target.id, true, now);
   }
 }

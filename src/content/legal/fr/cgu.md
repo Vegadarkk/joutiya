@@ -201,7 +201,7 @@ Il est interdit :
 - de créer des comptes fictifs ou multiples, ou d'usurper l'identité d'une personne, d'une entreprise ou de {brand} ;
 - d'envoyer du spam, des messages en masse ou de la prospection non sollicitée ;
 - de tenter d'accéder sans droit aux systèmes de {brand} ou au compte d'un autre utilisateur, ou d'introduire un code malveillant ;
-- de manipuler le classement des annonces, les signalements ou, quand ils existeront, les avis ;
+- de manipuler le classement des annonces, les signalements ou les avis (voir [Avis utilisateurs](/legal/avis-utilisateurs)) ;
 - de vendre, louer ou céder votre compte.
 
 ### 5.3 Données des autres utilisateurs {#utilisation-3}
@@ -335,7 +335,7 @@ Une annonce pour un objet interdit est bloquée ou mise en vérification au dép
 
 - Un professionnel publie depuis son compte Pro vérifié. Ses annonces portent la mention « Pro ».
 - Il donne au consommateur les informations exigées par la loi : identité de l'entreprise, caractéristiques essentielles du bien ou du service, prix toutes taxes comprises, garanties légales et, le cas échéant, droit de rétractation.
-- Il respecte les règles propres à son activité, par exemple dans l'immobilier ou la vente de véhicules.
+- Il respecte les règles propres à son activité, par exemple dans l'immobilier (§7.10) ou la vente de véhicules.
 - Un professionnel ne publie jamais depuis un compte de particulier (§4.3).
 
 ### 7.9 Durée, renouvellement et retrait {#annonces-9}
@@ -343,6 +343,16 @@ Une annonce pour un objet interdit est bloquée ou mise en vérification au dép
 - Une annonce reste en ligne {ttlDays} jours, puis expire. Vous pouvez la renouveler tant que son contenu n'a pas été supprimé.
 - Vous pouvez à tout moment la modifier, la mettre en pause, la marquer comme vendue ou la retirer. Une modification déclenche un nouveau contrôle (§8.2).
 - Le contenu d'une annonce expirée, vendue ou retirée est supprimé {purgeMonths} mois après, sauf s'il est visé par un signalement en cours, une réclamation ou une demande d'une autorité. La page de l'annonce indique alors qu'elle n'existe plus.
+
+### 7.10 Annonces immobilières {#annonces-10}
+
+**Informations déclarées.** Dans une annonce de vente ou de location d'un bien immobilier, l'annonceur déclare lui-même, sous sa seule responsabilité, les informations suivantes : la situation juridique du bien (titre foncier ou autre), le mandat (exclusif ou simple), les honoraires et la référence de l'agence, l'autorisation de construire et l'année de livraison d'un bien vendu sur plan, et le numéro d'autorisation d'hébergement touristique d'une location saisonnière (loi n° 80-14). Il certifie leur exactitude à la publication. {brand} ne les vérifie pas : leur affichage ne vaut ni contrôle, ni garantie, ni recommandation de sa part.
+
+**Autorisations et mandat.** Il appartient au seul annonceur de détenir les autorisations que son activité exige, notamment l'autorisation d'hébergement touristique, ainsi qu'un mandat écrit et valable du propriétaire quand il publie pour le compte d'un tiers. Il doit pouvoir en justifier sur demande de {brand} ou d'une autorité.
+
+**Responsabilité.** Une information inexacte, incomplète ou trompeuse engage la seule responsabilité de l'annonceur, envers les autres utilisateurs, les tiers et {brand} (§6.1 et §19.1). {brand} n'en répond que dans les conditions du régime d'hébergeur (§19.2).
+
+**Aucun paiement par {brand}.** Aucun acompte, dépôt de garantie, frais de réservation ou de visite ne passe par {brand} (§15.2). Le dépôt de garantie d'un bail d'habitation ne peut pas dépasser 2 mois de loyer (loi n° 67-12). Ne versez rien avant d'avoir visité le bien et signé un écrit (§15.3).
 
 ## 8. Modération des contenus {#moderation}
 

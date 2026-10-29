@@ -1,5 +1,6 @@
-import { CONDITIONS, categoryById, criterionById, searchCriteria, subcategoryById, type Condition } from "@/config/categories";
+import { CONDITIONS, RENTAL_SUBCATEGORY, categoryById, criterionById, searchCriteria, subcategoryById, type Condition } from "@/config/categories";
 import { cityBySlug, regionByCode } from "@/config/regions";
+import { DAY_PATTERN, RENTAL_SEARCH_DAYS_MAX, dayNumber } from "@/lib/listings/rental-availability";
 import { z } from "@/lib/zod";
 
 // Search parameters (phase 4, design §2): the one whitelist shared by the search page, /api/search,
@@ -25,6 +26,8 @@ export const SELLER_TYPES_FILTER = ["individual", "pro"] as const;
 export type SellerTypeFilter = (typeof SELLER_TYPES_FILTER)[number];
 /** Upper bound of price filters, MAD (PRICE_MAX of listings). */
 export const SEARCH_PRICE_MAX = 100_000_000;
+// Car rental dates (rental pack §4): bounds and duration live with the availability rules (no zod there).
+export { RENTAL_SEARCH_AHEAD_DAYS, RENTAL_SEARCH_DAYS_MAX, rentalDuration } from "@/lib/listings/rental-availability";
 
 /** URL parameter names. `breadcrumb.tsx` links use the same names. */
 export const SEARCH_QUERY_KEYS = {
@@ -42,7 +45,10 @@ export const SEARCH_QUERY_KEYS = {
   shop: "boutique",
   donation: "don",
   withPhoto: "photo",
+  includeSoldOut: "epuises",
   conditions: "etat",
+  rentFrom: "du",
+  rentTo: "au",
   sort: "tri",
   page: "page",
 } as const;
@@ -83,13 +89,34 @@ export interface SearchParams {
   shop?: string;
   donation?: true;
   withPhoto?: true;
+  /** Sold-out Pro listings too (owner decision 1: out of the default results, still online). */
+  includeSoldOut?: true;
   conditions?: Condition[];
   /** Only for criteria of `subcategory` (select, multiselect, number, boolean). */
   criteria?: Record<string, CriterionFilter>;
+  /**
+   * Car rentals only: pick-up and return days ("YYYY-MM-DD", Morocco), 1 to 60 days apart. The
+   * search keeps listings free on every day from pick-up to return (rental pack §4); a start in the
+   * past or beyond 180 days is ignored by the search service, not by the parser (no clock here).
+   */
+  dates?: RentalDates;
   /** Absent = default: relevance with a query, recent without. */
   sort?: SearchSort;
   /** 1-based; absent = 1. */
   page?: number;
+}
+
+export interface RentalDates {
+  from: string;
+  to: string;
+}
+
+function validDates(from: string | undefined, to: string | undefined): RentalDates | undefined {
+  if (!from || !to) return undefined;
+  const start = dayNumber(from);
+  const end = dayNumber(to);
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start || end - start > RENTAL_SEARCH_DAYS_MAX) return undefined;
+  return { from, to };
 }
 
 const PUBLIC_ID = /^[a-hj-km-np-z2-9]{10}$/;
@@ -176,8 +203,11 @@ export function parseSearchParams(source: Source): SearchParams {
   if (shop && PUBLIC_ID.test(shop)) params.shop = shop;
   if (read(source, k.donation) === "1") params.donation = true;
   if (read(source, k.withPhoto) === "1") params.withPhoto = true;
+  if (read(source, k.includeSoldOut) === "1") params.includeSoldOut = true;
   const conditions = list(read(source, k.conditions)).filter((value): value is Condition => (CONDITIONS as readonly string[]).includes(value));
   if (conditions.length) params.conditions = conditions;
+  const dates = validDates(read(source, k.rentFrom), read(source, k.rentTo));
+  if (dates) params.dates = dates;
   const sortParam = read(source, k.sort);
   const sort = SEARCH_SORTS.find((value) => SORT_PARAM[value] === sortParam);
   if (sort) params.sort = sort;
@@ -274,14 +304,20 @@ export function canonicalSearchParams(input: SearchParams): SearchParams {
     if (Object.keys(criteria).length) params.criteria = criteria;
     else delete params.criteria;
   }
+  if (params.dates) {
+    const dates = params.subcategory === RENTAL_SUBCATEGORY ? validDates(params.dates.from, params.dates.to) : undefined;
+    if (dates) params.dates = dates;
+    else delete params.dates;
+  }
   if (params.sort === "distance" && !params.city) delete params.sort;
   if (params.sort && params.sort === defaultSort(params)) delete params.sort;
   if (params.page !== undefined && (params.page <= 1 || params.page > SEARCH_MAX_PAGE)) delete params.page;
   return params;
 }
 
-/** Relevance when the visitor typed words, newest first otherwise (Leboncoin's default). */
-export function defaultSort(params: Pick<SearchParams, "q">): SearchSort {
+/** Relevance when the visitor typed words, newest first otherwise (Leboncoin's default); car rentals by dates: cheapest day first. */
+export function defaultSort(params: Pick<SearchParams, "q" | "dates">): SearchSort {
+  if (params.dates) return "price_asc";
   return params.q ? "relevance" : "recent";
 }
 
@@ -308,6 +344,7 @@ export function searchParamsToQuery(input: SearchParams): URLSearchParams {
   if (params.shop) query.set(k.shop, params.shop);
   if (params.donation) query.set(k.donation, "1");
   if (params.withPhoto) query.set(k.withPhoto, "1");
+  if (params.includeSoldOut) query.set(k.includeSoldOut, "1");
   if (params.conditions?.length) query.set(k.conditions, params.conditions.join(","));
   for (const [id, filter] of Object.entries(params.criteria ?? {})) {
     if (filter.kind === "options") query.set(`${CRITERION_PARAM_PREFIX}${id}`, filter.values.join(","));
@@ -316,6 +353,10 @@ export function searchParamsToQuery(input: SearchParams): URLSearchParams {
       if (filter.min !== undefined) query.set(`${CRITERION_PARAM_PREFIX}${id}-min`, String(filter.min));
       if (filter.max !== undefined) query.set(`${CRITERION_PARAM_PREFIX}${id}-max`, String(filter.max));
     }
+  }
+  if (params.dates) {
+    query.set(k.rentFrom, params.dates.from);
+    query.set(k.rentTo, params.dates.to);
   }
   if (params.sort) query.set(k.sort, SORT_PARAM[params.sort]);
   if (params.page) query.set(k.page, String(params.page));
@@ -333,9 +374,9 @@ export function searchPath(params: SearchParams): string {
   return query ? `${SEARCH_PATH}?${query}` : SEARCH_PATH;
 }
 
-/** True when nothing narrows the search (no words, no filter). Page and sort do not count. */
+/** True when nothing narrows the search (no words, no filter). Page, sort and the sold-out switch do not count. */
 export function isBlankSearch(params: SearchParams): boolean {
-  const { sort: _sort, page: _page, ...rest } = canonicalSearchParams(params);
+  const { sort: _sort, page: _page, includeSoldOut: _soldOut, ...rest } = canonicalSearchParams(params);
   return Object.keys(rest).length === 0;
 }
 
@@ -365,6 +406,7 @@ export const storedSearchParamsSchema = z
     shop: z.string().regex(PUBLIC_ID).optional(),
     donation: z.literal(true).optional(),
     withPhoto: z.literal(true).optional(),
+    includeSoldOut: z.literal(true).optional(),
     conditions: z.array(z.enum(CONDITIONS)).min(1).max(CONDITIONS.length).optional(),
     criteria: z
       .record(
@@ -376,6 +418,7 @@ export const storedSearchParamsSchema = z
         ]),
       )
       .optional(),
+    dates: z.object({ from: z.string().regex(DAY_PATTERN), to: z.string().regex(DAY_PATTERN) }).strict().optional(),
     sort: z.enum(SEARCH_SORTS).optional(),
   })
   .strict();

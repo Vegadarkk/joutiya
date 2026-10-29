@@ -75,6 +75,7 @@ describe("evidence labels of the moderation review", () => {
     expect(labels.evidence("account age 0 day(s)")).toBe("Compte créé aujourd'hui");
     expect(labels.evidence("1 previous rejection(s)")).toBe("1 refus antérieur");
     expect(labels.evidence("declaration self")).toBe("Déclaration du vendeur : le vendeur est la personne concernée");
+    expect(labels.evidence("ONSSA number M.07.113.20 not yet checked for this shop")).toMatch(/^N° ONSSA M\.07\.113\.20 encore jamais vérifié pour cette boutique/);
   });
 
   it("formats the price range in dirhams with the subcategory's name", async () => {

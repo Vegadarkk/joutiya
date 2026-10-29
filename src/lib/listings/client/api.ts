@@ -1,14 +1,19 @@
-import { apiDelete, apiGet, apiPatch, apiPost, csrfToken } from "@/lib/auth/client";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut, csrfToken } from "@/lib/auth/client";
 import {
   LISTING_API,
   type CreateListingInput,
   type CreateListingResponse,
+  type FleetResponse,
+  type FleetSaveInput,
+  type FleetSaveResponse,
   type ListingPatch,
   type ListingResponse,
   type OwnerListBucket,
   type OwnerListingsResponse,
   type PublishListingInput,
   type PublishListingResponse,
+  type RentalAvailabilityInput,
+  type RentalAvailabilityResponse,
 } from "@/lib/contracts/listings";
 import { MEDIA_API, type SignUploadInput, type SignUploadResponse, type UploadStatusResponse } from "@/lib/contracts/media";
 import { CSRF_HEADER } from "@/lib/security/cookies";
@@ -57,6 +62,20 @@ export type OwnerAction = "pause" | "resume" | "sold" | "renew";
 
 export function listingAction(id: string, action: OwnerAction): Promise<ListingResponse> {
   return apiPost<ListingResponse>(LISTING_API[action](id), {});
+}
+
+/** A car rental's blocked periods (replaced), or the same ones to confirm they are up to date. */
+export function saveAvailability(id: string, input: RentalAvailabilityInput): Promise<RentalAvailabilityResponse> {
+  return apiPut<RentalAvailabilityResponse>(LISTING_API.availability(id), input);
+}
+
+/** A car rental agency's fleet planning. */
+export function loadFleet(): Promise<FleetResponse> {
+  return apiGet<FleetResponse>(LISTING_API.fleet);
+}
+
+export function saveFleet(input: FleetSaveInput): Promise<FleetSaveResponse> {
+  return apiPut<FleetSaveResponse>(LISTING_API.fleet, input);
 }
 
 export function signUpload(input: SignUploadInput): Promise<SignUploadResponse> {

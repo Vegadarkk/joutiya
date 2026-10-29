@@ -261,6 +261,10 @@ describe("invoice identifiers", () => {
       { name: "ICE", value: "001234567000089" },
       { name: "N° auto-entrepreneur", value: "998877" },
     ]);
+    expect(invoiceFields({ form: "cooperative", ice: "001234567000089", coopNumber: "12/2019" })).toEqual([
+      { name: "ICE", value: "001234567000089" },
+      { name: "N° coopérative", value: "12/2019" },
+    ]);
     expect(invoiceFields({ form: "commercant", ice: "001234567000089", tp: "55" })).toEqual([
       { name: "ICE", value: "001234567000089" },
       { name: "Taxe professionnelle", value: "55" },

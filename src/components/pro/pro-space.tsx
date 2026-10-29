@@ -21,11 +21,13 @@ import { publishesAsPro, type ProState } from "@/lib/pro/lifecycle";
 import { loadProMe } from "@/lib/pro/client";
 import { paymentEligible } from "@/lib/pro/seller-payment-rules";
 import { cn } from "@/lib/utils";
+import { RentalSetup } from "@/components/rental/rental-setup";
+import { AgencySettings } from "./agency-settings";
 import { ProApplicationForm } from "./pro-application-form";
 
 // /pro: the member's Pro area (phase 7 design §4). One request (GET /api/pro/me) decides the
 // screen: the application (intro, eligibility, form), the pending review, a rejection to correct,
-// or the shop's dashboard (plan, launch offer, quotas, shortcuts). Payments stay closed until the
+// or the shop's dashboard (plan, launch offer, quotas, sector, shortcuts). Payments stay closed until the
 // sales gate: nothing here sells.
 
 type View = { kind: "loading" } | { kind: "failed"; error: unknown } | { kind: "ready"; me: ProMeResponse };
@@ -296,6 +298,10 @@ function Dashboard({ me, shop, lifecycle }: { me: ProMeResponse; shop: ProSelfVi
         </div>
       )}
 
+      {canPublish && shop.sector === "car_rental" ? <RentalSetup shop={shop} /> : null}
+
+      {suspended ? null : <AgencySettings shop={shop} />}
+
       <section className="flex flex-col gap-3" aria-labelledby="pro-shortcuts">
         <h2 id="pro-shortcuts" className="text-lg font-semibold">
           {t("shortcuts")}
@@ -309,6 +315,16 @@ function Dashboard({ me, shop, lifecycle }: { me: ProMeResponse; shop: ProSelfVi
           {canPublish ? (
             <Button asChild variant="outline">
               <Link href="/pro/stock">{t("stockImport")}</Link>
+            </Button>
+          ) : null}
+          {canPublish && shop.sector !== "real_estate" ? (
+            <Button asChild variant="outline">
+              <Link href="/pro/flotte">{t("fleet")}</Link>
+            </Button>
+          ) : null}
+          {canPublish && shop.sector === "car_rental" ? (
+            <Button asChild variant="outline">
+              <Link href="/pro/location">{t("rentalAgency")}</Link>
             </Button>
           ) : null}
           <Button asChild variant="outline">

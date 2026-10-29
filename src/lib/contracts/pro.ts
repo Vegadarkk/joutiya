@@ -1,9 +1,22 @@
 import { z } from "@/lib/zod";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
 import { citySlugSchema, regionCodeSchema } from "@/lib/contracts/listings";
-import { KYBC_DECLARED_TYPES, MAX_UPLOAD_BYTES, type KybcDeclaredType } from "@/lib/contracts/media";
+import { KYBC_DECLARED_TYPES, MAX_UPLOAD_BYTES, uploadIdSchema, type KybcDeclaredType } from "@/lib/contracts/media";
 import { KYBC_MAX_PIECES, KYBC_MIN_PIECES, proLegalSchema } from "@/lib/pro/kybc";
-import { PHONE_CHECK_OUTCOMES, PRO_DESCRIPTION_MAX, PRO_NAME_MAX, type PhoneCheckOutcome } from "@/lib/pro/profile-schema";
+import {
+  AGENCY_FEE_SCHEDULE_MAX,
+  PHONE_CHECK_OUTCOMES,
+  PRO_DESCRIPTION_MAX,
+  PRO_NAME_MAX,
+  PRO_SECTORS,
+  RENTAL_CHECK_REASON_MAX,
+  rentalAgencySchema,
+  type PhoneCheckOutcome,
+  type ProSector,
+  type RentalAgency,
+  type RentalCheckIssue,
+  type RentalCheckStatus,
+} from "@/lib/pro/profile-schema";
 
 // Pro application (phase 7 design §4): POST /api/pro/apply. Client-safe contract shared by the
 // wizard and the route. The KYBC pieces are uploads (purpose `kyb`) the applicant signed before.
@@ -36,7 +49,7 @@ export interface ProApplyResponse {
 // Back office (admin.joutiya.ma/pros): the KYBC queue and the moderator's decision. `submittedAt`
 // pins the application the moderator reviewed: a resubmission meanwhile answers 409.
 
-export const PRO_REGISTRY_SOURCES = ["ompic", "directinfo"] as const;
+export const PRO_REGISTRY_SOURCES = ["ompic", "directinfo", "odco"] as const;
 export const PRO_REJECT_REASON_MIN = 10;
 export const PRO_REJECT_REASON_MAX = 1000;
 
@@ -59,6 +72,49 @@ export const proDecisionSchema = z.discriminatedUnion("action", [
     .strict(),
 ]);
 export type ProDecisionInput = z.infer<typeof proDecisionSchema>;
+
+/**
+ * POST /api/admin/pros/{proId}/rental-check (decision 5): a moderator decides a car rental
+ * agency's licence document the AI check left in doubt. `submittedAt` pins the document reviewed.
+ */
+export const RENTAL_CHECK_REASON_MIN = 10;
+export const rentalCheckDecisionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("verify"), submittedAt: z.iso.datetime({ offset: true }) }).strict(),
+  z
+    .object({
+      action: z.literal("reject"),
+      /** Shown to the agency as written. */
+      reason: z.string().trim().min(RENTAL_CHECK_REASON_MIN).max(RENTAL_CHECK_REASON_MAX),
+      submittedAt: z.iso.datetime({ offset: true }),
+    })
+    .strict(),
+]);
+export type RentalCheckDecisionInput = z.infer<typeof rentalCheckDecisionSchema>;
+export interface RentalCheckDecisionResponse {
+  proId: string;
+  status: RentalCheckStatus;
+}
+
+/** A licence document waiting for a moderator (admin.joutiya.ma/pros). */
+export interface RentalCheckQueueItem {
+  proId: string;
+  name: string;
+  agrementRef: string;
+  issues: RentalCheckIssue[];
+  /** ISO. */
+  submittedAt: string;
+}
+
+/** The licence check as the back office shows it: the agency's view plus what Claude read. */
+export interface RentalCheckReview extends RentalCheckView {
+  uploadId: string;
+  /** Reference the document is checked against (the settings' reference when it was sent). */
+  agrementRef: string;
+  issues: RentalCheckIssue[];
+  /** What Claude read on the document; null when it did not run. */
+  extracted: { companyName: string; ice: string; reference: string; decisionDate: string; signs: string[]; note: string } | null;
+  piece: ProReviewPiece | null;
+}
 
 /**
  * POST /api/admin/pros/{proId}/phone: the moderator called the applicant's number during the
@@ -144,6 +200,8 @@ export interface ProReview {
     createdAt: string;
   } | null;
   pieces: ProReviewPiece[];
+  /** Car rental agency licence check (decision 5), null when the agency never sent a document. */
+  rentalCheck: RentalCheckReview | null;
 }
 
 export interface ProDecisionResponse {
@@ -164,15 +222,55 @@ export interface ProDecisionResponse {
 export const PRO_API = {
   apply: "/api/pro/apply",
   me: "/api/pro/me",
+  agency: "/api/pro/me/agency",
+  rental: "/api/pro/me/rental",
+  rentalCheck: "/api/pro/me/rental/check",
   kybcSign: "/api/pro/kybc/uploads",
   kybcComplete: (id: string) => `/api/pro/kybc/uploads/${id}/complete`,
   kybcDelete: (id: string) => `/api/pro/kybc/uploads/${id}`,
 } as const;
 
+/** PUT /api/pro/me/agency (Agence pack design §3): the shop's sector and, for an agency, its fee schedule. */
+export const proAgencySchema = z
+  .object({
+    sector: z.enum(PRO_SECTORS),
+    feeSchedule: z.string().trim().max(AGENCY_FEE_SCHEDULE_MAX),
+  })
+  .strict();
+export type ProAgencyInput = z.infer<typeof proAgencySchema>;
+export type ProAgencyResponse = ProAgencyInput;
+
+/** PUT /api/pro/me/rental (rental pack §5): the car rental agency's settings, replaced whole. */
+export const proRentalSchema = rentalAgencySchema;
+export type ProRentalInput = RentalAgency;
+export type ProRentalResponse = { rental: RentalAgency };
+
+/**
+ * POST /api/pro/me/rental/check (decision 5): sends the licence decision, a KYBC piece signed with
+ * `use: "agrement"` and completed, for the check against the reference in the settings.
+ */
+export const rentalCheckSubmitSchema = z.object({ uploadId: uploadIdSchema }).strict();
+export type RentalCheckSubmitInput = z.infer<typeof rentalCheckSubmitSchema>;
+
+/** The licence check as the agency sees it. */
+export interface RentalCheckView {
+  status: RentalCheckStatus;
+  /** ISO. */
+  submittedAt: string;
+  /** ISO, once decided (by the AI check or a moderator). */
+  checkedAt: string | null;
+  method: "ai" | "staff" | null;
+  /** The moderator's reason for a refusal. */
+  reason: string | null;
+}
+export type RentalCheckResponse = { rentalCheck: RentalCheckView };
+
 export const kybcSignSchema = z
   .object({
     declaredSize: z.number().int().min(1).max(MAX_UPLOAD_BYTES),
     declaredType: z.enum(KYBC_DECLARED_TYPES),
+    /** "agrement": a car rental agency's licence decision (a publishing shop), else a piece of a Pro application. */
+    use: z.enum(["application", "agrement"]).optional(),
   })
   .strict();
 export type KybcSignInput = z.infer<typeof kybcSignSchema>;
@@ -226,4 +324,11 @@ export interface ProSelfView {
   launchOffer: { endsAt: string | null; noticeDays: number } | null;
   /** Public storefront path segment `{slug}-{proId}`, when the storefront is shown. */
   storefront: string | null;
+  sector: ProSector;
+  /** The agency's fee schedule ("" when none or not an agency). */
+  feeSchedule: string;
+  /** Car rental agency settings, null until saved (publishing a rental needs the licence reference). */
+  rental: RentalAgency | null;
+  /** Check of the licence decision, null until a document is sent (or after the reference changed). */
+  rentalCheck: RentalCheckView | null;
 }

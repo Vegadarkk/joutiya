@@ -20,7 +20,7 @@ export const SLA_SWEEP_LIMIT = 50;
 /** How long a late report stays marked as alerted (a P0 left open a month is in the dashboard anyway). */
 export const LATE_MARKER_SECONDS = 30 * 86_400;
 
-const TARGET_LABEL: Record<ReportRecord["target"]["type"], string> = { listing: "annonce", user: "profil", message: "message", pro: "boutique" };
+const TARGET_LABEL: Record<ReportRecord["target"]["type"], string> = { listing: "annonce", user: "profil", message: "message", pro: "boutique", review: "avis" };
 
 export interface SlaSweepResult {
   /** Overdue P0 reports read. */

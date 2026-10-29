@@ -16,6 +16,7 @@ import { GET as getStock } from "@/app/api/pro/stock/route";
 import { POST as postImport } from "@/app/api/pro/stock/import/route";
 import type { StockImportResponse, StockListResponse } from "@/lib/contracts/stock-import";
 import { getListing } from "@/lib/db/repositories/listings";
+import { dayString, moroccoToday } from "@/lib/listings/rental-availability";
 import { proProfileRef, proProfileToFirestore } from "@/lib/db/repositories/pro-profiles";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { resetServerEnv } from "@/lib/env";
@@ -34,7 +35,7 @@ const PRO_ID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 const newProId = () => Array.from({ length: 8 }, () => PRO_ID_ALPHABET[randomInt(PRO_ID_ALPHABET.length)]).join("");
 const code = (body: unknown) => (body as ErrorBody).error.code;
 
-/** A verified shop on the launch offer, signed in as its owner. */
+/** A verified shop on the Business plan (the stock import's), signed in as its owner. */
 async function dealer(extra: Partial<ProProfileDoc> = {}): Promise<Member> {
   const owner = await member({ displayName: "Atlas Auto" });
   const proId = newProId();
@@ -51,9 +52,9 @@ async function dealer(extra: Partial<ProProfileDoc> = {}): Promise<Member> {
     legal: { form: "societe", ice: "001234567000089", rc: "12345", if: "1234567" },
     kybc: { status: "verified", iceFormatOk: true, uploadIds: [] },
     lifecycle: "verified",
-    plan: "essentiel",
-    planSource: "launch_offer",
-    quotas: DEFAULT_PRICING.pro.essentiel,
+    plan: "business",
+    planSource: "subscription",
+    quotas: DEFAULT_PRICING.pro.business,
     createdAt: now,
     updatedAt: now,
     ...extra,
@@ -94,7 +95,7 @@ describe("POST /api/pro/stock/import", () => {
     const preview = await send(owner, "preview", file);
     expect(preview.status).toBe(200);
     expect(preview.body.rows.map((row) => row.action)).toEqual(["create", "create", "error", "error"]);
-    expect(preview.body.remaining).toBe(DEFAULT_PRICING.pro.essentiel.activeListings);
+    expect(preview.body.remaining).toBe(DEFAULT_PRICING.pro.business.activeListings);
     expect(await ownerListingCount(owner.uid)).toBe(0);
 
     const applied = await send(owner, "apply", file);
@@ -104,7 +105,7 @@ describe("POST /api/pro/stock/import", () => {
     const draft = await getListing(first!.listingId!);
     expect(draft).toMatchObject({ status: "draft", sellerType: "pro", subcategoryId: "voitures", categoryId: "vehicules", price: 185000, title: "Dacia Duster DUS-1", location: { citySlug: "casablanca" } });
     expect(draft!.attributes).toMatchObject({ "stock-ref": "DUS-1", "car-brand": "dacia", mileage: 41000 });
-    expect(applied.body.remaining).toBe(DEFAULT_PRICING.pro.essentiel.activeListings! - 2);
+    expect(applied.body.remaining).toBe(DEFAULT_PRICING.pro.business.activeListings! - 2);
 
     // Equipment ticked on the site, then a new file without that column: an update keeps it.
     expect((await api<ListingBody>(patch, "PATCH", `/api/listings/${second!.listingId}`, { member: owner, body: { attributes: { ...draft!.attributes, "stock-ref": "DUS-2", "car-equipment": ["gps"] } } })).status).toBe(200);
@@ -124,6 +125,27 @@ describe("POST /api/pro/stock/import", () => {
     ]);
   });
 
+  it("imports a rental fleet with its blocked periods, then changes the periods alone", async () => {
+    const owner = await dealer();
+    const day = (offset: number) => dayString(moroccoToday(new Date()) + offset);
+    const header = "reference;categorie;titre;description;prix;ville;gamme;marque;modele;boite;carburant;kilometrage;indisponible";
+    const rental = (ref: string, periods: string) => `${ref};Location de voitures;Dacia Logan ${ref};${DESCRIPTION};300;Marrakech;Berline;Dacia;Logan;Manuelle;Diesel;Illimité;${periods}`;
+    const applied = await send(owner, "apply", `${header}\n${rental("LOG-1", `${day(3)}/${day(5)}`)}`);
+    expect(applied.body.rows[0]).toMatchObject({ action: "create", issues: [] });
+    const id = applied.body.rows[0]!.listingId!;
+    const created = await getListing(id);
+    expect(created).toMatchObject({ subcategoryId: "location-voitures", attributes: { "stock-ref": "LOG-1", "mileage-policy": "illimite" } });
+    expect(created!.rental?.unavailable).toEqual([{ from: day(3), to: day(5) }]);
+
+    const moved = await send(owner, "apply", `${header}\n${rental("LOG-1", `"${day(10)}; ${day(12)}/${day(13)}"`)}`);
+    expect(moved.body.rows.map((row) => [row.action, row.changes])).toEqual([["update", ["unavailable"]]]);
+    expect((await getListing(id))!.rental?.unavailable).toEqual([
+      { from: day(10), to: day(10) },
+      { from: day(12), to: day(13) },
+    ]);
+    expect((await send(owner, "preview", `${header}\n${rental("LOG-1", `"${day(10)}; ${day(12)}/${day(13)}"`)}`)).body.rows[0]!.action).toBe("unchanged");
+  });
+
   it("publishes an imported draft with its photo under the Pro budget, then lists it as absent", async () => {
     const owner = await dealer();
     const applied = await send(owner, "apply", `${HEADER}\n${car("PUB-1")}`);
@@ -137,6 +159,16 @@ describe("POST /api/pro/stock/import", () => {
     const next = await send(owner, "preview", `${HEADER}\n${car("PUB-2")}`);
     if (published.body.status === "published") expect(next.body.absent.map((listing) => listing.ref)).toEqual(["PUB-1"]);
     expect(next.body.rows[0]!.action).toBe("create");
+  });
+
+  it("is for the Business and Premium plans: an Essentiel shop is told to upgrade", async () => {
+    const owner = await dealer({ plan: "essentiel", planSource: "launch_offer", quotas: DEFAULT_PRICING.pro.essentiel });
+    const preview = await send(owner, "preview", `${HEADER}\n${car("E-1")}`);
+    expect(preview.status).toBe(403);
+    expect(code(preview.body)).toBe("plan_upgrade_required");
+    const stock = await api(getStock, "GET", "/api/pro/stock", { member: owner });
+    expect(stock.status).toBe(403);
+    expect(code(stock.body)).toBe("plan_upgrade_required");
   });
 
   it("refuses a suspended shop", async () => {

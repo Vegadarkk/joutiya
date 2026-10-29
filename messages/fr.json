@@ -10,7 +10,8 @@
     "post": "Déposer une annonce",
     "searchLabel": "Rechercher une annonce",
     "searchPlaceholder": "Rechercher sur Joutiya",
-    "signIn": "Se connecter"
+    "signIn": "Se connecter",
+    "guide": "Démarches"
   },
   "Locale": {
     "label": "Langue",
@@ -110,7 +111,8 @@
       "mentions": "Mentions légales",
       "autorites": "Contact autorités (DSA)",
       "interdits": "Objets interdits"
-    }
+    },
+    "guide": "Démarches administratives"
   },
   "Legal": {
     "provisionalTitle": "Version provisoire",
@@ -180,6 +182,37 @@
         "turnstile_failed": "La vérification anti-robots a échoué. Cochez à nouveau la case, puis renvoyez votre question."
       }
     }
+  },
+  "Guide": {
+    "metaTitle": "Démarches administratives au Maroc",
+    "metaDescription": "Les liens officiels de vos démarches, classés par profil : étudiants, auto-entrepreneurs, véhicules, immobilier, MRE, sociétés et coopératives, identité.",
+    "title": "Démarches administratives",
+    "lead": "Où faire une démarche, dans quel ordre, et le lien direct vers la page officielle. Classé par profil, en français, en arabe et en tarifit.",
+    "guideHome": "Démarches administratives",
+    "breadcrumb": "Fil d'Ariane",
+    "rubricsTitle": "Choisissez votre situation",
+    "procedureCount": "{count, plural, one {# démarche} other {# démarches}}",
+    "generalTitle": "Portails pour toutes les démarches",
+    "disclaimerTitle": "Une information, pas une démarche officielle",
+    "disclaimer": "Ce guide vous oriente vers les sites des administrations. Seule la source officielle fait foi : procédures, pièces et frais peuvent changer à tout moment. {brand} n'est lié à aucune administration et ne traite aucune démarche : ne payez jamais quelqu'un qui se présente de notre part pour une démarche.",
+    "prepare": "À préparer",
+    "officialLinks": "Sur le site officiel",
+    "langs": "Page en : {langs}",
+    "lang": {
+      "fr": "français",
+      "ar": "arabe",
+      "en": "anglais",
+      "es": "espagnol"
+    },
+    "newTab": "(site officiel, s'ouvre dans un nouvel onglet)",
+    "withdrawn": "Lien retiré le temps de vérifier la page officielle.",
+    "checked": "Liens vérifiés automatiquement le {date}.",
+    "reviewed": "Contenu relu le {date}.",
+    "otherRubrics": "Autres situations",
+    "categoryLink": "Vos démarches : {title}",
+    "helpCardTitle": "Démarches administratives",
+    "helpCardBody": "Bourse, auto-entrepreneur, mutation d'un véhicule, achat d'un bien, MRE : les liens officiels, classés par profil.",
+    "helpCardCta": "Voir les démarches"
   },
   "NotFound": {
     "title": "Cette page n'existe pas",
@@ -290,7 +323,7 @@
         "googleAuth": "La connexion et la gestion des comptes.",
         "adsense": "La publicité, quand elle sera activée, et seulement avec votre accord donné à part.",
         "cloudflare": "La diffusion et la protection du site, la vérification anti-robot (Turnstile) et l'IA de secours du contrôle des annonces (Workers AI), sur son réseau mondial.",
-        "anthropic": "L'aide au contrôle des annonces, au tri des signalements et à l'examen des recours, et l'Assistant Joutiya.",
+        "anthropic": "L'aide au contrôle des annonces, au tri des signalements et à l'examen des recours, la lecture de la décision d'agrément d'un loueur de voitures, et l'Assistant Joutiya.",
         "openai": "Le contrôle de secours des contenus.",
         "meta": "La vérification de votre numéro de téléphone par WhatsApp.",
         "resend": "L'envoi des e-mails.",
@@ -457,6 +490,7 @@
       "verifications": "Vérifications",
       "signOut": "Déconnexion",
       "favorites": "Mes favoris",
+      "reviews": "Mes avis",
       "savedSearches": "Mes recherches",
       "decisions": "Décisions et recours",
       "help": "Aide",
@@ -514,7 +548,8 @@
       "internal": "Une erreur technique est survenue. Réessayez.",
       "network": "Connexion impossible. Vérifiez votre réseau, puis réessayez.",
       "quota_exhausted": "Cette action est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc).",
-      "invalid_text": "Le texte contient un élément refusé. Corrigez-le puis réessayez."
+      "invalid_text": "Le texte contient un élément refusé. Corrigez-le puis réessayez.",
+      "review_unavailable": "Vous ne pouvez plus donner d'avis sur cette conversation."
     }
   },
   "Listing": {
@@ -538,7 +573,10 @@
       "invalid_token": "Ce lien n'est plus valide.",
       "upload_limit": "Trop de photos ont été envoyées pour cette annonce, photos refusées comprises. Supprimez les photos refusées pour en ajouter d'autres, ou patientez : elles sont effacées automatiquement 7 jours après leur envoi.",
       "quota_exhausted": "Le dépôt et la modification d'annonces sont momentanément suspendus : la limite quotidienne de notre service est atteinte. Votre annonce est conservée ; réessayez après 9 h (heure du Maroc).",
-      "adults_only_attestation": "Pour publier dans cette catégorie, confirmez qu'il s'agit d'un objet décoratif vendu uniquement à une personne majeure."
+      "adults_only_attestation": "Pour publier dans cette catégorie, confirmez qu'il s'agit d'un objet décoratif vendu uniquement à une personne majeure.",
+      "real_estate_attestation": "Pour publier une annonce immobilière, attestez que ses informations sont exactes et sous votre seule responsabilité.",
+      "rental_attestation": "Pour publier une location, confirmez la déclaration de votre agence (agrément, immatriculation, assurance).",
+      "rental_agrement_missing": "Pour publier une location, renseignez d'abord le numéro d'agrément de votre agence dans l'espace Pro (Mon agence de location)."
     },
     "wizard": {
       "title": "Déposer une annonce",
@@ -580,7 +618,9 @@
       "saveLimit": "Cette modification doit être vérifiée par notre équipe, et une annonce en cours de vérification compte parmi vos annonces actives : vous avez atteint le maximum. Mettez en pause ou supprimez une autre annonce, puis enregistrez à nouveau.",
       "saveQuota": "La limite quotidienne de notre service est atteinte : vos dernières modifications ne sont pas encore enregistrées. Gardez cette page ouverte et réessayez après 9 h (heure du Maroc).",
       "dossierTitle": "Historique, garantie et équipements",
-      "dossierHint": "Facultatif : une fiche complète inspire confiance et ressort mieux dans la recherche."
+      "dossierHint": "Facultatif : une fiche complète inspire confiance et ressort mieux dans la recherche.",
+      "rentalTitle": "Conditions de location",
+      "rentalHint": "Assurance, caution, conducteur, remise du véhicule : des conditions claires évitent les mauvaises surprises et ressortent dans la recherche."
     },
     "start": {
       "title": "Déposer une annonce",
@@ -787,7 +827,9 @@
         "explicit_consent": "Une autre personne, avec son accord explicite"
       },
       "sensitiveNote": "Sans l'accord de la personne concernée, retirez ces informations de l'annonce.",
-      "adultsOnlyAttestation": "J'atteste qu'il s'agit d'un objet décoratif d'artisanat (koumiya ou poignard décoratif), qui n'est pas une arme de combat, et que je le vendrai uniquement à une personne majeure (18 ans et plus). Mon annonce sera vérifiée par un modérateur avant sa mise en ligne."
+      "adultsOnlyAttestation": "J'atteste qu'il s'agit d'un objet décoratif d'artisanat (koumiya ou poignard décoratif), qui n'est pas une arme de combat, et que je le vendrai uniquement à une personne majeure (18 ans et plus). Mon annonce sera vérifiée par un modérateur avant sa mise en ligne.",
+      "realEstateAttestation": "J'atteste que les informations de mon annonce (titre de propriété, mandat, honoraires, permis, autorisation d'hébergement) sont exactes et que j'ai le droit de proposer ce bien. Je suis seul responsable de ces informations et de la transaction : {brand} ne les vérifie pas (<cgu>CGU</cgu>, art. 7.10 et 19.1).",
+      "rentalAttestation": "Je déclare que mon agence détient l'agrément de location de voitures sans chauffeur, que ce véhicule est immatriculé pour la location, dans la limite d'âge de la flotte et assuré, et que les informations, disponibilités et conditions publiées sont exactes. Elles engagent ma seule responsabilité."
     },
     "done": {
       "publishedTitle": "Votre annonce est en ligne",
@@ -815,6 +857,7 @@
       "criterion_max": "La valeur maximale est {max}.",
       "criterion_integer": "Entrez un nombre entier.",
       "criterion_text_max": "Ce champ ne peut pas dépasser {max} caractères.",
+      "criterion_format_onssa": "Format attendu : lettres, province, numéro et année séparés par des points, par exemple M.07.113.20.",
       "condition_required": "Indiquez l'état.",
       "title_min": "Le titre doit faire au moins {min} caractères.",
       "title_max": "Le titre ne peut pas dépasser {max} caractères.",
@@ -848,7 +891,16 @@
       "messaging_only": "Dans cette catégorie, le contact passe uniquement par la messagerie : désactivez le téléphone et WhatsApp.",
       "adults_only_attestation": "Confirmez qu'il s'agit d'un objet décoratif d'artisanat vendu uniquement à une personne majeure.",
       "criterion_pro_only": "Ce champ est réservé aux comptes professionnels.",
-      "deposit_max": "Le dépôt de garantie ne peut pas dépasser 2 mois de loyer (loi 67-12)."
+      "deposit_max": "Le dépôt de garantie ne peut pas dépasser 2 mois de loyer (loi 67-12).",
+      "real_estate_attestation": "Pour publier une annonce immobilière, attestez que ses informations sont exactes et sous votre seule responsabilité.",
+      "rental_rate_max": "Un tarif longue durée ne peut pas dépasser le prix par jour (ni celui à 7 jours pour le tarif à 30 jours).",
+      "rental_attestation": "Confirmez la déclaration de votre agence pour publier une location.",
+      "variants_pro_only": "Les variantes (tailles, couleurs, contenances) sont réservées aux boutiques Pro.",
+      "variants_donation": "Un don ne peut pas avoir de variantes.",
+      "variants_axis_invalid": "Ce critère ne s'applique pas à cette sous-catégorie : choisissez un autre axe de variante.",
+      "stock_pro_only": "Le suivi du stock est réservé aux boutiques Pro.",
+      "stock_with_variants": "Avec des variantes, le stock se saisit pour chaque combinaison.",
+      "no_variants": "Cette annonce n'a pas de variantes."
     },
     "status": {
       "draft": "Brouillon",
@@ -868,7 +920,10 @@
       "an": "an",
       "go": "Go",
       "nuit": "nuits",
-      "mois": "mois"
+      "mois": "mois",
+      "jour": "jours",
+      "ans": "ans",
+      "mad": "DH"
     }
   },
   "Categories": {
@@ -924,7 +979,20 @@
         "tenues-traditionnelles": "Tenues traditionnelles",
         "chaussures": "Chaussures",
         "sacs-accessoires": "Sacs & accessoires",
-        "montres-bijoux": "Montres & bijoux"
+        "montres-bijoux": "Montres & bijoux",
+        "beaute-soins": "Beauté et soins"
+      }
+    },
+    "terroir": {
+      "name": "Produits du terroir",
+      "sub": {
+        "huile-olive": "Huile d'olive",
+        "huile-argan-alimentaire": "Huile d'argan alimentaire",
+        "miel": "Miel",
+        "amlou-pates-a-tartiner": "Amlou et pâtes à tartiner",
+        "dattes-fruits-secs": "Dattes et fruits secs",
+        "epices-herbes": "Épices et herbes",
+        "autres-produits-terroir": "Autres produits du terroir"
       }
     },
     "famille": {
@@ -2231,6 +2299,167 @@
     },
     "delivery-year": {
       "label": "Livraison prévue (année)"
+    },
+    "beauty-product-type": {
+      "label": "Type de produit",
+      "options": {
+        "huile-argan": "Huile d'argan cosmétique",
+        "savon-noir": "Savon noir",
+        "ghassoul": "Ghassoul",
+        "eau-de-rose": "Eau de rose",
+        "henne": "Henné",
+        "parfum": "Parfum",
+        "maquillage": "Maquillage",
+        "soin-visage-corps": "Soin du visage et du corps",
+        "soin-cheveux": "Soin des cheveux",
+        "autre": "Autre"
+      }
+    },
+    "onssa-number": {
+      "label": "N° d'agrément ou d'autorisation ONSSA"
+    },
+    "olive-oil-grade": {
+      "label": "Catégorie",
+      "options": {
+        "vierge-extra": "Vierge extra",
+        "vierge": "Vierge",
+        "vierge-courante": "Vierge courante"
+      }
+    },
+    "honey-type": {
+      "label": "Variété de miel",
+      "options": {
+        "euphorbe": "Euphorbe (daghmous)",
+        "thym": "Thym (zaatar)",
+        "jujubier": "Jujubier (sedra)",
+        "oranger": "Fleur d'oranger",
+        "eucalyptus": "Eucalyptus",
+        "romarin": "Romarin",
+        "lavande": "Lavande",
+        "caroube": "Caroubier",
+        "toutes-fleurs": "Toutes fleurs",
+        "autre": "Autre"
+      }
+    },
+    "date-variety": {
+      "label": "Variété",
+      "options": {
+        "mejhoul": "Mejhoul",
+        "boufeggous": "Boufeggous",
+        "jihel": "Jihel",
+        "aziza": "Aziza",
+        "bouskri": "Bouskri",
+        "najda": "Najda",
+        "autre": "Autre"
+      }
+    },
+    "spice-type": {
+      "label": "Épice",
+      "options": {
+        "safran": "Safran",
+        "ras-el-hanout": "Ras el hanout",
+        "cumin": "Cumin",
+        "paprika": "Paprika",
+        "gingembre": "Gingembre",
+        "curcuma": "Curcuma",
+        "poivre": "Poivre",
+        "cannelle": "Cannelle",
+        "herbes-aromatiques": "Herbes aromatiques",
+        "autre": "Autre"
+      }
+    },
+    "terroir-type": {
+      "label": "Type de produit",
+      "options": {
+        "couscous-pates": "Couscous et pâtes",
+        "olives": "Olives",
+        "conserves-confitures": "Conserves et confitures",
+        "the-infusions": "Thé et infusions",
+        "farines-semoules": "Farines et semoules",
+        "autre": "Autre"
+      }
+    },
+    "rental-class": {
+      "label": "Catégorie de véhicule",
+      "options": {
+        "economique": "Économique",
+        "citadine": "Citadine",
+        "compacte": "Compacte",
+        "berline": "Berline",
+        "suv-4x4": "SUV et 4x4",
+        "monospace": "Monospace",
+        "utilitaire": "Utilitaire",
+        "minibus": "Minibus",
+        "cabriolet": "Cabriolet",
+        "luxe": "Luxe et prestige"
+      }
+    },
+    "seats": {
+      "label": "Places"
+    },
+    "min-rental-days": {
+      "label": "Durée minimale de location"
+    },
+    "mileage-policy": {
+      "label": "Kilométrage",
+      "options": {
+        "illimite": "Illimité",
+        "limite": "Limité"
+      }
+    },
+    "km-per-day": {
+      "label": "Kilomètres inclus par jour"
+    },
+    "rental-insurance": {
+      "label": "Assurance incluse",
+      "options": {
+        "rc": "Responsabilité civile seule",
+        "tous-risques-franchise": "Tous risques avec franchise",
+        "tous-risques-sans-franchise": "Tous risques sans franchise"
+      }
+    },
+    "insurance-excess": {
+      "label": "Franchise"
+    },
+    "rental-deposit": {
+      "label": "Caution"
+    },
+    "driver-min-age": {
+      "label": "Âge minimum du conducteur"
+    },
+    "licence-years": {
+      "label": "Ancienneté minimale du permis"
+    },
+    "vehicle-handover": {
+      "label": "Remise du véhicule",
+      "options": {
+        "agence": "En agence",
+        "aeroport": "À l'aéroport",
+        "livraison": "Livraison à l'adresse",
+        "gare": "En gare"
+      }
+    },
+    "one-way": {
+      "label": "Restitution dans une autre ville"
+    },
+    "rental-extras": {
+      "label": "Options sur demande",
+      "options": {
+        "siege-bebe": "Siège bébé",
+        "rehausseur": "Rehausseur",
+        "conducteur-additionnel": "Conducteur additionnel",
+        "gps": "GPS",
+        "wifi": "Wi-Fi à bord"
+      }
+    },
+    "rate-7-days": {
+      "label": "Prix par jour dès 7 jours"
+    },
+    "rate-30-days": {
+      "label": "Prix par jour dès 30 jours"
+    },
+    "fleet-units": {
+      "label": "Véhicules identiques dans la flotte"
     }
   },
   "MyListings": {
@@ -2351,7 +2580,15 @@
     "featuredInfo": "Emplacement payé par l'annonceur. Il ne modifie pas le classement des autres résultats.",
     "bumped": "Remontée",
     "bumpedInfo": "Cette annonce a été remontée par son auteur, contre paiement.",
-    "example": "Exemple"
+    "exclusive": "Exclusivité",
+    "facts": {
+      "surface": "{count} m²",
+      "rooms": "{count, plural, one {# pièce} other {# pièces}}",
+      "bedrooms": "{count} ch."
+    },
+    "example": "Exemple",
+    "rentalTotal": "≈ {total} pour {days, plural, one {# jour} other {# jours}}",
+    "rentalToConfirm": "Disponibilité à confirmer"
   },
   "ListingPage": {
     "home": "Accueil",
@@ -2393,7 +2630,10 @@
         "an": "an",
         "go": "Go",
         "nuit": "nuits",
-        "mois": "mois"
+        "mois": "mois",
+        "jour": "jours",
+        "ans": "ans",
+        "mad": "DH"
       }
     },
     "seller": {
@@ -2414,6 +2654,9 @@
       "message": "Envoyer un message",
       "messageShort": "Message",
       "messageHint": "Votre message arrive dans la messagerie Joutiya du vendeur. Ni votre e-mail ni votre numéro ne lui sont transmis.",
+      "testDrive": "Demander un essai",
+      "testDriveHint": "Écrivez au vendeur, puis proposez-lui vos créneaux dans la conversation.",
+      "testDriveText": "Bonjour, je souhaite essayer « {title} ». Quels créneaux vous conviennent ?",
       "signInBody": "Connectez-vous pour voir le numéro du vendeur. Vous reviendrez ensuite sur cette annonce.",
       "signInMessage": "Connectez-vous pour écrire au vendeur. Vous reviendrez ensuite sur cette annonce.",
       "signIn": "Se connecter",
@@ -2457,11 +2700,32 @@
           "rate_limited": "Vous avez envoyé beaucoup de messages. Réessayez {wait}.",
           "later": "plus tard",
           "quota_exhausted": "La messagerie est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc).",
-          "adult_confirmation_required": "Cet article est réservé aux personnes majeures : confirmez avoir 18 ans ou plus pour écrire au vendeur."
+          "adult_confirmation_required": "Cet article est réservé aux personnes majeures : confirmez avoir 18 ans ou plus pour écrire au vendeur.",
+          "rental_request_unavailable": "Cette annonce ne prend plus de demande de location."
         },
         "adultConfirm": "Je confirme avoir 18 ans ou plus.",
-        "adultMissing": "Confirmez avoir 18 ans ou plus pour écrire au vendeur."
-      }
+        "adultMissing": "Confirmez avoir 18 ans ou plus pour écrire au vendeur.",
+        "visitTitle": "Demander une visite à {name}",
+        "visitTitleFallback": "Demander une visite",
+        "visitDraft": "Bonjour, votre bien m'intéresse et je souhaiterais le visiter. Quelles sont vos disponibilités ?",
+        "visitSafety": "Une visite ne se paie jamais : ne versez ni acompte ni frais de réservation avant d'avoir vu le bien et signé un contrat. Après l'envoi, proposez vos créneaux dans la conversation.",
+        "rentalTitle": "Demande de réservation à {name}",
+        "rentalTitleFallback": "Demande de réservation",
+        "rentalDates": "Dates de location",
+        "rentalPickup": "Lieu de remise (facultatif)",
+        "rentalPickupPlaceholder": "Ex. : aéroport Mohammed V, agence de Maârif",
+        "rentalDraft": "Bonjour, je souhaite louer « {title} » du {from} au {to} ({days, plural, one {# jour} other {# jours}}). Est-ce disponible ?",
+        "rentalDraftPickup": "Bonjour, je souhaite louer « {title} » du {from} au {to} ({days, plural, one {# jour} other {# jours}}), remise à {pickup}. Est-ce disponible ?",
+        "rentalDatesMissing": "Choisissez les dates de prise en charge et de retour.",
+        "rentalSafety": "La location se conclut par le contrat écrit de l'agence : ne versez ni acompte ni caution sur le site ou avant d'avoir vu le véhicule.",
+        "rentalSend": "Envoyer la demande"
+      },
+      "visit": "Demander une visite",
+      "visitShort": "Visite",
+      "signInVisit": "Connectez-vous pour demander une visite. Vous reviendrez ensuite sur cette annonce.",
+      "rental": "Demander une réservation",
+      "rentalHint": "Envoyez vos dates à l'agence : elle confirme la disponibilité dans la messagerie. Rien ne se paie sur le site.",
+      "signInRental": "Connectez-vous pour envoyer une demande de réservation. Vous reviendrez ensuite sur cette annonce."
     },
     "safety": {
       "title": "Conseils de sécurité",
@@ -2469,7 +2733,10 @@
         "noAdvance": "Ne payez jamais à l'avance : ni acompte, ni frais d'envoi, ni réservation avant d'avoir vu l'article.",
         "meetPublic": "Rencontrez le vendeur dans un lieu public et fréquenté, de préférence en journée.",
         "checkItem": "Vérifiez l'article et ses papiers avant de payer.",
-        "noCodes": "Ne communiquez jamais vos codes bancaires, ni un code reçu par SMS ou WhatsApp."
+        "noCodes": "Ne communiquez jamais vos codes bancaires, ni un code reçu par SMS ou WhatsApp.",
+        "noDeposit": "Ne versez jamais d'acompte, de caution ni de frais de réservation avant d'avoir visité le bien et signé un contrat.",
+        "visitFirst": "Visitez le bien en personne et vérifiez l'identité du propriétaire ou de l'agence.",
+        "checkTitle": "Pour un achat, vérifiez le titre foncier auprès de la Conservation foncière (ANCFCC) et signez chez un notaire ou des adouls."
       },
       "host": "Joutiya héberge les annonces de ses utilisateurs : elle n'est ni vendeur ni acheteur, et n'est partie ni aux transactions ni aux litiges entre eux.",
       "more": "Tous nos conseils de confiance et de sécurité"
@@ -2521,11 +2788,68 @@
       },
       "source": "Démarches indicatives, à vérifier auprès de la NARSA (narsa.ma) ou de votre centre d'immatriculation."
     },
+    "terms": {
+      "mandate": "Mandat",
+      "mandates": {
+        "exclusif": "Exclusif",
+        "simple": "Simple",
+        "vente-directe": "Sans mandat : bien du professionnel"
+      },
+      "exclusive": "Exclusivité",
+      "reference": "Référence agence",
+      "fees": "Honoraires d'agence",
+      "feesOnTop": "En plus du prix, à la charge du client",
+      "feesOnTopAmount": "{amount} en plus du prix, à la charge du client",
+      "feesIncluded": "Inclus dans le prix",
+      "feesIncludedAmount": "{amount}, inclus dans le prix",
+      "feesNone": "Sans frais pour le client",
+      "offPlan": "Vente sur plan",
+      "offPlanYes": "Oui (VEFA)",
+      "delivery": "Livraison prévue en {year}",
+      "permit": "Permis de construire",
+      "authorization": "Autorisation d'hébergement",
+      "declared": "N° {number}, déclaré par l'annonceur",
+      "declaredNote": "Informations déclarées par l'annonceur, sous sa seule responsabilité. {brand} ne les vérifie pas. Demandez les justificatifs (titre foncier, mandat, autorisation) avant de vous engager."
+    },
     "example": {
       "title": "Annonce exemple",
       "body": "Joutiya a créé cette annonce pour montrer à quoi ressemble une bonne annonce de ce type : photos nettes, description complète, prix et caractéristiques renseignés. Le vendeur et l'article sont fictifs : on ne peut ni le contacter, ni acheter, ni réserver.",
       "cta": "Déposer une annonce",
       "contact": "Contact désactivé : c'est une annonce exemple."
+    },
+    "rental": {
+      "title": "Conditions de location",
+      "minDays": "Location minimum : {count, plural, one {# jour} other {# jours}}",
+      "unlimited": "Kilométrage illimité",
+      "limited": "{km} km inclus par jour",
+      "insurance": "Assurance",
+      "excess": "Franchise de {amount}",
+      "deposit": "Caution de {amount}",
+      "depositHint": "Demandez à l'agence sous quelle forme (empreinte de carte, espèces) et quand elle est rendue.",
+      "driver": "Conducteur",
+      "age": "{count} ans minimum",
+      "licence": "permis depuis {count, plural, one {# an} other {# ans}}",
+      "handover": "Remise du véhicule",
+      "oneWay": "Restitution possible dans une autre ville",
+      "extras": "Options sur demande",
+      "rates": "Tarifs dégressifs",
+      "rate7": "{amount} par jour dès 7 jours",
+      "rate30": "{amount} par jour dès 30 jours",
+      "fleet": "{count, plural, one {# véhicule de ce modèle} other {# véhicules de ce modèle}} dans la flotte",
+      "declared": "Conditions déclarées par l'agence, sous sa seule responsabilité : seul le contrat écrit de l'agence fait foi.",
+      "stockRef": "Réf."
+    },
+    "rentalGuide": {
+      "title": "Louer un véhicule au Maroc",
+      "steps": {
+        "agency": "Louez auprès d'une agence que vous pouvez voir : adresse, registre de commerce et contrat au nom de la société.",
+        "contract": "Lisez le contrat écrit avant de signer : prix total, kilométrage, assurance, franchise et caution. Il doit vous être remis en copie, en arabe sur demande.",
+        "inspection": "Faites l'état des lieux avec photos au départ et au retour : carrosserie, pneus, niveau de carburant.",
+        "guarantee": "Ne laissez jamais votre passeport ou votre carte d'identité en garantie, et ne signez pas de chèque en blanc.",
+        "licence": "Ayez votre permis valide sur vous (permis international si l'agence le demande) et respectez l'âge et l'ancienneté de permis exigés.",
+        "payment": "{brand} ne loue pas ce véhicule et ne reçoit aucun paiement : la location est un contrat entre vous et l'agence. Ne versez aucun acompte avant d'avoir vu l'agence et le véhicule."
+      },
+      "source": "Conseils indicatifs : les conditions et le contrat de l'agence priment."
     }
   },
   "Profile": {
@@ -2551,6 +2875,95 @@
       "priceDesc": "Prix décroissant",
       "filter": "Filtrer par catégorie",
       "all": "Toutes"
+    }
+  },
+  "Reviews": {
+    "title": "Avis",
+    "titleCount": "Avis ({count})",
+    "count": "{count, plural, one {# avis vérifié} other {# avis vérifiés}}",
+    "average": "Note moyenne : {average} sur 5",
+    "stars": "{count, plural, one {# étoile sur 5} other {# étoiles sur 5}}",
+    "spread": "Répartition des notes",
+    "spreadRow": "{stars, plural, one {# étoile} other {# étoiles}} : {count, plural, one {# avis} other {# avis}}",
+    "verified": "Échange vérifié",
+    "verifiedHint": "Seuls les acheteurs qui ont échangé avec ce vendeur par la messagerie du site peuvent donner un avis.",
+    "rules": "Comment fonctionnent les avis",
+    "listing": "Annonce :",
+    "exchangeOn": "Échange du",
+    "reply": "Réponse de {name}",
+    "formerMember": "Ancien membre",
+    "more": "Voir plus d'avis",
+    "failed": "Les avis suivants n'ont pas pu être chargés. Réessayez.",
+    "emptyTitle": "Pas encore d'avis",
+    "emptyBody": "Les acheteurs qui échangent avec {name} par la messagerie pourront donner leur avis ici.",
+    "dialog": {
+      "title": "Votre avis sur {name}",
+      "listing": "Annonce : {title}",
+      "rating": "Votre note",
+      "ratingHint": "Choisissez de 1 à 5 étoiles",
+      "words": {
+        "1": "Très décevant",
+        "2": "Décevant",
+        "3": "Correct",
+        "4": "Bien",
+        "5": "Excellent"
+      },
+      "text": "Votre avis",
+      "textHint": "Racontez l'échange : ponctualité, état de l'article, communication. Restez factuel et courtois.",
+      "count": "{count} / {max}",
+      "confirm": "Nous avons conclu un échange ou une rencontre",
+      "confirmHint": "Un avis porte sur un échange réel. Un faux avis est retiré et peut entraîner la suspension du compte.",
+      "rules": "Règles des avis",
+      "public": "Votre nom affiché et votre avis seront visibles sur la vitrine du vendeur, qui pourra y répondre une fois. Vous pourrez supprimer votre avis à tout moment depuis « Mes avis ».",
+      "submit": "Publier mon avis",
+      "cancel": "Annuler",
+      "close": "Fermer",
+      "problems": {
+        "rating": "Choisissez une note.",
+        "short": "Encore {count, plural, one {# caractère} other {# caractères}} au minimum.",
+        "confirm": "Cochez cette case pour confirmer l'échange."
+      },
+      "publishedTitle": "Merci, votre avis est publié",
+      "publishedBody": "Il apparaît sur la vitrine de {name}.",
+      "pendingTitle": "Merci, votre avis sera publié après vérification",
+      "pendingBody": "Il contient peut-être des informations personnelles : un modérateur le relit avant sa publication.",
+      "viewStorefront": "Voir la vitrine"
+    },
+    "mine": {
+      "title": "Mes avis",
+      "intro": "Les avis que vos acheteurs vous ont laissés, et ceux que vous avez donnés aux vendeurs.",
+      "tabs": {
+        "label": "Avis reçus ou donnés",
+        "received": "Reçus",
+        "given": "Donnés"
+      },
+      "loading": "Chargement de vos avis",
+      "retry": "Réessayer",
+      "emptyReceived": "Vous n'avez pas encore reçu d'avis",
+      "emptyReceivedBody": "Après un échange par la messagerie, vos acheteurs pourront noter la transaction.",
+      "emptyGiven": "Vous n'avez pas encore donné d'avis",
+      "emptyGivenBody": "Dans une conversation avec un vendeur, un bandeau vous invite à donner votre avis 24 heures après sa réponse.",
+      "toMessages": "Ouvrir mes messages",
+      "from": "De {name}",
+      "fromFormer": "D'un ancien membre",
+      "to": "Pour {name}",
+      "status": {
+        "pending": "En attente de vérification",
+        "hidden": "Masqué par la modération"
+      },
+      "yourReply": "Votre réponse",
+      "theirReply": "Réponse de {name}",
+      "reply": "Répondre",
+      "replyLabel": "Votre réponse publique",
+      "replyHint": "Une seule réponse, affichée sous l'avis. Restez courtois et ne donnez pas de coordonnées.",
+      "replySubmit": "Publier la réponse",
+      "replied": "Réponse publiée",
+      "delete": "Supprimer mon avis",
+      "deleteTitle": "Supprimer votre avis ?",
+      "deleteBody": "Il disparaît de la vitrine de {name}. Vous ne pourrez pas en donner un autre pour cette conversation.",
+      "deleteConfirm": "Supprimer",
+      "deleted": "Avis supprimé",
+      "cancel": "Annuler"
     }
   },
   "FreeText": {
@@ -2800,7 +3213,8 @@
       "seller": "Vendeur",
       "condition": "État",
       "options": "Options",
-      "criteria": "Critères : {subcategory}"
+      "criteria": "Critères : {subcategory}",
+      "rentalDates": "Dates de location"
     },
     "allCategories": "Toutes les catégories",
     "allOfCategory": "Toute la catégorie {category}",
@@ -2846,8 +3260,10 @@
       "range": "{label} : {min} – {max}",
       "rangeFrom": "{label} : dès {min}",
       "rangeTo": "{label} : jusqu'à {max}",
-      "options": "{label} : {values}"
-    }
+      "options": "{label} : {values}",
+      "dates": "{from} – {to} · {days} j"
+    },
+    "rentalDatesHint": "Les agences déclarent leurs jours indisponibles : les véhicules libres sur toute la période s'affichent, ceux à confirmer en dernier."
   },
   "Pro": {
     "metaTitle": "Espace Pro",
@@ -2857,7 +3273,7 @@
     "retry": "Réessayer",
     "intro": {
       "title": "Ouvrir une boutique Pro sur Joutiya",
-      "lead": "Pour les sociétés, commerçants et auto-entrepreneurs : une boutique à votre nom, des annonces marquées Pro et des quotas adaptés à votre activité.",
+      "lead": "Pour les sociétés, coopératives, commerçants et auto-entrepreneurs : une boutique à votre nom, des annonces marquées Pro et des quotas adaptés à votre activité.",
       "offer": "L'offre Essentiel est offerte aux boutiques validées jusqu'à l'ouverture des ventes. Vous serez prévenu {days} jours avant tout paiement.",
       "how": "Nous vérifions vos identifiants (ICE, registre) et une pièce justificative avant d'ouvrir la boutique, en général sous deux jours ouvrés."
     },
@@ -2886,7 +3302,8 @@
       "forms": {
         "societe": "Société (SARL, SA…)",
         "auto_entrepreneur": "Auto-entrepreneur",
-        "commercant": "Commerçant personne physique"
+        "commercant": "Commerçant personne physique",
+        "cooperative": "Coopérative"
       },
       "ice": "ICE",
       "iceHint": "Identifiant commun de l'entreprise : 15 chiffres.",
@@ -2894,8 +3311,9 @@
       "if": "Identifiant fiscal (IF)",
       "aeNumber": "Numéro d'auto-entrepreneur",
       "tp": "Numéro de taxe professionnelle (TP)",
+      "coopNumber": "Numéro d'immatriculation au registre des coopératives",
       "rcOrTp": "Indiquez le RC ou la taxe professionnelle.",
-      "piecesLead": "Ajoutez de 1 à {max} documents : extrait du registre de commerce (modèle J), attestation d'auto-entrepreneur ou de taxe professionnelle. Pas de copie de carte d'identité : si un document porte votre numéro de CNIE, masquez-le avant l'envoi. Formats acceptés : PDF, JPEG ou PNG, 10 Mo au plus chacun.",
+      "piecesLead": "Ajoutez de 1 à {max} documents : extrait du registre de commerce (modèle J), attestation d'auto-entrepreneur ou de taxe professionnelle, certificat d'immatriculation de la coopérative. Pas de copie de carte d'identité : si un document porte votre numéro de CNIE, masquez-le avant l'envoi. Formats acceptés : PDF, JPEG ou PNG, 10 Mo au plus chacun.",
       "piecesNotice": "Ces documents servent uniquement à vérifier votre activité professionnelle. Seuls nos modérateurs les consultent et chaque consultation est journalisée. Ils sont hébergés hors du Maroc, conservés le temps de la vérification, puis supprimés 6 mois après la fermeture de votre boutique ou le refus de la demande. Vous pouvez demander à y accéder ou à les faire supprimer à tout moment : <link>politique de confidentialité</link>.",
       "addPiece": "Ajouter un document",
       "removePiece": "Retirer {name}",
@@ -2930,7 +3348,8 @@
       "legalFormHint": {
         "societe": "ICE, RC et identifiant fiscal.",
         "auto_entrepreneur": "ICE et numéro d'auto-entrepreneur.",
-        "commercant": "ICE, et RC ou taxe professionnelle."
+        "commercant": "ICE, et RC ou taxe professionnelle.",
+        "cooperative": "ICE et numéro d'immatriculation au registre des coopératives."
       }
     },
     "pending": {
@@ -2975,7 +3394,9 @@
       "quotasTitle": "Vos quotas",
       "shortcuts": "Raccourcis",
       "stockImport": "Importer mon stock",
-      "sellerPayment": "Paiement chez le vendeur"
+      "fleet": "Planning de flotte",
+      "sellerPayment": "Paiement chez le vendeur",
+      "rentalAgency": "Mon agence de location"
     },
     "errors": {
       "pro_signup_closed": "Les demandes de compte Pro sont fermées pour le moment.",
@@ -2985,6 +3406,26 @@
       "phone_required": "Indiquez le numéro de mobile qu'un modérateur appellera.",
       "account_suspended": "Votre compte est suspendu : vous ne pouvez pas demander de compte Pro.",
       "email_not_verified": "Confirmez d'abord votre adresse e-mail."
+    },
+    "agency": {
+      "title": "Secteur d'activité",
+      "lead": "Une agence immobilière ou de location de voitures a une vitrine dédiée : ses biens par transaction, ou sa flotte filtrable par dates.",
+      "sectors": {
+        "general": "Commerce et services",
+        "real_estate": "Agence immobilière",
+        "car_rental": "Location de voitures"
+      },
+      "sectorHints": {
+        "general": "Vitrine de boutique classique.",
+        "real_estate": "Vitrine d'agence, mandat et honoraires sur vos annonces.",
+        "car_rental": "Vitrine de flotte par catégorie, disponibilités par dates."
+      },
+      "feeSchedule": "Barème des honoraires",
+      "feeScheduleHint": "Affiché sur votre vitrine, {max} caractères au plus. Pas de téléphone, d'e-mail ni de lien : les clients vous écrivent par la messagerie.",
+      "feeSchedulePlaceholder": "Exemple : vente 2,5 % du prix à la charge de l'acquéreur ; location un mois de loyer.",
+      "save": "Enregistrer",
+      "saved": "Secteur enregistré. Votre vitrine est mise à jour.",
+      "failed": "L'enregistrement a échoué."
     }
   },
   "Messaging": {
@@ -3058,6 +3499,13 @@
       "counterpartClosed": "{name} a fermé son compte : vous pouvez relire la conversation, mais plus y écrire.",
       "frozen": "Cette conversation est suspendue : vous pouvez la lire, mais plus y écrire.",
       "suspended": "Votre compte est suspendu : vous pouvez lire vos conversations, mais plus envoyer de message."
+    },
+    "review": {
+      "label": "Donner votre avis",
+      "title": "Comment s'est passé votre échange avec {name} ?",
+      "body": "Votre avis aide les autres acheteurs.",
+      "action": "Donner mon avis",
+      "later": "Plus tard"
     },
     "composer": {
       "label": "Votre message",
@@ -3223,20 +3671,23 @@
       "listing": "Signaler l'annonce",
       "user": "Signaler ce profil",
       "conversation": "Signaler {name}",
-      "message": "Signaler ce message"
+      "message": "Signaler ce message",
+      "review": "Signaler l'avis"
     },
     "hint": "Contenu illégal ou contraire à nos règles ? Un modérateur examinera votre signalement.",
     "title": {
       "listing": "Signaler cette annonce",
       "user": "Signaler ce profil",
       "conversation": "Signaler {name}",
-      "message": "Signaler ce message"
+      "message": "Signaler ce message",
+      "review": "Signaler cet avis"
     },
     "subject": {
       "listing": "Annonce « {title} »",
       "user": "Profil de {name}",
       "conversation": "Profil de {name}, à propos de cette conversation",
-      "message": "Message de {name}"
+      "message": "Message de {name}",
+      "review": "Avis de {name}"
     },
     "reasonLegend": "Pourquoi signalez-vous ce contenu ?",
     "group": {
@@ -3321,6 +3772,7 @@
     "mail": {
       "listing": "Signalement de l'annonce {id}",
       "user": "Signalement du profil {id}",
+      "review": "Signalement de l'avis {id}",
       "body": "Adresse de la page : {url}\n\nMotif du signalement :\n"
     }
   },
@@ -3434,6 +3886,84 @@
     "meta": {
       "title": "{name}, boutique à {city}",
       "description": "{name}, boutique vérifiée à {city} : {count, plural, one {# annonce en ligne} other {# annonces en ligne}} sur Joutiya."
+    },
+    "agency": {
+      "label": "Agence immobilière",
+      "verified": "Agence vérifiée",
+      "verifiedNote": "Les identifiants professionnels de cette agence (ICE, registre du commerce) ont été vérifiés. Les ventes et locations se concluent directement entre vous et l'agence : le site n'est partie à aucune transaction et ne perçoit ni honoraires, ni acompte, ni dépôt de garantie. Ne versez jamais d'argent avant d'avoir visité le bien.",
+      "transactionsTitle": "Les biens de l'agence",
+      "count": "{count, plural, one {# bien en ligne} other {# biens en ligne}}",
+      "see": "Voir les biens",
+      "feesTitle": "Barème des honoraires",
+      "feesNote": "Barème communiqué par l'agence, sous sa seule responsabilité. Les honoraires de chaque bien figurent aussi sur son annonce, à côté du prix."
+    },
+    "dealer": {
+      "title": "Stock de véhicules",
+      "count": "{count, plural, one {# véhicule en vente} other {# véhicules en vente}}",
+      "priceRange": "de {min} à {max}",
+      "seeAll": "Voir tout le stock",
+      "types": "Par type",
+      "brands": "Marques",
+      "otherBrands": "{count, plural, one {# autre marque} other {# autres marques}}",
+      "engine": "Motorisation",
+      "services": {
+        "tradeIn": "Reprise possible",
+        "financing": "Financement possible",
+        "warranty": "Garantie"
+      },
+      "onVehicles": "{count, plural, one {# véhicule} other {# véhicules}}",
+      "servicesNote": "Services déclarés par la boutique sur ses annonces : leurs conditions se voient avec elle. Une offre de crédit doit être écrite et indiquer le prêteur et le taux (TEG)."
+    },
+    "rental": {
+      "label": "Agence de location de voitures",
+      "verifiedNote": "Les identifiants professionnels de cette agence (ICE, registre du commerce) ont été vérifiés. La location se conclut directement entre vous et l'agence, par son contrat écrit : le site n'est partie à aucune location et ne perçoit ni acompte, ni caution. Ne versez rien avant d'avoir vu le véhicule et le contrat.",
+      "agencyTitle": "L'agence",
+      "agrement": "Agrément n°",
+      "agrementDeclared": "Numéro déclaré par l'agence, sous sa seule responsabilité.",
+      "hours": "Horaires",
+      "payments": "Paiement à l'agence",
+      "paymentOptions": {
+        "cash": "Espèces",
+        "card": "Carte bancaire",
+        "transfer": "Virement"
+      },
+      "airports": "Remise dans les aéroports",
+      "branchesTitle": "Les agences",
+      "branchesNote": "Adresses professionnelles déclarées par l'agence.",
+      "conditionsTitle": "Conditions de l'agence",
+      "conditionsNote": "Résumé des conditions déclarées sur ses annonces : chaque véhicule a les siennes sur son annonce, et le contrat de l'agence prévaut.",
+      "driver": "Conducteur",
+      "age": "dès {age} ans",
+      "licence": "permis depuis {count, plural, one {# an} other {# ans}}",
+      "deposit": "Caution de {amount}",
+      "depositRange": "Caution de {min} à {max}",
+      "depositHint": "Selon le véhicule. Versée à l'agence au départ, jamais sur le site.",
+      "insurance": "Assurance incluse",
+      "handover": "Remise du véhicule",
+      "oneWay": "retour dans une autre ville possible",
+      "otherListings": "{count, plural, one {# autre annonce} other {# autres annonces}}",
+      "agrementChecked": "Agrément contrôlé sur document le {date}",
+      "agrementCheckedNote": "Contrôle de cohérence du document fourni par l'agence (numéro, raison sociale, date). L'agence reste seule responsable de ses déclarations."
+    },
+    "fleet": {
+      "fleetTitle": "La flotte",
+      "fleetCount": "{count, plural, one {# véhicule en location} other {# véhicules en location}}",
+      "filterLead": "Vos dates de location : la flotte montre d'abord les véhicules libres sur toute la période.",
+      "city": "Agence",
+      "allCities": "Toutes les agences",
+      "reset": "Effacer",
+      "freeCount": "Libres à ces dates : {count, plural, one {# véhicule} other {# véhicules}}",
+      "noneFree": "Aucun véhicule libre à ces dates : essayez d'autres jours ou comparez avec les autres agences.",
+      "noMatch": "Aucun véhicule dans cette agence.",
+      "otherClass": "Autres véhicules",
+      "truncated": "Les {shown} véhicules les moins chers sont affichés : retrouvez toute la flotte dans la recherche.",
+      "seeInSearch": "Voir la flotte dans la recherche",
+      "compare": "Comparer avec les autres agences",
+      "fleetNote": "Disponibilités déclarées par l'agence, sans engagement : la réservation se confirme avec elle. Totaux estimés hors caution, tarif dégressif appliqué.",
+      "seats": "{count} places",
+      "free": "Libre à vos dates",
+      "blocked": "Indisponible à vos dates",
+      "minDays": "Location de {count, plural, one {# jour} other {# jours}} minimum"
     }
   },
   "Options": {
@@ -3852,15 +4382,21 @@
       "body": "Il s'ouvre dès que votre boutique est vérifiée et publie sous une offre Pro.",
       "link": "Voir mon espace Pro"
     },
+    "upgrade": {
+      "title": "L’import de stock est inclus dans les offres Business et Premium",
+      "body": "Avec votre offre actuelle, publiez vos véhicules un par un depuis « Déposer une annonce ».",
+      "link": "Voir les offres"
+    },
     "file": {
       "title": "Votre fichier",
       "lead": "CSV en UTF-8 ou exporté d'Excel (virgule, point-virgule ou tabulation), {rows} lignes au plus.",
       "template": "Télécharger le modèle",
+      "templateRental": "Modèle pour une flotte de location",
       "pick": "Choisir un fichier CSV",
       "hint": "Ou glissez-le ici. Rien n'est enregistré avant votre confirmation.",
       "chosen": "Fichier analysé : {name}. Choisissez-en un autre pour recommencer.",
       "columnsTitle": "Colonnes reconnues",
-      "columns": "reference (obligatoire, unique), categorie (Voitures par défaut, Utilitaires & camions, Motos & scooters), titre, description, prix, negociable, ville, quartier, etat, puis les critères par leur nom : marque, modele, annee, kilometrage, carburant, boite, puissance fiscale, origine, carrosserie, portes, couleur, premiere main, carnet, non accidente, papiers, garantie, duree garantie, reprise, financement, equipements. Les valeurs acceptent le libellé du site (« Diesel », « Caméra de recul ») ; plusieurs choix se séparent par « | ». Une cellule vide garde la valeur déjà sur le site.",
+      "columns": "reference (obligatoire, unique), categorie (Voitures par défaut, Utilitaires & camions, Motos & scooters), titre, description, prix, negociable, ville, quartier, etat, puis les critères par leur nom : marque, modele, annee, kilometrage, carburant, boite, puissance fiscale, origine, carrosserie, portes, couleur, premiere main, carnet, non accidente, papiers, garantie, duree garantie, reprise, financement, equipements. Les valeurs acceptent le libellé du site (« Diesel », « Caméra de recul ») ; plusieurs choix se séparent par « | ». Une cellule vide garde la valeur déjà sur le site. Location de voitures : categorie « Location de voitures », puis gamme, places, duree minimum, kilometrage (Illimité ou Limité), assurance, franchise, caution, age minimum, permis, remise, tarif semaine, tarif mois, unites, et indisponible pour les jours bloqués : « 2026-11-02/2026-11-05; 2026-12-24 » (« aucune » libère tous les jours).",
       "errors": {
         "too_large": "Ce fichier dépasse 1 Mo : découpez-le en plusieurs fichiers.",
         "not_csv": "Ce fichier n'est pas un CSV. Dans votre tableur, choisissez « Enregistrer sous », format CSV."
@@ -3905,13 +4441,14 @@
       "priceNegotiable": "prix négociable",
       "condition": "état",
       "attributes": "caractéristiques",
-      "location": "ville"
+      "location": "ville",
+      "unavailable": "jours bloqués"
     },
     "codes": {
       "ref_required": "référence manquante",
       "ref_invalid": "référence invalide (lettres, chiffres, - _ . /, 40 caractères au plus)",
       "ref_duplicate": "référence déjà présente plus haut dans le fichier",
-      "category_unknown": "catégorie non importable (voitures, utilitaires, motos)",
+      "category_unknown": "catégorie non importable (voitures, utilitaires, motos, location de voitures)",
       "value_unknown": "valeur non reconnue",
       "number_invalid": "nombre invalide ou hors limites",
       "required": "obligatoire",
@@ -3924,6 +4461,8 @@
       "description_short": "description courte : à compléter avant publication",
       "title_generated": "titre créé à partir de la marque, du modèle et de l'année",
       "column_ignored": "ignoré, la colonne dont il dépend ne l'ouvre pas",
+      "periods_invalid": "périodes illisibles : écrivez 2026-11-02/2026-11-05; 2026-12-24 (365 jours au plus, 40 périodes au plus)",
+      "periods_ignored": "ignoré : seules les locations de voitures ont des jours bloqués",
       "failed": "non enregistré, réessayez"
     },
     "photos": {
@@ -3950,7 +4489,9 @@
       "send": "Publier {count, plural, one {# brouillon} other {# brouillons}}",
       "progress": "Publication {done} sur {total}…",
       "outcome": "{published, plural, one {# annonce en ligne} other {# annonces en ligne}}, {pending_review, plural, one {# en vérification} other {# en vérification}}, {incomplete, plural, one {# incomplète} other {# incomplètes}}, {failed, plural, one {# échec} other {# échecs}}.",
-      "incomplete": "{count, plural, one {# brouillon à compléter} other {# brouillons à compléter}}"
+      "incomplete": "{count, plural, one {# brouillon à compléter} other {# brouillons à compléter}}",
+      "realEstate": "Pour les annonces immobilières : j'atteste que leurs informations (titre de propriété, mandat, honoraires, permis, autorisation d'hébergement) sont exactes et que j'ai le droit de proposer ces biens. J'en suis seul responsable : {brand} ne les vérifie pas.",
+      "rental": "Pour les locations de voitures : je déclare que mon agence détient l'agrément de location sans chauffeur et que ces véhicules sont immatriculés pour la location, dans la limite d'âge de la flotte et assurés. Leurs informations, disponibilités et conditions engagent ma seule responsabilité : {brand} ne les vérifie pas."
     },
     "absent": {
       "title": "Véhicules absents du fichier",
@@ -4043,6 +4584,238 @@
       "reauth": "Me reconnecter",
       "saved": "Vos réglages sont enregistrés.",
       "submit": "Enregistrer"
+    }
+  },
+  "Rental": {
+    "calendar": {
+      "previous": "Mois précédent",
+      "next": "Mois suivant",
+      "past": "hors calendrier",
+      "blocked": "indisponible",
+      "free": "disponible",
+      "legendFree": "Disponible",
+      "legendBlocked": "Indisponible"
+    },
+    "availability": {
+      "open": "Disponibilités",
+      "openOf": "Disponibilités de « {title} »",
+      "title": "Disponibilités de « {title} »",
+      "hint": "Touchez le premier puis le dernier jour d'une période pour la bloquer. Une période qui commence sur un jour bloqué le libère. Un jour bloqué veut dire qu'aucun véhicule de cette annonce n'est libre.",
+      "updatedOn": "Disponibilités à jour, confirmées le {date}",
+      "stale": "À confirmer : dernière mise à jour le {date}. Les locataires voient « disponibilité à confirmer ».",
+      "never": "Disponibilités jamais renseignées : les locataires voient « disponibilité à confirmer ».",
+      "anchor": "Touchez maintenant le dernier jour de la période.",
+      "summaryNone": "Aucune période bloquée.",
+      "summary": "{count, plural, one {# période bloquée.} other {# périodes bloquées.}}",
+      "tooMany": "Au plus {max} périodes : regroupez des jours proches.",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "confirm": "Tout est à jour",
+      "saved": "Disponibilités enregistrées.",
+      "confirmed": "Disponibilités confirmées.",
+      "conflict": "Le calendrier a changé entre-temps. Rouvrez-le pour voir la dernière version."
+    },
+    "listing": {
+      "title": "Disponibilités",
+      "updatedOn": "Déclarées par l'agence, mises à jour le {date}.",
+      "stale": "Disponibilité à confirmer avec l'agence (dernière mise à jour le {date}).",
+      "never": "Disponibilité à confirmer avec l'agence.",
+      "note": "Indication de l'agence, sans engagement : la réservation se confirme avec elle."
+    },
+    "search": {
+      "from": "Départ",
+      "to": "Retour",
+      "note": "Totaux estimés hors caution, tarif dégressif appliqué : le prix final est celui du contrat de l'agence.",
+      "barTitle": "Vos dates de location",
+      "submit": "Voir les véhicules libres"
+    },
+    "home": {
+      "title": "Louer une voiture",
+      "body": "Choisissez la ville et vos dates : les agences affichent les véhicules libres sur toute la période.",
+      "submit": "Trouver une voiture"
+    },
+    "airport": "{city} ({code})"
+  },
+  "Fleet": {
+    "title": "Planning de flotte",
+    "back": "Espace Pro",
+    "lead": "Vos voitures de location sur les 60 prochains jours. Touchez un jour pour le bloquer ou le libérer, ou glissez à la souris pour une période entière. Un jour bloqué veut dire qu'aucun véhicule de l'annonce n'est libre ce jour-là.",
+    "loading": "Chargement du planning",
+    "retry": "Réessayer",
+    "emptyTitle": "Aucune voiture de location en ligne",
+    "emptyBody": "Publiez vos véhicules dans « Location de voitures » : ils apparaîtront ici, prêts à être planifiés.",
+    "emptyAction": "Publier une voiture",
+    "city": "Ville de l'agence",
+    "allCities": "Toutes les villes",
+    "search": "Rechercher un véhicule",
+    "confirm": "Tout est à jour",
+    "vehicles": "{count, plural, one {# véhicule affiché,} other {# véhicules affichés,}}",
+    "stale": "{count, plural, one {# à confirmer.} other {# à confirmer.}}",
+    "allFresh": "disponibilités à jour.",
+    "legend": "Légende",
+    "truncated": "Votre flotte compte plus de 200 voitures : le planning montre les 200 premières par titre. Filtrez par ville ou utilisez « Mes annonces » pour les autres.",
+    "noMatch": "Aucun véhicule ne correspond à ce filtre.",
+    "gridLabel": "Disponibilités de la flotte, jour par jour",
+    "vehicle": "Véhicule",
+    "edited": "modifié",
+    "fresh": "à jour",
+    "toConfirm": "à confirmer",
+    "pending": "{count, plural, one {# véhicule modifié, pas encore enregistré.} other {# véhicules modifiés, pas encore enregistrés.}}",
+    "tooMany": "Au plus {max} périodes par véhicule : regroupez des jours proches.",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "saved": "Planning enregistré pour {count, plural, one {# véhicule} other {# véhicules}}.",
+    "confirmed": "Disponibilités confirmées pour {count, plural, one {# véhicule} other {# véhicules}}.",
+    "partial": "{count, plural, one {# véhicule n'a pas été enregistré : le planning est rechargé, refaites sa modification.} other {# véhicules n'ont pas été enregistrés : le planning est rechargé, refaites leurs modifications.}}"
+  },
+  "RentalAgency": {
+    "title": "Mon agence de location",
+    "back": "Retour à l'espace Pro",
+    "lead": "Ces informations s'affichent sur votre vitrine. Le numéro d'agrément est obligatoire pour publier une location.",
+    "loading": "Chargement des réglages",
+    "loadFailed": "Les réglages n'ont pas pu être chargés.",
+    "retry": "Réessayer",
+    "notVerified": "Ces réglages sont réservés aux boutiques Pro vérifiées.",
+    "sectorTitle": "Votre secteur n'est pas « Location de voitures »",
+    "sectorBody": "Vous pouvez enregistrer ces réglages, mais votre vitrine ne montrera votre flotte qu'une fois ce secteur choisi.",
+    "sectorAction": "Changer de secteur",
+    "agrementTitle": "Agrément",
+    "agrementLead": "Le numéro de la décision d'agrément délivrée par le ministère du Transport. Il s'affiche sur votre vitrine comme « déclaré par l'agence » : vous en restez seul responsable.",
+    "agrement": "Numéro d'agrément",
+    "agrementHint": "Tel qu'il figure sur votre décision d'agrément.",
+    "agrementPlaceholder": "Exemple : 123/2025",
+    "agrementRequired": "Renseignez votre numéro d'agrément.",
+    "agrementInvalid": "De 3 à 40 caractères : lettres latines, chiffres, espaces et . / - _, avec au moins un chiffre.",
+    "branchesTitle": "Vos agences",
+    "branchesLead": "{max} au plus, chacune avec son adresse professionnelle (jamais une adresse personnelle). Elles s'affichent sur votre vitrine.",
+    "branch": "Agence {index}",
+    "removeBranch": "Retirer l'agence {index}",
+    "remove": "Retirer",
+    "address": "Adresse de l'agence",
+    "addressHint": "Rue, quartier ou zone : pas de téléphone ni d'e-mail.",
+    "addressPlaceholder": "Exemple : 12 avenue Mohammed V, Guéliz",
+    "addressShort": "L'adresse compte au moins 5 caractères.",
+    "addressRequired": "Renseignez l'adresse ou retirez cette agence.",
+    "cityRequired": "Choisissez la ville de l'agence.",
+    "addBranch": "Ajouter une agence",
+    "serviceTitle": "Accueil des clients",
+    "hours": "Horaires d'ouverture",
+    "hoursHint": "{max} caractères au plus. Pas de téléphone, d'e-mail ni de lien : les clients vous écrivent par la messagerie.",
+    "hoursPlaceholder": "Exemple : tous les jours de 8 h à 21 h, remise à l'aéroport 24 h/24 sur rendez-vous",
+    "payments": "Paiements acceptés à l'agence",
+    "paymentOptions": {
+      "cash": "Espèces",
+      "card": "Carte bancaire",
+      "transfer": "Virement"
+    },
+    "airports": "Aéroports desservis",
+    "airportsHint": "Ceux où vous remettez et reprenez les véhicules.",
+    "failed": "L'enregistrement a échoué.",
+    "save": "Enregistrer",
+    "saved": "Réglages enregistrés. Votre vitrine est mise à jour.",
+    "upToDate": "Réglages à jour.",
+    "setup": {
+      "title": "Mettre votre agence en ligne",
+      "lead": "Trois étapes pour une vitrine de location prête à recevoir des demandes.",
+      "readyTitle": "Votre agence est en ligne",
+      "ready": "Les locataires voient vos véhicules libres à leurs dates. Confirmez votre planning au moins tous les 14 jours.",
+      "progress": "{done} sur {total}",
+      "step1": "Agrément et agences",
+      "step1Hint": "Le numéro d'agrément, obligatoire pour publier, vos adresses et vos horaires.",
+      "step1Action": "Mes réglages",
+      "step2": "Vos véhicules",
+      "step2Hint": "Une annonce par modèle, ou toute la flotte d'un coup par import CSV.",
+      "step2Action": "Déposer un véhicule",
+      "step2Import": "Importer ma flotte",
+      "step3": "Votre planning",
+      "step3Hint": "Bloquez les jours loués et confirmez vos disponibilités au moins tous les 14 jours.",
+      "step3Action": "Mon planning",
+      "doneLabel": "Étape {index} faite :",
+      "todoLabel": "Étape {index} à faire :"
+    },
+    "check": {
+      "title": "Contrôle de l'agrément sur document",
+      "saveFirst": "Enregistrez d'abord votre numéro d'agrément : vous pourrez ensuite envoyer votre décision d'agrément pour obtenir la mention « agrément contrôlé sur document » sur votre vitrine.",
+      "none": "Envoyez votre décision d'agrément (PDF ou photo nette). Si son numéro, la raison sociale ou l'ICE et sa date concordent avec votre compte Pro, votre vitrine affiche « agrément contrôlé sur document ».",
+      "pending": "Document reçu : contrôle en cours. Le résultat s'affiche ici en quelques minutes.",
+      "review": "Notre équipe vérifie votre document : le résultat s'affichera ici.",
+      "verified": "Agrément contrôlé sur document le {date}.",
+      "verifiedNote": "La mention s'affiche sur votre vitrine. Elle disparaît si vous changez de numéro d'agrément.",
+      "rejected": "Document refusé. Envoyez une décision d'agrément lisible, à jour et au nom de votre société.",
+      "notice": "Le document est lu par un outil d'intelligence artificielle (Claude, d'Anthropic), qui en relève le numéro, la raison sociale, l'ICE et la date, puis, en cas de doute, par notre équipe de modération. Il est conservé dans un espace privé tant que votre compte Pro est actif, puis 6 mois. Masquez tout numéro de CNIE avant l'envoi. <link>En savoir plus</link>",
+      "send": "Envoyer ma décision d'agrément",
+      "sendAnother": "Envoyer un autre document",
+      "refresh": "Actualiser",
+      "uploading": "Envoi : {percent} %",
+      "sending": "Contrôle du document…",
+      "pieceRejected": {
+        "too_large": "Ce fichier dépasse 10 Mo.",
+        "bad_type": "Seuls les fichiers PDF, JPEG et PNG sont acceptés.",
+        "active_content": "Ce PDF contient du contenu actif (script, formulaire) : exportez-le à nouveau en PDF simple.",
+        "expired": "L'envoi n'a pas abouti à temps. Réessayez."
+      }
+    }
+  },
+  "RentalRequest": {
+    "card": {
+      "title": "Demande de location",
+      "period": "Du {from} au {to} · {days, plural, one {# jour} other {# jours}}",
+      "pickup": "Remise : {place}",
+      "maskedLink": "[lien masqué]",
+      "requestedMine": "Demande envoyée à {name}",
+      "waiting": "En attente de la réponse de l'agence.",
+      "withdraw": "Retirer ma demande",
+      "withdrawnToast": "Demande retirée",
+      "requestedTheirs": "{name} demande ce véhicule",
+      "block": "Bloquer ces dates sur l'annonce",
+      "blockHint": "Cochez si plus aucun véhicule de ce modèle n'est libre sur la période : l'annonce sortira des recherches à ces dates.",
+      "accept": "Disponible",
+      "acceptedToast": "Disponibilité confirmée",
+      "blockFailed": "La disponibilité est confirmée, mais les dates n'ont pas pu être bloquées. Mettez votre planning à jour.",
+      "planning": "Ouvrir mon planning",
+      "decline": "Pas disponible",
+      "declinedToast": "Réponse envoyée : pas disponible",
+      "acceptedMine": "Vous avez confirmé la disponibilité",
+      "acceptedTheirs": "{name} confirme la disponibilité",
+      "blockedNote": "Dates bloquées sur l'annonce.",
+      "pickupAppointment": "Proposer la remise du véhicule",
+      "safety": "La location se conclut par le contrat écrit de l'agence. {site} ne prend ni acompte ni caution : ne versez rien avant d'avoir vu le véhicule et signé le contrat."
+    },
+    "event": {
+      "period": "du {from} au {to}",
+      "requested": {
+        "mine": "Vous avez demandé ce véhicule {period}",
+        "theirs": "{name} demande ce véhicule {period}"
+      },
+      "changed": {
+        "mine": "Vous avez modifié votre demande : {period}",
+        "theirs": "{name} a modifié sa demande : {period}"
+      },
+      "accepted": {
+        "mine": "Vous avez confirmé la disponibilité {period}",
+        "theirs": "{name} confirme la disponibilité {period}"
+      },
+      "declined": {
+        "mine": "Vous avez répondu « pas disponible » {period}",
+        "theirs": "{name} n'a pas de véhicule disponible {period}"
+      },
+      "withdrawn": {
+        "mine": "Vous avez retiré votre demande",
+        "theirs": "{name} a retiré sa demande"
+      },
+      "pickup": "remise : {place}"
+    },
+    "preview": {
+      "requested": "Demande de location",
+      "changed": "Demande de location modifiée",
+      "accepted": "Disponibilité confirmée",
+      "declined": "Pas de véhicule disponible",
+      "withdrawn": "Demande de location retirée"
+    },
+    "errors": {
+      "rental_request_changed": "Cette demande a changé entre-temps : voici sa dernière version.",
+      "rental_request_past": "Le jour de prise en charge est passé : le locataire doit demander d'autres dates.",
+      "rental_request_unavailable": "Cette annonce ne prend plus de demande de location."
     }
   }
 }

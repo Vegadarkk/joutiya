@@ -1,4 +1,5 @@
 import type { Condition } from "@/config/categories";
+import type { CardFacts } from "@/lib/listings/card-facts";
 import type { SearchParams, SearchSort } from "./params";
 
 // Search contracts (phase 4, design §3). Client-safe types: the engine adapters
@@ -59,6 +60,14 @@ export interface SearchDocument {
   featuredUntil?: number;
   /** Example listing (src/lib/demo): labelled card, no contact; out of the sitemap (`sitemapShard` out of range). */
   isExample?: true;
+  /** Car rental: blocked day numbers (days since 1970-01-01, Morocco) from the indexing day on (rental pack §4). */
+  rentUnavailableDays?: number[];
+  /** Car rental: epoch ms until which the availability counts as up to date (last save + 14 days). */
+  rentFreshUntil?: number;
+  /** Pro catalogue: declared stock 0 everywhere (decision 1: online, out of the default results). */
+  soldOut?: true;
+  /** Combinations at different prices: `price` is the lowest (« à partir de »). */
+  priceFrom?: true;
   /** Rounded city (later district) centroid. */
   _geo: { lat: number; lng: number };
   version: number;
@@ -102,9 +111,20 @@ export const CARD_FIELDS = [
   "sortAt",
   "isBumped",
   "featuredUntil",
+  // Card facts (src/lib/listings/card-facts.ts): every category's `cardFacts`, plus the mandate.
+  "a_surface",
+  "a_rooms",
+  "a_bedrooms",
+  "a_mandate",
   "isExample",
+  // Car rentals searched by dates: long-term rates (estimated total) and freshness.
+  "a_rate_7_days",
+  "a_rate_30_days",
+  "rentFreshUntil",
 ] as const satisfies readonly (keyof SearchDocument)[];
-export type CardDocument = Pick<SearchDocument, (typeof CARD_FIELDS)[number]>;
+type CardField = (typeof CARD_FIELDS)[number];
+/** The `a_*` card fields stay optional, as in the index (a listing without the criterion). */
+export type CardDocument = Pick<SearchDocument, Exclude<CardField, `a_${string}`>> & Partial<Pick<SearchDocument, Extract<CardField, `a_${string}`>>>;
 
 // ---- Engine query model (adapters translate it; never built from raw user strings).
 
@@ -196,8 +216,16 @@ export interface SearchCard {
   bumped: boolean;
   /** Served in an À la Une slot: "À la Une · Sponsorisé" mention (§8). */
   featured: boolean;
+  /** Key numbers under the title and the exclusive mandate (card-facts.ts); absent = none. */
+  facts?: CardFacts;
   /** Example listing: "Exemple" label, no favorite action. */
   example?: true;
+  /**
+   * Car rental in a search by dates (rental pack §4): rental days, estimated total in MAD (long-term
+   * rate applied, deposit excluded; null without a price) and whether the availability is up to date.
+   */
+  /** `from`/`to`: the searched days ("YYYY-MM-DD"), carried to the listing page (booking request). */
+  rental?: { days: number; total: number | null; fresh: boolean; from: string; to: string };
 }
 
 export interface SearchFacets {

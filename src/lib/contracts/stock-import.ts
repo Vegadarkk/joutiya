@@ -1,3 +1,4 @@
+import type { ProPlan } from "@/config/pricing";
 import { z } from "@/lib/zod";
 import type { ListingStatus } from "@/lib/contracts/listings";
 
@@ -53,11 +54,13 @@ export const STOCK_ROW_CODES = [
   "description_short",
   "title_generated",
   "column_ignored",
+  "periods_invalid",
+  "periods_ignored",
   "failed",
 ] as const;
 export type StockRowCode = (typeof STOCK_ROW_CODES)[number];
 
-export const STOCK_WARNING_CODES: readonly StockRowCode[] = ["description_short", "title_generated", "column_ignored"];
+export const STOCK_WARNING_CODES: readonly StockRowCode[] = ["description_short", "title_generated", "column_ignored", "periods_ignored"];
 
 export interface StockRowIssue {
   /** Header as written in the file (or the field when no column applies). */
@@ -88,6 +91,8 @@ export interface StockListing {
   status: ListingStatus;
   photoCount: number;
   slugId: string | null;
+  /** Its subcategory: real estate needs the advertiser's attestation at publication. */
+  subcategoryId: string | null;
 }
 
 export interface StockImportResponse {
@@ -104,6 +109,11 @@ export interface StockImportResponse {
 export interface StockListResponse {
   listings: StockListing[];
 }
+
+/** Pro plans with the stock import (owner's choice, 28 Oct 2026: the upper plans only). */
+export const STOCK_IMPORT_PLANS: readonly ProPlan[] = ["business", "premium"];
+
+export const importsStock = (plan: ProPlan): boolean => STOCK_IMPORT_PLANS.includes(plan);
 
 export const STOCK_API = {
   list: "/api/pro/stock",

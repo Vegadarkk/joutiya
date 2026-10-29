@@ -2,7 +2,7 @@ import { REPORT_TARGET_TYPES, type ReportTargetType } from "@/config/report-reas
 
 // Target keys (design D10, D24): `{type}:{id}` names one reported thing across reports, decisions,
 // the back-office queue groups and the AI proposals. Stored ids: listing id, account uid (a user
-// target), `{cid}/{mid}` (a message), proId (phase 7). Client-safe: the back office builds links.
+// target), `{cid}/{mid}` (a message), proId (phase 7), review id. Client-safe: the back office builds links.
 
 export interface TargetRef {
   type: ReportTargetType;
@@ -15,6 +15,7 @@ const ID_PATTERNS: Record<ReportTargetType, RegExp> = {
   user: /^[A-Za-z0-9_-]{1,128}$/,
   message: /^[A-Za-z0-9_-]{22}\/[A-Za-z0-9]{20}$/,
   pro: /^[a-z0-9-]{3,64}$/,
+  review: /^[A-Za-z0-9_-]{22}$/,
 };
 
 export function targetKey(target: TargetRef): string {

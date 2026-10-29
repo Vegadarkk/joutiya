@@ -7,7 +7,8 @@ import type { ProProfileDoc } from "./profile-schema";
 // end is the earliest of: the rejection (the profile's last change), the downgrade without a
 // subscription (`downgradedAt`), the owner's account closure or ban (`closedAt`, else the account's
 // last change). A suspended Pro keeps its pieces while the sanction can be lifted. A piece no
-// application lists (never sent, or replaced by a resubmission) goes at its purgeAt. Pure:
+// application lists (never sent, or replaced by a resubmission) goes at its purgeAt. A car rental
+// agency's licence document (decision 5) counts as listed while its check refers to it. Pure:
 // purge-quarantine applies it, retention-purge gives rejected profiles the same end, the unit tests
 // cover it.
 
@@ -18,7 +19,7 @@ export const KYBC_END_RETENTION_MS = 183 * DAY_MS;
 
 export type KybcRetention = { keep: true; until: Date } | { keep: false };
 
-export type KybcProfileView = Pick<ProProfileDoc, "kybc" | "lifecycle" | "updatedAt" | "downgradedAt">;
+export type KybcProfileView = Pick<ProProfileDoc, "kybc" | "lifecycle" | "updatedAt" | "downgradedAt" | "rentalCheck">;
 export type KybcOwnerView = Pick<UserDoc, "status" | "updatedAt"> & { closedAt?: Date };
 
 /** When the relationship with `profile`'s owner ended, or null while it lasts. */
@@ -31,7 +32,7 @@ export function relationshipEndedAt(profile: Pick<ProProfileDoc, "lifecycle" | "
 }
 
 export function kybcRetention(uploadId: string, profile: KybcProfileView | null, owner: KybcOwnerView | null, now: Date): KybcRetention {
-  if (!profile || !owner || !profile.kybc.uploadIds.includes(uploadId)) return { keep: false };
+  if (!profile || !owner || !(profile.kybc.uploadIds.includes(uploadId) || profile.rentalCheck?.uploadId === uploadId)) return { keep: false };
   const recheck = now.getTime() + KYBC_RECHECK_MS;
   const ended = relationshipEndedAt(profile, owner);
   if (!ended) return { keep: true, until: new Date(recheck) };

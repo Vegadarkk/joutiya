@@ -7,16 +7,20 @@ import { cityBySlug, cityName } from "@/config/regions";
 import { requirePageStaff } from "@/lib/auth/current-user";
 import { displayPhone } from "@/lib/phone/normalize";
 import { proIdSchema } from "@/lib/pro/profile-schema";
+import type { ProReview as ProReviewView } from "@/lib/contracts/pro";
 import { proReview } from "@/lib/pro/review";
 import { shopPaymentAdmin } from "@/lib/pro/seller-payment";
 import { ProDecisionForm, ProEffectsRerun } from "../../../_components/pro-decision-form";
-import { IDENTIFIER_LABEL, LEGAL_FORM_LABEL, LIFECYCLE_LABEL, PHONE_OUTCOME_LABEL, formatIce } from "../../../_components/pro-labels";
+import { IDENTIFIER_LABEL, LEGAL_FORM_LABEL, LIFECYCLE_LABEL, PHONE_OUTCOME_LABEL, RENTAL_CHECK_ISSUE_LABEL, RENTAL_CHECK_STATUS_LABEL, formatIce } from "../../../_components/pro-labels";
 import { ProPhoneCheckForm } from "../../../_components/pro-phone-check-form";
+import { RentalCheckDecisionForm } from "../../../_components/rental-check-decision-form";
 import { ShopPaymentPanel } from "../../../_components/shop-payment-panel";
 
 // Review of one Pro application (phase 7 design §4): the shop, the legal identifiers to check
 // against the registry, the KYBC pieces (each opening is journaled), the applicant's account, the
-// phone call while WhatsApp is unavailable, and the decision while the application is pending.
+// phone call while WhatsApp is unavailable, and the decision while the application is pending. For
+// a car rental agency, its licence document and what the AI check read on it (decision 5), with
+// the moderator's decision when the check left it in doubt.
 
 export const metadata: Metadata = { title: "Vérifier une demande Pro" };
 
@@ -24,11 +28,11 @@ const dateTime = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeSty
 const date = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeZone: "Africa/Casablanca" });
 
 const PIECE_TYPE: Record<string, string> = { "application/pdf": "PDF", "image/jpeg": "Image JPEG", "image/png": "Image PNG" };
-const REGISTRY_LABEL: Record<string, string> = { ompic: "OMPIC", directinfo: "DirectInfo" };
+const REGISTRY_LABEL: Record<string, string> = { ompic: "OMPIC", directinfo: "DirectInfo", odco: "ODCo" };
 
 /** Points the moderator checks before validating (design §4); the CNIE line follows audit C2-03. */
 const CHECKLIST = [
-  "Le nom, l'ICE et le RC (ou le n° d'auto-entrepreneur, la TP) correspondent au registre consulté.",
+  "Le nom, l'ICE et le RC (ou le n° d'auto-entrepreneur, la TP, le n° de coopérative) correspondent au registre consulté.",
   "Le justificatif est lisible, récent et au nom de la boutique ou du demandeur.",
   "L'activité déclarée est cohérente avec les annonces du compte.",
   "Un justificatif laisse voir un numéro de CNIE : refusez avec le motif « envoyez une copie où le numéro de CNIE est masqué ».",
@@ -148,6 +152,8 @@ export default async function ProReviewPage({ params }: { params: Promise<{ proI
             </ul>
           </Panel>
 
+          {review.rentalCheck ? <RentalCheckPanel proId={review.proId} check={review.rentalCheck} ice={review.legal["ice"] ?? ""} /> : null}
+
           <Panel title="Points à vérifier">
             <ul className="flex list-disc flex-col gap-1.5 ps-5 text-sm">
               {CHECKLIST.map((line) => (
@@ -214,5 +220,80 @@ export default async function ProReviewPage({ params }: { params: Promise<{ proI
         </aside>
       </div>
     </>
+  );
+}
+
+const CHECK_VARIANT: Record<string, "warning" | "danger" | "success"> = { pending: "warning", review: "warning", verified: "success", rejected: "danger" };
+
+function RentalCheckPanel({ proId, check, ice }: { proId: string; check: NonNullable<ProReviewView["rentalCheck"]>; ice: string }) {
+  const read = check.extracted;
+  const open = check.status === "review" || check.status === "pending";
+  return (
+    <section id="agrement" data-testid="rental-check-review" className="flex scroll-mt-6 flex-col gap-3 rounded-lg border border-border bg-surface p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">Agrément de location</h2>
+        <Badge variant={CHECK_VARIANT[check.status] ?? "warning"}>{RENTAL_CHECK_STATUS_LABEL[check.status] ?? check.status}</Badge>
+      </div>
+      <p className="text-sm text-foreground-muted">
+        Envoyé le {dateTime.format(new Date(check.submittedAt))}.
+        {check.checkedAt ? ` ${check.method === "ai" ? "Contrôlé par la lecture IA" : "Décidé par un modérateur"} le ${dateTime.format(new Date(check.checkedAt))}.` : ""}
+      </p>
+      <Facts
+        rows={[
+          ["Numéro déclaré", <span key="declared" className="font-mono tabular-nums" dir="ltr">{check.agrementRef}</span>],
+          ["ICE de la boutique", <span key="ice" className="font-mono tabular-nums" dir="ltr">{formatIce(ice)}</span>],
+          ...(read
+            ? ([
+                ["Numéro lu", read.reference ? <span key="reference" className="font-mono tabular-nums" dir="ltr">{read.reference}</span> : "Absent"],
+                ["Bénéficiaire lu", read.companyName ? <span key="company" dir="auto">{read.companyName}</span> : "Absent"],
+                ["ICE lu", read.ice ? <span key="read-ice" className="font-mono tabular-nums" dir="ltr">{formatIce(read.ice)}</span> : "Absent"],
+                ["Date lue", read.decisionDate || "Absente"],
+              ] as [string, ReactNode][])
+            : []),
+        ]}
+      />
+      {check.issues.length > 0 ? (
+        <ul className="flex flex-col gap-1 text-sm" data-testid="rental-check-issues">
+          {check.issues.map((issue) => (
+            <li key={issue} className="text-warning">
+              {RENTAL_CHECK_ISSUE_LABEL[issue] ?? issue}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {read && read.signs.length > 0 ? (
+        <div className="rounded-md bg-surface-muted p-3 text-sm">
+          <p className="font-medium">Signes relevés par la lecture IA</p>
+          <ul className="mt-1 flex list-disc flex-col gap-0.5 ps-5">
+            {read.signs.map((sign) => (
+              <li key={sign} dir="auto">
+                {sign}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {read?.note ? (
+        <p className="text-sm text-foreground-muted" dir="auto">
+          Note de la lecture IA : {read.note}
+        </p>
+      ) : null}
+      {check.piece?.status === "ready" ? (
+        <a href={`/kybc/${proId}/${check.piece.id}`} target="_blank" rel="noopener noreferrer" className="w-fit text-sm font-medium text-link underline underline-offset-2">
+          Ouvrir le document ({PIECE_TYPE[check.piece.declaredType] ?? check.piece.declaredType}, {formatSize(check.piece.size)})
+        </a>
+      ) : (
+        <Badge variant="warning">Fichier indisponible</Badge>
+      )}
+      <p className="text-xs text-foreground-muted">
+        Aucune vérification en ligne de l’authenticité n’existe : vérifiez la cohérence du numéro, du bénéficiaire (ICE ou raison sociale) et de la date, et l’absence de retouche.
+      </p>
+      {check.status === "rejected" && check.reason ? (
+        <p className="rounded-md bg-surface-muted p-3 text-sm whitespace-pre-line" dir="auto">
+          Motif du refus : {check.reason}
+        </p>
+      ) : null}
+      {open ? <RentalCheckDecisionForm proId={proId} submittedAt={check.submittedAt} /> : null}
+    </section>
   );
 }

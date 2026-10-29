@@ -12,6 +12,8 @@ import { formatMemberSince, SellerAvatar, SellerBadges } from "@/components/list
 import { ListingShelf, type ShelfItem } from "@/components/profile/listing-shelf";
 import { StorefrontBanner } from "@/components/profile/storefront-banner";
 import { ReportButton } from "@/components/report/report-button";
+import { RatingLink } from "@/components/reviews/rating-link";
+import { SellerReviews } from "@/components/reviews/seller-reviews";
 import { Button } from "@/components/ui/button";
 import { subcategoryById } from "@/config/categories";
 import { availablePromos } from "@/config/house-promos";
@@ -115,6 +117,7 @@ export default async function ProfilePage({ params }: { params: Params }) {
                   {cityName(city, locale)}
                 </span>
               ) : null}
+              <RatingLink rating={profile.rating} locale={locale} />
             </div>
             <SellerBadges badges={profile.badges} sellerType={profile.sellerType} className="mt-1" />
           </div>
@@ -171,6 +174,15 @@ export default async function ProfilePage({ params }: { params: Params }) {
           </div>
         ) : null}
       </section>
+
+      <SellerReviews
+        rating={profile.rating}
+        page={profile.reviews}
+        publicId={profile.publicId}
+        sellerName={profile.displayName}
+        locale={locale}
+        report={{ email: legal.dsaContactEmail, url: `${CANONICAL_ORIGIN}${profilePath(locale, profile.publicId)}#avis` }}
+      />
 
       {/* Profiles stay out of the ad inventory (AF §8 table): house promotion only. */}
       <AdSlot placement="profile-bottom" eligible={false} promos={availablePromos(flags)} seed={publicId} />

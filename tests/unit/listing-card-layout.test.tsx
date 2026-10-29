@@ -55,6 +55,21 @@ describe("ListingCard title", () => {
   });
 });
 
+describe("ListingCard facts", () => {
+  it("shows a property's key numbers under the title and the exclusive mandate on the photo", () => {
+    const facts = { facts: [{ id: "surface", value: 95 }, { id: "rooms", value: 5 }, { id: "bedrooms", value: 1 }], exclusive: true };
+    const fr = render(<ListingCard listing={card("abcd2345", { subcategoryId: "vente", sellerType: "pro", facts })} mediaBaseUrl={MEDIA} locale="fr" />);
+    expect(fr).toContain('data-testid="card-facts"');
+    expect(fr).toContain("95 m² · 5 pièces · 1 ch.");
+    expect(fr).toContain(">Exclusivité</span>");
+    expect(fr).toContain(">Pro</span>");
+    const ar = render(<ListingCard listing={card("abcd2345", { subcategoryId: "vente", facts: { facts: [{ id: "surface", value: 95 }], exclusive: false } })} mediaBaseUrl={MEDIA} locale="ar" />, "ar");
+    expect(ar).toContain("95 م²");
+    expect(ar).not.toContain("حصري");
+    expect(render(<ListingCard listing={card("abcd2345")} mediaBaseUrl={MEDIA} locale="fr" />)).not.toContain("card-facts");
+  });
+});
+
 describe("example listing", () => {
   it("carries the Exemple chip and no action", () => {
     const html = render(<ListingCard listing={card("abcd2345", { example: true })} mediaBaseUrl={MEDIA} locale="fr" action={<button type="button">Favori</button>} />);

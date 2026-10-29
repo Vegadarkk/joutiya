@@ -26,6 +26,7 @@ function listing(overrides: Partial<PublicListing> = {}): PublicListing {
     contact: { showPhone: true, whatsapp: true },
     seller: { publicId: "abcdefghjk", name: "Salma Testeuse", type: "individual" },
     example: false,
+    rental: null,
     publishedAt: "2026-10-12T10:00:00.000Z",
     sortAt: "2026-10-12T10:00:00.000Z",
     updatedAt: "2026-10-12T10:00:00.000Z",

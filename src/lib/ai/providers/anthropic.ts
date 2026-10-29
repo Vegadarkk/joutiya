@@ -17,7 +17,7 @@ import { ProviderError, RetryableAiError, type AiProvider, type AiTask, type AiT
 
 type Effort = "low" | "medium";
 
-export const TASK_SETTINGS: Record<AiTask, { model: keyof AiConfig["models"]; effort: Effort; maxTokens: number }> = {
+export const TASK_SETTINGS: Record<AiTask, { model: "screen" | "triage" | "appeal"; effort: Effort; maxTokens: number }> = {
   listing_screen: { model: "screen", effort: "low", maxTokens: 1024 },
   report_triage: { model: "triage", effort: "low", maxTokens: 1024 },
   appeal_review: { model: "appeal", effort: "medium", maxTokens: 8000 },

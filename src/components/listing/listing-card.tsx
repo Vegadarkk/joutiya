@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Camera, ImageOff } from "lucide-react";
+import { rentalFragment } from "@/components/rental/rental-day";
 import { BoostBadge } from "@/components/search/boost-badge";
 import type { CardBadge } from "@/components/search/filter-model";
 import { quietLinkClassName } from "@/components/ui/text-link";
@@ -8,8 +9,9 @@ import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
 import { useNumbersTranslations } from "@/i18n/numbers";
-import { intlLocale } from "@/lib/listings/client/format";
+import { formatPrice, intlLocale } from "@/lib/listings/client/format";
 import type { PublicListingCard } from "@/lib/listings/public";
+import type { SearchCard } from "@/lib/search/types";
 import { cn } from "@/lib/utils";
 import { PriceTag } from "./price-tag";
 import { blurhashPlaceholder, photoSources } from "./photo";
@@ -24,10 +26,13 @@ import { blurhashPlaceholder, photoSources } from "./photo";
 // (src/lib/demo) carries an "Exemple" chip and no action: it cannot be saved or contacted.
 
 /** Grid columns: 2 on phones, 3 from sm, 4 from lg (ListingGridSkeleton). */
+type FactKey = "surface" | "rooms" | "bedrooms";
+
 export const LISTING_CARD_SIZES = "(min-width: 1024px) 18rem, (min-width: 640px) 33vw, 50vw";
 
 export interface ListingCardProps {
-  listing: PublicListingCard;
+  /** `rental`: a car rental in a search by dates (estimated total, freshness). */
+  listing: PublicListingCard & Pick<SearchCard, "rental">;
   mediaBaseUrl: string | null;
   locale: Locale;
   /** Heading level of the title inside the surrounding page. */
@@ -54,12 +59,14 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
   const unit = listing.subcategoryId ? subcategoryById(listing.subcategoryId)?.priceUnit : undefined;
   const sources = listing.photo ? photoSources(mediaBaseUrl, listing.id, listing.photo, "s") : null;
   const placeholder = blurhashPlaceholder(listing.photo?.blurhash);
+  // Only the facts the messages can say (a category may add one before its wording lands).
+  const facts = (listing.facts?.facts ?? []).filter((fact) => t.has(`facts.${fact.id as FactKey}`));
   const details = (
     <>
       {/* Physical alignment on the heading: the dir="auto" title inherits the page side, not its own start. */}
       <Heading className="text-sm font-medium leading-snug ltr:text-left rtl:text-right">
         <Link
-          href={`/annonce/${listing.slugId}`}
+          href={listing.rental ? `/annonce/${listing.slugId}${rentalFragment(listing.rental)}` : `/annonce/${listing.slugId}`}
           prefetch={false}
           dir="auto"
           className={cn("line-clamp-2 break-words outline-none", quietLinkClassName, "group-hover:decoration-current after:absolute after:inset-0 after:rounded-lg")}
@@ -67,7 +74,18 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
           {listing.title}
         </Link>
       </Heading>
+      {facts.length > 0 ? (
+        <p data-testid="card-facts" className="truncate text-xs text-foreground-muted tabular-nums">
+          {facts.map((fact) => t(`facts.${fact.id as FactKey}`, { count: fact.value })).join(" · ")}
+        </p>
+      ) : null}
       <PriceTag price={listing.price} isDonation={listing.isDonation} negotiable={listing.priceNegotiable} unit={unit} locale={locale} />
+      {listing.rental ? (
+        <p data-testid="card-rental" className="flex flex-col text-xs tabular-nums">
+          {listing.rental.total !== null ? <span className="font-medium">{t("rentalTotal", { days: listing.rental.days, total: formatPrice(listing.rental.total, locale) })}</span> : null}
+          {listing.rental.fresh ? null : <span className="text-warning">{t("rentalToConfirm")}</span>}
+        </p>
+      ) : null}
       <p className="flex min-w-0 flex-wrap gap-x-2 text-xs text-foreground-muted">
         {city ? <span className="truncate">{cityName(city, locale)}</span> : null}
         <time dateTime={listing.sortAt}>{formatCardDate(listing.sortAt, locale)}</time>
@@ -123,7 +141,12 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
             {t("example")}
           </span>
         ) : null}
-        {listing.sellerType === "pro" ? <span className="absolute top-2 start-2 rounded-sm bg-structure px-2 py-0.5 text-xs font-medium text-structure-foreground">{t("pro")}</span> : null}
+        {listing.sellerType === "pro" || listing.facts?.exclusive ? (
+          <span className="absolute top-2 start-2 flex gap-1">
+            {listing.sellerType === "pro" ? <span className="rounded-sm bg-structure px-2 py-0.5 text-xs font-medium text-structure-foreground">{t("pro")}</span> : null}
+            {listing.facts?.exclusive ? <span className="rounded-sm bg-featured px-2 py-0.5 text-xs font-medium text-featured-foreground">{t("exclusive")}</span> : null}
+          </span>
+        ) : null}
         {action && !listing.example ? <div className="absolute top-1 end-1 z-10">{action}</div> : null}
       </div>
       {wide ? <div className="flex min-w-0 flex-1 flex-col gap-1.5 md:py-1">{details}</div> : details}

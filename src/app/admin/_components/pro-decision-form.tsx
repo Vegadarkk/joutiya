@@ -25,7 +25,7 @@ const MESSAGES: Record<string, string> = {
   rate_limited: "Trop de décisions en peu de temps. Réessayez dans quelques minutes.",
 };
 
-const REGISTRY_LABEL: Record<(typeof PRO_REGISTRY_SOURCES)[number], string> = { ompic: "OMPIC (registre du commerce)", directinfo: "DirectInfo" };
+const REGISTRY_LABEL: Record<(typeof PRO_REGISTRY_SOURCES)[number], string> = { ompic: "OMPIC (registre du commerce)", directinfo: "DirectInfo", odco: "ODCo (registre central des coopératives)" };
 
 type Choice = "verify" | "reject";
 

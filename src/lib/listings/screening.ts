@@ -1,6 +1,8 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { DEFAULT_AI, type AiConfig } from "@/config/ai";
+import { subcategoryById } from "@/config/categories";
+import { isVariantCriterion, withVariantAnswers } from "@/lib/contracts/catalog";
 import type { FieldIssue, ModerationFlag } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UploadRecord } from "@/lib/db/repositories/uploads";
@@ -19,6 +21,8 @@ export interface SellerFacts {
   listingsLast24h: number;
   phoneVerified: boolean;
   previousRejections: number;
+  /** ONSSA numbers a moderator already checked for the seller's shop. */
+  sanitaryNumbers?: readonly string[];
 }
 
 export interface ScreeningResult {
@@ -62,13 +66,14 @@ export function detectDuplicates(listing: Pick<ListingDoc, "title" | "descriptio
  * Seller facts from the account and its other listings (volume = the last 24 hours). `selfRejected`:
  * the screened listing itself was rejected by a moderator (reopened since), one more rejection.
  */
-export function sellerFacts(input: { accountCreatedAt: Date; phoneVerified: boolean; others: readonly Pick<ListingRecord, "createdAt" | "status">[]; selfRejected?: boolean; now: Date }): SellerFacts {
+export function sellerFacts(input: { accountCreatedAt: Date; phoneVerified: boolean; others: readonly Pick<ListingRecord, "createdAt" | "status">[]; selfRejected?: boolean; sanitaryNumbers?: readonly string[]; now: Date }): SellerFacts {
   const dayAgo = input.now.getTime() - 24 * 60 * 60 * 1000;
   return {
     accountAgeDays: Math.max(0, Math.floor((input.now.getTime() - input.accountCreatedAt.getTime()) / (24 * 60 * 60 * 1000))),
     listingsLast24h: input.others.filter((other) => other.createdAt.getTime() >= dayAgo).length,
     phoneVerified: input.phoneVerified,
     previousRejections: input.others.filter((other) => other.status === "rejected").length + (input.selfRejected ? 1 : 0),
+    sanitaryNumbers: input.sanitaryNumbers ?? [],
   };
 }
 
@@ -80,7 +85,8 @@ export async function screen(facts: ScreeningInput, selfId?: string): Promise<Sc
   const input: ScreenInput = {
     title: listing.title,
     description: listing.description,
-    attributes: listing.attributes,
+    // A criterion a variant axis takes over (the size of clothes) is answered by the axis.
+    attributes: withVariantAnswers(listing.attributes, listing.variants, subcategoryById(listing.subcategoryId ?? "")?.criteria.map((criterion) => criterion.id) ?? []),
     categoryId: listing.categoryId ?? "",
     subcategoryId: listing.subcategoryId ?? "",
     price: listing.price,
@@ -88,6 +94,7 @@ export async function screen(facts: ScreeningInput, selfId?: string): Promise<Sc
     contact: { showPhone: listing.contact.showPhone, whatsapp: listing.contact.whatsapp },
     sensitiveDeclaration: listing.moderation.sensitiveDeclaration ? { kind: listing.moderation.sensitiveDeclaration.kind } : null,
     ...(listing.location?.district ? { district: listing.location.district } : {}),
+    ...(listing.variants ? { variantAxes: listing.variants.axes.filter((axis) => !isVariantCriterion(axis.id)) } : {}),
     photos: listing.photos.map((photo) => ({ checks: checks.get(photo.id) })),
     seller: facts.seller,
     duplicates,

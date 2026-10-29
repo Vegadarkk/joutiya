@@ -1,8 +1,10 @@
 import { z } from "@/lib/zod";
 import { CONDITIONS, categoryById, subcategoryById } from "@/config/categories";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
+import { listingVariantsSchema, stockSchema, type ListingVariants } from "@/lib/contracts/catalog";
 import { MAX_PHOTOS_PRO, uploadIdSchema, type ListingPhoto, type UploadRejectReason, type UploadStatus } from "@/lib/contracts/media";
 import { LISTING_ID_PATTERN, SLUG_ID_MAX, SLUG_ID_PATTERN } from "@/lib/listings/ids";
+import { DAY_PATTERN, RENTAL_PERIODS_MAX, type RentalPeriod } from "@/lib/listings/rental-availability";
 
 // Shared client/server contracts of the listings API (phase 3, design §3). Imported by the wizard
 // (react-hook-form + zodResolver) and by the route handlers: one validation, same messages.
@@ -40,6 +42,8 @@ export const MODERATION_FLAGS = [
   "volume",
   "restricted_category",
   "credit_ad",
+  "sanitary_check",
+  "rental_review",
 ] as const;
 export type ModerationFlag = (typeof MODERATION_FLAGS)[number];
 
@@ -137,6 +141,10 @@ export const listingPatchSchema = z
     photos: z.array(uploadIdSchema).max(MAX_PHOTOS_PRO).optional(),
     contact: listingContactInputSchema.optional(),
     sensitiveDeclaration: z.object({ kind: z.enum(SENSITIVE_DECLARATION_KINDS) }).strict().nullable().optional(),
+    /** Pro listings only (catalogue §2); null removes them. With variants the stock is per combination. */
+    variants: listingVariantsSchema.nullable().optional(),
+    /** Declared stock of a Pro listing without variants; null: not tracked. */
+    stock: stockSchema.nullable().optional(),
   })
   .strict()
   .superRefine(checkTree);
@@ -149,11 +157,57 @@ export const publishListingSchema = z
     acceptRules: z.literal(true),
     /** Adults-only subcategory: the seller attests a decorative craft object sold to adults only. */
     adultsOnlyAttestation: z.literal(true).optional(),
+    /** Real estate: the advertiser attests its declared data and bears sole responsibility for them. */
+    realEstateAttestation: z.literal(true).optional(),
+    /** Car rental: the agency attests its licence, the vehicle's registration and insurance, and its declarations. */
+    rentalAttestation: z.literal(true).optional(),
   })
   .strict();
 export type PublishListingInput = z.infer<typeof publishListingSchema>;
 
+/** A blocked period of a car rental (rental pack §3): Morocco days, bounds included. */
+export const rentalPeriodSchema = z.object({ from: z.string().regex(DAY_PATTERN), to: z.string().regex(DAY_PATTERN) }).strict();
+
+/**
+ * PUT /api/listings/{id}/availability: every blocked period (replaces them), merged and trimmed
+ * server-side. `since` is the `updatedAt` the calendar was opened with (null: never set): another
+ * save meanwhile answers 409 `conflict`. Unchanged periods confirm the availability ("Tout est à jour").
+ */
+export const rentalAvailabilityInputSchema = z
+  .object({ unavailable: z.array(rentalPeriodSchema).max(RENTAL_PERIODS_MAX * 2), since: z.string().datetime().nullable() })
+  .strict();
+export type RentalAvailabilityInput = z.infer<typeof rentalAvailabilityInputSchema>;
+
+/** Vehicles of a fleet planning (rental pack §3) and the most one save may change. */
+export const FLEET_MAX = 200;
+
+/**
+ * PUT /api/pro/fleet: the fleet planning's changes, each like a calendar save (its own `since`
+ * lock). The vehicles left as they are sent unchanged confirm their availability ("Tout est à jour").
+ */
+export const fleetSaveSchema = z
+  .object({ changes: z.array(rentalAvailabilityInputSchema.extend({ id: listingIdSchema })).min(1).max(FLEET_MAX) })
+  .strict();
+export type FleetSaveInput = z.infer<typeof fleetSaveSchema>;
+
 /** Answers. Dates are ISO 8601 strings. */
+
+/** A car rental's declared availability; `updatedAt` null until the agency first saves it. */
+export interface RentalAvailability {
+  unavailable: RentalPeriod[];
+  updatedAt: string | null;
+}
+export type RentalAvailabilityResponse = { rental: RentalAvailability };
+/** GET /api/pro/fleet: the agency's car rentals on offer (published, paused, in review), by title. */
+export interface FleetResponse {
+  vehicles: OwnerListingSummary[];
+  /** More than FLEET_MAX rentals: the planning shows the first ones. */
+  truncated: boolean;
+}
+/** Each change's outcome, in the order sent: its new availability, or why it was not saved. */
+export interface FleetSaveResponse {
+  results: ({ id: string; rental: RentalAvailability } | { id: string; error: "conflict" | "not_found" | "invalid_body" | "failed" })[];
+}
 export interface FieldIssue {
   /** Dotted path in the listing ("title", "attributes.year", "photos"). */
   path: string;
@@ -192,6 +246,8 @@ export interface OwnerListingSummary {
   expiresAt: string | null;
   /** Expired before purge, or published with less than 7 days left (D16). */
   canRenew: boolean;
+  /** Car rentals only: the blocked periods the availability calendar edits. */
+  rental?: RentalAvailability;
 }
 
 export interface OwnerListing {
@@ -215,6 +271,9 @@ export interface OwnerListing {
   photos: OwnerPhoto[];
   contact: { showPhone: boolean; whatsapp: boolean };
   sensitiveDeclaration: { kind: SensitiveDeclarationKind; at: string } | null;
+  /** Pro catalogue (lot 4): variants, or the stock of a listing without them. */
+  variants: ListingVariants | null;
+  stock: number | null;
   moderation: { state: ModerationState; flags: ModerationFlag[] };
   version: number;
   createdAt: string;

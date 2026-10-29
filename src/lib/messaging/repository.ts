@@ -114,7 +114,7 @@ export async function getConversation(cid: string): Promise<ConversationRecord |
 }
 
 /** uid -> blocked uids, from userBlocks snapshots (missing document: nobody). */
-function blocksOf(snapshots: readonly DocumentSnapshot[]): Map<string, string[]> {
+export function blocksOf(snapshots: readonly DocumentSnapshot[]): Map<string, string[]> {
   const out = new Map<string, string[]>();
   for (const snapshot of snapshots) {
     const parsed = userBlocksSchema.safeParse(timestampsToDates(snapshot.data() ?? {}));
@@ -142,17 +142,20 @@ export interface NewMessageInput {
   original?: string;
   /** A system message about the conversation's appointment (src/lib/appointments). */
   appointment?: MessageDoc["appointment"];
+  /** A system message about the conversation's booking request (src/lib/rental-requests). */
+  rentalRequest?: MessageDoc["rentalRequest"];
   now: Date;
 }
 
 /**
- * Runs inside the append transaction on the conversation as read (src/lib/appointments): throws
- * to abort, else returns the conversation fields to set with the message (null deletes a field)
- * and, for a system message, its text and appointment step.
+ * Runs inside the append transaction on the conversation as read (src/lib/appointments,
+ * src/lib/rental-requests): throws to abort, else returns the conversation fields to set with the
+ * message (null deletes a field) and, for a system message, its text and appointment or booking
+ * request step.
  */
 export type ConversationExtension = (conversation: ConversationRecord) => {
-  fields: Partial<Record<"appointment" | "appointmentRemindAt", unknown>>;
-  message?: Required<Pick<NewMessageInput, "text" | "appointment">>;
+  fields: Partial<Record<"appointment" | "appointmentRemindAt" | "rentalRequest", unknown>>;
+  message?: Pick<NewMessageInput, "text"> & (Required<Pick<NewMessageInput, "appointment">> | Required<Pick<NewMessageInput, "rentalRequest">>);
 };
 
 function messageDoc(conversation: Pick<ConversationDoc, "participants" | "sellerProId">, input: NewMessageInput): MessageDoc {
@@ -160,8 +163,9 @@ function messageDoc(conversation: Pick<ConversationDoc, "participants" | "seller
     senderUid: input.senderUid,
     participants: conversation.participants,
     ...(conversation.sellerProId ? { sellerProId: conversation.sellerProId } : {}),
-    type: input.appointment ? "system" : "text",
+    type: input.appointment || input.rentalRequest ? "system" : "text",
     ...(input.appointment ? { appointment: input.appointment } : {}),
+    ...(input.rentalRequest ? { rentalRequest: input.rentalRequest } : {}),
     text: input.text,
     ...(input.flags.length > 0 ? { risk: { flags: input.flags, warned: true } } : {}),
     createdAt: input.now,
@@ -213,7 +217,7 @@ export interface AppendResult {
  * lists of both accounts, which decide, audit D1a-10), the conversation is not frozen ("frozen"),
  * no participant closed the account ("closed", L7).
  * The recipient's unread count + 1; archive and delete-for-me are lifted for both participants.
- * `extend` adds conversation fields to the same transaction (appointments), after these checks.
+ * `extend` adds conversation fields to the same transaction (appointments, booking requests), after these checks.
  */
 export async function appendMessage(cid: string, given: NewMessageInput, extend?: ConversationExtension): Promise<AppendResult> {
   const messageRef = messagesRef(cid).doc();
@@ -247,6 +251,8 @@ export async function appendMessage(cid: string, given: NewMessageInput, extend?
       purgeAt: conversationPurgeAt(input.now),
       ...Object.fromEntries(Object.entries(extra).filter(([, value]) => value !== null)),
     });
+    // The seller's first message makes the exchange reciprocal: it opens the buyer's review (vitrine-avis §2).
+    const sellerReplies = input.senderUid === conversation.sellerUid && !conversation.sellerRepliedAt;
     tx.set(messageRef, toFirestore(message));
     if (evidence) tx.set(evidenceRef(cid, messageRef.id), toFirestore(evidence));
     tx.update(
@@ -260,6 +266,7 @@ export async function appendMessage(cid: string, given: NewMessageInput, extend?
         updatedAt: next.updatedAt,
         purgeAt: next.purgeAt,
         ...Object.fromEntries(Object.keys(extra).map((key) => [key, cleared.includes(key) ? FieldValue.delete() : next[key as keyof typeof extra]])),
+        ...(sellerReplies ? { sellerRepliedAt: input.now } : {}),
       }),
     );
     return { conversation, recipientUid, writes: evidence ? 3 : 2 };

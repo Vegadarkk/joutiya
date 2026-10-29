@@ -16,6 +16,8 @@ export const USER_FIELDS = {
   description: "description",
   /** The reported private message (triage). */
   message: "message_signale",
+  /** The reported review (triage). */
+  review: "avis_signale",
   /** The reporter's explanation (triage). */
   reportExplanation: "explication_signalant",
   /** The appellant's text (appeal review). */

@@ -60,6 +60,12 @@ export type ErrorCode =
   | "reveal_not_allowed"
   /** Publish in an adults-only subcategory without the seller's attestation (422). */
   | "adults_only_attestation"
+  /** Publish a real-estate listing without the advertiser's attestation of its declared data (422). */
+  | "real_estate_attestation"
+  /** Publish a car rental without the agency's attestation (422). */
+  | "rental_attestation"
+  /** Publish a car rental before the agency's settings hold its licence reference (422, rental pack decision 3). */
+  | "rental_agrement_missing"
   // Search and discovery (phase 4). Messages: Listing.errors.<code>.
   /** Search engine missing or unreachable (503). */
   | "search_unavailable"
@@ -110,6 +116,8 @@ export type ErrorCode =
   | "payment_unavailable"
   /** The shop's KYBC is not verified, or the shop is suspended (409). */
   | "pro_not_verified"
+  /** The shop's plan does not include this feature (the stock import: Business and up) (403). */
+  | "plan_upgrade_required"
   /** No Stripe customer yet: nothing to manage before a first plan (409). */
   | "no_billing_customer"
   /** A webhook whose signature does not match (400, Stripe's expected answer). */
@@ -131,6 +139,12 @@ export type ErrorCode =
   | "appointment_changed"
   /** The chosen slot has started or passed (409). */
   | "appointment_slot_past"
+  /** The booking request changed since the caller saw it (answered, withdrawn, replaced; 409). */
+  | "rental_request_changed"
+  /** The requested pick-up day has passed: the agency can no longer accept (409). */
+  | "rental_request_past"
+  /** A booking request about a listing that is no published car rental (409). */
+  | "rental_request_unavailable"
   /** Reporter abusive (art. 23) or target not reportable by this account (403). */
   | "report_not_allowed"
   /** The reported target does not exist or is not visible to the reporter (404 semantics, 422). */
@@ -160,6 +174,8 @@ export type ErrorCode =
   | "unavailable"
   /** 422: a short free text (storefront bio, review) refused by the text screen; details: { field, issue }. */
   | "invalid_text"
+  /** 409: the conversation's review window is not open (details: { state, opensAt? }), or already used. */
+  | "review_unavailable"
   | "internal";
 
 export class HttpError extends Error {

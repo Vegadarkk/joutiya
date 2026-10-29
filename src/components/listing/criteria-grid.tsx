@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 
 export interface CriteriaGridProps {
   subcategoryId: string;
+  /** Fields shown elsewhere on the page (the property terms under the price). */
+  exclude?: readonly string[];
   attributes: ListingAttributes;
   condition: Condition | null;
   className?: string;
@@ -33,7 +35,7 @@ function formatNumber(value: number, criterion: Pick<Criterion, "unit">): string
   return value < 0 ? `-${digits}` : digits;
 }
 
-export function useCriteriaRows({ subcategoryId, attributes, condition, group }: Omit<CriteriaGridProps, "className">): CriterionRow[] {
+export function useCriteriaRows({ subcategoryId, attributes, condition, group, exclude = [] }: Omit<CriteriaGridProps, "className">): CriterionRow[] {
   const t = useTranslations("Criteria");
   const page = useTranslations("ListingPage.criteria");
   type Key = Parameters<typeof t.has>[0];
@@ -44,7 +46,7 @@ export function useCriteriaRows({ subcategoryId, attributes, condition, group }:
   const subcategory = subcategoryById(subcategoryId);
   if (condition && subcategory?.condition && !group) rows.push({ id: "condition", label: label("condition"), value: option("condition", condition) });
   for (const field of subcategory?.criteria ?? []) {
-    if (field.group !== group) continue;
+    if (field.group !== group || exclude.includes(field.id)) continue;
     const value = attributes[field.id];
     if (value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) continue;
     const def = criterionById(field.id) ?? field;

@@ -58,6 +58,13 @@ describe("screenListing: hard blockers", () => {
     ]);
   });
 
+  it("screens the free axes of a Pro listing's variants like the other texts", () => {
+    const axes = (label: string, value: string) => [{ label, values: ["500 g", value] }];
+    expect(codes(cleanListing({ variantAxes: axes("Contenance", "1 kg") }))).toEqual([]);
+    expect(codes(cleanListing({ variantAxes: axes("Contenance", "0612345678") }))).toEqual(["variants.axes.0.values.1:phone_in_text"]);
+    expect(codes(cleanListing({ variantAxes: axes("www.vends-ici.ma", "1 kg") }))).toEqual(["variants.axes.0.label:url_in_text"]);
+  });
+
   it("screens the free-text district like the other texts (it is shown on the public page)", () => {
     expect(codes(cleanListing({ district: "Maarif, appelez 0612345678" }))).toEqual(["location.district:phone_in_text"]);
     expect(codes(cleanListing({ district: "Maarif www.vends-ici.ma" }))).toEqual(["location.district:url_in_text"]);
@@ -208,5 +215,34 @@ describe("screenListing: soft flags and state", () => {
     expect(hard.blockers).toEqual([{ path: "description", code: "prohibited" }]);
     const soft = screenListing(cleanListing({ description: "سيارة في حالة جيدة، كانت لوالدي المريض بالسكري، الثمن قابل للنقاش." }), ctx);
     expect(soft).toMatchObject({ blockers: [], flags: ["sensitive_text"], state: "needs_review" });
+  });
+});
+
+describe("screenListing: food with an ONSSA number", () => {
+  const honey = (sanitaryNumbers?: readonly string[], number = "M.07.113.20") =>
+    cleanListing({
+      title: "Miel de thym 500 g",
+      description: "Miel de thym récolté cet été, pot en verre de 500 g, non chauffé.",
+      attributes: { "onssa-number": number, "honey-type": "thym" },
+      categoryId: "terroir",
+      subcategoryId: "miel",
+      price: 220,
+      seller: { accountAgeDays: 30, listingsLast24h: 0, phoneVerified: true, previousRejections: 0, ...(sanitaryNumbers ? { sanitaryNumbers } : {}) },
+    });
+
+  it("sends a number new for the shop to a moderator, without risk points", () => {
+    expect(screenListing(honey(), ctx)).toMatchObject({ state: "needs_review", flags: ["sanitary_check"], score: 0, blockers: [], evidence: ["ONSSA number M.07.113.20 not yet checked for this shop"] });
+    expect(screenListing(honey(["HFO.24.07.15"]), ctx).flags).toEqual(["sanitary_check"]);
+  });
+
+  it("lets a number a moderator already checked through", () => {
+    expect(screenListing(honey(["HFO.24.07.15", "M.07.113.20"]), ctx)).toMatchObject({ state: "auto_ok", flags: [], blockers: [] });
+  });
+
+  it("leaves a malformed number to the criteria check, and other subcategories alone", () => {
+    const malformed = screenListing(honey(undefined, "M07113"), ctx);
+    expect(malformed.blockers).toEqual([{ path: "attributes.onssa-number", code: "invalid" }]);
+    expect(malformed.flags).not.toContain("sanitary_check");
+    expect(screenListing(cleanListing(), ctx).flags).not.toContain("sanitary_check");
   });
 });

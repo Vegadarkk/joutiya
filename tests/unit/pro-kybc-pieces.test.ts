@@ -79,6 +79,12 @@ describe("kybcRetention", () => {
     expect(kybcRetention("up1", profile("verified"), null, now)).toEqual({ keep: false });
   });
 
+  it("keeps a car rental agency's licence document while its check refers to it", () => {
+    const rentalCheck = { status: "verified" as const, uploadId: "doc1", agrementRef: "123/2025", submittedAt: now, issues: [] };
+    expect(kybcRetention("doc1", profile("active", { rentalCheck }), owner(), now)).toEqual({ keep: true, until: recheck });
+    expect(kybcRetention("doc0", profile("active", { rentalCheck }), owner(), now)).toEqual({ keep: false });
+  });
+
   it("keeps a rejected application's pieces 6 months after the rejection", () => {
     const rejectedAt = new Date(now.getTime() - KYBC_END_RETENTION_MS + 5 * DAY);
     expect(kybcRetention("up1", profile("rejected", { updatedAt: rejectedAt }), owner(), now)).toEqual({ keep: true, until: new Date(rejectedAt.getTime() + KYBC_END_RETENTION_MS) });

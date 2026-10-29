@@ -33,6 +33,8 @@ export interface DemoEntry {
   attributes: Record<string, string | number | boolean | string[]>;
   /** Pexels photo ids, display order. */
   photos: string[];
+  /** Car rentals: blocked periods as [first, last] days after the seed day (rental pack §3). */
+  rentalBlocked?: [number, number][];
 }
 
 export const DEMO_SELLERS: readonly DemoSeller[] = [
@@ -110,6 +112,13 @@ export const DEMO_SELLERS: readonly DemoSeller[] = [
     type: "pro",
     city: "rabat",
     bio: "Nettoyage de bureaux, fin de chantier et déménagements à Rabat, Salé et Témara.",
+  },
+  {
+    key: "tafilalet",
+    name: "Dattes et Épices du Tafilalet",
+    type: "pro",
+    city: "errachidia",
+    bio: "Dattes du Tafilalet, épices et produits du terroir, conditionnés dans notre atelier d'Errachidia.",
   },
 ];
 
@@ -212,8 +221,9 @@ export const DEMO_ENTRIES: readonly DemoEntry[] = [
     description:
       "Berline récente de catégorie Dacia Logan ou similaire, diesel, climatisée, à louer à la journée ou à la semaine. Kilométrage illimité, assurance tous risques incluse. Livraison gratuite à l'aéroport Marrakech Menara. Tarif dégressif à partir de 7 jours.",
     price: 300,
-    attributes: { "car-brand": "dacia", model: "Logan", year: 2024, gearbox: "manuelle", fuel: "diesel" },
+    attributes: { "rental-class": "berline", "car-brand": "dacia", model: "Logan", year: 2024, gearbox: "manuelle", fuel: "diesel", seats: 5, "min-rental-days": 2, "mileage-policy": "illimite", "rental-insurance": "tous-risques-franchise", "insurance-excess": 5000, "rental-deposit": 5000, "driver-min-age": 21, "licence-years": 2, "vehicle-handover": ["agence", "aeroport"], "rate-7-days": 260, "rate-30-days": 220, "fleet-units": 6 },
     photos: ["34661689"],
+    rentalBlocked: [[3, 6], [15, 22], [40, 44]],
   },
   {
     key: "rent-picanto",
@@ -225,8 +235,9 @@ export const DEMO_ENTRIES: readonly DemoEntry[] = [
     description:
       "Petite citadine automatique idéale pour la ville et la corniche. Location minimum 2 jours, caution par carte ou espèces. Siège bébé disponible sur demande.",
     price: 250,
-    attributes: { "car-brand": "kia", model: "Picanto", year: 2023, gearbox: "automatique", fuel: "essence" },
+    attributes: { "rental-class": "citadine", "car-brand": "kia", model: "Picanto", year: 2023, gearbox: "automatique", fuel: "essence", seats: 4, "min-rental-days": 2, "mileage-policy": "limite", "km-per-day": 250, "rental-insurance": "rc", "rental-deposit": 3000, "driver-min-age": 21, "licence-years": 1, "vehicle-handover": ["agence", "livraison"], "rental-extras": ["siege-bebe"], "rate-7-days": 220, "fleet-units": 3 },
     photos: ["20475125", "20475132", "20475153"],
+    rentalBlocked: [[1, 2], [9, 12]],
   },
   {
     key: "moto-tmax",
@@ -2181,5 +2192,105 @@ export const DEMO_ENTRIES: readonly DemoEntry[] = [
     condition: "very_good",
     attributes: { "av-type": "televiseur", brand: "LG", model: "OLED65C2" },
     photos: ["28195649", "28195650"],
+  },
+
+  // ---- Beauté et Produits du terroir (appended: listing ids follow the entry index)
+  {
+    key: "beauty-ghassoul",
+    sub: "beaute-soins",
+    seller: "zineb",
+    city: "safi",
+    days: 5,
+    title: "Coffret savon noir et ghassoul, neuf",
+    description: "Coffret hammam jamais ouvert : savon noir à l'eucalyptus, ghassoul de l'Atlas et gant de kessa. Reçu en cadeau, en double.",
+    price: 120,
+    condition: "new_tagged",
+    attributes: { "beauty-product-type": "savon-noir" },
+    photos: ["6621470"],
+  },
+  // Demo ONSSA numbers: "ZZ" is no ONSSA activity code.
+  {
+    key: "terroir-olive",
+    sub: "huile-olive",
+    seller: "tifawt",
+    city: "meknes",
+    days: 2,
+    title: "Huile d'olive vierge extra, bidon de 5 litres",
+    description: "Huile d'olive vierge extra de la dernière récolte, extraction à froid dans notre moulin près de Meknès. Bidon de 5 litres, goût fruité et légèrement piquant.",
+    price: 450,
+    attributes: { "onssa-number": "ZZ.99.9001.26", "olive-oil-grade": "vierge-extra" },
+    photos: ["7296399"],
+  },
+  {
+    key: "terroir-argan",
+    sub: "huile-argan-alimentaire",
+    seller: "tifawt",
+    city: "essaouira",
+    days: 3,
+    title: "Huile d'argan alimentaire torréfiée, 250 ml",
+    description: "Huile d'argan alimentaire pressée par les femmes de la coopérative, à partir d'amandons torréfiés. Flacon en verre de 250 ml, idéale pour l'amlou et les salades.",
+    price: 180,
+    attributes: { "onssa-number": "ZZ.99.9002.26" },
+    photos: ["30408324"],
+  },
+  {
+    key: "terroir-honey",
+    sub: "miel",
+    seller: "tifawt",
+    city: "essaouira",
+    days: 1,
+    title: "Miel de thym de l'arrière-pays d'Essaouira, 500 g",
+    description: "Miel de thym récolté cet été par nos apicultrices. Pot en verre de 500 g, non chauffé, non filtré industriellement.",
+    price: 220,
+    attributes: { "onssa-number": "ZZ.99.9003.26", "honey-type": "thym" },
+    photos: ["13246534"],
+  },
+  {
+    key: "terroir-amlou",
+    sub: "amlou-pates-a-tartiner",
+    seller: "tifawt",
+    city: "agadir",
+    days: 6,
+    title: "Amlou traditionnel amandes, argan et miel, 300 g",
+    description: "Amlou préparé à la main : amandes grillées, huile d'argan alimentaire et miel. Pot de 300 g, sans sucre ajouté.",
+    price: 95,
+    attributes: { "onssa-number": "ZZ.99.9004.26" },
+    photos: ["18876241"],
+  },
+  {
+    key: "terroir-dates",
+    sub: "dattes-fruits-secs",
+    seller: "tafilalet",
+    city: "errachidia",
+    days: 2,
+    title: "Dattes Mejhoul du Tafilalet, boîte de 1 kg",
+    description: "Dattes Mejhoul calibre gros, récolte de cette saison, triées et conditionnées dans notre atelier. Boîte de 1 kg.",
+    price: 160,
+    attributes: { "onssa-number": "ZZ.99.9005.26", "date-variety": "mejhoul" },
+    photos: ["40209706"],
+  },
+  {
+    key: "terroir-spices",
+    sub: "epices-herbes",
+    seller: "tafilalet",
+    city: "erfoud",
+    days: 8,
+    title: "Ras el hanout maison, mélange de 25 épices, 250 g",
+    description: "Notre ras el hanout moulu à la commande, mélange de 25 épices dont cumin, gingembre, curcuma et cannelle. Sachet kraft refermable de 250 g.",
+    price: 60,
+    attributes: { "onssa-number": "ZZ.99.9006.26", "spice-type": "ras-el-hanout" },
+    photos: ["35787276"],
+  },
+  {
+    key: "terroir-jams",
+    sub: "autres-produits-terroir",
+    seller: "tafilalet",
+    city: "errachidia",
+    days: 4,
+    title: "Confitures artisanales de dattes et de figues, lot de 3",
+    description: "Trois pots de 250 g : confiture de dattes, de figues et d'oranges amères, cuites au chaudron en petites quantités.",
+    price: 90,
+    attributes: { "onssa-number": "ZZ.99.9007.26", "terroir-type": "conserves-confitures" },
+    photos: ["7586251"],
   },
 ];

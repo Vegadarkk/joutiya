@@ -1,14 +1,14 @@
-import { Baby, Building2, Car, Dumbbell, Handshake, Package, PawPrint, Shirt, Smartphone, Sofa, Wrench, type LucideIcon } from "lucide-react";
+import { Baby, Building2, Car, Dumbbell, Handshake, Package, PawPrint, Shirt, Smartphone, Sofa, Wheat, Wrench, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { CATEGORIES } from "@/config/categories";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
-// The eleven categories on the home page (design D21), each a small doorway of the logo (pointed
+// The twelve categories on the home page (design D21), each a small doorway of the logo (pointed
 // arch on a gold threshold) linking to its SEO page /c/{category} (L4). One scrolling row on
-// phones, the whole arcade in one line from lg. Below lg the tiles share the row width so that part
-// of the next tile always shows at the edge (about 3.5 tiles on phones, 6.5 on tablets): the row
-// reads as scrollable.
+// phones, the whole arcade in one line from xl (twelve labels do not fit a 1024 px row). Below xl
+// the tiles share the row width so that part of the next tile always shows at the edge (about 3.5
+// tiles on phones, 6.5 on tablets and small laptops): the row reads as scrollable.
 
 /** Same icons as the listing wizard (post/category-picker.tsx, a client module: not importable here). */
 const ICONS: Record<string, LucideIcon> = {
@@ -17,6 +17,7 @@ const ICONS: Record<string, LucideIcon> = {
   electronique: Smartphone,
   "maison-jardin": Sofa,
   mode: Shirt,
+  terroir: Wheat,
   famille: Baby,
   loisirs: Dumbbell,
   animaux: PawPrint,
@@ -38,11 +39,11 @@ export function CategoryGrid({ className }: { className?: string }) {
       <h2 id="home-categories" className="text-xl font-semibold">
         {t("title")}
       </h2>
-      <ul className="-mx-4 flex snap-x scroll-px-4 gap-1 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:-mx-6 sm:scroll-px-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-11 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
+      <ul className="-mx-4 flex snap-x scroll-px-4 gap-1 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:-mx-6 sm:scroll-px-6 sm:px-6 xl:mx-0 xl:grid xl:grid-cols-12 xl:overflow-visible xl:px-0 [&::-webkit-scrollbar]:hidden">
         {CATEGORIES.map((category) => {
           const Icon = ICONS[category.id] ?? Package;
           return (
-            <li key={category.id} className="w-[max(5.75rem,calc((100%_-_0.75rem)/3.5))] shrink-0 snap-start sm:w-[max(5.75rem,calc((100%_-_1.5rem)/6.5))] lg:w-auto">
+            <li key={category.id} className="w-[max(5.75rem,calc((100%_-_0.75rem)/3.5))] shrink-0 snap-start sm:w-[max(5.75rem,calc((100%_-_1.5rem)/6.5))] xl:w-auto">
               <Link
                 href={categoryHref(category.id)}
                 prefetch={false}
