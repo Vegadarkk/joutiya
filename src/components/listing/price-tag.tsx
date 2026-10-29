@@ -17,11 +17,14 @@ export interface PriceTagProps {
   locale: Locale;
   /** Combinations at different prices: `price` is the lowest (« À partir de 450 DH »). */
   from?: boolean;
+  /** A running promotion: `price` is the promotional one, `before` its struck-out price (none for a listing younger than 30 days). */
+  promo?: boolean;
+  before?: number | null;
   size?: "sm" | "lg";
   className?: string;
 }
 
-export function PriceTag({ price, isDonation, negotiable = false, unit, locale, from = false, size = "sm", className }: PriceTagProps) {
+export function PriceTag({ price, isDonation, negotiable = false, unit, locale, from = false, promo = false, before = null, size = "sm", className }: PriceTagProps) {
   const t = useTranslations("ListingCard");
   const large = size === "lg";
   const amount = isDonation ? t("donation") : price === null ? t("toDiscuss") : formatPrice(price, locale);
@@ -34,11 +37,18 @@ export function PriceTag({ price, isDonation, negotiable = false, unit, locale, 
           "font-semibold whitespace-nowrap tabular-nums",
           large ? "text-2xl sm:text-3xl" : "text-base",
           isDonation && "text-success",
+          showExtras && promo && "text-danger",
           price === null && !isDonation && (large ? "text-xl sm:text-2xl" : "text-sm text-foreground-muted"),
         )}
       >
         {amount}
       </span>
+      {showExtras && promo && before !== null ? (
+        <s data-testid="price-before" className={cn("whitespace-nowrap text-foreground-muted tabular-nums decoration-1", large ? "text-base" : "text-xs")}>
+          <span className="sr-only">{t("before")} </span>
+          {formatPrice(before, locale)}
+        </s>
+      ) : null}
       {showExtras && unit ? <span className={cn("text-foreground-muted", large ? "text-base" : "text-xs")}>{t(`per.${unit}`)}</span> : null}
       {showExtras && negotiable ? (
         <span className={cn("rounded-sm bg-surface-muted font-medium text-foreground-muted", large ? "px-2 py-0.5 text-sm" : "px-1.5 text-xs")}>{t("negotiable")}</span>

@@ -15,19 +15,22 @@ import { cityBySlug } from "@/config/regions";
 import { POST as create } from "@/app/api/listings/route";
 import { PATCH as patch } from "@/app/api/listings/[id]/route";
 import { POST as publish } from "@/app/api/listings/[id]/publish/route";
+import { DELETE as deletePromo, PUT as putPromo } from "@/app/api/listings/[id]/promo/route";
 import { PUT as putStock } from "@/app/api/listings/[id]/stock/route";
 import type { ListingVariants } from "@/lib/contracts/catalog";
-import type { CreateListingResponse, ListingPatch } from "@/lib/contracts/listings";
+import type { CreateListingResponse, ListingPatch, PromoResponse } from "@/lib/contracts/listings";
 import { getListing } from "@/lib/db/repositories/listings";
 import { proProfileRef, proProfileToFirestore } from "@/lib/db/repositories/pro-profiles";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { resetServerEnv } from "@/lib/env";
 import { db } from "@/lib/firebase/admin";
+import { sendMail } from "@/lib/mail";
 import { setClaims } from "@/lib/firebase/claims";
 import { createSessionForUid } from "@/lib/firebase/session";
 import type { ProProfileDoc } from "@/lib/pro/profile-schema";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { csrfToken } from "@/lib/security/csrf";
+import { lastMail } from "../auth/helpers";
 import { api, member, seedReadyUpload, type ErrorBody, type ListingBody, type Member, type PublishBody } from "./helpers";
 
 const PRO_ID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
@@ -187,5 +190,81 @@ describe("Pro catalogue: variants and stock", () => {
     expect(stock.status).toBe(400);
     const put = await api<ErrorBody>(putStock, "PUT", `/api/listings/${id}/stock`, { member: seller, body: { stock: 2 } });
     expect(put.status).toBe(400);
+  });
+});
+
+describe("Pro catalogue: promotions", () => {
+  const inHours = (hours: number) => new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+  type PromoBody = PromoResponse & ErrorBody;
+
+  async function publishedShirt(owner: Member, extra: Partial<ListingPatch> = { variants: undefined }): Promise<string> {
+    const { id, saved } = await shirtDraft(owner, extra);
+    expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+    const published = await api<PublishBody & ErrorBody>(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: { acceptRules: true } });
+    expect(published.body.status, JSON.stringify(published.body)).toBe("published");
+    return id;
+  }
+
+  it("runs one promotion at a time, then waits 7 days after it ends", async () => {
+    const owner = await shop();
+    const id = await publishedShirt(owner);
+    const set = await api<PromoBody>(putPromo, "PUT", `/api/listings/${id}/promo`, { member: owner, body: { kind: "promo", endsAt: inHours(72), percent: 20 } });
+    expect(set.status, JSON.stringify(set.body)).toBe(200);
+    expect(set.body.listing.status).toBe("published");
+    // Published today: no struck-out price yet (art. 54 needs 30 days of history).
+    expect(set.body.listing.catalogue?.promo).toMatchObject({ kind: "promo", prices: [{ key: "", price: 200, reference: null }] });
+    expect((await getListing(id))?.promo).toMatchObject({ kind: "promo", percent: 20 });
+
+    const again = await api<PromoBody>(putPromo, "PUT", `/api/listings/${id}/promo`, { member: owner, body: { kind: "flash", endsAt: inHours(24), percent: 10 } });
+    expect(again.status).toBe(400);
+    expect(again.body.error.details).toEqual([{ path: "promo", code: "promo_exists" }]);
+
+    const ended = await api<PromoBody>(deletePromo, "DELETE", `/api/listings/${id}/promo`, { member: owner });
+    expect(ended.status, JSON.stringify(ended.body)).toBe(200);
+    expect(ended.body.listing.catalogue?.promo).toBeNull();
+    const stored = (await getListing(id))!;
+    expect(stored.promo ?? null).toBeNull();
+    expect(stored.lastPromoEndedAt).toBeInstanceOf(Date);
+
+    const soon = await api<PromoBody>(putPromo, "PUT", `/api/listings/${id}/promo`, { member: owner, body: { kind: "promo", endsAt: inHours(72), percent: 20 } });
+    expect(soon.status).toBe(400);
+    expect(soon.body.error.details).toEqual([{ path: "startsAt", code: "promo_gap", value: expect.any(String) }]);
+  });
+
+  it("ends the promotion on a price change", async () => {
+    const owner = await shop();
+    const id = await publishedShirt(owner);
+    await api(putPromo, "PUT", `/api/listings/${id}/promo`, { member: owner, body: { kind: "soldes", endsAt: inHours(48), price: 199 } });
+    expect((await getListing(id))?.promo?.prices).toEqual([{ key: "", price: 199, reference: null }]);
+    const cheaper = await api<ListingBody & ErrorBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { price: 240 } });
+    expect(cheaper.status, JSON.stringify(cheaper.body)).toBe(200);
+    expect((await getListing(id))?.promo ?? null).toBeNull();
+  });
+
+  it("holds a cut deeper than 70 % for a moderator, with the statement mailed", async () => {
+    vi.mocked(sendMail).mockClear();
+    const owner = await shop();
+    const id = await publishedShirt(owner, {});
+    const deep = await api<PromoBody>(putPromo, "PUT", `/api/listings/${id}/promo`, { member: owner, body: { kind: "flash", endsAt: inHours(24), percent: 80 } });
+    expect(deep.status, JSON.stringify(deep.body)).toBe(200);
+    expect(deep.body.listing.status).toBe("pending_review");
+    expect(deep.body.listing.catalogue?.promo?.prices.map((entry) => entry.price)).toEqual([50, 58, 50]);
+    const stored = (await getListing(id))!;
+    expect(stored.moderation).toMatchObject({ state: "needs_review", flags: expect.arrayContaining(["promo_check"]) });
+    expect(stored.adsEligible).toBe(false);
+    expect(lastMail(sendMail, "listingPendingReview", owner.email)?.data).toMatchObject({ listingId: id });
+  });
+
+  it("keeps promotions for Pros, on a live listing", async () => {
+    const seller = await member();
+    const { id } = await shirtDraft(seller, { variants: undefined });
+    const draft = await api<ErrorBody>(putPromo, "PUT", `/api/listings/${id}/promo`, { member: seller, body: { kind: "promo", endsAt: inHours(72), percent: 20 } });
+    expect(draft.status).toBe(409);
+    await api(publish, "POST", `/api/listings/${id}/publish`, { member: seller, body: { acceptRules: true } });
+    const individual = await api<ErrorBody>(putPromo, "PUT", `/api/listings/${id}/promo`, { member: seller, body: { kind: "promo", endsAt: inHours(72), percent: 20 } });
+    expect(individual.status).toBe(400);
+    expect(individual.body.error.details).toEqual([{ path: "promo", code: "promo_pro_only" }]);
+    const both = await api<ErrorBody>(putPromo, "PUT", `/api/listings/${id}/promo`, { member: seller, body: { kind: "promo", endsAt: inHours(72), percent: 20, price: 100 } });
+    expect(both.status).toBe(400);
   });
 });

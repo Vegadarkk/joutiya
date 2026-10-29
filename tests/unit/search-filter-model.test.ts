@@ -144,6 +144,7 @@ describe("sorts", () => {
   it("offers relevance only with words and distance only with a city", () => {
     expect(sortOptions({})).toEqual(["recent", "price_asc", "price_desc"]);
     expect(sortOptions({ q: "velo", city: "rabat" })).toEqual(["relevance", "recent", "price_asc", "price_desc", "distance"]);
+    expect(sortOptions({ promo: true })).toEqual(["recent", "price_asc", "price_desc", "discount"]);
   });
 
   it("changes the sort, back to page 1, the default sort leaving the URL", () => {

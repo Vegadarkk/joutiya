@@ -902,7 +902,8 @@
       "variants_axis_invalid": "Ce critère ne s'applique pas à cette sous-catégorie : choisissez un autre axe de variante.",
       "stock_pro_only": "Le suivi du stock est réservé aux boutiques Pro.",
       "stock_with_variants": "Avec des variantes, le stock se saisit pour chaque combinaison.",
-      "no_variants": "Cette annonce n'a pas de variantes."
+      "no_variants": "Cette annonce n'a pas de variantes.",
+      "title_soldes": "Le mot « Soldes » n'est permis dans le titre que pendant des soldes lancées depuis « Mes annonces » : retirez-le."
     },
     "status": {
       "draft": "Brouillon",
@@ -2602,6 +2603,67 @@
       "save": "Enregistrer",
       "cancel": "Annuler",
       "saved": "Stock mis à jour"
+    },
+    "promo": {
+      "open": "Promotion",
+      "openOf": "Promotion : {title}",
+      "running": "{kind} en cours jusqu'au {end}",
+      "scheduled": "{kind} prévue du {start} au {end}",
+      "title": "Promotion : {title}",
+      "hint": "Le prix barré est calculé par Joutiya : le prix le plus bas de l'annonce pendant les 30 jours avant la promotion.",
+      "kind": "Type de promotion",
+      "kinds": {
+        "promo": "Promo",
+        "soldes": "Soldes",
+        "flash": "Vente flash"
+      },
+      "kindHints": {
+        "promo": "Une réduction ponctuelle, de 1 heure à 30 jours.",
+        "soldes": "Seule option qui permet le mot « Soldes » : articles en stock, période affichée.",
+        "flash": "Une vente éclair de 72 heures au plus, avec compte à rebours sur l'annonce."
+      },
+      "mode": "Réduction",
+      "modes": {
+        "percent": "En pourcentage",
+        "price": "Nouveau prix"
+      },
+      "percent": "Réduction (%)",
+      "price": "Prix promotionnel (DH)",
+      "start": "Début",
+      "startNow": "Dès maintenant",
+      "startAt": "À une date",
+      "startAtLabel": "Date et heure de début (heure du Maroc)",
+      "endsAt": "Date et heure de fin (heure du Maroc)",
+      "preview": "Aperçu",
+      "current": "Prix actuel",
+      "newPrice": "Prix promo",
+      "reference": "Prix barré",
+      "noReference": "Sans prix barré : l'annonce a moins de 30 jours d'historique de prix. Le badge n'affiche pas de pourcentage.",
+      "review": "Réduction de plus de {percent} % : un modérateur la vérifie, et l'annonce quitte les résultats jusqu'à sa validation.",
+      "gap": "Prochaine promotion possible à partir du {date} (7 jours entre deux promotions).",
+      "save": "Lancer la promotion",
+      "saved": "Promotion enregistrée.",
+      "savedHeld": "Promotion enregistrée : l'annonce est en vérification.",
+      "stop": "Arrêter la promotion",
+      "stopped": "Promotion arrêtée.",
+      "cancel": "Annuler",
+      "close": "Fermer",
+      "errors": {
+        "promo_no_price": "Une promotion demande un prix sur l'annonce et sur chaque combinaison.",
+        "promo_exists": "Une promotion est déjà en cours ou prévue : arrêtez-la d'abord.",
+        "promo_start_past": "Le début ne peut pas être dans le passé.",
+        "promo_start_far": "Le début doit être dans les 30 prochains jours.",
+        "promo_end_before_start": "La fin doit être après le début.",
+        "promo_too_short": "Une promotion dure au moins 1 heure.",
+        "promo_too_long": "Une promotion dure 30 jours au plus.",
+        "promo_flash_too_long": "Une vente flash dure 72 heures au plus.",
+        "promo_gap": "Attendez 7 jours entre deux promotions : la prochaine est possible à partir du {value}.",
+        "promo_price_with_variants": "Avec des variantes, la réduction se donne en pourcentage.",
+        "promo_not_lower": "Le prix promotionnel doit être inférieur au prix actuel ({value}).",
+        "promo_not_below_reference": "Le prix promotionnel doit être inférieur au prix barré ({value}), le plus bas des 30 derniers jours.",
+        "promo_pro_only": "Les promotions sont réservées aux boutiques Pro.",
+        "promo_review_paused": "Une réduction de plus de 70 % se lance sur une annonce en ligne : remettez-la d'abord en ligne."
+      }
     }
   },
   "Map": {
@@ -2644,7 +2706,14 @@
     "rentalTotal": "≈ {total} pour {days, plural, one {# jour} other {# jours}}",
     "rentalToConfirm": "Disponibilité à confirmer",
     "from": "À partir de",
-    "soldOut": "Épuisé"
+    "soldOut": "Épuisé",
+    "promo": {
+      "promo": "Promo",
+      "soldes": "Soldes",
+      "flash": "Vente flash"
+    },
+    "percentOff": "−{percent} %",
+    "before": "Au lieu de"
   },
   "ListingPage": {
     "home": "Accueil",
@@ -2917,7 +2986,15 @@
       "soldOut": "Épuisé",
       "allSoldOut": "Article épuisé. Il reste en ligne : écrivez au vendeur pour savoir s'il sera de nouveau disponible.",
       "valueSoldOut": "{value}, épuisé",
-      "valueAbsent": "{value}, non proposé avec ce choix"
+      "valueAbsent": "{value}, non proposé avec ce choix",
+      "before": "Au lieu de"
+    },
+    "promo": {
+      "period": "Du {start} au {end}",
+      "endsInHours": "Se termine dans {hours} h {minutes} min",
+      "endsInMinutes": "Se termine dans {minutes} min",
+      "reference": "Prix barré : le prix le plus bas des 30 jours avant la promotion.",
+      "noReference": "Pas de prix barré : l'annonce a moins de 30 jours d'historique de prix."
     }
   },
   "Profile": {
@@ -3307,7 +3384,8 @@
       "relevance": "Pertinence",
       "price_asc": "Prix croissant",
       "price_desc": "Prix décroissant",
-      "distance": "Plus proches"
+      "distance": "Plus proches",
+      "discount": "Plus forte réduction"
     },
     "active": "Filtres actifs",
     "remove": "Retirer le filtre {filter}",
@@ -3330,11 +3408,13 @@
       "rangeTo": "{label} : jusqu'à {max}",
       "options": "{label} : {values}",
       "dates": "{from} – {to} · {days} j",
-      "includeSoldOut": "Épuisés inclus"
+      "includeSoldOut": "Épuisés inclus",
+      "promo": "En promotion"
     },
     "rentalDatesHint": "Les agences déclarent leurs jours indisponibles : les véhicules libres sur toute la période s'affichent, ceux à confirmer en dernier.",
     "includeSoldOut": "Inclure les articles épuisés",
-    "includeSoldOutHint": "Les boutiques laissent en ligne les articles dont le stock est à 0."
+    "includeSoldOutHint": "Les boutiques laissent en ligne les articles dont le stock est à 0.",
+    "promo": "En promotion"
   },
   "Pro": {
     "metaTitle": "Espace Pro",

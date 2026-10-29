@@ -31,7 +31,7 @@ const EQUALITY_BASE = [
 ] as const;
 
 /** Numeric fields that also take `<`, `<=`, `>`, `>=`. */
-const COMPARISON_BASE = ["price", "sortAt", "featuredUntil", "rentFreshUntil"] as const;
+const COMPARISON_BASE = ["price", "sortAt", "featuredUntil", "rentFreshUntil", "promoStartsAt", "promoEndsAt"] as const;
 
 const criteria = Object.values(CRITERIA);
 /** `a_*` fields of select, multiselect and boolean criteria (free-text criteria stay searchable only). */
@@ -55,7 +55,7 @@ export function filterKind(field: string): FilterKind | undefined {
   return FILTER_KINDS.get(field);
 }
 
-export const SORTABLE_ATTRIBUTES = ["sortAt", "price", "_geo"] as const;
+export const SORTABLE_ATTRIBUTES = ["sortAt", "price", "_geo", "promoPercent"] as const;
 
 /**
  * D4: "sort" right after "words", so a date or price sort orders the matching listings and relevance

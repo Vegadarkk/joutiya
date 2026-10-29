@@ -1,6 +1,6 @@
 import { z } from "@/lib/zod";
 import { CRITERION_TEXT_MAX, criterionById } from "@/config/categories";
-import { VARIANT_KEY_SEPARATOR, itemAvailable, variantKey } from "./catalog-core";
+import { PROMO_KINDS, VARIANT_KEY_SEPARATOR, itemAvailable, variantKey } from "./catalog-core";
 import { refKey } from "./stock-import";
 
 // Shop catalogue of a Pro listing (lot 4, design phase-7/catalogue-boutique.md §2-3): variants on
@@ -184,3 +184,43 @@ export function withVariantAnswers<T extends Record<string, unknown>>(attributes
   for (const axis of variants?.axes ?? []) if (isVariantCriterion(axis.id) && criteria.includes(axis.id) && axis.values[0] !== undefined) answered[axis.id] = axis.values[0];
   return answered as T;
 }
+
+// ---- Promotions (catalogue §4; owner decisions 2-4 of 28 Oct 2026; law 31-08 art. 53-55)
+
+export { PROMO_KINDS, cardPromo, percentOff, promoRunning, promoSummary, type CardPromo, type PromoKind, type PromoPrice, type PromoView } from "./catalog-core";
+
+const HOUR_MS = 60 * 60 * 1000;
+/** Shortest promotion. */
+export const PROMO_MIN_MS = HOUR_MS;
+/** Longest promotion (a « Vente flash » is shorter, FLASH_MAX_MS). */
+export const PROMO_MAX_MS = 30 * 24 * HOUR_MS;
+/** Decision 4: a flash sale lasts 72 hours at most. */
+export const FLASH_MAX_MS = 72 * HOUR_MS;
+/** Decision 4: at least 7 days between the end of a promotion and the start of the next. */
+export const PROMO_GAP_MS = 7 * 24 * HOUR_MS;
+/** How far ahead a promotion may be scheduled. */
+export const PROMO_AHEAD_MS = 30 * 24 * HOUR_MS;
+/** A cut above this (against the struck-out price, else the current one) is held for a moderator. */
+export const PROMO_REVIEW_PERCENT = 70;
+export const PROMO_PERCENT_MIN = 1;
+export const PROMO_PERCENT_MAX = 90;
+
+/**
+ * `PUT /api/listings/{id}/promo`: one cut for every price (`percent`), or the new price of a
+ * listing without variants (`price`). Joutiya computes the struck-out price, never the Pro.
+ * `startsAt` absent: now.
+ */
+export const promoInputSchema = z
+  .object({
+    kind: z.enum(PROMO_KINDS),
+    startsAt: z.string().datetime({ offset: true }).optional(),
+    endsAt: z.string().datetime({ offset: true }),
+    percent: z.number().int().min(PROMO_PERCENT_MIN).max(PROMO_PERCENT_MAX).optional(),
+    price: z.number().int().min(1).max(VARIANT_PRICE_MAX).optional(),
+  })
+  .strict()
+  .refine((input) => (input.percent !== undefined) !== (input.price !== undefined), { message: "percent or price", path: ["percent"] });
+export type PromoInput = z.infer<typeof promoInputSchema>;
+
+/** The words a title may hold only during « Soldes » (art. 53: the word is reserved to them). */
+export const SOLDES_PATTERN = /(^|[^\p{L}])soldes?(?![\p{L}])/iu;

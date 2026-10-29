@@ -2,7 +2,7 @@ import "server-only";
 import { RENTAL_SUBCATEGORY, type Condition } from "@/config/categories";
 import { REVIEWS_PAGE } from "@/config/reviews";
 import { DEFAULT_BANNER, type BannerKey } from "@/config/storefront";
-import { isSoldOut, priceRange, type ListingVariants } from "@/lib/contracts/catalog";
+import { cardPromo, isSoldOut, priceRange, type CardPromo, type ListingVariants, type PromoView } from "@/lib/contracts/catalog";
 import type { ListingAttributes, ListingStatus, RentalAvailability } from "@/lib/contracts/listings";
 import type { PhotoVariant } from "@/lib/contracts/photo-variants";
 import type { RatingSummary, ReviewPage } from "@/lib/contracts/reviews";
@@ -22,6 +22,7 @@ import { sellerReviews } from "@/lib/reviews/seller";
 import { ratingSummary } from "@/lib/reviews/views";
 import { rentalAvailabilityOf } from "./availability";
 import { cardFactsField, cardFactsOf, type CardFacts } from "./card-facts";
+import { promoView } from "./promo";
 import { buildSlugId, parseSlugId } from "./ids";
 
 // Public reads (design §4 public.ts): the listing page by its `{slug}-{id}` segment and the
@@ -175,23 +176,28 @@ export interface PublicCatalogue {
   /** Without variants: the declared stock (null: not tracked). */
   stock: number | null;
   variants: ListingVariants | null;
+  /** Current or scheduled promotion (the page shows it while it runs). */
+  promo: PromoView | null;
 }
 
-function catalogueOf(record: ListingRecord): PublicCatalogue | null {
-  if (record.sellerType !== "pro" || record.isDonation || (record.variants === undefined && record.stock === undefined)) return null;
-  return { stock: record.variants ? null : (record.stock ?? null), variants: record.variants ?? null };
+function catalogueOf(record: ListingRecord, now: Date): PublicCatalogue | null {
+  const promo = promoView(record.promo, now);
+  if (record.sellerType !== "pro" || record.isDonation || (record.variants === undefined && record.stock === undefined && !promo)) return null;
+  return { stock: record.variants ? null : (record.stock ?? null), variants: record.variants ?? null, promo };
 }
 
 /**
  * Card price and stock marks: the lowest price of the combinations (« à partir de » when they
  * differ), sold out when the declared stock is 0 everywhere (decision 1: still online).
  */
-export function cardCatalogue(record: Pick<ListingRecord, "price" | "isDonation" | "variants" | "stock">): { price: number | null; soldOut?: true; priceFrom?: true } {
+export function cardCatalogue(record: Pick<ListingRecord, "price" | "isDonation" | "variants" | "stock" | "promo">, now = new Date()): { price: number | null; soldOut?: true; priceFrom?: true; promo?: CardPromo } {
   const range = record.variants ? priceRange(record) : null;
+  const promo = cardPromo(promoView(record.promo, now), now.getTime());
   return {
     price: range ? range.min : record.price,
     ...(isSoldOut(record) ? { soldOut: true as const } : {}),
     ...(range && range.max > range.min ? { priceFrom: true as const } : {}),
+    ...(promo ? { promo } : {}),
   };
 }
 
@@ -218,6 +224,8 @@ export interface PublicListingCard {
   soldOut?: true;
   /** Combinations at different prices: `price` is the lowest (« À partir de »). */
   priceFrom?: true;
+  /** A promotion running when the card was built. */
+  promo?: CardPromo;
 }
 
 function publicPhotos(record: ListingRecord): PublicPhoto[] {
@@ -251,7 +259,7 @@ export function toPublicListing(record: ListingRecord, state: PublicState, slugI
     seller: { publicId: record.sellerPublicId, name: record.sellerName, type: record.sellerType },
     example: record.example === true,
     rental: subcategoryId === RENTAL_SUBCATEGORY ? rentalAvailabilityOf(record) : null,
-    catalogue: catalogueOf(record),
+    catalogue: catalogueOf(record, new Date()),
     publishedAt: publishedAt.toISOString(),
     sortAt: record.sortAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),

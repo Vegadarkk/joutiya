@@ -116,7 +116,7 @@ describe("listingSchema", () => {
   it("exposes the enums of §5 and the design", () => {
     expect(LISTING_STATUSES).toEqual(["draft", "pending_review", "published", "paused", "sold", "expired", "rejected", "removed", "purged"]);
     expect(MODERATION_STATES).toEqual(["auto_ok", "needs_review", "auto_rejected", "human_ok", "human_rejected"]);
-    expect(MODERATION_FLAGS).toEqual(["prohibited_kw", "prohibited_soft", "sensitive_text", "third_party_phone", "face", "nsfw_review", "price_outlier", "dup_text", "dup_photo", "new_account", "volume", "restricted_category", "credit_ad", "sanitary_check", "rental_review"]);
+    expect(MODERATION_FLAGS).toEqual(["prohibited_kw", "prohibited_soft", "sensitive_text", "third_party_phone", "face", "nsfw_review", "price_outlier", "dup_text", "dup_photo", "new_account", "volume", "restricted_category", "credit_ad", "sanitary_check", "rental_review", "promo_check"]);
     expect(UPLOAD_STATUSES).toEqual(["signed", "processing", "ready", "rejected"]);
     expect(UPLOAD_REJECT_REASONS).toEqual(["too_large", "bad_type", "decode_failed", "nsfw", "expired", "quota", "active_content"]);
     expect(CONDITIONS).toEqual(["new_tagged", "like_new", "very_good", "good", "for_parts"]);

@@ -31,6 +31,8 @@ interface Seeded {
   published: { id: string; title: string };
   /** A dress in two sizes and two colours, prices from 420 to 450 DH. */
   dress: { slugId: string; title: string };
+  /** A jacket online for 40 days: 1 500 DH, then 1 200 DH for the last 10 (struck-out price 1 200). */
+  jacket: { id: string; slugId: string; title: string };
 }
 
 /** A verified shop for the member, a dress draft ready up to the price, and a published dress in two sizes. */
@@ -151,7 +153,31 @@ async function seedShop(email: string): Promise<Seeded> {
       publishedAt: now,
       expiresAt: new Date(now.getTime() + 60 * 86_400_000),
     });
-  return { draftId, published, dress };
+  const jacketId = randomId(8);
+  const jacketPhoto = `e2ephotof${randomId(6)}`;
+  const jacket = { id: jacketId, slugId: `veste-fes-${jacketId}`, title: `Veste en laine ${jacketId}` };
+  const daysAgo = (days: number) => new Date(now.getTime() - days * 86_400_000);
+  await firestore
+    .collection("listings")
+    .doc(jacketId)
+    .set({
+      ...base,
+      status: "published",
+      slugId: jacket.slugId,
+      title: jacket.title,
+      description: "Veste en laine tissée main, doublure coton, boutons en corne.",
+      attributes: { audience: "homme", "clothing-type": "veste-manteau", "clothing-size": "l" },
+      price: 1200,
+      priceLog: [
+        { at: daysAgo(40), price: 1500 },
+        { at: daysAgo(10), price: 1200 },
+      ],
+      photos: [{ id: jacketPhoto, ...(await storePhoto(jacketId, jacketPhoto, { r: 70, g: 60, b: 48 })), blurhash: BLURHASH }],
+      adsEligible: true,
+      publishedAt: daysAgo(40),
+      expiresAt: new Date(now.getTime() + 20 * 86_400_000),
+    });
+  return { draftId, published, dress, jacket };
 }
 
 test.describe("shop catalogue", () => {
@@ -240,5 +266,47 @@ test.describe("shop catalogue", () => {
     await buyer.getByTestId("contact-bar").getByRole("button", { name: "Envoyer un message" }).click();
     const dialog = buyer.getByRole("dialog");
     await expect(dialog.getByLabel("Votre message")).toHaveValue(`Bonjour, « ${dress.title} » en M / Vert est-il toujours disponible ?`, { timeout: 15_000 });
+  });
+
+  test("a shop launches a promotion from Mes annonces, and buyers see it with its struck-out price", async ({ page, request, browser }) => {
+    test.setTimeout(120_000);
+    const email = `catalogue-${randomId(10)}@joutiya.test`;
+    await signUpAndIn(page, request, email, "Lalla Atelier");
+    const { jacket } = await seedShop(email);
+
+    await page.context().clearCookies();
+    await page.goto("/fr/mes-annonces");
+    await expect(page).toHaveURL(/\/connexion/);
+    await page.getByLabel("Adresse e-mail").fill(email);
+    await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+    await waitForTurnstile(page);
+    await page.getByRole("button", { name: "Se connecter" }).click();
+    await expect(page).toHaveURL(/\/fr\/mes-annonces/, { timeout: 15_000 });
+
+    const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: jacket.title }) });
+    await row.getByRole("button", { name: /^Promotion : / }).click();
+    const dialog = page.getByTestId("promo-dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("radio", { name: "Soldes" }).click();
+    await dialog.getByRole("textbox", { name: "Réduction (%)" }).fill("20");
+    // Joutiya's struck-out price: the lowest of the 30 days (1 200), not the old 1 500.
+    const preview = dialog.getByTestId("promo-preview");
+    await expect(preview).toContainText(/1\s200/);
+    await expect(preview).toContainText(/960/);
+    await page.screenshot({ path: "test-results/catalogue-promo-dialog.png" });
+    await dialog.getByRole("button", { name: "Lancer la promotion" }).click();
+    await expect(page.getByText("Promotion enregistrée.")).toBeVisible();
+    await expect(row.getByTestId("owner-promo")).toHaveText(/Soldes en cours jusqu'au/);
+    const stored = (await getFirestore(firebase()).collection("listings").doc(jacket.id).get()).data()!;
+    expect(stored.promo).toMatchObject({ kind: "soldes", percent: 20, prices: [{ key: "", price: 960, reference: 1200 }] });
+
+    const buyer = await (await browser.newContext()).newPage();
+    await buyer.goto(`/fr/annonce/${jacket.slugId}`);
+    const notice = buyer.getByTestId("promo-notice");
+    await expect(notice).toBeVisible();
+    await expect(notice.getByTestId("promo-badge")).toHaveText(/Soldes\s*−20 %/);
+    await expect(buyer.getByTestId("price-tag").first()).toContainText(/960/);
+    await expect(buyer.getByTestId("price-before").first()).toContainText(/1\s200/);
+    await buyer.screenshot({ path: "test-results/catalogue-promo-listing.png", fullPage: true });
   });
 });

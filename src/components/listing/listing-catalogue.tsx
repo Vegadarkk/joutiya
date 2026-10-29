@@ -6,11 +6,12 @@ import { CircleCheck, CircleSlash, PackageCheck, TriangleAlert } from "lucide-re
 import { radioKeyTarget } from "@/components/post/controls/chips";
 import type { Locale } from "@/config/site";
 import type { ListingVariants } from "@/lib/contracts/catalog";
-import { isSoldOut, stockState, type StockState } from "@/lib/contracts/catalog-core";
+import { isSoldOut, promoRunning, stockState, type PromoView, type StockState } from "@/lib/contracts/catalog-core";
 import { formatPrice } from "@/lib/listings/client/format";
 import { initialSelection, selectedKey, valueState, type ValueState } from "@/lib/listings/client/variant-picker";
 import type { PublicCatalogue } from "@/lib/listings/public";
 import { cn } from "@/lib/utils";
+import { useNow } from "./use-now";
 import { setVariantSelection } from "./variant-selection";
 
 // Stock and variants of a Pro listing on its page (catalogue §2-3, decision 1). Without variants:
@@ -33,11 +34,13 @@ export interface ListingCatalogueProps {
   /** The listing's price: a combination without its own takes it. */
   price: number | null;
   locale: Locale;
+  /** Epoch ms of the server render (the promotion's clock). */
+  renderedAt: number;
 }
 
-export function ListingCatalogue({ listingId, catalogue, axes, price, locale }: ListingCatalogueProps) {
+export function ListingCatalogue({ listingId, catalogue, axes, price, locale, renderedAt }: ListingCatalogueProps) {
   if (!catalogue.variants) return catalogue.stock === null ? null : <StockLine state={stockState(catalogue.stock)} count={catalogue.stock} />;
-  return <VariantPicker listingId={listingId} variants={catalogue.variants} axes={axes} price={price} locale={locale} />;
+  return <VariantPicker listingId={listingId} variants={catalogue.variants} axes={axes} price={price} locale={locale} promo={catalogue.promo} renderedAt={renderedAt} />;
 }
 
 const STOCK_ICONS: Record<Exclude<StockState, "untracked">, typeof CircleCheck> = { in_stock: CircleCheck, low: TriangleAlert, sold_out: CircleSlash };
@@ -70,10 +73,13 @@ interface VariantPickerProps {
   axes: PickerAxis[];
   price: number | null;
   locale: Locale;
+  promo: PromoView | null;
+  renderedAt: number;
 }
 
-function VariantPicker({ listingId, variants, axes, price, locale }: VariantPickerProps) {
+function VariantPicker({ listingId, variants, axes, price, locale, promo, renderedAt }: VariantPickerProps) {
   const t = useTranslations("ListingPage.catalogue");
+  const now = useNow(renderedAt, 15_000, promo !== null);
   const [selection, setSelection] = useState<(string | undefined)[]>(() => initialSelection(variants));
   const key = selectedKey(selection);
   const item = key === null ? undefined : variants.items.find((entry) => entry.key === key);
@@ -87,6 +93,9 @@ function VariantPicker({ listingId, variants, axes, price, locale }: VariantPick
   }, [listingId, item, label]);
 
   const allSoldOut = isSoldOut({ variants });
+  // The chosen combination's promotional price while the promotion runs, and its struck-out price.
+  const promoted = item && promoRunning(promo, now) ? promo?.prices.find((entry) => entry.key === item.key) : undefined;
+  const itemPrice = item ? (item.price ?? price) : null;
 
   return (
     <section data-testid="variant-picker" aria-label={t("title")} className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4 sm:max-w-xl">
@@ -111,7 +120,19 @@ function VariantPicker({ listingId, variants, axes, price, locale }: VariantPick
           <>
             <p data-testid="variant-summary" className="flex flex-wrap items-baseline gap-x-2 text-base">
               <span className="font-medium">{label}</span>
-              {(item.price ?? price) !== null ? <span className="font-semibold tabular-nums">{formatPrice(item.price ?? price ?? 0, locale)}</span> : null}
+              {promoted ? (
+                <>
+                  <span className="font-semibold text-danger tabular-nums">{formatPrice(promoted.price, locale)}</span>
+                  {promoted.reference !== null ? (
+                    <s className="text-sm text-foreground-muted tabular-nums decoration-1">
+                      <span className="sr-only">{t("before")} </span>
+                      {formatPrice(promoted.reference, locale)}
+                    </s>
+                  ) : null}
+                </>
+              ) : itemPrice !== null ? (
+                <span className="font-semibold tabular-nums">{formatPrice(itemPrice, locale)}</span>
+              ) : null}
             </p>
             <StockLine state={stockState(item.stock)} count={item.stock ?? null} />
           </>

@@ -21,6 +21,7 @@ export const SEARCH_QUERY_KEYS = {
   donation: "don",
   withPhoto: "photo",
   includeSoldOut: "epuises",
+  promo: "promo",
   conditions: "etat",
   rentFrom: "du",
   rentTo: "au",

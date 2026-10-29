@@ -8,7 +8,7 @@ import { requireOwner } from "@/lib/auth/guards";
 import type { Device } from "@/lib/auth/respond";
 import { enqueueAiTask } from "@/lib/ai/queue";
 import { audit } from "@/lib/audit";
-import { variantCriteria, type StockUpdateInput } from "@/lib/contracts/catalog";
+import { variantCriteria, type PromoInput, type StockUpdateInput } from "@/lib/contracts/catalog";
 import { MAX_DRAFTS, type CreateListingInput, type FieldIssue, type ListingPatch, type ListingStatus, type ModerationFlag, type PublishListingResponse } from "@/lib/contracts/listings";
 import { listingPhotoSchema, type ListingPhoto } from "@/lib/contracts/media";
 import { listingContentRef, recordContentOp, recordContentOpTx } from "@/lib/db/repositories/content-ops";
@@ -51,9 +51,10 @@ import { notifySearchIndex } from "@/lib/search/queue";
 import { escalateOnIp } from "./escalation";
 import { buildSlugId, newListingId } from "./ids";
 import { IllegalTransitionError, canRenew, canTransition, draftPurgeAt, renew, renewForReview, transition, type Lifetime, type TransitionContext, type TransitionEffects, type TransitionResult } from "./lifecycle";
-import { ownerListingView } from "./owner-view";
+import { ownerListingView, toOwnerSummary } from "./owner-view";
 import { PUBLIC_STATES } from "./public";
-import { logPrices } from "./catalog";
+import { effectivePrices, logPrices } from "./catalog";
+import { planPromo, promoEnd } from "./promo";
 import { assessReadiness } from "./readiness";
 import { needsRealEstateAttestation } from "./real-estate";
 import { revalidateListingPaths } from "./revalidate";
@@ -394,6 +395,8 @@ export async function patchListing(actor: Actor, id: string, patch: ListingPatch
     if (fields.price !== undefined || fields.isDonation !== undefined || fields.variants !== undefined) {
       const priceLog = logPrices(listing.priceLog, applyPatch(listing, fields), now);
       if (priceLog && !isDeepStrictEqual(priceLog, listing.priceLog)) fields.priceLog = priceLog;
+      // A price change ends the promotion: its struck-out price no longer holds (catalogue §4).
+      if (listing.promo && !isDeepStrictEqual(effectivePrices(listing), effectivePrices(applyPatch(listing, fields)))) Object.assign(fields, promoEnd(listing, now));
     }
     const next = applyPatch(listing, fields);
     const blockers = assessReadiness(next, { seller: seller.seller, phoneVerified: seller.user.badges.phoneVerified });
@@ -474,6 +477,57 @@ export async function updateStock(actor: Actor, id: string, input: StockUpdateIn
   const user = await getUserRecord(actor.auth.user.uid);
   if (!user) throw new HttpError(403, "forbidden", "account record missing");
   return ownerListingView(await commit(listing, changed, effects, { actor, user, now }));
+}
+
+/** Statuses a promotion may be set on: shown or about to be shown again. */
+const PROMO_STATUSES: readonly ListingStatus[] = ["published", "paused"];
+
+/**
+ * A promotion (catalogue §4): planned by `planPromo` (struck-out price computed from the price
+ * log, durations, the 7-day gap). A cut deeper than PROMO_REVIEW_PERCENT holds the listing for a
+ * moderator (flag `promo_check`, statement mailed), as a pre-publication hold would.
+ */
+export async function setPromo(actor: Actor, id: string, input: PromoInput, now = new Date()) {
+  const listing = await ownedListing(actor, id);
+  if (!PROMO_STATUSES.includes(listing.status)) throw new HttpError(409, "conflict", `no promotion on a ${listing.status} listing`);
+  if (listing.sellerType !== "pro") throw invalidField("promo", "promo_pro_only");
+  const plan = planPromo(listing, input, now);
+  if (!plan.ok) throw new HttpError(400, "invalid_body", undefined, { details: plan.issues });
+  // A moderator checks a deep cut while the listing is held: a paused one would come back unchecked.
+  if (plan.review && listing.status !== "published") throw invalidField("percent", "promo_review_paused");
+  const user = await getUserRecord(actor.auth.user.uid);
+  if (!user) throw new HttpError(403, "forbidden", "account record missing");
+  const fields: ListingFieldPatch = { promo: plan.promo };
+  // An ended promotion makes way: its end counts for the gap of the next one.
+  if (listing.promo) Object.assign(fields, promoEnd(listing, now), { promo: plan.promo });
+  let effects: TransitionEffects = { search: listing.status === "published" ? "upsert" : null, contentOp: { op: "listing.update", ip: actor.ip }, audit: null, revalidate: hasPublicPage(listing.status), mail: null };
+  let hold: ModerationDecisionInput | undefined;
+  let mail: MailJob | null = null;
+  if (plan.review && listing.status === "published") {
+    const result: ScreeningResult = { state: "needs_review", score: listing.moderation.score, flags: [...new Set<ModerationFlag>([...listing.moderation.flags, "promo_check"])], blockers: [], evidence: [`promo_cut ${plan.percent}%`] };
+    const ctx = { now, lifetime: await lifetime(), ip: actor.ip };
+    const held = step(() => transition(listing, "pending_review", ctx));
+    Object.assign(fields, held.patch);
+    fields.moderation = { ...listing.moderation, state: "needs_review", flags: result.flags };
+    fields.adsEligible = false;
+    effects = held.effects;
+    hold = holdRecord(listing, result, now);
+    mail = { template: "listingPendingReview", statement: statementOf("hold", result.flags, await redressAddress()) };
+  }
+  const updated = await commit(listing, fields, effects, { actor, user, now, hold });
+  if (mail) await notifySeller(updated, user, mail);
+  return toOwnerSummary(updated, now);
+}
+
+/** Ends the current or scheduled promotion now (a scheduled one leaves no gap to wait). */
+export async function endListingPromo(actor: Actor, id: string, now = new Date()) {
+  const listing = await ownedListing(actor, id);
+  const fields = promoEnd(listing, now);
+  if (!fields) return toOwnerSummary(listing, now);
+  const user = await getUserRecord(actor.auth.user.uid);
+  if (!user) throw new HttpError(403, "forbidden", "account record missing");
+  const effects: TransitionEffects = { search: listing.status === "published" ? "upsert" : null, contentOp: null, audit: null, revalidate: hasPublicPage(listing.status), mail: null };
+  return toOwnerSummary(await commit(listing, fields, effects, { actor, user, now }), now);
 }
 
 // ---- Publication ----------------------------------------------------------------------------

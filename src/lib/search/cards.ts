@@ -1,4 +1,5 @@
 import { RENTAL_SUBCATEGORY } from "@/config/categories";
+import { promoRunning, type CardPromo } from "@/lib/contracts/catalog-core";
 import { cardFactsField, cardFactsOf } from "@/lib/listings/card-facts";
 import { rentalDayRate } from "@/lib/listings/rental";
 import { rentalDuration, type RentalDates } from "./params";
@@ -12,6 +13,14 @@ function rentalOf(doc: CardDocument, now: Date, dates: RentalDates): NonNullable
   if (typeof doc.a_rate_30_days === "number") attributes["rate-30-days"] = doc.a_rate_30_days;
   const total = typeof doc.price === "number" ? rentalDayRate(attributes, doc.price, days) * days : null;
   return { days, total, fresh: typeof doc.rentFreshUntil === "number" && doc.rentFreshUntil > now.getTime(), from: dates.from, to: dates.to };
+}
+
+/** A promotion running at `now` (the index keeps an ended one until the next write: ignored here). */
+function promoOf(doc: CardDocument, now: Date): { promo?: CardPromo } {
+  if (typeof doc.promoStartsAt !== "number" || typeof doc.promoEndsAt !== "number" || typeof doc.promoPrice !== "number" || !doc.promoKind) return {};
+  if (!promoRunning({ startsAt: doc.promoStartsAt, endsAt: doc.promoEndsAt }, now.getTime())) return {};
+  const reference = typeof doc.promoReference === "number" && doc.promoReference > 0 ? doc.promoReference : null;
+  return { promo: { kind: doc.promoKind, price: doc.promoPrice, reference, percent: typeof doc.promoPercent === "number" ? doc.promoPercent : 0, endsAt: doc.promoEndsAt } };
 }
 
 // Engine hit -> results card (design D22): the one card shape of every engine-backed list (search,
@@ -43,6 +52,7 @@ export function toSearchCard(doc: CardDocument, now: Date, featured = false, dat
     ...(doc.isExample === true ? { example: true as const } : {}),
     ...(doc.soldOut === true ? { soldOut: true as const } : {}),
     ...(doc.priceFrom === true ? { priceFrom: true as const } : {}),
+    ...promoOf(doc, now),
     ...(dates && doc.subcategoryId === RENTAL_SUBCATEGORY ? { rental: rentalOf(doc, now, dates) } : {}),
   };
 }

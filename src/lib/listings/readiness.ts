@@ -1,7 +1,7 @@
 import { criteriaSchema, criterionApplies, subcategoryById, type Subcategory } from "@/config/categories";
 import { listingQuotas, type Seller } from "@/config/pricing";
 import { cityBySlug } from "@/config/regions";
-import { isVariantCriterion, withVariantAnswers } from "@/lib/contracts/catalog";
+import { SOLDES_PATTERN, isVariantCriterion, withVariantAnswers } from "@/lib/contracts/catalog";
 import { descriptionSchema, titleSchema, type FieldIssue } from "@/lib/contracts/listings";
 import type { ListingDoc } from "@/lib/db/schemas";
 import { realEstateIssues } from "./real-estate";
@@ -43,6 +43,7 @@ export const READINESS_CODES = [
   "variants_axis_invalid",
   "stock_pro_only",
   "stock_with_variants",
+  "title_soldes",
   "unknown",
 ] as const;
 export type ReadinessCode = (typeof READINESS_CODES)[number];
@@ -53,7 +54,7 @@ export interface SellerFacts {
 }
 
 type Candidate = Pick<ListingDoc, "title" | "description" | "categoryId" | "subcategoryId" | "attributes" | "condition" | "price" | "isDonation" | "location" | "photos" | "contact"> &
-  Partial<Pick<ListingDoc, "variants" | "stock">>;
+  Partial<Pick<ListingDoc, "variants" | "stock" | "promo">>;
 
 const issue = (path: string, code: ReadinessCode): FieldIssue => ({ path, code });
 
@@ -168,6 +169,8 @@ function locationIssues(listing: Candidate): FieldIssue[] {
 export function assessReadiness(listing: Candidate, facts: SellerFacts): FieldIssue[] {
   const issues: FieldIssue[] = [];
   issues.push(...textIssues("title", listing.title, titleSchema));
+  // Art. 53 of law 31-08: « soldes » names a sale with its dates and struck-out prices, nothing else.
+  if (SOLDES_PATTERN.test(listing.title) && listing.promo?.kind !== "soldes") issues.push(issue("title", "title_soldes"));
   issues.push(...textIssues("description", listing.description, descriptionSchema));
   const tree = treeIssues(listing, facts.seller);
   issues.push(...tree.issues);

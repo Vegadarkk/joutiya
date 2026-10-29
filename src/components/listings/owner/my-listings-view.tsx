@@ -217,6 +217,13 @@ export function MyListingsView() {
     [apiMessage, refresh, router, t, tab],
   );
 
+  /** A row changed in place (promotion): a deep cut held for review leaves the « En ligne » tab. */
+  const onChanged = useCallback(
+    (summary: OwnerListingSummary) =>
+      refresh(tab, (listings) => listings.flatMap((item) => (item.id !== summary.id ? [item] : BUCKET_STATUSES[tab].includes(summary.status) ? [{ ...summary, canRenew: item.canRenew }] : []))),
+    [refresh, tab],
+  );
+
   const onDelete = useCallback(
     async (id: string) => {
       setBusyId(id);
@@ -338,7 +345,7 @@ export function MyListingsView() {
             ) : null}
             <ul className={cn("flex flex-col divide-y divide-border transition-opacity duration-200", current.refreshing && "opacity-80")} aria-busy={busyId !== null || current.refreshing || undefined}>
               {current.listings.map((listing) => (
-                <OwnerListingCard key={listing.id} listing={listing} mediaBaseUrl={mediaBaseUrl} busy={busyId === listing.id} salesOpen={salesOpen} onAction={(action) => onAction(listing.id, action)} onDelete={() => onDelete(listing.id)} />
+                <OwnerListingCard key={listing.id} listing={listing} mediaBaseUrl={mediaBaseUrl} busy={busyId === listing.id} salesOpen={salesOpen} onAction={(action) => onAction(listing.id, action)} onDelete={() => onDelete(listing.id)} onChanged={onChanged} />
               ))}
             </ul>
           </>

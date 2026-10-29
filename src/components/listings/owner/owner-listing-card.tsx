@@ -18,6 +18,7 @@ import { wizardPath } from "@/lib/listings/client/routes";
 import { cn } from "@/lib/utils";
 import { primaryAction } from "./buckets";
 import { ListingActions } from "./listing-actions";
+import { OwnerPromo, showsPromo } from "./owner-promo";
 import { OwnerStock } from "./owner-stock";
 import { ListingStatusBadge } from "./status-badge";
 
@@ -33,13 +34,15 @@ interface OwnerListingCardProps {
   busy?: boolean;
   salesOpen?: boolean;
   now?: Date;
+  /** The row after a change made in place (a promotion set or stopped). */
+  onChanged?: (listing: OwnerListingSummary) => void;
 }
 
 /**
  * One row of "Mes annonces": cover, title, price, city, status, expiry, actions. On phones the
  * primary action takes the full row under the cover (its label is longer than the text column).
  */
-export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, busy = false, salesOpen = false, now = new Date() }: OwnerListingCardProps) {
+export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, busy = false, salesOpen = false, now = new Date(), onChanged }: OwnerListingCardProps) {
   const t = useTranslations("MyListings");
   const locale = useLocale() as Locale;
   const city = listing.citySlug ? cityBySlug(listing.citySlug) : undefined;
@@ -107,6 +110,7 @@ export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, bu
         {listing.status === "rejected" ? <p className="text-xs text-danger text-pretty">{t("rejected.body")}</p> : null}
         {listing.rental ? <OwnerAvailability listingId={listing.id} title={title} rental={listing.rental} now={now} /> : null}
         {listing.catalogue && STOCK_STATUSES.includes(listing.status) ? <OwnerStock listingId={listing.id} title={title} catalogue={listing.catalogue} /> : null}
+        {listing.catalogue && onChanged && showsPromo(listing) ? <OwnerPromo listing={{ ...listing, catalogue: listing.catalogue }} title={title} now={now} onChanged={onChanged} /> : null}
       </div>
       {primary ? (
         <div className="col-span-2 mt-3 flex min-w-0 sm:col-span-1 sm:col-start-2 sm:mt-2">

@@ -2,9 +2,9 @@ import "server-only";
 import { z } from "@/lib/zod";
 import { requireUser, type AuthContext } from "@/lib/auth/guards";
 import { applyDevice, applyTurnstilePass, deviceOf, jsonResponse } from "@/lib/auth/respond";
-import { FLEET_MAX, OWNER_LIST_BUCKETS, createListingSchema, fleetSaveSchema, listingPatchSchema, publishListingSchema, rentalAvailabilityInputSchema, type CreateListingResponse, type ListingResponse, type OwnerListingsResponse, type RentalAvailabilityResponse } from "@/lib/contracts/listings";
+import { FLEET_MAX, OWNER_LIST_BUCKETS, createListingSchema, fleetSaveSchema, listingPatchSchema, publishListingSchema, rentalAvailabilityInputSchema, type CreateListingResponse, type ListingResponse, type OwnerListingsResponse, type PromoResponse, type RentalAvailabilityResponse } from "@/lib/contracts/listings";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
-import { stockUpdateSchema } from "@/lib/contracts/catalog";
+import { promoInputSchema, stockUpdateSchema } from "@/lib/contracts/catalog";
 import { getListing, listOwnerListings } from "@/lib/db/repositories/listings";
 import { getFlags } from "@/lib/config/runtime";
 import { HttpError, notFound } from "@/lib/http/errors";
@@ -18,7 +18,7 @@ import { listFleet, saveFleet } from "./fleet";
 import { isListingId } from "./ids";
 import { ownerListingView, toOwnerSummary } from "./owner-view";
 import { revealPhone } from "./phone-reveal";
-import { changeStatus, createDraft, patchListing, publish, updateStock, type Actor, type OwnerAction } from "./service";
+import { changeStatus, createDraft, patchListing, publish, endListingPromo, setPromo, updateStock, type Actor, type OwnerAction } from "./service";
 
 // Route handlers of /api/listings/** (design §3): thin, every one through requireUser (Origin +
 // CSRF on mutations, 401 anonymous, 403 role_missing / account_suspended), the owner check inside
@@ -113,6 +113,29 @@ export async function handleStock(request: Request, params: Params): Promise<Res
   await enforceLimit("listing.owner.read.uid", auth.user.uid);
   const body: ListingResponse = { listing: await updateStock(actorOf(request, auth), id, input) };
   await chargeOwnerRead(auth.user.uid, 1 + body.listing.photos.length);
+  return json(body);
+}
+
+export async function handlePromo(request: Request, params: Params): Promise<Response> {
+  const auth = await requireUser(request, { mutation: true });
+  const id = await listingIdOf(params);
+  const input = await readJson(request, promoInputSchema);
+  await enforceLimit("listing.promo.uid", auth.user.uid);
+  await assertQuotas(DEPOSIT_QUOTAS);
+  await enforceLimit("listing.owner.read.uid", auth.user.uid);
+  const body: PromoResponse = { listing: await setPromo(actorOf(request, auth), id, input) };
+  await chargeOwnerRead(auth.user.uid, 1);
+  return json(body);
+}
+
+export async function handleEndPromo(request: Request, params: Params): Promise<Response> {
+  const auth = await requireUser(request, { mutation: true });
+  const id = await listingIdOf(params);
+  await enforceLimit("listing.promo.uid", auth.user.uid);
+  await assertQuotas(DEPOSIT_QUOTAS);
+  await enforceLimit("listing.owner.read.uid", auth.user.uid);
+  const body: PromoResponse = { listing: await endListingPromo(actorOf(request, auth), id) };
+  await chargeOwnerRead(auth.user.uid, 1);
   return json(body);
 }
 

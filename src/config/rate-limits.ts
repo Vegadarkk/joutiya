@@ -86,6 +86,8 @@ export const RATE_LIMITS = {
   // PUT /api/listings/{id}/stock (catalogue §7): the declared stock alone, one write and a
   // grouped re-index, no screening. 2 000 per day per account (a shop of 1 000 listings twice).
   "listing.stock.uid": { points: 2000, duration: DAY, policy: "open", key: "uid" },
+  // PUT and DELETE /api/listings/{id}/promo (catalogue §7): 200 per day per account.
+  "listing.promo.uid": { points: 200, duration: DAY, policy: "open", key: "uid" },
   // POST /api/pro/apply (phase 7): a few attempts a day per account (reads the account, the
   // owner's shop and up to 6 uploads, then one transaction).
   "pro.apply.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },

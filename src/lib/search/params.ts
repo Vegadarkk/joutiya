@@ -21,7 +21,7 @@ export const SEARCH_DISTRICT_MAX = 64;
 /** Radius choices around the chosen city centroid, km. */
 export const RADIUS_KM = [5, 10, 20, 50, 100, 200] as const;
 export type RadiusKm = (typeof RADIUS_KM)[number];
-export const SEARCH_SORTS = ["recent", "relevance", "price_asc", "price_desc", "distance"] as const;
+export const SEARCH_SORTS = ["recent", "relevance", "price_asc", "price_desc", "distance", "discount"] as const;
 export type SearchSort = (typeof SEARCH_SORTS)[number];
 export const SELLER_TYPES_FILTER = ["individual", "pro"] as const;
 export type SellerTypeFilter = (typeof SELLER_TYPES_FILTER)[number];
@@ -40,6 +40,7 @@ const SORT_PARAM: Record<SearchSort, string> = {
   price_asc: "prix-croissant",
   price_desc: "prix-decroissant",
   distance: "distance",
+  discount: "reduction",
 };
 const SELLER_PARAM: Record<SellerTypeFilter, string> = { individual: "particulier", pro: "pro" };
 
@@ -69,6 +70,8 @@ export interface SearchParams {
   withPhoto?: true;
   /** Sold-out Pro listings too (owner decision 1: out of the default results, still online). */
   includeSoldOut?: true;
+  /** Running promotions only (catalogue §4); the « Réduction » sort implies it. */
+  promo?: true;
   conditions?: Condition[];
   /** Only for criteria of `subcategory` (select, multiselect, number, boolean). */
   criteria?: Record<string, CriterionFilter>;
@@ -182,6 +185,7 @@ export function parseSearchParams(source: Source): SearchParams {
   if (read(source, k.donation) === "1") params.donation = true;
   if (read(source, k.withPhoto) === "1") params.withPhoto = true;
   if (read(source, k.includeSoldOut) === "1") params.includeSoldOut = true;
+  if (read(source, k.promo) === "1") params.promo = true;
   const conditions = list(read(source, k.conditions)).filter((value): value is Condition => (CONDITIONS as readonly string[]).includes(value));
   if (conditions.length) params.conditions = conditions;
   const dates = validDates(read(source, k.rentFrom), read(source, k.rentTo));
@@ -323,6 +327,7 @@ export function searchParamsToQuery(input: SearchParams): URLSearchParams {
   if (params.donation) query.set(k.donation, "1");
   if (params.withPhoto) query.set(k.withPhoto, "1");
   if (params.includeSoldOut) query.set(k.includeSoldOut, "1");
+  if (params.promo) query.set(k.promo, "1");
   if (params.conditions?.length) query.set(k.conditions, params.conditions.join(","));
   for (const [id, filter] of Object.entries(params.criteria ?? {})) {
     if (filter.kind === "options") query.set(`${CRITERION_PARAM_PREFIX}${id}`, filter.values.join(","));
@@ -385,6 +390,7 @@ export const storedSearchParamsSchema = z
     donation: z.literal(true).optional(),
     withPhoto: z.literal(true).optional(),
     includeSoldOut: z.literal(true).optional(),
+    promo: z.literal(true).optional(),
     conditions: z.array(z.enum(CONDITIONS)).min(1).max(CONDITIONS.length).optional(),
     criteria: z
       .record(
