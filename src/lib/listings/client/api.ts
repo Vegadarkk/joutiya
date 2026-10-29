@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut, csrfToken } from "@/lib/auth/client";
+import type { StockUpdateInput } from "@/lib/contracts/catalog";
 import {
   LISTING_API,
   type CreateListingInput,
@@ -67,6 +68,11 @@ export function listingAction(id: string, action: OwnerAction): Promise<ListingR
 /** A car rental's blocked periods (replaced), or the same ones to confirm they are up to date. */
 export function saveAvailability(id: string, input: RentalAvailabilityInput): Promise<RentalAvailabilityResponse> {
   return apiPut<RentalAvailabilityResponse>(LISTING_API.availability(id), input);
+}
+
+/** The declared stock alone of a Pro listing (catalogue §3): no new moderation. */
+export function saveStock(id: string, input: StockUpdateInput): Promise<ListingResponse> {
+  return apiPut<ListingResponse>(LISTING_API.stock(id), input);
 }
 
 /** A car rental agency's fleet planning. */

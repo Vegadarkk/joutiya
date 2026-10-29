@@ -246,6 +246,8 @@ export interface OwnerListingSummary {
   expiresAt: string | null;
   /** Expired before purge, or published with less than 7 days left (D16). */
   canRenew: boolean;
+  /** Pro listing (catalogue §3): its declared stock, edited in place from « Mes annonces ». */
+  catalogue?: { stock: number | null; variants: ListingVariants | null };
   /** Car rentals only: the blocked periods the availability calendar edits. */
   rental?: RentalAvailability;
 }

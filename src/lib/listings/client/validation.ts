@@ -20,6 +20,7 @@ import {
   type OwnerListing,
   type WizardStep,
 } from "@/lib/contracts/listings";
+import { withVariantAnswers } from "@/lib/contracts/catalog";
 import { MAX_PHOTOS_PRO } from "@/lib/contracts/media";
 import { rentalIssues } from "@/lib/listings/rental";
 
@@ -32,7 +33,7 @@ export type DraftLike = Pick<
   OwnerListing,
   "categoryId" | "subcategoryId" | "title" | "description" | "attributes" | "condition" | "price" | "priceNegotiable" | "isDonation" | "location" | "photos" | "contact"
 > &
-  Partial<Pick<OwnerListing, "sellerType">>;
+  Partial<Pick<OwnerListing, "sellerType" | "variants">>;
 
 export { TITLE_MIN, TITLE_MAX, DESCRIPTION_MIN, DESCRIPTION_MAX, PRICE_MAX, DISTRICT_MAX };
 
@@ -72,6 +73,8 @@ export function stepOfPath(path: string): WizardStep {
     case "price":
     case "priceNegotiable":
     case "isDonation":
+    case "variants":
+    case "stock":
       return "prix";
     case "location":
       return "lieu";
@@ -212,8 +215,11 @@ export function stepValues(step: WizardStep, draft: DraftLike): Record<string, u
   switch (step) {
     case "categorie":
       return { categoryId: draft.categoryId ?? "", subcategoryId: draft.subcategoryId ?? "" };
-    case "criteres":
-      return { attributes: draft.attributes, condition: draft.condition };
+    case "criteres": {
+      // A criterion a variant axis takes over (the size of clothes) is answered by the axis.
+      const criteria = draft.subcategoryId ? (subcategoryById(draft.subcategoryId)?.criteria.map((criterion) => criterion.id) ?? []) : [];
+      return { attributes: withVariantAnswers(draft.attributes, draft.variants, criteria), condition: draft.condition };
+    }
     case "titre":
       return { title: draft.title };
     case "description":

@@ -18,7 +18,11 @@ import { wizardPath } from "@/lib/listings/client/routes";
 import { cn } from "@/lib/utils";
 import { primaryAction } from "./buckets";
 import { ListingActions } from "./listing-actions";
+import { OwnerStock } from "./owner-stock";
 import { ListingStatusBadge } from "./status-badge";
+
+/** Statuses whose stock the Pro sets from the list (the read-only ones have none to keep up). */
+const STOCK_STATUSES: readonly OwnerListingSummary["status"][] = ["published", "paused", "pending_review", "expired"];
 
 interface OwnerListingCardProps {
   listing: OwnerListingSummary;
@@ -102,6 +106,7 @@ export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, bu
         {listing.status === "pending_review" ? <p className="text-xs text-foreground-muted text-pretty">{t("pending.body")}</p> : null}
         {listing.status === "rejected" ? <p className="text-xs text-danger text-pretty">{t("rejected.body")}</p> : null}
         {listing.rental ? <OwnerAvailability listingId={listing.id} title={title} rental={listing.rental} now={now} /> : null}
+        {listing.catalogue && STOCK_STATUSES.includes(listing.status) ? <OwnerStock listingId={listing.id} title={title} catalogue={listing.catalogue} /> : null}
       </div>
       {primary ? (
         <div className="col-span-2 mt-3 flex min-w-0 sm:col-span-1 sm:col-start-2 sm:mt-2">

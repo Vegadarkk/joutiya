@@ -7,7 +7,9 @@ import { criterionApplies, criterionById, subcategoryById, type Condition } from
 import type { FieldIssue } from "@/lib/contracts/listings";
 import { useWizard } from "@/lib/listings/client/store";
 import { criterionBounds, stepIssues } from "@/lib/listings/client/validation";
+import { variantCriteria } from "@/lib/contracts/catalog";
 import { CriteriaFields, type AttributeValue } from "../criteria-fields";
+import { useCriteriaLabels } from "../labels";
 import { useValidationMessage } from "../field-messages";
 import { STEP_FORM_ID } from "../wizard-shell";
 
@@ -15,6 +17,7 @@ export function CriteriaStep({ onNext }: { onNext: () => void }) {
   const { listing, update, flush, blockers } = useWizard();
   const t = useTranslations("Listing");
   const message = useValidationMessage();
+  const labels = useCriteriaLabels();
   const [attempted, setAttempted] = useState(false);
   const subcategory = listing.subcategoryId ? subcategoryById(listing.subcategoryId) : undefined;
 
@@ -37,6 +40,11 @@ export function CriteriaStep({ onNext }: { onNext: () => void }) {
       </form>
     );
   }
+
+  // A criterion a variant axis takes over (the size of clothes) is set at the price step.
+  const taken = new Set<string>(variantCriteria(listing.variants));
+  const covered = subcategory.criteria.filter((criterion) => taken.has(criterion.id));
+  const shown = covered.length > 0 ? { ...subcategory, criteria: subcategory.criteria.filter((criterion) => !taken.has(criterion.id)) } : subcategory;
 
   function onAttribute(id: string, value: AttributeValue | undefined) {
     const attributes = { ...listing.attributes };
@@ -66,7 +74,8 @@ export function CriteriaStep({ onNext }: { onNext: () => void }) {
       ) : (
         <>
           <p className="text-sm text-foreground-muted">{t("wizard.requiredHint")}</p>
-          <CriteriaFields subcategory={subcategory} attributes={listing.attributes} condition={listing.condition} errors={errors} onAttribute={onAttribute} onCondition={onCondition} onBlur={() => void flush()} pro={listing.sellerType === "pro"} />
+          {covered.length > 0 ? <p className="text-sm text-foreground-muted">{t("catalogue.fromVariants", { criteria: covered.map((criterion) => labels.label(criterion.id)).join(", ") })}</p> : null}
+          <CriteriaFields subcategory={shown} attributes={listing.attributes} condition={listing.condition} errors={errors} onAttribute={onAttribute} onCondition={onCondition} onBlur={() => void flush()} pro={listing.sellerType === "pro"} />
         </>
       )}
     </form>
