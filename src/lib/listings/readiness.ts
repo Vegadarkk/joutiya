@@ -4,6 +4,7 @@ import { cityBySlug } from "@/config/regions";
 import { descriptionSchema, titleSchema, type FieldIssue } from "@/lib/contracts/listings";
 import type { ListingDoc } from "@/lib/db/schemas";
 import { realEstateIssues } from "./real-estate";
+import { rentalIssues } from "./rental";
 
 // Publish readiness (architecture §7 step 1, design D4/D8): the hard blockers a listing must clear
 // before the pre-moderation runs. Pure: config and contracts only, so the matrix is unit-tested on
@@ -27,6 +28,7 @@ export const READINESS_CODES = [
   "price_required",
   "price_invalid",
   "deposit_max",
+  "rental_rate_max",
   "donation_not_allowed",
   "donation_price",
   "city_required",
@@ -148,6 +150,7 @@ export function assessReadiness(listing: Candidate, facts: SellerFacts): FieldIs
     issues.push(...attributeIssues(listing.attributes, tree.subcategory, facts.seller));
     issues.push(...dossierIssues(listing.attributes, tree.subcategory, facts.seller));
     issues.push(...realEstateIssues(listing, tree.subcategory));
+    issues.push(...rentalIssues(listing, tree.subcategory));
     if (tree.subcategory.condition === "required" && !listing.condition) issues.push(issue("condition", "condition_required"));
     issues.push(...priceIssues(listing, tree.subcategory));
   }

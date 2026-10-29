@@ -148,6 +148,7 @@ export const FLAG_LABELS: Record<ModerationFlag, string> = {
   restricted_category: "Catégorie réservée aux majeurs",
   credit_ad: "Mensualité sans TEG",
   sanitary_check: "N° ONSSA à vérifier",
+  rental_review: "Location à vérifier",
 };
 
 export const DECISION_TEXT_MAX = 500;

@@ -10,11 +10,12 @@ import { SwitchField } from "@/components/post/controls/switch";
 import { NumberInput } from "@/components/post/criteria-fields";
 import { useCategoryLabels } from "@/components/post/labels";
 import { Button } from "@/components/ui/button";
-import { CATEGORIES, CONDITIONS, subcategoryById, type Condition } from "@/config/categories";
+import { CATEGORIES, CONDITIONS, RENTAL_SUBCATEGORY, subcategoryById, type Condition } from "@/config/categories";
+import { RentalDatesFields, completeDates } from "@/components/rental/rental-dates-fields";
 import type { Locale } from "@/config/site";
 import { useNumbersTranslations } from "@/i18n/numbers";
 import { currencyLabel } from "@/lib/listings/client/format";
-import { canonicalSearchParams, RADIUS_KM, type SearchParams, type SellerTypeFilter } from "@/lib/search/params";
+import { canonicalSearchParams, RADIUS_KM, type RentalDates, type SearchParams, type SellerTypeFilter } from "@/lib/search/params";
 import type { SearchFacets } from "@/lib/search/types";
 import { cn } from "@/lib/utils";
 import { SearchCityCombobox } from "./city-combobox";
@@ -102,6 +103,8 @@ export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
   const ids = useId();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<SearchParams>(params);
+  // Car rentals: the days being typed (one may still be empty), applied once both are set.
+  const [rentDates, setRentDates] = useState<Partial<RentalDates>>(params.dates ?? {});
   const count = countFilters(params);
   const update = (patch: Partial<SearchParams>) => setDraft((current) => ({ ...current, ...patch }));
 
@@ -112,7 +115,7 @@ export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
 
   function apply(event: FormEvent) {
     event.preventDefault();
-    navigation?.navigate(canonicalSearchParams({ ...draft, page: undefined }));
+    navigation?.navigate(canonicalSearchParams({ ...draft, dates: completeDates(rentDates), page: undefined }));
     setOpen(false);
   }
 
@@ -120,7 +123,10 @@ export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
     <Dialog.Root
       open={open}
       onOpenChange={(next) => {
-        if (next) setDraft(params);
+        if (next) {
+          setDraft(params);
+          setRentDates(params.dates ?? {});
+        }
         setOpen(next);
       }}
     >
@@ -164,6 +170,12 @@ export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col divide-y divide-border overflow-y-auto overscroll-contain px-5">
+              {draft.subcategory === RENTAL_SUBCATEGORY ? (
+                <Section title={t("sections.rentalDates")}>
+                  <RentalDatesFields value={rentDates} onChange={setRentDates} />
+                  <p className="text-sm text-foreground-muted">{t("rentalDatesHint")}</p>
+                </Section>
+              ) : null}
               <Section title={t("sections.category")}>
                 <label htmlFor={`${ids}-category`} className="sr-only">
                   {t("sections.category")}
@@ -285,7 +297,14 @@ export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
             </div>
 
             <div className="flex items-center gap-2 border-t border-border px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-              <Button type="button" variant="ghost" onClick={() => setDraft((current) => clearFilters(current))}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setDraft((current) => clearFilters(current));
+                  setRentDates({});
+                }}
+              >
                 {t("reset")}
               </Button>
               <Button type="submit" className="flex-1">

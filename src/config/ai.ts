@@ -52,7 +52,14 @@ export const aiConfigSchema = z
     /** Trusted flaggers (art. 22 DSA) and authorities' accounts: their P0 reports are strong signals. */
     trustedFlaggers: z.array(z.string().min(1).max(128)).max(50),
     models: z
-      .object({ screen: z.string().min(1).max(80), triage: z.string().min(1).max(80), appeal: z.string().min(1).max(80), assistant: z.string().min(1).max(80) })
+      .object({
+        screen: z.string().min(1).max(80),
+        triage: z.string().min(1).max(80),
+        appeal: z.string().min(1).max(80),
+        assistant: z.string().min(1).max(80),
+        /** Reading of a car rental agency's licence decision (decision 5); absent: the appeal model. */
+        document: z.string().min(1).max(80).optional(),
+      })
       .strict(),
     /** USD per million tokens, by model id (cost accounting into the `claude.budget` quota). */
     prices: z.record(

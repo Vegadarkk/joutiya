@@ -1,8 +1,8 @@
 import "server-only";
-import type { Condition } from "@/config/categories";
+import { RENTAL_SUBCATEGORY, type Condition } from "@/config/categories";
 import { REVIEWS_PAGE } from "@/config/reviews";
 import { DEFAULT_BANNER, type BannerKey } from "@/config/storefront";
-import type { ListingAttributes, ListingStatus } from "@/lib/contracts/listings";
+import type { ListingAttributes, ListingStatus, RentalAvailability } from "@/lib/contracts/listings";
 import type { PhotoVariant } from "@/lib/contracts/photo-variants";
 import type { RatingSummary, ReviewPage } from "@/lib/contracts/reviews";
 import { COLLECTIONS } from "@/lib/db/schemas";
@@ -10,15 +10,16 @@ import { getListing, listPublishedByOwner, type ListingRecord } from "@/lib/db/r
 import { findUserByPublicId, getUserRecord, type UserRecord } from "@/lib/db/repositories/profiles";
 import { getSellerPayments } from "@/lib/config/runtime";
 import type { PublicShopPayment } from "@/lib/contracts/seller-payment";
-import { getProProfile } from "@/lib/db/repositories/pro-profiles";
+import { getProProfile, type ProProfileRecord } from "@/lib/db/repositories/pro-profiles";
 import { publicShopPayment } from "@/lib/pro/seller-payment";
 import { db } from "@/lib/firebase/admin";
 import { aggregationReads, consume } from "@/lib/quota";
 import { assertQuotas, PUBLIC_READ_QUOTAS } from "@/lib/quota/gate";
 import { storefrontShown } from "@/lib/pro/lifecycle";
-import { PRO_ID_PATTERN, type ProSector } from "@/lib/pro/profile-schema";
+import { PRO_ID_PATTERN, type ProSector, type RentalAgency } from "@/lib/pro/profile-schema";
 import { sellerReviews } from "@/lib/reviews/seller";
 import { ratingSummary } from "@/lib/reviews/views";
+import { rentalAvailabilityOf } from "./availability";
 import { cardFactsField, cardFactsOf, type CardFacts } from "./card-facts";
 import { buildSlugId, parseSlugId } from "./ids";
 
@@ -159,6 +160,8 @@ export interface PublicListing {
   seller: { publicId: string; name: string; type: UserRecord["type"] };
   /** Example listing (src/lib/demo): labelled, no contact action, not indexed by search engines. */
   example: boolean;
+  /** Car rentals: the agency's declared availability (rental pack §3); null otherwise. */
+  rental: RentalAvailability | null;
   /** ISO 8601. */
   publishedAt: string;
   sortAt: string;
@@ -216,6 +219,7 @@ export function toPublicListing(record: ListingRecord, state: PublicState, slugI
     contact: { showPhone: record.contact.showPhone, whatsapp: record.contact.whatsapp },
     seller: { publicId: record.sellerPublicId, name: record.sellerName, type: record.sellerType },
     example: record.example === true,
+    rental: subcategoryId === RENTAL_SUBCATEGORY ? rentalAvailabilityOf(record) : null,
     publishedAt: publishedAt.toISOString(),
     sortAt: record.sortAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
@@ -344,6 +348,10 @@ export interface PublicStorefront {
   sector: ProSector;
   /** The agency's fee schedule ("" when none). */
   feeSchedule: string;
+  /** A car rental agency's settings (sector "car_rental", rental pack §5), null until saved. */
+  rental: RentalAgency | null;
+  /** ISO day the licence decision was checked on its document (decision 5), null while not checked. */
+  rentalCheckedAt: string | null;
   /** « Payer chez le vendeur » and the seller information, when the shop has turned them on. */
   payment: PublicShopPayment | null;
   /** The owner's public face and listings, as on /profil. */
@@ -372,8 +380,17 @@ export async function getPublicStorefront(proId: string, limit = 24): Promise<Pu
     citySlug: profile.citySlug,
     sector: profile.sector ?? "general",
     feeSchedule: profile.sector === "real_estate" ? (profile.agency?.feeSchedule ?? "") : "",
+    rental: profile.sector === "car_rental" ? (profile.rental ?? null) : null,
+    rentalCheckedAt: profile.sector === "car_rental" ? checkedOn(profile) : null,
     seller: await profileView(user, limit),
   };
+}
+
+/** The day the licence check was passed, for the reference still in the settings. */
+function checkedOn(profile: Pick<ProProfileRecord, "rental" | "rentalCheck">): string | null {
+  const check = profile.rentalCheck;
+  if (!check || check.status !== "verified" || !check.checkedAt || check.agrementRef !== profile.rental?.agrementRef) return null;
+  return check.checkedAt.toISOString();
 }
 
 export function storefrontSegment(slug: string, proId: string): string {

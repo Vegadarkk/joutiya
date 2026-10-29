@@ -1,6 +1,6 @@
 import "server-only";
 import { isDeepStrictEqual } from "node:util";
-import { subcategoryAllowsAds, subcategoryById } from "@/config/categories";
+import { RENTAL_SUBCATEGORY, subcategoryAllowsAds, subcategoryById } from "@/config/categories";
 import { listingLifetime, listingQuotas, withinQuota, type ListingQuotas, type Seller } from "@/config/pricing";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { AuthContext } from "@/lib/auth/guards";
@@ -53,6 +53,7 @@ import { IllegalTransitionError, canRenew, canTransition, draftPurgeAt, renew, r
 import { ownerListingView } from "./owner-view";
 import { PUBLIC_STATES } from "./public";
 import { assessReadiness } from "./readiness";
+import { needsRealEstateAttestation } from "./real-estate";
 import { revalidateListingPaths } from "./revalidate";
 import { screen, sellerFacts, type ScreeningResult } from "./screening";
 
@@ -88,6 +89,8 @@ export interface SellerContext {
   quotas: ListingQuotas;
   /** ONSSA numbers a moderator already checked for the shop (Produits du terroir); none for an individual. */
   sanitaryNumbers?: readonly string[];
+  /** A car rental agency's licence reference (rental pack decision 3), when its settings hold one. */
+  rentalAgrementRef?: string;
 }
 
 export async function sellerOf(auth: AuthContext): Promise<SellerContext> {
@@ -101,8 +104,10 @@ export async function sellerOf(auth: AuthContext): Promise<SellerContext> {
   const profile = proId ? await getProProfile(proId) : null;
   const plan = profile && profile.ownerUid === user.uid && publishesAsPro(profile.lifecycle) ? profile.plan : "none";
   const seller: Seller = { type: "pro", plan };
-  const sanitaryNumbers = profile && profile.ownerUid === user.uid ? (profile.sanitaryNumbers ?? []) : [];
-  return { user, seller, quotas: listingQuotas(seller, pricing), sanitaryNumbers };
+  const own = profile && profile.ownerUid === user.uid ? profile : null;
+  const sanitaryNumbers = own ? (own.sanitaryNumbers ?? []) : [];
+  const agrementRef = own?.rental?.agrementRef;
+  return { user, seller, quotas: listingQuotas(seller, pricing), sanitaryNumbers, ...(agrementRef ? { rentalAgrementRef: agrementRef } : {}) };
 }
 
 async function lifetime(): Promise<Lifetime> {
@@ -404,6 +409,10 @@ export interface PublishOptions {
   turnstileToken?: string;
   /** The seller ticked the adults-only attestation (required in an `adultsOnly` subcategory). */
   adultsOnlyAttestation?: boolean;
+  /** The advertiser attested its declared real-estate data (required in the immobilier category). */
+  realEstateAttestation?: boolean;
+  /** The agency ticked the car rental attestation (required in `location-voitures`). */
+  rentalAttestation?: boolean;
   device: Device;
   now?: Date;
 }
@@ -431,7 +440,11 @@ export async function publish(actor: Actor, request: Request, id: string, option
   if (blockers.length > 0) throw invalidListing(blockers);
   const screening = await screenFor(listing, seller, now);
   if (screening.blockers.length > 0) throw invalidListing(screening.blockers);
-  if (subcategoryById(listing.subcategoryId ?? "")?.adultsOnly && !options.adultsOnlyAttestation) throw new HttpError(422, "adults_only_attestation");
+  const subcategory = subcategoryById(listing.subcategoryId ?? "");
+  if (subcategory?.adultsOnly && !options.adultsOnlyAttestation) throw new HttpError(422, "adults_only_attestation");
+  if (needsRealEstateAttestation(subcategory) && !options.realEstateAttestation) throw new HttpError(422, "real_estate_attestation");
+  if (listing.subcategoryId === RENTAL_SUBCATEGORY && !seller.rentalAgrementRef) throw new HttpError(422, "rental_agrement_missing");
+  if (listing.subcategoryId === RENTAL_SUBCATEGORY && !options.rentalAttestation) throw new HttpError(422, "rental_attestation");
 
   await assertWithinQuota(uid, seller.quotas);
   const turnstilePassed = await escalateOnIp(request, "listing.create.ip", options.device, options.turnstileToken, "listing");

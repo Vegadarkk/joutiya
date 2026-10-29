@@ -33,6 +33,8 @@ export interface DemoEntry {
   attributes: Record<string, string | number | boolean | string[]>;
   /** Pexels photo ids, display order. */
   photos: string[];
+  /** Car rentals: blocked periods as [first, last] days after the seed day (rental pack §3). */
+  rentalBlocked?: [number, number][];
 }
 
 export const DEMO_SELLERS: readonly DemoSeller[] = [
@@ -219,8 +221,9 @@ export const DEMO_ENTRIES: readonly DemoEntry[] = [
     description:
       "Berline récente de catégorie Dacia Logan ou similaire, diesel, climatisée, à louer à la journée ou à la semaine. Kilométrage illimité, assurance tous risques incluse. Livraison gratuite à l'aéroport Marrakech Menara. Tarif dégressif à partir de 7 jours.",
     price: 300,
-    attributes: { "car-brand": "dacia", model: "Logan", year: 2024, gearbox: "manuelle", fuel: "diesel" },
+    attributes: { "rental-class": "berline", "car-brand": "dacia", model: "Logan", year: 2024, gearbox: "manuelle", fuel: "diesel", seats: 5, "min-rental-days": 2, "mileage-policy": "illimite", "rental-insurance": "tous-risques-franchise", "insurance-excess": 5000, "rental-deposit": 5000, "driver-min-age": 21, "licence-years": 2, "vehicle-handover": ["agence", "aeroport"], "rate-7-days": 260, "rate-30-days": 220, "fleet-units": 6 },
     photos: ["34661689"],
+    rentalBlocked: [[3, 6], [15, 22], [40, 44]],
   },
   {
     key: "rent-picanto",
@@ -232,8 +235,9 @@ export const DEMO_ENTRIES: readonly DemoEntry[] = [
     description:
       "Petite citadine automatique idéale pour la ville et la corniche. Location minimum 2 jours, caution par carte ou espèces. Siège bébé disponible sur demande.",
     price: 250,
-    attributes: { "car-brand": "kia", model: "Picanto", year: 2023, gearbox: "automatique", fuel: "essence" },
+    attributes: { "rental-class": "citadine", "car-brand": "kia", model: "Picanto", year: 2023, gearbox: "automatique", fuel: "essence", seats: 4, "min-rental-days": 2, "mileage-policy": "limite", "km-per-day": 250, "rental-insurance": "rc", "rental-deposit": 3000, "driver-min-age": 21, "licence-years": 1, "vehicle-handover": ["agence", "livraison"], "rental-extras": ["siege-bebe"], "rate-7-days": 220, "fleet-units": 3 },
     photos: ["20475125", "20475132", "20475153"],
+    rentalBlocked: [[1, 2], [9, 12]],
   },
   {
     key: "moto-tmax",

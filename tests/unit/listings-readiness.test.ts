@@ -79,7 +79,7 @@ describe("assessReadiness", () => {
   it("checks the category tree: unknown, mismatch, Pro-only", () => {
     expect(codes(ready({ subcategoryId: "licornes" })).get("subcategoryId")).toEqual(["unknown"]);
     expect(codes(ready({ categoryId: "mode", subcategoryId: "velos" })).get("subcategoryId")).toEqual(["subcategory_mismatch"]);
-    const rental = ready({ subcategoryId: "location-voitures", attributes: { "car-brand": "dacia", model: "Logan", gearbox: "manuelle" }, price: 300, condition: undefined });
+    const rental = ready({ subcategoryId: "location-voitures", attributes: { "rental-class": "berline", "car-brand": "dacia", model: "Logan", gearbox: "manuelle", fuel: "diesel" }, price: 300, condition: undefined });
     expect(codes(rental).get("subcategoryId")).toEqual(["pro_only"]);
     expect(codes(rental, PRO).has("subcategoryId")).toBe(false);
   });

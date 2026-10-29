@@ -1,8 +1,8 @@
 import { CATEGORIES, categoryById, criterionById, searchCriteria, subcategoryById, type Condition, type CriterionUnit } from "@/config/categories";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
 import type { Locale } from "@/config/site";
-import { formatPrice, groupDigits } from "@/lib/listings/client/format";
-import { canonicalSearchParams, SEARCH_MAX_PAGE, SEARCH_PATH, searchQueryObject, type CriterionFilter, type SearchParams, type SearchSort } from "@/lib/search/params";
+import { formatPrice, groupDigits, intlLocale } from "@/lib/listings/client/format";
+import { canonicalSearchParams, rentalDuration, SEARCH_MAX_PAGE, SEARCH_PATH, searchQueryObject, type CriterionFilter, type SearchParams, type SearchSort } from "@/lib/search/params";
 import type { SearchCard, SearchFacets } from "@/lib/search/types";
 import { locationName } from "./location";
 
@@ -26,6 +26,7 @@ export type FilterKey =
   | "donation"
   | "withPhoto"
   | "conditions"
+  | "dates"
   | `criterion:${string}`;
 
 /** Messages of `SearchFilters.chips`. */
@@ -46,6 +47,7 @@ export const CHIP_KEYS = [
   "rangeFrom",
   "rangeTo",
   "options",
+  "dates",
 ] as const;
 export type ChipKey = (typeof CHIP_KEYS)[number];
 
@@ -121,6 +123,9 @@ export function withoutFilter(params: SearchParams, key: FilterKey): SearchParam
     case "conditions":
       delete next.conditions;
       break;
+    case "dates":
+      delete next.dates;
+      break;
   }
   return canonicalSearchParams(next);
 }
@@ -134,6 +139,7 @@ export function clearFilters(params: SearchParams): SearchParams {
 export function activeFilterKeys(params: SearchParams): FilterKey[] {
   const keys: FilterKey[] = [];
   if (params.category) keys.push("category");
+  if (params.dates) keys.push("dates");
   if (params.city || params.region) keys.push("location");
   if (params.district) keys.push("district");
   if (params.priceMin !== undefined || params.priceMax !== undefined) keys.push("price");
@@ -224,6 +230,12 @@ function filterLabel(params: SearchParams, key: FilterKey, locale: Locale, label
       return labels.chip("withPhoto");
     case "conditions":
       return labels.chip("conditions", { values: joinValues((params.conditions ?? []).map((value) => labels.condition(value)), labels) });
+    case "dates": {
+      if (!params.dates) return key;
+      const day = new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", timeZone: "UTC" });
+      const at = (value: string) => day.format(new Date(`${value}T12:00:00Z`));
+      return labels.chip("dates", { from: at(params.dates.from), to: at(params.dates.to), days: String(rentalDuration(params.dates)) });
+    }
   }
   return key;
 }

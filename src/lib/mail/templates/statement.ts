@@ -23,6 +23,7 @@ const FLAGS: Record<MailLocale, Record<string, string>> = {
     restricted_category: "catégorie réservée aux personnes majeures : chaque annonce est vérifiée par un modérateur avant sa mise en ligne",
     credit_ad: "mensualité de crédit annoncée sans le taux effectif global (TEG) ni les mentions obligatoires de la loi 31-08",
     sanitary_check: "numéro sanitaire ONSSA utilisé pour la première fois par votre boutique : un modérateur le vérifie avant la mise en ligne",
+    rental_review: "location de véhicule à vérifier : location avec chauffeur, pièce d'identité ou chèque en blanc demandé en garantie, ou véhicule au-delà de l'âge limite des flottes de location",
   },
   ar: {
     prohibited_kw: "ذكر غرض أو خدمة ممنوعة على Joutiya",
@@ -39,6 +40,7 @@ const FLAGS: Record<MailLocale, Record<string, string>> = {
     restricted_category: "فئة مخصصة للبالغين: يراجع مشرف كل إعلان قبل نشره",
     credit_ad: "قسط قرض معلن دون السعر الفعلي الإجمالي ولا البيانات الإلزامية للقانون 31.08",
     sanitary_check: "رقم صحي (ONSSA) يستعمله متجرك لأول مرة: يتحقق منه مشرف قبل النشر",
+    rental_review: "كراء سيارة يحتاج إلى مراجعة: كراء مع سائق، أو طلب وثيقة هوية أو شيك على بياض كضمان، أو سيارة تجاوزت السن المسموح بها لأساطيل الكراء",
   },
 };
 

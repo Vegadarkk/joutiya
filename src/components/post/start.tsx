@@ -24,9 +24,8 @@ export function WizardStart() {
   const apiMessage = useApiErrorMessage();
   const router = useRouter();
   const params = useSearchParams();
-  const forceNew = params.get("nouveau") === "1";
-  // Before the draft exists its seller type is unknown: the session's role opens the Pro-only subcategories.
   const { session } = useSession();
+  const forceNew = params.get("nouveau") === "1";
   const [state, setState] = useState<State>({ kind: forceNew ? "pick" : "checking" });
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const started = useRef(false);
@@ -102,7 +101,7 @@ export function WizardStart() {
           {apiMessage(state.failed)}
         </FormMessage>
       ) : null}
-      <CategoryPicker categoryId={categoryId} subcategoryId={null} onCategory={setCategoryId} onSubcategory={(subcategory) => void onSubcategory(subcategory)} isPro={session?.role === "pro"} />
+      <CategoryPicker categoryId={categoryId} subcategoryId={null} isPro={session?.role === "pro"} onCategory={setCategoryId} onSubcategory={(subcategory) => void onSubcategory(subcategory)} />
     </div>
   );
 }

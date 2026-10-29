@@ -39,7 +39,8 @@ export const GET = apiRoute(async (request, context) => {
   const pieceId = uploadIdSchema.safeParse(params["pieceId"]);
   if (!proId.success || !pieceId.success) throw notFound();
   const profile = await getProProfile(proId.data);
-  if (!profile || !profile.kybc.uploadIds.includes(pieceId.data)) throw notFound();
+  // A piece of the application, or the car rental agency's licence document (decision 5).
+  if (!profile || !(profile.kybc.uploadIds.includes(pieceId.data) || profile.rentalCheck?.uploadId === pieceId.data)) throw notFound();
   const upload = await getUpload(pieceId.data);
   if (!upload || upload.purpose !== "kyb" || upload.status !== "ready" || !upload.finalKey || upload.ownerUid !== profile.ownerUid) throw notFound();
   await audit(

@@ -199,6 +199,16 @@ describe("storefront", () => {
     expect(store?.seller.listings.map((card) => card.id)).toEqual([ID]);
   });
 
+  it("shows a car rental agency's settings only in that sector", async () => {
+    const rental = { agrementRef: "AGR 123/2025", branches: [{ citySlug: "marrakech", address: "Avenue Mohammed VI, Guéliz" }], hours: "8 h - 20 h", payments: ["cash" as const], airports: ["rak" as const] };
+    repo.getUserRecord.mockResolvedValue(user({ type: "pro" }));
+    repo.listPublishedByOwner.mockResolvedValue([]);
+    repo.getProProfile.mockResolvedValue(shop({ sector: "car_rental", rental }));
+    expect(await getPublicStorefront(PRO)).toMatchObject({ sector: "car_rental", rental });
+    repo.getProProfile.mockResolvedValue(shop({ sector: "general", rental }));
+    expect((await getPublicStorefront(PRO))?.rental).toBeNull();
+  });
+
   it("is a 404 when the storefront is not shown or the owner has no public face", async () => {
     for (const overrides of [{ lifecycle: "pending_verification" }, { lifecycle: "rejected" }, { lifecycle: "downgraded" }, { lifecycle: "suspended" }, { plan: "none" }] as const) {
       repo.getProProfile.mockResolvedValue(shop(overrides as Partial<ProProfileRecord>));

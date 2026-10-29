@@ -88,8 +88,12 @@ export const RATE_LIMITS = {
   "pro.apply.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },
   // GET /api/pro/me (3 to 4 reads: account, shop, active count): the Pro area's page loads.
   "pro.read.uid": { points: 300, duration: HOUR, policy: "open", key: "uid" },
-  // PUT /api/pro/me/agency (1 read, 1 write, a storefront revalidation): 20 per day per account.
+  // PUT /api/pro/me/agency and /api/pro/me/rental (1 read, 1 write, a storefront revalidation):
+  // 20 per day per account, shared.
   "pro.agency.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
+  // POST /api/pro/me/rental/check (decision 5): each document sent costs one Claude call under the
+  // monthly cap. Closed: 5 per day per account.
+  "pro.rental.check.uid": { points: 5, duration: DAY, policy: "closed", key: "uid" },
   // POST /api/listings/{id}/options (phase 7): a paid option, ~4 reads and 4 writes. Closed: it
   // debits credits. 30 per day per account.
   "listing.options.uid": { points: 30, duration: DAY, policy: "closed", key: "uid" },
@@ -112,6 +116,10 @@ export const RATE_LIMITS = {
   // DELETE /api/listings/{id} and pause / resume / sold / renew (~4 writes and an ISR
   // revalidation each): 120 per day per account (an individual has at most 20 active listings).
   "listing.status.uid": { points: 120, duration: DAY, policy: "open", key: "uid" },
+  // PUT /api/listings/{id}/availability and each vehicle of a PUT /api/pro/fleet (one read, one
+  // write, a re-index and an ISR revalidation per vehicle): 600 per hour per account, an agency
+  // confirming its whole fleet (200 vehicles at most) and still editing it.
+  "rental.availability.uid": { points: 600, duration: HOUR, policy: "open", key: "uid" },
   // POST /api/listings/{id}/publish, every attempt (a refused one still reads the listing, the
   // account and the seller's other listings for the screening): 60 per day per account, before
   // any read. The 5 publications a day (listing.create.uid) are counted inside, at the transition.

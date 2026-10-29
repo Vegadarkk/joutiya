@@ -301,6 +301,9 @@ describe("PropertyTerms", () => {
     expect(shown).toContain(fr.ListingPage.terms.mandates.exclusif);
     expect(shown).toMatch(/25\s000 DH en plus du prix, à la charge du client/);
     expect(html).toMatch(/<dd dir="auto"[^>]*>CASA-118<\/dd>/);
+    // Declared data, never shown as verified: the advertiser alone answers for them.
+    expect(html).toContain('data-testid="property-terms-declared"');
+    expect(shown).toContain("sous sa seule responsabilité. Joutiya ne les vérifie pas");
   });
 
   it("states included or no fees, an off-plan delivery and a declared tourist authorisation", () => {

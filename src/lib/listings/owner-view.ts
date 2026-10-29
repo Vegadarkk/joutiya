@@ -4,6 +4,8 @@ import type { UploadStatus } from "@/lib/contracts/media";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import { listUploadsByTarget, type UploadRecord } from "@/lib/db/repositories/uploads";
 import { MANUAL_ATTACH_STATUSES } from "@/lib/uploads/policy";
+import { RENTAL_SUBCATEGORY } from "@/config/categories";
+import { rentalAvailabilityOf } from "./availability";
 import { canRenew } from "./lifecycle";
 
 // Owner's view of a listing (contracts OwnerListing / OwnerListingSummary): the document's fields
@@ -94,6 +96,7 @@ export function toOwnerSummary(listing: ListingRecord, now = new Date()): OwnerL
     publishedAt: iso(listing.publishedAt),
     expiresAt: iso(listing.expiresAt),
     canRenew: canRenew(listing, now),
+    ...(listing.subcategoryId === RENTAL_SUBCATEGORY ? { rental: rentalAvailabilityOf(listing) } : {}),
   };
 }
 

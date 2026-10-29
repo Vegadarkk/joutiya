@@ -1,8 +1,8 @@
 import { csvLine } from "./csv";
 
-// Template of the stock file (design concession/concession.md §4), offered for download in the
-// Pro area: the French column names the import reads and one example car. Values are the French
-// labels a dealer types in a spreadsheet; option ids work too. Client-safe.
+// Templates of the stock file (design concession/concession.md §4), offered for download in the
+// Pro area: the French column names the import reads and one example car, for sale or for rent.
+// Values are the French labels a dealer types in a spreadsheet; option ids work too. Client-safe.
 
 export const STOCK_TEMPLATE_COLUMNS = [
   "reference",
@@ -66,7 +66,67 @@ const EXAMPLE: Record<(typeof STOCK_TEMPLATE_COLUMNS)[number], string> = {
   equipements: "Climatisation | GPS | Caméra de recul | CarPlay / Android Auto",
 };
 
-/** The template as CSV text (semicolons, as spreadsheets in French write them), with a byte order mark for Excel. */
-export function stockTemplateCsv(): string {
-  return `﻿${csvLine(STOCK_TEMPLATE_COLUMNS)}\r\n${csvLine(STOCK_TEMPLATE_COLUMNS.map((column) => EXAMPLE[column]))}\r\n`;
+/** Fleet of a car rental agency (rental pack §3): one example car, its terms and its blocked periods. */
+export const RENTAL_TEMPLATE_COLUMNS = [
+  "reference",
+  "categorie",
+  "titre",
+  "description",
+  "prix",
+  "ville",
+  "quartier",
+  "gamme",
+  "marque",
+  "modele",
+  "annee",
+  "boite",
+  "carburant",
+  "places",
+  "duree minimum",
+  "kilometrage",
+  "assurance",
+  "franchise",
+  "caution",
+  "age minimum",
+  "permis",
+  "remise",
+  "tarif semaine",
+  "tarif mois",
+  "unites",
+  "indisponible",
+] as const;
+
+const RENTAL_EXAMPLE: Record<(typeof RENTAL_TEMPLATE_COLUMNS)[number], string> = {
+  reference: "LOG-01",
+  categorie: "Location de voitures",
+  titre: "Dacia Logan diesel ou similaire",
+  description: "Berline récente et climatisée, idéale pour la ville et la route. Remise en agence à Guéliz ou à l'aéroport Marrakech Menara.",
+  prix: "300",
+  ville: "Marrakech",
+  quartier: "Guéliz",
+  gamme: "Berline",
+  marque: "Dacia",
+  modele: "Logan",
+  annee: "2024",
+  boite: "Manuelle",
+  carburant: "Diesel",
+  places: "5",
+  "duree minimum": "2",
+  kilometrage: "Illimité",
+  assurance: "Tous risques avec franchise",
+  franchise: "5000",
+  caution: "5000",
+  "age minimum": "21",
+  permis: "2",
+  remise: "En agence | À l'aéroport",
+  "tarif semaine": "260",
+  "tarif mois": "220",
+  unites: "3",
+  indisponible: "2026-12-20/2027-01-03",
+};
+
+/** A template as CSV text (semicolons, as spreadsheets in French write them), with a byte order mark for Excel. */
+export function stockTemplateCsv(kind: "sale" | "rental" = "sale"): string {
+  const [columns, example]: [readonly string[], Record<string, string>] = kind === "rental" ? [RENTAL_TEMPLATE_COLUMNS, RENTAL_EXAMPLE] : [STOCK_TEMPLATE_COLUMNS, EXAMPLE];
+  return `﻿${csvLine(columns)}\r\n${csvLine(columns.map((column) => example[column] ?? ""))}\r\n`;
 }

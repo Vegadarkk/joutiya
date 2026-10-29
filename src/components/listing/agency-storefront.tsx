@@ -53,7 +53,7 @@ export function AgencyTransactions({ counts, shopPublicId, className }: { counts
   );
 }
 
-/** The agency's fee schedule as it wrote it (law 31-08 art. 3: prices shown to consumers). */
+/** The agency's fee schedule as it wrote it (law 31-08 art. 3: prices shown to consumers), under its sole responsibility. */
 export function FeeSchedule({ text, className }: { text: string; className?: string }) {
   const t = useTranslations("Storefront.agency");
   if (!text.trim()) return null;

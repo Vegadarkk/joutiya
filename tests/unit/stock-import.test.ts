@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { CsvError, csvLine, guessSeparator, neutralizeFormula, parseCsv } from "@/lib/pro/stock-import/csv";
 import { diffFields, planImport, type StockEntry } from "@/lib/pro/stock-import/plan";
-import { mapColumns, parseInteger, parseRows, type ParsedRow } from "@/lib/pro/stock-import/rows";
+import { dayNumber } from "@/lib/listings/rental-availability";
+import { mapColumns, parseInteger, parsePeriods, parseRows, type ParsedRow } from "@/lib/pro/stock-import/rows";
 import { stockTemplateCsv } from "@/lib/pro/stock-import/template";
 import { matchPhotos, photoNameParts } from "@/lib/pro/stock-import/photos";
 
@@ -173,6 +174,64 @@ describe("stock template", () => {
       "car-equipment": ["climatisation", "gps", "camera-recul", "carplay-android-auto"],
     });
     expect(rows[0]!.fields.location).toMatchObject({ citySlug: "casablanca", district: "Aïn Sebaâ" });
+  });
+});
+
+describe("car rental fleet lines", () => {
+  const TODAY = dayNumber("2026-10-28");
+  const fleetOf = (text: string) => parseRows(parseCsv(text, 300), { pro: true, today: TODAY });
+
+  it("parses the rental template: terms, the mileage policy and the blocked periods", () => {
+    const { rows, ignoredColumns } = fleetOf(stockTemplateCsv("rental"));
+    expect(ignoredColumns).toEqual([]);
+    expect(rows[0]!.issues).toEqual([]);
+    expect(rows[0]!.subcategoryId).toBe("location-voitures");
+    expect(rows[0]!.fields.attributes).toMatchObject({
+      "stock-ref": "LOG-01",
+      "rental-class": "berline",
+      "mileage-policy": "illimite",
+      "rental-insurance": "tous-risques-franchise",
+      "insurance-excess": 5000,
+      "vehicle-handover": ["agence", "aeroport"],
+      "rate-7-days": 260,
+      "fleet-units": 3,
+    });
+    expect(rows[0]!.fields.unavailable).toEqual([{ from: "2026-12-20", to: "2027-01-03" }]);
+  });
+
+  it("reads periods and single days, merges them and drops the past", () => {
+    expect(parsePeriods("2026-11-02/2026-11-05; 2026-11-06, 2026-12-24 au 2026-12-26", TODAY)).toEqual([
+      { from: "2026-11-02", to: "2026-11-06" },
+      { from: "2026-12-24", to: "2026-12-26" },
+    ]);
+    expect(parsePeriods("2026-10-20/2026-10-29", TODAY)).toEqual([{ from: "2026-10-28", to: "2026-10-29" }]);
+    expect(parsePeriods("aucune", TODAY)).toEqual([]);
+    expect(parsePeriods("02/11/2026", TODAY)).toBeUndefined();
+    expect(parsePeriods("2026-11-05/2026-11-02", TODAY)).toBeUndefined();
+    expect(parsePeriods("2028-01-01", TODAY)).toBeUndefined();
+  });
+
+  it("refuses unreadable periods and ignores them outside car rentals", () => {
+    const header = "reference;categorie;titre;description;prix;ville;gamme;marque;modele;boite;carburant;indisponible";
+    const rental = `LOG-02;Location de voitures;Clio 5 essence;${DESCRIPTION};250;Rabat;Citadine;Renault;Clio;Manuelle;Essence`;
+    const [bad] = fleetOf(`${header}\n${rental};du 2 au 5 novembre`).rows;
+    expect(codes(bad!)).toEqual(["periods_invalid"]);
+    const [sale] = fleetOf(`${HEADER};indisponible\n${LINE};2026-11-02`).rows;
+    expect(codes(sale!)).toEqual(["periods_ignored"]);
+    expect(sale!.fields.unavailable).toBeUndefined();
+  });
+
+  it("plans a change of periods alone as an update, and the same periods as unchanged", () => {
+    const [row] = fleetOf(stockTemplateCsv("rental")).rows;
+    const same = entry(row!, { subcategoryId: "location-voitures", fields: { ...row!.fields } });
+    expect(planImport([row!], [same], 10).results[0]!.action).toBe("unchanged");
+    const before = entry(row!, { subcategoryId: "location-voitures", fields: { ...row!.fields, unavailable: [] } });
+    const plan = planImport([row!], [before], 10);
+    expect(plan.results[0]).toMatchObject({ action: "update", changes: ["unavailable"] });
+    expect(plan.updates[0]).toMatchObject({ patch: {}, unavailable: [{ from: "2026-12-20", to: "2027-01-03" }] });
+    // A file without the column leaves the periods as they are.
+    const { unavailable: _ignored, ...withoutPeriods } = row!.fields;
+    expect(diffFields({ ...row!, fields: withoutPeriods }, before).changes).toEqual([]);
   });
 });
 
