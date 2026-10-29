@@ -508,6 +508,7 @@ export function ThreadView({ cid }: { cid: string }) {
           key={conversation.appointment.id}
           cid={cid}
           appointment={conversation.appointment}
+          role={conversation.role}
           counterpartName={name}
           listingTitle={conversation.listing.title}
           writable={writable}

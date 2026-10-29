@@ -45,12 +45,18 @@ export function DateDoor({ slot, locale, className }: { slot: Slot; locale: Loca
   );
 }
 
+/** Cancel reasons offered to a participant: only the seller can say the item is gone. */
+export const cancelReasonsFor = (role: "buyer" | "seller"): AppointmentCancelReason[] =>
+  APPOINTMENT_CANCEL_REASONS.filter((reason) => reason !== "sold" || role === "seller");
+
 /** The place with its masked links shown as such. */
 export const placeText = (place: string, masked: string) => place.split(URL_MARKER).join(masked);
 
 export interface AppointmentCardProps {
   cid: string;
   appointment: AppointmentView;
+  /** My side of the conversation. */
+  role: "buyer" | "seller";
   counterpartName: string;
   listingTitle: string;
   /** False when the conversation is read-only (blocked, frozen, closed, suspended): no action. */
@@ -62,7 +68,7 @@ export interface AppointmentCardProps {
   now: number;
 }
 
-export function AppointmentCard({ cid, appointment, counterpartName, listingTitle, writable, onChange, onReschedule, now }: AppointmentCardProps) {
+export function AppointmentCard({ cid, appointment, role, counterpartName, listingTitle, writable, onChange, onReschedule, now }: AppointmentCardProps) {
   const t = useTranslations("Appointments.card");
   const kindLabel = useTranslations("Appointments.kind");
   const kindPhrase = useTranslations("Appointments.kindPhrase");
@@ -171,7 +177,7 @@ export function AppointmentCard({ cid, appointment, counterpartName, listingTitl
               <Dialog.Description className="text-foreground-muted text-pretty">{t("cancelBody", { name })}</Dialog.Description>
               <fieldset className="flex flex-col gap-2">
                 <legend className="mb-1 text-sm font-medium">{t("reason")}</legend>
-                {APPOINTMENT_CANCEL_REASONS.map((item) => (
+                {cancelReasonsFor(role).map((item) => (
                   <label key={item} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-border px-3 has-[:checked]:border-structure has-[:checked]:bg-structure/5">
                     <input type="radio" name={`${id}-reason`} value={item} checked={reason === item} onChange={() => setReason(item)} className="size-4 accent-[var(--color-structure)]" />
                     <span className="text-sm">{reasons(item)}</span>
