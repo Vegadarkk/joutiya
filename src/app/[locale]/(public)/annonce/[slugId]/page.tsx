@@ -256,13 +256,16 @@ export default async function ListingPage({ params }: { params: Params }) {
         <ListingStatusBanner state={listing.state} />
         {listing.example ? <ExampleBanner /> : null}
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-x-10 lg:[grid-template-areas:'gallery_aside'_'header_aside'_'body_aside'] xl:grid-cols-[minmax(0,1fr)_24rem]">
+        {/* From lg the title, the price and the seller card share the right column, so the first screen
+            says what is sold, for how much and how to contact (UX audit, 29 Oct 2026); the gallery
+            and the body take the left one. On phones the four blocks stack in DOM order. */}
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-x-10 lg:gap-y-6 lg:[grid-template-areas:'gallery_header'_'gallery_aside'_'body_aside'] xl:grid-cols-[minmax(0,1fr)_24rem]">
           <div className="-mx-4 sm:mx-0 lg:[grid-area:gallery]">
             <Gallery listingId={listing.id} title={listing.title} photos={listing.photos} mediaBaseUrl={media} />
           </div>
 
           <header className="flex min-w-0 flex-col gap-3 lg:[grid-area:header]">
-            <h1 dir="auto" className="text-2xl font-semibold text-balance break-words sm:text-3xl">
+            <h1 dir="auto" className="text-2xl font-semibold text-balance break-words sm:text-3xl lg:text-xl">
               {listing.title}
             </h1>
             <ListingPrice
@@ -350,7 +353,7 @@ export default async function ListingPage({ params }: { params: Params }) {
                 {t("locationTitle")}
               </h2>
               <p className="text-sm text-foreground-muted">{t("locationHint")}</p>
-              <ListingMapBlock citySlug={listing.location.citySlug} regionCode={listing.location.regionCode} seed={listing.id} locale={locale} className="w-full max-w-[35rem]" />
+              <ListingMapBlock citySlug={listing.location.citySlug} regionCode={listing.location.regionCode} seed={listing.id} locale={locale} className="w-full max-w-[26rem]" />
             </section>
 
             {VEHICLE_SALE_SUBCATEGORIES.includes(listing.subcategoryId) ? <VehicleBuyingGuide attributes={listing.attributes} sellerType={listing.seller.type} /> : null}
