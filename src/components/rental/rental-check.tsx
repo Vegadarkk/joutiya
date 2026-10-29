@@ -10,6 +10,7 @@ import { Link } from "@/i18n/navigation";
 import type { RentalCheckView } from "@/lib/contracts/pro";
 import { loadProMe, submitRentalCheck, uploadKybcPiece } from "@/lib/pro/client";
 import { cn } from "@/lib/utils";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // The check of a car rental agency's licence decision (decision 5), in its settings: the agency
 // sends the decision (PDF or photo, sanitized and stored privately like the KYBC pieces), an AI
@@ -29,7 +30,7 @@ export function RentalCheckPanel({ check, savedRef, onChange }: { check: RentalC
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [refreshing, setRefreshing] = useState(false);
   const busy = phase.kind === "uploading" || phase.kind === "sending";
-  const day = (iso: string) => format.dateTime(new Date(iso), { dateStyle: "long", timeZone: "Africa/Casablanca" });
+  const day = (iso: string) => format.dateTime(new Date(iso), { dateStyle: "long", timeZone: moroccoTimeZone(new Date(iso).getTime()) });
 
   async function send(file: File) {
     setPhase({ kind: "uploading", progress: 0 });

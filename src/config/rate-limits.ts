@@ -127,6 +127,9 @@ export const RATE_LIMITS = {
   // write, a re-index and an ISR revalidation per vehicle): 600 per hour per account, an agency
   // confirming its whole fleet (200 vehicles at most) and still editing it.
   "rental.availability.uid": { points: 600, duration: HOUR, policy: "open", key: "uid" },
+  // And 1 000 a day per account (audit B-02): 600 an hour all day long would be ~28 800 writes, more
+  // than the whole site's 20 000; 1 000 confirms a full fleet five times a day for ~10 % of the quota.
+  "rental.availability.day.uid": { points: 1000, duration: DAY, policy: "open", key: "uid" },
   // POST /api/listings/{id}/publish, every attempt (a refused one still reads the listing, the
   // account and the seller's other listings for the screening): 60 per day per account, before
   // any read. The 5 publications a day (listing.create.uid) are counted inside, at the transition.
@@ -230,7 +233,8 @@ export const RATE_LIMITS = {
   "message.send.uid": { points: 20, duration: MINUTE, policy: "open", key: "uid" },
   // Every send costs 2-3 writes of the shared 20 000/day Firestore quota (audit D1a-01): besides the
   // burst above, 120 per hour and 400 per day per account, and 60 per hour per account and thread
-  // (key `${uid}:${cid}`), checked together in handlers.ts before the quota gate.
+  // (key `${uid}:${cid}`), checked together (messaging/send-limits.ts) before the quota gate, by every
+  // thread write: messages and the offer, appointment and rental-request steps.
   "message.send.hour.uid": { points: 120, duration: HOUR, policy: "open", key: "uid" },
   "message.send.day.uid": { points: 400, duration: DAY, policy: "open", key: "uid" },
   "message.send.thread": { points: 60, duration: HOUR, policy: "open", key: "uid+cid" },

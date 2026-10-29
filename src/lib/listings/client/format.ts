@@ -1,4 +1,5 @@
 import { LOCALE_TAGS, type Locale } from "@/config/site";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // Number and date formatting of the listing UI. Prices are integer MAD shown as "1 500 DH"
 // (fr) / "1 500 درهم" (ar, Western digits): fr-MA CLDR would give "1.500 MAD", so the grouping is
@@ -49,5 +50,5 @@ export function formatRelativeDays(days: number, locale: Locale): string {
 }
 
 export function formatDate(date: Date, locale: Locale): string {
-  return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Casablanca" }).format(date);
+  return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "long", year: "numeric", timeZone: moroccoTimeZone(date.getTime()) }).format(date);
 }

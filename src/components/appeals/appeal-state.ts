@@ -2,6 +2,7 @@ import { decisionTemplate, fillTemplateText } from "@/config/decision-templates"
 import type { Locale } from "@/config/site";
 import type { AppealableDecision } from "@/lib/decisions/contracts";
 import { intlLocale } from "@/lib/listings/client/format";
+import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
 // Pure helpers of the decisions page and the appeal link page (art. 17 and 20 DSA, design D13-D16):
 // which decisions a member sees, where each one stands, and the statement texts in the reader's
@@ -110,5 +111,5 @@ export function statementTexts(decision: Pick<AppealableDecision, "templateId" |
  * they may print different days: the elements showing it suppress the hydration warning.
  */
 export function formatDecisionDate(iso: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long", timeZone: "Africa/Casablanca" }).format(new Date(iso));
+  return new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long", timeZone: moroccoTimeZone(new Date(iso).getTime()) }).format(new Date(iso));
 }

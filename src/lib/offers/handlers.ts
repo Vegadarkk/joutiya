@@ -6,6 +6,7 @@ import { notFound } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { json } from "@/lib/http/route";
 import { MESSAGING_QUOTAS } from "@/lib/messaging/service";
+import { enforceSendLimits } from "@/lib/messaging/send-limits";
 import { assertQuotas } from "@/lib/quota/gate";
 import { assertLimit, consumeLimit } from "@/lib/rate-limit/limiter";
 import { actOnOffer } from "./service";
@@ -28,7 +29,7 @@ export async function handleOffer(request: Request, params: Params): Promise<Res
   const action = await readJson(request, offerActionSchema, OFFER_BODY_MAX);
   if (action.action === "make") assertLimit("offer.uid", await consumeLimit("offer.uid", auth.user.uid));
   if (action.action === "make" || action.action === "counter") assertLimit("offer.thread", await consumeLimit("offer.thread", `${auth.user.uid}:${cid}`));
-  assertLimit("message.send.thread", await consumeLimit("message.send.thread", `${auth.user.uid}:${cid}`));
+  await enforceSendLimits(auth.user.uid, cid);
   await assertQuotas(MESSAGING_QUOTAS);
   const body: OfferResponse = await actOnOffer({ uid: auth.user.uid, claims: auth.user.claims }, cid, action);
   return json(body, { status: 201 });

@@ -98,3 +98,22 @@ describe("rating summary and cursor", () => {
     expect(decodeReviewCursor(Buffer.from(`x.${"A".repeat(22)}`).toString("base64url"))).toBeNull();
   });
 });
+
+describe("ratingStatsOf", async () => {
+  const { ratingStatsOf } = await import("@/lib/reviews/repository");
+  const snapshot = (stats: unknown) => ({ get: (field: string) => (field === "stats" ? stats : undefined) }) as unknown as Parameters<typeof ratingStatsOf>[0];
+
+  it("keeps the ratings when another stats counter is out of range (staging, 28 Oct)", () => {
+    const stats = { activeListings: -1, responseRate: 0.9, medianReplyMin: 12, ratingCount: 40, ratingSum: 184, ratingAvg: 4.6, ratingHistogram: [0, 1, 2, 9, 28] };
+    expect(ratingStatsOf(snapshot(stats))).toEqual({ ratingCount: 40, ratingSum: 184, ratingHistogram: [0, 1, 2, 9, 28] });
+  });
+
+  it("starts at zero before the first review and reads a negative counter as zero", () => {
+    expect(ratingStatsOf(snapshot(undefined))).toEqual({ ratingCount: 0, ratingSum: 0, ratingHistogram: [0, 0, 0, 0, 0] });
+    expect(ratingStatsOf(snapshot({ ratingCount: -2, ratingHistogram: [1, -1, 0, 0, 0] }))).toEqual({ ratingCount: 0, ratingSum: 0, ratingHistogram: [1, 0, 0, 0, 0] });
+  });
+
+  it("derives the sum from the average for an account from before ratingSum", () => {
+    expect(ratingStatsOf(snapshot({ ratingCount: 4, ratingAvg: 4.5 })).ratingSum).toBe(18);
+  });
+});

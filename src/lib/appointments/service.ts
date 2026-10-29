@@ -33,8 +33,11 @@ interface Step {
   remindAt: Date | null;
 }
 
-/** The next state of `current` after `action` by `uid` at `now`; throws when the action does not apply. */
-export function nextStep(current: AppointmentDoc | undefined, action: AppointmentAction, uid: string, now: Date): Step {
+/**
+ * The next state of `current` after `action` by `uid` at `now`; throws when the action does not apply.
+ * `sellerUid` is the conversation's seller: only the seller cancels because the item is gone (#167).
+ */
+export function nextStep(current: AppointmentDoc | undefined, action: AppointmentAction, uid: string, now: Date, sellerUid?: string): Step {
   const at = now.getTime();
   if (action.action === "propose") {
     const slots = sortSlots(action.slots);
@@ -73,6 +76,7 @@ export function nextStep(current: AppointmentDoc | undefined, action: Appointmen
       return { appointment: { ...base, status: "withdrawn" }, event: "withdrawn", remindAt: null };
     case "cancel": {
       if (current.status !== "confirmed" || !current.chosen || !isActive(viewOf(current), at)) throw changed();
+      if (action.reason === "sold" && sellerUid !== undefined && uid !== sellerUid) throw new HttpError(403, "forbidden", "only the seller cancels because the item is gone");
       const appointment: AppointmentDoc = { ...base, status: "cancelled", cancelledBy: uid, ...(action.reason ? { reason: action.reason } : {}) };
       return { appointment, event: "cancelled", slot: current.chosen, remindAt: null };
     }
@@ -94,7 +98,7 @@ export async function actOnAppointment(actor: MessagingActor, cid: string, actio
     actor,
     cid,
     (conversation) => {
-      const step = nextStep(conversation.appointment, action, actor.uid, now);
+      const step = nextStep(conversation.appointment, action, actor.uid, now, conversation.sellerUid);
       result = step.appointment;
       const appointment: AppointmentEventDoc = {
         id: step.appointment.id,
