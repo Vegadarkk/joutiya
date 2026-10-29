@@ -5,7 +5,7 @@ import { firebase, randomId, signUpAndIn } from "./helpers";
 
 // CGU change notice (phase 6, D11): a member whose recorded CGU version is older than the current
 // text sees the band under the header on public and private pages until they acknowledge it; the
-// acknowledgement records the current version.
+// acknowledgement records the current version. Its first display records the notice (CGU §22.1).
 process.env.FIREBASE_AUTH_EMULATOR_HOST ??= "127.0.0.1:9099";
 
 test("a member who accepted older CGU sees the notice until they acknowledge it", async ({ page, request }) => {
@@ -22,6 +22,7 @@ test("a member who accepted older CGU sees the notice until they acknowledge it"
   await expect(notice).toBeVisible();
   await expect(notice.getByRole("heading")).toContainText("conditions générales d'utilisation");
   await expect(notice.getByRole("link", { name: "Lire les CGU" })).toHaveAttribute("href", "/fr/legal/cgu");
+  await expect.poll(async () => ((await account.get()).get("consents.cguNotice") as { version?: string } | undefined)?.version).toBeTruthy();
 
   await page.goto("/fr/mes-annonces");
   await expect(notice).toBeVisible();

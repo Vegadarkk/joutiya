@@ -8,18 +8,18 @@ import type { CguNoticeCursor } from "@/lib/db/repositories/users";
 
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/firebase/admin", () => ({ isFirestoreConfigured: () => true, isFirebaseConfigured: () => true, db: vi.fn() }));
-vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
+vi.mock("@/lib/mail/deliver", () => ({ deliverMail: vi.fn(async () => ({ provider: "memory", id: "m" })) }));
 const degraded = { value: false };
 /** Resend headroom under the job's share (null: counter unreadable, the cap applies). */
 const room = { value: null as number | null };
 vi.mock("@/lib/quota", () => ({ isDegraded: vi.fn(async () => degraded.value), headroom: vi.fn(async () => room.value), consume: vi.fn() }));
 vi.mock("@/lib/db/repositories/profiles", () => ({ listUserRecordsAfter: vi.fn() }));
-vi.mock("@/lib/db/repositories/users", () => ({ getUserPrivate: vi.fn(), readCguNoticeCursor: vi.fn(), writeCguNoticeCursor: vi.fn(async () => undefined) }));
+vi.mock("@/lib/db/repositories/users", () => ({ getUserPrivate: vi.fn(), readCguNoticeCursor: vi.fn(), recordCguNotice: vi.fn(async () => undefined), writeCguNoticeCursor: vi.fn(async () => undefined) }));
 
 const { cguAccepted, LEGAL_VERSIONS } = await import("@/config/legal-versions");
 const profiles = await import("@/lib/db/repositories/profiles");
 const users = await import("@/lib/db/repositories/users");
-const { sendMail } = await import("@/lib/mail");
+const { deliverMail } = await import("@/lib/mail/deliver");
 const { CGU_NOTICE_MAX_MAILS, CGU_NOTICE_PAGE_SIZE, sendCguNotices } = await import("@/worker/jobs/cgu-notice");
 
 const CURRENT = LEGAL_VERSIONS.cgu.version;
@@ -30,6 +30,8 @@ function user(uid: string, overrides: Partial<UserRecord> = {}): UserRecord {
 
 /** Stored CGU version per uid (missing uid: no private document). */
 let accepted: Record<string, string>;
+/** First notice of the current version per uid (consents.cguNotice). */
+let notices: Record<string, Date>;
 let pages: UserRecord[][];
 
 beforeEach(() => {
@@ -37,12 +39,14 @@ beforeEach(() => {
   room.value = null;
   accepted = {};
   pages = [];
-  vi.mocked(sendMail).mockReset();
+  notices = {};
+  vi.mocked(deliverMail).mockReset().mockResolvedValue({ provider: "memory", id: "m" });
+  vi.mocked(users.recordCguNotice).mockReset();
   vi.mocked(users.writeCguNoticeCursor).mockReset();
   vi.mocked(users.readCguNoticeCursor).mockReset().mockResolvedValue({ version: "0.9", lastUid: null, done: true });
   vi.mocked(users.getUserPrivate)
     .mockReset()
-    .mockImplementation(async (uid: string) => (uid in accepted ? ({ email: `${uid}@example.com`, consents: { cgu: { version: accepted[uid], at: new Date() } } } as never) : null));
+    .mockImplementation(async (uid: string) => (uid in accepted ? ({ email: `${uid}@example.com`, consents: { cgu: { version: accepted[uid], at: new Date() }, ...(uid in notices ? { cguNotice: { version: CURRENT, at: notices[uid] } } : {}) } } as never) : null));
   vi.mocked(profiles.listUserRecordsAfter)
     .mockReset()
     .mockImplementation(async (after: string | null, limit: number) => {
@@ -68,14 +72,16 @@ describe("cgu-notice job", () => {
     accepted = { a: "0.9", b: CURRENT, c: "0.9", d: "0.9" };
     const result = await sendCguNotices(new Date("2026-12-01T09:40:00Z"));
     expect(result).toMatchObject({ version: CURRENT, visited: 5, mails: 1, complete: true });
-    expect(sendMail).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(sendMail).mock.calls[0]![0]).toMatchObject({
+    expect(deliverMail).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(deliverMail).mock.calls[0]![0]).toMatchObject({
       template: "cguChanged",
       to: "a@example.com",
       priority: "bulk",
       idempotencyKey: `cguChanged-${CURRENT}-a`,
-      data: { version: CURRENT, effective: LEGAL_VERSIONS.cgu.effective },
+      // Notified on 1 December, later than 30 days before the effective day: 30 days from the mail.
+      data: { version: CURRENT, effective: "2026-12-31" },
     });
+    expect(users.recordCguNotice).toHaveBeenCalledExactlyOnceWith("a", CURRENT, new Date("2026-12-01T09:40:00Z"));
     expect(users.writeCguNoticeCursor).toHaveBeenLastCalledWith({ version: CURRENT, lastUid: "e", done: true }, expect.any(Date));
   });
 
@@ -87,7 +93,7 @@ describe("cgu-notice job", () => {
     vi.mocked(users.readCguNoticeCursor).mockResolvedValue(null);
     expect(await sendCguNotices()).toMatchObject({ complete: true, visited: 0 });
     expect(users.writeCguNoticeCursor).toHaveBeenLastCalledWith({ version: CURRENT, lastUid: null, done: true }, expect.any(Date));
-    expect(sendMail).not.toHaveBeenCalled();
+    expect(deliverMail).not.toHaveBeenCalled();
   });
 
   it("stops at the mail budget and resumes after the last account visited", async () => {
@@ -102,7 +108,7 @@ describe("cgu-notice job", () => {
     vi.mocked(users.readCguNoticeCursor).mockResolvedValue(cursor);
     const second = await sendCguNotices();
     expect(second).toMatchObject({ mails: 5, complete: true });
-    expect(vi.mocked(sendMail).mock.calls.map(([mail]) => mail.to)).toEqual(many.map((entry) => `${entry.uid}@example.com`));
+    expect(vi.mocked(deliverMail).mock.calls.map(([mail]) => mail.to)).toEqual(many.map((entry) => `${entry.uid}@example.com`));
   });
 
   it("sends no more than the Resend headroom left by the other mails", async () => {
@@ -113,12 +119,43 @@ describe("cgu-notice job", () => {
     expect(users.writeCguNoticeCursor).toHaveBeenLastCalledWith({ version: CURRENT, lastUid: "b", done: false }, expect.any(Date));
   });
 
+  it("dates the mail from a notice the banner already gave, and records nothing more", async () => {
+    pages = [[user("a")]];
+    accepted = { a: "0.9" };
+    notices = { a: new Date("2026-11-20T10:00:00Z") };
+    await sendCguNotices(new Date("2026-12-01T09:40:00Z"));
+    expect(vi.mocked(deliverMail).mock.calls[0]![0].data).toMatchObject({ effective: "2026-12-20" });
+    expect(users.recordCguNotice).not.toHaveBeenCalled();
+  });
+
+  it("records no notice for a mail that did not leave", async () => {
+    pages = [[user("a"), user("b"), user("c")]];
+    accepted = { a: "0.9", b: "0.9", c: "0.9" };
+    vi.mocked(deliverMail).mockResolvedValueOnce({ skipped: "suppressed" });
+    expect(await sendCguNotices()).toMatchObject({ visited: 3, mails: 2, complete: true });
+    expect(vi.mocked(users.recordCguNotice).mock.calls.map(([uid]) => uid)).toEqual(["b", "c"]);
+  });
+
+  it("stops before an account whose mail cannot leave now, which the next run serves", async () => {
+    pages = [[user("a"), user("b"), user("c")]];
+    accepted = { a: "0.9", b: "0.9", c: "0.9" };
+    vi.mocked(deliverMail).mockResolvedValueOnce({ provider: "memory", id: "1" }).mockRejectedValueOnce(new Error("provider down"));
+    expect(await sendCguNotices()).toMatchObject({ mails: 1, stopped: "mail", complete: false });
+    expect(users.writeCguNoticeCursor).toHaveBeenLastCalledWith({ version: CURRENT, lastUid: "a", done: false }, expect.any(Date));
+
+    vi.mocked(deliverMail).mockReset().mockResolvedValueOnce({ skipped: "quota" });
+    vi.mocked(users.readCguNoticeCursor).mockResolvedValue({ version: CURRENT, lastUid: "a", done: false });
+    expect(await sendCguNotices()).toMatchObject({ mails: 0, stopped: "quota", complete: false });
+    expect(users.writeCguNoticeCursor).toHaveBeenLastCalledWith({ version: CURRENT, lastUid: "a", done: false }, expect.any(Date));
+    expect(users.recordCguNotice).toHaveBeenCalledTimes(1);
+  });
+
   it("sends nothing while a Resend quota is degraded, and keeps its place", async () => {
     degraded.value = true;
     pages = [[user("a"), user("b")]];
     accepted = { a: CURRENT, b: "0.9" };
     expect(await sendCguNotices()).toMatchObject({ mails: 0, stopped: "quota", complete: false });
-    expect(sendMail).not.toHaveBeenCalled();
+    expect(deliverMail).not.toHaveBeenCalled();
     expect(users.writeCguNoticeCursor).toHaveBeenLastCalledWith({ version: CURRENT, lastUid: "a", done: false }, expect.any(Date));
   });
 

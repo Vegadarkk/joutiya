@@ -26,8 +26,13 @@ function hostState(entry: { name: string; address: string; phone: string }) {
   return { complete, partial: Boolean(entry.name) && !complete, noName: !entry.name };
 }
 
-export function legalScope(config: LegalConfig, switches: LegalSwitches, version: LegalVersion, language: "fr" | "ar"): TemplateScope {
-  const date = new Intl.DateTimeFormat(language === "ar" ? "ar-MA" : "fr-MA", { dateStyle: "long", timeZone: "Africa/Casablanca" }).format(new Date(`${version.effective}T12:00:00Z`));
+/** An ISO day of LEGAL_VERSIONS, written out in the text's language. */
+export function formatLegalDate(day: string, language: "fr" | "ar"): string {
+  return new Intl.DateTimeFormat(language === "ar" ? "ar-MA" : "fr-MA", { dateStyle: "long", timeZone: "Africa/Casablanca" }).format(new Date(`${day}T12:00:00Z`));
+}
+
+export function legalScope(config: LegalConfig, switches: LegalSwitches, version: Pick<LegalVersion, "version" | "effective">, language: "fr" | "ar"): TemplateScope {
+  const date = formatLegalDate(version.effective, language);
   const languages = config.dsaContactLanguages.map((code) => LANGUAGE_NAMES[language][code]).join(language === "ar" ? "، " : ", ");
   const host = hostState(config.host);
   return {

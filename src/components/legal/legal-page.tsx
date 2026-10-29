@@ -21,6 +21,12 @@ export interface LegalPageProps {
   /** The site is not in French but the text is: the note that only French exists. */
   frenchOnly: boolean;
   provisional?: boolean;
+  /** Current text not yet in force (CGU §22.1): its date (formatted) and the version still in force. */
+  upcoming?: { date: string; previous: { version: string; href: string } };
+  /** Earlier versions kept online (CGU §22.4), newest first, dates formatted. */
+  archive?: { version: string; from: string; replacedOn: string; href: string }[];
+  /** This is an earlier version: until when it applies, and the current text. */
+  archived?: { version: string; replacedOn: string; inForce: boolean; currentHref: string };
 }
 
 /** French typography: no line break before « : ; ! ? » or after «. */
@@ -158,7 +164,49 @@ function Contents({ sections, language, className }: { sections: Heading[]; lang
   );
 }
 
-export function LegalPage({ blocks, language, translated, frenchOnly, provisional = false }: LegalPageProps) {
+function VersionsNote({ upcoming, archive, archived }: Pick<LegalPageProps, "upcoming" | "archive" | "archived">): ReactNode {
+  const t = useTranslations("Legal");
+  const link = cn("font-medium text-link", textLinkClassName);
+  if (!upcoming && !archived && (archive ?? []).length === 0) return null;
+  return (
+    <aside data-testid="legal-versions" className="mt-4 flex max-w-[68ch] flex-col gap-1 border-s-4 border-border bg-surface-muted px-4 py-3 text-sm">
+      {upcoming ? (
+        <>
+          <p className="font-medium">{t("upcomingTitle", { date: upcoming.date })}</p>
+          <p className="text-foreground-muted">{t("upcomingBody", { version: upcoming.previous.version })}</p>
+          <Link href={upcoming.previous.href} className={link}>
+            {t("upcomingLink", { version: upcoming.previous.version })}
+          </Link>
+        </>
+      ) : null}
+      {archived ? (
+        <>
+          <p className="font-medium">{t("archivedTitle", { version: archived.version })}</p>
+          <p className="text-foreground-muted">{archived.inForce ? t("archivedInForce", { date: archived.replacedOn }) : t("archivedPast", { date: archived.replacedOn })}</p>
+          <Link href={archived.currentHref} className={link}>
+            {t("archivedCurrent")}
+          </Link>
+        </>
+      ) : null}
+      {!upcoming && !archived && archive && archive.length > 0 ? (
+        <>
+          <p className="font-medium">{t("archiveTitle")}</p>
+          <ul className="flex flex-col gap-0.5">
+            {archive.map((entry) => (
+              <li key={entry.version}>
+                <Link href={entry.href} className={link}>
+                  {t("archiveItem", { version: entry.version, from: entry.from, date: entry.replacedOn })}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </aside>
+  );
+}
+
+export function LegalPage({ blocks, language, translated, frenchOnly, provisional = false, upcoming, archive, archived }: LegalPageProps) {
   const t = useTranslations("Legal");
   const french = language === "fr";
   const titleIndex = blocks.findIndex((block) => block.type === "heading" && block.level === 1);
@@ -192,6 +240,7 @@ export function LegalPage({ blocks, language, translated, frenchOnly, provisiona
           {frenchOnly ? <p className="text-foreground-muted">{t("frenchOnly")}</p> : null}
         </aside>
       ) : null}
+      <VersionsNote upcoming={upcoming} archive={archive} archived={archived} />
 
       <div className={toc ? "mt-10 grid gap-10 lg:grid-cols-[15rem_minmax(0,68ch)] lg:gap-14" : "mt-10 max-w-[68ch]"}>
         {toc ? (

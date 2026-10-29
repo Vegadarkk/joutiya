@@ -12,8 +12,9 @@ en production sans tag. Pousser un tag et promouvoir la production attendent ton
    provisoires) en version `1.0`, en vigueur le jour de l'ouverture, sans `replaces` ni résumé, et
    `LEGAL_TEXTS_FROZEN = true` ; puis `node scripts/legal-hash.ts --apply` enregistre les empreintes
    des textes. Ensuite, tout changement d'un texte demande une nouvelle version (CGU §22 : annonce
-   `announced`, résumé FR/AR, 30 jours de préavis), ou `--form-only` pour une simple correction de
-   forme.
+   `announced`, résumé FR/AR, 30 jours de préavis, texte sortant copié dans
+   `src/content/legal/{fr,ar}/archive/` et listé dans `LEGAL_ARCHIVE`, qui le garde en ligne), ou
+   `--form-only` pour une simple correction de forme.
 2. **Staging** : le commit à publier tourne en staging (*Deploy staging* vert, contrôle « Release
    images » présent sur le commit) et a été vérifié dans le staging.
 3. **Tag** (après ton feu vert) :
