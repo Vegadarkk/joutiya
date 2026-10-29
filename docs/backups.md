@@ -173,6 +173,9 @@ npx firebase emulators:exec --only auth,firestore --project demo-joutiya \
   "node --env-file=.env.local scripts/restore-drill.ts --identity joutiya-backup.key --from-bucket staging"
 ```
 
+Sous Windows, si Java 21 n'arrive pas à démarrer l'émulateur (erreur de socket locale en boucle), définissez
+`JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain.tmpdir=C:\Windows\Temp` avant la commande (répétition A, 29 octobre 2026).
+
 (`--from <dossier>` pour une copie téléchargée, `--until YYYY-MM-DD` pour l'état d'une nuit.)
 
 Les tests contre l'émulateur (`tests/api/backup/restore.test.ts`, `tests/api/backup/drill.test.ts`) passent. La chaîne réelle ne l'est pas
@@ -209,7 +212,7 @@ vide ou jetable.
 
 | Date | Répétition | Source -> cible | Nuits (de … à …) | Parties | Documents (simulation) | Documents écrits | Durée simulation | Durée écriture | Écarts, remarques |
 |---|---|---|---|---|---|---|---|---|---|
-| | A | staging -> émulateur du PC | | | | | | | |
+| 2026-10-29 | A | staging -> émulateur du PC2 | 27 -> 29 octobre | 74 | 414 | 414 (17 collections identiques en SHA-256) | ~1 min (`restore-drill.ts`, étapes 1 à 4) | 21 s (RTO) | Aucun écart : 0 chemin manquant, en trop ou différent, 0 référence orpheline, comptes Auth 4/4. RPO 9 h 28 min (dernière version 03:00:03Z). Main `d9acf0e`. |
 | | B | prod -> `joutiya-staging` | | | | | | | |
 
 ## Limites connues
