@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { CATEGORIES, criteriaSchema, subcategoryById } from "@/config/categories";
 import { REGIONS, cityBySlug } from "@/config/regions";
+import { withVariantAnswers } from "@/lib/contracts/catalog";
 import { publishedListingSchema, userSchema } from "@/lib/db/schemas";
 import { DEMO_ENTRIES, DEMO_SELLERS } from "@/lib/demo/catalog";
 import { DEMO_ID_PREFIX, DEMO_LIFETIME_DAYS, DEMO_UID_PREFIX, demoListings, demoPhotoRefs, demoSellers, demoShops, pexelsUrl } from "@/lib/demo/data";
@@ -62,7 +63,9 @@ describe("demo listings", () => {
     for (const { id, ...doc } of listings) {
       expect(LISTING_ID_PATTERN.test(id) && id.startsWith(DEMO_ID_PREFIX), id).toBe(true);
       expect(publishedListingSchema.safeParse(doc).error?.issues ?? [], id).toEqual([]);
-      expect(criteriaSchema(doc.subcategoryId as string, doc.sellerType).safeParse(doc.attributes).error?.issues ?? [], `${id} ${doc.subcategoryId}`).toEqual([]);
+      // A size or colour taken over by the variants is answered by them (as the publish readiness does).
+      const criteria = subcategoryById(doc.subcategoryId as string)?.criteria.map((criterion) => criterion.id) ?? [];
+      expect(criteriaSchema(doc.subcategoryId as string, doc.sellerType).safeParse(withVariantAnswers(doc.attributes, doc.variants, criteria)).error?.issues ?? [], `${id} ${doc.subcategoryId}`).toEqual([]);
       expect(parseSlugId(doc.slugId as string)?.id).toBe(id);
       expect(doc.ownerUid.startsWith(DEMO_UID_PREFIX)).toBe(true);
       expect(toSearchDocument({ id, ...doc }, NOW), id).not.toBeNull();

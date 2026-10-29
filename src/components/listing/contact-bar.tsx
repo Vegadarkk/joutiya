@@ -18,6 +18,7 @@ import { findListingConversation } from "@/lib/messaging/client";
 import { cn } from "@/lib/utils";
 import type { RevealChallengeProps, RevealErrorProps } from "./contact-feedback";
 import type { MessageDialogProps } from "./message-dialog";
+import { useVariantSelection } from "./variant-selection";
 import { isWhatsappUrl, revealFailure } from "./reveal";
 
 export { isWhatsappUrl, REVEAL_ERROR_KEYS, revealFailure, type RevealErrorKey } from "./reveal";
@@ -165,6 +166,8 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
   const [composeMounted, setComposeMounted] = useState(false);
   const [intent, setIntent] = useState<ComposeIntent>("message");
   const desktop = useDesktop();
+  /** The combination picked on the page (Pro catalogue): the first message names it. */
+  const variant = useVariantSelection(listingId);
 
   const canReveal = showPhone || whatsapp;
   const own = status === "ready" && session !== null && session.publicId === sellerPublicId;
@@ -370,8 +373,8 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
       <BarSpacer />
       {composeMounted ? (
         <MessageDialog
-          // A fresh form per intent: the visit request comes with its own draft.
-          key={intent}
+          // A fresh form per intent (the visit request comes with its own draft) and per picked combination.
+          key={`${intent}:${variant ?? ""}`}
           intent={intent === "visit" || intent === "rental" ? intent : "message"}
           open={compose === "open"}
           onOpenChange={(open) => setCompose(open ? "open" : "closed")}
@@ -381,6 +384,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
           adultsOnly={adultsOnly}
           onSignedOut={() => setCompose("signin")}
           {...(intent === "test_drive" ? { initialText: t("testDriveText", { title: listingTitle ?? "" }), threadQuery: "rdv=test_drive" } : {})}
+          {...(intent === "message" && variant ? { initialText: t("variantText", { title: listingTitle ?? "", variant }) } : {})}
         />
       ) : null}
     </div>

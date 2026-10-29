@@ -1,5 +1,6 @@
 import { z } from "@/lib/zod";
 import { CRITERION_TEXT_MAX, criterionById } from "@/config/categories";
+import { VARIANT_KEY_SEPARATOR, itemAvailable, variantKey } from "./catalog-core";
 import { refKey } from "./stock-import";
 
 // Shop catalogue of a Pro listing (lot 4, design phase-7/catalogue-boutique.md §2-3): variants on
@@ -18,8 +19,6 @@ export const VARIANT_LABEL_MAX = 20;
 export const VARIANT_VALUE_MAX = 20;
 /** Declared stock, per listing or combination. */
 export const STOCK_MAX = 9_999;
-/** « Plus que N en stock » from this level down (0 reads « Épuisé »). */
-export const LOW_STOCK = 5;
 /** Integer MAD (PRICE_MAX of listings: contracts/listings.ts imports this module). */
 const VARIANT_PRICE_MAX = 100_000_000;
 
@@ -34,8 +33,8 @@ export const FREE_AXES = ["free-1", "free-2"] as const;
 export type FreeAxis = (typeof FREE_AXES)[number];
 export type VariantAxisId = VariantCriterion | FreeAxis;
 
-/** Joins the values of a combination, axis order (`"m|bleu"`); values never hold it. */
-export const VARIANT_KEY_SEPARATOR = "|";
+// The zod-free part (the listing page's picker bundles it without the schemas).
+export { LOW_STOCK, VARIANT_KEY_SEPARATOR, isSoldOut, itemAvailable, stockState, variantKey, type StockState } from "./catalog-core";
 
 export const isVariantCriterion = (id: string): id is VariantCriterion => (VARIANT_CRITERIA as readonly string[]).includes(id);
 
@@ -71,10 +70,6 @@ export const variantItemSchema = z
   })
   .strict();
 export type VariantItem = z.infer<typeof variantItemSchema>;
-
-export function variantKey(values: readonly string[]): string {
-  return values.join(VARIANT_KEY_SEPARATOR);
-}
 
 /** Every combination of the axes, axis order (the first axis varies slowest). */
 export function variantCombinations(axes: readonly Pick<VariantAxis, "values">[]): string[] {
@@ -149,25 +144,8 @@ export const stockUpdateSchema = z
   .refine((input) => (input.stock !== undefined) !== (input.items !== undefined), { message: "stock or items" });
 export type StockUpdateInput = z.infer<typeof stockUpdateSchema>;
 
-/** What the stock of a listing or combination shows. */
-export type StockState = "untracked" | "in_stock" | "low" | "sold_out";
-
-export function stockState(stock: number | undefined | null): StockState {
-  if (stock === undefined || stock === null) return "untracked";
-  if (stock <= 0) return "sold_out";
-  return stock <= LOW_STOCK ? "low" : "in_stock";
-}
 
 type Catalogue = { stock?: number | undefined; variants?: ListingVariants | undefined };
-
-/** Stock 0 everywhere it is tracked, and tracked everywhere: sold out (decision 1, still online). */
-export function isSoldOut(listing: Catalogue): boolean {
-  if (listing.variants) return listing.variants.items.every((item) => item.stock === 0);
-  return listing.stock === 0;
-}
-
-/** Combination still sold: stock not tracked, or above 0. */
-export const itemAvailable = (item: Pick<VariantItem, "stock">) => item.stock === undefined || item.stock > 0;
 
 /**
  * Lowest and highest price of a listing with variants (a combination without its own price takes

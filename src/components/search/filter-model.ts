@@ -25,6 +25,7 @@ export type FilterKey =
   | "shop"
   | "donation"
   | "withPhoto"
+  | "includeSoldOut"
   | "conditions"
   | "dates"
   | `criterion:${string}`;
@@ -42,6 +43,7 @@ export const CHIP_KEYS = [
   "shop",
   "donation",
   "withPhoto",
+  "includeSoldOut",
   "conditions",
   "range",
   "rangeFrom",
@@ -120,6 +122,9 @@ export function withoutFilter(params: SearchParams, key: FilterKey): SearchParam
     case "withPhoto":
       delete next.withPhoto;
       break;
+    case "includeSoldOut":
+      delete next.includeSoldOut;
+      break;
     case "conditions":
       delete next.conditions;
       break;
@@ -148,6 +153,7 @@ export function activeFilterKeys(params: SearchParams): FilterKey[] {
   if (params.sellerId) keys.push("seller");
   if (params.donation) keys.push("donation");
   if (params.withPhoto) keys.push("withPhoto");
+  if (params.includeSoldOut) keys.push("includeSoldOut");
   if (params.conditions?.length) keys.push("conditions");
   for (const id of Object.keys(params.criteria ?? {})) keys.push(`criterion:${id}`);
   return keys;
@@ -228,6 +234,8 @@ function filterLabel(params: SearchParams, key: FilterKey, locale: Locale, label
       return labels.chip("donation");
     case "withPhoto":
       return labels.chip("withPhoto");
+    case "includeSoldOut":
+      return labels.chip("includeSoldOut");
     case "conditions":
       return labels.chip("conditions", { values: joinValues((params.conditions ?? []).map((value) => labels.condition(value)), labels) });
     case "dates": {

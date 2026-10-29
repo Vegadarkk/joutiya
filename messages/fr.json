@@ -2642,7 +2642,9 @@
     },
     "example": "Exemple",
     "rentalTotal": "≈ {total} pour {days, plural, one {# jour} other {# jours}}",
-    "rentalToConfirm": "Disponibilité à confirmer"
+    "rentalToConfirm": "Disponibilité à confirmer",
+    "from": "À partir de",
+    "soldOut": "Épuisé"
   },
   "ListingPage": {
     "home": "Accueil",
@@ -2779,7 +2781,8 @@
       "signInVisit": "Connectez-vous pour demander une visite. Vous reviendrez ensuite sur cette annonce.",
       "rental": "Demander une réservation",
       "rentalHint": "Envoyez vos dates à l'agence : elle confirme la disponibilité dans la messagerie. Rien ne se paie sur le site.",
-      "signInRental": "Connectez-vous pour envoyer une demande de réservation. Vous reviendrez ensuite sur cette annonce."
+      "signInRental": "Connectez-vous pour envoyer une demande de réservation. Vous reviendrez ensuite sur cette annonce.",
+      "variantText": "Bonjour, « {title} » en {variant} est-il toujours disponible ?"
     },
     "safety": {
       "title": "Conseils de sécurité",
@@ -2904,6 +2907,17 @@
         "payment": "{brand} ne loue pas ce véhicule et ne reçoit aucun paiement : la location est un contrat entre vous et l'agence. Ne versez aucun acompte avant d'avoir vu l'agence et le véhicule."
       },
       "source": "Conseils indicatifs : les conditions et le contrat de l'agence priment."
+    },
+    "catalogue": {
+      "title": "Choix et disponibilité",
+      "choose": "Choisissez une option pour voir le prix et le stock.",
+      "notOffered": "Cette combinaison n'est pas proposée par le vendeur.",
+      "inStock": "En stock",
+      "low": "Plus que {count} en stock",
+      "soldOut": "Épuisé",
+      "allSoldOut": "Article épuisé. Il reste en ligne : écrivez au vendeur pour savoir s'il sera de nouveau disponible.",
+      "valueSoldOut": "{value}, épuisé",
+      "valueAbsent": "{value}, non proposé avec ce choix"
     }
   },
   "Profile": {
@@ -3315,9 +3329,12 @@
       "rangeFrom": "{label} : dès {min}",
       "rangeTo": "{label} : jusqu'à {max}",
       "options": "{label} : {values}",
-      "dates": "{from} – {to} · {days} j"
+      "dates": "{from} – {to} · {days} j",
+      "includeSoldOut": "Épuisés inclus"
     },
-    "rentalDatesHint": "Les agences déclarent leurs jours indisponibles : les véhicules libres sur toute la période s'affichent, ceux à confirmer en dernier."
+    "rentalDatesHint": "Les agences déclarent leurs jours indisponibles : les véhicules libres sur toute la période s'affichent, ceux à confirmer en dernier.",
+    "includeSoldOut": "Inclure les articles épuisés",
+    "includeSoldOutHint": "Les boutiques laissent en ligne les articles dont le stock est à 0."
   },
   "Pro": {
     "metaTitle": "Espace Pro",

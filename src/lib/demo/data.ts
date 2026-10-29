@@ -121,6 +121,8 @@ export function demoListing(entry: DemoEntry, index: number, now: Date, photos: 
     example: true,
     // Rentals: periods counted from the seed day, confirmed on that day (fresh for 14 days).
     ...(entry.rentalBlocked ? { rental: { unavailable: entry.rentalBlocked.map(([from, to]) => ({ from: dayString(moroccoToday(now) + from), to: dayString(moroccoToday(now) + to) })), updatedAt: now } } : {}),
+    ...(entry.variants ? { variants: entry.variants } : {}),
+    ...(entry.stock !== undefined ? { stock: entry.stock } : {}),
     adsEligible: false,
     publishedAt: at,
     expiresAt: new Date(now.getTime() + DEMO_LIFETIME_DAYS * DAY_MS),

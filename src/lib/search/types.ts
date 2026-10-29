@@ -121,6 +121,9 @@ export const CARD_FIELDS = [
   "a_rate_7_days",
   "a_rate_30_days",
   "rentFreshUntil",
+  // Pro catalogue: « Épuisé » and « À partir de » on the card.
+  "soldOut",
+  "priceFrom",
 ] as const satisfies readonly (keyof SearchDocument)[];
 type CardField = (typeof CARD_FIELDS)[number];
 /** The `a_*` card fields stay optional, as in the index (a listing without the criterion). */
@@ -220,6 +223,10 @@ export interface SearchCard {
   facts?: CardFacts;
   /** Example listing: "Exemple" label, no favorite action. */
   example?: true;
+  /** Pro catalogue: declared stock 0 everywhere (« Épuisé »). */
+  soldOut?: true;
+  /** Combinations at different prices: `price` is the lowest (« À partir de »). */
+  priceFrom?: true;
   /**
    * Car rental in a search by dates (rental pack §4): rental days, estimated total in MAD (long-term
    * rate applied, deposit excluded; null without a price) and whether the availability is up to date.

@@ -1,4 +1,5 @@
 import type { Condition } from "@/config/categories";
+import type { ListingVariants } from "@/lib/contracts/catalog";
 
 // Example listings catalog (src/lib/demo/data.ts, scripts/seed-demo.ts): fictitious sellers and
 // realistic listings in every subcategory, spread over the 12 regions, with the brands visitors
@@ -39,6 +40,9 @@ export interface DemoEntry {
   photos: string[];
   /** Car rentals: blocked periods as [first, last] days after the seed day (rental pack §3). */
   rentalBlocked?: [number, number][];
+  /** Pro catalogue (catalogue §2-3): combinations with their stock and price, or the declared stock. */
+  variants?: ListingVariants;
+  stock?: number;
 }
 
 export const DEMO_SELLERS: readonly DemoSeller[] = [
@@ -126,6 +130,13 @@ export const DEMO_SELLERS: readonly DemoSeller[] = [
     type: "pro",
     city: "errachidia",
     bio: "Dattes du Tafilalet, épices et produits du terroir, conditionnés dans notre atelier d'Errachidia.",
+  },
+  {
+    key: "lalla",
+    name: "Atelier Lalla",
+    type: "pro",
+    city: "fes",
+    bio: "Robes, caftans et babouches cousus dans notre atelier de Fès, du S au XL.",
   },
 ];
 
@@ -2299,5 +2310,84 @@ export const DEMO_ENTRIES: readonly DemoEntry[] = [
     price: 90,
     attributes: { "onssa-number": "ZZ.99.9007.26", "terroir-type": "conserves-confitures" },
     photos: ["7586251"],
+  },
+
+  // ---- Pro catalogue (lot 4): variants and declared stock
+  {
+    key: "shop-dress",
+    sub: "vetements",
+    seller: "lalla",
+    city: "fes",
+    days: 1,
+    title: "Robe d'été en lin lavé, coupe droite",
+    description: "Robe en lin lavé cousue dans notre atelier, coupe droite et poches côté. Du S au XL, en sable ou en vert olive. Le L sable est épuisé, il revient la semaine prochaine.",
+    price: 420,
+    condition: "new_tagged",
+    attributes: { audience: "femme", "clothing-type": "robe" },
+    photos: ["36594454"],
+    variants: {
+      axes: [
+        { id: "clothing-size", values: ["s", "m", "l", "xl"] },
+        { id: "color", values: ["beige", "vert"] },
+      ],
+      items: [
+        { key: "s|beige", stock: 4 },
+        { key: "s|vert", stock: 6 },
+        { key: "m|beige", stock: 2 },
+        { key: "m|vert", stock: 9 },
+        { key: "l|beige", stock: 0 },
+        { key: "l|vert", stock: 3 },
+        { key: "xl|vert", stock: 1, price: 450 },
+      ],
+    },
+  },
+  {
+    key: "shop-babouches",
+    sub: "chaussures",
+    seller: "lalla",
+    city: "fes",
+    days: 3,
+    title: "Babouches en cuir de Fès, semelle cousue",
+    description: "Babouches en cuir tanné à Fès, semelle cousue main. Pointures 37 à 43, en jaune safran ou en noir.",
+    price: 190,
+    condition: "new_tagged",
+    attributes: { audience: "mixte", "shoe-type": "babouches" },
+    photos: ["35787272"],
+    variants: {
+      axes: [
+        { id: "shoe-size", values: ["37", "38", "39", "40", "41", "42", "43"] },
+        { id: "color", values: ["jaune", "noir"] },
+      ],
+      items: [
+        { key: "37|jaune", stock: 3 },
+        { key: "38|jaune", stock: 5 },
+        { key: "39|jaune", stock: 5 },
+        { key: "40|jaune", stock: 2 },
+        { key: "40|noir", stock: 4 },
+        { key: "41|noir", stock: 6 },
+        { key: "42|noir", stock: 0 },
+        { key: "43|noir", stock: 2, price: 210 },
+      ],
+    },
+  },
+  {
+    key: "shop-argan",
+    sub: "huile-argan-alimentaire",
+    seller: "tifawt",
+    city: "essaouira",
+    days: 2,
+    title: "Huile d'argan alimentaire pressée à froid",
+    description: "Huile d'argan alimentaire torréfiée, pressée à froid par la coopérative. Flacon en verre teinté, trois contenances.",
+    price: 90,
+    attributes: { "onssa-number": "ZZ.99.9008.26" },
+    photos: ["13246534"],
+    variants: {
+      axes: [{ id: "free-1", label: "Contenance", values: ["100 ml", "250 ml", "1 L"] }],
+      items: [
+        { key: "100 ml", stock: 40 },
+        { key: "250 ml", stock: 12, price: 190 },
+        { key: "1 L", stock: 4, price: 650 },
+      ],
+    },
   },
 ];
