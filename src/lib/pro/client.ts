@@ -1,5 +1,6 @@
 import { ApiError, apiDelete, apiGet, apiPost, apiPut, uploadToPresignedUrl, type UploadProgress } from "@/lib/auth/client";
 import { KYBC_DECLARED_TYPES, MAX_UPLOAD_BYTES, type KybcDeclaredType } from "@/lib/contracts/media";
+import type { SectionsInput, SectionsResponse } from "@/lib/contracts/catalog";
 import { STOCK_API, type StockImportMode, type StockImportResponse, type StockListResponse } from "@/lib/contracts/stock-import";
 import { PRO_API, type KybcCompleteResponse, type KybcSignInput, type KybcSignResponse, type RentalCheckResponse, type ProAgencyInput, type ProAgencyResponse, type ProRentalInput, type ProRentalResponse, type ProApplyInput, type ProApplyResponse, type ProMeResponse } from "@/lib/contracts/pro";
 
@@ -10,6 +11,7 @@ import { PRO_API, type KybcCompleteResponse, type KybcSignInput, type KybcSignRe
 export const loadProMe = () => apiGet<ProMeResponse>(PRO_API.me);
 
 export const saveProAgency = (input: ProAgencyInput) => apiPut<ProAgencyResponse>(PRO_API.agency, input);
+export const saveSections = (input: SectionsInput) => apiPut<SectionsResponse>(PRO_API.sections, input);
 export const saveRentalAgency = (input: ProRentalInput) => apiPut<ProRentalResponse>(PRO_API.rental, input);
 
 /** Sends the licence decision (a piece uploaded with `use: "agrement"`) for its check (decision 5). */

@@ -105,6 +105,7 @@ export function buildFilter(input: SearchParams, now: Date): FilterExpr | undefi
   if (params.sellerType) parts.push(eq("sellerType", params.sellerType));
   if (params.sellerId) parts.push(eq("sellerPublicId", params.sellerId));
   if (params.shop) parts.push(eq("sellerPublicId", params.shop));
+  if (params.shop && params.section) parts.push(eq("sectionId", params.section));
   if (params.donation) parts.push(eq("isDonation", true));
   if (params.withPhoto) parts.push(eq("hasPhoto", true));
   // Sold-out listings stay online but leave the default results (owner decision 1, 2026-10-28).

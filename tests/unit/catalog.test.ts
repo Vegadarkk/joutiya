@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { cityBySlug } from "@/config/regions";
 import {
+  SHOP_SECTIONS_MAX,
   VARIANT_ITEMS_MAX,
+  sectionsInputSchema,
+  shopSectionsSchema,
   availableValues,
   isSoldOut,
   listingVariantsSchema,
@@ -20,6 +23,7 @@ import { planPromo, promoEnd, promoView, referencePrices } from "@/lib/listings/
 import { assessReadiness, issuesByPath, type SellerFacts } from "@/lib/listings/readiness";
 import { toSearchDocument } from "@/lib/search/document";
 import { buildFilter, promoRunningFilter, sortSpecs } from "@/lib/search/service";
+import { parseSearchParams, searchPath } from "@/lib/search/params";
 
 // Pro catalogue, lot 4 PR 1 (design phase-7/catalogue-boutique.md §2-4): the variants contract,
 // stock states, the price history behind a promotion's struck-out price, the publish readiness
@@ -335,5 +339,35 @@ describe("promotions (catalogue §4)", () => {
       { field: "promoPercent", dir: "desc" },
       { field: "sortAt", dir: "desc" },
     ]);
+  });
+});
+
+describe("shop sections (catalogue §5)", () => {
+  it("keeps 12 distinct names of 30 characters at most", () => {
+    const names = (list: string[]) => sectionsInputSchema.safeParse({ sections: list.map((name) => ({ name })) }).success;
+    expect(names(["Ramadan", "Rentrée"])).toBe(true);
+    expect(names(["Ramadan", "ramadan"])).toBe(false);
+    expect(names(["x".repeat(31)])).toBe(false);
+    expect(names([" "])).toBe(false);
+    expect(names(Array.from({ length: SHOP_SECTIONS_MAX + 1 }, (_, index) => `Rayon ${index}`))).toBe(false);
+    expect(sectionsInputSchema.safeParse({ sections: [{ id: "RAMADA", name: "Ramadan" }] }).success).toBe(false);
+    expect(shopSectionsSchema.safeParse([{ id: "ramada", name: "A" }, { id: "ramada", name: "B" }]).success).toBe(false);
+  });
+
+  it("indexes a listing's section and filters a shop's search on it", () => {
+    expect(toSearchDocument(shirt({ sectionId: "ramada" }), NOW)?.sectionId).toBe("ramada");
+    expect(toSearchDocument(shirt(), NOW)).not.toHaveProperty("sectionId");
+    const params = parseSearchParams(new URLSearchParams("boutique=abcdefghjk&section=ramada"));
+    expect(params).toMatchObject({ shop: "abcdefghjk", section: "ramada" });
+    expect(searchPath(params)).toBe("/recherche?boutique=abcdefghjk&section=ramada");
+    // Without its shop a section means nothing.
+    expect(parseSearchParams(new URLSearchParams("section=ramada"))).toEqual({});
+    expect(buildFilter({ shop: "abcdefghjk", section: "ramada", includeSoldOut: true }, NOW)).toEqual({
+      and: [
+        { field: "sellerType", op: "eq", value: "pro" },
+        { field: "sellerPublicId", op: "eq", value: "abcdefghjk" },
+        { field: "sectionId", op: "eq", value: "ramada" },
+      ],
+    });
   });
 });

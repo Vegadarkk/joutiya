@@ -111,6 +111,7 @@ export function toOwnerSummary(listing: ListingRecord, now = new Date()): OwnerL
     canRenew: canRenew(listing, now),
     ...(listing.subcategoryId === RENTAL_SUBCATEGORY ? { rental: rentalAvailabilityOf(listing) } : {}),
     ...(listing.sellerType === "pro" && !listing.isDonation ? { catalogue: ownerCatalogue(listing, now) } : {}),
+    ...(listing.sellerType === "pro" ? { sectionId: listing.sectionId ?? null } : {}),
   };
 }
 

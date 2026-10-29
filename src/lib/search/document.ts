@@ -208,6 +208,7 @@ export function toSearchDocument(listing: ListingRecord, now: Date = new Date())
     ...(district ? { district } : {}),
     sellerType: listing.sellerType,
     sellerPublicId: listing.sellerPublicId,
+    ...(listing.sectionId ? { sectionId: listing.sectionId } : {}),
     ...(price !== undefined ? { price } : {}),
     priceNegotiable: listing.priceNegotiable,
     isDonation: listing.isDonation,

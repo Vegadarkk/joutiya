@@ -22,6 +22,7 @@ const EQUALITY_BASE = [
   "district",
   "sellerType",
   "sellerPublicId",
+  "sectionId",
   "isDonation",
   "hasPhoto",
   "soldOut",

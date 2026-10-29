@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { OwnerAvailability } from "@/components/rental/owner-availability";
 import { quietLinkClassName } from "@/components/ui/text-link";
 import { Link, getPathname } from "@/i18n/navigation";
+import type { ShopSection } from "@/lib/contracts/catalog";
 import type { OwnerListingSummary } from "@/lib/contracts/listings";
 import { isolate } from "@/lib/i18n/bidi";
 import type { OwnerAction } from "@/lib/listings/client/api";
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { primaryAction } from "./buckets";
 import { ListingActions } from "./listing-actions";
 import { OwnerPromo, showsPromo } from "./owner-promo";
+import { OwnerSection } from "./owner-section";
 import { OwnerStock } from "./owner-stock";
 import { ListingStatusBadge } from "./status-badge";
 
@@ -34,15 +36,17 @@ interface OwnerListingCardProps {
   busy?: boolean;
   salesOpen?: boolean;
   now?: Date;
-  /** The row after a change made in place (a promotion set or stopped). */
+  /** The row after a change made in place (a promotion set or stopped, a section). */
   onChanged?: (listing: OwnerListingSummary) => void;
+  /** The shop's storefront sections (catalogue §5): the row offers them. */
+  sections?: ShopSection[];
 }
 
 /**
  * One row of "Mes annonces": cover, title, price, city, status, expiry, actions. On phones the
  * primary action takes the full row under the cover (its label is longer than the text column).
  */
-export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, busy = false, salesOpen = false, now = new Date(), onChanged }: OwnerListingCardProps) {
+export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, busy = false, salesOpen = false, now = new Date(), onChanged, sections = [] }: OwnerListingCardProps) {
   const t = useTranslations("MyListings");
   const locale = useLocale() as Locale;
   const city = listing.citySlug ? cityBySlug(listing.citySlug) : undefined;
@@ -110,6 +114,7 @@ export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, bu
         {listing.status === "rejected" ? <p className="text-xs text-danger text-pretty">{t("rejected.body")}</p> : null}
         {listing.rental ? <OwnerAvailability listingId={listing.id} title={title} rental={listing.rental} now={now} /> : null}
         {listing.catalogue && STOCK_STATUSES.includes(listing.status) ? <OwnerStock listingId={listing.id} title={title} catalogue={listing.catalogue} /> : null}
+        {onChanged && sections.length > 0 && listing.sectionId !== undefined && STOCK_STATUSES.includes(listing.status) ? <OwnerSection listing={listing} title={title} sections={sections} onChanged={onChanged} /> : null}
         {listing.catalogue && onChanged && showsPromo(listing) ? <OwnerPromo listing={{ ...listing, catalogue: listing.catalogue }} title={title} now={now} onChanged={onChanged} /> : null}
       </div>
       {primary ? (

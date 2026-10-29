@@ -1,7 +1,7 @@
 import { z } from "@/lib/zod";
 import { CONDITIONS, categoryById, subcategoryById } from "@/config/categories";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
-import { listingVariantsSchema, stockSchema, type ListingVariants, type PromoView } from "@/lib/contracts/catalog";
+import { listingVariantsSchema, stockSchema, type ListingVariants, type PromoView, type ShopSection } from "@/lib/contracts/catalog";
 import { MAX_PHOTOS_PRO, uploadIdSchema, type ListingPhoto, type UploadRejectReason, type UploadStatus } from "@/lib/contracts/media";
 import { LISTING_ID_PATTERN, SLUG_ID_MAX, SLUG_ID_PATTERN } from "@/lib/listings/ids";
 import { DAY_PATTERN, RENTAL_PERIODS_MAX, type RentalPeriod } from "@/lib/listings/rental-availability";
@@ -261,6 +261,8 @@ export interface OwnerListingSummary {
   canRenew: boolean;
   /** Pro listing (catalogue §3): its declared stock, edited in place from « Mes annonces ». */
   catalogue?: OwnerCatalogue;
+  /** Pro listing (catalogue §5): its storefront section, null when none. */
+  sectionId?: string | null;
   /** Car rentals only: the blocked periods the availability calendar edits. */
   rental?: RentalAvailability;
 }
@@ -299,10 +301,11 @@ export interface OwnerListing {
 
 export type CreateListingResponse = { id: string };
 /** `salesOpen`: paid options can be bought (config/flags.salesEnabled, phase 7). */
-export type OwnerListingsResponse = { listings: OwnerListingSummary[]; salesOpen: boolean };
+/** `sections`: the shop's storefront sections (catalogue §5), for a Pro owner that has some. */
+export type OwnerListingsResponse = { listings: OwnerListingSummary[]; salesOpen: boolean; sections?: ShopSection[] };
 export type ListingResponse = { listing: OwnerListing };
-/** A promotion set or ended (catalogue §4): the « Mes annonces » row (status included: a deep cut is held). */
-export type PromoResponse = { listing: OwnerListingSummary };
+/** A change made in place from « Mes annonces » (promotion, section): the row (status included: a deep cut is held). */
+export type OwnerRowResponse = { listing: OwnerListingSummary };
 export type PublishListingResponse = {
   status: Extract<ListingStatus, "published" | "pending_review" | "rejected">;
   slugId?: string;

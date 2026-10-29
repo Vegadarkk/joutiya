@@ -1,6 +1,7 @@
 import "server-only";
 import { requireUser } from "@/lib/auth/guards";
 import { uploadIdSchema } from "@/lib/contracts/media";
+import { sectionsInputSchema } from "@/lib/contracts/catalog";
 import { kybcSignSchema, proAgencySchema, proApplySchema, proRentalSchema, rentalCheckSubmitSchema, type ProApplyResponse } from "@/lib/contracts/pro";
 import { STOCK_IMPORT_BODY_MAX_BYTES, stockImportRequestSchema } from "@/lib/contracts/stock-import";
 import { serverEnv } from "@/lib/env";
@@ -13,7 +14,7 @@ import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 import { completeKybcUpload, deleteKybcUpload, signKybcUpload } from "./kybc-uploads";
 import { submitRentalCheck } from "./rental-check";
-import { proSelf, submitApplication, updateAgency, updateRentalAgency } from "./service";
+import { proSelf, submitApplication, updateAgency, updateRentalAgency, updateSections } from "./service";
 import { importStock, stockList } from "./stock-import/service";
 
 // Route handlers of /api/pro/** (phase 7 design §4): requireUser (Origin + CSRF on mutations),
@@ -70,6 +71,14 @@ export async function handleAgency(request: Request): Promise<Response> {
   const input = await readJson(request, proAgencySchema);
   await enforceLimit("pro.agency.uid", auth.user.uid);
   return json(await updateAgency(auth, input));
+}
+
+/** PUT /api/pro/me/sections: the storefront's sections (catalogue §5). */
+export async function handleSections(request: Request): Promise<Response> {
+  const auth = await requireUser(request, { mutation: true });
+  const input = await readJson(request, sectionsInputSchema);
+  await enforceLimit("pro.agency.uid", auth.user.uid);
+  return json(await updateSections(auth, input));
 }
 
 /** PUT /api/pro/me/rental: the car rental agency's settings (rental pack §5). */

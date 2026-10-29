@@ -1,4 +1,4 @@
-import { cache } from "react";
+import { Fragment, cache } from "react";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { BadgeCheck, CalendarDays, MapPin } from "lucide-react";
@@ -15,6 +15,7 @@ import { DealerStock } from "@/components/pro/dealer-stock";
 import { RentalFleet, type FleetLabels } from "@/components/rental/rental-fleet";
 import { RentalAgencyCard, RentalBranches, RentalConditions } from "@/components/rental/rental-storefront";
 import { SellerInfo } from "@/components/pro/seller-info";
+import { StorefrontTabs } from "@/components/storefront/storefront-tabs";
 import { ReportButton } from "@/components/report/report-button";
 import { RatingLink } from "@/components/reviews/rating-link";
 import { SellerReviews } from "@/components/reviews/seller-reviews";
@@ -34,7 +35,8 @@ import { getPublicStorefront, parseStorefrontSegment, storefrontPath } from "@/l
 import { dealerStock } from "@/lib/search/dealer";
 import { rentalFleet } from "@/lib/search/rental-fleet";
 import type { RentalFleetView } from "@/lib/search/rental-fleet-view";
-import { shopSubcategoryCounts } from "@/lib/search/storefront";
+import { searchPath } from "@/lib/search/params";
+import { shopShelves, shopSubcategoryCounts } from "@/lib/search/storefront";
 import { mediaBaseUrl } from "@/lib/storage/keys";
 
 // Storefront of a verified Pro shop (phase 7 design §4): /boutique/{slug}-{proId}. ISR like the
@@ -109,7 +111,7 @@ export default async function StorefrontPage({ params }: { params: Params }) {
   if (store.segment !== shop) permanentRedirect(storefrontPath(locale, store.segment));
 
   const rentalAgency = store.sector === "car_rental";
-  const [t, profile, criteria, legal, flags, vehicles, fleet] = await Promise.all([
+  const [t, profile, criteria, legal, flags, vehicles, fleet, shelves] = await Promise.all([
     getTranslations({ locale: numbersLocale(locale), namespace: "Storefront" }),
     getTranslations({ locale: numbersLocale(locale), namespace: "Profile" }),
     getTranslations({ locale, namespace: "Criteria" }),
@@ -119,6 +121,8 @@ export default async function StorefrontPage({ params }: { params: Params }) {
     store.seller.publishedCount > 0 ? dealerStock(store.seller.publicId) : null,
     // A car rental agency's fleet (rental pack §5); null when it rents nothing yet.
     rentalAgency && store.seller.publishedCount > 0 ? rentalFleet(store.seller.publicId) : null,
+    // Its sections and running promotions (catalogue §5), as tabs over the grid.
+    store.seller.publishedCount > 0 && !store.example ? shopShelves(store.seller.publicId, store.sections) : [],
   ]);
   const media = mediaBaseUrl();
   const city = cityBySlug(store.citySlug);
@@ -135,6 +139,32 @@ export default async function StorefrontPage({ params }: { params: Params }) {
     <p className="rounded-md bg-surface-muted p-4 text-sm text-foreground-muted text-pretty">
       {store.example ? t("example.note") : agency ? t("agency.verifiedNote") : rentalAgency ? t("rental.verifiedNote") : t("verifiedNote")}
     </p>
+  );
+
+  const allListings = (
+    <>
+      {listings.length > 0 ? (
+        <ul className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
+          {listings.map((listing) => (
+            <li key={listing.id} className="min-w-0">
+              <ListingCard listing={listing} mediaBaseUrl={media} locale={locale} action={<FavoriteButton listingId={listing.id} />} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState
+          title={profile("emptyTitle")}
+          action={
+            <Button asChild variant="outline">
+              <Link href="/recherche">{profile("browse")}</Link>
+            </Button>
+          }
+        >
+          {profile("emptyBody", { name: isolate(store.name) })}
+        </EmptyState>
+      )}
+      {hidden > 0 ? <p className="text-sm text-foreground-muted">{profile("newest", { shown: listings.length })}</p> : null}
+    </>
   );
 
   return (
@@ -202,27 +232,36 @@ export default async function StorefrontPage({ params }: { params: Params }) {
           <h2 id="storefront-listings" className="text-xl font-semibold">
             {fleet ? t("rental.otherListings", { count: listedCount }) : profile("listingsTitle", { count: seller.publishedCount })}
           </h2>
-          {listings.length > 0 ? (
-            <ul className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
-              {listings.map((listing) => (
-                <li key={listing.id} className="min-w-0">
-                  <ListingCard listing={listing} mediaBaseUrl={media} locale={locale} action={<FavoriteButton listingId={listing.id} />} />
-                </li>
-              ))}
-            </ul>
+          {shelves.length > 0 ? (
+            <StorefrontTabs
+              label={t("shelves.label")}
+              tabs={[
+                { key: "all", label: t("shelves.all"), count: listedCount },
+                ...shelves.map((shelf) => ({ key: shelf.key, label: shelf.kind === "promo" ? t("shelves.promotions") : shelf.name, count: shelf.total, promo: shelf.kind === "promo" })),
+              ]}
+              panels={[
+                allListings,
+                ...shelves.map((shelf) => (
+                  <Fragment key={shelf.key}>
+                    <ul className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
+                      {shelf.listings.map((listing) => (
+                        <li key={listing.id} className="min-w-0">
+                          <ListingCard listing={listing} mediaBaseUrl={media} locale={locale} action={<FavoriteButton listingId={listing.id} />} />
+                        </li>
+                      ))}
+                    </ul>
+                    {shelf.total > shelf.listings.length ? (
+                      <Button asChild variant="outline" className="self-start">
+                        <Link href={searchPath(shelf.params)}>{t("shelves.seeAll", { count: shelf.total })}</Link>
+                      </Button>
+                    ) : null}
+                  </Fragment>
+                )),
+              ]}
+            />
           ) : (
-            <EmptyState
-              title={profile("emptyTitle")}
-              action={
-                <Button asChild variant="outline">
-                  <Link href="/recherche">{profile("browse")}</Link>
-                </Button>
-              }
-            >
-              {profile("emptyBody", { name: isolate(store.name) })}
-            </EmptyState>
+            allListings
           )}
-          {hidden > 0 ? <p className="text-sm text-foreground-muted">{profile("newest", { shown: listings.length })}</p> : null}
         </section>
       )}
 
