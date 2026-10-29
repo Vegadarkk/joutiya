@@ -68,7 +68,7 @@ Les annonces marquées « Annonce exemple » sont rédigées par {brand} pour il
 
 ### 2.9 Vue carte {#tri-9}
 
-L'accueil et la page de recherche s'affichent en carte, ou en liste quand la carte ne peut pas s'afficher ; la recherche permet aussi de choisir la liste. La carte de l'accueil montre les 24 annonces publiées le plus récemment et les annonces À la Une (§3.2). Sur la carte, chaque annonce est placée à une position approximative, arrondie à environ 1 km, jamais à l'adresse exacte. Des annonces proches peuvent être regroupées en un seul repère, qui s'ouvre en zoomant. La liste à côté de la carte suit le tri choisi. Le bouton « Rechercher dans cette zone » limite les résultats aux annonces de la zone affichée ; il agit comme un filtre de lieu (§2.6).
+L'accueil et la page de recherche s'affichent en carte, ou en liste quand la carte ne peut pas s'afficher ; la recherche permet aussi de choisir la liste. La carte de l'accueil montre les 24 annonces les plus récentes, selon la date du §2.1, et les annonces À la Une (§3.2). Sur la carte, chaque annonce est placée à une position approximative, arrondie à environ 1 km, jamais à l'adresse exacte. Des annonces proches peuvent être regroupées en un seul repère, qui s'ouvre en zoomant. La liste à côté de la carte suit le tri choisi. Le bouton « Rechercher dans cette zone » limite les résultats aux annonces de la zone affichée ; il agit comme un filtre de lieu (§2.6).
 
 ## 3. Les options payantes {#options}
 
