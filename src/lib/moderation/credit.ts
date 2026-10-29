@@ -8,15 +8,20 @@
 /** Credit words, French, darija in Latin script and Arabic. */
 const CREDIT_WORDS = /mensualit[eé]s?|cr[eé]dit|financement|leasing|\bloa\b|\blld\b|apport|taqsit|ta9sit|تقسيط|بالتقسيط|قرض|أقساط|اقساط|قسط/iu;
 
-/** A figure tied to a month: "2500 dh/mois", "1 900 DH par mois", "3000 درهم شهريا", "mensualité de 1 900". */
+/**
+ * A figure tied to a month: "2500 dh/mois", "1 900 DH par mois", "3000 درهم شهريا", "mensualité de 1 900".
+ * Runs on whitespace-collapsed text; the figure takes a space only before a digit and at most 16
+ * characters, and no two whitespace quantifiers overlap: linear time on any description (the
+ * earlier `[\d\s.,]*\s*…\s*` backtracked cubically on a run of spaces).
+ */
 const MONTHLY_FIGURE =
-  /\d[\d\s.,]*\s*(?:dh|dhs|mad|درهم)?\s*(?:\/\s*mois|par\s+mois|mensuel(?:le)?s?|chaque\s+mois|f\s*chhar|fi\s*chhar|kol\s*chhar|شهريا|شهريًا|في\s*الشهر|كل\s*شهر|\/\s*شهر)|mensualit[eé]s?\s+(?:de|à|a)\s+\d|أقساط\s*(?:ب|من)?\s*\d|قسط\s*(?:شهري)?\s*\d/iu;
+  /\d(?:[\d.,]|\s(?=\d)){0,15}\s?(?:(?:dh|dhs|mad|درهم)\s?)?(?:\/\s*mois|par\s+mois|mensuel(?:le)?s?|chaque\s+mois|f\s*chhar|fi\s*chhar|kol\s*chhar|شهريا|شهريًا|في\s*الشهر|كل\s*شهر|\/\s*شهر)|mensualit[eé]s?\s+(?:de|à|a)\s+\d|أقساط\s*(?:ب|من)?\s*\d|قسط\s*(?:شهري)?\s*\d/iu;
 
 /** The annual percentage rate named: "TEG", "taux effectif global", "السعر الفعلي الإجمالي". */
 const APR_MENTION = /\bteg\b|taux\s+effectif\s+global|السعر\s+الفعلي\s+الإجمالي/iu;
 
 /** True when `text` quotes an instalment figure for a credit without naming the TEG. */
 export function quotesCreditWithoutApr(text: string): boolean {
-  const flat = text.normalize("NFKC");
+  const flat = text.normalize("NFKC").replace(/\s+/gu, " ");
   return CREDIT_WORDS.test(flat) && MONTHLY_FIGURE.test(flat) && !APR_MENTION.test(flat);
 }

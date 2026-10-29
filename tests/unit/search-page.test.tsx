@@ -183,6 +183,24 @@ describe("search page states", () => {
     }
   });
 
+  it("labels an example listing in the map rows, as the grid card does", async () => {
+    process.env.MAP_PMTILES_URL = "https://media.joutiya.test/maps/morocco.pmtiles";
+    resetServerEnv();
+    try {
+      mocks.runSearch.mockImplementation(async (params) =>
+        response(params, { hits: [card("aaaa2345", { example: true }), card("bbbb2345")], total: 2, totalPages: 1 }),
+      );
+      const html = await renderPage({ q: "draisienne" });
+      expect(html).toContain('data-search-view="map"');
+      expect(html.match(/data-testid="example-chip"/g)).toHaveLength(1);
+      const exampleRow = html.slice(html.indexOf('data-listing-id="aaaa2345"'), html.indexOf('data-listing-id="bbbb2345"'));
+      expect(text(exampleRow)).toContain(fr.SearchMap.row.example);
+    } finally {
+      delete process.env.MAP_PMTILES_URL;
+      resetServerEnv();
+    }
+  });
+
   it("renders the results in Arabic with Arabic links and labels", async () => {
     mocks.runSearch.mockImplementation(async (params) => response(params, { hits: [card("aaaa2345")], total: 1, totalPages: 1 }));
     const html = await renderPage({ categorie: "vehicules" }, "ar");

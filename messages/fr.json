@@ -3407,11 +3407,13 @@
         "night": "/nuit",
         "month": "/mois",
         "day": "/jour"
-      }
+      },
+      "example": "Annonce exemple"
     },
     "row": {
       "noPhoto": "Pas de photo",
-      "pro": "Pro"
+      "pro": "Pro",
+      "example": "Exemple"
     },
     "detail": {
       "close": "Fermer l'aperçu",
@@ -3425,7 +3427,8 @@
       "exclusive": "Exclusivité",
       "open": "Ouvrir la page complète",
       "report": "Signaler",
-      "contact": "Contacter"
+      "contact": "Contacter",
+      "example": "Annonce exemple"
     },
     "legal": {
       "all": "Toutes les informations légales",

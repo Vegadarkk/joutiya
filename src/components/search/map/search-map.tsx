@@ -111,7 +111,7 @@ export default function SearchMap({ onReady }: SearchMapProps) {
   const latest = useRef({ state, onReady, labels: null as PinLabels | null, rtl });
   const labels: PinLabels = {
     pin: (listing) =>
-      [t("pin.label", { title: listing.title, price: listing.amount }), listing.featured ? t("pin.featured") : null, listing.today ? t("pin.today") : null].filter(Boolean).join(", "),
+      [t("pin.label", { title: listing.title, price: listing.amount }), listing.example ? t("pin.example") : null, listing.featured ? t("pin.featured") : null, listing.today ? t("pin.today") : null].filter(Boolean).join(", "),
     cluster: (count) => t("pin.cluster", { count }),
   };
   useEffect(() => {
