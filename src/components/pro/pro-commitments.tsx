@@ -83,6 +83,14 @@ export function ProCommitments({ scope, checked, onCheckedChange, error, classNa
           <Link href="/legal/cgu#roles" target="_blank" rel="noopener" className={cn("font-medium text-link", textLinkClassName)}>
             {t("termsLink")}
           </Link>
+          {scope === "holiday_rental" ? (
+            <>
+              {" · "}
+              <Link href="/legal/cgu#annonces-10" target="_blank" rel="noopener" className={cn("font-medium text-link", textLinkClassName)}>
+                {t("termsHoliday")}
+              </Link>
+            </>
+          ) : null}
         </p>
       </div>
 
