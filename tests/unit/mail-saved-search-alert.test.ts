@@ -68,6 +68,23 @@ describe("savedSearchAlert", () => {
     expect(rendered.text).toContain("1 500 DH, Casablanca");
   });
 
+  it("puts the favorites on promotion first, with the struck-out price", () => {
+    const favorites: NonNullable<TemplateData["savedSearchAlert"]["favorites"]> = [
+      { title: "Veste en laine", url: `${SITE}/fr/annonce/veste-fes-abcd2345`, price: 960, isDonation: false, citySlug: "fes", kind: "soldes", before: 1200, percent: 20 },
+      { title: "Miel de thym", url: `${SITE}/fr/annonce/miel-fes-efgh2345`, price: 90, isDonation: false, citySlug: null, kind: "flash", before: null, percent: 0 },
+    ];
+    const both = renderMail(mail("fr", { ...DATA, favorites }));
+    expect(both.subject).toBe("13 nouvelles annonces pour vos recherches");
+    expect(both.text.indexOf("Vos favoris en promotion")).toBeLessThan(both.text.indexOf("Vélos <Casa> & co"));
+    expect(both.text).toMatch(/960\sDH au lieu de 1\s200\sDH, Soldes −20 %, Fès/);
+    expect(both.text).toMatch(/90\sDH, Vente flash\)/);
+    expect(both.text).toContain(`${SITE}/fr/favoris`);
+    const only = renderMail(mail("fr", { ...DATA, searches: [], favorites }));
+    expect(only.subject).toBe("2 de vos favoris sont en promotion");
+    expect(only.text).not.toContain("recherches sauvegardées.");
+    expect(renderMail(mail("ar", { ...DATA, searches: [], favorites: favorites.slice(0, 1) })).subject).toBe("أحد إعلاناتك المفضلة عليه تخفيض");
+  });
+
   it("names the only search in the subject and writes Arabic right to left", () => {
     const one = { ...DATA, searches: [DATA.searches[0]!] };
     expect(renderMail(mail("fr", one)).subject).toBe("12 nouvelles annonces pour « Vélos <Casa> & co »");
