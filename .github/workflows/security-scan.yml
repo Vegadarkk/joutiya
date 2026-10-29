@@ -77,6 +77,9 @@ jobs:
           work="$RUNNER_TEMP/zap"
           install -d -m 0777 "$work"
           cp .zap/rules.tsv "$work/rules.tsv"
+          # Staging sends its CSP as Content-Security-Policy-Report-Only by design (§6), which 10038
+          # reads as no CSP: a warning there, a failure on production.
+          if [[ "$TARGET" == "staging" ]]; then sed -i 's/^10038\tFAIL\t/10038\tWARN\t/' "$work/rules.tsv"; fi
           docker pull --quiet "$ZAP_IMAGE"
           set +e
           # Console output to the encrypted report only: it lists URLs and findings.

@@ -11,6 +11,8 @@ export const routing = defineRouting({
   localeCookie: {
     name: "NEXT_LOCALE",
     sameSite: "lax",
+    // Also written by the locale switcher in the page (document.cookie): never HttpOnly.
+    secure: true,
     maxAge: 60 * 60 * 24 * 365,
   },
 });
