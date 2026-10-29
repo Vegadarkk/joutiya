@@ -36,6 +36,7 @@ export const GUIDE_PROCEDURES = {
   "immo-vente": { rubric: "immobilier", sources: ["dgi-teleservices", "ancfcc"] },
   "immo-taxes-locales": { rubric: "immobilier", sources: ["tgr-taxes-locales"] },
   "immo-location": { rubric: "immobilier", sources: ["idarati-logement"] },
+  "immo-location-touristique": { rubric: "immobilier", sources: ["tourisme-hebergement"] },
   // Diaspora
   "mre-services": { rubric: "mre", sources: ["mre-accueil", "mre-consulaire", "mre-justice"] },
   "mre-immatriculation": { rubric: "mre", sources: ["consulat-immatriculation", "consulat-trouver"] },

@@ -133,11 +133,12 @@ export default async function StorefrontPage({ params }: { params: Params }) {
   const hidden = listedCount - listings.length;
   const initial = Array.from(store.name.trim())[0]?.toLocaleUpperCase() ?? "?";
   const agency = store.sector === "real_estate";
+  const holidayAgency = store.sector === "holiday_rental";
   const counts = agency && seller.publishedCount > 0 ? await shopSubcategoryCounts(seller.publicId, "immobilier") : null;
-  const label = agency ? t("agency.label") : rentalAgency ? t("rental.label") : t("label");
+  const label = agency ? t("agency.label") : rentalAgency ? t("rental.label") : holidayAgency ? t("holiday.label") : t("label");
   const aside = (
     <p className="rounded-md bg-surface-muted p-4 text-sm text-foreground-muted text-pretty">
-      {store.example ? t("example.note") : agency ? t("agency.verifiedNote") : rentalAgency ? t("rental.verifiedNote") : t("verifiedNote")}
+      {store.example ? t("example.note") : agency ? t("agency.verifiedNote") : rentalAgency ? t("rental.verifiedNote") : holidayAgency ? t("holiday.verifiedNote") : t("verifiedNote")}
     </p>
   );
 
@@ -195,7 +196,7 @@ export default async function StorefrontPage({ params }: { params: Params }) {
         </div>
         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-sm bg-featured px-3 py-1 text-sm font-medium text-featured-foreground sm:ms-auto sm:self-start">
           {store.example ? null : <BadgeCheck className="size-4" aria-hidden="true" />}
-          {store.example ? t("example.badge") : agency || rentalAgency ? t("agency.verified") : t("verified")}
+          {store.example ? t("example.badge") : agency || rentalAgency || holidayAgency ? t("agency.verified") : t("verified")}
         </span>
       </header>
       {store.example ? <ExampleBanner scope="shop" /> : null}

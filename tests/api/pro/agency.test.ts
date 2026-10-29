@@ -88,7 +88,7 @@ describe("PUT /api/pro/me/agency", () => {
   it("refuses to become an agency without the commitments", async () => {
     const owner = await member();
     const proId = await shop(owner);
-    for (const sector of ["real_estate", "car_rental"]) {
+    for (const sector of ["real_estate", "car_rental", "holiday_rental"]) {
       const refused = await put(owner, { sector, feeSchedule: "" });
       expect(refused.status).toBe(400);
       expect(code(refused.body)).toBe("commitments_required");
