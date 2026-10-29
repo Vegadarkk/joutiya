@@ -237,10 +237,12 @@ export const proAgencySchema = z
   .object({
     sector: z.enum(PRO_SECTORS),
     feeSchedule: z.string().trim().max(AGENCY_FEE_SCHEDULE_MAX),
+    /** The agency commitments of `sector` (src/lib/pro/commitments.ts), ticked: required to become an agency. */
+    acceptCommitments: z.literal(true).optional(),
   })
   .strict();
 export type ProAgencyInput = z.infer<typeof proAgencySchema>;
-export type ProAgencyResponse = ProAgencyInput;
+export type ProAgencyResponse = Omit<ProAgencyInput, "acceptCommitments">;
 
 /** PUT /api/pro/me/rental (rental pack §5): the car rental agency's settings, replaced whole. */
 export const proRentalSchema = rentalAgencySchema;

@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { CalendarClock, Check } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { FormMessage, useApiErrorMessage } from "@/components/auth/form-message";
 import { InlineError } from "@/components/feedback/inline-error";
+import { ProCommitments } from "@/components/pro/pro-commitments";
 import { Button } from "@/components/ui/button";
 import { textLinkClassName } from "@/components/ui/text-link";
 import type { Locale } from "@/config/site";
@@ -16,7 +18,8 @@ import { cn } from "@/lib/utils";
 
 // The Pass Boutique on /pro/abonnement (owner decision 2026-10-28): one payment for `days` of the
 // plan, no renewal. Drawn as a ticket beside the doors of the plans: dashed edge, the gold of the
-// brand on the price. The shop's owner accepts the terms and pays on Stripe's page; back from it
+// brand on the price. The shop's owner ticks the legal commitments of a temporary shop (with the
+// admin guide's procedures), accepts the terms and pays on Stripe's page; back from it
 // (`?pass=<end seen before, ms>`) the plan page reloads until the webhook has moved the end of the pass.
 
 /** Codes the section explains in its own words (Subscription.errors). */
@@ -39,17 +42,20 @@ export function passBlock(data: SubscriptionResponse, offer: Offer, live: boolea
 export function PassOffer({ data, offer, block, locale, date, onReload }: { data: SubscriptionResponse; offer: Offer; block: PassBlock; locale: Locale; date: (iso: string) => string; onReload: () => void }) {
   const t = useNumbersTranslations("Subscription");
   const apiMessage = useApiErrorMessage();
+  const commitmentsText = useTranslations("Pro.commitments");
   const [terms, setTerms] = useState(false);
+  const [commitments, setCommitments] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<unknown>(undefined);
   const extending = data.planSource === "pass" && data.passEndsAt !== null;
   const buyable = block === null;
   const missingTerms = attempted && !terms;
+  const missingCommitments = attempted && !commitments;
 
   async function buy() {
     setAttempted(true);
-    if (!terms) return;
+    if (!terms || !commitments) return;
     setPending(true);
     setFailure(undefined);
     try {
@@ -113,6 +119,7 @@ export function PassOffer({ data, offer, block, locale, date, onReload }: { data
             <li>{t("pass.notes.end")}</li>
             <li>{t("pass.notes.subscribe")}</li>
           </ul>
+          <ProCommitments scope="pass" checked={commitments} onCheckedChange={setCommitments} error={missingCommitments ? commitmentsText("required") : undefined} />
           <div className="flex flex-col gap-2">
             <label className="flex cursor-pointer items-start gap-3 text-sm text-pretty">
               <input type="checkbox" checked={terms} aria-invalid={missingTerms ? true : undefined} onChange={(event) => setTerms(event.target.checked)} className="mt-0.5 size-4 shrink-0 accent-primary" />

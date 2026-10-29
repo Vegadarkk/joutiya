@@ -3540,7 +3540,7 @@
       "shopTitle": "Votre boutique",
       "legalTitle": "Votre statut",
       "piecesTitle": "Vos justificatifs",
-      "commitTitle": "Votre engagement",
+      "commitTitle": "Engagements juridiques",
       "name": "Nom de la boutique",
       "nameHint": "Le nom affiché sur vos annonces et votre vitrine, de 2 à {max} caractères.",
       "description": "Présentation",
@@ -3576,7 +3576,6 @@
       "pieceFailed": "Le document n'a pas pu être envoyé. Réessayez.",
       "piecesRequired": "Ajoutez au moins un justificatif.",
       "piecesPending": "Attendez la fin de l'envoi des documents.",
-      "commitment": "Je certifie que ces informations sont exactes et je m'engage à ne proposer que des produits et services conformes à la loi marocaine.",
       "commitmentRequired": "Cochez l'engagement pour envoyer la demande.",
       "submit": "Envoyer ma demande",
       "resubmit": "Envoyer ma demande corrigée",
@@ -3599,6 +3598,55 @@
         "commercant": "ICE, et RC ou taxe professionnelle.",
         "cooperative": "ICE et numéro d'immatriculation au registre des coopératives."
       }
+    },
+    "commitments": {
+      "titles": {
+        "shop": "Vos engagements de professionnel",
+        "pass": "Vos engagements pour la boutique temporaire",
+        "real_estate": "Vos engagements d'agence immobilière",
+        "car_rental": "Vos engagements d'agence de location de voitures"
+      },
+      "leads": {
+        "shop": "Ouvrir une boutique Pro engage votre entreprise. Lisez ces engagements et vérifiez vos démarches avant d'envoyer la demande.",
+        "pass": "Une boutique temporaire est une boutique Pro à part entière : les mêmes règles s'appliquent pendant toute sa durée.",
+        "real_estate": "Une agence immobilière agit pour le compte de propriétaires. Ces engagements s'ajoutent à ceux de votre boutique.",
+        "car_rental": "La location de voitures est une activité réglementée. Ces engagements s'ajoutent à ceux de votre boutique."
+      },
+      "items": {
+        "identity": "Les informations et les pièces que je fournis sont exactes et concernent mon entreprise. Je n'utilise ni le nom, ni l'ICE, ni les documents d'une autre entreprise.",
+        "registered": "Mon entreprise est immatriculée au Maroc et à jour de ses déclarations fiscales et sociales.",
+        "lawful": "Je ne propose que des biens et des services permis par la loi marocaine, avec les autorisations que mon activité exige.",
+        "responsible": "Je suis seul responsable de mes annonces, de mes prix et des contrats conclus avec mes clients : {brand} n'est partie à aucune vente ni location.",
+        "temporary": "Après la fin de la boutique temporaire, je reste responsable des ventes conclues pendant sa durée (livraison, garantie, réclamations).",
+        "mandate": "Je ne publie un bien qu'avec le mandat écrit de son propriétaire, et j'indique mes honoraires sur chaque annonce.",
+        "property": "Je vérifie la situation du bien (titre foncier, droit de le vendre ou de le louer) avant de le publier.",
+        "tourism": "Pour une location touristique de courte durée, je respecte la loi n° 80-14 sur les établissements touristiques et les autres formes d'hébergement touristique.",
+        "agrement": "Mon agence détient l'agrément de location de voitures délivré par le ministère chargé du transport.",
+        "fleet": "Mes véhicules sont assurés et en règle (carte grise, visite technique, vignette).",
+        "contract": "Je remets à chaque client un contrat de location écrit, avec le prix total et les conditions (caution, franchise, kilométrage)."
+      },
+      "fakeTitle": "Fausse boutique ou fausse agence : ce que vous risquez",
+      "fakeBody": "Une fausse déclaration ou l'usurpation d'une entreprise entraîne le refus de la demande ou la suspension du compte Pro, et le retrait de ses annonces. Elle peut aussi constituer une infraction pénale (faux, escroquerie). {brand} conserve les éléments de la demande et les transmet aux autorités qui les requièrent légalement.",
+      "guideTitle": "Vos démarches, sur les sites officiels",
+      "guide": {
+        "pro-societe": "Créer une société",
+        "pro-ice": "Obtenir l'identifiant commun de l'entreprise (ICE)",
+        "pro-obligations": "Obligations fiscales et sociales d'une entreprise",
+        "ae-impots": "Auto-entrepreneur : déclarer et payer ses impôts",
+        "immo-verifier": "Vérifier la situation d'un bien",
+        "immo-location": "Louer un logement : bail et démarches",
+        "vehicule-mutation": "Mutation d'un véhicule (changement de propriétaire)"
+      },
+      "newTab": "(s'ouvre dans un nouvel onglet)",
+      "guideNote": "Le guide des démarches renvoie vers les sites des administrations, seuls à faire foi. Règles des comptes Pro :",
+      "termsLink": "CGU, article 4",
+      "accept": {
+        "shop": "Je certifie que ces informations sont exactes et j'accepte ces engagements, sous ma seule responsabilité.",
+        "pass": "J'accepte ces engagements pour toute la durée de ma boutique temporaire, sous ma seule responsabilité.",
+        "real_estate": "J'accepte ces engagements d'agence immobilière, sous ma seule responsabilité.",
+        "car_rental": "J'accepte ces engagements d'agence de location de voitures, sous ma seule responsabilité."
+      },
+      "required": "Cochez la case pour confirmer vos engagements."
     },
     "pending": {
       "title": "Demande en cours de vérification",
@@ -3653,7 +3701,8 @@
       "invalid_pieces": "Un des documents n'est plus disponible. Retirez-le et ajoutez-le de nouveau.",
       "phone_required": "Indiquez le numéro de mobile qu'un modérateur appellera.",
       "account_suspended": "Votre compte est suspendu : vous ne pouvez pas demander de compte Pro.",
-      "email_not_verified": "Confirmez d'abord votre adresse e-mail."
+      "email_not_verified": "Confirmez d'abord votre adresse e-mail.",
+      "commitments_required": "Confirmez vos engagements d'agence pour choisir ce secteur."
     },
     "agency": {
       "title": "Secteur d'activité",

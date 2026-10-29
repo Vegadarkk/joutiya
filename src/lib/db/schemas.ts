@@ -1026,6 +1026,8 @@ export const billingAccountSchema = z
       .object({
         passId: z.string().regex(/^[a-z0-9_]{1,40}$/),
         consentVersion: z.string().min(1).max(20),
+        /** Legal commitments of a temporary shop ticked with it (`COMMITMENTS_VERSION`, src/lib/pro/commitments.ts). */
+        commitmentsVersion: z.string().min(1).max(20).optional(),
         at: ts,
         idempotencyKey: z.string().max(200).optional(),
         sessionId: z.string().regex(/^cs_[A-Za-z0-9_]{1,200}$/).optional(),
