@@ -54,14 +54,14 @@ Pour signaler un contenu, utilisez le bouton « Signaler » présent sur chaque 
 
 ### 2.1 Les données que vous nous fournissez {#donnees-1}
 
-- **Compte :** adresse e-mail, pseudonyme, mot de passe, langue, et si vous le souhaitez ville ou région et photo de profil. Le mot de passe est conservé par notre prestataire d'authentification sous une forme illisible (hachée) ; {brand} ne le stocke pas.
+- **Compte :** adresse e-mail, pseudonyme, mot de passe, langue, et si vous le souhaitez ville ou région, photo de profil, texte de présentation et bannière de votre vitrine. Le mot de passe est conservé par notre prestataire d'authentification sous une forme illisible (hachée) ; {brand} ne le stocke pas.
 - **Connexion avec Google :** Google nous transmet un jeton qui contient notamment votre adresse e-mail, l'indication qu'elle est vérifiée et l'identifiant de votre compte Google.
 - **Téléphone :** votre numéro, si vous le faites vérifier<!--if:whatsappEnabled--> (§3.13)<!--endif-->.
 - **Annonces :** titre, description, prix, catégorie et critères, photos, ville, quartier si vous l'indiquez, position sur la carte arrondie à environ 1 km, et vos choix de contact (messagerie, affichage du numéro, WhatsApp).
-- **Messages :** le contenu de vos conversations avec les autres utilisateurs.
+- **Messages :** le contenu de vos conversations avec les autres utilisateurs, y compris les rendez-vous proposés (créneaux, lieu) et les demandes de réservation d'un véhicule (dates, lieu de prise en charge).
 - **Avis :** la note, le texte et votre déclaration d'échange, pour un avis que vous laissez à un vendeur ; la réponse d'un vendeur à un avis (§3.7).
 - **Signalements et recours :** le contenu visé, le motif, votre explication, votre déclaration de bonne foi, et votre nom et votre e-mail si vous les donnez.
-- **Compte Pro :** nom et forme de l'entreprise, identifiants légaux selon la forme (ICE, registre du commerce, identifiant fiscal, numéro d'auto-entrepreneur ou de taxe professionnelle), ville, description, logo, site web, téléphone public, pièces justificatives et engagement de conformité.
+- **Compte Pro :** nom et forme de l'entreprise, identifiants légaux selon la forme (ICE, registre du commerce, identifiant fiscal, numéro d'auto-entrepreneur, de coopérative ou de taxe professionnelle), ville, description, logo, site web, téléphone public, pièces justificatives et engagement de conformité ; selon l'activité, les informations de vente à distance (adresse, e-mail de contact, livraison, retours), le lien de paiement, le barème d'honoraires d'une agence immobilière, le numéro d'agrément, les agences et horaires d'un loueur de voitures, et les numéros sanitaires ONSSA.
 - **Achats, à l'ouverture des ventes :** options achetées, crédits, abonnements, données de facturation. Les données de votre carte sont saisies directement chez notre prestataire de paiement.
 - **Assistant {brand} :** les questions que vous lui posez.
 - **Vos choix :** acceptation des CGU, consentement aux transferts (§7.2), accord pour recevoir nos e-mails d'information, choix en matière de cookies.
@@ -129,7 +129,7 @@ Quand un traitement repose sur notre intérêt légitime, vous pouvez vous y opp
 
 ### 3.1 Votre compte {#finalites-1}
 
-Nous utilisons les données de votre compte pour l'ouvrir, vérifier votre adresse e-mail, vous connecter, afficher votre profil public et le gérer jusqu'à sa clôture. Votre profil public montre votre pseudonyme, votre ville ou région si vous l'indiquez, vos badges (téléphone vérifié et, pour un professionnel, « Pro » et, lorsqu'il est proposé, « Certifié »), vos annonces en ligne et vos statistiques de réponse.
+Nous utilisons les données de votre compte pour l'ouvrir, vérifier votre adresse e-mail, vous connecter, afficher votre profil public et le gérer jusqu'à sa clôture. Votre profil public (votre vitrine) montre votre pseudonyme, votre ville ou région si vous l'indiquez, votre texte de présentation (500 caractères au plus, contrôlé par des règles automatiques comme une annonce) et la bannière choisie parmi celles de {brand}, vos badges (téléphone vérifié et, pour un professionnel, « Pro » et, lorsqu'il est proposé, « Certifié »), vos annonces en ligne et vos statistiques de réponse.
 
 Un compte dont l'adresse e-mail n'est pas confirmée sous 24 heures est supprimé.
 
@@ -141,7 +141,7 @@ Une annonce publiée est publique : tout visiteur peut la consulter, et elle peu
 
 ### 3.3 La messagerie et la détection des arnaques {#finalites-3}
 
-Nous transmettons vos messages à votre interlocuteur, vous prévenons des nouveaux messages et gardons l'historique de vos conversations. Vous pouvez bloquer un interlocuteur et archiver une conversation.
+Nous transmettons vos messages à votre interlocuteur, vous prévenons des nouveaux messages et gardons l'historique de vos conversations. Vous pouvez bloquer un interlocuteur et archiver une conversation. Les rendez-vous et les demandes de réservation font partie de la conversation et sont conservés comme elle (§5.1).
 
 Pour vous protéger des arnaques, chaque message est analysé automatiquement **sur nos serveurs, par des règles fixes** : liens externes, coordonnées bancaires (IBAN), mots-clés de paiement à distance ou d'avance. Un numéro ou un lien WhatsApp n'est signalé que s'il accompagne une demande d'avance ou de virement. Les liens sont masqués, un bandeau d'alerte peut s'afficher, et un cas qui se répète est examiné par un modérateur.
 
@@ -168,7 +168,7 @@ Nous ne communiquons pas votre identité à la personne visée par votre signale
 
 ### 3.6 Les e-mails {#finalites-6}
 
-Nous vous envoyons des e-mails liés au service : confirmation de votre adresse, sécurité du compte, nouveaux messages, alertes de recherche, décisions de modération et recours, et, à l'ouverture des ventes, confirmations d'achat et factures.
+Nous vous envoyons des e-mails liés au service : confirmation de votre adresse, sécurité du compte, nouveaux messages, rappels de rendez-vous (la veille et 2 heures avant, avec le nom de votre interlocuteur, l'annonce, la date et le lieu), alertes de recherche, décisions de modération et recours ; pour un professionnel, l'activation ou la suspension de son lien de paiement ; à l'ouverture des ventes, confirmations d'achat, factures et avis de fin d'un Pass Boutique. Les rappels de rendez-vous suivent votre réglage des e-mails de nouveaux messages.
 
 Nous ne vous envoyons des e-mails d'information (nouveautés, conseils) que si vous l'avez accepté, par une case non cochée à l'avance. Chaque e-mail d'information contient un lien de désinscription.
 
@@ -197,7 +197,7 @@ Les comptes Pro sont ouverts dès le lancement de {brand}. Avant sa première pu
 - **Intervention humaine :** si un élément ne concorde pas, en cas de doute, ou si l'IA n'est pas disponible, un modérateur examine le document. Seul un modérateur peut le refuser.
 - **Conservation et droits :** comme les pièces justificatives ci-dessus (espace privé, 6 mois après la fin de la relation, aucune autre fin). Vous êtes informé de cette lecture avant l'envoi.
 
-Sur le site, une boutique Pro montre le nom de l'entreprise, son logo, sa description, sa ville, son site web et, dans la limite d'un quota, son téléphone public. Chaque annonce indique si le vendeur est un particulier ou un professionnel.
+Sur le site, une boutique Pro montre le nom de l'entreprise, son logo, sa description, sa ville, son site web et, dans la limite d'un quota, son téléphone public. Selon l'activité, elle montre aussi les informations de vente à distance et l'adresse du site de paiement (§3.9), le barème d'honoraires d'une agence immobilière, le numéro d'agrément, les agences et les horaires d'un loueur de voitures. Le numéro sanitaire ONSSA s'affiche sur les annonces de produits alimentaires, et un numéro approuvé est gardé avec le profil Pro. Chaque annonce indique si le vendeur est un particulier ou un professionnel.
 
 ### 3.9 Les paiements, à l'ouverture des ventes {#finalites-9}
 
@@ -206,9 +206,10 @@ Tant que les ventes d'options payantes ne sont pas ouvertes, {brand} ne traite a
 À leur ouverture :
 - Stripe traite le paiement ; les données de votre carte sont saisies chez Stripe et {brand} ne les voit jamais ;
 - RevenueCat gère l'état de vos abonnements Pro ;
+- pour la facture d'un abonnement ou d'un Pass Boutique, Stripe reçoit le nom de la boutique, son e-mail et ses identifiants légaux (ICE et, selon la forme, RC, IF, numéro d'auto-entrepreneur ou de coopérative, taxe professionnelle) ;
 - {brand} garde la trace de vos achats, de vos crédits et de vos factures.
 
-{brand} n'intervient jamais dans les paiements entre utilisateurs.
+{brand} n'intervient jamais dans les paiements entre utilisateurs. Le bouton « Payer chez le vendeur » mène à la page de paiement du professionnel : {brand} ne transmet aucune donnée à cette page, et compte seulement le nombre de clics sur le bouton, par annonce, sans enregistrer qui a cliqué.
 
 ### 3.10 La publicité {#finalites-10}
 
@@ -249,6 +250,7 @@ Votre usage de WhatsApp reste régi par les conditions et la politique de confid
 - **objets interdits :** mots-clés en français, en arabe, en darija et en arabizi, et cohérence de la catégorie ;
 - **données sensibles et données de tiers** (§4.4) ;
 - **risque d'arnaque :** ancienneté du compte, nombre d'annonces, prix anormal pour la catégorie, doublons de texte ou de photos, réputation de l'adresse IP ;
+- **règles propres à certaines annonces :** location de véhicules, publicité pour un crédit sans ses mentions, nouveau numéro sanitaire ONSSA, terres collectives ou biens habous, toujours examinées par un modérateur ;
 - **photos :** un modèle de détection de nudité et un modèle de détection de visages, qui fonctionnent sur nos propres serveurs. Notre prestataire Cloudflare compare aussi les images publiées aux empreintes connues de contenus pédocriminels.
 
 Selon le résultat, l'annonce est publiée, bloquée avec un message qui explique pourquoi, ou mise en attente d'un modérateur.

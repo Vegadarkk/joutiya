@@ -84,6 +84,8 @@ Conformément à l'art. 7 du DSA, ces contrôles volontaires ne privent pas {bra
 
 Chaque annonce indique si elle est publiée par un particulier ou par un professionnel, et renvoie au profil ou à la boutique de l'annonceur. {brand} n'est jamais présentée comme le vendeur d'un bien proposé par un utilisateur.
 
+Les annonces marquées « Annonce exemple » sont rédigées par {brand} pour montrer à quoi ressemble une bonne annonce. Le vendeur et le bien sont fictifs : elles ne sont pas à vendre et ne peuvent pas être contactées. Elles ne bénéficient d'aucune option payante.
+
 ## 3. Accès au service et inscription {#comptes}
 
 ### 3.1 Accès au service {#comptes-1}
@@ -160,7 +162,7 @@ Le statut Pro s'ajoute à votre compte après vérification (§4.4). Un compte P
 
 Avant votre première annonce en tant que professionnel, {brand} vérifie votre entreprise (vérification dite « KYBC »). Votre demande comprend :
 
-- les pièces correspondant à votre forme juridique : pour une société, l'ICE, le numéro du registre du commerce et l'identifiant fiscal ; pour un auto-entrepreneur, l'ICE et le numéro d'auto-entrepreneur ; pour un commerçant, l'ICE et le registre du commerce ou la taxe professionnelle ;
+- les pièces correspondant à votre forme juridique : pour une société, l'ICE, le numéro du registre du commerce et l'identifiant fiscal ; pour un auto-entrepreneur, l'ICE et le numéro d'auto-entrepreneur ; pour une coopérative, l'ICE et le numéro d'inscription au registre des coopératives ; pour un commerçant, l'ICE et le registre du commerce ou la taxe professionnelle ;
 - un téléphone vérifié (§3.5) ;
 - votre engagement de respecter les règles applicables à votre activité, notamment l'information du consommateur, l'affichage des prix et les garanties légales.
 
@@ -178,7 +180,7 @@ Les comptes Pro sont ouverts dès le lancement de {brand}. Tant que les ventes n
 
 Avant la fin ou toute modification de cette offre, {brand} vous prévient au moins 30 jours à l'avance, par e-mail et dans votre espace. Aucun paiement ne vous sera demandé sans votre accord exprès, donné selon les CGV alors publiées.
 
-À la fin de l'offre, si vous ne souscrivez pas d'abonnement, votre compte reste un compte Pro, mais ses quotas de publication sont réduits. Les annonces au-delà du quota sont mises en pause, les plus anciennes d'abord ; elles ne sont pas supprimées pour ce motif.
+À la fin de l'offre, si vous ne souscrivez ni abonnement ni Pass Boutique (§16.2), votre compte reste un compte Pro, mais ses quotas de publication sont réduits. Les annonces au-delà du quota sont mises en pause, les plus anciennes d'abord ; elles ne sont pas supprimées pour ce motif.
 
 ### 4.6 Personnel de {brand} {#roles-6}
 
@@ -335,7 +337,9 @@ Une annonce pour un objet interdit est bloquée ou mise en vérification au dép
 
 - Un professionnel publie depuis son compte Pro vérifié. Ses annonces portent la mention « Pro ».
 - Il donne au consommateur les informations exigées par la loi : identité de l'entreprise, caractéristiques essentielles du bien ou du service, prix toutes taxes comprises, garanties légales et, le cas échéant, droit de rétractation.
-- Il respecte les règles propres à son activité, par exemple dans l'immobilier (§7.10) ou la vente de véhicules.
+- Il respecte les règles propres à son activité, par exemple dans l'immobilier (§7.10), la vente ou la location de véhicules (§7.11).
+- **Produits alimentaires.** La catégorie « Produits du terroir » est réservée aux professionnels. Chaque annonce indique le numéro d'autorisation ou d'agrément sanitaire de l'ONSSA, affiché sur l'annonce. La première annonce qui porte un nouveau numéro est examinée par un modérateur, qui le vérifie sur les listes publiques de l'ONSSA. Le professionnel reste seul responsable de la conformité de ses produits.
+- **Publicité pour un crédit.** Une annonce qui indique une mensualité ou un financement donne aussi le nom du prêteur, la durée, le coût total et le taux effectif global (loi n° 31-08). À défaut, elle est examinée par un modérateur avant publication. {brand} ne propose ni n'intermédie aucun crédit.
 - Un professionnel ne publie jamais depuis un compte de particulier (§4.3).
 
 ### 7.9 Durée, renouvellement et retrait {#annonces-9}
@@ -354,6 +358,16 @@ Une annonce pour un objet interdit est bloquée ou mise en vérification au dép
 
 **Aucun paiement par {brand}.** Aucun acompte, dépôt de garantie, frais de réservation ou de visite ne passe par {brand} (§15.2). Le dépôt de garantie d'un bail d'habitation ne peut pas dépasser 2 mois de loyer (loi n° 67-12). Ne versez rien avant d'avoir visité le bien et signé un écrit (§15.3).
 
+### 7.11 Location de véhicules {#annonces-11}
+
+**Réservée aux agences.** La location de voitures sans chauffeur est réservée aux comptes Pro. À chaque publication, l'agence atteste qu'elle détient l'autorisation d'exercer, que ses véhicules sont immatriculés pour la location, assurés et conformes aux règles d'âge du parc. La location avec chauffeur relève d'une autre autorisation et n'est pas proposée dans cette catégorie.
+
+**Informations déclarées.** Le numéro d'autorisation, les agences, les horaires, les conditions de location, les moyens de paiement et le calendrier de disponibilité sont déclarés par l'agence, sous sa seule responsabilité. {brand} ne les vérifie pas, sauf la mention « agrément contrôlé sur document » : elle indique seulement que le document envoyé par l'agence concorde avec son compte (voir la [politique de confidentialité](/legal/confidentialite#finalites-8)). Une information inexacte engage la seule responsabilité de l'agence, y compris envers {brand} (§6.1 et §19.1).
+
+**Demande de réservation.** Depuis la messagerie, un utilisateur peut envoyer à l'agence une demande avec des dates et un lieu de prise en charge. Ce n'est qu'une demande : la location se conclut directement entre l'agence et le client. Aucun acompte, dépôt de garantie ou paiement ne passe par {brand} (§15.2).
+
+**Garanties.** Une annonce qui demande de laisser un passeport ou une carte d'identité en garantie, ou un chèque en blanc, ou qui propose un véhicule plus ancien que les limites du parc, est examinée par un modérateur avant publication.
+
 ## 8. Modération des contenus {#moderation}
 
 ### 8.1 Principes {#moderation-1}
@@ -370,6 +384,7 @@ La modération combine des contrôles automatiques (§8.2 et §8.3) et des déci
 2. **Objets interdits** : recherche de mots-clés en français, en arabe, en darija et en arabizi, et cohérence entre l'annonce et sa catégorie.
 3. **Données personnelles** : recherche de données sensibles et de noms ou numéros de tiers dans le texte, détection des visages sur les photos (§7.6).
 4. **Score de risque** : ancienneté du compte, nombre d'annonces publiées, prix inhabituel pour la catégorie, doublons de texte ou de photos, réputation de l'adresse IP.
+   Certaines annonces sont toujours examinées par un modérateur : location de véhicules (§7.11), publicité pour un crédit sans ses mentions, nouveau numéro sanitaire (§7.8), terres collectives ou biens habous (page [Objets interdits](/legal/objets-interdits#autres)).
 5. **Photos** : détection de la nudité. Les images diffusées sont aussi comparées, par Cloudflare, aux empreintes connues de contenus pédocriminels.
 6. **Agent de modération** (§8.3).
 
@@ -418,7 +433,7 @@ Selon le cas, {brand} peut :
 - limiter la visibilité d'un contenu : le masquer ou le faire descendre dans les résultats ;
 - adresser un avertissement ;
 - suspendre un compte pendant 7 ou 30 jours, ou le fermer définitivement (§11) ;
-- pour un professionnel, refuser ou retirer la vérification Pro, et suspendre les achats ;
+- pour un professionnel, refuser ou retirer la vérification Pro, suspendre les achats, et suspendre son bouton « Payer chez le vendeur » (§15.2) ;
 - rétablir un contenu ou un compte quand une mesure se révèle injustifiée.
 
 Chaque mesure est motivée (§10) et peut être contestée (§12).
@@ -603,6 +618,8 @@ Vous pouvez à tout moment saisir le tribunal compétent (§23), avant, pendant 
 
 La messagerie sert à échanger avec un annonceur au sujet d'une annonce. Chaque conversation est liée à une annonce.
 
+Dans une conversation, vous pouvez proposer un rendez-vous (rencontre, visite d'un bien, essai d'un véhicule, remise d'un véhicule loué) avec des créneaux et un lieu, et l'autre personne le confirme, le déplace ou l'annule. Un rappel est envoyé par e-mail la veille et 2 heures avant, sauf si vous avez désactivé les e-mails de nouveaux messages. Choisissez un lieu public pour une première rencontre (§15.3).
+
 Un message compte 2 000 caractères au plus. Le nombre de messages et de nouvelles conversations par jour est limité, surtout pour les comptes récents, et un contrôle anti-robot peut être demandé au premier message.
 
 ### 13.2 Règles de conduite {#messagerie-2}
@@ -675,7 +692,9 @@ Les garanties prévues par la loi s'appliquent entre eux. Un professionnel doit 
 
 **{brand} ne vous demandera jamais de paiement pour une transaction entre utilisateurs, ni vos codes bancaires.** Un message, un e-mail ou un lien qui prétend le contraire est une tentative d'arnaque : ne payez pas et signalez-le.
 
-Les seuls paiements faits à {brand} seront ceux des options et abonnements que vous achèterez vous-même depuis votre espace, une fois les ventes ouvertes (§16).
+Les seuls paiements faits à {brand} seront ceux des options, abonnements et Pass Boutique que vous achèterez vous-même depuis votre espace, une fois les ventes ouvertes (§16).
+
+**« Payer chez le vendeur ».** Un professionnel vérifié peut afficher sur ses annonces un bouton vers sa propre page de paiement (celle de sa banque ou de son prestataire de paiement), ou la mention « Paiement à la livraison accepté ». L'argent va directement au professionnel : {brand} ne le reçoit pas, ne prend aucune commission, ne garantit ni la vente ni la page de paiement, et ne peut pas rembourser. Avant de quitter le site, l'acheteur voit le nom et l'ICE du vendeur et l'adresse de la page. Un nouveau lien ne s'active qu'après 24 heures et seulement vers un prestataire de paiement vérifié par {brand} ; sinon il attend l'examen d'un modérateur. Le professionnel publie sur sa boutique les informations qu'exige la vente à distance (loi n° 31-08) : adresse, e-mail, livraison et retours. Il reste seul responsable du paiement, de la livraison et du service après-vente. {brand} peut suspendre le bouton (§8.6). Ce bouton est le seul lien de paiement légitime : refusez tout autre lien reçu par message.
 
 ### 15.3 Arnaques : les règles de prudence {#transactions-3}
 
@@ -708,7 +727,7 @@ Une annonce remontée porte la mention « Remontée » ; une annonce À la Une p
 
 ### 16.2 Abonnements Pro {#services-payants-2}
 
-À l'ouverture des ventes, les professionnels pourront souscrire un abonnement Pro, régi par les CGV. Jusque-là, l'offre de lancement gratuite s'applique (§4.5).
+À l'ouverture des ventes, les professionnels pourront souscrire un abonnement Pro, ou acheter un Pass Boutique : 30 jours de l'offre Essentiel, en un seul paiement, sans renouvellement. Les deux sont régis par les CGV. Jusque-là, l'offre de lancement gratuite s'applique (§4.5).
 
 ### 16.3 Publicité sur le site {#services-payants-3}
 

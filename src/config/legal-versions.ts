@@ -20,7 +20,7 @@ export const LEGAL_VERSIONS: Record<LegalSlug, LegalVersion> = {
   // "2026-10": the version sign-up recorded before the texts were versioned (same text).
   cgu: { version: "1.0", effective: "2026-10-28", replaces: ["2026-10"] },
   "referencement-et-classement": { version: "1.0", effective: "2026-10-28" },
-  cgv: { version: "0.1", effective: "2026-10-20" },
+  cgv: { version: "0.2", effective: "2026-10-29" },
   confidentialite: { version: "1.0", effective: "2026-10-28" },
   cookies: { version: "1.0", effective: "2026-10-28" },
   "droits-et-obligations": { version: "1.0", effective: "2026-10-28" },
