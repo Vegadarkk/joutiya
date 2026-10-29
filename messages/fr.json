@@ -56,7 +56,9 @@
       }
     },
     "categories": {
-      "title": "Parcourir les catégories"
+      "title": "Parcourir les catégories",
+      "previous": "Catégories précédentes",
+      "next": "Catégories suivantes"
     },
     "featured": {
       "previous": "Annonces À la Une précédentes",
