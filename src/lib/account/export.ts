@@ -305,6 +305,7 @@ export async function buildAccountExport(uid: string, now = new Date()): Promise
         slug: profile.slug,
         description: profile.description,
         website: profile.website ?? null,
+        social: (profile.social?.links ?? []).map((link) => ({ network: link.network, handle: link.handle })),
         regionCode: profile.regionCode,
         citySlug: profile.citySlug,
         whatsapp: profile.whatsapp,

@@ -75,6 +75,7 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
   launchOfferNotice: { displayName: "Nadia", shopName: "Atlas Vélos", plan: "essentiel", kind: "ending", endsAt: "2027-03-01T00:00:00.000Z", freeListings: 0, paused: 0 },
   passNotice: { displayName: "Nadia", shopName: "Atlas Vélos", kind: "ended", endsAt: "2027-03-01T00:00:00.000Z", freeListings: 0, paused: 2 },
   sellerPaymentNotice: { displayName: "Nadia", shopName: "Atlas Vélos", kind: "changed", host: "pay.example-bank.ma", activeFrom: "2026-11-02T10:00:00.000Z" },
+  socialLinksNotice: { displayName: "Nadia", shopName: "Atlas Vélos", kind: "hidden", reason: "Le lien Instagram mène au compte d'un autre vendeur." },
   proRejected: { displayName: "Nadia", shopName: "Atlas Vélos", reason: "L'ICE ne correspond pas au registre du commerce.", contact: "dsa@joutiya.ma" },
   newMessages: { displayName: "Nadia", count: 4, conversations: [{ listingTitle: "Vélo de ville", counterpartName: "Karim" }] },
   appointmentReminder: {

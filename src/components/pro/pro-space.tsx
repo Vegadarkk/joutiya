@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { RentalSetup } from "@/components/rental/rental-setup";
 import { AgencySettings } from "./agency-settings";
 import { SectionsSettings } from "./sections-settings";
+import { SocialLinksSettings } from "./social-links-settings";
 import { ProApplicationForm } from "./pro-application-form";
 import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
@@ -303,6 +304,7 @@ function Dashboard({ me, shop, lifecycle }: { me: ProMeResponse; shop: ProSelfVi
       {canPublish && shop.sector === "car_rental" ? <RentalSetup shop={shop} /> : null}
 
       {suspended ? null : <AgencySettings shop={shop} />}
+      {canPublish ? <SocialLinksSettings shop={shop} /> : null}
       {canPublish && shop.sector !== "car_rental" ? <SectionsSettings shop={shop} /> : null}
 
       <section className="flex flex-col gap-3" aria-labelledby="pro-shortcuts">
@@ -335,7 +337,11 @@ function Dashboard({ me, shop, lifecycle }: { me: ProMeResponse; shop: ProSelfVi
           </Button>
           {shop.storefront && !suspended ? (
             <Button asChild variant="outline">
-              <Link href={`/boutique/${shop.storefront}`}>{t("storefront")}</Link>
+              {/* No prefetch: a storefront render started here could finish after a save on this
+                  page revalidated it, and the owner would see the old storefront for 5 minutes. */}
+              <Link href={`/boutique/${shop.storefront}`} prefetch={false}>
+                {t("storefront")}
+              </Link>
             </Button>
           ) : null}
           {paymentEligible(lifecycle, plan) ? (

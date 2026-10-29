@@ -15,6 +15,7 @@ import { DealerStock } from "@/components/pro/dealer-stock";
 import { RentalFleet, type FleetLabels } from "@/components/rental/rental-fleet";
 import { RentalAgencyCard, RentalBranches, RentalConditions } from "@/components/rental/rental-storefront";
 import { SellerInfo } from "@/components/pro/seller-info";
+import { SocialLinks } from "@/components/pro/social-links";
 import { StorefrontTabs } from "@/components/storefront/storefront-tabs";
 import { ReportButton } from "@/components/report/report-button";
 import { RatingLink } from "@/components/reviews/rating-link";
@@ -218,6 +219,7 @@ export default async function StorefrontPage({ params }: { params: Params }) {
         <div className={store.description ? "flex flex-col gap-4 self-start" : "flex max-w-prose flex-col gap-4 lg:col-span-2"}>
           {store.rental ? <RentalAgencyCard rental={store.rental} checkedAt={store.rentalCheckedAt} locale={locale} /> : null}
           <FeeSchedule text={store.feeSchedule} />
+          <SocialLinks links={store.social} />
           {store.payment ? <PayAtSeller payment={store.payment} className="rounded-lg border border-border bg-surface p-4" /> : null}
           {aside}
         </div>

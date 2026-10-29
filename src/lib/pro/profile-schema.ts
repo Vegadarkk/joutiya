@@ -3,6 +3,7 @@ import { CRITERION_FORMATS } from "@/config/categories";
 import { PRO_PLANS, listingQuotasSchema } from "@/config/pricing";
 import { AIRPORT_IDS } from "@/config/airports";
 import { PAYMENT_URL_MAX } from "@/config/seller-payments";
+import { SOCIAL_HANDLE_MAX, SOCIAL_NETWORKS } from "@/config/social-links";
 import { shopSectionsSchema } from "@/lib/contracts/catalog";
 import { sellerInfoInputSchema } from "@/lib/contracts/seller-payment";
 import { citySlugSchema, regionCodeSchema } from "@/lib/contracts/listings";
@@ -145,6 +146,25 @@ export const sellerPaymentSchema = z
   .strict();
 export type SellerPaymentDoc = z.infer<typeof sellerPaymentSchema>;
 
+/**
+ * The shop's social links (src/config/social-links.ts): handles only, the link is rebuilt from the
+ * network's template. The stored shape is loose on purpose (a grammar tightened later must not
+ * make the profile unreadable): the storefront drops a handle off its network's grammar.
+ */
+export const socialLinksSchema = z
+  .object({
+    links: z
+      .array(z.object({ network: z.enum(SOCIAL_NETWORKS), handle: z.string().regex(/^[A-Za-z0-9._/-]+$/).max(SOCIAL_HANDLE_MAX) }).strict())
+      .max(SOCIAL_NETWORKS.length)
+      .refine((links) => unique(links.map((link) => link.network)), "duplicate network"),
+    /** Hidden by a moderator (report « Lien de réseau social suspect »): nothing is shown until restored. */
+    hiddenAt: ts.optional(),
+    hiddenReason: z.string().min(1).max(500).optional(),
+    updatedAt: ts,
+  })
+  .strict();
+export type SocialLinksDoc = z.infer<typeof socialLinksSchema>;
+
 export const proProfileSchema = z
   .object({
     ownerUid: uid,
@@ -159,6 +179,8 @@ export const proProfileSchema = z
     phonePublic: z.string().max(20).optional(),
     whatsapp: z.boolean(),
     website: z.url({ protocol: /^https$/ }).max(200).optional(),
+    /** Social links shown on the storefront (PUT /api/pro/me/social); absent until the owner sets some. */
+    social: socialLinksSchema.optional(),
     regionCode: regionCodeSchema,
     citySlug: citySlugSchema,
     legal: proLegalSchema,

@@ -23,6 +23,7 @@ import { phoneVerified } from "./templates/phoneVerified";
 import { launchOfferNotice } from "./templates/launchOfferNotice";
 import { passNotice } from "./templates/passNotice";
 import { sellerPaymentNotice } from "./templates/sellerPaymentNotice";
+import { socialLinksNotice } from "./templates/socialLinksNotice";
 import { proApproved } from "./templates/proApproved";
 import { proRejected } from "./templates/proRejected";
 import { reportReceived } from "./templates/reportReceived";
@@ -67,6 +68,7 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   launchOfferNotice,
   passNotice,
   sellerPaymentNotice,
+  socialLinksNotice,
   newMessages,
   appointmentReminder,
   reviewReceived,

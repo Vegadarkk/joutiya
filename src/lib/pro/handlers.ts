@@ -2,7 +2,7 @@ import "server-only";
 import { requireUser } from "@/lib/auth/guards";
 import { uploadIdSchema } from "@/lib/contracts/media";
 import { sectionsInputSchema } from "@/lib/contracts/catalog";
-import { kybcSignSchema, proAgencySchema, proApplySchema, proRentalSchema, rentalCheckSubmitSchema, type ProApplyResponse } from "@/lib/contracts/pro";
+import { kybcSignSchema, proAgencySchema, proApplySchema, proRentalSchema, proSocialSchema, rentalCheckSubmitSchema, type ProApplyResponse } from "@/lib/contracts/pro";
 import { STOCK_IMPORT_BODY_MAX_BYTES, stockImportRequestSchema } from "@/lib/contracts/stock-import";
 import { serverEnv } from "@/lib/env";
 import { HttpError, notFound } from "@/lib/http/errors";
@@ -15,6 +15,7 @@ import { verifyTurnstile } from "@/lib/security/turnstile";
 import { completeKybcUpload, deleteKybcUpload, signKybcUpload } from "./kybc-uploads";
 import { submitRentalCheck } from "./rental-check";
 import { proSelf, submitApplication, updateAgency, updateRentalAgency, updateSections } from "./service";
+import { updateSocialLinks } from "./social-links";
 import { importStock, stockList } from "./stock-import/service";
 
 // Route handlers of /api/pro/** (phase 7 design §4): requireUser (Origin + CSRF on mutations),
@@ -79,6 +80,14 @@ export async function handleSections(request: Request): Promise<Response> {
   const input = await readJson(request, sectionsInputSchema);
   await enforceLimit("pro.agency.uid", auth.user.uid);
   return json(await updateSections(auth, input));
+}
+
+/** PUT /api/pro/me/social: the shop's social links, shown on its storefront. */
+export async function handleSocial(request: Request): Promise<Response> {
+  const auth = await requireUser(request, { mutation: true });
+  const input = await readJson(request, proSocialSchema);
+  await enforceLimit("pro.agency.uid", auth.user.uid);
+  return json(await updateSocialLinks(auth, input));
 }
 
 /** PUT /api/pro/me/rental: the car rental agency's settings (rental pack §5). */
