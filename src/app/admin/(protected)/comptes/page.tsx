@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { inputClassName } from "@/components/ui/input";
+import { CANONICAL_ORIGIN } from "@/config/site";
 import { requirePageStaff } from "@/lib/auth/current-user";
 import { uidByPublicId } from "@/lib/decisions/users";
 import { publicIdSchema } from "@/lib/db/schemas";
@@ -49,7 +50,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
             name="profil"
             defaultValue={query}
             required
-            placeholder="https://joutiya.ma/fr/profil/…"
+            placeholder={`${CANONICAL_ORIGIN}/fr/profil/…`}
             aria-invalid={problem ? true : undefined}
             aria-describedby={problem ? "profil-error" : undefined}
             className={inputClassName}

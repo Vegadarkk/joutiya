@@ -229,7 +229,7 @@ export const HELP_FR: HelpLocaleContent = {
       ],
       keywords: ["données", "vie privée", "rgpd", "cndp", "supprimer mes données", "cookies", "confidentialité", "droits"],
     },
-    "role-de-joutiya": {
+    "role-d-aalan": {
       title: "Le rôle d'Aalan",
       summary: "Aalan héberge les annonces de ses utilisateurs : elle n'est ni vendeur, ni acheteur, ni partie aux ventes.",
       blocks: [
@@ -239,7 +239,7 @@ export const HELP_FR: HelpLocaleContent = {
       ],
       keywords: ["litige", "remboursement", "garantie", "hébergeur", "responsabilité", "médiation", "conflit", "vendeur malhonnête"],
     },
-    "assistant-joutiya": {
+    "assistant-aalan": {
       title: "L'Assistant Aalan",
       summary: "Un assistant d'intelligence artificielle qui répond à vos questions à partir des articles de ce centre d'aide.",
       blocks: [
