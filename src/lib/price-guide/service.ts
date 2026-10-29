@@ -1,6 +1,4 @@
 import "server-only";
-import { priceRange } from "@/lib/contracts/catalog";
-import type { ListingRecord } from "@/lib/db/repositories/listings";
 import { logger } from "@/lib/logging/logger";
 import { searchEngine } from "@/lib/search/engine";
 import { attributeField, type EngineQuery, type FilterExpr, type SearchEngine } from "@/lib/search/types";
@@ -99,11 +97,10 @@ export interface GuideCache {
   set(key: string, value: string, ttlSeconds: number): Promise<void>;
 }
 
-/** What one cache entry holds: the comparables' description, the guide (or null), the listing's price. */
-export interface CachedGuide {
+/** What one cache entry holds: the comparables' description and the guide (or null). */
+interface CachedGuide {
   key: string;
   guide: PriceGuide | null;
-  price: number | null;
 }
 
 let override: GuideCache | null | undefined;
@@ -113,7 +110,7 @@ export function setPriceGuideCacheForTests(cache: GuideCache | null | undefined)
   override = cache;
 }
 
-/** A cache call never holds a page render or the API for long. */
+/** A cache call never holds a page render for long. */
 const CACHE_TIMEOUT_MS = 300;
 
 function timed<T>(promise: Promise<T>): Promise<T> {
@@ -139,14 +136,14 @@ function guideCache(): GuideCache | null {
 export const priceGuideCacheKey = (listingId: string) => `pg:v1:${listingId}`;
 
 /** The entry of `listingId`, or null (none, unreadable, Valkey down). */
-export async function cachedGuide(listingId: string): Promise<CachedGuide | null> {
+async function cachedGuide(listingId: string): Promise<CachedGuide | null> {
   const cache = guideCache();
   if (!cache) return null;
   try {
     const raw = await cache.get(priceGuideCacheKey(listingId));
     if (!raw) return null;
     const value = JSON.parse(raw) as Partial<CachedGuide>;
-    return typeof value.key === "string" && value.guide !== undefined ? { key: value.key, guide: value.guide ?? null, price: value.price ?? null } : null;
+    return typeof value.key === "string" && value.guide !== undefined ? { key: value.key, guide: value.guide ?? null } : null;
   } catch (error) {
     logger.warn({ err: (error as Error).message }, "price guide: cache unavailable");
     return null;
@@ -172,22 +169,6 @@ export function subjectKey(subject: GuideSubject): string {
   return spec ? `${specKey(spec)}|${subject.citySlug}|${subject.regionCode}` : NO_GUIDE;
 }
 
-/** The guide subject of a stored listing; null without the fields every published listing has. */
-export function subjectOfListing(listing: ListingRecord): GuideSubject | null {
-  if (!listing.subcategoryId || !listing.location) return null;
-  const range = priceRange(listing);
-  return {
-    id: listing.id,
-    subcategoryId: listing.subcategoryId,
-    attributes: listing.attributes,
-    price: range ? range.min : null,
-    isDonation: listing.isDonation,
-    example: listing.example === true,
-    citySlug: listing.location.citySlug,
-    regionCode: listing.location.regionCode,
-  };
-}
-
 /**
  * The guide of a listing, from the cache when it still describes the same comparables, else
  * computed and cached (an absent guide too). Never throws: the engine down or misconfigured means
@@ -206,6 +187,6 @@ export async function priceGuideFor(subject: GuideSubject, engine?: SearchEngine
       return null;
     }
   }
-  await storeGuide(subject.id, { key, guide, price: subject.price });
+  await storeGuide(subject.id, { key, guide });
   return guide;
 }

@@ -189,7 +189,7 @@ export function priceStats(prices: readonly number[]): PriceStats | null {
   return { low: Math.min(p25, down(kept[0] ?? p25)), high: Math.max(p75, up(kept.at(-1) ?? p75)), p25, p75, count: sorted.length };
 }
 
-/** The guide of a listing as pages and the API show it. */
+/** The guide of a listing as the listing page shows it. */
 export interface PriceGuide extends PriceStats {
   scope: PriceGuideScope;
   /** The area: the city slug, the region code, or "ma". */
