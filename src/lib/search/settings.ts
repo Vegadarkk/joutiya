@@ -71,7 +71,7 @@ export const RANKING_RULES = ["words", "sort", "typo", "proximity", "attributeRa
  */
 export const STOP_WORDS = ["ال", "أل", "إل", "آل", "ٱل"] as const;
 
-/** Facet values returned per facet: every city (CITIES has 100) and every subcategory. */
+/** Facet values returned per facet: every city (CITIES has 104) and every subcategory. */
 export const MAX_VALUES_PER_FACET = 200;
 
 /** Meilisearch limits: synonyms per term, words per synonym term. */
