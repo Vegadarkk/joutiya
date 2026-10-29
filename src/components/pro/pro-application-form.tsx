@@ -20,10 +20,11 @@ import { submitProApplication } from "@/lib/pro/client";
 import { PRO_DESCRIPTION_MAX, PRO_NAME_MAX } from "@/lib/pro/profile-schema";
 import { cn } from "@/lib/utils";
 import { KybcPieces, type PieceState } from "./kybc-pieces";
+import { ProCommitments } from "./pro-commitments";
 
 // Pro application form (phase 7 design §4): shop, legal form and its identifiers, the number a
-// moderator calls while the WhatsApp check is parked, the KYBC pieces, the commitment and a
-// Turnstile check. Checked here as the server checks it (src/lib/pro/kybc.ts), so a refusal is
+// moderator calls while the WhatsApp check is parked, the KYBC pieces, the legal commitments (with
+// the admin guide's procedures) and a Turnstile check. Checked here as the server checks it (src/lib/pro/kybc.ts), so a refusal is
 // shown on its field before anything is sent; the server stays the judge.
 
 type Identifier = "ice" | "rc" | "if" | "aeNumber" | "tp" | "coopNumber";
@@ -263,19 +264,7 @@ export function ProApplicationForm({ previous, needsPhone, onDone }: ProApplicat
       </Section>
 
       <Section title={t("commitTitle")}>
-        <div className="flex flex-col gap-1.5">
-          <label className="flex cursor-pointer items-start gap-3 text-sm text-pretty">
-            <input
-              type="checkbox"
-              checked={draft.commitment}
-              aria-invalid={problems.commitment ? true : undefined}
-              onChange={(event) => set({ commitment: event.target.checked })}
-              className="mt-0.5 size-4 shrink-0 accent-primary"
-            />
-            <span>{t("commitment")}</span>
-          </label>
-          {problems.commitment ? <InlineError>{t(problems.commitment)}</InlineError> : null}
-        </div>
+        <ProCommitments scope="shop" checked={draft.commitment} onCheckedChange={(commitment) => set({ commitment })} error={message("commitment")} />
         <TurnstileWidget ref={turnstile} action="pro-apply" cData="pro-apply" onToken={setToken} error={message("challenge")} />
       </Section>
 

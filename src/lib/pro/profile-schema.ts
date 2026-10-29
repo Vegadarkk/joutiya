@@ -169,6 +169,8 @@ export const proProfileSchema = z
         /** Pieces in the private bucket (uploads purpose `kyb`), purged 6 months after the relationship ends. */
         uploadIds: z.array(z.string().min(1).max(64)).max(KYBC_MAX_PIECES),
         complianceCommitmentAt: ts.optional(),
+        /** Legal commitments text ticked with the application (`COMMITMENTS_VERSION`, src/lib/pro/commitments.ts). */
+        commitmentsVersion: z.string().max(20).optional(),
         /** Collection notice shown with the pieces when they were sent (`KYBC_NOTICE_VERSION`). */
         noticeVersion: z.string().max(20).optional(),
         /** Number to call, declared with the application while the account has no verified number; deleted once verified. */
@@ -183,6 +185,8 @@ export const proProfileSchema = z
     /** Badge « Certifié »: pieces checked in detail (Business). */
     certified: z.object({ at: ts, by: uid }).strict().optional(),
     sector: z.enum(PRO_SECTORS).optional(),
+    /** The owner's acknowledgment of the agency commitments of `sector` (PUT /api/pro/me/agency). */
+    sectorCommitment: z.object({ sector: z.enum(PRO_SECTORS), version: z.string().max(20), at: ts }).strict().optional(),
     /** Example shop (src/lib/demo): fictitious, labelled on its storefront, never shown as verified. */
     example: z.literal(true).optional(),
     /** Real-estate agency details (sector "real_estate"), set by the owner (PUT /api/pro/me/agency). */

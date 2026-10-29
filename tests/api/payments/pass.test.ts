@@ -79,6 +79,7 @@ import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { csrfToken } from "@/lib/security/csrf";
 import { proPlansNightly } from "@/worker/jobs/pro-plans";
 import { DAY_MS, api, member, readyPatch, seedReadyUpload, type ErrorBody, type Member } from "../listings/helpers";
+import { COMMITMENTS_VERSION } from "@/lib/pro/commitments";
 
 const STRIPE_SECRET = "whsec_test_secret";
 const VARS = { STRIPE_SECRET_KEY: "sk_test_joutiya", STRIPE_WEBHOOK_SECRET: STRIPE_SECRET, REVENUECAT_SECRET_API_KEY: "sk-test", REVENUECAT_PROJECT_ID: "proj-test" };
@@ -142,7 +143,7 @@ async function shop(owner: Member, extra: Partial<ProProfileDoc> = {}): Promise<
   return proId;
 }
 
-const buyPass = (owner: Member, body: unknown = { pass: "boutique30", acceptTerms: true, locale: "fr" }) => api<BillingRedirectResponse & ErrorBody>(passCheckout, "POST", "/api/billing/pass", { member: owner, body });
+const buyPass = (owner: Member, body: unknown = { pass: "boutique30", acceptTerms: true, acceptCommitments: true, locale: "fr" }) => api<BillingRedirectResponse & ErrorBody>(passCheckout, "POST", "/api/billing/pass", { member: owner, body });
 const page = async (owner: Member) => (await api<SubscriptionResponse>(subscriptionPage, "GET", "/api/billing/subscription", { member: owner })).body;
 
 async function stripeDeliver(type: string, object: Record<string, unknown>) {
@@ -197,7 +198,7 @@ describe("pass checkout", () => {
       metadata: { accountId: `pro_${proId}`, app_user_id: account!.rcAppUserId, kind: "pass", passId: "boutique30" },
     });
     expect(session.params.success_url).toMatch(/\/fr\/pro\/abonnement\?pass=0$/);
-    expect(account?.lastPassCheckout).toMatchObject({ passId: "boutique30", consentVersion: "2026-10", sessionId: expect.stringMatching(/^cs_test_/) });
+    expect(account?.lastPassCheckout).toMatchObject({ passId: "boutique30", consentVersion: "2026-10", commitmentsVersion: COMMITMENTS_VERSION, sessionId: expect.stringMatching(/^cs_test_/) });
   });
 
   it("is refused while sales are closed, during the free launch offer, under a subscription, without consent or for an unknown pass", async () => {
@@ -206,8 +207,9 @@ describe("pass checkout", () => {
     flags.salesEnabled = false;
     expect(code((await buyPass(owner)).body)).toBe("sales_closed");
     flags.salesEnabled = true;
-    expect((await buyPass(owner, { pass: "boutique30", acceptTerms: false })).status).toBe(400);
-    expect((await buyPass(owner, { pass: "boutique90", acceptTerms: true })).status).toBe(404);
+    expect((await buyPass(owner, { pass: "boutique30", acceptTerms: false, acceptCommitments: true })).status).toBe(400);
+    expect((await buyPass(owner, { pass: "boutique30", acceptTerms: true })).status).toBe(400);
+    expect((await buyPass(owner, { pass: "boutique90", acceptTerms: true, acceptCommitments: true })).status).toBe(404);
 
     offer.endsAt = new Date(Date.now() + 10 * DAY_MS).toISOString();
     const onOffer = await member();

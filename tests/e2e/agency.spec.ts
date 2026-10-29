@@ -116,6 +116,11 @@ test.describe("real-estate agency", () => {
     await expect(settings.getByText(/Retirez le numéro de téléphone/)).toBeVisible();
     await expect(settings.getByRole("button", { name: "Enregistrer" })).toBeDisabled();
     await settings.getByLabel("Barème des honoraires").fill(FEES);
+    // Becoming an agency takes its legal commitments: refused until the box is ticked.
+    await settings.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(settings.getByText("Cochez la case pour confirmer vos engagements.")).toBeVisible();
+    await expect(settings.getByRole("link", { name: /Vérifier la situation d'un bien/ })).toHaveAttribute("href", "/fr/demarches/immobilier#procedure-immo-verifier");
+    await settings.getByRole("checkbox", { name: /J'accepte ces engagements d'agence immobilière/ }).check();
     await settings.getByRole("button", { name: "Enregistrer" }).click();
     await expect(page.getByText("Secteur enregistré. Votre vitrine est mise à jour.")).toBeVisible();
     await page.screenshot({ path: "test-results/agency-settings.png", fullPage: true });

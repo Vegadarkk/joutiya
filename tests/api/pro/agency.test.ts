@@ -21,6 +21,7 @@ import type { ProProfileDoc } from "@/lib/pro/profile-schema";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { csrfToken } from "@/lib/security/csrf";
 import { api, member, type ErrorBody, type Member } from "../listings/helpers";
+import { COMMITMENTS_VERSION } from "@/lib/pro/commitments";
 
 const PRO_ID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 const newProId = () => Array.from({ length: 8 }, () => PRO_ID_ALPHABET[randomInt(PRO_ID_ALPHABET.length)]).join("");
@@ -67,10 +68,13 @@ describe("PUT /api/pro/me/agency", () => {
     const owner = await member();
     const proId = await shop(owner);
     const fees = "Vente : 2,5 % du prix à la charge de l'acquéreur.\nLocation : un mois de loyer.";
-    const set = await put(owner, { sector: "real_estate", feeSchedule: `  ${fees}  ` });
+    const set = await put(owner, { sector: "real_estate", feeSchedule: `  ${fees}  `, acceptCommitments: true });
     expect(set.status).toBe(200);
     expect(set.body).toEqual({ sector: "real_estate", feeSchedule: fees });
     expect((await getProProfile(proId))?.agency).toEqual({ feeSchedule: fees });
+    expect((await getProProfile(proId))?.sectorCommitment).toMatchObject({ sector: "real_estate", version: COMMITMENTS_VERSION });
+    // The fee schedule of an agency changes without a new acknowledgment.
+    expect((await put(owner, { sector: "real_estate", feeSchedule: fees })).status).toBe(200);
     const read = await api<ProMeResponse>(getMe, "GET", "/api/pro/me", { member: owner });
     expect(read.body.shop).toMatchObject({ sector: "real_estate", feeSchedule: fees });
 
@@ -81,10 +85,25 @@ describe("PUT /api/pro/me/agency", () => {
     expect(profile?.agency).toBeUndefined();
   });
 
+  it("refuses to become an agency without the commitments", async () => {
+    const owner = await member();
+    const proId = await shop(owner);
+    for (const sector of ["real_estate", "car_rental"]) {
+      const refused = await put(owner, { sector, feeSchedule: "" });
+      expect(refused.status).toBe(400);
+      expect(code(refused.body)).toBe("commitments_required");
+    }
+    const profile = await getProProfile(proId);
+    expect(profile?.sector ?? "general").toBe("general");
+    expect(profile?.sectorCommitment).toBeUndefined();
+    expect((await put(owner, { sector: "car_rental", feeSchedule: "", acceptCommitments: true })).status).toBe(200);
+    expect((await getProProfile(proId))?.sectorCommitment).toMatchObject({ sector: "car_rental", version: COMMITMENTS_VERSION });
+  });
+
   it("refuses a fee schedule with contact details, and a shop that cannot publish", async () => {
     const owner = await member();
     await shop(owner);
-    const refused = await put(owner, { sector: "real_estate", feeSchedule: "Appelez le 06 12 34 56 78" });
+    const refused = await put(owner, { sector: "real_estate", feeSchedule: "Appelez le 06 12 34 56 78", acceptCommitments: true });
     expect(refused.status).toBe(422);
     expect(code(refused.body)).toBe("invalid_text");
     expect((refused.body as unknown as { error: { details: unknown } }).error.details).toEqual({ field: "feeSchedule", issue: "phone_in_text" });

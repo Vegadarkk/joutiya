@@ -19,6 +19,7 @@ import { firstStrictIssue } from "@/lib/moderation/free-text";
 import { isPhoneVerificationConfigured } from "@/lib/phone-verify/config";
 import { normalizeMoroccanMobile } from "@/lib/phone/normalize";
 import { consume } from "@/lib/quota";
+import { COMMITMENTS_VERSION, sectorCommitmentScope } from "./commitments";
 import { iceFormatOk, KYBC_NOTICE_VERSION } from "./kybc";
 import { publishesAsPro, storefrontShown, transition } from "./lifecycle";
 import type { ProProfileDoc } from "./profile-schema";
@@ -98,6 +99,7 @@ export async function submitApplication(actor: ProActor, input: ProApplyInput, n
       iceFormatOk: iceFormatOk(input.legal.ice),
       uploadIds: [...new Set(input.uploadIds)],
       complianceCommitmentAt: now,
+      commitmentsVersion: COMMITMENTS_VERSION,
       noticeVersion: KYBC_NOTICE_VERSION,
       ...(phoneToCheck ? { phoneToCheck } : {}),
       submittedAt: now,
@@ -177,6 +179,9 @@ export async function proSelf(auth: AuthContext): Promise<ProMeResponse> {
  */
 export async function updateAgency(auth: AuthContext, input: ProAgencyInput, now = new Date()): Promise<ProAgencyResponse> {
   const profile = await ownedPublishingShop(auth);
+  // Becoming an agency takes the trade's legal commitments, ticked by the owner (owner ask 2026-10-29).
+  const becomesAgency = sectorCommitmentScope(input.sector) !== null && input.sector !== (profile.sector ?? "general");
+  if (becomesAgency && !input.acceptCommitments) throw new HttpError(400, "commitments_required", "the agency commitments must be accepted");
   const feeSchedule = input.sector === "real_estate" ? input.feeSchedule : "";
   // The listing text rules, sensitive data refused outright (as a member's storefront bio).
   const issue = feeSchedule ? firstStrictIssue(feeSchedule) : null;
@@ -184,6 +189,7 @@ export async function updateAgency(auth: AuthContext, input: ProAgencyInput, now
   await proProfileRef(profile.proId).update({
     sector: input.sector,
     agency: feeSchedule ? { feeSchedule } : FieldValue.delete(),
+    ...(becomesAgency ? { sectorCommitment: { sector: input.sector, version: COMMITMENTS_VERSION, at: Timestamp.fromDate(now) } } : {}),
     updatedAt: Timestamp.fromDate(now),
   });
   void consume("firestore.reads", 1);

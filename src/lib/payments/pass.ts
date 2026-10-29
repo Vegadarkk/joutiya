@@ -19,6 +19,7 @@ import { sendMail } from "@/lib/mail";
 import { listingRecipient } from "@/lib/mail/recipients";
 import { transition, type ProEvent } from "@/lib/pro/lifecycle";
 import { pauseListingsOverQuota } from "@/lib/pro/quota";
+import { COMMITMENTS_VERSION } from "@/lib/pro/commitments";
 import { mailBudget } from "./launch-offer";
 import { passEndAfter, passNoticeDue, runningPassEnd } from "./pass-rules";
 import { expireOpenSession, invoiceFields, ownShop, pageUrl, SESSION_LIFETIME_MS, stripeCustomer } from "./plans";
@@ -71,7 +72,7 @@ export async function startPassCheckout(auth: AuthContext, input: CheckoutPassIn
     const before = await getBillingAccountTx(tx, accountId);
     const next: BillingAccountDoc = {
       ...(before ?? { kind: "shop" as const, ownerUid: auth.user.uid, proId, rcAppUserId: randomUUID(), createdAt: now }),
-      lastPassCheckout: { passId: pass.id, consentVersion: PASS_CONSENT_VERSION, at: now, idempotencyKey },
+      lastPassCheckout: { passId: pass.id, consentVersion: PASS_CONSENT_VERSION, commitmentsVersion: COMMITMENTS_VERSION, at: now, idempotencyKey },
       updatedAt: now,
     };
     setBillingAccountTx(tx, accountId, next);

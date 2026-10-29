@@ -86,6 +86,8 @@ export type ErrorCode =
   | "pro_application_exists"
   /** KYBC pieces that are not the applicant's `kyb` uploads. */
   | "invalid_pieces"
+  /** Becoming an agency without ticking the trade's legal commitments (400, src/lib/pro/commitments.ts). */
+  | "commitments_required"
   // Credits and paid options (phase 7, design §5). Messages: Options.errors.<code>.
   /** config/flags.salesEnabled is off: nothing can be bought (403). */
   | "sales_closed"

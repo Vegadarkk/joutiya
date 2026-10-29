@@ -167,6 +167,8 @@ export const checkoutPassSchema = z
     pass: z.string().regex(/^[a-z0-9_]{1,40}$/),
     /** "J'accepte les CGV du Pass Boutique : paiement unique, sans renouvellement, sans remboursement au prorata." */
     acceptTerms: z.literal(true),
+    /** The legal commitments of a temporary shop (src/lib/pro/commitments.ts, scope "pass"), ticked. */
+    acceptCommitments: z.literal(true),
     locale: z.enum(LOCALES).default("fr"),
   })
   .strict();
