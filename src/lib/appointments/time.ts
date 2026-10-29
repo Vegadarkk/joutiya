@@ -1,22 +1,17 @@
-// Morocco's wall clock (Africa/Casablanca, offset from the runtime's time zone data: UTC+0 since
-// 20 September 2026 in tzdata 2026c, UTC+1 before) <-> epoch ms, for the slot picker: a member
-// picks "jeudi 14:30" in Morocco's time whatever the device's zone. Pure.
+import { MOROCCO_TIME_ZONE, moroccoTimeZone } from "@/lib/i18n/morocco-time";
 
-export const APPOINTMENT_TIME_ZONE = "Africa/Casablanca";
+// Morocco's wall clock <-> epoch ms, for the slot picker: a member picks "jeudi 14:30" in Morocco's
+// time whatever the device's zone, and whatever its time zone data (src/lib/i18n/morocco-time.ts).
+// Pure.
 
-const PARTS = new Intl.DateTimeFormat("en-CA", {
-  timeZone: APPOINTMENT_TIME_ZONE,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-});
+const wallClock = (timeZone: string) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const WALL_CLOCKS = new Map([MOROCCO_TIME_ZONE, "UTC"].map((zone) => [zone, wallClock(zone)]));
 
 /** Morocco's wall clock at `at`: { day: "2026-11-05", minutes: 870 } (minutes since midnight). */
 export function moroccoClock(at: number): { day: string; minutes: number } {
-  const parts = Object.fromEntries(PARTS.formatToParts(new Date(at)).map((part) => [part.type, part.value]));
+  const format = WALL_CLOCKS.get(moroccoTimeZone(at)) ?? wallClock(moroccoTimeZone(at));
+  const parts = Object.fromEntries(format.formatToParts(new Date(at)).map((part) => [part.type, part.value]));
   return { day: `${parts.year}-${parts.month}-${parts.day}`, minutes: Number(parts.hour) * 60 + Number(parts.minute) };
 }
 
