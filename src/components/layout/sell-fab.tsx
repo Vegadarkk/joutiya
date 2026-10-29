@@ -20,6 +20,8 @@ export function SellFab({ label }: { label: string }) {
         "sell-arch fixed end-4 bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] z-30 flex h-15 w-13 items-end justify-center pb-3.5 md:hidden",
         "transition-[background-color,scale] duration-150 ease-door hover:bg-ochre-700 active:scale-95",
         "[:root:has([data-testid=consent-banner])_&]:hidden",
+        // The search map's sheet (lot 2): the arch stands above it, and leaves when it fills the screen.
+        "search-map:bottom-[calc(var(--search-sheet,0px)+0.75rem)] search-map:transition-[bottom] [:root[data-search-snap=full]_&]:search-map:hidden",
       )}
     >
       <Plus className="size-6" strokeWidth={2.25} aria-hidden="true" />

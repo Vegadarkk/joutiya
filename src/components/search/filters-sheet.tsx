@@ -71,6 +71,7 @@ export function withLocation(draft: SearchParams, location: LocationValue): Sear
   const next: SearchParams = { ...draft, city: location.city, region: location.city ? undefined : location.region };
   delete next.radiusKm;
   delete next.district;
+  delete next.zone;
   if (!next.city && next.sort === "distance") delete next.sort;
   return next;
 }

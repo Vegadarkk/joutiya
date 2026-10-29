@@ -44,15 +44,16 @@ function and(parts: (FilterExpr | undefined)[]): FilterExpr | undefined {
 
 /**
  * Category, subcategory and place (D7): the scope shared by the results and the À la Une query.
- * City + radius = `_geoRadius` around the city centroid (crosses region borders), city alone =
- * `citySlug` equality, else region.
+ * Map zone or city + radius = `_geoRadius` (crosses region borders; listings sit at their rounded
+ * city centroid), city alone = `citySlug` equality, else region.
  */
 function scopeFilters(params: SearchParams): FilterExpr[] {
   const parts: FilterExpr[] = [];
   if (params.category) parts.push(eq("categoryId", params.category));
   if (params.subcategory) parts.push(eq("subcategoryId", params.subcategory));
   const city = params.city ? cityBySlug(params.city) : undefined;
-  if (city && params.radiusKm) parts.push({ geoRadius: { lat: city.lat, lng: city.lng, meters: params.radiusKm * 1000 } });
+  if (params.zone) parts.push({ geoRadius: { lat: params.zone.lat, lng: params.zone.lng, meters: params.zone.km * 1000 } });
+  else if (city && params.radiusKm) parts.push({ geoRadius: { lat: city.lat, lng: city.lng, meters: params.radiusKm * 1000 } });
   else if (city) parts.push(eq("citySlug", city.slug));
   else if (params.region) parts.push(eq("regionCode", params.region));
   return parts;
@@ -141,9 +142,10 @@ export function featuredFilter(input: SearchParams, now: Date): FilterExpr {
 /**
  * Engine sort of a search sort (D6). Relevance = ranking rules only (their last rule is
  * `sortAt:desc`); date and price sorts sit right after "words" in the rules, so relevance still
- * breaks ties. Distance needs the city (listings share its centroid: newest first among equals).
+ * breaks ties. Distance needs the city or the map zone (from its centre; listings of one city share
+ * its centroid: newest first among equals).
  */
-export function sortSpecs(sort: SearchSort, params: Pick<SearchParams, "city">): SortSpec[] {
+export function sortSpecs(sort: SearchSort, params: Pick<SearchParams, "city" | "zone">): SortSpec[] {
   switch (sort) {
     case "relevance":
       return [];
@@ -153,7 +155,8 @@ export function sortSpecs(sort: SearchSort, params: Pick<SearchParams, "city">):
       return [{ field: "price", dir: "desc" }];
     case "distance": {
       const city = params.city ? cityBySlug(params.city) : undefined;
-      if (city) return [{ geoPoint: { lat: city.lat, lng: city.lng }, dir: "asc" }, { field: "sortAt", dir: "desc" }];
+      const point = params.zone ?? city;
+      if (point) return [{ geoPoint: { lat: point.lat, lng: point.lng }, dir: "asc" }, { field: "sortAt", dir: "desc" }];
       return [{ field: "sortAt", dir: "desc" }];
     }
     case "recent":

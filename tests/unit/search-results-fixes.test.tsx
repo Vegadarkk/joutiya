@@ -21,6 +21,8 @@ vi.mock("@/lib/search/limits", () => ({ enforceSearchLimit: mocks.enforceSearchL
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "user-agent": "vitest", "cf-connecting-ip": "203.0.113.7" }) }));
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/storage/keys", () => ({ mediaBaseUrl: () => "https://media.joutiya.test" }));
+// The map panel's legal foot reopens the consent panel; its provider lives in the root shell.
+vi.mock("@/components/consent/consent-link", () => ({ ConsentLink: () => <button type="button">cookies</button> }));
 vi.mock("next/navigation", async (importOriginal) => ({
   ...(await importOriginal<typeof NextNavigation>()),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn(), back: vi.fn(), forward: vi.fn() }),
@@ -88,11 +90,13 @@ async function renderPage(query: Record<string, string>, locale: TestLocale = "f
   );
 }
 
-/** The markup between the toolbar's opening tag and the pending bar after it. */
+/** The markup from the toolbar's opening tag to the results: the filters bar, then the save and sort tools. */
 function toolbar(html: string): string {
   const start = html.indexOf('role="toolbar"');
   expect(start).toBeGreaterThan(-1);
-  return html.slice(start, html.indexOf('aria-hidden="true" class="h-0.5', start));
+  const end = html.indexOf('data-testid="results-grid"', start);
+  expect(end).toBeGreaterThan(start);
+  return html.slice(start, end);
 }
 
 const count = (html: string) => /data-testid="search-count"[^>]*>([^<]*)</.exec(html)?.[1];

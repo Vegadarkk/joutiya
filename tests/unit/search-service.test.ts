@@ -192,6 +192,28 @@ describe("sortSpecs (D6)", () => {
     ]);
     expect(sortSpecs("distance", {})).toEqual([{ field: "sortAt", dir: "desc" }]);
   });
+
+  it("sorts by distance from the centre of a map zone (Carte vivante, lot 2)", () => {
+    expect(sortSpecs("distance", { zone: { lat: 34.02, lng: -6.84, km: 8 } })).toEqual([
+      { geoPoint: { lat: 34.02, lng: -6.84 }, dir: "asc" },
+      { field: "sortAt", dir: "desc" },
+    ]);
+  });
+});
+
+describe("map zone filter (Carte vivante, lot 2)", () => {
+  it("searches the zone's circle, for the results and the À la Une draw alike", () => {
+    const zone = { lat: 34.02, lng: -6.84, km: 8 };
+    const circle = { geoRadius: { lat: 34.02, lng: -6.84, meters: 8000 } };
+    expect(buildFilter({ zone, includeSoldOut: true }, NOW)).toEqual(circle);
+    expect(buildFilter({ category: "vehicules", zone, includeSoldOut: true }, NOW)).toEqual({ and: [{ field: "categoryId", op: "eq", value: "vehicules" }, circle] });
+    expect(featuredFilter({ zone }, NOW)).toEqual({ and: [circle, { field: "featuredUntil", op: "gt", value: NOW.getTime() }] });
+  });
+
+  it("wins over a city that came along (parsed links never carry both)", () => {
+    const filter = buildFilter({ zone: { lat: 34.02, lng: -6.84, km: 8 }, city: "casablanca", radiusKm: 20, includeSoldOut: true }, NOW);
+    expect(filter).toEqual({ geoRadius: { lat: 34.02, lng: -6.84, meters: 8000 } });
+  });
 });
 
 describe("facetFields", () => {

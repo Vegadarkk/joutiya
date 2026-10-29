@@ -125,10 +125,14 @@ describe("SiteHeader", () => {
 
 describe("shell paths", () => {
   it("drops the category row in the focused flows and 'Vendre' over forms and bottom bars", () => {
-    for (const path of ["/", "/recherche", "/c/vehicules", "/mes-annonces", "/demarches"]) {
+    for (const path of ["/", "/c/vehicules", "/mes-annonces", "/demarches"]) {
       expect(showsCategoryRow(path), path).toBe(true);
       expect(showsSellButton(path), path).toBe(true);
     }
+    // The map-first search (lot 2) keeps 'Vendre' over its sheet; its filters replace the category row.
+    expect(showsCategoryRow("/recherche")).toBe(false);
+    expect(showsSellButton("/recherche")).toBe(true);
+    expect(showsCategoryRow("/recherches")).toBe(true);
     for (const path of ["/deposer", "/deposer/abc/photos", "/connexion", "/messages", "/messages/c1", "/anti-robot"]) {
       expect(showsCategoryRow(path), path).toBe(false);
       expect(showsSellButton(path), path).toBe(false);

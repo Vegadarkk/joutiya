@@ -3267,7 +3267,8 @@
       "all": "كل الإعلانات",
       "query": "«{query}»",
       "inCity": "{what} في {place}",
-      "inRegion": "{what}، جهة {place}"
+      "inRegion": "{what}، جهة {place}",
+      "inZone": "{what} في منطقة الخريطة"
     },
     "count": "{count, plural, zero {لا توجد إعلانات} one {إعلان واحد} two {إعلانان} few {# إعلانات} many {# إعلانًا} other {# إعلان}}",
     "countAtLeast": "أكثر من {count, plural, other {# إعلان}}",
@@ -3332,6 +3333,73 @@
       "capped": "تُعرض أول {pages} صفحة فقط. حدّد بحثك أكثر لرؤية باقي الإعلانات."
     }
   },
+  "SearchMap": {
+    "view": {
+      "label": "طريقة عرض النتائج",
+      "map": "الخريطة",
+      "list": "القائمة"
+    },
+    "panel": {
+      "collapse": "طيّ القائمة",
+      "expand": "إظهار القائمة"
+    },
+    "sheet": {
+      "toPeek": "تصغير القائمة",
+      "toHalf": "عرض القائمة حتى منتصف الشاشة",
+      "toFull": "تكبير القائمة"
+    },
+    "mapLabel": "خريطة النتائج، المواقع تقريبية",
+    "loading": "جارٍ تحميل الخريطة…",
+    "unavailable": "تعذّر عرض الخريطة: تبقى النتائج في شكل قائمة.",
+    "zoneButton": "البحث في هذه المنطقة",
+    "today": "اليوم",
+    "featuredRows": "إعلانات في الواجهة",
+    "legend": {
+      "label": "مفتاح الخريطة",
+      "price": "السعر",
+      "featured": "في الواجهة",
+      "today": "جديد اليوم",
+      "approximate": "مواقع تقريبية"
+    },
+    "pin": {
+      "label": "{title}، {price}",
+      "featured": "في الواجهة",
+      "today": "نُشر اليوم",
+      "cluster": "{count, plural, zero {لا إعلانات} one {إعلان واحد} two {إعلانان} few {# إعلانات} many {# إعلانًا} other {# إعلان}} هنا، كبّر الخريطة لرؤيتها",
+      "per": {
+        "night": "/ليلة",
+        "month": "/شهر",
+        "day": "/يوم"
+      }
+    },
+    "row": {
+      "noPhoto": "بدون صورة",
+      "pro": "محترف"
+    },
+    "detail": {
+      "close": "إغلاق المعاينة",
+      "noPhoto": "بدون صورة",
+      "photos": "{count, plural, zero {لا صور} one {صورة واحدة} two {صورتان} few {# صور} many {# صورة} other {# صورة}}",
+      "negotiable": "قابل للتفاوض",
+      "approximate": "{place}، موقع تقريبي",
+      "facts": "باختصار",
+      "pro": "بائع محترف",
+      "individual": "فرد",
+      "exclusive": "حصري",
+      "open": "فتح الصفحة الكاملة",
+      "report": "الإبلاغ",
+      "contact": "التواصل"
+    },
+    "legal": {
+      "all": "كل المعلومات القانونية",
+      "short": {
+        "cgu": "شروط الاستخدام",
+        "confidentialite": "الخصوصية",
+        "cookies": "ملفات الارتباط",
+        "mentions": "الإشعارات القانونية"
+      }
+    }
+  },
   "SearchFilters": {
     "open": "التصفية",
     "openCount": "التصفية، {count, plural, one {عامل واحد مفعّل} two {عاملان مفعّلان} few {# عوامل مفعّلة} many {# عاملًا مفعّلًا} other {# عامل مفعّل}}",
@@ -3385,6 +3453,7 @@
       "priceFrom": "من {min}",
       "priceTo": "حتى {max}",
       "radius": "{place} + {km} كلم",
+      "zone": "منطقة الخريطة · {km} كلم",
       "district": "حي {district}",
       "sellerIndividual": "أفراد",
       "sellerPro": "مهنيون",

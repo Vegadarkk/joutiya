@@ -23,6 +23,7 @@ import {
   withPage,
   withSort,
   type FilterLabels,
+  type TitleKey,
 } from "@/components/search/filter-model";
 import type { Locale } from "@/config/site";
 import { parseSearchParams, searchPath, type SearchParams } from "@/lib/search/params";
@@ -40,7 +41,7 @@ function labels(locale: Locale): FilterLabels {
 
 function title(locale: Locale) {
   const t = createTranslator({ locale, messages: locale === "ar" ? ar : fr, namespace: "SearchPage.title" });
-  return (key: "all" | "query" | "inCity" | "inRegion", values?: Record<string, string>) => t(key, values as never);
+  return (key: TitleKey, values?: Record<string, string>) => t(key, values as never);
 }
 
 const url = (query: string) => parseSearchParams(new URLSearchParams(query));
@@ -228,6 +229,25 @@ describe("searchTitle", () => {
     expect(searchTitle(url("sous-categorie=voitures&region=02"), "fr", labels("fr"), title("fr"))).toBe(`${fr.Categories.vehicules.sub.voitures}, région L'Oriental`);
     expect(searchTitle({}, "fr", labels("fr"), title("fr"))).toBe(fr.SearchPage.title.all);
     expect(searchTitle(url("categorie=immobilier&ville=casablanca"), "ar", labels("ar"), title("ar"))).toBe(`${ar.Categories.immobilier.name} في الدار البيضاء`);
+  });
+});
+
+describe("map zone (Carte vivante, lot 2)", () => {
+  const zoned = url("q=velo&zone=33.573,-7.59,12&tri=distance");
+
+  it("is a removable place chip, titled as the map's zone", () => {
+    expect(activeFilterKeys(zoned)).toEqual(["location"]);
+    const [chip] = describeFilters(zoned, "fr", labels("fr"));
+    expect(chip?.label).toBe("Zone de la carte · 12 km");
+    expect(searchPath(chip!.without)).toBe("/recherche?q=velo");
+    expect(searchTitle(zoned, "fr", labels("fr"), title("fr"))).toBe("« velo » dans la zone de la carte");
+    expect(searchTitle(url("zone=33.573,-7.59,12"), "ar", labels("ar"), title("ar"))).toBe(`${ar.SearchPage.title.all} في منطقة الخريطة`);
+  });
+
+  it("offers the distance sort from the zone's centre and widens to the whole country", () => {
+    expect(sortOptions(zoned)).toContain("distance");
+    expect(widenings(zoned).map((widening) => widening.kind)).toEqual(["country"]);
+    expect(searchPath(widenings(zoned)[0]!.params)).toBe("/recherche?q=velo");
   });
 });
 

@@ -269,7 +269,7 @@ export default async function ListingPage({ params }: { params: Params }) {
             {contactable ? <FavoriteButton listingId={listing.id} variant="inline" className="self-start" /> : null}
           </header>
 
-          <aside aria-label={t("sellerLabel")} className="min-w-0 lg:[grid-area:aside]">
+          <aside id="contact" aria-label={t("sellerLabel")} className="min-w-0 scroll-mt-24 lg:[grid-area:aside]">
             <div className="flex flex-col gap-6 lg:sticky lg:top-24">
               <SellerCard seller={seller} fallbackName={listing.seller.name} fallbackType={listing.seller.type} locale={locale}>
                 {listing.example ? <ExampleContactNotice /> : null}
@@ -324,7 +324,10 @@ export default async function ListingPage({ params }: { params: Params }) {
 
             {/* Report link, then the safety tips: a non-interactive block always stands between the ad
                 and the contact or report controls (D6). */}
-            <ReportButton target={{ type: "listing", id: listing.id }} subject={listing.title} ownerPublicId={listing.seller.publicId} email={legal.dsaContactEmail} url={canonicalUrl} />
+            {/* The search map links here ("Signaler", lot 2). */}
+            <div id="signaler" className="scroll-mt-24">
+              <ReportButton target={{ type: "listing", id: listing.id }} subject={listing.title} ownerPublicId={listing.seller.publicId} email={legal.dsaContactEmail} url={canonicalUrl} />
+            </div>
             <SafetyTips variant={realEstate ? "realEstate" : "goods"} />
             <AdSlot placement="listing-bottom" eligible={found.adsEligible} promos={availablePromos(flags)} seed={listing.id} />
           </div>

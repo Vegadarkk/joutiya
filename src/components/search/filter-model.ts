@@ -37,6 +37,7 @@ export const CHIP_KEYS = [
   "priceFrom",
   "priceTo",
   "radius",
+  "zone",
   "district",
   "sellerIndividual",
   "sellerPro",
@@ -97,6 +98,7 @@ export function withoutFilter(params: SearchParams, key: FilterKey): SearchParam
     case "location":
       delete next.city;
       delete next.region;
+      delete next.zone;
       delete next.radiusKm;
       delete next.district;
       if (next.sort === "distance") delete next.sort;
@@ -151,7 +153,7 @@ export function activeFilterKeys(params: SearchParams): FilterKey[] {
   const keys: FilterKey[] = [];
   if (params.category) keys.push("category");
   if (params.dates) keys.push("dates");
-  if (params.city || params.region) keys.push("location");
+  if (params.city || params.region || params.zone) keys.push("location");
   if (params.district) keys.push("district");
   if (params.priceMin !== undefined || params.priceMax !== undefined) keys.push("price");
   if (params.shop) keys.push("shop");
@@ -219,6 +221,7 @@ function filterLabel(params: SearchParams, key: FilterKey, locale: Locale, label
       return params.subcategory ? labels.subcategory(category, params.subcategory) : labels.category(category);
     }
     case "location": {
+      if (params.zone) return labels.chip("zone", { km: String(params.zone.km) });
       const place = locationName({ city: params.city, region: params.region }, locale) ?? "";
       return params.radiusKm ? labels.chip("radius", { place, km: String(params.radiusKm) }) : place;
     }
@@ -262,14 +265,14 @@ export function describeFilters(params: SearchParams, locale: Locale, labels: Fi
   return activeFilterKeys(params).map((key) => ({ key, label: filterLabel(params, key, locale, labels), without: withoutFilter(params, key) }));
 }
 
-/** Sorts that make sense for this search: relevance needs words, distance a city (D6). */
-export function sortOptions(params: Pick<SearchParams, "q" | "city" | "promo">): SearchSort[] {
+/** Sorts that make sense for this search: relevance needs words, distance a city or a map zone (D6). */
+export function sortOptions(params: Pick<SearchParams, "q" | "city" | "zone" | "promo">): SearchSort[] {
   const sorts: SearchSort[] = [];
   if (params.q) sorts.push("relevance");
   sorts.push("recent", "price_asc", "price_desc");
   // « Plus forte réduction » ranks the running promotions: offered once the filter keeps only them.
   if (params.promo) sorts.push("discount");
-  if (params.city) sorts.push("distance");
+  if (params.city || params.zone) sorts.push("distance");
   return sorts;
 }
 
@@ -347,10 +350,10 @@ export type Widening = { kind: "region"; code: string; params: SearchParams } | 
 export function widenings(params: SearchParams): Widening[] {
   const out: Widening[] = [];
   const city = params.city ? cityBySlug(params.city) : undefined;
-  const base: SearchParams = { ...params, page: undefined, city: undefined, radiusKm: undefined, district: undefined, region: undefined };
+  const base: SearchParams = { ...params, page: undefined, city: undefined, radiusKm: undefined, district: undefined, region: undefined, zone: undefined };
   if (base.sort === "distance") delete base.sort;
   if (city && regionByCode(city.regionCode)) out.push({ kind: "region", code: city.regionCode, params: canonicalSearchParams({ ...base, region: city.regionCode }) });
-  if (params.city || params.region) out.push({ kind: "country", params: canonicalSearchParams(base) });
+  if (params.city || params.region || params.zone) out.push({ kind: "country", params: canonicalSearchParams(base) });
   return out;
 }
 
@@ -378,7 +381,7 @@ export function setCriterion(criteria: Record<string, CriterionFilter> | undefin
 }
 
 /** Messages of `SearchPage.title`. */
-export type TitleKey = "all" | "query" | "inCity" | "inRegion";
+export type TitleKey = "all" | "query" | "inCity" | "inRegion" | "inZone";
 
 /** Heading of a search: the words, else the (sub)category, else "all listings"; then the place. */
 export function searchTitle(params: SearchParams, locale: Locale, labels: FilterLabels, title: (key: TitleKey, values?: Record<string, string>) => string): string {
@@ -389,6 +392,7 @@ export function searchTitle(params: SearchParams, locale: Locale, labels: Filter
       : params.category
         ? labels.category(params.category)
         : title("all");
+  if (params.zone) return title("inZone", { what });
   const city = params.city ? cityBySlug(params.city) : undefined;
   if (city) return title("inCity", { what, place: cityName(city, locale) });
   const region = params.region ? regionByCode(params.region) : undefined;

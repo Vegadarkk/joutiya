@@ -22,10 +22,12 @@ interface PaginationProps {
   /** Total hits: past SEARCH_MAX_PAGE pages, a note asks to narrow the search. */
   total?: number;
   pageSize?: number;
+  /** "previous · page n of m · next" at every width (the map panel). */
+  compact?: boolean;
   className?: string;
 }
 
-export function Pagination({ params, page, totalPages, total, pageSize = SEARCH_PAGE_SIZE, className }: PaginationProps) {
+export function Pagination({ params, page, totalPages, total, pageSize = SEARCH_PAGE_SIZE, compact = false, className }: PaginationProps) {
   const t = useTranslations("SearchPage.pagination");
   const last = Math.min(totalPages, SEARCH_MAX_PAGE);
   if (last <= 1) return null;
@@ -47,9 +49,9 @@ export function Pagination({ params, page, totalPages, total, pageSize = SEARCH_
             </span>
           )}
         </li>
-        <li className="px-3 text-sm text-foreground-muted tabular-nums sm:hidden">{t("status", { page: current, total: last })}</li>
+        <li className={cn("px-3 text-sm text-foreground-muted tabular-nums", !compact && "sm:hidden")}>{t("status", { page: current, total: last })}</li>
         {pages.map((entry, index) =>
-          entry === "gap" ? (
+          compact ? null : entry === "gap" ? (
             <li key={`gap-${index}`} aria-hidden="true" className="w-6 text-center text-foreground-muted max-sm:hidden">
               …
             </li>

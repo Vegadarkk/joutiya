@@ -18,8 +18,9 @@ import { SellFab } from "./sell-fab";
 // (64 px, 80 px from md: the messages shell sizes itself on these heights): the logo plate, the
 // search pill, the pill of account buttons and the "Vendre" arch. The category row scrolls away
 // under it; on phones "Vendre" floats at the bottom end. Every control is a 44 px touch target.
-// The search pill hides on pages whose main content has its own search form (/recherche, the help
-// centre): never two search fields at once.
+// The search pill hides on pages whose main content has its own search form (the help centre):
+// never two search fields at once. On /recherche the pill is the page's search (lot 2), filled
+// from the URL, and over the map view the band turns clear so that its pieces float on the map.
 
 export function SiteHeader({ locale }: { locale: string }) {
   const t = useTranslations("Nav");
@@ -28,13 +29,14 @@ export function SiteHeader({ locale }: { locale: string }) {
   const chips = CATEGORIES.map((category) => ({ id: category.id, label: names(`${category.id}.name` as CategoryKey) }));
   return (
     <>
-      <header className="header-lift sticky top-0 z-40 bg-background/85 backdrop-blur-md">
-        <Container className="flex h-16 items-center gap-2 md:h-20 md:gap-3 lg:gap-4">
+      {/* Over the search map (lot 2) the band goes clear: only its pieces float, the map takes the rest. */}
+      <header className="header-lift sticky top-0 z-40 bg-background/85 backdrop-blur-md search-map:pointer-events-none search-map:bg-transparent search-map:backdrop-blur-none search-map:[animation:none]">
+        <Container className="flex h-16 items-center gap-2 md:h-20 md:gap-3 lg:gap-4 search-map:*:pointer-events-auto search-map:lg:max-w-none">
           {/* On every page: the home payload is prefetched when the visitor reaches for the logo, not during load. */}
           <IntentLink
             href="/"
             aria-label={t("home")}
-            className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-surface-brand shadow-[0_0_0_1px_var(--float-edge),0_8px_20px_-10px_var(--float-shadow)] md:size-auto md:h-13 md:rounded-[0.7rem] md:bg-transparent md:dark:bg-surface md:dark:px-3.5"
+            className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-surface-brand shadow-[0_0_0_1px_var(--float-edge),0_8px_20px_-10px_var(--float-shadow)] md:size-auto md:h-13 md:rounded-[0.7rem] md:bg-transparent md:dark:bg-surface md:dark:px-3.5 search-map:md:bg-surface search-map:md:px-3.5"
           >
             <DoorMark className="w-6 md:hidden" />
             <Logo label={SITE_NAME} className="hidden h-full md:inline-flex dark:h-9" />

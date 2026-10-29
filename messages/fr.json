@@ -3277,7 +3277,8 @@
       "all": "Toutes les annonces",
       "query": "« {query} »",
       "inCity": "{what} à {place}",
-      "inRegion": "{what}, région {place}"
+      "inRegion": "{what}, région {place}",
+      "inZone": "{what} dans la zone de la carte"
     },
     "count": "{count, plural, one {# annonce} other {# annonces}}",
     "countAtLeast": "Plus de {count, plural, other {# annonces}}",
@@ -3342,6 +3343,73 @@
       "capped": "Seules les {pages} premières pages s'affichent. Affinez votre recherche pour voir les autres annonces."
     }
   },
+  "SearchMap": {
+    "view": {
+      "label": "Affichage des résultats",
+      "map": "Carte",
+      "list": "Liste"
+    },
+    "panel": {
+      "collapse": "Replier la liste",
+      "expand": "Afficher la liste"
+    },
+    "sheet": {
+      "toPeek": "Réduire la liste",
+      "toHalf": "Afficher la liste à mi-hauteur",
+      "toFull": "Agrandir la liste"
+    },
+    "mapLabel": "Carte des résultats, positions approximatives",
+    "loading": "Chargement de la carte…",
+    "unavailable": "La carte n'a pas pu s'afficher : les résultats restent en liste.",
+    "zoneButton": "Rechercher dans cette zone",
+    "today": "Aujourd'hui",
+    "featuredRows": "Annonces À la Une",
+    "legend": {
+      "label": "Légende de la carte",
+      "price": "Prix",
+      "featured": "À la Une",
+      "today": "Nouveau aujourd'hui",
+      "approximate": "Positions approximatives"
+    },
+    "pin": {
+      "label": "{title}, {price}",
+      "featured": "À la Une",
+      "today": "publiée aujourd'hui",
+      "cluster": "{count, plural, one {# annonce} other {# annonces}} ici, zoomer pour les voir",
+      "per": {
+        "night": "/nuit",
+        "month": "/mois",
+        "day": "/jour"
+      }
+    },
+    "row": {
+      "noPhoto": "Pas de photo",
+      "pro": "Pro"
+    },
+    "detail": {
+      "close": "Fermer l'aperçu",
+      "noPhoto": "Pas de photo",
+      "photos": "{count, plural, one {# photo} other {# photos}}",
+      "negotiable": "Négociable",
+      "approximate": "{place}, position approximative",
+      "facts": "En bref",
+      "pro": "Vendeur professionnel",
+      "individual": "Particulier",
+      "exclusive": "Exclusivité",
+      "open": "Ouvrir la page complète",
+      "report": "Signaler",
+      "contact": "Contacter"
+    },
+    "legal": {
+      "all": "Toutes les informations légales",
+      "short": {
+        "cgu": "CGU",
+        "confidentialite": "Confidentialité",
+        "cookies": "Cookies",
+        "mentions": "Mentions légales"
+      }
+    }
+  },
   "SearchFilters": {
     "open": "Filtres",
     "openCount": "Filtres, {count, plural, one {# actif} other {# actifs}}",
@@ -3395,6 +3463,7 @@
       "priceFrom": "Dès {min}",
       "priceTo": "Jusqu'à {max}",
       "radius": "{place} + {km} km",
+      "zone": "Zone de la carte · {km} km",
       "district": "Quartier {district}",
       "sellerIndividual": "Particuliers",
       "sellerPro": "Professionnels",

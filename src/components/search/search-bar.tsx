@@ -27,6 +27,7 @@ export function submittedParams(current: SearchParams, q: string, location: Loca
     next.region = location.city ? undefined : location.region;
     delete next.radiusKm;
     delete next.district;
+    delete next.zone;
   }
   if (!next.q && next.sort === "relevance") delete next.sort;
   return canonicalSearchParams(next);

@@ -4,6 +4,7 @@ import type * as NextNavigation from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ar from "../../messages/ar.json";
 import fr from "../../messages/fr.json";
+import { resetServerEnv } from "@/lib/env";
 import { HttpError } from "@/lib/http/errors";
 import type { SearchParams } from "@/lib/search/params";
 import { SearchUnavailableError, type SearchCard, type SearchResponse } from "@/lib/search/types";
@@ -22,6 +23,8 @@ vi.mock("@/lib/search/limits", () => ({ enforceSearchLimit: mocks.enforceSearchL
 vi.mock("next/headers", () => ({ headers: async () => new Headers(mocks.requestHeaders) }));
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
 vi.mock("@/lib/storage/keys", () => ({ mediaBaseUrl: () => "https://media.joutiya.test" }));
+// The map panel's legal foot reopens the consent panel; its provider lives in the root shell.
+vi.mock("@/components/consent/consent-link", () => ({ ConsentLink: () => <button type="button">cookies</button> }));
 vi.mock("next/navigation", async (importOriginal) => ({
   ...(await importOriginal<typeof NextNavigation>()),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn(), back: vi.fn(), forward: vi.fn() }),
@@ -139,9 +142,13 @@ describe("search page states", () => {
     const request = mocks.enforceSearchLimit.mock.calls[0]?.[0];
     expect(new URL(request?.url ?? "").pathname).toBe("/recherche");
     expect(request?.headers.get("cf-connecting-ip")).toBe("203.0.113.7");
-    expect(html).toContain('role="search"');
-    expect(html).toMatch(/<input[^>]*id="search-q"[^>]*value="velo"/);
+    // The header pill is the page's search field (Carte vivante, lot 2): no second search form here.
+    expect(html).not.toContain('role="search"');
     expect(html).toMatch(/<h1[^>]*>[^<]*velo[^<]*Casablanca<\/h1>/);
+    // No basemap configured: the card grid only, no map rows.
+    expect(html).not.toContain('data-testid="result-rows"');
+    expect(html).toContain('data-ad-slot="search-aside"');
+    expect(html).toContain('data-testid="panel-legal"');
     expect(html).toMatch(/data-testid="search-count"[^>]*>30 annonces</);
     expect(html).toContain(`role="toolbar" aria-label="${fr.SearchPage.toolbar}"`);
     expect(html).toContain('data-testid="featured-row"');
@@ -152,10 +159,35 @@ describe("search page states", () => {
     expect(html).not.toContain(fr.SearchPage.empty.title);
   });
 
+  it("starts on the map rows when a basemap is configured, the grid and its ads waiting for the list view", async () => {
+    process.env.MAP_PMTILES_URL = "https://media.joutiya.test/maps/morocco.pmtiles";
+    resetServerEnv();
+    try {
+      mocks.runSearch.mockImplementation(async (params) =>
+        response(params, { hits: [card("aaaa2345"), card("bbbb2345")], featured: [card("dddd2345", { featured: true })], total: 3, totalPages: 1 }),
+      );
+      const html = await renderPage({ q: "velo" });
+      expect(html).toContain('data-search-view="map"');
+      expect(html.match(/data-testid="result-rows"/g)).toHaveLength(2);
+      // À la Une first, with its own label (§8), each listing once, linked to its page.
+      expect(html.indexOf('data-listing-id="dddd2345"')).toBeLessThan(html.indexOf('data-listing-id="aaaa2345"'));
+      expect(html).toContain(`aria-label="${fr.SearchMap.featuredRows}"`);
+      expect(html.match(/data-listing-id="aaaa2345"/g)).toHaveLength(1);
+      expect(html).toContain('href="/fr/annonce/velo-aaaa2345"');
+      expect(html).not.toContain('data-testid="results-grid"');
+      expect(html).not.toContain("data-ad-slot");
+      expect(html).toContain('data-testid="panel-legal"');
+    } finally {
+      delete process.env.MAP_PMTILES_URL;
+      resetServerEnv();
+    }
+  });
+
   it("renders the results in Arabic with Arabic links and labels", async () => {
     mocks.runSearch.mockImplementation(async (params) => response(params, { hits: [card("aaaa2345")], total: 1, totalPages: 1 }));
     const html = await renderPage({ categorie: "vehicules" }, "ar");
-    expect(html).toContain('action="/ar/recherche"');
+    expect(html).toContain('href="/ar/legal/cgu"');
+    expect(html).toContain(ar.SearchMap.legal.short.cgu);
     expect(html).toContain(`aria-label="${ar.SearchPage.toolbar}"`);
     expect(html).toMatch(/<h1[^>]*>[^<]+<\/h1>/);
     expect(html).toContain(ar.Categories.vehicules.name);
@@ -207,7 +239,8 @@ describe("search page states", () => {
         expect(html).toContain('role="alert"');
         expect(html).toContain(t.title);
         expect(html).toContain(t.retry);
-        expect(html).toMatch(/<input[^>]*id="search-q"[^>]*value="velo"/);
+        // The criteria stay in the title (and in the header pill, bound by the page once hydrated).
+        expect(html).toMatch(/<h1[^>]*>[^<]*velo[^<]*<\/h1>/);
         expect(html).not.toContain('data-testid="search-count"');
         expect(html).not.toContain('role="toolbar"');
       }

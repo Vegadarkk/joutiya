@@ -17,7 +17,7 @@ export function Footer({ publisher }: { publisher: string }) {
   const column = (name: "legal" | "trust") => LEGAL_PAGES.filter((page) => page.column === name);
   // Thin green line on top: the logo's door outline (bab-700); bab-600 in dark, where structure equals this background.
   return (
-    <footer className="mt-auto border-t-2 border-structure bg-surface-brand text-foreground dark:border-bab-600">
+    <footer className="mt-auto border-t-2 search-map:hidden border-structure bg-surface-brand text-foreground dark:border-bab-600">
       <Container className="grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr]">
         <div className="flex flex-col gap-4">
           <Logo label={SITE_NAME} className="h-12 w-fit" />
