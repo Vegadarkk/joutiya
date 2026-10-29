@@ -7,6 +7,8 @@ export const SEARCH_Q_MAX = 100;
 /** URL parameter names. `breadcrumb.tsx` links use the same names. */
 export const SEARCH_QUERY_KEYS = {
   q: "q",
+  /** `brut=1`: the words are searched as typed, never interpreted (search/interpret). */
+  raw: "brut",
   category: "categorie",
   subcategory: "sous-categorie",
   region: "region",

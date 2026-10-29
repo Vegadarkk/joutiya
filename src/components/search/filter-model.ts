@@ -38,6 +38,7 @@ export const CHIP_KEYS = [
   "priceTo",
   "radius",
   "zone",
+  "zoneNear",
   "district",
   "sellerIndividual",
   "sellerPro",
@@ -145,7 +146,7 @@ export function withoutFilter(params: SearchParams, key: FilterKey): SearchParam
 
 /** Every filter off; the words and the sort stay (Leboncoin's "Effacer les filtres"). */
 export function clearFilters(params: SearchParams): SearchParams {
-  return canonicalSearchParams({ q: params.q, sort: params.sort });
+  return canonicalSearchParams({ q: params.q, raw: params.raw, sort: params.sort });
 }
 
 /** Active filters in display order (the words are in the search bar, not a chip). */

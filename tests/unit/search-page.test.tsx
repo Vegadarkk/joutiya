@@ -114,10 +114,10 @@ beforeEach(() => {
 
 describe("search page metadata", () => {
   it("is noindex, follow, with its own canonical and a title naming the search", async () => {
-    const meta = await generateMetadata(props({ q: "velo", ville: "rabat" }));
+    const meta = await generateMetadata(props({ q: "draisienne", ville: "rabat" }));
     expect(meta.robots).toEqual({ index: false, follow: true });
     expect(meta.alternates).toEqual({ canonical: "/fr/recherche" });
-    expect(meta.title).toContain("velo");
+    expect(meta.title).toContain("draisienne");
     expect(meta.title).toContain("Rabat");
     const arabic = await generateMetadata(props({}, "ar"));
     expect(arabic.title).toBe(ar.SearchPage.title.all);
@@ -137,14 +137,14 @@ describe("search page states", () => {
         facets: { categories: { vehicules: 30 }, subcategories: { velos: 20, motos: 10 } },
       }),
     );
-    const html = await renderPage({ q: "velo", ville: "casablanca" });
-    expect(mocks.runSearch).toHaveBeenCalledWith(expect.objectContaining({ q: "velo", city: "casablanca" }));
+    const html = await renderPage({ q: "draisienne", ville: "casablanca" });
+    expect(mocks.runSearch).toHaveBeenCalledWith(expect.objectContaining({ q: "draisienne", city: "casablanca" }));
     const request = mocks.enforceSearchLimit.mock.calls[0]?.[0];
     expect(new URL(request?.url ?? "").pathname).toBe("/recherche");
     expect(request?.headers.get("cf-connecting-ip")).toBe("203.0.113.7");
     // The header pill is the page's search field (Carte vivante, lot 2): no second search form here.
     expect(html).not.toContain('role="search"');
-    expect(html).toMatch(/<h1[^>]*>[^<]*velo[^<]*Casablanca<\/h1>/);
+    expect(html).toMatch(/<h1[^>]*>[^<]*draisienne[^<]*Casablanca<\/h1>/);
     // No basemap configured: the card grid only, no map rows.
     expect(html).not.toContain('data-testid="result-rows"');
     expect(html).toContain('data-ad-slot="search-aside"');
@@ -154,7 +154,7 @@ describe("search page states", () => {
     expect(html).toContain('data-testid="featured-row"');
     expect(html).toContain('data-testid="results-grid"');
     expect(html).toContain('data-badge="bumped"');
-    expect(html).toContain('href="/fr/recherche?q=velo&amp;ville=casablanca&amp;page=2"');
+    expect(html).toContain('href="/fr/recherche?q=draisienne&amp;ville=casablanca&amp;page=2"');
     expect(html).not.toContain(fr.SearchPage.approximate.title);
     expect(html).not.toContain(fr.SearchPage.empty.title);
   });
@@ -166,7 +166,7 @@ describe("search page states", () => {
       mocks.runSearch.mockImplementation(async (params) =>
         response(params, { hits: [card("aaaa2345"), card("bbbb2345")], featured: [card("dddd2345", { featured: true })], total: 3, totalPages: 1 }),
       );
-      const html = await renderPage({ q: "velo" });
+      const html = await renderPage({ q: "draisienne" });
       expect(html).toContain('data-search-view="map"');
       expect(html.match(/data-testid="result-rows"/g)).toHaveLength(2);
       // À la Une first, with its own label (§8), each listing once, linked to its page.
@@ -204,7 +204,7 @@ describe("search page states", () => {
   it("says when the results only match some of the words", async () => {
     mocks.runSearch.mockImplementation(async (params) => response(params, { hits: [card("aaaa2345")], total: 1, totalPages: 1, approximate: true }));
     for (const locale of ["fr", "ar"] as const) {
-      const html = await renderPage({ q: "velo rouge" }, locale);
+      const html = await renderPage({ q: "draisienne rouge" }, locale);
       expect(html).toContain(MESSAGES[locale].SearchPage.approximate.title);
       expect(html).toContain('data-testid="results-grid"');
     }
@@ -213,7 +213,7 @@ describe("search page states", () => {
   it("shows the empty state with ways out, and still the paid slots", async () => {
     mocks.runSearch.mockImplementation(async (params) => response(params, { featured: [card("dddd2345", { featured: true })] }));
     for (const locale of ["fr", "ar"] as const) {
-      const html = await renderPage({ q: "velo", ville: "rabat" }, locale);
+      const html = await renderPage({ q: "draisienne", ville: "rabat" }, locale);
       const t = MESSAGES[locale].SearchPage.empty;
       expect(html).toContain(t.title);
       expect(html).toContain(t.widenCountry);
@@ -223,24 +223,52 @@ describe("search page states", () => {
     }
   });
 
+  it("reads a sentence as filters it shows as removable chips, unless the search asks for the exact text", async () => {
+    mocks.runSearch.mockImplementation(async (params) => response(params, { hits: [card("aaaa2345")], total: 1, totalPages: 1 }));
+    const html = await renderPage({ q: "velo pas cher moins de 3000 dh", ville: "casablanca" });
+    expect(mocks.runSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ category: "vehicules", subcategory: "velos", priceMax: 3000, sort: "price_asc", city: "casablanca" }),
+    );
+    expect(mocks.runSearch.mock.calls[0]?.[0].q).toBeUndefined();
+    expect(html).toContain('data-testid="understood"');
+    expect(html).toMatch(/<h1[^>]*>[^<]*Vélos[^<]*Casablanca<\/h1>/);
+    // Each chip removes its own item and keeps the sentence searched as typed from then on.
+    expect(html).toContain(`aria-label="${fr.SearchInterpret.remove.replace("{filter}", "Vélos")}"`);
+    expect(html).toMatch(/href="\/fr\/recherche\?q=velo[^"]*brut=1[^"]*"/);
+    expect(html).toContain('data-testid="search-exact"');
+    expect((await generateMetadata(props({ q: "velo", ville: "rabat" }))).title).toContain("Vélos");
+
+    // « à côté » with a zone: one chip for it, « À 3 km de vous », and no second zone chip in the toolbar.
+    const near = await renderPage({ q: "velo a cote", zone: "33.599,-7.62,3" });
+    expect(near).toContain(`aria-label="${fr.SearchInterpret.remove.replace("{filter}", fr.SearchInterpret.nearZone.replace("{km}", "3"))}"`);
+    expect(near).not.toContain('data-filter="location"');
+    expect(await renderPage({ q: "draisienne", zone: "33.599,-7.62,3" })).toContain('data-filter="location"');
+
+    mocks.runSearch.mockClear();
+    const exact = await renderPage({ q: "velo pas cher", brut: "1" });
+    expect(mocks.runSearch).toHaveBeenCalledWith(expect.objectContaining({ q: "velo pas cher", raw: true }));
+    expect(mocks.runSearch.mock.calls[0]?.[0].subcategory).toBeUndefined();
+    expect(exact).not.toContain('data-testid="understood"');
+  });
+
   it("sends a page past the end back to the first page", async () => {
     mocks.runSearch.mockImplementation(async (params) => response(params, { total: 30, totalPages: 2 }));
-    const html = await renderPage({ q: "velo", page: "7" });
+    const html = await renderPage({ q: "draisienne", page: "7" });
     expect(text(html)).toContain(fr.SearchPage.empty.outOfRangeTitle);
-    expect(html).toContain('href="/fr/recherche?q=velo"');
+    expect(html).toContain('href="/fr/recherche?q=draisienne"');
   });
 
   it("shows an honest error with retry when the engine is down, keeping the criteria", async () => {
     for (const failure of [new SearchUnavailableError(), new Error("boom")]) {
       mocks.runSearch.mockRejectedValue(failure);
       for (const locale of ["fr", "ar"] as const) {
-        const html = await renderPage({ q: "velo" }, locale);
+        const html = await renderPage({ q: "draisienne" }, locale);
         const t = MESSAGES[locale].SearchPage.error;
         expect(html).toContain('role="alert"');
         expect(html).toContain(t.title);
         expect(html).toContain(t.retry);
         // The criteria stay in the title (and in the header pill, bound by the page once hydrated).
-        expect(html).toMatch(/<h1[^>]*>[^<]*velo[^<]*<\/h1>/);
+        expect(html).toMatch(/<h1[^>]*>[^<]*draisienne[^<]*<\/h1>/);
         expect(html).not.toContain('data-testid="search-count"');
         expect(html).not.toContain('role="toolbar"');
       }
@@ -251,7 +279,7 @@ describe("search page states", () => {
     for (const code of ["turnstile_required", "turnstile_failed"] as const) {
       mocks.enforceSearchLimit.mockRejectedValue(new HttpError(403, code));
       for (const locale of ["fr", "ar"] as const) {
-        const html = await renderPage({ q: "velo" }, locale);
+        const html = await renderPage({ q: "draisienne" }, locale);
         expect(html).toContain(MESSAGES[locale].SearchPage.challenge.title);
         expect(html).not.toContain('data-testid="results-grid"');
       }
@@ -262,7 +290,7 @@ describe("search page states", () => {
   it("asks to wait when rate limited with a pass", async () => {
     mocks.enforceSearchLimit.mockRejectedValue(new HttpError(429, "rate_limited", undefined, { headers: { "Retry-After": "30" } }));
     for (const locale of ["fr", "ar"] as const) {
-      const html = await renderPage({ q: "velo" }, locale);
+      const html = await renderPage({ q: "draisienne" }, locale);
       expect(html).toContain(MESSAGES[locale].SearchPage.rateLimited.title);
       expect(html).toContain('role="alert"');
     }
@@ -284,9 +312,9 @@ describe("loadSearch", () => {
     expect(await loadSearch({}, request)).toEqual({ kind: "unavailable" });
     mocks.runSearch.mockRejectedValueOnce(new SearchUnavailableError());
     expect(await loadSearch({}, request)).toEqual({ kind: "unavailable" });
-    const ok = response({ q: "velo" });
+    const ok = response({ q: "draisienne" });
     mocks.runSearch.mockResolvedValueOnce(ok);
-    expect(await loadSearch({ q: "velo" }, request)).toEqual({ kind: "results", response: ok });
+    expect(await loadSearch({ q: "draisienne" }, request)).toEqual({ kind: "results", response: ok });
   });
 
   it("builds the page request from the incoming headers", async () => {

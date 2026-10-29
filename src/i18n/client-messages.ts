@@ -65,6 +65,8 @@ export const SEARCH_PAGE_CLIENT_NAMESPACES = [
   "SavedSearches.button",
   "SavedSearches.summary",
   "SavedSearches.dialog",
+  // Understood words of a typed sentence and « Utiliser ma position » (Carte vivante, lot 4).
+  "SearchInterpret",
 ] as const;
 
 /**

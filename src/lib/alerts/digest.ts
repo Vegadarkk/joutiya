@@ -1,3 +1,4 @@
+import { nearestCity } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import type { FavoriteDropListing, SavedSearchAlertSection } from "@/lib/mail/types";
 import { searchPath, type SearchParams } from "@/lib/search/params";
@@ -44,19 +45,25 @@ export function digestSections(news: readonly SearchNews[], locale: Locale, url:
   return [...news]
     .filter((item) => item.total > 0 && item.hits.length > 0)
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-    .map((item) => ({
-      name: item.name,
-      // Newest first on the results page too: the e-mail is about what is new.
-      url: url(locale, searchPath({ ...item.params, sort: "recent", page: undefined })),
-      total: item.total,
-      listings: item.hits.slice(0, ALERT_LISTINGS_PER_SEARCH).map((hit) => ({
-        title: hit.title,
-        url: url(locale, `annonce/${hit.slugId}`),
-        price: hit.price,
-        isDonation: hit.isDonation,
-        citySlug: hit.citySlug,
-      })),
-    }));
+    .map((item) => {
+      const zone = item.params.zone;
+      const near = zone ? nearestCity(zone.lat, zone.lng) : undefined;
+      return {
+        name: item.name,
+        // Newest first on the results page too: the e-mail is about what is new.
+        url: url(locale, searchPath({ ...item.params, sort: "recent", page: undefined })),
+        total: item.total,
+        listings: item.hits.slice(0, ALERT_LISTINGS_PER_SEARCH).map((hit) => ({
+          title: hit.title,
+          url: url(locale, `annonce/${hit.slugId}`),
+          price: hit.price,
+          isDonation: hit.isDonation,
+          citySlug: hit.citySlug,
+        })),
+        // A map zone in words: its radius around the nearest city.
+        ...(zone && near ? { zone: { km: zone.km, citySlug: near.slug } } : {}),
+      };
+    });
 }
 
 /** Favorites of the digest whose promotion runs (catalogue §4), deepest cut first. */

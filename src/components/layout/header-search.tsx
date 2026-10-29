@@ -80,10 +80,18 @@ function HeaderSearchForm({ locale, binding, className }: { locale: string; bind
           placeholder={t("searchPlaceholder")}
           value={q}
           onChange={(event) => setQ(event.target.value)}
-          className={cn(SEGMENT_INPUT, "ps-4 pe-2 md:ps-10 [&::-webkit-search-cancel-button]:hidden")}
+          className={cn(SEGMENT_INPUT, "peer ps-4 pe-2 md:ps-10 lg:placeholder:text-transparent [&::-webkit-search-cancel-button]:hidden")}
         />
+        {/* Wide screens: the invitation to type a sentence (« Chercher en parlant », lot 4) in place of
+            the short placeholder, shown while the field is empty; phones keep the short one. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute start-10 end-2 top-1/2 hidden -translate-y-1/2 truncate text-sm text-foreground-muted lg:peer-placeholder-shown:block"
+        >
+          {t("searchPlaceholderLong")}
+        </span>
       </div>
-      <div className="relative hidden w-52 shrink-0 before:absolute before:start-0 before:top-1/2 before:h-6 before:w-px before:-translate-y-1/2 before:bg-border-strong lg:block xl:w-60">
+      <div className="relative hidden w-52 shrink-0 before:absolute before:start-0 before:top-1/2 before:h-6 before:w-px before:-translate-y-1/2 before:bg-border-strong lg:block xl:w-56">
         <SearchCityCombobox
           value={place}
           onChange={setPlace}

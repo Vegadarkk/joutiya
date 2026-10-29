@@ -26,6 +26,7 @@ import { SearchEmpty } from "@/components/search/search-empty";
 import { SearchError } from "@/components/search/search-error";
 import { PendingBar, PendingRegion, SearchNavigationProvider } from "@/components/search/search-navigation";
 import { SortSelect } from "@/components/search/sort-select";
+import { UnderstoodChips, understoodChipKeys } from "@/components/search/understood-chips";
 import { infeedPositions } from "@/config/ads";
 import { RENTAL_SUBCATEGORY, subcategoryAllowsAds } from "@/config/categories";
 import { availablePromos, type HousePromo } from "@/config/house-promos";
@@ -36,6 +37,7 @@ import { searchMapConfig } from "@/lib/config/public";
 import type { PublicMapConfig } from "@/lib/config/public-types";
 import { getFlags } from "@/lib/config/runtime";
 import { getLegalConfig } from "@/lib/legal/config";
+import { interpretSearch, type AppliedSearch } from "@/lib/search/interpret";
 import { parseSearchParams, SEARCH_MAX_TOTAL_HITS, SEARCH_PATH, searchPath } from "@/lib/search/params";
 import type { SearchCard, SearchResponse } from "@/lib/search/types";
 import { mediaBaseUrl } from "@/lib/storage/keys";
@@ -50,6 +52,14 @@ import { loadSearch, pageRequest, searchPageTitle } from "./search-state";
 // (desktop: a list at the start side; phones: a bottom sheet), the list view lays the card grid out
 // in the page, and without script the rows are the list. The header pill is the page's search field
 // (HeaderSearchBridge): words and place prefilled, the other filters carried.
+//
+// « Chercher en parlant » (lot 4): words without `brut=1` go through the rule-based interpreter
+// (src/lib/search/interpret) before the search; the filters it understood and the URL leaves free
+// apply, the rest of the words are searched, and the understood items show as chips. Rendered in
+// place, no redirect: the URL keeps the sentence as typed (the pill shows it, a reload or a shared
+// link reads it the same way, the interpreter being deterministic) and the request costs one
+// search, under the same limits, challenge and error states. A chip's × or « Chercher le texte
+// exact » leads to an ordinary URL with `brut=1`, which is never interpreted.
 
 const favoriteAction = (card: SearchCard) => <FavoriteButton listingId={card.id} />;
 const rowFavorite = (listing: MapListing) => <FavoriteButton listingId={listing.id} />;
@@ -61,7 +71,8 @@ type Props = {
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const locale = pageLocale((await params).locale);
-  const title = await searchPageTitle(locale, parseSearchParams(await searchParams));
+  const query = parseSearchParams(await searchParams);
+  const title = await searchPageTitle(locale, interpretSearch(query)?.params ?? query);
   // The canonical of the root layout points at the home page: never inherit it here.
   return { title, robots: { index: false, follow: true }, alternates: { canonical: `/${locale}${SEARCH_PATH}` } };
 }
@@ -85,6 +96,8 @@ interface ResultsProps {
   map: PublicMapConfig | null;
   publisher: string;
   translators: ResultsTranslators;
+  /** The understood words of a typed sentence (null: none, or `brut=1`). */
+  interpreted: AppliedSearch | null;
 }
 
 /** Loaded by the page: Results stays a synchronous component (rendered alone in the unit tests). */
@@ -98,7 +111,7 @@ async function resultsTranslators(locale: Locale) {
 }
 type ResultsTranslators = Awaited<ReturnType<typeof resultsTranslators>>;
 
-function Results({ response, locale, title, count, promos, map, publisher, translators }: ResultsProps) {
+function Results({ response, locale, title, count, promos, map, publisher, translators, interpreted }: ResultsProps) {
   const { t, own, labels } = translators;
   const { params, hits, featured } = response;
   const organic = withoutFeatured(hits, featured);
@@ -122,6 +135,8 @@ function Results({ response, locale, title, count, promos, map, publisher, trans
             <p data-testid="search-count" aria-live="polite" className="text-foreground-muted">
               {count}
             </p>
+            {/* In the head: the panel's own padding on the map, the page flow in the list. */}
+            {interpreted ? <UnderstoodChips interpreted={interpreted} locale={locale} className="mt-2 pb-1" /> : null}
           </header>
           <div
             role="toolbar"
@@ -130,7 +145,7 @@ function Results({ response, locale, title, count, promos, map, publisher, trans
           >
             <div className="search-toolbar-scroll flex min-w-0 flex-1 items-center gap-2">
               <FiltersSheet params={params} facets={response.facets} className="shrink-0 max-sm:gap-1.5 max-sm:px-3" />
-              <ActiveFilterChips params={params} locale={locale} className="search-toolbar-chips" />
+              <ActiveFilterChips params={params} locale={locale} hide={understoodChipKeys(interpreted)} className="search-toolbar-chips" />
             </div>
             <ViewToggle />
             <PendingBar className="absolute inset-x-0 bottom-0" />
@@ -217,8 +232,10 @@ export default async function SearchPage({ params, searchParams }: Props) {
   const locale = pageLocale((await params).locale);
   setRequestLocale(locale);
   const query = parseSearchParams(await searchParams);
-  const [outcome, flags, legal] = await Promise.all([pageRequest().then((request) => loadSearch(query, request)), getFlags(), getLegalConfig()]);
-  const applied = outcome.kind === "results" ? outcome.response.params : query;
+  const interpreted = interpretSearch(query);
+  const searched = interpreted?.params ?? query;
+  const [outcome, flags, legal] = await Promise.all([pageRequest().then((request) => loadSearch(searched, request)), getFlags(), getLegalConfig()]);
+  const applied = outcome.kind === "results" ? outcome.response.params : searched;
   // The count prints a number: Tarifit pages format it as French (no Intl data for "rif").
   const [t, title, translators] = await Promise.all([
     getTranslations({ locale: numbersLocale(locale), namespace: "SearchPage" }),
@@ -235,7 +252,8 @@ export default async function SearchPage({ params, searchParams }: Props) {
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
       <SearchNavigationProvider>
-        <HeaderSearchBridge params={applied} />
+        {/* The pill holds the sentence as typed and the URL's own filters: sent again, it is read again. */}
+        <HeaderSearchBridge params={interpreted ? query : applied} />
         {outcome.kind === "results" ? (
           <Results
             response={outcome.response}
@@ -246,12 +264,13 @@ export default async function SearchPage({ params, searchParams }: Props) {
             map={searchMapConfig()}
             publisher={legal.companyName}
             translators={translators}
+            interpreted={interpreted}
           />
         ) : (
           <Container className="flex flex-col gap-4 pt-6 pb-12 sm:gap-5 sm:pt-8 sm:pb-16">
             <h1 className="text-2xl font-semibold text-balance break-words sm:text-3xl">{title}</h1>
             {outcome.kind === "challenge" ? (
-              <SearchChallenge params={applied} />
+              <SearchChallenge params={query} />
             ) : (
               <SearchError kind={outcome.kind} retryAfter={outcome.kind === "rate_limited" ? outcome.retryAfter : undefined} />
             )}

@@ -215,6 +215,8 @@ export interface SavedSearchAlertSection {
   /** New listings since the last digest (the ones listed included). */
   total: number;
   listings: SavedSearchAlertListing[];
+  /** A map zone search: its radius and nearest city, named in words (never its coordinates). */
+  zone?: { km: number; citySlug: string };
 }
 
 export interface SavedSearchAlertListing {

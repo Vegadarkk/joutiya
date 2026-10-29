@@ -67,6 +67,11 @@ export type CriterionFilter =
 
 export interface SearchParams {
   q?: string;
+  /**
+   * The words as typed: never turned into filters (« Chercher le texte exact », or a removed
+   * understood filter; search/interpret). Only with `q`.
+   */
+  raw?: true;
   category?: string;
   subcategory?: string;
   region?: string;
@@ -210,6 +215,7 @@ export function parseSearchParams(source: Source): SearchParams {
   const params: SearchParams = {};
   const q = clipText(read(source, k.q)?.replace(/\s+/g, " ").trim() ?? "", SEARCH_Q_MAX).trim();
   if (q) params.q = q;
+  if (read(source, k.raw) === "1") params.raw = true;
   const category = read(source, k.category);
   if (category && ID.test(category)) params.category = category;
   const subcategory = read(source, k.subcategory);
@@ -287,6 +293,7 @@ export function parseSearchParams(source: Source): SearchParams {
  */
 export function canonicalSearchParams(input: SearchParams): SearchParams {
   const params: SearchParams = { ...input };
+  if (!params.q || params.raw !== true) delete params.raw;
   const sub = params.subcategory ? subcategoryById(params.subcategory) : undefined;
   if (params.subcategory && !sub) delete params.subcategory;
   if (sub) {
@@ -376,6 +383,7 @@ export function searchParamsToQuery(input: SearchParams): URLSearchParams {
   const k = SEARCH_QUERY_KEYS;
   const query = new URLSearchParams();
   if (params.q) query.set(k.q, params.q);
+  if (params.raw) query.set(k.raw, "1");
   if (params.category) query.set(k.category, params.category);
   if (params.subcategory) query.set(k.subcategory, params.subcategory);
   if (params.region && !params.city) query.set(k.region, params.region);
@@ -424,7 +432,7 @@ export function searchPath(params: SearchParams): string {
 
 /** True when nothing narrows the search (no words, no filter). Page, sort and the sold-out switch do not count. */
 export function isBlankSearch(params: SearchParams): boolean {
-  const { sort: _sort, page: _page, includeSoldOut: _soldOut, ...rest } = canonicalSearchParams(params);
+  const { sort: _sort, page: _page, includeSoldOut: _soldOut, raw: _raw, ...rest } = canonicalSearchParams(params);
   return Object.keys(rest).length === 0;
 }
 
@@ -441,6 +449,7 @@ export function sameSearch(a: SearchParams, b: SearchParams): boolean {
 export const storedSearchParamsSchema = z
   .object({
     q: z.string().min(1).max(SEARCH_Q_MAX).optional(),
+    raw: z.literal(true).optional(),
     category: z.string().regex(ID).max(40).optional(),
     subcategory: z.string().regex(ID).max(40).optional(),
     region: z.string().regex(/^(0[1-9]|1[0-2])$/).optional(),

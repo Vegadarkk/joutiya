@@ -221,6 +221,18 @@ describe("sendSavedSearchAlerts", () => {
     expect(repository.markSearchesNotified).not.toHaveBeenCalled();
   });
 
+  it("runs a map zone search with its circle and names the zone by its nearest city", async () => {
+    const zone = { lat: 33.6, lng: -7.62, km: 3 };
+    store = [search("fatima", "z1", { name: "Mes vélos", params: { category: "vehicules", subcategory: "velos", district: "z1", zone } })];
+    news(["z1"], 2);
+    expect(await sendSavedSearchAlerts(NOW)).toMatchObject({ searches: 1, mails: 1 });
+    expect(vi.mocked(runSearch).mock.calls[0]?.[0]).toMatchObject({ zone, sort: "recent" });
+    const section = digestOf("fatima")?.data.searches[0];
+    expect(section?.zone).toEqual({ km: 3, citySlug: "casablanca" });
+    expect(section?.url).toContain("zone=33.6%2C-7.62%2C3");
+    expect(JSON.stringify(digestOf("fatima")?.data)).not.toContain("33.6,");
+  });
+
   it("skips a car rental search whose pick-up day has passed", async () => {
     const rental = (id: string, from: string) => search("loueur", id, { params: { category: "vehicules", subcategory: "location-voitures", district: id, dates: { from, to: "2026-10-30" } } });
     store = [rental("r1", "2026-10-15"), rental("r2", "2026-10-16")];
