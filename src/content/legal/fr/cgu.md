@@ -290,6 +290,7 @@ Le nombre d'annonces et de photos est limité. Les limites sont affichées lors 
 - Vous pouvez indiquer que le prix est négociable, ou proposer le bien en don.
 - Pour une location, le prix correspond à la période indiquée dans l'annonce.
 - Un professionnel indique le prix total toutes taxes comprises, frais obligatoires inclus, selon les règles d'information sur les prix.
+- **Prix repère.** Une annonce peut afficher un « Prix repère » : la fourchette habituelle des prix d'annonces comparables publiées sur {brand} (même sous-catégorie et mêmes critères principaux ; même ville, sinon même région, sinon tout le Maroc), sans les prix les plus hauts et les plus bas. C'est une indication automatique, ni une estimation du bien ni une garantie, et vous restez libre de votre prix. Il ne s'affiche pas sous 8 annonces comparables, ni pour certaines catégories, notamment les dons, services, produits du terroir, lots, bétail, locations à la nuit et articles pour adultes.
 
 Un prix très éloigné des prix habituels de la catégorie peut entraîner une vérification avant publication (§8.2).
 
@@ -622,6 +623,8 @@ Vous pouvez à tout moment saisir le tribunal compétent (§23), avant, pendant 
 La messagerie sert à échanger avec un annonceur au sujet d'une annonce. Chaque conversation est liée à une annonce.
 
 Dans une conversation, vous pouvez proposer un rendez-vous (rencontre, visite d'un bien, essai d'un véhicule, remise d'un véhicule loué) avec des créneaux et un lieu, et l'autre personne le confirme, le déplace ou l'annule. Un rappel est envoyé par e-mail la veille et 2 heures avant, sauf si vous avez désactivé les e-mails de nouveaux messages. Choisissez un lieu public pour une première rencontre (§15.3).
+
+**Faire une offre.** Pour un bien à prix unique, l'acheteur peut proposer un prix, en dirhams entiers, entre 30 % du prix affiché et ce prix. Le vendeur a 48 heures pour accepter, refuser ou faire une contre-offre, une seule fois ; l'acheteur peut retirer son offre ou accepter la contre-offre. Le nombre d'offres est limité. Une offre est une proposition entre utilisateurs : même acceptée, elle n'oblige ni à vendre ni à acheter, ne réserve pas le bien et ne déclenche aucun paiement. La vente se conclut entre vous seuls, aux conditions de remise et de paiement dont vous convenez ; {brand} n'y est pas partie (§15.1).
 
 Un message compte 2 000 caractères au plus. Le nombre de messages et de nouvelles conversations par jour est limité, surtout pour les comptes récents, et un contrôle anti-robot peut être demandé au premier message.
 

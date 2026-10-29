@@ -58,7 +58,7 @@ Pour signaler un contenu, utilisez le bouton « Signaler » présent sur chaque 
 - **Connexion avec Google :** Google nous transmet un jeton qui contient notamment votre adresse e-mail, l'indication qu'elle est vérifiée et l'identifiant de votre compte Google.
 - **Téléphone :** votre numéro, si vous le faites vérifier<!--if:whatsappEnabled--> (§3.13)<!--endif-->.
 - **Annonces :** titre, description, prix, catégorie et critères, photos, ville, quartier si vous l'indiquez, position sur la carte arrondie à environ 1 km, et vos choix de contact (messagerie, affichage du numéro, WhatsApp).
-- **Messages :** le contenu de vos conversations avec les autres utilisateurs, y compris les rendez-vous proposés (créneaux, lieu) et les demandes de réservation d'un véhicule (dates, lieu de prise en charge).
+- **Messages :** le contenu de vos conversations avec les autres utilisateurs, y compris les rendez-vous proposés (créneaux, lieu), les demandes de réservation d'un véhicule (dates, lieu de prise en charge) et les offres de prix (montant, statut, dates, note facultative).
 - **Avis :** la note, le texte et votre déclaration d'échange, pour un avis que vous laissez à un vendeur ; la réponse d'un vendeur à un avis (§3.7).
 - **Signalements et recours :** le contenu visé, le motif, votre explication, votre déclaration de bonne foi, et votre nom et votre e-mail si vous les donnez.
 - **Compte Pro :** nom et forme de l'entreprise, identifiants légaux selon la forme (ICE, registre du commerce, identifiant fiscal, numéro d'auto-entrepreneur, de coopérative ou de taxe professionnelle), ville, description, logo, site web, téléphone public, pièces justificatives et engagement de conformité ; selon l'activité, les informations de vente à distance (adresse, e-mail de contact, livraison, retours), le lien de paiement, le barème d'honoraires d'une agence immobilière, le numéro d'agrément, les agences et horaires d'un loueur de voitures, et les numéros sanitaires ONSSA.
@@ -135,13 +135,13 @@ Un compte dont l'adresse e-mail n'est pas confirmée sous 24 heures est supprim�
 
 ### 3.2 Vos annonces {#finalites-2}
 
-Nous utilisons le contenu de vos annonces pour les contrôler (§4), les publier, les rendre trouvables dans notre moteur de recherche, les placer sur la carte à une position arrondie à environ 1 km, puis les faire expirer ou les renouveler.
+Nous utilisons le contenu de vos annonces pour les contrôler (§4), les publier, les rendre trouvables dans notre moteur de recherche, les placer sur la carte à une position arrondie à environ 1 km, puis les faire expirer ou les renouveler. Les prix des annonces publiées servent aussi, de façon agrégée et sans aucune donnée personnelle, à calculer le « Prix repère » d'annonces comparables ; ce calcul est gardé en mémoire 24 heures.
 
 Une annonce publiée est publique : tout visiteur peut la consulter, et elle peut apparaître dans les moteurs de recherche. Votre numéro de téléphone n'est jamais écrit dans la page : il ne s'affiche qu'à un membre connecté qui clique sur « Voir le numéro », dans la limite d'un quota.
 
 ### 3.3 La messagerie et la détection des arnaques {#finalites-3}
 
-Nous transmettons vos messages à votre interlocuteur, vous prévenons des nouveaux messages et gardons l'historique de vos conversations. Vous pouvez bloquer un interlocuteur et archiver une conversation. Les rendez-vous et les demandes de réservation font partie de la conversation et sont conservés comme elle (§5.1).
+Nous transmettons vos messages à votre interlocuteur, vous prévenons des nouveaux messages et gardons l'historique de vos conversations. Vous pouvez bloquer un interlocuteur et archiver une conversation. Les rendez-vous, les demandes de réservation et les offres de prix font partie de la conversation : ils sont conservés comme elle (§5.1), figurent dans l'export de vos données, et la note d'une offre passe par les mêmes contrôles qu'un message.
 
 Pour vous protéger des arnaques, chaque message est analysé automatiquement **sur nos serveurs, par des règles fixes** : liens externes, coordonnées bancaires (IBAN), mots-clés de paiement à distance ou d'avance. Un numéro ou un lien WhatsApp n'est signalé que s'il accompagne une demande d'avance ou de virement. Les liens sont masqués, un bandeau d'alerte peut s'afficher, et un cas qui se répète est examiné par un modérateur.
 
