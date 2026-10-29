@@ -323,7 +323,7 @@
         "googleAuth": "La connexion et la gestion des comptes.",
         "adsense": "La publicité, quand elle sera activée, et seulement avec votre accord donné à part.",
         "cloudflare": "La diffusion et la protection du site, la vérification anti-robot (Turnstile) et l'IA de secours du contrôle des annonces (Workers AI), sur son réseau mondial.",
-        "anthropic": "L'aide au contrôle des annonces, au tri des signalements et à l'examen des recours, et l'Assistant Joutiya.",
+        "anthropic": "L'aide au contrôle des annonces, au tri des signalements et à l'examen des recours, la lecture de la décision d'agrément d'un loueur de voitures, et l'Assistant Joutiya.",
         "openai": "Le contrôle de secours des contenus.",
         "meta": "La vérification de votre numéro de téléphone par WhatsApp.",
         "resend": "L'envoi des e-mails.",
