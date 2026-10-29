@@ -77,7 +77,8 @@ describe("AccountMenu without its chunk", () => {
     const link = /<a [^>]*href="\/fr\/parametres"[^>]*>([\s\S]*?)<\/a>/.exec(html);
     expect(link?.[0]).toContain("min-w-11");
     expect(link?.[1]).toContain(`<span class="sr-only">${fr.Auth.menu.account}</span>`);
-    expect(link?.[1]).toContain("Salma Benali");
+    // The header pill shows the avatar's initials; the display name heads the menu itself.
+    expect(link?.[1]).toMatch(/<span class="[^"]*" aria-hidden="true">SB<\/span>/);
   });
 });
 

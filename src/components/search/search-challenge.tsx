@@ -7,7 +7,7 @@ import { formatWait } from "@/components/auth/form-message";
 import { TurnstileWidget, type TurnstileHandle } from "@/components/auth/turnstile-widget";
 import { InlineError } from "@/components/feedback/inline-error";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { KhatamLoader } from "@/components/ui/khatam-loader";
 import { useRouter } from "@/i18n/navigation";
 import type { SearchParams } from "@/lib/search/params";
 import { cn } from "@/lib/utils";
@@ -83,7 +83,7 @@ export function SearchChallenge({ params, className }: { params: SearchParams; c
       {state.kind === "limited" ? null : <TurnstileWidget ref={widget} action="search" cData="search-page" onToken={onToken} className="w-full max-w-xs" />}
       {busy ? (
         <p role="status" className="flex items-center gap-2 text-sm text-foreground-muted">
-          <Spinner />
+          <KhatamLoader size="inline" />
           {t("checking")}
         </p>
       ) : null}

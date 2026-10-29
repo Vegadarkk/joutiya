@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { Map as MapIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { KhatamLoader } from "@/components/ui/khatam-loader";
 import { usePublicConfig } from "@/lib/config/client";
 import { supportsWebGL2 } from "@/lib/map/webgl";
 import { cn } from "@/lib/utils";
@@ -66,7 +66,7 @@ export function MapToggle({ center, description, children, className }: MapToggl
         {interactive && !ready ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center" role="status">
             <span className="flex items-center gap-2 rounded-full bg-surface/95 px-4 py-2 text-sm font-medium text-foreground shadow-lg shadow-bab-950/10">
-              <Spinner />
+              <KhatamLoader size="inline" />
               {t("loading")}
             </span>
           </div>

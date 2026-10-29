@@ -1,9 +1,8 @@
 "use client";
 
 import { Suspense } from "react";
-import { UserRound } from "lucide-react";
+import { Heart, UserRound } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
 import { Link, usePathname } from "@/i18n/navigation";
 import { useSession } from "@/lib/auth/client";
 import { lazyIsland } from "@/components/layout/lazy-island";
@@ -13,9 +12,11 @@ import type { SessionSummary } from "@/lib/contracts/auth";
 import { cn } from "@/lib/utils";
 import type { AccountDropdownProps } from "./account-dropdown";
 
-// Header account state. Private pages render with the session the layout already knows. Public
-// pages are static and carry no session: the anonymous button renders first (server and client
-// alike) and swaps once GET /api/auth/me has answered. Both states are 44 px tall, so nothing shifts.
+// Header account state, inside the header's pill of round 44 px buttons: messages (members),
+// favourites (from md), then the avatar or the sign-in link. Private pages render with the session
+// the layout already knows. Public pages are static and carry no session: the anonymous state
+// renders first (server and client alike) and swaps once GET /api/auth/me has answered. Both
+// states are 44 px tall, so nothing shifts.
 // The menu itself (account-dropdown.tsx) is a separate chunk, loaded once a session is known:
 // anonymous visitors never download it, and the same trigger shows as a plain button meanwhile.
 // If that chunk cannot be loaded, the trigger links to the account settings (sign-out included).
@@ -49,6 +50,19 @@ export function initials(session: SessionSummary): string {
   return letters.toLocaleUpperCase();
 }
 
+/** A round 44 px button of the header pill. */
+const PILL_BUTTON_CLASS =
+  "inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full text-sm font-medium text-foreground transition-[background-color,scale] duration-150 ease-door hover:bg-surface-muted active:scale-[0.97] [&_svg]:size-[1.15rem]";
+
+function FavoritesLink() {
+  const t = useTranslations("Auth.menu");
+  return (
+    <Link href="/favoris" aria-label={t("favorites")} className={cn(PILL_BUTTON_CLASS, "hidden md:inline-flex")}>
+      <Heart aria-hidden="true" />
+    </Link>
+  );
+}
+
 export function AccountMenu() {
   const nav = useTranslations("Nav");
   const t = useTranslations("Auth.menu");
@@ -59,32 +73,27 @@ export function AccountMenu() {
   if (status !== "ready" || !session) {
     const next = nextFor(locale, pathname);
     return (
-      <Button asChild variant="ghost" className="px-2 md:px-3">
-        <Link href={next ? { pathname: "/connexion", query: { next } } : "/connexion"} className="min-w-11">
+      <>
+        <FavoritesLink />
+        <Link href={next ? { pathname: "/connexion", query: { next } } : "/connexion"} className={cn(PILL_BUTTON_CLASS, "lg:px-3.5")}>
           <UserRound aria-hidden="true" />
-          <span className="hidden sm:inline">{nav("signIn")}</span>
-          <span className="sr-only sm:hidden">{nav("signIn")}</span>
+          <span className="hidden lg:inline">{nav("signIn")}</span>
+          <span className="sr-only lg:hidden">{nav("signIn")}</span>
         </Link>
-      </Button>
+      </>
     );
   }
 
   const name = session.displayName ?? session.email ?? "";
-  const triggerClassName = cn(
-    "inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-md px-1.5 text-sm font-medium text-foreground transition-[background-color,scale] duration-150 ease-door hover:bg-surface-muted active:scale-[0.98] md:px-2",
-    "data-[state=open]:bg-surface-muted",
-  );
-  // Named by its text, not aria-label, so the name holds what is visible (WCAG 2.5.3): "Mon compte"
-  // then the display name from sm; the initials are a decorative avatar.
+  const triggerClassName = cn(PILL_BUTTON_CLASS, "data-[state=open]:bg-surface-muted");
+  // Named by its text, not aria-label (WCAG 2.5.3): "Mon compte"; the initials are a decorative
+  // avatar, and the menu opens on the display name.
   const triggerContent = (
     <>
-      <span className="flex size-8 items-center justify-center rounded-full bg-structure text-xs font-semibold text-structure-foreground dark:bg-bab-700" aria-hidden="true">
+      <span className="flex size-9 items-center justify-center rounded-full bg-structure text-xs font-semibold text-structure-foreground dark:bg-bab-600" aria-hidden="true">
         {initials(session)}
       </span>
-      <span className="sr-only">{t("account")}</span>{" "}
-      <span dir="auto" className="hidden max-w-32 truncate sm:inline">
-        {name}
-      </span>
+      <span className="sr-only">{t("account")}</span>
     </>
   );
   return (
@@ -94,6 +103,7 @@ export function AccountMenu() {
           <MessagesLink />
         </Suspense>
       ) : null}
+      <FavoritesLink />
       <Suspense
         fallback={
           <button type="button" aria-haspopup="menu" aria-expanded={false} className={triggerClassName}>

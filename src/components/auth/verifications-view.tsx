@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
+import { KhatamLoader } from "@/components/ui/khatam-loader";
 import { Link } from "@/i18n/navigation";
 import { apiGet, apiPost, isApiError, refreshSession } from "@/lib/auth/client";
 import { usePublicConfig } from "@/lib/config/client";
@@ -323,7 +323,7 @@ export function PendingCode({
       <div className="flex flex-col gap-2 border-t border-border pt-4 text-sm text-foreground-muted sm:flex-row sm:items-center sm:justify-between">
         {/* The only live region: one line, which changes once (waiting -> paused). */}
         <span role="status" className={pollStopped ? "flex items-start gap-2 text-warning" : "flex items-center gap-2"}>
-          {pollStopped ? <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> : <Spinner className="size-4 text-primary" />}
+          {pollStopped ? <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> : <KhatamLoader size="sm" className="size-4" />}
           {pollStopped ? t("pollStopped") : t("waiting")}
         </span>
         {/* Ticks every second: kept out of the accessibility tree (the expiry itself is announced when it happens). */}

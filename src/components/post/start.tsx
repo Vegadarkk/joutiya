@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { FormMessage, useApiErrorMessage } from "@/components/auth/form-message";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { KhatamLoader } from "@/components/ui/khatam-loader";
 import type { Subcategory } from "@/config/categories";
 import { Link, useRouter } from "@/i18n/navigation";
 import { isApiError, useSession } from "@/lib/auth/client";
@@ -71,7 +71,7 @@ export function WizardStart() {
   if (state.kind === "checking" || state.kind === "resuming" || state.kind === "creating") {
     return (
       <div role="status" aria-busy="true" className="flex flex-col items-center gap-4 py-16 text-foreground-muted">
-        <Spinner className="size-8 text-primary" />
+        <KhatamLoader />
         <p>{state.kind === "creating" ? t("creating") : t("resuming")}</p>
       </div>
     );

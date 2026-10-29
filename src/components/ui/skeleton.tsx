@@ -2,9 +2,9 @@ import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Placeholder block while content loads; hidden from assistive technology. Reduced motion gets a
- * flat block: no shine sweep, not even one frozen half-way.
+ * Placeholder block while content loads; hidden from assistive technology. A still cream wash with
+ * no shine sweep: the page's khatam loader (khatam-loader.tsx) shows that something is coming.
  */
 export function Skeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div aria-hidden="true" className={cn("skeleton-shimmer rounded-md motion-reduce:animate-none motion-reduce:bg-none motion-reduce:bg-skeleton", className)} {...props} />;
+  return <div aria-hidden="true" className={cn("rounded-md bg-skeleton", className)} {...props} />;
 }

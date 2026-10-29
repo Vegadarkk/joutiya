@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ActionView } from "@/components/auth/action-view";
 import { AuthShell } from "@/components/auth/auth-shell";
-import { Spinner } from "@/components/ui/spinner";
+import { KhatamLoader } from "@/components/ui/khatam-loader";
 import { pageLocale } from "@/i18n/params";
 
 // Target of the verification and reset e-mails. Only `mode` is read here, for the title; the
@@ -29,7 +29,7 @@ export default async function ActionPage({ params, searchParams }: Props) {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <AuthShell title={title}>
-      <Suspense fallback={<Spinner className="size-6 text-primary" />}>
+      <Suspense fallback={<KhatamLoader />}>
         <ActionView nonce={nonce} />
       </Suspense>
     </AuthShell>

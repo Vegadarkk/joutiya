@@ -1,0 +1,28 @@
+"use client";
+
+import { Plus } from "lucide-react";
+import { Link, usePathname } from "@/i18n/navigation";
+import { cn } from "@/lib/utils";
+import { showsSellButton } from "./shell-paths";
+
+// "Vendre" on a phone (Carte vivante, lot 1): the ochre arch floating at the bottom end, above the
+// home indicator. Left out where it would sit on a form or a bottom bar (shell-paths.ts), and
+// hidden while the cookie banner is up: it never covers that choice.
+
+export function SellFab({ label }: { label: string }) {
+  const pathname = usePathname();
+  if (!showsSellButton(pathname)) return null;
+  return (
+    <Link
+      href="/deposer"
+      aria-label={label}
+      className={cn(
+        "sell-arch fixed end-4 bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] z-30 flex h-15 w-13 items-end justify-center pb-3.5 md:hidden",
+        "transition-[background-color,scale] duration-150 ease-door hover:bg-ochre-700 active:scale-95",
+        "[:root:has([data-testid=consent-banner])_&]:hidden",
+      )}
+    >
+      <Plus className="size-6" strokeWidth={2.25} aria-hidden="true" />
+    </Link>
+  );
+}

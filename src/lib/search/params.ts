@@ -2,6 +2,7 @@ import { CONDITIONS, RENTAL_SUBCATEGORY, categoryById, criterionById, searchCrit
 import { cityBySlug, regionByCode } from "@/config/regions";
 import { DAY_PATTERN, dayNumber } from "@/lib/listings/rental-availability";
 import { z } from "@/lib/zod";
+import { SEARCH_PATH, SEARCH_Q_MAX, SEARCH_QUERY_KEYS } from "./url-keys";
 
 // Search parameters (phase 4, design §2): the one whitelist shared by the search page, /api/search,
 // the category x city pages, saved searches and their alerts. Client-safe (no server import).
@@ -9,13 +10,13 @@ import { z } from "@/lib/zod";
 // lenient: an unknown or invalid value is dropped, never an error, so a hand-edited or stale URL
 // still searches. `canonicalSearchParams` removes contradictions so equal searches serialize alike.
 
-export const SEARCH_PATH = "/recherche";
+export { SEARCH_PATH, SEARCH_Q_MAX, SEARCH_QUERY_KEYS };
+
 /** Cards per results page: 2 columns x 12 on phones, 4 x 6 on desktop. */
 export const SEARCH_PAGE_SIZE = 24;
 /** §6: pagination limited to 50 pages; Meilisearch `pagination.maxTotalHits` = 50 x 24. */
 export const SEARCH_MAX_PAGE = 50;
 export const SEARCH_MAX_TOTAL_HITS = SEARCH_PAGE_SIZE * SEARCH_MAX_PAGE;
-export const SEARCH_Q_MAX = 100;
 export const SEARCH_DISTRICT_MAX = 64;
 /** Radius choices around the chosen city centroid, km. */
 export const RADIUS_KM = [5, 10, 20, 50, 100, 200] as const;
@@ -30,28 +31,6 @@ export const SEARCH_PRICE_MAX = 100_000_000;
 export const RENTAL_SEARCH_DAYS_MAX = 60;
 export const RENTAL_SEARCH_AHEAD_DAYS = 180;
 
-/** URL parameter names. `breadcrumb.tsx` links use the same names. */
-export const SEARCH_QUERY_KEYS = {
-  q: "q",
-  category: "categorie",
-  subcategory: "sous-categorie",
-  region: "region",
-  city: "ville",
-  radius: "rayon",
-  district: "quartier",
-  priceMin: "prix-min",
-  priceMax: "prix-max",
-  sellerType: "vendeur",
-  sellerId: "vendeur-id",
-  shop: "boutique",
-  donation: "don",
-  withPhoto: "photo",
-  conditions: "etat",
-  rentFrom: "du",
-  rentTo: "au",
-  sort: "tri",
-  page: "page",
-} as const;
 
 /** Criterion filters: `f-<criterionId>=a,b` (select, multiselect), `f-<id>-min` / `-max` (number), `f-<id>=1` (boolean). */
 export const CRITERION_PARAM_PREFIX = "f-";
