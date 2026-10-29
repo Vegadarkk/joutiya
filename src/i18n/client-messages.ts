@@ -22,6 +22,7 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   // Listing page islands: gallery, map, contact (the reveal errors and challenge load on demand).
   "ListingPage.gallery",
   "ListingPage.contact",
+  "ListingPage.catalogue",
   "Map",
   "Auth.common",
   "Auth.errors",

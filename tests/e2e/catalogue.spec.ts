@@ -29,6 +29,8 @@ async function waitForTurnstile(page: Page): Promise<void> {
 interface Seeded {
   draftId: string;
   published: { id: string; title: string };
+  /** A dress in two sizes and two colours, prices from 420 to 450 DH. */
+  dress: { slugId: string; title: string };
 }
 
 /** A verified shop for the member, a dress draft ready up to the price, and a published dress in two sizes. */
@@ -122,7 +124,34 @@ async function seedShop(email: string): Promise<Seeded> {
       publishedAt: now,
       expiresAt: new Date(now.getTime() + 60 * 86_400_000),
     });
-  return { draftId, published };
+  const dressId = randomId(8);
+  const dressPhoto = `e2ephotoe${randomId(6)}`;
+  const dress = { slugId: `robe-lin-fes-${dressId}`, title: `Robe en lin ${dressId}` };
+  await firestore
+    .collection("listings")
+    .doc(dressId)
+    .set({
+      ...base,
+      status: "published",
+      slugId: dress.slugId,
+      title: dress.title,
+      description: "Robe en lin lavé, coupe droite et poches côté, cousue dans notre atelier.",
+      attributes: { audience: "femme", "clothing-type": "robe" },
+      price: 420,
+      variants: {
+        axes: [
+          { id: "clothing-size", values: ["m", "l"] },
+          { id: "color", values: ["beige", "vert"] },
+        ],
+        items: [{ key: "m|beige", stock: 4 }, { key: "m|vert", stock: 2 }, { key: "l|beige", stock: 0 }, { key: "l|vert", price: 450 }],
+      },
+      priceLog: [{ at: now, price: 420 }],
+      photos: [{ id: dressPhoto, ...(await storePhoto(dressId, dressPhoto, { r: 196, g: 180, b: 140 })), blurhash: BLURHASH }],
+      adsEligible: true,
+      publishedAt: now,
+      expiresAt: new Date(now.getTime() + 60 * 86_400_000),
+    });
+  return { draftId, published, dress };
 }
 
 test.describe("shop catalogue", () => {
@@ -153,14 +182,12 @@ test.describe("shop catalogue", () => {
     await catalogue.getByRole("textbox", { name: /^Prix \(.+\) M$/ }).fill("480");
     await page.screenshot({ path: "test-results/catalogue-variants.png", fullPage: true });
 
-    const saved = page.waitForResponse((response) => response.url().endsWith(`/api/listings/${draftId}`) && response.request().method() === "PATCH");
+    // Saved by the coalesced autosave or on the step change, whichever comes first.
     await page.getByRole("button", { name: "Continuer" }).click();
-    expect((await saved).status()).toBe(200);
     await expect(page).toHaveURL(/\/lieu$/);
-
-    const stored = (await getFirestore(firebase()).collection("listings").doc(draftId).get()).data()!;
-    expect(stored.variants).toEqual({ axes: [{ id: "clothing-size", values: ["s", "m"] }], items: [{ key: "s", stock: 3 }, { key: "m", price: 480 }] });
-    expect(stored.attributes["clothing-size"]).toBeUndefined();
+    const stored = async () => (await getFirestore(firebase()).collection("listings").doc(draftId).get()).data()!;
+    await expect.poll(async () => (await stored()).variants, { timeout: 15_000 }).toEqual({ axes: [{ id: "clothing-size", values: ["s", "m"] }], items: [{ key: "s", stock: 3 }, { key: "m", price: 480 }] });
+    expect((await stored()).attributes["clothing-size"]).toBeUndefined();
 
     await page.goto(`/fr/deposer/${draftId}/prix`);
     await expect(catalogue.getByRole("textbox", { name: "Stock S" })).toHaveValue("3");
@@ -185,5 +212,33 @@ test.describe("shop catalogue", () => {
 
     const after = (await getFirestore(firebase()).collection("listings").doc(published.id).get()).data()!;
     expect(after.variants.items).toEqual([{ key: "s", stock: 2 }, { key: "m", stock: 0 }]);
+  });
+
+  test("a buyer picks a size and a colour, sees price and stock, and the first message names them", async ({ page, request, browser }) => {
+    test.setTimeout(120_000);
+    const email = `catalogue-${randomId(10)}@joutiya.test`;
+    await signUpAndIn(page, request, email, "Lalla Atelier");
+    const { dress } = await seedShop(email);
+
+    const buyer = await (await browser.newContext()).newPage();
+    await signUpAndIn(buyer, request, `acheteuse-${randomId(10)}@joutiya.test`, "Samira Test");
+    await buyer.goto(`/fr/annonce/${dress.slugId}`);
+    await expect(buyer.getByTestId("price-tag").first()).toContainText(/À partir de\s*420/);
+
+    const picker = buyer.getByTestId("variant-picker");
+    await expect(picker.getByText("Choisissez une option pour voir le prix et le stock.")).toBeVisible();
+    await picker.getByRole("radiogroup", { name: /Taille/ }).getByRole("radio", { name: "L", exact: true }).click();
+    // L beige is sold out: struck through, still choosable.
+    await picker.getByRole("radio", { name: "Beige, épuisé" }).click();
+    await expect(picker.getByTestId("stock-line")).toHaveText("Épuisé");
+    await picker.getByRole("radio", { name: "Vert", exact: true }).click();
+    await expect(picker.getByTestId("variant-summary")).toContainText(/L \/ Vert\s*450/);
+    await picker.getByRole("radio", { name: "M", exact: true }).click();
+    await expect(picker.getByTestId("stock-line")).toHaveText("Plus que 2 en stock");
+    await buyer.screenshot({ path: "test-results/catalogue-listing-page.png", fullPage: true });
+
+    await buyer.getByTestId("contact-bar").getByRole("button", { name: "Envoyer un message" }).click();
+    const dialog = buyer.getByRole("dialog");
+    await expect(dialog.getByLabel("Votre message")).toHaveValue(`Bonjour, « ${dress.title} » en M / Vert est-il toujours disponible ?`, { timeout: 15_000 });
   });
 });

@@ -27,6 +27,7 @@ function listing(overrides: Partial<PublicListing> = {}): PublicListing {
     seller: { publicId: "abcdefghjk", name: "Salma Testeuse", type: "individual" },
     example: false,
     rental: null,
+    catalogue: null,
     publishedAt: "2026-10-12T10:00:00.000Z",
     sortAt: "2026-10-12T10:00:00.000Z",
     updatedAt: "2026-10-12T10:00:00.000Z",

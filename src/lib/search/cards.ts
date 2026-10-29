@@ -41,6 +41,8 @@ export function toSearchCard(doc: CardDocument, now: Date, featured = false, dat
     featured: featured && typeof doc.featuredUntil === "number" && doc.featuredUntil > now.getTime(),
     ...cardFactsField(cardFactsOf(doc.subcategoryId, (id) => (doc as Record<string, unknown>)[attributeField(id)])),
     ...(doc.isExample === true ? { example: true as const } : {}),
+    ...(doc.soldOut === true ? { soldOut: true as const } : {}),
+    ...(doc.priceFrom === true ? { priceFrom: true as const } : {}),
     ...(dates && doc.subcategoryId === RENTAL_SUBCATEGORY ? { rental: rentalOf(doc, now, dates) } : {}),
   };
 }

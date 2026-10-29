@@ -79,7 +79,7 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
           {facts.map((fact) => t(`facts.${fact.id as FactKey}`, { count: fact.value })).join(" · ")}
         </p>
       ) : null}
-      <PriceTag price={listing.price} isDonation={listing.isDonation} negotiable={listing.priceNegotiable} unit={unit} locale={locale} />
+      <PriceTag price={listing.price} isDonation={listing.isDonation} negotiable={listing.priceNegotiable} unit={unit} locale={locale} from={listing.priceFrom === true} className={cn(listing.soldOut && "text-foreground-muted")} />
       {listing.rental ? (
         <p data-testid="card-rental" className="flex flex-col text-xs tabular-nums">
           {listing.rental.total !== null ? <span className="font-medium">{t("rentalTotal", { days: listing.rental.days, total: formatPrice(listing.rental.total, locale) })}</span> : null}
@@ -134,6 +134,11 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
             <Camera className="size-3.5" aria-hidden="true" />
             <span className="sr-only">{t("photos", { count: listing.photoCount })}</span>
             <span aria-hidden="true">{listing.photoCount}</span>
+          </span>
+        ) : null}
+        {listing.soldOut ? (
+          <span data-testid="sold-out-chip" className="absolute bottom-2 start-2 rounded-sm bg-bab-950/80 px-2 py-0.5 text-xs font-semibold text-cream-100">
+            {t("soldOut")}
           </span>
         ) : null}
         {listing.example ? (

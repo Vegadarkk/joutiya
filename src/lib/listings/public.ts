@@ -2,6 +2,7 @@ import "server-only";
 import { RENTAL_SUBCATEGORY, type Condition } from "@/config/categories";
 import { REVIEWS_PAGE } from "@/config/reviews";
 import { DEFAULT_BANNER, type BannerKey } from "@/config/storefront";
+import { isSoldOut, priceRange, type ListingVariants } from "@/lib/contracts/catalog";
 import type { ListingAttributes, ListingStatus, RentalAvailability } from "@/lib/contracts/listings";
 import type { PhotoVariant } from "@/lib/contracts/photo-variants";
 import type { RatingSummary, ReviewPage } from "@/lib/contracts/reviews";
@@ -162,10 +163,36 @@ export interface PublicListing {
   example: boolean;
   /** Car rentals: the agency's declared availability (rental pack §3); null otherwise. */
   rental: RentalAvailability | null;
+  /** A Pro's declared stock or variants (catalogue §2-3); null when the listing has neither. */
+  catalogue: PublicCatalogue | null;
   /** ISO 8601. */
   publishedAt: string;
   sortAt: string;
   updatedAt: string;
+}
+
+export interface PublicCatalogue {
+  /** Without variants: the declared stock (null: not tracked). */
+  stock: number | null;
+  variants: ListingVariants | null;
+}
+
+function catalogueOf(record: ListingRecord): PublicCatalogue | null {
+  if (record.sellerType !== "pro" || record.isDonation || (record.variants === undefined && record.stock === undefined)) return null;
+  return { stock: record.variants ? null : (record.stock ?? null), variants: record.variants ?? null };
+}
+
+/**
+ * Card price and stock marks: the lowest price of the combinations (« à partir de » when they
+ * differ), sold out when the declared stock is 0 everywhere (decision 1: still online).
+ */
+export function cardCatalogue(record: Pick<ListingRecord, "price" | "isDonation" | "variants" | "stock">): { price: number | null; soldOut?: true; priceFrom?: true } {
+  const range = record.variants ? priceRange(record) : null;
+  return {
+    price: range ? range.min : record.price,
+    ...(isSoldOut(record) ? { soldOut: true as const } : {}),
+    ...(range && range.max > range.min ? { priceFrom: true as const } : {}),
+  };
 }
 
 /** What a listing card shows (profile grid; search results in phase 4). */
@@ -187,6 +214,10 @@ export interface PublicListingCard {
   facts?: CardFacts;
   /** Example listing: "Exemple" label, no favorite action. */
   example?: true;
+  /** Pro catalogue: declared stock 0 everywhere (« Épuisé »). */
+  soldOut?: true;
+  /** Combinations at different prices: `price` is the lowest (« À partir de »). */
+  priceFrom?: true;
 }
 
 function publicPhotos(record: ListingRecord): PublicPhoto[] {
@@ -220,6 +251,7 @@ export function toPublicListing(record: ListingRecord, state: PublicState, slugI
     seller: { publicId: record.sellerPublicId, name: record.sellerName, type: record.sellerType },
     example: record.example === true,
     rental: subcategoryId === RENTAL_SUBCATEGORY ? rentalAvailabilityOf(record) : null,
+    catalogue: catalogueOf(record),
     publishedAt: publishedAt.toISOString(),
     sortAt: record.sortAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
@@ -235,9 +267,9 @@ export function toPublicCard(record: ListingRecord): PublicListingCard | null {
     slugId: record.slugId,
     title: record.title,
     subcategoryId: record.subcategoryId ?? null,
-    price: record.price,
     priceNegotiable: record.priceNegotiable,
     isDonation: record.isDonation,
+    ...cardCatalogue(record),
     citySlug: record.location?.citySlug ?? null,
     photo: photos[0] ?? null,
     photoCount: photos.length,

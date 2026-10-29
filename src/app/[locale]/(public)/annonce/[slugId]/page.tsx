@@ -19,6 +19,7 @@ import { Gallery } from "@/components/listing/gallery";
 import { JsonLd } from "@/components/listing/json-ld";
 import { ExampleBanner, ExampleContactNotice } from "@/components/listing/example-banner";
 import { ListingStatusBanner } from "@/components/listing/listing-status-banner";
+import { ListingCatalogue } from "@/components/listing/listing-catalogue";
 import { PriceTag } from "@/components/listing/price-tag";
 import { SafetyTips } from "@/components/listing/safety-tips";
 import { GuideCategoryLink } from "@/components/guide/category-link";
@@ -35,6 +36,7 @@ import { pageLocale } from "@/i18n/params";
 import { getFlags } from "@/lib/config/runtime";
 import { isolate } from "@/lib/i18n/bidi";
 import { alternates } from "@/lib/i18n/metadata";
+import { isVariantCriterion, priceRange } from "@/lib/contracts/catalog";
 import { getLegalConfig } from "@/lib/legal/config";
 import { formatDate, formatPrice } from "@/lib/listings/client/format";
 import { photoUrl } from "@/lib/listings/client/photo-url";
@@ -141,13 +143,14 @@ export default async function ListingPage({ params }: { params: Params }) {
   if (found.redirect) permanentRedirect(listingPath(locale, found.listing.slugId));
 
   const { listing } = found;
-  const [seller, payment, legal, flags, t, names] = await Promise.all([
+  const [seller, payment, legal, flags, t, names, criteria] = await Promise.all([
     sellerOf(found.ownerUid),
     listing.state === "published" && !listing.example ? shopPaymentFor(found.proId) : Promise.resolve(null),
     getLegalConfig(),
     getFlags(),
     getTranslations({ locale, namespace: "ListingPage" }),
     getTranslations({ locale, namespace: "Categories" }),
+    getTranslations({ locale, namespace: "Criteria" }),
   ]);
   const media = mediaBaseUrl();
   const category = categoryById(listing.categoryId);
@@ -172,6 +175,17 @@ export default async function ListingPage({ params }: { params: Params }) {
   // An example listing (src/lib/demo) shows the page of an offer without being one: no contact, no
   // favorite, no Product markup.
   const contactable = published && !listing.example;
+  // Pro catalogue: the lowest price of the combinations, « À partir de » when they differ.
+  const variants = listing.catalogue?.variants;
+  const range = variants ? priceRange({ variants, price: listing.price, isDonation: listing.isDonation }) : null;
+  // The picker's axes named here: the criteria labels stay out of the page's JavaScript.
+  type CriteriaKey = Parameters<typeof criteria>[0];
+  const criterionText = (key: string, fallback: string) => (criteria.has(key as CriteriaKey) ? criteria(key as CriteriaKey) : fallback);
+  const pickerAxes = (variants?.axes ?? []).map((axis) =>
+    isVariantCriterion(axis.id)
+      ? { name: criterionText(`${axis.id}.label`, axis.id), values: axis.values.map((value) => criterionText(`${axis.id}.options.${value}`, value)) }
+      : { name: axis.label ?? "", values: axis.values },
+  );
 
   const jsonLd = listingJsonLd({ listing, url: canonicalUrl, images, categoryName: subcategoryName ?? categoryName, cityName: cityLabel, regionName: regionLabel });
   // Crawlable steps: the category landing pages (/recherche is robots-disallowed). /c/{category}
@@ -216,7 +230,16 @@ export default async function ListingPage({ params }: { params: Params }) {
             <h1 dir="auto" className="text-2xl font-semibold text-balance break-words sm:text-3xl">
               {listing.title}
             </h1>
-            <PriceTag price={listing.price} isDonation={listing.isDonation} negotiable={listing.priceNegotiable} unit={subcategory?.priceUnit} locale={locale} size="lg" />
+            <PriceTag
+              price={range ? range.min : listing.price}
+              from={range !== null && range.max > range.min}
+              isDonation={listing.isDonation}
+              negotiable={listing.priceNegotiable}
+              unit={subcategory?.priceUnit}
+              locale={locale}
+              size="lg"
+            />
+            {listing.catalogue && published ? <ListingCatalogue listingId={listing.id} catalogue={listing.catalogue} axes={pickerAxes} price={listing.price} locale={locale} /> : null}
             {realEstate ? <PropertyTerms attributes={listing.attributes} locale={locale} className="self-stretch sm:max-w-xl" /> : null}
             {subcategory?.adultsOnly ? (
               <p data-testid="adults-only-notice" className="flex items-start gap-2 self-start rounded-md border border-warning/30 bg-warning-surface px-3 py-2 text-sm text-foreground text-pretty">

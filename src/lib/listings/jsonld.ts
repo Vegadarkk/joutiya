@@ -1,4 +1,5 @@
 import type { Condition } from "@/config/categories";
+import { isSoldOut, priceRange } from "@/lib/contracts/catalog";
 import type { PublicListing, PublicState } from "./public";
 
 // schema.org Product + Offer of a public listing page (design §5). Pure. What the page shows and
@@ -54,15 +55,23 @@ export function listingJsonLd({ listing, url, images, categoryName, cityName, re
     : undefined;
   // "À discuter" has no amount: an Offer without a price would be invalid, so none is published.
   const price = listing.isDonation ? 0 : listing.price;
+  // A Pro catalogue: combinations at different prices are an AggregateOffer; a declared stock of 0
+  // everywhere is out of stock while the page stays published (catalogue decision 1).
+  const catalogue = { variants: listing.catalogue?.variants ?? undefined, stock: listing.catalogue?.stock ?? undefined };
+  const range = catalogue.variants ? priceRange({ ...catalogue, price: listing.price, isDonation: listing.isDonation }) : null;
+  const availability = listing.state === "published" && listing.catalogue && isSoldOut(catalogue) ? "https://schema.org/OutOfStock" : AVAILABILITY[listing.state];
+  const amount =
+    range && range.max > range.min
+      ? { "@type": "AggregateOffer", lowPrice: String(range.min), highPrice: String(range.max), offerCount: catalogue.variants?.items.length }
+      : { "@type": "Offer", price: String(range ? range.min : price) };
   const offer =
-    price === null
+    price === null && !range
       ? undefined
       : {
-          "@type": "Offer",
+          ...amount,
           url,
-          price: String(price),
           priceCurrency: "MAD",
-          availability: AVAILABILITY[listing.state],
+          availability,
           ...(listing.condition ? { itemCondition: ITEM_CONDITION[listing.condition] } : {}),
           ...(place ? { availableAtOrFrom: place } : {}),
         };
