@@ -5,7 +5,11 @@ import nextTs from "eslint-config-next/typescript";
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
-  globalIgnores([".next/**", "dist/**", "public/vendor/**", "coverage/**", "playwright-report/**", "test-results/**", "next-env.d.ts", "workers/*/.wrangler/**"]),
+  // `.agents/**`: skills installed by `npx skills add` — third-party code we neither
+  // review nor reformat. The Cloudflare `security-audit` skill ships four `.cjs`
+  // validators; linting them in the sibling Punk Records repo produced 42
+  // `'Buffer' is not defined` errors, and `no-console` is an error here too.
+  globalIgnores([".next/**", "dist/**", "public/vendor/**", "coverage/**", "playwright-report/**", "test-results/**", "next-env.d.ts", "workers/*/.wrangler/**", ".agents/**"]),
   {
     rules: {
       // XSS (§6): raw HTML injection is never needed; the CSP hook and React escaping do the rest.
