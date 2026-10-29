@@ -3,7 +3,6 @@ import { setGoogleVerifierForTests, type GoogleIdentity } from "@/lib/auth/googl
 import { findUidByEmail, getUser, getUserPrivate } from "@/lib/db/repositories/users";
 import { auth } from "@/lib/firebase/admin";
 import { setClaims } from "@/lib/firebase/claims";
-import { signInWithCustomToken } from "@/lib/firebase/rest";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { DEVICE_COOKIE } from "@/lib/security/cookies";
 import { gisNonce, newDeviceCookie } from "@/lib/security/device";
@@ -12,7 +11,6 @@ import { verifyTurnstile } from "@/lib/security/turnstile";
 import { POST as google } from "@/app/api/auth/google/route";
 import { POST as login } from "@/app/api/auth/login/route";
 import { GET as me } from "@/app/api/auth/me/route";
-import { POST as session } from "@/app/api/auth/session/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
 import { CONSENTS, Jar as BaseJar, PASSWORD, call, uniqueEmail, type ErrorBody, type SignedInBody } from "./helpers";
 
@@ -217,57 +215,5 @@ describe("POST /api/auth/google", () => {
     const disabled = await call<ErrorBody>(google, GOOGLE, { jar: new Jar(), body: body({ email }) });
     expect(disabled.status).toBe(403);
     expect(disabled.body.error.code).toBe("account_disabled");
-  });
-});
-
-describe("POST /api/auth/session", () => {
-  /** Firebase ID token of a Google sign-in for `email`, minted through the Auth emulator (signInWithIdp takes a fake IdP token). */
-  async function googleIdToken(email: string): Promise<string> {
-    const host = process.env["FIREBASE_AUTH_EMULATOR_HOST"] ?? "127.0.0.1:9099";
-    const idp = JSON.stringify({ sub: `g-${email}`, email, email_verified: true });
-    const response = await fetch(`http://${host}/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=fake-api-key`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ postBody: `id_token=${encodeURIComponent(idp)}&providerId=google.com`, requestUri: "http://localhost", returnSecureToken: true }),
-    });
-    expect(response.ok).toBe(true);
-    return ((await response.json()) as { idToken: string }).idToken;
-  }
-
-  it("accepts a Google sign-in token under 5 minutes old and refuses an older one (§10: tokens too old refused)", async () => {
-    const email = uniqueEmail("sa");
-    const created = await call<SignedInBody>(google, GOOGLE, { jar: new Jar(), body: body({ email }, { consents: CONSENTS, turnstileToken: "t" }) });
-    expect(created.status).toBe(200);
-    const idToken = await googleIdToken(email);
-    const authTime = Date.now();
-    try {
-      // Only the clock moves (timers stay real for the emulator calls): the token's auth_time is 6 minutes old.
-      vi.useFakeTimers({ toFake: ["Date"], now: authTime + 6 * 60_000 });
-      const stale = await call<ErrorBody>(session, "/api/auth/session", { jar: new Jar(), body: { idToken } });
-      expect(stale.status).toBe(401);
-      expect(stale.body.error).toMatchObject({ code: "invalid_credentials", message: "recent sign-in required" });
-
-      vi.setSystemTime(authTime + (4 * 60 + 50) * 1000);
-      const jar = new Jar();
-      const fresh = await call<SignedInBody>(session, "/api/auth/session", { jar, body: { idToken } });
-      expect(fresh.status).toBe(200);
-      expect(fresh.body.status).toBe("signed_in");
-      expect(fresh.body.session.uid).toBe(created.body.session.uid);
-      expect(jar.get("__Host-session")).toBeDefined();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("refuses an ID token that does not come from a Google sign-in", async () => {
-    const email = uniqueEmail("s");
-    const created = await call<SignedInBody>(google, GOOGLE, { jar: new Jar(), body: body({ email }, { consents: CONSENTS, turnstileToken: "t" }) });
-    const custom = await auth().createCustomToken(created.body.session.uid);
-    const { idToken } = await signInWithCustomToken(custom);
-    const refused = await call<ErrorBody>(session, "/api/auth/session", { jar: new Jar(), body: { idToken } });
-    expect(refused.status).toBe(401);
-    expect(refused.body.error.code).toBe("invalid_credentials");
-    const garbage = await call<ErrorBody>(session, "/api/auth/session", { jar: new Jar(), body: { idToken: "x".repeat(40) } });
-    expect(garbage.status).toBe(401);
   });
 });

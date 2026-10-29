@@ -3455,10 +3455,16 @@
       "pro": "Vendeur professionnel",
       "individual": "Particulier",
       "exclusive": "Exclusivité",
-      "open": "Ouvrir la page complète",
+      "open": "Voir l'annonce complète",
       "report": "Signaler",
       "contact": "Contacter",
-      "example": "Annonce exemple"
+      "example": "Annonce exemple",
+      "criteria": "Caractéristiques",
+      "description": "Description",
+      "readMore": "Lire la suite",
+      "seller": "Vendeur",
+      "profile": "Voir son profil",
+      "loading": "Chargement des détails de l'annonce"
     },
     "legal": {
       "all": "Toutes les informations légales",

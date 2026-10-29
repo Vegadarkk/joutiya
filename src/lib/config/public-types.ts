@@ -1,13 +1,13 @@
 // Browser configuration served at runtime (§2: one image for staging and production, no
 // NEXT_PUBLIC_* frozen at build time). Public values only: never a secret here.
 
+/**
+ * The Firebase project, checked by scripts/launch-check.ts. No Web API key: the browser has no
+ * Firebase SDK, and a published key would let anyone call Identity Toolkit directly (password
+ * guessing, reset mails, sign-ups) past the API's limits and Turnstile (security review, M2).
+ */
 export interface PublicFirebaseConfig {
-  apiKey: string;
-  authDomain: string;
   projectId: string;
-  appId: string;
-  /** Development only: Auth emulator origin, e.g. http://127.0.0.1:9099. */
-  authEmulatorUrl?: string;
 }
 
 /** Browser-side upload limits (phase 3); the API enforces the same numbers. */

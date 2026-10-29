@@ -1,6 +1,7 @@
 import type { Condition } from "@/config/categories";
 import type { CardFacts } from "@/lib/listings/card-facts";
 import type { CardPromo, PromoKind } from "@/lib/contracts/catalog-core";
+import type { ListingAttributes } from "@/lib/contracts/listings";
 import type { SearchParams, SearchSort } from "./params";
 
 // Search contracts (phase 4, design §3). Client-safe types: the engine adapters
@@ -49,6 +50,12 @@ export interface SearchDocument {
   priceNegotiable: boolean;
   isDonation: boolean;
   condition?: Condition;
+  /**
+   * The criteria as the listing page shows them (the subcategory's, free text included): read back
+   * by the map's detail panel (src/lib/search/preview.ts), never searched nor filtered. Absent from
+   * documents indexed before 2026-10-29 until the next reindex.
+   */
+  attributes?: ListingAttributes;
   hasPhoto: boolean;
   photo?: SearchPhoto;
   photoCount: number;

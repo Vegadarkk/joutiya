@@ -1,23 +1,17 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { optionalUser, requireSameOrigin } from "@/lib/auth/guards";
-import { sessionSchema, type MeResponse, type SessionResponse } from "@/lib/contracts/auth";
-import { linkProvider } from "@/lib/db/repositories/users";
-import { isStaff } from "@/lib/firebase/claims";
-import { createSessionFromIdToken, revokeSessions, verifySession } from "@/lib/firebase/session";
-import { forbidden } from "@/lib/http/errors";
+import type { MeResponse } from "@/lib/contracts/auth";
+import { revokeSessions, verifySession } from "@/lib/firebase/session";
 import { readCookie } from "@/lib/http/cookies";
-import { readJson } from "@/lib/http/json";
 import { logConnection } from "@/lib/logging/connection-logs";
-import { logger } from "@/lib/logging/logger";
-import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { CSRF_HEADER, SESSION_COOKIE, clearSessionCookies } from "@/lib/security/cookies";
 import { csrfToken } from "@/lib/security/csrf";
-import { anonymous, beginAnonymous, finish } from "./anonymous";
-import { deviceOf, jsonResponse, signedIn, withDevice } from "./respond";
+import { deviceOf, jsonResponse, withDevice } from "./respond";
 import { sessionSummary } from "./summary";
 
-// Session plumbing: who am I, logout, and the Google popup exchange.
+// Session plumbing: who am I and logout. Google sign-in goes through /api/auth/google only: the
+// Firebase ID token exchange (/api/auth/session) was removed, it skipped the GIS nonce binding.
 
 /** The session of the caller, or null (a revoked cookie reads as signed out); the CSRF header lets the UI recover its token. */
 export async function handleMe(request: Request): Promise<Response> {
@@ -41,19 +35,3 @@ export async function handleLogout(request: Request): Promise<Response> {
   clearSessionCookies(response);
   return withDevice(response, request);
 }
-
-/** Firebase ID token of a Google popup sign-in (existing account) -> session cookie (§6). */
-async function session(request: Request): Promise<Response> {
-  const flow = beginAnonymous(request);
-  const input = await readJson(request, sessionSchema);
-  await enforceLimit("google.ip", flow.identity.ipBucket);
-  await enforceLimit("google.device", flow.identity.deviceKey);
-  const minted = await createSessionFromIdToken(input.idToken, { providers: ["google.com"] });
-  if (isStaff(minted.user.claims)) throw forbidden("staff accounts sign in on the back office");
-  await linkProvider(minted.user.uid, "google.com").catch((error: unknown) => logger.warn({ err: (error as Error).message }, "providers update skipped"));
-  await logConnection({ uid: minted.user.uid, event: "google_login", ip: flow.identity.ip });
-  const body: SessionResponse = { status: "signed_in", session: await sessionSummary(minted.user) };
-  return finish(flow, signedIn(minted, body));
-}
-
-export const handleSession = anonymous(session);

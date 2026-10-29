@@ -87,8 +87,6 @@ export const googleSchema = z
   .strict();
 export type GoogleInput = z.infer<typeof googleSchema>;
 
-export const sessionSchema = z.object({ idToken: z.string().min(20).max(4096) }).strict();
-
 export const resetRequestSchema = z.object({ email: emailSchema, locale: localeSchema.default("fr"), turnstileToken: turnstileTokenSchema }).strict();
 export type ResetRequestInput = z.infer<typeof resetRequestSchema>;
 

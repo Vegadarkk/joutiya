@@ -77,5 +77,7 @@ describe("buildSlugId / parseSlugId", () => {
     expect(parseSlugId("slug-ABCDEFGH")).toBeNull();
     expect(parseSlugId("slug-abcdefg0")).toBeNull();
     expect(parseSlugId(`${"a".repeat(200)}-${id}`)).toBeNull();
+    expect(parseSlugId(`x.1-${id}`)).toBeNull();
+    expect(parseSlugId(`v%C3%A9lo-${id}`)).toBeNull();
   });
 });

@@ -158,10 +158,12 @@ export function toSearchDocument(listing: ListingRecord, now: Date = new Date())
 
   const attrsText: string[] = [];
   const attributes: Record<`a_${string}`, DocumentAttribute> = {};
+  const shown: Record<string, AttributeValue> = {};
   for (const criterion of criteria) {
     if (!Object.hasOwn(listing.attributes, criterion.id)) continue;
     const value = listing.attributes[criterion.id];
     if (value === undefined) continue;
+    shown[criterion.id] = value;
     attrsText.push(...criterionText(criterion.id, value));
     const filterable = criterionValue(criterion.id, value);
     if (filterable !== undefined) attributes[attributeField(criterion.id)] = filterable;
@@ -213,6 +215,7 @@ export function toSearchDocument(listing: ListingRecord, now: Date = new Date())
     priceNegotiable: listing.priceNegotiable,
     isDonation: listing.isDonation,
     ...(listing.condition ? { condition: listing.condition } : {}),
+    attributes: shown,
     hasPhoto: photo !== undefined,
     ...(photo ? { photo: { id: photo.id, w: photo.w, h: photo.h, blurhash: photo.blurhash } } : {}),
     photoCount: listing.photos.length,
