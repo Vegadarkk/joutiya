@@ -1,6 +1,7 @@
 import "server-only";
 import { subcategoryById } from "@/config/categories";
 import type { QuotaId } from "@/config/quotas";
+import { getAbuseRules } from "@/lib/config/runtime";
 import { MESSAGE_TEXT_MAX, type MessageRiskFlag, type SendMessageResponse, type StartConversationResponse } from "@/lib/contracts/messaging";
 import { getListing } from "@/lib/db/repositories/listings";
 import { getUserRecord } from "@/lib/db/repositories/profiles";
@@ -58,8 +59,8 @@ export interface MessagingActor {
   claims: Claims;
 }
 
-function analyze(text: string): MessageAnalysis {
-  const analysis = analyzeMessage(text);
+async function analyze(text: string): Promise<MessageAnalysis> {
+  const analysis = analyzeMessage(text, (await getAbuseRules()).messaging);
   if (analysis.text.length > STORED_TEXT_MAX) throw new HttpError(400, "invalid_body", undefined, { details: [{ path: "text", code: "too_big" }] });
   return analysis;
 }
@@ -136,7 +137,7 @@ async function append(
  * conversation as `buyerAdultConfirmedAt`.
  */
 export async function startConversation(actor: MessagingActor, input: { listingId: string; text: string; adultConfirmed?: boolean }, now = new Date()): Promise<StartConversationResponse> {
-  const analysis = analyze(input.text);
+  const analysis = await analyze(input.text);
   const cid = conversationId(input.listingId, actor.uid);
   const [existing, buyer] = await Promise.all([getConversation(cid), getUserRecord(actor.uid)]);
   if (existing) {
@@ -208,7 +209,7 @@ export async function startConversation(actor: MessagingActor, input: { listingI
 
 /** A message in an existing conversation (D4): participants only, not blocked, not frozen. */
 export async function sendMessage(actor: MessagingActor, cid: string, text: string, now = new Date()): Promise<SendMessageResponse> {
-  const analysis = analyze(text);
+  const analysis = await analyze(text);
   const { messageId } = await append(actor, cid, text, analysis, now);
   return { messageId, flags: analysis.flags };
 }

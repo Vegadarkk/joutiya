@@ -1,116 +1,66 @@
 import "server-only";
-import { RateLimiterMemory, RateLimiterRedis, RateLimiterRes, type RateLimiterAbstract } from "rate-limiter-flexible";
-import { RATE_LIMITS, type RateLimitId } from "@/config/rate-limits";
+import type { RateLimitOverrides } from "@/config/abuse";
+import { RATE_LIMITS, type RateLimitDefinition, type RateLimitId } from "@/config/rate-limits";
+import { getAbuse } from "@/lib/config/runtime";
 import { HttpError, rateLimited, unavailable } from "@/lib/http/errors";
-import { logger } from "@/lib/logging/logger";
-import { pepperedHash } from "@/lib/security/hash";
-import { isValkeyConfigured, valkey } from "@/lib/valkey/clients";
+import * as core from "./core";
+import type { LimitOutcome, LimitState } from "./core";
 
-// Limiters on valkey-ratelimit (§6). Redis down: `rejectIfRedisNotReady` and a short command
-// timeout make the call fail fast, then the limiter's policy decides (open or closed). Without
-// RATE_LIMIT_REDIS_URL (local dev, unit tests) an in-memory limiter applies the same table.
-// The client is lazy (valkey/clients.ts): it stays "wait" until something connects it, and
-// rate-limiter-flexible refuses every call until it is "ready", so each call connects it first.
-// The proxy bundle has its own instance of this module, hence its own client (design D14).
+export { limitKey } from "./core";
+export type { LimitOutcome, LimitState };
 
-export type LimitOutcome =
-  | { ok: true; remaining: number }
-  | { ok: false; reason: "limited"; retryAfterSeconds: number }
-  | { ok: false; reason: "unavailable" };
+// Rate limits of the API and the server pages (§6): the RATE_LIMITS table under the private
+// overrides of Firestore `config/abuse` `rateLimits` (points, duration, blockDuration by id; the
+// policy and the key stay the committed ones). The store calls are in core.ts. The overrides come
+// from the 5-minute config cache and are never waited on for more than OVERRIDES_WAIT_MS: a slow or
+// unreachable Firestore leaves the last known values (then the committed ones), never a slow limiter.
+// The proxy's page limits (proxy-limits.ts) use core.ts directly, on the committed values.
 
-const limiters = new Map<RateLimitId, RateLimiterAbstract>();
+const OVERRIDES_WAIT_MS = 250;
+let known: RateLimitOverrides = {};
+/** Bounded wait on the read in flight, shared by concurrent callers; undefined when no read is in flight. */
+let waiting: Promise<void> | undefined;
 
-function build(id: RateLimitId): RateLimiterAbstract {
-  const definition = RATE_LIMITS[id];
-  const common = {
-    keyPrefix: `rl:${id}`,
-    points: definition.points,
-    duration: definition.duration,
-    blockDuration: "blockDuration" in definition ? definition.blockDuration : 0,
-  };
-  if (!isValkeyConfigured("ratelimit")) return new RateLimiterMemory(common);
-  return new RateLimiterRedis({
-    ...common,
-    storeClient: valkey("ratelimit"),
-    rejectIfRedisNotReady: true,
-  });
-}
-
-function limiter(id: RateLimitId): RateLimiterAbstract {
-  let instance = limiters.get(id);
-  if (!instance) {
-    instance = build(id);
-    limiters.set(id, instance);
+async function overrides(): Promise<RateLimitOverrides> {
+  if (!waiting) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const read = getAbuse().then(
+      (config) => {
+        known = config.rateLimits;
+      },
+      () => undefined,
+    );
+    const bounded = Promise.race([read, new Promise<void>((resolve) => (timer = setTimeout(resolve, OVERRIDES_WAIT_MS)))]).finally(() => clearTimeout(timer));
+    waiting = bounded;
+    // A hanging read is waited on once: later callers go on at once with the known values.
+    void read.finally(() => {
+      if (waiting === bounded) waiting = undefined;
+    });
   }
-  return instance;
+  await waiting;
+  return known;
 }
 
-/** HMAC of the raw key under the pepper: no IP, e-mail or uid in clear in Valkey. */
-export function limitKey(id: RateLimitId, raw: string): string {
-  return pepperedHash(`rl:${id}`, raw).slice(0, 32);
+/** `RATE_LIMITS[id]` under an override of config/abuse. Pure. */
+export function applyRateLimitOverride(id: RateLimitId, override: RateLimitOverrides[RateLimitId]): RateLimitDefinition {
+  const base: RateLimitDefinition = RATE_LIMITS[id];
+  if (!override) return base;
+  return { ...base, ...(override.points !== undefined ? { points: override.points } : {}), ...(override.duration !== undefined ? { duration: override.duration } : {}), ...(override.blockDuration !== undefined ? { blockDuration: override.blockDuration } : {}) };
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([promise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("rate limiter timeout")), ms))]);
-}
-
-let connecting: Promise<void> | undefined;
-
-/**
- * Connects the lazy store client on first use; concurrent callers share the attempt. A failed
- * attempt resolves too: ioredis keeps reconnecting in the background and, meanwhile, the limiter
- * rejects at once ("not ready"), which the policy turns into open or closed.
- */
-async function storeReady(): Promise<void> {
-  if (!isValkeyConfigured("ratelimit")) return;
-  const client = valkey("ratelimit");
-  if (client.status === "wait") connecting = client.connect().catch(() => undefined);
-  if (connecting && client.status !== "ready") await connecting;
-}
-
-/** One store call: connect first, all of it under the 500 ms budget. */
-function run<T>(call: () => Promise<T>): Promise<T> {
-  return withTimeout(storeReady().then(call), 500);
-}
-
-/** A store outage logs once a minute per limiter: the proxy meters every page view. */
-const UNAVAILABLE_LOG_INTERVAL_MS = 60_000;
-const unavailableLoggedAt = new Map<RateLimitId, number>();
-
-function logUnavailable(id: RateLimitId, error: unknown): void {
-  const now = Date.now();
-  if (now - (unavailableLoggedAt.get(id) ?? -Infinity) < UNAVAILABLE_LOG_INTERVAL_MS) return;
-  unavailableLoggedAt.set(id, now);
-  logger.warn({ limiter: id, err: (error as Error).message }, "rate limiter unavailable");
+/** The definition applied to `id` now (committed values under the config/abuse overrides). */
+export async function rateLimitDefinition(id: RateLimitId): Promise<RateLimitDefinition> {
+  return applyRateLimitOverride(id, (await overrides())[id]);
 }
 
 /** Consumes `points` for `rawKey`. Never throws: the outcome carries the decision. */
 export async function consumeLimit(id: RateLimitId, rawKey: string, points = 1): Promise<LimitOutcome> {
-  try {
-    const result = await run(() => limiter(id).consume(limitKey(id, rawKey), points));
-    return { ok: true, remaining: result.remainingPoints };
-  } catch (error) {
-    if (error instanceof RateLimiterRes) return { ok: false, reason: "limited", retryAfterSeconds: Math.ceil(error.msBeforeNext / 1000) };
-    logUnavailable(id, error);
-    return { ok: false, reason: "unavailable" };
-  }
-}
-
-export interface LimitState {
-  /** Points consumed in the current window (0 when the key is unknown). */
-  consumedPoints: number;
-  /** Milliseconds before the key frees itself (window end or block end; 0 when unknown). */
-  msBeforeNext: number;
+  return core.consumeLimit(id, rawKey, points, await rateLimitDefinition(id));
 }
 
 /** Consumed points and the time left on `rawKey`, or null when the store cannot answer. */
 export async function limitState(id: RateLimitId, rawKey: string): Promise<LimitState | null> {
-  try {
-    const result = await run(() => limiter(id).get(limitKey(id, rawKey)));
-    return { consumedPoints: result?.consumedPoints ?? 0, msBeforeNext: Math.max(0, result?.msBeforeNext ?? 0) };
-  } catch {
-    return null;
-  }
+  return core.limitState(id, rawKey, await rateLimitDefinition(id));
 }
 
 /** Points already consumed for `rawKey` in the current window (0 when none, null when unknown). */
@@ -124,22 +74,12 @@ export async function consumedPoints(id: RateLimitId, rawKey: string): Promise<n
  * store marks the key as exhausted whatever its count. Best effort, like resetLimit.
  */
 export async function blockLimit(id: RateLimitId, rawKey: string, seconds?: number): Promise<void> {
-  const definition = RATE_LIMITS[id];
-  const duration = seconds ?? ("blockDuration" in definition && definition.blockDuration > 0 ? definition.blockDuration : definition.duration);
-  try {
-    await run(() => limiter(id).block(limitKey(id, rawKey), duration));
-  } catch (error) {
-    logger.warn({ limiter: id, err: (error as Error).message }, "rate limiter block skipped");
-  }
+  return core.blockLimit(id, rawKey, seconds, await rateLimitDefinition(id));
 }
 
 /** Forgets a key (successful login clears the failure counters of that account + IP). */
 export async function resetLimit(id: RateLimitId, rawKey: string): Promise<void> {
-  try {
-    await run(() => limiter(id).delete(limitKey(id, rawKey)));
-  } catch {
-    // Best effort.
-  }
+  return core.resetLimit(id, rawKey, await rateLimitDefinition(id));
 }
 
 /**
@@ -161,9 +101,9 @@ export function isRateLimitError(error: unknown): boolean {
   return error instanceof HttpError && (error.code === "rate_limited" || error.code === "unavailable");
 }
 
-/** Tests only: drop every limiter (memory state included). */
+/** Tests only: drop every limiter (memory state included) and the known overrides. */
 export function resetRateLimiters(): void {
-  limiters.clear();
-  connecting = undefined;
-  unavailableLoggedAt.clear();
+  core.resetLimiterStore();
+  known = {};
+  waiting = undefined;
 }

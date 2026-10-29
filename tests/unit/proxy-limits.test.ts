@@ -14,7 +14,7 @@ const store = vi.hoisted(() => ({
   calls: [] as { id: string; key: string }[],
 }));
 
-vi.mock("@/lib/rate-limit/limiter", () => ({
+vi.mock("@/lib/rate-limit/core", () => ({
   consumeLimit: vi.fn(async (id: string, key: string): Promise<LimitOutcome> => {
     store.calls.push({ id, key });
     return store.outcomes.get(id) ?? { ok: true, remaining: 10 };

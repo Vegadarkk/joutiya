@@ -1,5 +1,5 @@
 import { isValidSocialHandle, parseSocialLink, SOCIAL_NETWORKS, socialHref, type SocialLinkProblem, type SocialNetwork } from "@/config/social-links";
-import { containsProhibited } from "@/lib/moderation/prohibited";
+import { containsProhibited, type CompiledProhibited } from "@/lib/moderation/prohibited";
 import type { SocialLinksDoc } from "./profile-schema";
 
 // Social links of a shop (src/config/social-links.ts). Pure: the save, the storefront, the Pro
@@ -8,12 +8,12 @@ import type { SocialLinksDoc } from "./profile-schema";
 /** A refusal: the address or handle (`SocialLinkProblem`), or a prohibited word in the handle. */
 export type SocialLinkIssue = SocialLinkProblem | "prohibited";
 
-/** The handle to store, or why the value is refused (as the form shows it while typing). */
-export function checkSocialLink(network: SocialNetwork, raw: string): { handle: string } | { problem: SocialLinkIssue } {
+/** The handle to store, or why the value is refused (as the form shows it while typing; the save adds the config/abuse `terms`). */
+export function checkSocialLink(network: SocialNetwork, raw: string, terms?: CompiledProhibited): { handle: string } | { problem: SocialLinkIssue } {
   const parsed = parseSocialLink(network, raw);
   if ("problem" in parsed) return parsed;
   // The words a listing may not carry may not be a handle either ("cannabis.shop").
-  if (containsProhibited(parsed.handle.replace(/[._/-]+/g, " ")).hard.length > 0) return { problem: "prohibited" };
+  if (containsProhibited(parsed.handle.replace(/[._/-]+/g, " "), terms).hard.length > 0) return { problem: "prohibited" };
   return parsed;
 }
 

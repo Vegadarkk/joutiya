@@ -6,7 +6,7 @@ import { quotesCreditWithoutApr } from "@/lib/moderation/credit";
 import { rentalReviewReasons } from "./rental";
 import { findPhoneNumbers } from "@/lib/moderation/phones";
 import { containsProhibited } from "@/lib/moderation/prohibited";
-import { NEW_ACCOUNT_DAYS, VOLUME_PER_DAY, decideState, riskScore, sortFlags } from "@/lib/moderation/risk";
+import { DEFAULT_RISK_RULES, decideState, riskScore, sortFlags } from "@/lib/moderation/risk";
 import { detectSensitiveDetailed } from "@/lib/moderation/sensitive";
 import type { FieldIssue, ScreenBlockerCode, ScreenContext, ScreenInput, ScreenResult } from "@/lib/moderation/types";
 
@@ -93,6 +93,7 @@ function checkContact(input: ScreenInput, blockers: FieldIssue[]): void {
 export function screenListing(input: ScreenInput, ctx: ScreenContext): ScreenResult {
   const blockers: FieldIssue[] = [];
   const flags = new Set<ModerationFlag>();
+  const risk = ctx.abuse?.risk ?? DEFAULT_RISK_RULES;
   const evidence: string[] = [];
   const note = (text: string) => {
     if (!evidence.includes(text)) evidence.push(text);
@@ -129,7 +130,7 @@ export function screenListing(input: ScreenInput, ctx: ScreenContext): ScreenRes
       pushIssue(blockers, issue(field.path, contact.kind === "email" ? "email_in_text" : "url_in_text"));
       note(`${contact.kind} in ${field.path}`);
     }
-    const prohibited = containsProhibited(field.text);
+    const prohibited = containsProhibited(field.text, ctx.abuse?.prohibited);
     if (prohibited.hard.length > 0) {
       pushIssue(blockers, issue(field.path, "prohibited"));
       flags.add("prohibited_kw");
@@ -192,11 +193,11 @@ export function screenListing(input: ScreenInput, ctx: ScreenContext): ScreenRes
     flags.add("dup_photo");
     note(`same photo as ${input.duplicates?.samePhoto} listing(s)`);
   }
-  if (input.seller.accountAgeDays < NEW_ACCOUNT_DAYS) {
+  if (input.seller.accountAgeDays < risk.newAccountDays) {
     flags.add("new_account");
     note(`account age ${input.seller.accountAgeDays} day(s)`);
   }
-  if (input.seller.listingsLast24h >= VOLUME_PER_DAY) {
+  if (input.seller.listingsLast24h >= risk.volumePerDay) {
     flags.add("volume");
     note(`${input.seller.listingsLast24h} listings in 24h`);
   }
@@ -204,7 +205,7 @@ export function screenListing(input: ScreenInput, ctx: ScreenContext): ScreenRes
   if (input.sensitiveDeclaration) note(`declaration ${input.sensitiveDeclaration.kind}`);
 
   const sorted = sortFlags(flags);
-  const { score } = riskScore(sorted, { previousRejections: input.seller.previousRejections });
+  const { score } = riskScore(sorted, { previousRejections: input.seller.previousRejections }, risk);
   const state = decideState(score, sorted, { reviewAt: ctx.ai.risk.reviewAt });
   return { state, score, flags: sorted, blockers, evidence };
 }

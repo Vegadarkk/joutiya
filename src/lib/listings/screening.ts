@@ -1,12 +1,15 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { DEFAULT_AI, type AiConfig } from "@/config/ai";
+import type { AiConfig } from "@/config/ai";
+import { aiConfig } from "@/lib/ai/config";
 import { subcategoryById } from "@/config/categories";
 import { isVariantCriterion, withVariantAnswers } from "@/lib/contracts/catalog";
+import { getAbuseRules } from "@/lib/config/runtime";
 import type { FieldIssue, ModerationFlag } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UploadRecord } from "@/lib/db/repositories/uploads";
 import type { ListingDoc } from "@/lib/db/schemas";
+import type { AbuseRules } from "@/lib/moderation/abuse";
 import { screenListing } from "@/lib/moderation/screen";
 import type { ScreenDuplicates, ScreenInput } from "@/lib/moderation/types";
 import { normalizeText } from "@/lib/text/normalize";
@@ -40,7 +43,10 @@ export interface ScreeningInput {
   seller: SellerFacts;
   /** The owner's other listings that may duplicate this one (published, pending, paused). */
   others: readonly Pick<ListingRecord, "id" | "title" | "description" | "photos">[];
+  /** Absent: Firestore `config/ai` (5-minute cache, src/lib/ai/config.ts). */
   ai?: AiConfig;
+  /** Absent: Firestore `config/abuse` (5-minute cache), whose defaults are the committed values. */
+  abuse?: AbuseRules;
 }
 
 /** sha256 of the normalised title + description: two listings with the same text share it. */
@@ -99,7 +105,7 @@ export async function screen(facts: ScreeningInput, selfId?: string): Promise<Sc
     seller: facts.seller,
     duplicates,
   };
-  const result = await screenListing(input, { ai: facts.ai ?? DEFAULT_AI });
+  const result = screenListing(input, { ai: facts.ai ?? (await aiConfig()), abuse: facts.abuse ?? (await getAbuseRules()) });
   return {
     state: result.state,
     score: result.score,

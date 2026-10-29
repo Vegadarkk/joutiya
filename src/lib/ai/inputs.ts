@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { reportReason } from "@/config/report-reasons";
+import { getAbuseRules } from "@/lib/config/runtime";
 import { HIDDEN_MARKER } from "@/lib/contracts/messaging";
 import { getListing, type ListingRecord } from "@/lib/db/repositories/listings";
 import { getModerationDecision, listDecisionsForTarget } from "@/lib/db/repositories/moderation-decisions";
@@ -9,7 +10,7 @@ import { logger } from "@/lib/logging/logger";
 import { openImage } from "@/lib/media/sharp-setup";
 import { mediaObjectKey } from "@/lib/media/urls";
 import { staffMemberText, staffPlaceLabel } from "@/lib/messaging/member-text";
-import { containsProhibited } from "@/lib/moderation/prohibited";
+import { containsProhibited, type CompiledProhibited } from "@/lib/moderation/prohibited";
 import { consume } from "@/lib/quota";
 import { getReport, type ReportRecord } from "@/lib/reports/repository";
 import { getReview } from "@/lib/reviews/repository";
@@ -79,7 +80,7 @@ async function removedBefore(listingId: string): Promise<boolean> {
   return history.some((decision) => decision.action === "remove");
 }
 
-function listingFacts(listing: ListingRecord, previouslyRejected: boolean): ListingFacts {
+function listingFacts(listing: ListingRecord, previouslyRejected: boolean, terms: CompiledProhibited): ListingFacts {
   return {
     kind: "listing",
     status: listing.status,
@@ -88,7 +89,7 @@ function listingFacts(listing: ListingRecord, previouslyRejected: boolean): List
     score: listing.moderation.score,
     hidden: Boolean(listing.moderation.hiddenBy),
     openReports: listing.moderation.openReports,
-    prohibitedHard: containsProhibited(`${listing.title}\n${listing.description}`).hard,
+    prohibitedHard: containsProhibited(`${listing.title}\n${listing.description}`, terms).hard,
     previouslyRejected,
   };
 }
@@ -112,10 +113,11 @@ export async function listingScreenInput(listingId: string, deps: InputDeps = {}
   const images = await (deps.images ?? loadListingImages)(listing);
   // Only a held listing may be approved alone (D20): its history is read for that gate only.
   const previouslyRejected = listing.status === "pending_review" && (await removedBefore(listing.id));
+  const { prohibited } = await getAbuseRules();
   const target: AiTarget = { type: "listing", id: listing.id };
   return {
     listing,
-    input: { task: "listing_screen", target, text, images, facts: listingFacts(listing, previouslyRejected), inputHash: inputHash("listing_screen", target, text, images) },
+    input: { task: "listing_screen", target, text, images, facts: listingFacts(listing, previouslyRejected, prohibited), inputHash: inputHash("listing_screen", target, text, images) },
   };
 }
 

@@ -2,7 +2,6 @@ import "server-only";
 import type { UserRecord } from "firebase-admin/auth";
 import { NextResponse } from "next/server";
 import { z } from "@/lib/zod";
-import { RATE_LIMITS } from "@/config/rate-limits";
 import { audit } from "@/lib/audit";
 import { accessIdentity, requireSameOrigin, type StaffContext } from "@/lib/auth/guards";
 import { assertPasswordPolicy } from "@/lib/auth/password-policy";
@@ -29,7 +28,7 @@ import { logConnection } from "@/lib/logging/connection-logs";
 import { logger } from "@/lib/logging/logger";
 import { sendMail, type ActionLinkRequest } from "@/lib/mail";
 import { requestIdentity, type RequestIdentity } from "@/lib/rate-limit/keys";
-import { blockLimit, consumeLimit, enforceLimit, limitState, resetLimit } from "@/lib/rate-limit/limiter";
+import { blockLimit, consumeLimit, enforceLimit, limitState, rateLimitDefinition, resetLimit } from "@/lib/rate-limit/limiter";
 import { clearSessionCookies, CSRF_HEADER, SESSION_COOKIE, setSessionCookies } from "@/lib/security/cookies";
 import { csrfToken } from "@/lib/security/csrf";
 import { expectedOrigin, hostKind } from "@/lib/security/origin";
@@ -113,9 +112,6 @@ export const STAFF_API = {
 const LOGIN_LIMIT = "staff.login.accountIp";
 const ACCOUNT_LIMIT = "login.fail.account";
 const TURNSTILE_AFTER_FAILURES = 3;
-const LOCK_AFTER_FAILURES = RATE_LIMITS[LOGIN_LIMIT].points;
-const LOCK_SECONDS = RATE_LIMITS[LOGIN_LIMIT].blockDuration;
-const ACCOUNT_FAILURE_LIMIT = RATE_LIMITS[ACCOUNT_LIMIT].points;
 
 function accountLocked(retryAfterSeconds: number): HttpError {
   return new HttpError(429, "account_locked", undefined, { headers: { "Retry-After": String(Math.max(1, Math.ceil(retryAfterSeconds))) } });
@@ -160,13 +156,15 @@ export async function login(request: Request): Promise<Response> {
   await enforceLimit("login.ip", identity.ipBucket);
   const account = emailNormHash(body.email);
   const accountIp = `${account}:${identity.ipBucket}`;
-  const [pair, perAccount] = await Promise.all([limitState(LOGIN_LIMIT, accountIp), limitState(ACCOUNT_LIMIT, account)]);
+  // Thresholds of the limiters as applied (config/abuse overrides included).
+  const [pair, perAccount, lock, accountLimit] = await Promise.all([limitState(LOGIN_LIMIT, accountIp), limitState(ACCOUNT_LIMIT, account), rateLimitDefinition(LOGIN_LIMIT), rateLimitDefinition(ACCOUNT_LIMIT)]);
+  const lockSeconds = lock.blockDuration ?? lock.duration;
   // An unreadable counter never reads as "no failures": the staff limiter's policy is closed.
   if (!pair || !perAccount) throw unavailable("rate limiter unavailable");
   // Retry-After is the store's own time left on the block set by the failure that filled the window.
-  if (pair.consumedPoints >= LOCK_AFTER_FAILURES) throw accountLocked(pair.msBeforeNext > 0 ? pair.msBeforeNext / 1000 : LOCK_SECONDS);
+  if (pair.consumedPoints >= lock.points) throw accountLocked(pair.msBeforeNext > 0 ? pair.msBeforeNext / 1000 : lockSeconds);
 
-  const turnstileNeeded = Boolean(serverEnv().TURNSTILE_SITE_KEY) || pair.consumedPoints >= TURNSTILE_AFTER_FAILURES || perAccount.consumedPoints >= ACCOUNT_FAILURE_LIMIT;
+  const turnstileNeeded = Boolean(serverEnv().TURNSTILE_SITE_KEY) || pair.consumedPoints >= TURNSTILE_AFTER_FAILURES || perAccount.consumedPoints >= accountLimit.points;
   if (turnstileNeeded) {
     // Nothing counted yet: no credential has been looked at.
     if (!body.turnstileToken) return json<StaffLoginResponse>({ status: "turnstile_required" });
@@ -199,7 +197,7 @@ export async function login(request: Request): Promise<Response> {
         throw new HttpError(401, "invalid_credentials");
       }
       if (error.code === "USER_DISABLED") throw new HttpError(403, "account_disabled");
-      if (error.code.startsWith("TOO_MANY_ATTEMPTS")) throw accountLocked(LOCK_SECONDS);
+      if (error.code.startsWith("TOO_MANY_ATTEMPTS")) throw accountLocked(lockSeconds);
     }
     throw error;
   }
