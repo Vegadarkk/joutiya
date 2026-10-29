@@ -5,6 +5,7 @@
 10021	FAIL	(X-Content-Type-Options Header Missing)
 10035	FAIL	(Strict-Transport-Security Header Not Set)
 10038	FAIL	(Content Security Policy (CSP) Header Not Set)
+# (10038 is a WARN on staging, whose CSP is report-only by design: security-scan.yml.)
 10054	FAIL	(Cookie without SameSite Attribute)
 40012	FAIL	(Cross Site Scripting (Reflected))
 40014	FAIL	(Cross Site Scripting (Persistent))
