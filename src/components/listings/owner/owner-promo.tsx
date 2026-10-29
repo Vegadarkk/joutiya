@@ -11,7 +11,7 @@ import { useVariantLabels } from "@/components/post/variant-labels";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import type { Locale } from "@/config/site";
+import { SITE_NAME, type Locale } from "@/config/site";
 import { moroccoClock, moroccoTime } from "@/lib/appointments/time";
 import { isApiError } from "@/lib/auth/client";
 import {
@@ -221,7 +221,7 @@ function PromoDialog({ listing, title, now, onClose, onChanged }: PromoDialogPro
           <div className="flex flex-col gap-1.5 border-b border-border px-5 pt-5 pb-4 sm:px-6">
             <Dialog.Title className="text-lg font-semibold text-balance">{t("title", { title: isolate(title) })}</Dialog.Title>
             <Dialog.Description id={descriptionId} className="text-sm text-foreground-muted text-pretty">
-              {t("hint")}
+              {t("hint", { site: SITE_NAME })}
             </Dialog.Description>
           </div>
 

@@ -2612,7 +2612,7 @@
       "running": "{kind} en cours jusqu'au {end}",
       "scheduled": "{kind} prévue du {start} au {end}",
       "title": "Promotion : {title}",
-      "hint": "Le prix barré est calculé par Joutiya : le prix le plus bas de l'annonce pendant les 30 jours avant la promotion.",
+      "hint": "Le prix barré est calculé par {site} : le prix le plus bas affiché aux acheteurs pendant les 30 jours avant la promotion (un prix fixé pendant une pause ne compte qu'à partir du retour en ligne).",
       "kind": "Type de promotion",
       "kinds": {
         "promo": "Promo",
@@ -3019,7 +3019,7 @@
       "period": "Du {start} au {end}",
       "endsInHours": "Se termine dans {hours} h {minutes} min",
       "endsInMinutes": "Se termine dans {minutes} min",
-      "reference": "Prix barré : le prix le plus bas des 30 jours avant la promotion.",
+      "reference": "Prix barré : le prix le plus bas affiché aux acheteurs pendant les 30 jours avant la promotion.",
       "noReference": "Pas de prix barré : l'annonce a moins de 30 jours d'historique de prix."
     }
   },
