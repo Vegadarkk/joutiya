@@ -4,7 +4,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEv
 import { takeQueuedDoor } from "@/lib/welcome/flags";
 import { cycleFocus } from "@/lib/welcome/focus";
 import { doorSteps, MIN_PUSH_SCALE, pushScale, reducedSteps, SKIP_FADE_MS, type DoorPart } from "@/lib/welcome/motion";
+import { doorTilt } from "@/lib/welcome/tilt";
 import { WELCOME_ATTRIBUTE, type WelcomeState } from "@/lib/welcome/script";
+import { playDust } from "./dust-layer";
 
 // The welcome threshold's behaviour; its markup and texts come from the server (welcome-threshold.tsx).
 // The pre-paint script has already decided whether it shows (html[data-welcome]): without that
@@ -12,6 +14,8 @@ import { WELCOME_ATTRIBUTE, type WelcomeState } from "@/lib/welcome/script";
 // navigation to home). "screen": modal dialog, focus trapped, Escape or "Découvrir sans compte"
 // opens the door. "door": the door opens at once (a sign-in just landed here). While it opens, any
 // click, tap or Escape skips to a short fade. At the end the state goes, focus moves to #main.
+// Issue #199: on the screen, the door leans a little towards a mouse pointer (never on touch or with
+// reduced motion); while the door opens, dust floats in its light over the threshold.
 
 type Phase = "pending" | "screen" | "door" | "opening" | "closing" | "done";
 
@@ -42,6 +46,8 @@ export function WelcomeDialog({ labelledBy, children }: { labelledBy: string; ch
   const animations = useRef<Animation[]>([]);
   const litTimer = useRef<number | undefined>(undefined);
   const unmountedState = useRef<string | null>(null);
+  const dust = useRef<HTMLDivElement>(null);
+  const stopDust = useRef<() => void>(() => undefined);
   const [done, setDone] = useState(false);
 
   const lit = useCallback(() => {
@@ -55,6 +61,7 @@ export function WelcomeDialog({ labelledBy, children }: { labelledBy: string; ch
     if (phase.current === "done") return;
     phase.current = "done";
     window.clearTimeout(litTimer.current);
+    stopDust.current();
     document.documentElement.removeAttribute(WELCOME_ATTRIBUTE);
     setDone(true);
     if (focus) focusMain();
@@ -71,17 +78,29 @@ export function WelcomeDialog({ labelledBy, children }: { labelledBy: string; ch
     // The pressed action fades out: focus stays in the dialog until the page takes it.
     element.focus({ preventScroll: true });
     const door = part(element, "door");
-    const steps = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      ? reducedSteps()
-      : doorSteps({
-          rtl: html.dir === "rtl",
-          scale: door ? pushScale(door.getBoundingClientRect(), { width: window.innerWidth, height: window.innerHeight }) : MIN_PUSH_SCALE,
-        });
+    // The door comes back upright (its transition) while the copy fades.
+    door?.style.removeProperty("rotate");
+    const box = door?.getBoundingClientRect();
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const scale = box ? pushScale(box, { width: window.innerWidth, height: window.innerHeight }) : MIN_PUSH_SCALE;
+    const steps = reduced ? reducedSteps() : doorSteps({ rtl: html.dir === "rtl", scale });
+    const played = new Map<DoorPart, Animation>();
     animations.current = steps.flatMap((step) => {
       const target = step.part === "ground" ? element : part(element, step.part);
       if (!target) return [];
-      return [target.animate(step.keyframes, { delay: step.delay, duration: step.duration, easing: step.easing, fill: "both" })];
+      const animation = target.animate(step.keyframes, { delay: step.delay, duration: step.duration, easing: step.easing, fill: "both" });
+      played.set(step.part, animation);
+      return [animation];
     });
+    // The glint's masked copy of the tiles is done before the push: out of the frames it would cost.
+    const sheen = part(element, "sheen");
+    played.get("sheen")?.finished.then(
+      () => sheen?.style.setProperty("display", "none"),
+      () => undefined,
+    );
+    const push = played.get("door");
+    const spill = played.get("spill");
+    if (dust.current && box && push && spill) stopDust.current = playDust(dust.current, box, push, spill, scale);
     litTimer.current = window.setTimeout(lit, steps.find((step) => step.part === "ground")?.delay ?? 0);
     // A skip pauses these: its own fade then ends the threshold.
     Promise.all(animations.current.map((animation) => animation.finished)).then(
@@ -133,6 +152,48 @@ export function WelcomeDialog({ labelledBy, children }: { labelledBy: string; ch
     };
   }, [finish, open]);
 
+  // The door leans towards a mouse pointer while the screen waits. Pointer events only write its
+  // `rotate`, once a frame; its CSS transition smooths it (globals.css).
+  useEffect(() => {
+    const element = root.current;
+    const door = element ? part(element, "door") : null;
+    if (!door || done) return;
+    const fine = window.matchMedia("(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)");
+    if (!fine.matches) return;
+    let frame = 0;
+    let pointer: { x: number; y: number } | null = null;
+    const lean = () => {
+      frame = 0;
+      if (phase.current !== "screen") return;
+      if (!pointer) {
+        door.style.removeProperty("rotate");
+        return;
+      }
+      door.style.setProperty("rotate", doorTilt(door.getBoundingClientRect(), pointer));
+    };
+    const schedule = () => {
+      if (!frame) frame = window.requestAnimationFrame(lean);
+    };
+    const onMove = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse") return;
+      pointer = { x: event.clientX, y: event.clientY };
+      schedule();
+    };
+    const onLeave = () => {
+      pointer = null;
+      schedule();
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    document.documentElement.addEventListener("pointerleave", onLeave);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("pointermove", onMove);
+      document.documentElement.removeEventListener("pointerleave", onLeave);
+    };
+  }, [done]);
+
+  useEffect(() => () => stopDust.current(), []);
+
   useEffect(() => {
     if (done) return;
     function onKeyDown(event: KeyboardEvent) {
@@ -176,6 +237,7 @@ export function WelcomeDialog({ labelledBy, children }: { labelledBy: string; ch
       onPointerDown={skip}
     >
       {children}
+      <div ref={dust} className="welcome-dust" hidden aria-hidden="true" />
     </div>
   );
 }

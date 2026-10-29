@@ -3,8 +3,9 @@ import { DOOR_VIEWBOX, PUSH_POINT } from "@/lib/welcome/motion";
 
 // The logo's door (public/brand/joutiya-icon.svg, same paths as DoorMark) in layers, so that it can
 // open: the gate's tiled frame (alfiz), the arch and its cream frame with a dark doorway behind, the light inside the doorway, the
-// gold threshold, the pool of light on the ground, and the ochre leaf on top, an HTML element of its
-// own (SVG children cannot turn in 3D) with a front and a back face. Parts are found by
+// gold threshold, the pool of light on the ground, the leaf's shadow, and the ochre leaf on top, an HTML element of its
+// own (SVG children cannot turn in 3D) with a front and a back face. A glint of the rising light crosses
+// the tiles: a ring growing from the doorway, the mask of a brighter copy of them (issue #199). Parts are found by
 // data-welcome-part (src/components/welcome/welcome-dialog.tsx). Decorative: the dialog is named by
 // its tagline.
 
@@ -26,6 +27,8 @@ export const ALFIZ = { x: 110, y: 44, width: 292, height: 370 } as const;
 /** Khatam lattice of the frame's spandrels: eight-pointed stars touching on the diagonals. */
 const KHATAM = "M12 3.51L20.49 12L12 20.49L3.51 12ZM6 6H18V18H6Z";
 const KHATAM_CORNER = "M0 -8.49L8.49 0L0 8.49L-8.49 0ZM-6 -6H6V6H-6Z";
+/** Where the glint starts: the doorway's centre. */
+const GLINT = { cx: 256, cy: 280, r: 200 } as const;
 
 /** The leaf: the doorway down to the threshold's top edge, so that it swings over the threshold. */
 export const LEAF = "M202.24 414.16L202.24 255.85A76.34 76.34 0 0 1 256 141.37A76.34 76.34 0 0 1 309.76 255.85L309.76 414.16Z";
@@ -87,13 +90,27 @@ export function DoorScene() {
       <svg className="welcome-layer welcome-alfiz" viewBox={VIEWBOX} focusable="false">
         <defs>
           {/* Tiles centred on the door's axis (x 256). */}
-          <pattern id="welcome-khatam" className="welcome-khatam" patternUnits="userSpaceOnUse" x="244" y={ALFIZ.y} width="24" height="24">
-            <path d={KHATAM} />
-            {[0, 24].flatMap((x) => [0, 24].map((y) => <path key={`${x}-${y}`} transform={`translate(${x} ${y})`} d={KHATAM_CORNER} />))}
-          </pattern>
+          {["welcome-khatam", "welcome-khatam-lit"].map((id) => (
+            <pattern key={id} id={id} className={id} patternUnits="userSpaceOnUse" x="244" y={ALFIZ.y} width="24" height="24">
+              <path d={KHATAM} />
+              {[0, 24].flatMap((x) => [0, 24].map((y) => <path key={`${x}-${y}`} transform={`translate(${x} ${y})`} d={KHATAM_CORNER} />))}
+            </pattern>
+          ))}
+          {/* A ring: white between 62% and 100% of the radius, brightest at 80%. */}
+          <radialGradient id="welcome-glint-ring">
+            <stop offset="0.62" stopColor="#000" />
+            <stop offset="0.8" stopColor="#fff" />
+            <stop offset="1" stopColor="#000" />
+          </radialGradient>
+          <mask id="welcome-glint" maskUnits="userSpaceOnUse" x={ALFIZ.x} y={ALFIZ.y} width={ALFIZ.width} height={ALFIZ.height}>
+            <circle className="welcome-glint" data-welcome-part="glint" fill="url(#welcome-glint-ring)" {...GLINT} />
+          </mask>
         </defs>
         <rect className="fill-bab-900" {...ALFIZ} />
         <rect className="welcome-alfiz-tiles" fill="url(#welcome-khatam)" {...ALFIZ} />
+        <g className="welcome-sheen" data-welcome-part="sheen" mask="url(#welcome-glint)">
+          <rect fill="url(#welcome-khatam-lit)" {...ALFIZ} />
+        </g>
         <rect className="welcome-alfiz-line" {...ALFIZ} />
         <rect className="welcome-alfiz-line welcome-alfiz-inner" x={ALFIZ.x + 4} y={ALFIZ.y + 4} width={ALFIZ.width - 8} height={ALFIZ.height - 4} />
         {/* A gold edge where the tiles meet the arch (the arch layer covers its inner half). */}
@@ -123,6 +140,7 @@ export function DoorScene() {
         <path className="fill-gold-400" d={THRESHOLD} />
       </svg>
       <div className="welcome-spill" data-welcome-part="spill" />
+      <div className="welcome-cast" data-welcome-part="cast" />
       <div className="welcome-hinge" style={HINGE_STYLE}>
         <div className="welcome-leaf" data-welcome-part="leaf">
           <div className="welcome-face">

@@ -421,8 +421,9 @@ html[data-welcome]:has(#main:target) .welcome {
   gap: 0.45em;
   max-width: 100%;
   font-family: var(--font-ruqaa), var(--font-readex), serif;
-  /* One line down to a 320 px phone. */
-  font-size: min(max(1.25rem, calc(var(--welcome-door-h) * 0.068)), 6vw);
+  /* One line down to a 320 px phone, for a longer name too (issue #199): the text, its two rules and
+     gaps within 94% of the width, at about 0.53 em a letter. */
+  font-size: min(max(1.25rem, calc(var(--welcome-door-h) * 0.068)), 6vw, calc(82vw / (var(--welcome-crest-chars, 21) * 0.53 + 0.9)));
   white-space: nowrap;
   font-weight: 700;
   line-height: 1.3;
@@ -465,12 +466,24 @@ html[data-welcome]:has(#main:target) .welcome {
 /* The frame rises above the door's box (ALFIZ in door-scene.tsx, 12 of the door's 386 units). */
 .welcome-gate {
   margin-top: calc(var(--welcome-door-h) * 12 / 386 + 0.375rem);
+  /* Depth for the door leaning towards the pointer (welcome-dialog.tsx). */
+  perspective: calc(var(--welcome-door-h) * 3);
 }
 .welcome-khatam path {
   fill: none;
   stroke: var(--color-gold-400);
   stroke-width: 0.55;
   stroke-opacity: 0.42;
+}
+/* The tiles as the glint lights them (door-scene.tsx), shown only inside its ring. */
+.welcome-khatam-lit path {
+  fill: none;
+  stroke: var(--color-gold-100);
+  stroke-width: 0.9;
+}
+.welcome-glint {
+  transform-box: fill-box;
+  transform-origin: center;
 }
 .welcome-alfiz-line {
   fill: none;
@@ -545,6 +558,28 @@ html[data-welcome]:has(#main:target) .welcome {
   flex: none;
   height: var(--welcome-door-h);
   aspect-ratio: 240 / 386;
+  /* Its lean towards a mouse pointer is set once a frame: the transition smooths it, and brings it
+     back upright when the door opens. */
+  transition: rotate 700ms var(--ease-door);
+}
+/* Dust in the doorway's light (src/components/welcome/dust-layer.ts), over the whole threshold: one
+   16 px glow per mote, placed and scaled by its transform. */
+.welcome-dust {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.welcome-dust i {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 16px;
+  height: 16px;
+  /* A gold speck in a cream halo: it shows on the doorway's light as on the night. */
+  background: radial-gradient(closest-side, var(--color-gold-300) 30%, color-mix(in oklab, var(--color-gold-100) 50%, transparent) 55%, transparent);
+  opacity: 0;
+  will-change: transform, opacity;
 }
 .welcome-layer {
   position: absolute;
@@ -555,7 +590,9 @@ html[data-welcome]:has(#main:target) .welcome {
 }
 .welcome-light,
 .welcome-shade,
-.welcome-spill {
+.welcome-spill,
+.welcome-sheen,
+.welcome-cast {
   opacity: 0;
 }
 .welcome-light-core {
@@ -579,6 +616,23 @@ html[data-welcome]:has(#main:target) .welcome {
   height: 26%;
   background: radial-gradient(closest-side, color-mix(in oklab, var(--color-gold-300) 45%, transparent), transparent);
   pointer-events: none;
+}
+/* The leaf's shadow (motion.ts, "cast"): from the foot of the hinge (x 202.24 of the door's 136-376,
+   x 309.76 in RTL) over the threshold and the ground, swept outwards as the leaf opens. A gradient,
+   never a blur: the layer is then scaled 16 times or more by the push. */
+.welcome-cast {
+  --welcome-cast-at: 100% 0;
+  position: absolute;
+  top: 92.79%;
+  inset-inline-end: 72.4%;
+  width: 46%;
+  height: 14%;
+  transform-origin: var(--welcome-cast-at);
+  background: radial-gradient(farthest-side at var(--welcome-cast-at), color-mix(in oklab, var(--color-bab-950) 72%, transparent), transparent);
+  pointer-events: none;
+}
+[dir="rtl"] .welcome-cast {
+  --welcome-cast-at: 0 0;
 }
 /* The leaf turns on its hinge, the start side of the doorway. */
 .welcome-hinge {
@@ -1274,3 +1328,110 @@ html[data-welcome]:has(#main:target) .welcome {
   }
 }
 /* ── end home map ── */
+
+/* ── Micro-animations (issue #199) ──
+ * The favourite's heart (src/components/favorites/favorite-button.tsx): it beats as it fills, a gold
+ * ring and six sparks leave it. The published listing's seal (src/components/auth/status-panel.tsx,
+ * `celebrate`): the logo's eight-pointed star turns into place behind the check. Reduced motion
+ * shortens them to their last frame (the rule at the top of this file).
+ */
+.favorite-pop {
+  animation: favorite-pop 450ms var(--ease-door) both;
+}
+@keyframes favorite-pop {
+  0% {
+    scale: 0.6;
+  }
+  45% {
+    scale: 1.25;
+  }
+  72% {
+    scale: 0.92;
+  }
+  100% {
+    scale: 1;
+  }
+}
+.favorite-sparks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.favorite-sparks > i {
+  --spark-a: 0deg;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  margin: -1.5px;
+  border-radius: 9999px;
+  background: var(--featured);
+  opacity: 0;
+  animation: favorite-spark 520ms var(--ease-door) 60ms forwards;
+}
+.favorite-sparks > i:nth-child(2) {
+  --spark-a: 60deg;
+}
+.favorite-sparks > i:nth-child(3) {
+  --spark-a: 120deg;
+}
+.favorite-sparks > i:nth-child(4) {
+  --spark-a: 180deg;
+}
+.favorite-sparks > i:nth-child(5) {
+  --spark-a: 240deg;
+}
+.favorite-sparks > i:nth-child(6) {
+  --spark-a: 300deg;
+}
+@keyframes favorite-spark {
+  from {
+    opacity: 1;
+    transform: rotate(var(--spark-a)) translateX(0.5rem) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: rotate(var(--spark-a)) translateX(1.125rem) scale(0.4);
+  }
+}
+.status-seal {
+  animation: status-seal 500ms var(--ease-door) both;
+}
+@keyframes status-seal {
+  0% {
+    scale: 0.6;
+    opacity: 0;
+  }
+  60% {
+    scale: 1.08;
+    opacity: 1;
+  }
+  100% {
+    scale: 1;
+  }
+}
+.status-star {
+  position: absolute;
+  inset: -0.625rem;
+  color: var(--featured);
+  animation: status-star 800ms var(--ease-door) 120ms both;
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 14.6%;
+    border: 2px solid currentColor;
+    border-radius: 2px;
+  }
+  &::after {
+    transform: rotate(45deg);
+  }
+}
+@keyframes status-star {
+  from {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.5);
+  }
+}
+/* ── end micro-animations ── */
