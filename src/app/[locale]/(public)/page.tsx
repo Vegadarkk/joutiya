@@ -5,7 +5,6 @@ import { AdSlot } from "@/components/ads/ad-slot";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { CategoryGrid } from "@/components/home/category-grid";
 import { FeaturedCarousel } from "@/components/home/featured-carousel";
-import { SearchPanel } from "@/components/home/search-panel";
 import { RentCarModule } from "@/components/rental/rent-car-module";
 import { Container } from "@/components/layout/container";
 import { ResultsGrid } from "@/components/search/results-grid";
@@ -24,9 +23,10 @@ import type { SearchCard } from "@/lib/search/types";
 
 const favoriteAction = (card: SearchCard) => <FavoriteButton listingId={card.id} />;
 
-// Home (design D21): search hero, the twelve categories, À la Une (8 drawn) and the 12 newest
-// listings, behind the welcome threshold of a first visit (design C7). ISR every 5 minutes; an
-// engine failure hides the two listing sections (D2) and the page still renders.
+// Home (design D21): the page's promise, the twelve categories, À la Une (8 drawn) and the 12 newest
+// listings, behind the welcome threshold of a first visit (design C7). The search is the header's
+// pill (Carte vivante, lot 1). ISR every 5 minutes; an engine failure hides the two listing sections
+// (D2) and the page still renders.
 
 export const revalidate = 300;
 // Rendered on the first visit, never at build: the image is built without a search engine, so a
@@ -76,8 +76,9 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     <>
       {/* First visit only (decided before paint, see src/lib/welcome/script.ts); hidden otherwise. */}
       <WelcomeThreshold locale={locale} texts={welcome} />
-      <Container className="pt-6 sm:pt-10">
-        <SearchPanel locale={locale} />
+      <Container className="pt-4 sm:pt-8">
+        <h1 className="max-w-2xl text-2xl font-semibold text-balance sm:text-3xl">{t("title")}</h1>
+        <p className="mt-2 max-w-xl text-foreground-muted text-pretty sm:text-lg">{t("subtitle")}</p>
       </Container>
       <Container className="flex flex-col gap-12 py-10 sm:gap-14 sm:py-14">
         {/* Desktop only (AF §8 table): no ad on the phone home page. */}

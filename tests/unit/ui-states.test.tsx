@@ -12,7 +12,10 @@ import { Gallery } from "@/components/listing/gallery";
 import { ListingCard } from "@/components/listing/listing-card";
 import { ChipRadioGroup } from "@/components/post/controls/chips";
 import { Button } from "@/components/ui/button";
+import { ListingGridSkeleton, PageSkeleton } from "@/components/feedback/skeletons";
+import { KhatamLoader } from "@/components/ui/khatam-loader";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { quietLinkClassName, textLinkClassName } from "@/components/ui/text-link";
 import { Toaster, toastMotionClassName } from "@/components/ui/toaster";
 import type { PublicListingCard } from "@/lib/listings/public";
@@ -113,9 +116,42 @@ describe("text links", () => {
 });
 
 describe("Skeleton", () => {
-  it("drops the shine sweep under reduced motion and keeps a flat block", () => {
+  it("is a still cream block, without the shine sweep", () => {
     const classes = classOf(renderToStaticMarkup(<Skeleton className="h-4" />), "div");
-    expect(classes).toEqual(expect.arrayContaining(["skeleton-shimmer", "motion-reduce:animate-none", "motion-reduce:bg-none", "motion-reduce:bg-skeleton", "h-4"]));
+    expect(classes).toEqual(["rounded-md", "bg-skeleton", "h-4"]);
+  });
+
+  it("keeps the blocks and lays one khatam over the region, the status named in text", () => {
+    for (const html of [renderToStaticMarkup(<ListingGridSkeleton label="Chargement de vos favoris" />), renderToStaticMarkup(<PageSkeleton label="Chargement" />)]) {
+      expect(html).toMatch(/^<div role="status" aria-busy="true" class="relative/);
+      expect(html.match(/data-testid="skeleton-loader"/g)).toHaveLength(1);
+      expect(html.match(/data-loader="khatam"/g)).toHaveLength(1);
+      expect(html.match(/class="rounded-md bg-skeleton/g)?.length).toBeGreaterThan(4);
+    }
+  });
+});
+
+describe("KhatamLoader", () => {
+  it("is a gold khatam, hidden from assistive technology unless it carries a label", () => {
+    const decorative = renderToStaticMarkup(<KhatamLoader />);
+    expect(decorative).toBe('<span aria-hidden="true" data-loader="khatam" class="khatam size-[2.125rem] [--khatam-stroke:2.5px] text-gold-500 dark:text-gold-300"></span>');
+    const status = renderToStaticMarkup(<KhatamLoader size="lg" label="Chargement des annonces…" />);
+    expect(status).toMatch(/^<span role="status" class="inline-flex"><span aria-hidden="true" data-loader="khatam" class="khatam size-12 /);
+    expect(status).toContain('<span class="sr-only">Chargement des annonces…</span>');
+  });
+
+  it("stands in for the spinner of buttons, in the text's size and colour", () => {
+    expect(renderToStaticMarkup(<Spinner />)).toBe('<span aria-hidden="true" data-loader="khatam" class="khatam size-[1.1em] [--khatam-stroke:0.1em]"></span>');
+    const button = renderToStaticMarkup(<Button loading>Publier</Button>);
+    expect(button).toContain('aria-busy="true"');
+    expect(button).toContain('data-loader="khatam"');
+  });
+
+  it("stays still under reduced motion", () => {
+    const css = readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../src/styles/globals.css"), "utf8");
+    const rule = /@utility khatam \{[\s\S]*?\n\}/.exec(css)?.[0] ?? "";
+    expect(rule).toContain("animation: khatam-turn 3.2s linear infinite;");
+    expect(rule).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*animation: none;/);
   });
 });
 

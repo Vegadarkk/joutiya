@@ -7,17 +7,18 @@ import { describe, expect, it, vi } from "vitest";
 import ar from "../../messages/ar.json";
 import fr from "../../messages/fr.json";
 import { CategoryGrid } from "@/components/home/category-grid";
-import { dropEmptyFields, SearchPanel } from "@/components/home/search-panel";
+import { HeaderSearch } from "@/components/layout/header-search";
 import { SwitchField } from "@/components/post/controls/switch";
 import { SearchCityCombobox } from "@/components/search/city-combobox";
+import { dropEmptyFields } from "@/components/search/drop-empty-fields";
 import { escapeClosesList, FiltersSheet } from "@/components/search/filters-sheet";
 import type { Locale } from "@/config/site";
 import { parseSearchParams } from "@/lib/search/params";
 
-// Place field, filters sheet, switch rows and home hero after the phase 4 browser pass: the list
+// Place field, filters sheet, switch rows and search forms after the phase 4 browser pass: the list
 // floats above the results toolbar and stays out of the Tab order, Escape in an open list keeps
-// the sheet, the sheet animates out, switch rows are 44 px targets, the home form leaves empty
-// fields out of the URL and the category row shows part of the next tile.
+// the sheet, the sheet animates out, switch rows are 44 px targets, the GET search forms leave
+// empty fields out of the URL and the category row shows part of the next tile.
 
 vi.mock("next/navigation", async (importOriginal) => ({
   ...(await importOriginal<typeof NextNavigation>()),
@@ -99,7 +100,7 @@ describe("SwitchField", () => {
   });
 });
 
-describe("SearchPanel", () => {
+describe("header search pill", () => {
   it("leaves empty fields out of the submitted URL", () => {
     const data = new FormData();
     data.append("q", "");
@@ -114,10 +115,19 @@ describe("SearchPanel", () => {
     expect([...words.entries()]).toEqual([["q", "vélo"]]);
   });
 
-  it("still renders the GET form to the search page", () => {
-    const html = render(<SearchPanel locale="ar" />, "ar");
-    expect(html).toMatch(/<form role="search"[^>]*action="\/ar\/recherche" method="get"/);
+  it("renders the GET form to the search page: words, then the place under its own name, then a named submit", () => {
+    const html = render(<HeaderSearch locale="ar" />, "ar");
+    const form = /<form [^>]*>/.exec(html)?.[0] ?? "";
+    expect(form).toContain(`role="search" aria-label="${ar.Nav.searchLabel}"`);
+    expect(form).toContain('action="/ar/recherche" method="get"');
     expect(html).toContain('name="q"');
+    // The place keeps the search page's names (ville / region) and has a label of its own: the
+    // posting wizard's "Ville" field shares no accessible name with it.
+    expect(html).toContain(`<label for="${/<label for="([^"]+-input)"/.exec(html)?.[1]}" class="sr-only">${ar.Nav.searchPlace}</label>`);
+    expect(fr.Nav.searchPlace).not.toMatch(/ville/i);
+    expect(html).toContain(`aria-label="${ar.Nav.searchSubmit}"`);
+    // The place segment from lg only: phones and tablets search by words.
+    expect(html).toMatch(/<div class="relative hidden w-52 [^"]*lg:block[^"]*"><div class="relative flex flex-col/);
   });
 });
 

@@ -8,10 +8,14 @@
     "skip": "الانتقال إلى المحتوى",
     "home": "الصفحة الرئيسية لجوطية",
     "post": "أضف إعلانًا",
+    "sell": "بيع",
     "searchLabel": "ابحث عن إعلان",
-    "searchPlaceholder": "ابحث في جوطية",
+    "searchPlaceholder": "عمّاذا تبحث؟",
+    "searchPlace": "مكان البحث",
+    "searchSubmit": "ابحث",
     "signIn": "تسجيل الدخول",
-    "guide": "الإجراءات"
+    "guide": "الإجراءات",
+    "categories": "الفئات"
   },
   "Locale": {
     "label": "اللغة",
@@ -26,9 +30,6 @@
   "Home": {
     "title": "بِع واشترِ بالقرب منك",
     "subtitle": "إعلانات مبوبة بين الأفراد والمهنيين، من طنجة إلى الداخلة.",
-    "searchLabel": "عمّاذا تبحث؟",
-    "searchPlaceholder": "هاتف، دراجة، شقة…",
-    "submit": "ابحث",
     "pillars": {
       "free": {
         "title": "النشر مجاني",

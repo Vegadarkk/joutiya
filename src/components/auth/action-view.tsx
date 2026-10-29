@@ -8,7 +8,7 @@ import { useTranslations } from "next-intl";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "@/lib/zod";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { KhatamLoader } from "@/components/ui/khatam-loader";
 import { Link } from "@/i18n/navigation";
 import { apiPost, isApiError, setSession } from "@/lib/auth/client";
 import { AUTH_API, passwordSchema, type ActionResponse, type SessionSummary } from "@/lib/contracts/auth";
@@ -88,7 +88,7 @@ export function ActionView({ nonce }: { nonce?: string }) {
   if (state.kind === "working") {
     return (
       <div role="status" className="flex items-center gap-3 rounded-lg border border-border bg-surface-muted px-5 py-6 text-foreground-muted">
-        <Spinner className="size-5 text-primary" />
+        <KhatamLoader size="sm" />
         <span>{mode === "verifyEmail" ? t("verifying") : t("checking")}</span>
       </div>
     );

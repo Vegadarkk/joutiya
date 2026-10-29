@@ -8,9 +8,10 @@ import { CATEGORIES } from "@/config/categories";
 import type { SearchParams } from "@/lib/search/params";
 import { SearchUnavailableError, type SearchCard } from "@/lib/search/types";
 
-// The home page module (lot L3b, D21): ISR every 5 minutes, search panel with the location
-// combobox, the twelve category tiles, À la Une (8) and the 12 newest listings; an engine failure
-// leaves the listing sections out and the page still renders. French and Arabic.
+// The home page module (lot L3b, D21): ISR every 5 minutes, the page's heading (the search is the
+// header's pill since the Carte vivante, lot 1), the twelve category tiles, À la Une (8) and the
+// 12 newest listings; an engine failure leaves the listing sections out and the page still
+// renders. French and Arabic.
 
 const mocks = vi.hoisted(() => ({
   featuredListings: vi.fn<(params: SearchParams, count: number) => Promise<SearchCard[]>>(),
@@ -89,17 +90,18 @@ describe("home page", () => {
     expect(page.generateStaticParams()).toEqual([]);
   });
 
-  it("renders the panel, the categories, À la Une and the recent listings", async () => {
+  it("renders the heading, the categories, À la Une and the recent listings", async () => {
     mocks.featuredListings.mockResolvedValue(cards("feat", 8, { featured: true }));
     mocks.latestListings.mockResolvedValue(cards("rece", 12));
     const html = await renderPage();
     expect(mocks.featuredListings).toHaveBeenCalledWith({}, 8);
     expect(mocks.latestListings).toHaveBeenCalledWith({}, 12);
-    const form = html.match(/<form[^>]*>/)?.[0] ?? "";
-    expect(form).toContain('role="search"');
-    expect(form).toContain('action="/fr/recherche" method="get"');
-    expect(html).toContain('role="combobox"');
-    expect(html).toContain('name="q"');
+    expect(html).toContain(`<h1 class="max-w-2xl text-2xl font-semibold text-balance sm:text-3xl">${fr.Home.title}</h1>`);
+    expect(html).toContain(fr.Home.subtitle);
+    // One search field per page: the header's pill. The only form left is the car rental module's.
+    expect(html).not.toContain('role="search"');
+    expect(html.match(/<form[^>]*>/g)).toHaveLength(1);
+    expect(html).toContain('data-testid="home-rent-car"');
     expect(html).toContain('data-testid="home-categories"');
     expect(CATEGORIES).toHaveLength(12);
     for (const category of CATEGORIES) expect(html).toContain(`href="/fr/c/${category.id}"`);
@@ -116,6 +118,7 @@ describe("home page", () => {
     mocks.featuredListings.mockResolvedValue(cards("feat", 2, { featured: true }));
     mocks.latestListings.mockResolvedValue(cards("rece", 3));
     const html = await renderPage("ar");
+    expect(html).toContain(`>${ar.Home.title}</h1>`);
     expect(html).toContain('action="/ar/recherche"');
     expect(html).toContain(`href="/ar/c/${CATEGORIES[0]?.id}"`);
     expect(html).toContain(ar.Home.categories.title);

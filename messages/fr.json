@@ -8,10 +8,14 @@
     "skip": "Aller au contenu",
     "home": "Accueil Joutiya",
     "post": "Déposer une annonce",
+    "sell": "Vendre",
     "searchLabel": "Rechercher une annonce",
-    "searchPlaceholder": "Rechercher sur Joutiya",
+    "searchPlaceholder": "Que cherchez-vous ?",
+    "searchPlace": "Lieu de la recherche",
+    "searchSubmit": "Rechercher",
     "signIn": "Se connecter",
-    "guide": "Démarches"
+    "guide": "Démarches",
+    "categories": "Catégories"
   },
   "Locale": {
     "label": "Langue",
@@ -36,9 +40,6 @@
   "Home": {
     "title": "Achetez et vendez près de chez vous",
     "subtitle": "Des petites annonces entre particuliers et professionnels, de Tanger à Dakhla.",
-    "searchLabel": "Que cherchez-vous ?",
-    "searchPlaceholder": "Téléphone, vélo, appartement…",
-    "submit": "Rechercher",
     "pillars": {
       "free": {
         "title": "Publier gratuitement",

@@ -1,5 +1,5 @@
 import { useTranslations } from "next-intl";
-import { ListingCardSkeleton } from "@/components/feedback/skeletons";
+import { ListingCardSkeleton, SkeletonLoader } from "@/components/feedback/skeletons";
 import { Container } from "@/components/layout/container";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RESULTS_GRID_CLASS } from "./grid";
@@ -13,10 +13,11 @@ export function SearchResultsSkeleton({ count = 12 }: { count?: number }) {
       <span className="sr-only">{t("loading")}</span>
       <div className="border-b border-border bg-surface-brand/60">
         <Container className="py-4 sm:py-6">
-          <Skeleton className="h-[7.5rem] rounded-lg sm:h-16" />
+          <Skeleton className="h-[7.5rem] rounded-lg bg-surface sm:h-16" />
         </Container>
       </div>
-      <Container className="flex flex-col gap-5 pt-6 pb-12 sm:pt-8">
+      <Container className="relative flex flex-col gap-5 pt-6 pb-12 sm:pt-8">
+        <SkeletonLoader />
         <div className="flex flex-col gap-2">
           <Skeleton className="h-8 w-2/3 max-w-sm" />
           <Skeleton className="h-4 w-32" />

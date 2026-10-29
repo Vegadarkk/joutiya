@@ -6,7 +6,7 @@ import { useApiErrorMessage } from "@/components/auth/form-message";
 import { TurnstileWidget, type TurnstileHandle } from "@/components/auth/turnstile-widget";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { KhatamLoader } from "@/components/ui/khatam-loader";
 import { apiPost } from "@/lib/auth/client";
 import { SEARCH_API } from "@/lib/contracts/search";
 
@@ -68,7 +68,7 @@ export function PageChallenge({ next, nonce }: { next: string; nonce?: string })
       >
         {state.kind === "sending" ? (
           <>
-            <Spinner />
+            <KhatamLoader size="inline" />
             {t("checking")}
           </>
         ) : state.kind === "done" ? (

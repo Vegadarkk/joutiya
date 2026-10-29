@@ -3,8 +3,10 @@ import { ConsentLink } from "@/components/consent/consent-link";
 import { Link } from "@/i18n/navigation";
 import { LEGAL_PAGES } from "@/config/legal-pages";
 import { Container } from "@/components/layout/container";
+import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { Logo } from "@/components/layout/logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { SITE_NAME } from "@/config/site";
 import { quietLinkClassName } from "@/components/ui/text-link";
 import { cn } from "@/lib/utils";
 
@@ -18,9 +20,13 @@ export function Footer({ publisher }: { publisher: string }) {
     <footer className="mt-auto border-t-2 border-structure bg-surface-brand text-foreground dark:border-bab-600">
       <Container className="grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr]">
         <div className="flex flex-col gap-4">
-          <Logo label="Joutiya" className="h-12 w-fit" />
+          <Logo label={SITE_NAME} className="h-12 w-fit" />
           <p className="max-w-xs text-sm text-pretty text-foreground-muted">{t("about")}</p>
-          <ThemeToggle className="w-fit bg-background/40" />
+          <div className="flex flex-wrap items-center gap-3">
+            <ThemeToggle className="w-fit bg-background/40" />
+            {/* Phones only: from md the language menu is in the header. */}
+            <LocaleSwitcher className="border border-border bg-background/40 md:hidden" />
+          </div>
         </div>
         <nav aria-labelledby="footer-legal">
           <h2 id="footer-legal" className="mb-4 font-semibold">
@@ -65,7 +71,8 @@ export function Footer({ publisher }: { publisher: string }) {
         </nav>
       </Container>
       <div className="border-t border-foreground/10">
-        <Container className="flex flex-col gap-2 py-5 text-xs text-foreground-muted sm:flex-row sm:items-center sm:justify-between">
+        {/* Phones: room at the end for the floating "Vendre" arch. */}
+        <Container className="flex flex-col gap-2 py-5 pb-24 text-xs text-foreground-muted sm:flex-row sm:items-center sm:justify-between md:pb-5">
           <p className="max-w-2xl text-pretty">{t("disclaimer")}</p>
           <p className="shrink-0">{t("copyright", { year, publisher })}</p>
         </Container>

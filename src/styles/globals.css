@@ -105,8 +105,11 @@
   --success-surface: #e8f5ee;
   --warning: #8a5a00;
   --warning-surface: #fdf3dc;
-  --skeleton: #e9eeec;
-  --skeleton-shine: #f6f8f7;
+  /* Placeholder blocks: a still cream wash (the khatam loader tells that something is coming). */
+  --skeleton: var(--color-cream-200);
+  /* Floating controls (header pills, later the map overlays): hairline edge and soft drop. */
+  --float-edge: rgb(11 30 31 / 0.07);
+  --float-shadow: rgb(11 30 31 / 0.28);
 }
 
 [data-theme="dark"] {
@@ -137,8 +140,9 @@
   --success-surface: #0f2e22;
   --warning: #fdb022;
   --warning-surface: #33260a;
-  --skeleton: #183a3b;
-  --skeleton-shine: #21494a;
+  --skeleton: #143537;
+  --float-edge: rgb(242 233 216 / 0.09);
+  --float-shadow: rgb(0 0 0 / 0.55);
 }
 
 @theme inline {
@@ -168,7 +172,6 @@
   --color-warning: var(--warning);
   --color-warning-surface: var(--warning-surface);
   --color-skeleton: var(--skeleton);
-  --color-skeleton-shine: var(--skeleton-shine);
 }
 
 @layer base {
@@ -206,29 +209,77 @@
   box-shadow: inset 0 -3px 0 var(--featured);
 }
 
+/* A control floating over the page (header pills; the map overlays of the Carte vivante later). */
+@utility float-card {
+  background-color: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--float-edge),
+    0 8px 20px -10px var(--float-shadow);
+}
+
+/* "Vendre": the door's arch in ochre, standing in a gold frame (the threshold) set off by the ground. */
+@utility sell-arch {
+  border-radius: var(--radius-arch);
+  background-color: var(--color-ochre-600);
+  color: var(--color-cream-50);
+  box-shadow:
+    0 0 0 3px var(--background),
+    0 0 0 4.5px var(--color-gold-400),
+    0 10px 22px -10px rgb(11 30 31 / 0.55);
+}
+
+/* The sticky header lifts off the page once it scrolls (scroll-driven, no script; static where unsupported). */
+@utility header-lift {
+  @supports (animation-timeline: scroll()) {
+    animation: header-lift linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 4rem;
+  }
+}
+
+@keyframes header-lift {
+  to {
+    box-shadow:
+      0 1px 0 var(--float-edge),
+      0 10px 24px -18px var(--float-shadow);
+  }
+}
+
 /* Pointed horseshoe arch of the logo, used for brand frames. */
 @utility arch {
   border-start-start-radius: 50% 2.25rem;
   border-start-end-radius: 50% 2.25rem;
 }
 
-@utility skeleton-shimmer {
-  background: linear-gradient(
-    90deg,
-    var(--skeleton) 0%,
-    var(--skeleton-shine) 40%,
-    var(--skeleton) 80%
-  );
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+/*
+ * Loading mark: the khatam, the 8-point star of the logo's door (two squares, one turned 45deg),
+ * turning slowly. Drawn in currentColor; --khatam-stroke sets the line for each size
+ * (src/components/ui/khatam-loader.tsx). Reduced motion keeps the star still.
+ */
+@utility khatam {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  animation: khatam-turn 3.2s linear infinite;
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 17.5%;
+    border: var(--khatam-stroke, 2px) solid currentColor;
+    border-radius: 1px;
+  }
+  &::after {
+    transform: rotate(45deg);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 }
 
-@keyframes skeleton-shimmer {
-  from {
-    background-position: 100% 0;
-  }
+@keyframes khatam-turn {
   to {
-    background-position: -100% 0;
+    transform: rotate(360deg);
   }
 }
 

@@ -39,12 +39,11 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   // Fleet of a car rental agency's storefront, filtered by dates in place (rental pack §5).
   "Storefront.fleet",
   // Search islands shared by the home, category and listing pages (phase 4): favorite heart,
-  // À la Une badge, search bar and place field, home search panel.
+  // À la Une badge, search bar and the place field (the header's search pill too).
   "Favorites.button",
   "ListingCard",
   "Search.bar",
   "Search.location",
-  "Home",
 ] as const;
 
 /**

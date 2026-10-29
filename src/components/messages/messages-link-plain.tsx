@@ -8,7 +8,7 @@ import { Link } from "@/i18n/navigation";
 // (messages-link.tsx) loads, or for good if it cannot be downloaded. Kept apart so the account
 // menu (first JavaScript of every page) does not pull the live client.
 
-export const MESSAGES_LINK_CLASS = "relative inline-flex size-11 items-center justify-center rounded-md text-foreground hover:bg-surface-muted [&_svg]:size-[1.15rem]";
+export const MESSAGES_LINK_CLASS = "relative inline-flex size-11 items-center justify-center rounded-full text-foreground transition-[background-color] duration-150 ease-door hover:bg-surface-muted [&_svg]:size-[1.15rem]";
 
 export function MessagesLinkPlain() {
   const t = useTranslations("Auth.menu");

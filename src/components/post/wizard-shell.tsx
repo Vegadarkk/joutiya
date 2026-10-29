@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Check, CircleDot, CloudOff, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CircleDot, CloudOff } from "lucide-react";
+import { KhatamLoader } from "@/components/ui/khatam-loader";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { isApiError } from "@/lib/auth/client";
@@ -160,7 +161,7 @@ export function SaveIndicator({ state, error, mode = "auto", onRetry, onSave, he
   return (
     <p role="status" aria-live="polite" className={cn("flex min-h-5 flex-wrap items-center gap-x-1.5 gap-y-1 text-sm", state === "error" ? "text-danger" : state === "pending" && live ? "text-warning" : "text-foreground-muted")}>
       {state === "saving" ? (
-        <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
+        <KhatamLoader size="sm" className="size-4" />
       ) : state === "saved" ? (
         <Check className="size-4 shrink-0 text-success" aria-hidden="true" />
       ) : state === "error" ? (

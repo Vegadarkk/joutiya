@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CarFront, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { dropEmptyFields } from "@/components/home/search-panel";
+import { dropEmptyFields } from "@/components/search/drop-empty-fields";
 import { LocationField } from "@/components/search/location-field";
 import { Button } from "@/components/ui/button";
 import { RENTAL_SUBCATEGORY } from "@/config/categories";
