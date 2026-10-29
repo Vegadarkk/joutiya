@@ -44,7 +44,9 @@ Quand vous choisissez un lieu et un rayon, vous pouvez trier du plus proche au p
 
 ### 2.4 Prix {#tri-4}
 
-Vous pouvez trier du prix le plus bas au plus haut, ou l'inverse. Une annonce Pro proposée en plusieurs variantes (taille, couleur, contenance) à des prix différents est triée et filtrée selon son prix le plus bas.
+Vous pouvez trier du prix le plus bas au plus haut, ou l'inverse. Une annonce Pro proposée en plusieurs variantes (taille, couleur, contenance) à des prix différents est triée et filtrée selon son prix le plus bas. Le tri par prix retient le prix hors promotion.
+
+Le tri « Plus forte réduction » ne garde que les annonces dont une promotion est en cours, et les range de la plus forte réduction à la plus faible, puis de la plus récente à la plus ancienne. La réduction se mesure par rapport au prix barré calculé par {brand} (le prix le plus bas des 30 jours avant la promotion, voir les [CGU](/legal/cgu#annonces-8)) ; une promotion sans prix barré compte pour une réduction nulle et vient après les autres. Le filtre « En promotion » garde les mêmes annonces sans changer le tri choisi.
 
 ### 2.5 Mesures de modération {#tri-5}
 
@@ -54,7 +56,7 @@ Vous pouvez trier du prix le plus bas au plus haut, ou l'inverse. Une annonce Pr
 
 Les filtres (catégorie, prix, lieu, etc.) restreignent la liste des résultats. Ils ne changent pas l'ordre du tri choisi, sauf les dates de location (§2.7).
 
-Une annonce Pro dont le stock déclaré est épuisé, pour toutes ses variantes, ne figure plus dans les résultats par défaut. Elle reste en ligne, et une option de recherche permet d'afficher aussi les articles épuisés.
+Une annonce Pro dont le stock déclaré est épuisé, pour toutes ses variantes, ne figure plus dans les résultats par défaut. Elle reste en ligne avec la mention « Épuisé », et l'option « Inclure les articles épuisés » la fait réapparaître dans les résultats.
 
 ### 2.7 Location de voitures par dates {#tri-7}
 
@@ -63,6 +65,10 @@ Quand vous cherchez une voiture de location pour des dates précises, les véhic
 ### 2.8 Annonces exemples {#tri-8}
 
 Les annonces marquées « Annonce exemple » sont rédigées par {brand} pour illustrer le site ([CGU](/legal/cgu#role-4)). Elles apparaissent dans les résultats selon les mêmes règles, avec cette mention, et ne reçoivent aucune option payante.
+
+### 2.9 Vue carte {#tri-9}
+
+La page de recherche peut s'afficher en carte ou en liste. Sur la carte, chaque annonce est placée à une position approximative, arrondie à environ 1 km, jamais à l'adresse exacte. La liste à côté de la carte suit le tri choisi. Le bouton « Rechercher dans cette zone » limite les résultats aux annonces de la zone affichée ; il agit comme un filtre de lieu (§2.6).
 
 ## 3. Les options payantes {#options}
 
@@ -76,7 +82,7 @@ Deux options payantes permettent de mettre une annonce en avant. L'annonceur les
 
 ### 3.2 À la Une {#options-2}
 
-- **Effet.** L'annonce apparaît en plus, dans des emplacements séparés des résultats : deux emplacements en tête de la première page de résultats et le carrousel de l'accueil. Les annonces À la Une sont tirées au sort et placées à des positions fixes. L'option dure 7 ou 30 jours. L'annonce reste aussi dans les résultats ordinaires, à sa place habituelle.
+- **Effet.** L'annonce apparaît en plus, dans des emplacements séparés des résultats : deux emplacements en tête de la première page de résultats et le carrousel de l'accueil. Les annonces À la Une sont tirées au sort et placées à des positions fixes. L'option dure 7 ou 30 jours. L'annonce reste aussi dans les résultats ordinaires, à sa place habituelle. En vue carte (§2.9), les annonces À la Une sont regroupées en tête de la liste avec la même mention, et leur repère sur la carte montre une photo, dans une couleur expliquée par la légende.
 - **Mention.** « À la Une · Sponsorisé ».
 - **Info-bulle.** « Emplacement payé par l'annonceur. Il ne modifie pas le classement des autres résultats. »
 

@@ -176,7 +176,7 @@ Nos e-mails ne contiennent ni pixel de suivi d'ouverture ni lien de suivi des cl
 
 ### 3.7 Les favoris, les alertes de recherche et les avis {#finalites-7}
 
-Vous pouvez enregistrer des annonces en favoris et sauvegarder jusqu'à 10 recherches. Si vous activez une alerte, nous vous envoyons au plus un e-mail par jour avec les nouvelles annonces. Vous pouvez supprimer un favori, une recherche ou une alerte à tout moment.
+Vous pouvez enregistrer des annonces en favoris et sauvegarder jusqu'à 10 recherches. Si vous activez une alerte, nous vous envoyons au plus un e-mail par jour avec les nouvelles annonces. Ce même e-mail signale aussi vos favoris dont une promotion a commencé la veille, avec leur prix promotionnel et leur prix barré. Vous pouvez supprimer un favori, une recherche ou une alerte à tout moment.
 
 Après un échange par la messagerie, l'acheteur peut noter le vendeur (voir [Avis utilisateurs](/legal/avis-utilisateurs)). Nous vérifions à partir de la conversation que l'échange a eu lieu. Le texte passe par des contrôles automatiques, et un avis qui semble contenir une donnée sensible est examiné par un modérateur avant publication. Un avis publié est public : il montre le pseudonyme de son auteur, la note, le texte, la date de l'avis et celle de l'échange, et le titre de l'annonce, sur le profil ou la boutique du vendeur, qui peut y répondre une fois. L'auteur peut supprimer son avis à tout moment. S'il ferme son compte, ses avis restent affichés et son nom est remplacé par « Ancien membre ». Si le vendeur ferme son compte, les avis qu'il a reçus sont masqués.
 
