@@ -2,7 +2,7 @@
 // admin and journaled; this file holds the schema and the defaults. Legal form, capital and VAT
 // are data, never hardcoded in pages. The only address ever displayed is the Paris domiciliation.
 
-import { z } from "@/lib/zod";
+import { z } from "../lib/zod.ts";
 
 const text = z.string().trim();
 
