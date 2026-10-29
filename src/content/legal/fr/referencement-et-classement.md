@@ -44,7 +44,7 @@ Quand vous choisissez un lieu et un rayon, vous pouvez trier du plus proche au p
 
 ### 2.4 Prix {#tri-4}
 
-Vous pouvez trier du prix le plus bas au plus haut, ou l'inverse.
+Vous pouvez trier du prix le plus bas au plus haut, ou l'inverse. Une annonce Pro proposée en plusieurs variantes (taille, couleur, contenance) à des prix différents est triée et filtrée selon son prix le plus bas.
 
 ### 2.5 Mesures de modération {#tri-5}
 
@@ -53,6 +53,8 @@ Vous pouvez trier du prix le plus bas au plus haut, ou l'inverse.
 ### 2.6 Filtres {#tri-6}
 
 Les filtres (catégorie, prix, lieu, etc.) restreignent la liste des résultats. Ils ne changent pas l'ordre du tri choisi, sauf les dates de location (§2.7).
+
+Une annonce Pro dont le stock déclaré est épuisé, pour toutes ses variantes, ne figure plus dans les résultats par défaut. Elle reste en ligne, et une option de recherche permet d'afficher aussi les articles épuisés.
 
 ### 2.7 Location de voitures par dates {#tri-7}
 
