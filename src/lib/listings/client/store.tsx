@@ -83,6 +83,8 @@ function applyPatch(listing: OwnerListing, patch: ListingPatch): OwnerListing {
   if (patch.isDonation !== undefined) next.isDonation = patch.isDonation;
   if (patch.location !== undefined) next.location = patch.location;
   if (patch.contact !== undefined) next.contact = patch.contact;
+  if (patch.variants !== undefined) next.variants = patch.variants;
+  if (patch.stock !== undefined) next.stock = patch.stock;
   if (patch.sensitiveDeclaration !== undefined) {
     next.sensitiveDeclaration = patch.sensitiveDeclaration ? { kind: patch.sensitiveDeclaration.kind, at: new Date().toISOString() } : null;
   }

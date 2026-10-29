@@ -1,11 +1,14 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
+import { InlineError } from "@/components/feedback/inline-error";
 import { subcategoryById } from "@/config/categories";
 import { useWizard } from "@/lib/listings/client/store";
 import { stepIssues } from "@/lib/listings/client/validation";
+import { attributesWithoutAxes } from "@/lib/listings/client/variants";
 import { useValidationMessage } from "../field-messages";
 import { PriceInput } from "../price-input";
+import { VariantsEditor } from "../variants-editor";
 import { STEP_FORM_ID } from "../wizard-shell";
 
 export function PriceStep({ onNext }: { onNext: () => void }) {
@@ -17,6 +20,7 @@ export function PriceStep({ onNext }: { onNext: () => void }) {
   const blocker = blockers.find((issue) => issue.path === "price" || issue.path === "isDonation");
   const issue = blocker ?? (attempted ? issues[0] : undefined);
   const error = issue ? message(issue.code) : undefined;
+  const catalogueBlockers = blockers.filter((item) => item.path === "stock" || item.path.startsWith("variants"));
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -42,6 +46,20 @@ export function PriceStep({ onNext }: { onNext: () => void }) {
         error={error}
         onBlur={() => void flush()}
       />
+      {/* Pro catalogue (owner decision 5: Pros only): no stock nor variants on a donation. */}
+      {subcategory && listing.sellerType === "pro" && !listing.isDonation ? (
+        <VariantsEditor
+          subcategory={subcategory}
+          price={listing.price}
+          variants={listing.variants}
+          stock={listing.stock}
+          onChange={({ variants, stock }) => update({ variants, stock, ...(variants ? { attributes: attributesWithoutAxes(listing.attributes, variants.axes) } : {}) })}
+          onBlur={() => void flush()}
+        />
+      ) : null}
+      {catalogueBlockers.map((item) => (
+        <InlineError key={`${item.path}:${item.code}`}>{message(item.code)}</InlineError>
+      ))}
     </form>
   );
 }

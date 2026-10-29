@@ -926,6 +926,39 @@
       "jour": "jours",
       "ans": "ans",
       "mad": "DH"
+    },
+    "catalogue": {
+      "title": "Stock et variantes",
+      "hint": "Facultatif. Proposez plusieurs tailles, couleurs ou contenances dans une seule annonce et indiquez votre stock. Joutiya ne vend rien à votre place : mettez le stock à jour quand vous vendez.",
+      "mode": "Comment vendez-vous cet article ?",
+      "single": "Un seul modèle",
+      "multiple": "Plusieurs variantes",
+      "trackStock": "Indiquer le stock",
+      "trackStockHint": "L'annonce affiche « Plus que N en stock » à partir de 5, et « Épuisé » à 0.",
+      "stock": "Stock",
+      "untracked": "Non suivi",
+      "axis": "Caractéristique {n}",
+      "axisFree": "Autre (à nommer)",
+      "axisLabel": "Nom de la caractéristique",
+      "axisLabelPlaceholder": "Contenance",
+      "labelRequired": "Nommez cette caractéristique.",
+      "values": "Valeurs",
+      "newValue": "Nouvelle valeur",
+      "valuePlaceholder": "500 g",
+      "addValue": "Ajouter",
+      "removeValue": "Retirer {value}",
+      "duplicateValue": "Cette valeur existe déjà.",
+      "valuesRequired": "Choisissez au moins une valeur.",
+      "addAxis": "Ajouter une caractéristique",
+      "removeAxis": "Retirer « {name} »",
+      "combinations": "Combinaisons proposées",
+      "combinationsHint": "Décochez celles que vous ne vendez pas. Sans prix propre, une combinaison prend le prix de l'annonce {price}.",
+      "combination": "Combinaison",
+      "price": "Prix ({currency})",
+      "ref": "Référence",
+      "tooMany": "{count} combinaisons : {max} au plus. Retirez des valeurs.",
+      "noneOffered": "Proposez au moins une combinaison.",
+      "fromVariants": "{criteria} : indiqué par les variantes, à l'étape Prix."
     }
   },
   "Categories": {
@@ -2550,6 +2583,25 @@
     "errors": {
       "renewBlocked": "Votre annonce doit être corrigée avant d'être renouvelée : corrigez les points signalés et enregistrez, puis renouvelez-la depuis « Mes annonces ».",
       "listingLimit": "Vous avez atteint le nombre maximal d'annonces actives. Mettez en pause ou supprimez une autre annonce pour remettre celle-ci en ligne."
+    },
+    "stock": {
+      "untracked": "Stock non suivi",
+      "soldOut": "Épuisé : hors des résultats par défaut",
+      "count": "{count} en stock",
+      "low": "Plus que {count} en stock",
+      "variants": "{count, plural, one {# combinaison} other {# combinaisons}} en vente",
+      "variantsSoldOut": "{count, plural, one {# combinaison} other {# combinaisons}}, dont {out, plural, one {# épuisée} other {# épuisées}}",
+      "open": "Stock",
+      "openOf": "Mettre à jour le stock de {title}",
+      "title": "Stock de {title}",
+      "hint": "Indiquez ce qu'il vous reste. L'annonce se met à jour tout de suite, sans nouvelle vérification.",
+      "stock": "Stock",
+      "stockOf": "Stock de {name}",
+      "emptyHint": "Laissez vide pour ne pas suivre le stock. À 0, l'article reste en ligne avec la mention « Épuisé ».",
+      "untrackedShort": "Non suivi",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "saved": "Stock mis à jour"
     }
   },
   "Map": {

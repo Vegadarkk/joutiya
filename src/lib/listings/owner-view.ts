@@ -99,6 +99,7 @@ export function toOwnerSummary(listing: ListingRecord, now = new Date()): OwnerL
     expiresAt: iso(listing.expiresAt),
     canRenew: canRenew(listing, now),
     ...(listing.subcategoryId === RENTAL_SUBCATEGORY ? { rental: rentalAvailabilityOf(listing) } : {}),
+    ...(listing.sellerType === "pro" && !listing.isDonation ? { catalogue: { stock: listing.stock ?? null, variants: listing.variants ?? null } } : {}),
   };
 }
 
