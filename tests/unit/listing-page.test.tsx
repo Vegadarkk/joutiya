@@ -230,7 +230,7 @@ describe("page content", () => {
     expect(html).toContain("4 annonces en ligne");
     expect(html).toContain('data-testid="contact-bar"');
     expect(html).toContain('data-testid="safety-tips"');
-    expect(html).toContain('data-testid="map-block" data-city="casablanca" data-seed="abcd2345" class="w-full max-w-[35rem]"');
+    expect(html).toContain('data-testid="map-block" data-city="casablanca" data-seed="abcd2345" class="w-full max-w-[26rem]"');
     // Report link, safety tips, then the ad slot: never an ad right after a contact or report control (D6).
     const report = html.indexOf(fr.Report.trigger.listing.replace(/'/g, "&#x27;"));
     const tips = html.indexOf('data-testid="safety-tips"');

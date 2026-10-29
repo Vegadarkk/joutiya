@@ -46,7 +46,8 @@ export function Lightbox({ open, start, onClose, onCloseAutoFocus, listingId, ti
       }}
     >
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-bab-950/95 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        {/* Opaque: at 95 % the page's header and price showed through the photo (UX audit). */}
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-bab-950 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
         <Dialog.Content
           onKeyDown={onKeyDown}
           onCloseAutoFocus={onCloseAutoFocus}
@@ -77,7 +78,7 @@ export function Lightbox({ open, start, onClose, onCloseAutoFocus, listingId, ti
                 const sources = photoSources(mediaBaseUrl, listingId, photo, "l");
                 if (!sources) return null;
                 return (
-                  <li key={photo.id} className="flex h-full w-full shrink-0 snap-center snap-always items-center justify-center px-2 pb-4 sm:px-16">
+                  <li key={photo.id} className="flex h-full w-full shrink-0 snap-center snap-always items-center justify-center pb-4 sm:px-16">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={sources.large}
