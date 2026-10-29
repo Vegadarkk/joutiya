@@ -1,12 +1,15 @@
 import { z } from "@/lib/zod";
 import { startConversationSchema, stripFormatCharacters } from "@/lib/contracts/messaging";
 import { DAY_PATTERN } from "@/lib/listings/rental-availability";
+import type { RentalUnit } from "@/config/categories";
 import { RENTAL_PICKUP_MAX, type RentalRequestEvent, type RentalRequestStatus } from "@/lib/rental-requests/rules";
 
 // Booking requests of a car rental in a conversation (rental pack §6): the renter asks for a
 // period (pick-up and return days, Morocco's calendar) and a pick-up place; the agency answers
 // "available" (optionally blocking the days on the listing) or "not available"; the renter may
-// withdraw an unanswered request or send another one. One current request per conversation,
+// withdraw an unanswered request or send another one. A holiday home's stay (seasonal rental
+// conception §3) takes the same steps by nights: arrival and departure days, a free note instead
+// of the pick-up place, the host (an individual or an agency) answers. One current request per conversation,
 // carried by the conversation document; every step is a system message of the thread. Nothing is
 // booked or paid through the site: the rental is concluded by the agency's written contract.
 
@@ -48,10 +51,12 @@ export interface RentalRequestView {
   status: RentalRequestStatus;
   /** I am the renter (the conversation's buyer). */
   requestedByMe: boolean;
-  /** "YYYY-MM-DD", Morocco's calendar: pick-up and return days. */
+  /** "YYYY-MM-DD", Morocco's calendar: pick-up and return days, or a stay's arrival and departure. */
   from: string;
   to: string;
-  /** Links masked (URL_MARKER). */
+  /** day: a car rental; night: a holiday home's stay. */
+  unit: RentalUnit;
+  /** Links masked (URL_MARKER). A stay's note (travellers, arrival time). */
   pickup: string | null;
   /** Accepted with the days blocked on the listing. */
   blocked: boolean;
@@ -65,6 +70,7 @@ export interface RentalRequestEventView {
   byMe: boolean;
   from: string;
   to: string;
+  unit: RentalUnit;
   pickup: string | null;
 }
 

@@ -317,9 +317,9 @@ export default async function ListingPage({ params }: { params: Params }) {
                     showPhone={listing.contact.showPhone}
                     whatsapp={listing.contact.whatsapp}
                     adultsOnly={Boolean(subcategory?.adultsOnly)}
-                    visit={realEstate}
+                    visit={realEstate && !datedRental(listing.subcategoryId)}
                     testDrive={listing.seller.type === "pro" && VEHICLE_SALE_SUBCATEGORIES.includes(listing.subcategoryId)}
-                    rental={listing.subcategoryId === RENTAL_SUBCATEGORY}
+                    rental={datedRental(listing.subcategoryId)?.unit}
                     offer={offer}
                   />
                 ) : null}

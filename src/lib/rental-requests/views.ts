@@ -10,6 +10,7 @@ export function rentalRequestView(request: RentalRequestDoc, requestedByMe: bool
     requestedByMe,
     from: request.from,
     to: request.to,
+    unit: request.unit ?? "day",
     pickup: request.pickup ?? null,
     blocked: request.blocked === true,
     updatedAt: request.updatedAt.getTime(),
@@ -17,5 +18,5 @@ export function rentalRequestView(request: RentalRequestDoc, requestedByMe: bool
 }
 
 export function rentalRequestEventView(step: RentalRequestEventDoc, byMe: boolean): RentalRequestEventView {
-  return { event: step.event, byMe, from: step.from, to: step.to, pickup: step.pickup ?? null };
+  return { event: step.event, byMe, from: step.from, to: step.to, unit: step.unit ?? "day", pickup: step.pickup ?? null };
 }

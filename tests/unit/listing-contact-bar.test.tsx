@@ -146,10 +146,16 @@ describe("visit request (real estate)", () => {
 describe("booking request (car rental)", () => {
   it("adds the booking request button and opens the plain thread", () => {
     expect(render()).not.toContain('data-testid="rental-request-button"');
-    const html = render({ rental: true });
+    const html = render({ rental: "day" });
     expect(html).toContain('data-testid="rental-request-button"');
     expect(html).toContain(fr.ListingPage.contact.rental);
     expect(threadHref("c123", "rental")).toBe("/messages/c123");
+  });
+
+  it("asks for a stay on a holiday home", () => {
+    const html = render({ rental: "night" }).replaceAll("&#x27;", "'");
+    expect(html).toContain(fr.ListingPage.contact.home.rental);
+    expect(html).toContain(fr.ListingPage.contact.home.rentalHint);
   });
 });
 

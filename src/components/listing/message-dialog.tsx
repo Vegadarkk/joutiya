@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { AmountField, amountProblem } from "@/components/offers/amount-field";
 import { offerErrorKey } from "@/components/offers/error-keys";
 import { OfferNotice } from "@/components/offers/offer-notice";
+import type { RentalUnit } from "@/config/categories";
 import type { Locale } from "@/config/site";
 import { Link, useRouter } from "@/i18n/navigation";
 import { ApiError, refreshSession } from "@/lib/auth/client";
@@ -68,9 +69,9 @@ export function composeProblem(text: string): "empty" | "reserved" | null {
  * The days of the search the renter came from, when they can still be requested: the results put
  * them in the listing URL's fragment (`#du=&au=`), which never reaches the server or the edge cache.
  */
-export function requestedDates(hash: string, today: number): Partial<RentalDates> {
-  const dates = completeDates(fragmentDates(hash) ?? {});
-  return dates && rentalRequestProblem(dates, today) === null ? dates : {};
+export function requestedDates(hash: string, today: number, unit: RentalUnit = "day"): Partial<RentalDates> {
+  const dates = completeDates(fragmentDates(hash) ?? {}, unit);
+  return dates && rentalRequestProblem(dates, today, unit) === null ? dates : {};
 }
 
 export interface MessageDialogProps {
@@ -83,9 +84,12 @@ export interface MessageDialogProps {
   adultsOnly?: boolean;
   /**
    * "visit": a visit request (real estate), with its draft, then the thread on the slots. "rental": a
-   * car rental's booking request. "offer": a price offer, with its amount.
+   * car rental's booking request, or a holiday home's stay (`rentalUnit` night). "offer": a price
+   * offer, with its amount.
    */
   intent?: "message" | "visit" | "rental" | "offer";
+  /** day: a car rental (pick-up and return, pick-up place); night: a stay (arrival and departure, a note). */
+  rentalUnit?: RentalUnit;
   /** The price an offer is measured against (intent "offer"). */
   offerPrice?: number;
   /** The session ended meanwhile: the bar shows its sign-in prompt. */
@@ -96,7 +100,10 @@ export interface MessageDialogProps {
   threadQuery?: string;
 }
 
-export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sellerName, adultsOnly = false, intent = "message", onSignedOut, initialText, threadQuery, offerPrice }: MessageDialogProps) {
+/** Texts of a stay (ListingPage.contact.compose.home), the car rental's otherwise. */
+type RentalComposeKey = "rentalTitle" | "rentalTitleFallback" | "rentalDates" | "rentalPickup" | "rentalPickupPlaceholder" | "rentalDraft" | "rentalDraftPickup" | "rentalDatesMissing" | "rentalSafety";
+
+export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sellerName, adultsOnly = false, intent = "message", rentalUnit = "day", onSignedOut, initialText, threadQuery, offerPrice }: MessageDialogProps) {
   const t = useTranslations("ListingPage.contact.compose");
   const offers = useTranslations("Offers.listing");
   const offerDialog = useTranslations("Offers.dialog");
@@ -108,18 +115,19 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
   const turnstile = useRef<TurnstileHandle>(null);
   const visit = intent === "visit";
   const rental = intent === "rental";
+  const r = <K extends RentalComposeKey>(key: K) => (rentalUnit === "night" ? (`home.${key}` as const) : key);
   const offer = intent === "offer" && offerPrice !== undefined && offerPrice > 0 ? offerPrice : null;
   const [amountText, setAmountText] = useState("");
   const [amountShown, setAmountShown] = useState<OfferProblem | "empty" | null>(null);
-  const [dates, setDates] = useState<Partial<RentalDates>>(() => (rental && typeof window !== "undefined" ? requestedDates(window.location.hash, moroccoToday(Date.now())) : {}));
+  const [dates, setDates] = useState<Partial<RentalDates>>(() => (rental && typeof window !== "undefined" ? requestedDates(window.location.hash, moroccoToday(Date.now()), rentalUnit) : {}));
   const [pickup, setPickup] = useState("");
   const [edited, setEdited] = useState(false);
   const [datesMissing, setDatesMissing] = useState(false);
   const draft = (next: Partial<RentalDates>, place: string): string => {
-    const complete = completeDates(next);
+    const complete = completeDates(next, rentalUnit);
     if (!complete) return "";
     const values = { title: listingTitle ?? "", from: formatRentalDay(complete.from, locale as Locale), to: formatRentalDay(complete.to, locale as Locale), days: rentalDuration(complete) };
-    return place.trim() ? t("rentalDraftPickup", { ...values, pickup: place.trim() }) : t("rentalDraft", values);
+    return place.trim() ? t(r("rentalDraftPickup"), { ...values, pickup: place.trim() }) : t(r("rentalDraft"), values);
   };
   const offerDraft = (typed: string): string => {
     const amount = parsePriceInput(typed);
@@ -153,7 +161,7 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
     const found = composeProblem(text);
     setProblem(found);
     if (adultsOnly && !adult) setAdultMissing(true);
-    const period = rental ? completeDates(dates) : undefined;
+    const period = rental ? completeDates(dates, rentalUnit) : undefined;
     if (rental && !period) setDatesMissing(true);
     const amountIssue = offer !== null ? amountProblem(amountText, offer) : null;
     setAmountShown(amountIssue);
@@ -211,8 +219,8 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
                     : t("visitTitleFallback")
                   : rental
                     ? sellerName
-                      ? t("rentalTitle", { name: isolate(sellerName) })
-                      : t("rentalTitleFallback")
+                      ? t(r("rentalTitle"), { name: isolate(sellerName) })
+                      : t(r("rentalTitleFallback"))
                     : offer !== null
                       ? offerDialog("makeTitle", { name: isolate(sellerName ?? "") })
                       : sellerName
@@ -225,27 +233,28 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
             {rental ? (
               <div className="flex flex-col gap-4" data-testid="rental-request-fields">
                 <fieldset className="flex flex-col gap-1.5">
-                  <legend className="mb-1.5 text-sm font-medium">{t("rentalDates")}</legend>
+                  <legend className="mb-1.5 text-sm font-medium">{t(r("rentalDates"))}</legend>
                   <RentalDatesFields
                     value={dates}
+                    unit={rentalUnit}
                     onChange={(next) => {
                       setDates(next);
-                      if (completeDates(next)) setDatesMissing(false);
+                      if (completeDates(next, rentalUnit)) setDatesMissing(false);
                       if (!edited) setText(draft(next, pickup));
                     }}
                   />
-                  {datesMissing && !completeDates(dates) ? <InlineError>{t("rentalDatesMissing")}</InlineError> : null}
+                  {datesMissing && !completeDates(dates, rentalUnit) ? <InlineError>{t(r("rentalDatesMissing"))}</InlineError> : null}
                 </fieldset>
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor={`${counterId}-pickup`} className="text-sm font-medium">
-                    {t("rentalPickup")}
+                    {t(r("rentalPickup"))}
                   </label>
                   <Input
                     id={`${counterId}-pickup`}
                     dir="auto"
                     value={pickup}
                     maxLength={RENTAL_PICKUP_MAX}
-                    placeholder={t("rentalPickupPlaceholder")}
+                    placeholder={t(r("rentalPickupPlaceholder"))}
                     onChange={(event) => {
                       const place = event.target.value.replace(/[⟦⟧]/g, "");
                       setPickup(place);
@@ -330,7 +339,7 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
             <p className="flex items-start gap-2 text-sm text-foreground-muted text-pretty">
               <LockKeyhole className="mt-0.5 size-4 shrink-0 text-structure dark:text-gold-300" aria-hidden="true" />
               <span>
-                {t("privacy")} {visit ? t("visitSafety") : rental ? t("rentalSafety") : t("safety")}{" "}
+                {t("privacy")} {visit ? t("visitSafety") : rental ? t(r("rentalSafety")) : t("safety")}{" "}
                 {t.rich("scanned", {
                   link: (chunks) => (
                     <Link href="/legal/confidentialite#finalites-3" target="_blank" rel="noopener" className="font-medium text-link underline underline-offset-2">

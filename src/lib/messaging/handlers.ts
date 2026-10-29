@@ -22,7 +22,7 @@ import { assertQuotas } from "@/lib/quota/gate";
 import { requestIdentity } from "@/lib/rate-limit/keys";
 import { assertLimit, consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
 import { moroccoToday } from "@/lib/listings/rental-availability";
-import { actOnRentalRequest, assertRentalListing, requestAction } from "@/lib/rental-requests/service";
+import { actOnRentalRequest, rentalListingUnit, requestAction } from "@/lib/rental-requests/service";
 import { assertOfferListing } from "@/lib/offers/listing";
 import { actOnOffer, makeAction } from "@/lib/offers/service";
 import { verifyTurnstile } from "@/lib/security/turnstile";
@@ -115,7 +115,7 @@ export async function handleThread(request: Request, params: Params): Promise<Re
 
 /**
  * POST /api/conversations {listingId, text, turnstileToken, adultConfirmed?, rentalRequest?, offer?}
- * -> 201 StartConversationResponse. With a car rental's booking request (rental pack §6): its dates
+ * -> 201 StartConversationResponse. With a booking request (rental pack §6; a holiday home's stay): its dates
  * are checked and the request limiter consumed before Turnstile, the listing read after it, then
  * the message and the request's system step. With a price offer (Carte vivante lot 5): the offer
  * limiters before Turnstile, the listing read and the amount checked against its price after it,
@@ -145,7 +145,11 @@ export async function handleStart(request: Request): Promise<Response> {
   const check = await verifyTurnstile(input.turnstileToken, { action: "message", remoteIp: identity.ip, hostname: new URL(serverEnv().SITE_URL).hostname });
   if (!check.ok) throw new HttpError(403, "turnstile_failed", undefined, { details: { codes: check.codes } });
   const listing = rental || offer ? await getListing(input.listingId) : null;
-  if (rental) assertRentalListing(listing);
+  if (rental) {
+    // A stay's nights, checked before the conversation starts.
+    const problem = rentalRequestProblem(rental, moroccoToday(now), rentalListingUnit(listing));
+    if (problem) throw new HttpError(400, "invalid_body", undefined, { details: [{ path: "rentalRequest.from", code: problem }] });
+  }
   let offerPrice: number | undefined;
   if (offer) {
     offerPrice = assertOfferListing(listing, now);

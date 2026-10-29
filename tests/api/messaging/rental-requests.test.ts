@@ -26,7 +26,8 @@ import { expectError, member, row, seedListing, start, startOk, thread, type Err
 // Booking requests of a car rental on the emulators (rental pack §6): the first message carries
 // the request, the agency accepts (writing the days on the listing) or declines, the renter
 // withdraws or replaces it; every step is a system message; non-rental listings and the wrong
-// participant are refused.
+// participant are refused. A holiday home's stay (seasonal rental conception §3) takes the same
+// steps by nights, from an individual host too.
 
 const day = (offset: number) => dayString(moroccoToday(new Date()) + offset);
 
@@ -158,5 +159,34 @@ describe("booking request of a car rental", () => {
     const { cid } = await requestOk(renter, listing.id, { from: day(1), to: day(2) });
     for (let index = 1; index < 20; index += 1) await actOk(renter, cid, { action: "request", from: day(1), to: day(2 + (index % 5)) });
     expectError(await act(renter, cid, { action: "request", from: day(1), to: day(3) }), 429, "rate_limited");
+  });
+});
+
+describe("stay request of a holiday home", () => {
+  async function holidayHome() {
+    const [guest, host] = await Promise.all([member({ displayName: "Imane Voyageuse" }), member({ displayName: "Hassan Hôte" })]);
+    const listing = await seedListing(host, { categoryId: "immobilier", subcategoryId: "location-vacances", title: "Riad avec patio à Essaouira", price: 800, priceNegotiable: false });
+    return { guest, host, listing };
+  }
+
+  it("takes the nights with the first message; the host accepts and blocks the nights, the departure day stays free", async () => {
+    const { guest, host, listing } = await holidayHome();
+    expectError(await start(guest, { listingId: listing.id, text: "Bonjour", turnstileToken: "ok", rentalRequest: { from: day(3), to: day(3) } }), 400, "invalid_body");
+    const { cid } = await requestOk(guest, listing.id, { from: day(3), to: day(6), pickup: "2 adultes, arrivée vers 18 h" });
+
+    const seen = await thread(host, cid);
+    expect(seen.body.conversation.rentalRequest).toMatchObject({ status: "requested", unit: "night", from: day(3), to: day(6), pickup: "2 adultes, arrivée vers 18 h" });
+    expect(seen.body.messages[0]).toMatchObject({ rentalRequest: { event: "requested", unit: "night" } });
+
+    const accepted = await actOk(host, cid, { action: "accept", id: seen.body.conversation.rentalRequest!.id, block: true });
+    expect(accepted).toMatchObject({ blocked: true, rentalRequest: { status: "accepted", unit: "night" } });
+    expect((await getListing(listing.id))?.rental?.unavailable).toEqual([{ from: day(3), to: day(5) }]);
+  });
+
+  it("refuses a stay without a night from the thread", async () => {
+    const { guest, listing } = await holidayHome();
+    const { cid } = await requestOk(guest, listing.id, { from: day(1), to: day(2) });
+    expectError(await act(guest, cid, { action: "request", from: day(4), to: day(4) }), 400, "invalid_body");
+    expect((await actOk(guest, cid, { action: "request", from: day(4), to: day(5) })).rentalRequest).toMatchObject({ unit: "night", from: day(4) });
   });
 });

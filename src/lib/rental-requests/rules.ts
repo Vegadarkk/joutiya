@@ -1,8 +1,8 @@
 import { RENTAL_SEARCH_AHEAD_DAYS, RENTAL_SEARCH_DAYS_MAX, dayNumber } from "@/lib/listings/rental-availability";
 
 // Booking request rules shared by the listing page's dialog, the thread and the server (rental
-// pack §6). Pure and zod-free: the listing page's islands import them (contracts/rental-requests.ts
-// re-exports them with the schemas).
+// pack §6; a holiday home's stay: seasonal rental conception §3). Pure and zod-free: the listing
+// page's islands import them (contracts/rental-requests.ts re-exports them with the schemas).
 
 export const RENTAL_REQUEST_STATUSES = ["requested", "accepted", "declined", "withdrawn"] as const;
 export type RentalRequestStatus = (typeof RENTAL_REQUEST_STATUSES)[number];
@@ -27,13 +27,14 @@ export type RentalRequestProblem = "invalid_day" | "reversed" | "past" | "too_fa
 
 /**
  * Why a request for `from`-`to` cannot be sent on `today` (a day number), else null: the same
- * bounds as a search by dates (a pick-up within 180 days, at most 60 days of rental).
+ * bounds as a search by dates (a pick-up within 180 days, at most 60 days of rental). A stay
+ * (`unit` night) leaves on a later day than it arrives.
  */
-export function rentalRequestProblem(dates: { from: string; to: string }, today: number): RentalRequestProblem | null {
+export function rentalRequestProblem(dates: { from: string; to: string }, today: number, unit: "day" | "night" = "day"): RentalRequestProblem | null {
   const from = dayNumber(dates.from);
   const to = dayNumber(dates.to);
   if (Number.isNaN(from) || Number.isNaN(to)) return "invalid_day";
-  if (to < from) return "reversed";
+  if (to < from || (unit === "night" && to === from)) return "reversed";
   if (from < today) return "past";
   if (from > today + RENTAL_SEARCH_AHEAD_DAYS) return "too_far";
   if (to - from > RENTAL_SEARCH_DAYS_MAX) return "too_long";

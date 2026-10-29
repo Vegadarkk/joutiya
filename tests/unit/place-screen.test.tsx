@@ -76,8 +76,8 @@ describe("reporting a step", () => {
     expect(canReport(view({ type: "system", text: "⟦rdv:proposed⟧", appointment: { ...proposal, place: null } }))).toBe(false);
     expect(canReport(view({ type: "system", text: "⟦rdv:proposed⟧", appointment: proposal, mine: true }))).toBe(false);
     expect(canReport(view({ type: "system", text: "⟦rdv:proposed⟧", appointment: proposal, hidden: true }))).toBe(false);
-    expect(canReport(view({ type: "system", text: "⟦loc:requested⟧", rentalRequest: { event: "requested", byMe: false, from: "2026-11-02", to: "2026-11-04", pickup: "Aéroport" } }))).toBe(true);
-    expect(canReport(view({ type: "system", text: "⟦loc:accepted⟧", rentalRequest: { event: "accepted", byMe: false, from: "2026-11-02", to: "2026-11-04", pickup: "Aéroport" } }))).toBe(false);
+    expect(canReport(view({ type: "system", text: "⟦loc:requested⟧", rentalRequest: { event: "requested", byMe: false, from: "2026-11-02", to: "2026-11-04", unit: "day", pickup: "Aéroport" } }))).toBe(true);
+    expect(canReport(view({ type: "system", text: "⟦loc:accepted⟧", rentalRequest: { event: "accepted", byMe: false, from: "2026-11-02", to: "2026-11-04", unit: "day", pickup: "Aéroport" } }))).toBe(false);
   });
 
   it("shows the proposer's place on the step, with the report button when offered", () => {
@@ -86,7 +86,7 @@ describe("reporting a step", () => {
     expect(html).toContain("lieu : ⁨Café du parc, voir [lien masqué]⁩");
     expect(html).toContain('data-testid="report-message"');
     expect(render(<AppointmentEventItem step={step} counterpartName="Karim" time="10:00" />)).not.toContain("report-message");
-    const rental = render(<RentalRequestEventItem step={{ event: "requested", byMe: false, from: "2026-11-02", to: "2026-11-04", pickup: "Aéroport" }} counterpartName="Karim" time="10:00" onReport={() => {}} />);
+    const rental = render(<RentalRequestEventItem step={{ event: "requested", byMe: false, from: "2026-11-02", to: "2026-11-04", unit: "day", pickup: "Aéroport" }} counterpartName="Karim" time="10:00" onReport={() => {}} />);
     expect(rental).toContain('data-testid="report-message"');
   });
 });

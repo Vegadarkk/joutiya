@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarCheck, CalendarSearch, CalendarX, CarFront, Undo2 } from "lucide-react";
+import { BedDouble, CalendarCheck, CalendarSearch, CalendarX, CarFront, Undo2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { Locale } from "@/config/site";
 import type { RentalRequestEvent, RentalRequestEventView } from "@/lib/contracts/rental-requests";
@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 import { formatRentalDay } from "./rental-day";
 
 // A booking request step in the thread (system message): who asked or answered, for which days,
-// in Morocco's calendar. A received request with a pick-up place can be reported like a message (A-02).
+// in Morocco's calendar; a holiday home's stay with its own wording (RentalRequest.event.home). A
+// received request with a pick-up place can be reported like a message (A-02).
 
 const ICONS: Record<RentalRequestEvent, typeof CarFront> = { requested: CarFront, changed: CalendarSearch, accepted: CalendarCheck, declined: CalendarX, withdrawn: Undo2 };
 
@@ -20,7 +21,8 @@ export function RentalRequestEventItem({ step, counterpartName, time, onReport }
   const card = useTranslations("RentalRequest.card");
   const thread = useTranslations("Messaging.thread");
   const locale = useLocale() as Locale;
-  const Icon = ICONS[step.event];
+  const stay = step.unit === "night";
+  const Icon = stay && step.event === "requested" ? BedDouble : ICONS[step.event];
   const period = t("period", { from: formatRentalDay(step.from, locale), to: formatRentalDay(step.to, locale) });
   const tone = step.event === "accepted" ? "text-success" : step.event === "declined" ? "text-danger" : "text-primary";
   const pickup = step.pickup && (step.event === "requested" || step.event === "changed") ? step.pickup.split(URL_MARKER).join(card("maskedLink")) : null;
@@ -30,8 +32,10 @@ export function RentalRequestEventItem({ step, counterpartName, time, onReport }
         <Icon className={cn("mt-0.5 size-4 shrink-0", tone)} aria-hidden="true" />
         <span className="min-w-0">
           <span className="sr-only">{thread("system")} : </span>
-          {t(`${step.event}.${step.byMe ? "mine" : "theirs"}`, { name: isolate(counterpartName), period })}
-          {pickup ? <span className="text-foreground-muted"> ({t("pickup", { place: isolate(pickup) })})</span> : null}
+          {stay && (step.event === "requested" || step.event === "declined")
+            ? t(`home.${step.event}.${step.byMe ? "mine" : "theirs"}`, { name: isolate(counterpartName), period })
+            : t(`${step.event}.${step.byMe ? "mine" : "theirs"}`, { name: isolate(counterpartName), period })}
+          {pickup ? <span className="text-foreground-muted"> ({t(stay ? "home.pickup" : "pickup", { place: isolate(pickup) })})</span> : null}
           <time className="ms-2 text-[0.6875rem] text-foreground-muted tabular-nums">{time}</time>
         </span>
       </p>
