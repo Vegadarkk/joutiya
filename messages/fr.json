@@ -67,6 +67,9 @@
     "recent": {
       "title": "Annonces récentes",
       "all": "Voir toutes les annonces"
+    },
+    "rent": {
+      "label": "Louer"
     }
   },
   "Welcome": {

@@ -6,6 +6,7 @@ import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { CategoryGrid } from "@/components/home/category-grid";
 import { FeaturedCarousel } from "@/components/home/featured-carousel";
 import { HomePillars } from "@/components/home/home-pillars";
+import { RentShortcuts } from "@/components/home/rent-shortcuts";
 import { Container } from "@/components/layout/container";
 import { RentCarLink } from "@/components/rental/rent-car-link";
 import { RentCarModule } from "@/components/rental/rent-car-module";
@@ -133,6 +134,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 {/* Map view (and its no-script page): the panel's content. */}
                 {map ? (
                   <RowsArea className="search-rows home-rows flex flex-col gap-6">
+                    <RentShortcuts />
                     <CategoryGrid variant="rail" />
                     {featuredRows.length > 0 ? (
                       <section aria-labelledby="home-featured-rows" data-testid="home-featured-rows" className="flex flex-col gap-1">
