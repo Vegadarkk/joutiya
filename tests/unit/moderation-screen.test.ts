@@ -58,6 +58,13 @@ describe("screenListing: hard blockers", () => {
     ]);
   });
 
+  it("screens the free axes of a Pro listing's variants like the other texts", () => {
+    const axes = (label: string, value: string) => [{ label, values: ["500 g", value] }];
+    expect(codes(cleanListing({ variantAxes: axes("Contenance", "1 kg") }))).toEqual([]);
+    expect(codes(cleanListing({ variantAxes: axes("Contenance", "0612345678") }))).toEqual(["variants.axes.0.values.1:phone_in_text"]);
+    expect(codes(cleanListing({ variantAxes: axes("www.vends-ici.ma", "1 kg") }))).toEqual(["variants.axes.0.label:url_in_text"]);
+  });
+
   it("screens the free-text district like the other texts (it is shown on the public page)", () => {
     expect(codes(cleanListing({ district: "Maarif, appelez 0612345678" }))).toEqual(["location.district:phone_in_text"]);
     expect(codes(cleanListing({ district: "Maarif www.vends-ici.ma" }))).toEqual(["location.district:url_in_text"]);

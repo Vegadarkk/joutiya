@@ -27,7 +27,7 @@ function pushIssue(blockers: FieldIssue[], next: FieldIssue): void {
   if (!blockers.some((b) => b.path === next.path && b.code === next.code)) blockers.push(next);
 }
 
-/** Title, description, the free-text attributes in key order, then the district. */
+/** Title, description, the free-text attributes in key order, the district, then the free variant axes. */
 function textFields(input: ScreenInput): TextField[] {
   const fields: TextField[] = [
     { path: "title", text: input.title ?? "" },
@@ -38,6 +38,10 @@ function textFields(input: ScreenInput): TextField[] {
     if (typeof value === "string" && value.trim() !== "") fields.push({ path: `attributes.${key}`, text: value });
   }
   if (input.district && input.district.trim() !== "") fields.push({ path: "location.district", text: input.district });
+  (input.variantAxes ?? []).forEach((axis, index) => {
+    if (axis.label) fields.push({ path: `variants.axes.${index}.label`, text: axis.label });
+    axis.values.forEach((value, at) => fields.push({ path: `variants.axes.${index}.values.${at}`, text: value }));
+  });
   return fields;
 }
 

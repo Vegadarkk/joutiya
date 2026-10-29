@@ -8,6 +8,7 @@ import { requireOwner } from "@/lib/auth/guards";
 import type { Device } from "@/lib/auth/respond";
 import { enqueueAiTask } from "@/lib/ai/queue";
 import { audit } from "@/lib/audit";
+import { variantCriteria, type StockUpdateInput } from "@/lib/contracts/catalog";
 import { MAX_DRAFTS, type CreateListingInput, type FieldIssue, type ListingPatch, type ListingStatus, type ModerationFlag, type PublishListingResponse } from "@/lib/contracts/listings";
 import { listingPhotoSchema, type ListingPhoto } from "@/lib/contracts/media";
 import { listingContentRef, recordContentOp, recordContentOpTx } from "@/lib/db/repositories/content-ops";
@@ -52,6 +53,7 @@ import { buildSlugId, newListingId } from "./ids";
 import { IllegalTransitionError, canRenew, canTransition, draftPurgeAt, renew, renewForReview, transition, type Lifetime, type TransitionContext, type TransitionEffects, type TransitionResult } from "./lifecycle";
 import { ownerListingView } from "./owner-view";
 import { PUBLIC_STATES } from "./public";
+import { logPrices } from "./catalog";
 import { assessReadiness } from "./readiness";
 import { needsRealEstateAttestation } from "./real-estate";
 import { revalidateListingPaths } from "./revalidate";
@@ -186,7 +188,7 @@ export async function createDraft(actor: Actor, input: CreateListingInput, now =
     purgeAt: draftPurgeAt(now),
     version: 0,
   });
-  const doc = options.patch ? listingSchema.parse(applyPatch(blank, await fieldsOf({ id, ...blank }, options.patch, { uid, quotas: sellerContext.quotas, now }))) : blank;
+  const doc = options.patch ? listingSchema.parse(applyPatch(blank, await fieldsOf({ id, ...blank }, options.patch, { uid, quotas: sellerContext.quotas, sellerType: seller.type, now }))) : blank;
   try {
     await createListing(id, doc, { maxDrafts: options.maxDrafts ?? MAX_DRAFTS });
   } catch (error) {
@@ -204,7 +206,7 @@ function invalidField(path: string, code: string): HttpError {
 }
 
 /** Turns a wizard patch into document fields (tree consistency, city centroid, photo order). */
-async function fieldsOf(listing: ListingRecord, patch: ListingPatch, ctx: { uid: string; quotas: ListingQuotas; now: Date }): Promise<ListingFieldPatch> {
+async function fieldsOf(listing: ListingRecord, patch: ListingPatch, ctx: { uid: string; quotas: ListingQuotas; sellerType: Seller["type"]; now: Date }): Promise<ListingFieldPatch> {
   const fields: ListingFieldPatch = {};
   if (patch.subcategoryId !== undefined) {
     const subcategory = subcategoryById(patch.subcategoryId);
@@ -264,7 +266,35 @@ async function fieldsOf(listing: ListingRecord, patch: ListingPatch, ctx: { uid:
     }
     fields.photos = photos;
   }
+  catalogueFields(listing, patch, fields, ctx.sellerType);
   return fields;
+}
+
+/**
+ * Variants and stock of a save (catalogue §2-3, Pros only: owner decision 5). With variants the
+ * stock is per combination (the listing's own goes), and a criterion an axis takes over loses its
+ * attribute: the sizes of the axis answer it.
+ */
+function catalogueFields(listing: ListingRecord, patch: ListingPatch, fields: ListingFieldPatch, sellerType: Seller["type"]): void {
+  if (sellerType !== "pro" && patch.variants) throw invalidField("variants", "variants_pro_only");
+  if (sellerType !== "pro" && typeof patch.stock === "number") throw invalidField("stock", "stock_pro_only");
+  if (patch.variants !== undefined) fields.variants = patch.variants;
+  if (patch.stock !== undefined) fields.stock = patch.stock;
+  const variants = fields.variants === undefined ? listing.variants : (fields.variants ?? undefined);
+  if (!variants) return;
+  if (typeof fields.stock === "number") throw invalidField("stock", "stock_with_variants");
+  if (listing.stock !== undefined) fields.stock = null;
+  const taken = variantCriteria(variants);
+  const attributes = fields.attributes ?? listing.attributes;
+  if (taken.some((id) => Object.hasOwn(attributes, id))) fields.attributes = Object.fromEntries(Object.entries(attributes).filter(([id]) => !(taken as string[]).includes(id)));
+}
+
+/**
+ * What the pre-moderation reads of the variants: the axes (free labels and values are texts) and
+ * the prices; the stock alone is never screened again (catalogue §3).
+ */
+function screenedVariants(variants: ListingDoc["variants"] | null | undefined): unknown {
+  return variants ? { axes: variants.axes, items: variants.items.map(({ stock: _stock, ...item }) => item) } : null;
 }
 
 /**
@@ -348,7 +378,7 @@ export async function patchListing(actor: Actor, id: string, patch: ListingPatch
   // Not a draft autosave: a save may screen again and commits ~3 writes (listing.edit.uid).
   if (listing.status !== "draft" && !options.imported) await enforceLimit("listing.edit.uid", uid);
   const seller = options.imported?.seller ?? (await sellerOf(actor.auth));
-  const fields = changedFields(listing, await fieldsOf(listing, patch, { uid, quotas: seller.quotas, now }));
+  const fields = changedFields(listing, await fieldsOf(listing, patch, { uid, quotas: seller.quotas, sellerType: seller.seller.type, now }));
   // Nothing changes: nothing is written. A rejected listing's save reopens it, even an empty one.
   if (Object.keys(fields).length === 0 && listing.status !== "rejected") return ownerListingView(listing);
   // Every draft edit restarts its 30-day clock (written with the edit: no extra write).
@@ -360,12 +390,18 @@ export async function patchListing(actor: Actor, id: string, patch: ListingPatch
   let maxActive: number | null | undefined;
 
   if (SCREENED_STATUSES.includes(listing.status)) {
+    // A listing published before keeps its price history (the struck-out price of a promotion).
+    if (fields.price !== undefined || fields.isDonation !== undefined || fields.variants !== undefined) {
+      const priceLog = logPrices(listing.priceLog, applyPatch(listing, fields), now);
+      if (priceLog && !isDeepStrictEqual(priceLog, listing.priceLog)) fields.priceLog = priceLog;
+    }
     const next = applyPatch(listing, fields);
     const blockers = assessReadiness(next, { seller: seller.seller, phoneVerified: seller.user.badges.phoneVerified });
     if (blockers.length > 0) throw invalidListing(blockers);
     // Kept as is: indexed again when published, its public page refreshed (paused and expired too).
     effects = { search: listing.status === "published" ? "upsert" : null, contentOp: { op: "listing.update", ip: actor.ip }, audit: null, revalidate: hasPublicPage(listing.status), mail: null };
-    if (SCREENED_FIELDS.some((field) => fields[field] !== undefined)) {
+    const variantsScreened = fields.variants !== undefined && !isDeepStrictEqual(screenedVariants(fields.variants), screenedVariants(listing.variants));
+    if (variantsScreened || SCREENED_FIELDS.some((field) => fields[field] !== undefined)) {
       const result = await screenFor(next, seller, now);
       if (result.blockers.length > 0) throw invalidListing(result.blockers);
       if (result.state === "needs_review" && listing.status !== "pending_review") {
@@ -401,6 +437,43 @@ export async function patchListing(actor: Actor, id: string, patch: ListingPatch
   if (fields.photos) await releaseDroppedPhotos(listing, fields.photos, now);
   if (mail) await notifySeller(updated, seller.user, mail);
   return ownerListingView(updated);
+}
+
+// ---- Stock --------------------------------------------------------------------------------------
+
+/**
+ * The declared stock alone (catalogue §3): from « Mes annonces » or the Pro area, one write, the
+ * listing indexed again when online, no screening (no text, no price changes). Joutiya never
+ * counts sales: the Pro sets the figure. A combination not on the listing is a 400.
+ */
+export async function updateStock(actor: Actor, id: string, input: StockUpdateInput, now = new Date()) {
+  const listing = await ownedListing(actor, id);
+  if (!EDITABLE_STATUSES.includes(listing.status)) throw new HttpError(409, "conflict", "listing is read-only in this status");
+  if (listing.sellerType !== "pro") throw invalidField("stock", "stock_pro_only");
+  const fields: ListingFieldPatch = {};
+  if (input.items) {
+    if (!listing.variants) throw invalidField("items", "no_variants");
+    const wanted = new Map(input.items.map((item) => [item.key, item.stock]));
+    const known = new Set(listing.variants.items.map((item) => item.key));
+    const unknown = input.items.findIndex((item) => !known.has(item.key));
+    if (unknown >= 0) throw invalidField(`items.${unknown}.key`, "unknown");
+    const items = listing.variants.items.map((item) => {
+      if (!wanted.has(item.key)) return item;
+      const { stock: _stock, ...rest } = item;
+      const stock = wanted.get(item.key);
+      return stock === null || stock === undefined ? rest : { ...rest, stock };
+    });
+    fields.variants = { ...listing.variants, items };
+  } else {
+    if (listing.variants) throw invalidField("stock", "stock_with_variants");
+    fields.stock = input.stock ?? null;
+  }
+  const changed = changedFields(listing, fields);
+  if (Object.keys(changed).length === 0) return ownerListingView(listing);
+  const effects: TransitionEffects = { search: listing.status === "published" ? "upsert" : null, contentOp: null, audit: null, revalidate: hasPublicPage(listing.status), mail: null };
+  const user = await getUserRecord(actor.auth.user.uid);
+  if (!user) throw new HttpError(403, "forbidden", "account record missing");
+  return ownerListingView(await commit(listing, changed, effects, { actor, user, now }));
 }
 
 // ---- Publication ----------------------------------------------------------------------------
@@ -457,6 +530,8 @@ export async function publish(actor: Actor, request: Request, id: string, option
   const ctx = { now, lifetime: await lifetime(), ip: actor.ip };
   const { patch, effects } = step(() => transition(listing, to, ctx));
   patch.slugId = slugId;
+  // The price history starts with the publication (catalogue §4).
+  patch.priceLog = logPrices(listing.priceLog, listing, now) ?? null;
   patch.moderation = moderationPatch(listing.moderation, screening, to === "pending_review");
   patch.adsEligible = to === "published" && listing.moderation.openReports === 0 && !listing.moderation.hiddenBy && subcategoryAllowsAds(listing.subcategoryId);
   const hold = to === "pending_review" ? holdRecord(listing, screening, now, rejectedBefore) : undefined;

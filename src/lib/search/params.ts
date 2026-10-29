@@ -45,6 +45,7 @@ export const SEARCH_QUERY_KEYS = {
   shop: "boutique",
   donation: "don",
   withPhoto: "photo",
+  includeSoldOut: "epuises",
   conditions: "etat",
   rentFrom: "du",
   rentTo: "au",
@@ -88,6 +89,8 @@ export interface SearchParams {
   shop?: string;
   donation?: true;
   withPhoto?: true;
+  /** Sold-out Pro listings too (owner decision 1: out of the default results, still online). */
+  includeSoldOut?: true;
   conditions?: Condition[];
   /** Only for criteria of `subcategory` (select, multiselect, number, boolean). */
   criteria?: Record<string, CriterionFilter>;
@@ -200,6 +203,7 @@ export function parseSearchParams(source: Source): SearchParams {
   if (shop && PUBLIC_ID.test(shop)) params.shop = shop;
   if (read(source, k.donation) === "1") params.donation = true;
   if (read(source, k.withPhoto) === "1") params.withPhoto = true;
+  if (read(source, k.includeSoldOut) === "1") params.includeSoldOut = true;
   const conditions = list(read(source, k.conditions)).filter((value): value is Condition => (CONDITIONS as readonly string[]).includes(value));
   if (conditions.length) params.conditions = conditions;
   const dates = validDates(read(source, k.rentFrom), read(source, k.rentTo));
@@ -340,6 +344,7 @@ export function searchParamsToQuery(input: SearchParams): URLSearchParams {
   if (params.shop) query.set(k.shop, params.shop);
   if (params.donation) query.set(k.donation, "1");
   if (params.withPhoto) query.set(k.withPhoto, "1");
+  if (params.includeSoldOut) query.set(k.includeSoldOut, "1");
   if (params.conditions?.length) query.set(k.conditions, params.conditions.join(","));
   for (const [id, filter] of Object.entries(params.criteria ?? {})) {
     if (filter.kind === "options") query.set(`${CRITERION_PARAM_PREFIX}${id}`, filter.values.join(","));
@@ -369,9 +374,9 @@ export function searchPath(params: SearchParams): string {
   return query ? `${SEARCH_PATH}?${query}` : SEARCH_PATH;
 }
 
-/** True when nothing narrows the search (no words, no filter). Page and sort do not count. */
+/** True when nothing narrows the search (no words, no filter). Page, sort and the sold-out switch do not count. */
 export function isBlankSearch(params: SearchParams): boolean {
-  const { sort: _sort, page: _page, ...rest } = canonicalSearchParams(params);
+  const { sort: _sort, page: _page, includeSoldOut: _soldOut, ...rest } = canonicalSearchParams(params);
   return Object.keys(rest).length === 0;
 }
 
@@ -401,6 +406,7 @@ export const storedSearchParamsSchema = z
     shop: z.string().regex(PUBLIC_ID).optional(),
     donation: z.literal(true).optional(),
     withPhoto: z.literal(true).optional(),
+    includeSoldOut: z.literal(true).optional(),
     conditions: z.array(z.enum(CONDITIONS)).min(1).max(CONDITIONS.length).optional(),
     criteria: z
       .record(
