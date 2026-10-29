@@ -107,6 +107,16 @@ describe("credit advertising without the APR", () => {
     expect(quotesCreditWithoutApr("Mensualités de 1 900 dh sur 60 mois")).toBe(true);
     expect(quotesCreditWithoutApr("Taqsit 3000dh/mois m3a l'banque")).toBe(true);
     expect(quotesCreditWithoutApr("بالتقسيط 3000 درهم شهريا")).toBe(true);
+    expect(quotesCreditWithoutApr("Crédit auto\n1 250,50 dh / mois")).toBe(true);
+    expect(quotesCreditWithoutApr("Leasing 4 200 MAD\n\nmensuel")).toBe(true);
+  });
+
+  it("answers in linear time on runs of spaces and digits (no catastrophic backtracking)", () => {
+    const started = performance.now();
+    expect(quotesCreditWithoutApr(`crédit 1${" ".repeat(4000)}x`)).toBe(false);
+    expect(quotesCreditWithoutApr(`crédit ${"1 ".repeat(2000)}x`)).toBe(false);
+    expect(quotesCreditWithoutApr(`crédit ${"1,".repeat(2000)}x`)).toBe(false);
+    expect(performance.now() - started).toBeLessThan(200);
   });
 
   it("lets through the TEG, a plain price, rent and financing without figures", () => {

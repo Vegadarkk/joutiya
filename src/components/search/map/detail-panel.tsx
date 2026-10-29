@@ -39,7 +39,9 @@ export function DetailPanel() {
 
   if (!listing || !select) return null;
   const href = `/annonce/${listing.slugId}`;
-  const chips = [...listing.facts, ...(listing.pro ? [t("pro")] : [t("individual")]), ...(listing.exclusive ? [t("exclusive")] : [])];
+  // An example listing (src/lib/demo) names no seller type: it has no seller to contact.
+  const seller = listing.example ? [] : listing.pro ? [t("pro")] : [t("individual")];
+  const chips = [...listing.facts, ...seller, ...(listing.exclusive ? [t("exclusive")] : [])];
 
   return (
     <section role="dialog" aria-modal="false" aria-labelledby={titleId} data-testid="search-detail" className="search-detail float-card">
@@ -77,6 +79,11 @@ export function DetailPanel() {
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 pt-4 pb-4">
         {listing.featured || listing.bumped ? <BoostBadge kind={listing.featured ? "featured" : "bumped"} className="self-start" /> : null}
+        {listing.example ? (
+          <span data-testid="example-chip" className="self-start rounded-sm bg-featured px-2 py-0.5 text-xs font-semibold text-featured-foreground">
+            {t("example")}
+          </span>
+        ) : null}
         <h2 id={titleId} ref={heading} tabIndex={-1} dir="auto" className="text-lg font-semibold leading-snug break-words outline-none ltr:text-left rtl:text-right">
           {listing.title}
         </h2>

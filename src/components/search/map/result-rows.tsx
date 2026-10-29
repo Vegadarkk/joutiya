@@ -71,6 +71,11 @@ export function ResultRows({ listings, cards, renderAction, priorityCount = 0, l
             </div>
             <div className="flex min-w-0 flex-col gap-0.5 py-0.5">
               {listing.featured || listing.bumped ? <BoostBadge kind={listing.featured ? "featured" : "bumped"} className="mb-0.5 self-start" /> : null}
+              {listing.example ? (
+                <span data-testid="example-chip" className="mb-0.5 self-start rounded-sm bg-featured px-1.5 py-px text-xs font-semibold text-featured-foreground">
+                  {t("example")}
+                </span>
+              ) : null}
               <p className="flex flex-wrap items-baseline gap-x-1.5 text-base font-semibold tabular-nums">
                 <span className="whitespace-nowrap">{listing.amount}</span>
                 {listing.per ? <span className="text-xs font-normal text-foreground-muted">{listing.per}</span> : null}
