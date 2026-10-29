@@ -15,6 +15,14 @@ const UPLOAD_LIMITS = { maxBytes: MAX_UPLOAD_BYTES, maxPhotos: MAX_PHOTOS_INDIVI
 export const MAP_ATTRIBUTION = "© OpenStreetMap contributors · Protomaps";
 
 /**
+ * The basemap of the search page and the home page's map (Carte vivante), read when the page
+ * renders: per request on /recherche, at the ISR render on the home page (never at build).
+ */
+export function searchMapConfig(env: ServerEnv = serverEnv()): PublicConfig["map"] {
+  return env.MAP_PMTILES_URL ? { pmtilesUrl: env.MAP_PMTILES_URL, attribution: MAP_ATTRIBUTION } : null;
+}
+
+/**
  * The browser's configuration, built from the server environment at request time; the ad flags
  * come from config/flags (getFlags), the defaults (ads off) when the caller has none.
  */
@@ -41,7 +49,7 @@ export function publicConfig(env: ServerEnv = serverEnv(), flags: Pick<FlagsConf
     // R2 keys and bucket names never leave the server: only the public media host is shared.
     mediaBaseUrl: mediaBaseUrl(env),
     upload: { ...UPLOAD_LIMITS },
-    map: env.MAP_PMTILES_URL ? { pmtilesUrl: env.MAP_PMTILES_URL, attribution: MAP_ATTRIBUTION } : null,
+    map: searchMapConfig(env),
     phoneVerification: isPhoneVerificationConfigured(env),
     ads: {
       mode: flags.adsMode,

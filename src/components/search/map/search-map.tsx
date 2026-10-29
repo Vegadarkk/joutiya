@@ -11,18 +11,20 @@ import { isRtl, type Locale } from "@/config/site";
 import { buildSearchStyle, pinsCollection, PINS_SOURCE, SEARCH_ZOOM, type MapTheme } from "@/lib/map/search-style";
 import { MAPLIBRE_WORKER_URL } from "@/lib/map/style";
 import { supportsWebGL2 } from "@/lib/map/webgl";
-import { boundsOf, zoneFromView } from "@/lib/search/map-pins";
+import { boundsOf, coreBounds, zoneFromView } from "@/lib/search/map-pins";
 import type { SearchZone } from "@/lib/search/params";
 import type { MapListing } from "./map-listings";
 import { mapPadding } from "./map-layout";
 import { useSearchMap } from "./search-map-root";
 
-// The map of the search page (Carte vivante, lot 2): a lazy island (next/dynamic, ssr:false) that
-// only loads in the map view, after the list has painted. Same self-hosted basemap and CSP rules as
-// the listing page map (worker from our origin, PMTiles by Range requests, no glyphs or sprites).
-// The results are HTML markers (real buttons: focus, Enter, screen-reader names) over a clustered
-// GeoJSON source: price pills, the À la Une results as photo arches ringed in gold, a green dot on
-// the ones published today, count bubbles where pins overlap. Positions are approximate only.
+// The map of the search page (Carte vivante, lot 2) and of the home page (lot 3): a lazy island
+// (next/dynamic, ssr:false) that only loads in the map view, after the list has painted. Same
+// self-hosted basemap and CSP rules as the listing page map (worker from our origin, PMTiles by
+// Range requests, no glyphs or sprites). The results are HTML markers (real buttons: focus, Enter,
+// screen-reader names) over a clustered GeoJSON source: price pills, a green dot on the ones
+// published today, count bubbles where pins overlap. The few À la Une results stand apart as photo
+// arches ringed in gold, never folded into a count (the home map shows the whole country).
+// Positions are approximate only.
 
 let protocolRegistered = false;
 
@@ -59,6 +61,9 @@ function pinElement(listing: MapListing, label: string): HTMLButtonElement {
   element.append(price);
   return element;
 }
+
+/** The clustered source holds the organic results; the À la Une arches are placed on their own. */
+const clustered = (listings: readonly MapListing[]) => pinsCollection(listings.filter((listing) => !listing.featured));
 
 function clusterElement(count: number, label: string): HTMLButtonElement {
   const element = document.createElement("button");
@@ -131,7 +136,7 @@ export default function SearchMap({ onReady }: SearchMapProps) {
       addProtocol("pmtiles", new Protocol().tile);
       protocolRegistered = true;
     }
-    const pins = pinsCollection(latest.current.state?.listings ?? []);
+    const pins = clustered(latest.current.state?.listings ?? []);
     let ready = false;
     let failed = false;
     const instance = new MapLibreMap({
@@ -176,7 +181,7 @@ export default function SearchMap({ onReady }: SearchMapProps) {
     const observer = new MutationObserver(() => {
       if (!ready) return;
       const current = (instance.getSource(PINS_SOURCE) as GeoJSONSource | undefined)?.serialize().data;
-      instance.setStyle(buildSearchStyle(pmtilesUrl, { attribution, theme: themeOf(), pins: (current as ReturnType<typeof pinsCollection>) ?? pinsCollection(latest.current.state?.listings ?? []) }), { diff: true });
+      instance.setStyle(buildSearchStyle(pmtilesUrl, { attribution, theme: themeOf(), pins: (current as ReturnType<typeof pinsCollection>) ?? clustered(latest.current.state?.listings ?? []) }), { diff: true });
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
@@ -199,7 +204,13 @@ export default function SearchMap({ onReady }: SearchMapProps) {
     function sync() {
       if (!instance) return;
       const seen = new Set<string>();
-      const features = instance.querySourceFeatures(PINS_SOURCE) as MapGeoJSONFeature[];
+      const features = [
+        ...(instance.querySourceFeatures(PINS_SOURCE) as MapGeoJSONFeature[]),
+        // À la Une: always their own arch, at every zoom.
+        ...[...byId.values()]
+          .filter((listing) => listing.featured)
+          .map((listing) => ({ geometry: { type: "Point" as const, coordinates: [listing.position.lng, listing.position.lat] }, properties: { id: listing.id } })),
+      ];
       for (const feature of features) {
         if (feature.geometry.type !== "Point") continue;
         const [lng, lat] = feature.geometry.coordinates as [number, number];
@@ -287,7 +298,7 @@ export default function SearchMap({ onReady }: SearchMapProps) {
     const source = instance.getSource(PINS_SOURCE) as GeoJSONSource | undefined;
     for (const { marker } of markers.current.values()) marker.remove();
     markers.current.clear();
-    source?.setData(pinsCollection(listings));
+    source?.setData(clustered(listings));
     setMoved(false);
     const animate = !first.current && !reducedMotion();
     first.current = false;
@@ -310,7 +321,9 @@ export default function SearchMap({ onReady }: SearchMapProps) {
       instance.fitBounds(zoneBounds(zone), { ...options, maxZoom: SEARCH_ZOOM.max, padding: 0 });
       return;
     }
-    const box = boundsOf(listings.map((listing) => listing.position));
+    // The home page frames where most listings stand; a search shows every result.
+    const points = listings.map((listing) => listing.position);
+    const box = current?.variant === "home" ? coreBounds(points) : boundsOf(points);
     if (box) {
       instance.fitBounds(new LngLatBounds([box.sw.lng, box.sw.lat], [box.ne.lng, box.ne.lat]), options);
       return;
@@ -430,15 +443,6 @@ export default function SearchMap({ onReady }: SearchMapProps) {
           </button>
         </div>
       ) : null}
-      <p className="search-attribution">
-        {tMap.rich("attribution", {
-          osm: (chunks) => (
-            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
-              {chunks}
-            </a>
-          ),
-        })}
-      </p>
     </>
   );
 }

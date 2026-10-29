@@ -125,10 +125,14 @@ describe("SiteHeader", () => {
 
 describe("shell paths", () => {
   it("drops the category row in the focused flows and 'Vendre' over forms and bottom bars", () => {
-    for (const path of ["/", "/c/vehicules", "/mes-annonces", "/demarches"]) {
+    for (const path of ["/c/vehicules", "/mes-annonces", "/demarches"]) {
       expect(showsCategoryRow(path), path).toBe(true);
       expect(showsSellButton(path), path).toBe(true);
     }
+    // The home page (lot 3) shows the twelve categories itself (map panel or arcade); 'Vendre' stays.
+    expect(showsCategoryRow("/")).toBe(false);
+    expect(showsSellButton("/")).toBe(true);
+    expect(showsCategoryRow("/c")).toBe(true);
     // The map-first search (lot 2) keeps 'Vendre' over its sheet; its filters replace the category row.
     expect(showsCategoryRow("/recherche")).toBe(false);
     expect(showsSellButton("/recherche")).toBe(true);

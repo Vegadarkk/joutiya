@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import ar from "../../messages/ar.json";
+import fr from "../../messages/fr.json";
 import { approximatePosition, cityBySlug, MOROCCO_BBOX } from "@/config/regions";
 import { buildMapListings, pinAmount, type MapListingLabels } from "@/components/search/map/map-listings";
 import { mapPadding, DETAIL_PX, PANEL_PX } from "@/components/search/map/map-layout";
@@ -6,7 +8,7 @@ import { dragHeight, settleSnap, sheetHeights, SHEET_PEEK_PX, stepSnap } from "@
 import { initialView, mapPossible, slowConnection } from "@/components/search/map/view-mode";
 import { CLUSTER_RADIUS_PX, HALO_LAYER, PINS_SOURCE, SEARCH_ZOOM, buildSearchStyle, pinsCollection } from "@/lib/map/search-style";
 import { HOUSE_LAYERS, REGIONS_SOURCE, buildHouseStyle } from "@/lib/map/style";
-import { boundsOf, distanceKm, isPublishedToday, pinPosition, pinSources, zoneFromView } from "@/lib/search/map-pins";
+import { boundsOf, coreBounds, distanceKm, isPublishedToday, pinPosition, pinSources, zoneFromView } from "@/lib/search/map-pins";
 import {
   ZONE_KM_MAX,
   canonicalSearchParams,
@@ -72,6 +74,11 @@ describe("zone URL parameter", () => {
     expect(formatZone({ lat: 33.573, lng: -7.59, km: 12 })).toBe("33.573,-7.59,12");
   });
 
+  it("opens the search page on the zone alone from the home page's map (lot 3: no filter there)", () => {
+    const zone = { lat: 33.57312, lng: -7.58981, km: 41.2 };
+    expect(searchPath(canonicalSearchParams({ zone, page: undefined }))).toBe("/recherche?zone=33.573%2C-7.59%2C42");
+  });
+
   it("normalises a zone set in code, and drops one that is not finite", () => {
     expect(canonicalSearchParams({ zone: { lat: 40, lng: -7.123456, km: 0.2 } }).zone).toEqual({ lat: MOROCCO_BBOX.north, lng: -7.123, km: 1 });
     expect(canonicalSearchParams({ zone: { lat: Number.NaN, lng: -7, km: 5 }, city: "rabat" })).toEqual({ city: "rabat", region: rabat.regionCode });
@@ -126,6 +133,19 @@ describe("pins", () => {
       ["cccc2345", false],
     ]);
     expect(pins[2]?.position).toEqual(approximatePosition(rabat, "cccc2345"));
+  });
+
+  it("frame on the home page where most listings stand, leaving a far outlier out from 10 points", () => {
+    const north = Array.from({ length: 20 }, (_, index) => ({ lat: 33 + index * 0.1, lng: -7 + index * 0.05 }));
+    const dakhla = { lat: 23.7167, lng: -15.95 };
+    const core = coreBounds([...north, dakhla]);
+    expect(core?.sw.lat).toBeCloseTo(33);
+    expect(core?.sw.lng).toBeCloseTo(-7);
+    expect(core?.ne.lat).toBeCloseTo(34.8);
+    expect(boundsOf([...north, dakhla])?.sw).toEqual(dakhla);
+    // Few listings: every one of them.
+    expect(coreBounds([...north.slice(0, 5), dakhla])).toEqual(boundsOf([...north.slice(0, 5), dakhla]));
+    expect(coreBounds([])).toBeNull();
   });
 
   it("frame their bounds and turn the visible map into its inscribed zone", () => {
@@ -265,6 +285,17 @@ describe("map padding", () => {
     expect(mapPadding(phone).bottom).toBe(SHEET_PEEK_PX + 16);
     expect(mapPadding({ ...phone, snap: "half" }).bottom).toBe(422 + 16);
     expect(mapPadding({ ...phone, snap: "full" }).bottom).toBe(422 + 16);
+  });
+});
+
+describe("paid placement on the map (DSA)", () => {
+  it("names an À la Une pin and its legend with the cards' own sponsored mention", () => {
+    for (const messages of [fr, ar]) {
+      expect(messages.SearchMap.pin.featured).toBe(messages.ListingCard.featured);
+      expect(messages.SearchMap.legend.featured).toBe(messages.ListingCard.featured);
+    }
+    expect(fr.SearchMap.pin.featured).toBe("À la Une · Sponsorisé");
+    expect(ar.SearchMap.pin.featured).toBe("في الواجهة · مُموَّل");
   });
 });
 
