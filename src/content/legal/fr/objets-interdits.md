@@ -86,13 +86,14 @@ En plus des dix catégories du §2, sont aussi interdits (voir les [CGU](/legal/
 - les objets archéologiques, et les objets d'art ou antiquités classés ou inscrits au patrimoine national ;
 - les données personnelles, les comptes et abonnements revendus, les moyens de paiement, le change de devises (les pièces et billets de collection restent autorisés) et les crypto-actifs ;
 - les loteries, les chaînes et systèmes pyramidaux ;
-- les prêts, crédits, placements, assurances et autres services financiers ;
+- les prêts, crédits, placements, assurances et autres services financiers ; un professionnel peut indiquer le financement proposé pour son propre bien, avec les mentions obligatoires (prêteur, durée, coût total, taux effectif global ; voir les [CGU](/legal/cgu#annonces-8)) ;
+- la vente des terres collectives (soulaliyate) et des biens habous, qui ne peuvent pas être vendus comme un bien privé : une annonce qui les mentionne est examinée par un modérateur avant sa mise en ligne ;
 - les drones, les brouilleurs de signaux et les émetteurs radio sans agrément de l'Agence nationale de réglementation des télécommunications (les téléphones et appareils grand public restent autorisés), les sacs en plastique interdits par la loi depuis 2016 (les sacs isothermes, de congélation, les sacs poubelle et les sacs à usage agricole ou industriel restent autorisés) ;
 - les services dont l'exercice exige un diplôme ou un agrément, proposés par une personne qui ne le détient pas ;
 - tant que cette catégorie n'existe pas, les offres d'emploi ;
 - tout contenu qui porte atteinte aux droits d'un tiers.
 
-Ces contenus ne sont pas repérés par une liste de mots : ils sont relevés lors de la modération ou après un signalement.
+Sauf les terres collectives et les biens habous, ces contenus ne sont pas repérés par une liste de mots : ils sont relevés lors de la modération ou après un signalement.
 
 ## 4. Ce qui se passe à la publication {#effets}
 

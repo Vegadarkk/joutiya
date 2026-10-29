@@ -26,7 +26,7 @@ Pour chaque arnaque, le réflexe à adopter est indiqué en gras.
 
 ### 2.1 Le faux acheteur qui « paie » par un lien {#arnaques-1}
 
-Un acheteur accepte votre prix sans discuter, puis veut payer par un service de livraison, une banque en ligne ou un portefeuille mobile. Il vous envoie un lien ou un faux justificatif pour « recevoir l'argent », ou vous demande de poursuivre sur WhatsApp pour finaliser le paiement. Le lien sert à voler vos données bancaires. **Ne cliquez sur aucun lien de paiement : l'argent se reçoit en main propre, à la remise du bien.**
+Un acheteur accepte votre prix sans discuter, puis veut payer par un service de livraison, une banque en ligne ou un portefeuille mobile. Il vous envoie un lien ou un faux justificatif pour « recevoir l'argent », ou vous demande de poursuivre sur WhatsApp pour finaliser le paiement. Le lien sert à voler vos données bancaires. **Ne cliquez sur aucun lien de paiement : l'argent se reçoit en main propre, à la remise du bien.** Seule exception, côté acheteur : le bouton « Payer chez le vendeur » d'une boutique Pro vérifiée, affiché sur l'annonce elle-même, jamais envoyé par message ([CGU](/legal/cgu#transactions-2)).
 
 ### 2.2 L'acompte ou les frais avant la rencontre {#arnaques-2}
 

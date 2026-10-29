@@ -26,7 +26,7 @@ Les publicités et les promotions de {brand}, qui ne sont pas des annonces et ne
 
 ## 2. Les critères de tri {#tri}
 
-Quatre tris sont proposés. Vous choisissez celui qui vous convient dans la page de résultats. Sans mots-clés, les résultats sont triés par date ; avec des mots-clés, ils sont triés par pertinence, sauf si vous choisissez un autre tri.
+Quatre tris sont proposés. Vous choisissez celui qui vous convient dans la page de résultats. Sans mots-clés, les résultats sont triés par date ; avec des mots-clés, ils sont triés par pertinence, sauf si vous choisissez un autre tri. Une recherche de location de voitures par dates suit une règle propre (§2.7).
 
 ### 2.1 Date {#tri-1}
 
@@ -52,7 +52,15 @@ Vous pouvez trier du prix le plus bas au plus haut, ou l'inverse.
 
 ### 2.6 Filtres {#tri-6}
 
-Les filtres (catégorie, prix, lieu, etc.) restreignent la liste des résultats. Ils ne changent pas l'ordre du tri choisi.
+Les filtres (catégorie, prix, lieu, etc.) restreignent la liste des résultats. Ils ne changent pas l'ordre du tri choisi, sauf les dates de location (§2.7).
+
+### 2.7 Location de voitures par dates {#tri-7}
+
+Quand vous cherchez une voiture de location pour des dates précises, les véhicules indisponibles à ces dates sont écartés et les résultats sont triés par prix croissant, sauf si vous choisissez un autre tri. Les véhicules dont l'agence a confirmé la disponibilité depuis moins de 14 jours s'affichent d'abord ; les autres suivent, avec la mention « disponibilité à confirmer ». Aucun paiement ne change cet ordre.
+
+### 2.8 Annonces exemples {#tri-8}
+
+Les annonces marquées « Annonce exemple » sont rédigées par {brand} pour illustrer le site ([CGU](/legal/cgu#role-4)). Elles apparaissent dans les résultats selon les mêmes règles, avec cette mention, et ne reçoivent aucune option payante.
 
 ## 3. Les options payantes {#options}
 
@@ -105,7 +113,7 @@ Le badge « Certifié », lorsqu'il est proposé, signale un professionnel dont 
 
 ### 4.3 Mêmes règles de classement {#pro-3}
 
-Particuliers et professionnels sont classés selon les mêmes règles (§2). L'offre de lancement des comptes Pro, gratuite, donne des quotas de publication et une boutique : elle ne donne aucun avantage de classement. Les professionnels peuvent, comme les particuliers, acheter les options du §3, avec les mêmes mentions.
+Particuliers et professionnels sont classés selon les mêmes règles (§2). L'offre de lancement des comptes Pro, gratuite, donne des quotas de publication et une boutique : elle ne donne aucun avantage de classement. Il en va de même des abonnements Pro et du Pass Boutique. Les professionnels peuvent, comme les particuliers, acheter les options du §3, avec les mêmes mentions.
 
 ## 5. Publicités et promotions de {brand} {#publicite}
 
