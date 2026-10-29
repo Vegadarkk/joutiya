@@ -90,6 +90,37 @@ export async function enqueueAiTask(task: AiTask, target: AiTarget, options: Enq
   return { queued: true };
 }
 
+/**
+ * The licence check of a car rental agency (decision 5) rides the same queue and consumer, so
+ * Claude calls stay one at a time under the same budget: job name RENTAL_CHECK_JOB, the shop's
+ * id only, one job per submission.
+ */
+export const RENTAL_CHECK_JOB = "rental-check";
+export const rentalCheckJobSchema = z
+  .object({ proId: z.string().regex(/^[a-hj-km-np-z2-9]{8}$/), submittedAt: z.number().int().nonnegative() })
+  .strict();
+export type RentalCheckJobData = z.infer<typeof rentalCheckJobSchema>;
+
+/** Queues the check of `proId`'s document sent at `submittedAt`; `{ queued: false }` without a queue. */
+export async function enqueueRentalCheck(data: RentalCheckJobData): Promise<{ queued: boolean }> {
+  const job = rentalCheckJobSchema.parse(data);
+  const url = serverEnv().QUEUE_REDIS_URL;
+  if (!url) {
+    logger.debug({ job: RENTAL_CHECK_JOB }, "ai: queue not configured, rental check dropped");
+    return { queued: false };
+  }
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("rental check not enqueued in time")), ENQUEUE_TIMEOUT_MS);
+  });
+  try {
+    await Promise.race([agentQueue(url).add(RENTAL_CHECK_JOB, job, { ...AGENT_JOB_OPTIONS, jobId: `${RENTAL_CHECK_JOB}-${job.proId}-${job.submittedAt}` }), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+  return { queued: true };
+}
+
 /** Tests and shutdown: closes the producer and its connection. */
 export async function closeAgentQueue(): Promise<void> {
   const current = queue;

@@ -24,6 +24,7 @@ import { applyVerificationEffects, hasProClaims } from "./effects";
 import { KYBC_END_RETENTION_MS } from "./kybc-retention";
 import { IllegalProTransitionError, publishesAsPro, transition } from "./lifecycle";
 import type { ProProfileDoc } from "./profile-schema";
+import { rentalCheckReview } from "./rental-check";
 
 // KYBC review of the back office (phase 7 design §4): the queue of submitted applications, one
 // application's review, and the moderator's decision. The decision is one transaction that
@@ -102,6 +103,7 @@ export async function proReview(proId: string): Promise<ProReview | null> {
         }
       : null,
     pieces: pieces.map((upload) => ({ id: upload.id, status: upload.status, declaredType: upload.declaredType, size: upload.size ?? null })),
+    rentalCheck: await rentalCheckReview(record),
   };
 }
 

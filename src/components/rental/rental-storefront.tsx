@@ -1,5 +1,5 @@
 import { Banknote, BadgeInfo, Clock, IdCard, KeyRound, MapPin, Plane, ShieldCheck, Wallet, type LucideIcon } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { airportById } from "@/config/airports";
 import { cityBySlug, cityName } from "@/config/regions";
@@ -10,15 +10,17 @@ import type { FleetConditions } from "@/lib/search/rental-fleet-view";
 import { cn } from "@/lib/utils";
 
 // Blocks of a car rental agency's storefront (rental pack §5), server-rendered: the agency card
-// (licence reference « déclarée par l'agence », hours, payments on site, airports), its branches
+// (licence reference « déclarée par l'agence », or « contrôlé sur document » once its decision
+// passed the check of decision 5, hours, payments on site, airports), its branches
 // (declared professional addresses) and its conditions summed up from its listings. Everything is
 // the agency's declaration; the written rental contract prevails.
 
 const list = (items: string[], locale: Locale) => items.join(locale === "ar" ? "، " : ", ");
 
-export function RentalAgencyCard({ rental, locale, className }: { rental: RentalAgency; locale: Locale; className?: string }) {
+export function RentalAgencyCard({ rental, checkedAt = null, locale, className }: { rental: RentalAgency; checkedAt?: string | null; locale: Locale; className?: string }) {
   const t = useTranslations("Storefront.rental");
   const r = useTranslations("Rental");
+  const format = useFormatter();
   const airports = rental.airports
     .map((id) => airportById(id))
     .filter((airport) => airport !== undefined)
@@ -32,7 +34,7 @@ export function RentalAgencyCard({ rental, locale, className }: { rental: Rental
         {t("agencyTitle")}
       </h2>
       <div className="flex items-start gap-3">
-        <Badge icon={IdCard} />
+        <Badge icon={checkedAt ? ShieldCheck : IdCard} />
         <div className="flex min-w-0 flex-col gap-0.5">
           <p className="font-medium">
             {t("agrement")}{" "}
@@ -40,7 +42,16 @@ export function RentalAgencyCard({ rental, locale, className }: { rental: Rental
               {rental.agrementRef}
             </span>
           </p>
-          <p className="text-sm text-foreground-muted text-pretty">{t("agrementDeclared")}</p>
+          {checkedAt ? (
+            <>
+              <p data-testid="rental-agrement-checked" className="text-sm font-medium text-success text-pretty">
+                {t("agrementChecked", { date: format.dateTime(new Date(checkedAt), { dateStyle: "long", timeZone: "Africa/Casablanca" }) })}
+              </p>
+              <p className="text-xs text-foreground-muted text-pretty">{t("agrementCheckedNote")}</p>
+            </>
+          ) : (
+            <p className="text-sm text-foreground-muted text-pretty">{t("agrementDeclared")}</p>
+          )}
         </div>
       </div>
       {rental.hours ? (

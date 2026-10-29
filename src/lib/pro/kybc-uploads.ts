@@ -15,6 +15,7 @@ import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { isStorageNotConfigured, objectStore, type ObjectStore } from "@/lib/storage";
 import { isStorageFull } from "@/lib/uploads/storage-gauge";
 import { KYBC_SNIFF_BYTES, KYBC_UPLOADS_PER_ACCOUNT, kybcObjectKey, pdfHasActiveContent, sniffKybcType } from "./kybc";
+import { ownedRentalAgency } from "./rental-check";
 import { assertCanApply, type ProActor } from "./service";
 
 // KYBC pieces of a Pro application (phase 7 design §4, repo-map 5.2): same presigned PUT to the
@@ -26,7 +27,9 @@ import { assertCanApply, type ProActor } from "./service";
 // at most 10 MiB per request, no variants. The pieces stay until purgeAt (7 days) unless an
 // application lists them: purge-quarantine then keeps them with the application
 // (src/lib/pro/kybc-retention.ts). Signing needs the same eligibility as the application, so a
-// closed sign-up or an account without a verified phone parks nothing in the bucket.
+// closed sign-up or an account without a verified phone parks nothing in the bucket. A car rental
+// agency's licence decision (`use: "agrement"`, decision 5) is the same kind of piece, signed by a
+// publishing shop with a licence reference instead, and kept with its check.
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -47,7 +50,9 @@ export async function signKybcUpload(actor: ProActor, input: KybcSignInput, now 
   if (await isStorageFull()) throw new HttpError(503, "storage_full", undefined, { headers: { "Retry-After": "3600" } });
   await enforceLimit("pro.kybc.sign.uid", uid);
   await assertQuotas(DEPOSIT_QUOTAS);
-  await assertCanApply(actor.auth);
+  // A car rental agency's licence decision (decision 5), or a piece of a Pro application.
+  if (input.use === "agrement") await ownedRentalAgency(actor.auth);
+  else await assertCanApply(actor.auth);
   if ((await countUploadsByTarget(uid)) >= KYBC_UPLOADS_PER_ACCOUNT) throw new HttpError(409, "upload_limit", "too many KYBC pieces");
   await enforceLimit("upload.bytes.uid", uid, input.declaredSize);
 
@@ -147,7 +152,8 @@ export async function completeKybcUpload(actor: ProActor, id: string, now = new 
  * `processing` first (a complete call in flight then finds it gone and removes its copy), then
  * its quarantine and private objects and its document go. A piece listed by an application under
  * review or verified is kept with it (409): the review and the retention rule own it; after a
- * rejection the applicant may drop it before resubmitting.
+ * rejection the applicant may drop it before resubmitting. The same holds for the licence document
+ * of a check not refused.
  */
 export async function deleteKybcUpload(actor: ProActor, id: string, now = new Date()): Promise<void> {
   const uid = actor.auth.user.uid;
@@ -156,6 +162,7 @@ export async function deleteKybcUpload(actor: ProActor, id: string, now = new Da
   const user = await getUser(uid);
   const profile = user?.proId ? await getProProfile(user.proId) : null;
   if (profile && profile.ownerUid === uid && profile.lifecycle !== "rejected" && profile.kybc.uploadIds.includes(id)) throw new HttpError(409, "conflict", "piece listed by the application");
+  if (profile && profile.ownerUid === uid && profile.rentalCheck?.uploadId === id && profile.rentalCheck.status !== "rejected") throw new HttpError(409, "conflict", "licence document under check or checked");
   const objects = store();
   const ended = await transitionUpload(id, ["signed", "processing", "ready"], { status: "rejected", rejectReason: "expired" }, now);
   if (!ended.ok && !ended.upload) throw notFound();

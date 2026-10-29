@@ -23,11 +23,13 @@ import { loadProMe, saveRentalAgency } from "@/lib/pro/client";
 import { publishesAsPro, type ProState } from "@/lib/pro/lifecycle";
 import { RENTAL_AGREMENT_PATTERN, RENTAL_BRANCHES_MAX, RENTAL_HOURS_MAX, RENTAL_PAYMENTS, RENTAL_ADDRESS_MAX, type RentalAgency, type RentalPayment } from "@/lib/pro/profile-schema";
 import { cn } from "@/lib/utils";
+import { RentalCheckPanel } from "./rental-check";
 
 // /pro/location: a car rental agency's settings (rental pack §5): its Ministry of Transport
 // licence reference (decision 3: required to publish a rental, shown « déclaré »), its branches
 // (professional addresses), opening hours, payments taken on site and the airports it serves.
 // The free texts follow the storefront screen (free-text.ts), live here and again on the server.
+// Under the reference, the check of the licence decision on its document (decision 5).
 
 type View = { kind: "loading" } | { kind: "failed"; error: unknown } | { kind: "ready"; me: ProMeResponse };
 
@@ -138,6 +140,8 @@ function RentalAgencyForm({ shop }: { shop: ProSelfView }) {
   const [attempted, setAttempted] = useState(false);
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<unknown>(null);
+  const [check, setCheck] = useState(shop.rentalCheck);
+  const savedRef = saved === "null" ? null : (JSON.parse(saved) as RentalAgency).agrementRef;
 
   const set = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
   const setBranch = (key: number, patch: Partial<Branch>) => set({ branches: draft.branches.map((branch) => (branch.key === key ? { ...branch, ...patch } : branch)) });
@@ -174,6 +178,8 @@ function RentalAgencyForm({ shop }: { shop: ProSelfView }) {
     setFailure(null);
     try {
       const result = await saveRentalAgency(input);
+      // The server dropped the document check made against the previous reference.
+      if (result.rental.agrementRef !== savedRef) setCheck(null);
       setSaved(JSON.stringify(result.rental));
       toast.success(t("saved"));
     } catch (caught) {
@@ -206,6 +212,7 @@ function RentalAgencyForm({ shop }: { shop: ProSelfView }) {
             onChange={(event) => set({ agrementRef: event.target.value })}
           />
         </Field>
+        <RentalCheckPanel check={check} savedRef={savedRef && savedRef === agrement ? savedRef : null} onChange={setCheck} />
       </Section>
 
       <Section title={t("branchesTitle")} lead={t("branchesLead", { max: RENTAL_BRANCHES_MAX })}>

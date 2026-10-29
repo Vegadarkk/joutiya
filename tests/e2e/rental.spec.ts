@@ -94,6 +94,8 @@ test.describe("Car rental", () => {
     await setup.getByRole("link", { name: "Mes réglages" }).click();
     await expect(page).toHaveURL(/\/fr\/pro\/location$/);
     const settings = page.getByTestId("rental-agency-settings");
+    // The document check waits for a saved reference (decision 5).
+    await expect(settings.getByText(/^Enregistrez d'abord votre numéro d'agrément/)).toBeVisible();
     await settings.getByLabel(/^Numéro d'agrément/).fill("AG");
     await expect(settings.getByText(/^De 3 à 40 caractères/)).toBeVisible();
     await settings.getByLabel(/^Numéro d'agrément/).fill("AGR 123/2025");
@@ -102,6 +104,8 @@ test.describe("Car rental", () => {
     await settings.getByRole("checkbox", { name: "Marrakech (RAK)" }).check();
     await settings.getByRole("button", { name: "Enregistrer" }).click();
     await expect(page.getByText("Réglages enregistrés. Votre vitrine est mise à jour.")).toBeVisible();
+    await expect(settings.getByTestId("rental-check")).toHaveAttribute("data-status", "none");
+    await expect(settings.getByRole("button", { name: "Envoyer ma décision d'agrément" })).toBeVisible();
     await page.screenshot({ path: "test-results/rental-agency-settings.png", fullPage: true });
     await page.goto("/fr/pro");
     await expect(page.getByTestId("rental-setup-progress")).toHaveText("1 sur 3");

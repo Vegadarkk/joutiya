@@ -181,7 +181,7 @@ export default async function StorefrontPage({ params }: { params: Params }) {
           </section>
         ) : null}
         <div className={store.description ? "flex flex-col gap-4 self-start" : "flex max-w-prose flex-col gap-4 lg:col-span-2"}>
-          {store.rental ? <RentalAgencyCard rental={store.rental} locale={locale} /> : null}
+          {store.rental ? <RentalAgencyCard rental={store.rental} checkedAt={store.rentalCheckedAt} locale={locale} /> : null}
           <FeeSchedule text={store.feeSchedule} />
           {store.payment ? <PayAtSeller payment={store.payment} className="rounded-lg border border-border bg-surface p-4" /> : null}
           {aside}
