@@ -17,7 +17,7 @@ import {
   regionCodeSchema,
   slugIdSchema,
 } from "@/lib/contracts/listings";
-import { PROMO_KINDS, listingVariantsSchema, sectionIdSchema, stockSchema, variantItemSchema } from "@/lib/contracts/catalog";
+import { PRICE_LOG_MAX, PROMO_KINDS, listingVariantsSchema, sectionIdSchema, stockSchema, variantItemSchema } from "@/lib/contracts/catalog";
 import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, UPLOAD_DOC_DECLARED_TYPES, UPLOAD_REJECT_REASONS, UPLOAD_STATUSES, listingPhotoSchema, uploadIdSchema } from "@/lib/contracts/media";
 import { ROLES } from "@/lib/firebase/claims";
 import { DAY_PATTERN, RENTAL_PERIODS_MAX } from "@/lib/listings/rental-availability";
@@ -279,8 +279,6 @@ export const moderationSchema = z
   .strict();
 export type ListingModeration = z.infer<typeof moderationSchema>;
 
-/** Points of `priceLog`: a change a day for a month on 6 prices, beyond any real use. */
-export const PRICE_LOG_MAX = 200;
 export const priceLogEntrySchema = z
   .object({ at: ts, price: z.number().int().min(0).max(PRICE_MAX).nullable(), key: variantItemSchema.shape.key.optional() })
   .strict();

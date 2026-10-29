@@ -36,6 +36,9 @@ export const itemAvailable = (item: StockItem) => item.stock === undefined || it
 
 // ---- Promotions (catalogue §4, law 31-08 art. 53-55)
 
+/** Points of a listing's price history: ten changes a month on each of 50 combinations (VARIANT_ITEMS_MAX); ~30 KB at most. */
+export const PRICE_LOG_MAX = 500;
+
 export const PROMO_KINDS = ["promo", "soldes", "flash"] as const;
 export type PromoKind = (typeof PROMO_KINDS)[number];
 
@@ -65,12 +68,18 @@ export function percentOff(price: number, before: number): number {
   return before > 0 && price < before ? Math.floor(((before - price) / before) * 100) : 0;
 }
 
-/** The lowest promotional price, its struck-out price and the largest cut, for a card. */
+/** Of two struck-out prices for the same price: one over none, else the lower (the smaller claim). */
+const smallerClaim = (reference: number | null, other: number | null) => reference !== null && (other === null || reference < other);
+
+/**
+ * The lowest promotional price, its own struck-out price and its own cut, for a card and the
+ * listing page: the badge always reads the pair shown next to it (B-06, art. 54), never another
+ * combination's deeper cut; 0 when that price has no struck-out price.
+ */
 export function promoSummary(promo: Pick<PromoView, "prices">): { price: number; reference: number | null; percent: number } | null {
   if (promo.prices.length === 0) return null;
-  const lowest = promo.prices.reduce((best, entry) => (entry.price < best.price ? entry : best));
-  const percent = Math.max(0, ...promo.prices.map((entry) => (entry.reference === null ? 0 : percentOff(entry.price, entry.reference))));
-  return { price: lowest.price, reference: lowest.reference, percent };
+  const shown = promo.prices.reduce((best, entry) => (entry.price < best.price || (entry.price === best.price && smallerClaim(entry.reference, best.reference)) ? entry : best));
+  return { price: shown.price, reference: shown.reference, percent: shown.reference === null ? 0 : percentOff(shown.price, shown.reference) };
 }
 
 /** What a card shows of a running promotion: the badge, the lowest price and its struck-out price. */
@@ -79,7 +88,7 @@ export interface CardPromo {
   price: number;
   /** Null: no struck-out price (listing younger than 30 days). */
   reference: number | null;
-  /** Largest cut against a struck-out price (« -20 % »); 0 without one. */
+  /** Cut of `price` against `reference` (« -20 % »); 0 without one. */
   percent: number;
   /** Epoch ms (a flash sale's countdown). */
   endsAt: number;

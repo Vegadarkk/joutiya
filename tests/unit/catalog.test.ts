@@ -18,7 +18,9 @@ import {
 import { listingPatchSchema } from "@/lib/contracts/listings";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { ListingDoc, PriceLogEntry } from "@/lib/db/schemas";
-import { PRICE_LOG_DAYS, effectivePrices, logPrices, prunePriceLog } from "@/lib/listings/catalog";
+import { PRICE_LOG_MAX, promoSummary } from "@/lib/contracts/catalog";
+import { PRICE_LOG_DAYS, effectivePrices, livePriceLog, logPrices, prunePriceLog } from "@/lib/listings/catalog";
+import { transition } from "@/lib/listings/lifecycle";
 import { planPromo, promoEnd, promoView, referencePrices } from "@/lib/listings/promo";
 import { assessReadiness, issuesByPath, type SellerFacts } from "@/lib/listings/readiness";
 import { toSearchDocument } from "@/lib/search/document";
@@ -203,6 +205,38 @@ describe("price history", () => {
     ]);
     expect(PRICE_LOG_DAYS).toBe(31);
   });
+
+  it("over the cap, drops the points a later lower price makes useless before the oldest (B-11)", () => {
+    const keys = Array.from({ length: 50 }, (_, index) => `k${index}`);
+    const listing = (log: PriceLogEntry[]) => ({ price: 200, isDonation: false, publishedAt: at(40), priceLog: log, variants: { axes: [{ id: "free-1" as const, label: "Lot", values: keys }], items: keys.map((key) => ({ key })) } });
+    // Back and forth on 50 combinations: 650 points, over the cap. The higher or equal points before
+    // a lower one go, the first of each key stays: the struck-out price is the one of the whole log.
+    const swinging: PriceLogEntry[] = keys.flatMap((key) => [{ at: at(40), price: 300, key }, ...Array.from({ length: 12 }, (_, step) => ({ at: at(25 - step), price: step % 2 === 0 ? 400 : 200, key }))]);
+    expect(swinging.length).toBeGreaterThan(PRICE_LOG_MAX);
+    const kept = prunePriceLog(swinging, NOW);
+    expect(kept.filter((entry) => entry.key === "k0")).toEqual([
+      { at: at(40), price: 300, key: "k0" },
+      { at: at(14), price: 200, key: "k0" },
+    ]);
+    expect(referencePrices(listing(kept), NOW)).toEqual(referencePrices(listing(swinging), NOW));
+    // Rising prices are all needed: the oldest go, and a key losing its first point loses its
+    // struck-out price, never gets a higher one.
+    const rising: PriceLogEntry[] = keys.flatMap((key) => [{ at: at(40), price: 100, key }, ...Array.from({ length: 12 }, (_, step) => ({ at: at(25 - step), price: 110 + step, key }))]);
+    const pruned = prunePriceLog(rising, NOW);
+    expect(pruned).toHaveLength(PRICE_LOG_MAX);
+    expect([...referencePrices(listing(pruned), NOW).values()].every((reference) => reference === null)).toBe(true);
+  });
+
+  it("logs the prices shown when a listing goes live, nothing while it is paused (B-03)", () => {
+    const base = { version: 1, publishedAt: at(60), expiresAt: new Date(NOW.getTime() + 10 * DAY), purgeAt: undefined, sortAt: at(60), sortSource: "publish" as const, isDonation: false };
+    const paused = { ...base, status: "paused" as const, pausedReason: "owner" as const, price: 300, priceLog: [{ at: at(60), price: 100 }] };
+    const resumed = transition(paused, "published", { now: NOW, lifetime: { ttlDays: 60, purgeMonths: 6 } });
+    expect(resumed.patch.priceLog).toEqual([{ at: at(60), price: 100 }, { at: NOW, price: 300 }]);
+    // Same price as its last point: nothing to add.
+    expect(transition({ ...paused, price: 100 }, "published", { now: NOW, lifetime: { ttlDays: 60, purgeMonths: 6 } }).patch).not.toHaveProperty("priceLog");
+    expect(transition({ ...paused, status: "published", pausedReason: undefined }, "paused", { now: NOW, lifetime: { ttlDays: 60, purgeMonths: 6 } }).patch).not.toHaveProperty("priceLog");
+    expect(livePriceLog({ price: 100, isDonation: false, priceLog: [{ at: at(60), price: 100 }] }, NOW)).toBeUndefined();
+  });
 });
 
 describe("publish readiness of the catalogue", () => {
@@ -274,6 +308,14 @@ describe("promotions (catalogue §4)", () => {
     );
   });
 
+  it("never strikes a price set while the listing was paused (B-03)", () => {
+    // Sold at 100 DH, paused and raised to 300 DH 31 days ago, resumed now: the 300 DH point dates from the return.
+    const resumed = plain({ price: 300, publishedAt: at(60), priceLog: [{ at: at(60), price: 100 }, { at: NOW, price: 300 }] });
+    expect(referencePrices(resumed, NOW)).toEqual(new Map([["", 100]]));
+    const plan = planPromo(resumed, { kind: "soldes", endsAt: later(72), price: 200 }, NOW);
+    expect(plan).toEqual({ ok: false, issues: [{ path: "price", code: "promo_not_below_reference", value: "100" }] });
+  });
+
   it("plans a cut under the struck-out price", () => {
     const plan = planPromo(plain(), { kind: "promo", endsAt: later(72), percent: 20 }, NOW);
     expect(plan).toEqual({ ok: true, review: false, percent: 20, promo: { kind: "promo", startsAt: NOW, endsAt: new Date(later(72)), percent: 20, prices: [{ key: "", price: 200, reference: 250 }] } });
@@ -339,6 +381,16 @@ describe("promotions (catalogue §4)", () => {
       { field: "promoPercent", dir: "desc" },
       { field: "sortAt", dir: "desc" },
     ]);
+  });
+});
+
+describe("promotion badge (B-06)", () => {
+  it("reads the pair shown, never another combination's deeper cut", () => {
+    expect(promoSummary({ prices: [{ key: "a", price: 90, reference: 100 }, { key: "b", price: 250, reference: 500 }] })).toEqual({ price: 90, reference: 100, percent: 10 });
+    // The lowest price has no struck-out price: no percentage either.
+    expect(promoSummary({ prices: [{ key: "a", price: 90, reference: null }, { key: "b", price: 250, reference: 500 }] })).toEqual({ price: 90, reference: null, percent: 0 });
+    // Equal prices: one with a struck-out price, the lower of two.
+    expect(promoSummary({ prices: [{ key: "a", price: 90, reference: null }, { key: "b", price: 90, reference: 150 }, { key: "c", price: 90, reference: 120 }] })).toEqual({ price: 90, reference: 120, percent: 25 });
   });
 });
 

@@ -14,7 +14,9 @@ import { DEFAULT_PRICING } from "@/config/pricing";
 import { cityBySlug } from "@/config/regions";
 import { POST as create } from "@/app/api/listings/route";
 import { PATCH as patch } from "@/app/api/listings/[id]/route";
+import { POST as pause } from "@/app/api/listings/[id]/pause/route";
 import { POST as publish } from "@/app/api/listings/[id]/publish/route";
+import { POST as resume } from "@/app/api/listings/[id]/resume/route";
 import { DELETE as deletePromo, PUT as putPromo } from "@/app/api/listings/[id]/promo/route";
 import { PUT as putSection } from "@/app/api/listings/[id]/section/route";
 import { PUT as putStock } from "@/app/api/listings/[id]/stock/route";
@@ -139,6 +141,24 @@ describe("Pro catalogue: variants and stock", () => {
       ["s|bleu", 230],
       ["l|noir", 230],
     ]);
+  });
+
+  it("logs only the prices buyers see: none while paused, the new ones on resume (B-03)", async () => {
+    const owner = await shop();
+    const { id } = await shirtDraft(owner, { variants: undefined, attributes: { audience: "homme", "clothing-type": "haut", "clothing-size": "m" } });
+    await api(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: { acceptRules: true } });
+    expect((await getListing(id))!.priceLog?.map((point) => point.price)).toEqual([250]);
+
+    expect((await api(pause, "POST", `/api/listings/${id}/pause`, { member: owner })).status).toBe(200);
+    const raised = await api<ListingBody & ErrorBody>(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: { price: 750 } });
+    expect(raised.status, JSON.stringify(raised.body)).toBe(200);
+    const paused = (await getListing(id))!;
+    expect(paused.price).toBe(750);
+    expect(paused.priceLog?.map((point) => point.price)).toEqual([250]);
+
+    const back = await api<ErrorBody>(resume, "POST", `/api/listings/${id}/resume`, { member: owner });
+    expect(back.status, JSON.stringify(back.body)).toBe(200);
+    expect((await getListing(id))!.priceLog?.map((point) => point.price)).toEqual([250, 750]);
   });
 
   it("sets the stock alone, without a new screening, and refuses what the listing does not hold", async () => {

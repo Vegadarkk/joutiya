@@ -7,7 +7,7 @@ import { enqueueSearchOutboxTx } from "@/lib/db/repositories/search-outbox";
 import { auth, db } from "@/lib/firebase/admin";
 import { getClaims, setClaims } from "@/lib/firebase/claims";
 import { getLegalConfig } from "@/lib/legal/config";
-import { purgeAtFor, transition, type Lifetime } from "@/lib/listings/lifecycle";
+import { purgeAtFor, transition, withLivePrices, type Lifetime } from "@/lib/listings/lifecycle";
 import { revalidateListingPaths } from "@/lib/listings/revalidate";
 import { logger } from "@/lib/logging/logger";
 import { consume } from "@/lib/quota";
@@ -219,7 +219,7 @@ export function unremovePatch(listing: ListingRecord, now: Date, life: Lifetime)
   if (!listing.publishedAt) return { patch: { ...base, status: "pending_review", purgeAt: null }, search: null };
   const live = listing.expiresAt !== undefined && listing.expiresAt.getTime() > now.getTime();
   if (!live) return { patch: { ...base, status: "expired", purgeAt: purgeAtFor(now, life) }, search: null };
-  return { patch: { ...base, status: "published", purgeAt: purgeAtFor(listing.expiresAt ?? now, life) }, search: "upsert" };
+  return withLivePrices(listing, { patch: { ...base, status: "published", purgeAt: purgeAtFor(listing.expiresAt ?? now, life) }, search: "upsert" }, now);
 }
 
 /** Ban reversed: the listings this ban removed come back. */
