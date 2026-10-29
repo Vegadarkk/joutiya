@@ -27,6 +27,7 @@ async function waitForTurnstile(page: Page): Promise<void> {
 }
 
 interface Seeded {
+  proId: string;
   draftId: string;
   published: { id: string; title: string };
   /** A dress in two sizes and two colours, prices from 420 to 450 DH. */
@@ -177,7 +178,7 @@ async function seedShop(email: string): Promise<Seeded> {
       publishedAt: daysAgo(40),
       expiresAt: new Date(now.getTime() + 20 * 86_400_000),
     });
-  return { draftId, published, dress, jacket };
+  return { proId, draftId, published, dress, jacket };
 }
 
 test.describe("shop catalogue", () => {
@@ -308,5 +309,73 @@ test.describe("shop catalogue", () => {
     await expect(buyer.getByTestId("price-tag").first()).toContainText(/960/);
     await expect(buyer.getByTestId("price-before").first()).toContainText(/1\s200/);
     await buyer.screenshot({ path: "test-results/catalogue-promo-listing.png", fullPage: true });
+  });
+
+  test("a shop files a listing under a section, and its storefront shows the section and promotions as tabs", async ({ page, request, browser }) => {
+    test.setTimeout(120_000);
+    const email = `catalogue-${randomId(10)}@joutiya.test`;
+    await signUpAndIn(page, request, email, "Lalla Atelier");
+    const { proId, published, jacket } = await seedShop(email);
+    const now = Date.now();
+    await getFirestore(firebase())
+      .collection("listings")
+      .doc(published.id)
+      .update({
+        promo: {
+          kind: "promo",
+          startsAt: new Date(now - 3_600_000),
+          endsAt: new Date(now + 48 * 3_600_000),
+          percent: 10,
+          prices: [
+            { key: "s", price: 1080, reference: null },
+            { key: "m", price: 1080, reference: null },
+          ],
+        },
+      });
+
+    await page.context().clearCookies();
+    await page.goto("/fr/pro");
+    await expect(page).toHaveURL(/\/connexion/);
+    await page.getByLabel("Adresse e-mail").fill(email);
+    await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+    await waitForTurnstile(page);
+    await page.getByRole("button", { name: "Se connecter" }).click();
+    await expect(page).toHaveURL(/\/fr\/pro/, { timeout: 15_000 });
+
+    const settings = page.getByTestId("sections-settings");
+    await settings.getByRole("button", { name: "Ajouter un rayon" }).click();
+    await settings.getByRole("textbox", { name: "Nom du rayon 1" }).fill("Hiver");
+    await settings.getByRole("button", { name: "Ajouter un rayon" }).click();
+    await settings.getByRole("textbox", { name: "Nom du rayon 2" }).fill("hiver");
+    await expect(settings.getByText("Ce nom est déjà pris par un autre rayon.")).toBeVisible();
+    await settings.getByRole("button", { name: "Supprimer le rayon 2" }).click();
+    await settings.getByRole("button", { name: "Enregistrer les rayons" }).click();
+    await expect(page.getByText("Rayons enregistrés.")).toBeVisible();
+    await settings.screenshot({ path: "test-results/catalogue-sections-settings.png" });
+
+    await page.goto("/fr/mes-annonces");
+    const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: jacket.title }) });
+    await row.getByTestId("owner-section").selectOption({ label: "Hiver" });
+    await expect(page.getByText("Rayon enregistré.")).toBeVisible();
+    const stored = (await getFirestore(firebase()).collection("listings").doc(jacket.id).get()).data()!;
+    expect(stored.sectionId).toMatch(/^[a-z0-9]{6}$/);
+
+    await expect.poll(async () => (await request.post("/api/dev/search/rebuild")).ok(), { timeout: 20_000, message: "listings indexed" }).toBe(true);
+    const buyer = await (await browser.newContext()).newPage();
+    await buyer.goto(`/fr/boutique/maison-lalla-${proId}`);
+    const tabs = buyer.getByRole("tablist", { name: "Rayons de la boutique" });
+    await expect(tabs.getByRole("tab")).toHaveText([/^Tout/, /^Hiver/, /^Promotions/]);
+    await tabs.getByRole("tab", { name: /^Hiver/ }).click();
+    await expect(buyer).toHaveURL(/#rayon-[a-z0-9]{6}$/);
+    const hiver = buyer.getByRole("tabpanel");
+    await expect(hiver.getByRole("link", { name: jacket.title })).toBeVisible();
+    await expect(hiver.getByRole("link", { name: published.title })).toHaveCount(0);
+    await buyer.screenshot({ path: "test-results/catalogue-storefront-section.png", fullPage: true });
+    await tabs.getByRole("tab", { name: /^Promotions/ }).click();
+    await expect(buyer).toHaveURL(/#promotions$/);
+    await expect(buyer.getByRole("tabpanel").getByRole("link", { name: published.title })).toBeVisible();
+    await buyer.reload();
+    await expect(tabs.getByRole("tab", { name: /^Promotions/ })).toHaveAttribute("aria-selected", "true");
+    await buyer.screenshot({ path: "test-results/catalogue-storefront-promotions.png", fullPage: true });
   });
 });

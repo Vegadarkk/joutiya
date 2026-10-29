@@ -23,6 +23,7 @@ import { paymentEligible } from "@/lib/pro/seller-payment-rules";
 import { cn } from "@/lib/utils";
 import { RentalSetup } from "@/components/rental/rental-setup";
 import { AgencySettings } from "./agency-settings";
+import { SectionsSettings } from "./sections-settings";
 import { ProApplicationForm } from "./pro-application-form";
 
 // /pro: the member's Pro area (phase 7 design §4). One request (GET /api/pro/me) decides the
@@ -301,6 +302,7 @@ function Dashboard({ me, shop, lifecycle }: { me: ProMeResponse; shop: ProSelfVi
       {canPublish && shop.sector === "car_rental" ? <RentalSetup shop={shop} /> : null}
 
       {suspended ? null : <AgencySettings shop={shop} />}
+      {canPublish && shop.sector !== "car_rental" ? <SectionsSettings shop={shop} /> : null}
 
       <section className="flex flex-col gap-3" aria-labelledby="pro-shortcuts">
         <h2 id="pro-shortcuts" className="text-lg font-semibold">

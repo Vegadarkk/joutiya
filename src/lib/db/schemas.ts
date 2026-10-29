@@ -17,7 +17,7 @@ import {
   regionCodeSchema,
   slugIdSchema,
 } from "@/lib/contracts/listings";
-import { PROMO_KINDS, listingVariantsSchema, stockSchema, variantItemSchema } from "@/lib/contracts/catalog";
+import { PROMO_KINDS, listingVariantsSchema, sectionIdSchema, stockSchema, variantItemSchema } from "@/lib/contracts/catalog";
 import { MAX_UPLOAD_BYTES, PHOTO_VARIANTS, UPLOAD_DOC_DECLARED_TYPES, UPLOAD_REJECT_REASONS, UPLOAD_STATUSES, listingPhotoSchema, uploadIdSchema } from "@/lib/contracts/media";
 import { ROLES } from "@/lib/firebase/claims";
 import { DAY_PATTERN, RENTAL_PERIODS_MAX } from "@/lib/listings/rental-availability";
@@ -352,6 +352,8 @@ export const listingSchema = z
     promo: listingPromoSchema.optional(),
     /** End of the last promotion that ran: the next one starts 7 days later at the earliest (decision 4). */
     lastPromoEndedAt: ts.optional(),
+    /** Section of the shop's storefront (catalogue §5); an id the shop no longer has is ignored. */
+    sectionId: sectionIdSchema.optional(),
     /** The number is never here; `showPhone` requires `badges.phoneVerified` at publish. */
     contact: z.object({ messaging: z.literal(true), showPhone: z.boolean(), whatsapp: z.boolean() }).strict(),
     boosts: z.object({ bumpedAt: ts.optional(), featuredUntil: ts.optional(), dailyBumpUntil: ts.optional(), highlightUntil: ts.optional() }).strict(),

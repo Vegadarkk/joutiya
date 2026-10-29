@@ -224,3 +224,31 @@ export type PromoInput = z.infer<typeof promoInputSchema>;
 
 /** The words a title may hold only during « Soldes » (art. 53: the word is reserved to them). */
 export const SOLDES_PATTERN = /(^|[^\p{L}])soldes?(?![\p{L}])/iu;
+
+// ---- Shop sections (catalogue §5)
+
+/** Sections (« rayons ») of a shop: « Ramadan », « Rentrée »… shown as storefront tabs. */
+export const SHOP_SECTIONS_MAX = 12;
+export const SHOP_SECTION_NAME_MAX = 30;
+export const SECTION_ID_PATTERN = /^[a-z0-9]{6}$/;
+export const sectionIdSchema = z.string().regex(SECTION_ID_PATTERN);
+const sectionNameSchema = z.string().trim().min(1).max(SHOP_SECTION_NAME_MAX);
+const distinctNames = (sections: readonly { name: string }[]) => new Set(sections.map((section) => section.name.toLocaleLowerCase("fr"))).size === sections.length;
+
+export const shopSectionSchema = z.object({ id: sectionIdSchema, name: sectionNameSchema }).strict();
+export type ShopSection = z.infer<typeof shopSectionSchema>;
+export const shopSectionsSchema = z
+  .array(shopSectionSchema)
+  .max(SHOP_SECTIONS_MAX)
+  .refine((sections) => new Set(sections.map((section) => section.id)).size === sections.length && distinctNames(sections), { message: "duplicate section" });
+
+/** `PUT /api/pro/me/sections`: the list replaced whole, in display order; a new section has no id yet. */
+export const sectionsInputSchema = z
+  .object({ sections: z.array(z.object({ id: sectionIdSchema.optional(), name: sectionNameSchema }).strict()).max(SHOP_SECTIONS_MAX).refine(distinctNames, { message: "duplicate name" }) })
+  .strict();
+export type SectionsInput = z.infer<typeof sectionsInputSchema>;
+export type SectionsResponse = { sections: ShopSection[] };
+
+/** `PUT /api/listings/{id}/section`: the listing's section, null to take it out. */
+export const sectionUpdateSchema = z.object({ sectionId: sectionIdSchema.nullable() }).strict();
+export type SectionUpdateInput = z.infer<typeof sectionUpdateSchema>;

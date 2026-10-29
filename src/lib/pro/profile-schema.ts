@@ -3,6 +3,7 @@ import { CRITERION_FORMATS } from "@/config/categories";
 import { PRO_PLANS, listingQuotasSchema } from "@/config/pricing";
 import { AIRPORT_IDS } from "@/config/airports";
 import { PAYMENT_URL_MAX } from "@/config/seller-payments";
+import { shopSectionsSchema } from "@/lib/contracts/catalog";
 import { sellerInfoInputSchema } from "@/lib/contracts/seller-payment";
 import { citySlugSchema, regionCodeSchema } from "@/lib/contracts/listings";
 import { KYBC_MAX_PIECES, KYBC_STATUSES, proLegalSchema } from "./kybc";
@@ -186,6 +187,8 @@ export const proProfileSchema = z
     example: z.literal(true).optional(),
     /** Real-estate agency details (sector "real_estate"), set by the owner (PUT /api/pro/me/agency). */
     agency: z.object({ feeSchedule: z.string().trim().max(AGENCY_FEE_SCHEDULE_MAX) }).strict().optional(),
+    /** Sections of the storefront (catalogue §5), in display order. */
+    sections: shopSectionsSchema.optional(),
     /** Car rental agency settings, set by the owner (PUT /api/pro/me/rental). */
     rental: rentalAgencySchema.optional(),
     /** Check of the licence decision (POST /api/pro/me/rental/check, then the agent queue or a moderator). */

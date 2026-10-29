@@ -8,7 +8,7 @@ import { requireOwner } from "@/lib/auth/guards";
 import type { Device } from "@/lib/auth/respond";
 import { enqueueAiTask } from "@/lib/ai/queue";
 import { audit } from "@/lib/audit";
-import { variantCriteria, type PromoInput, type StockUpdateInput } from "@/lib/contracts/catalog";
+import { variantCriteria, type PromoInput, type SectionUpdateInput, type StockUpdateInput } from "@/lib/contracts/catalog";
 import { MAX_DRAFTS, type CreateListingInput, type FieldIssue, type ListingPatch, type ListingStatus, type ModerationFlag, type PublishListingResponse } from "@/lib/contracts/listings";
 import { listingPhotoSchema, type ListingPhoto } from "@/lib/contracts/media";
 import { listingContentRef, recordContentOp, recordContentOpTx } from "@/lib/db/repositories/content-ops";
@@ -477,6 +477,25 @@ export async function updateStock(actor: Actor, id: string, input: StockUpdateIn
   const user = await getUserRecord(actor.auth.user.uid);
   if (!user) throw new HttpError(403, "forbidden", "account record missing");
   return ownerListingView(await commit(listing, changed, effects, { actor, user, now }));
+}
+
+/**
+ * A Pro listing's section of the storefront (catalogue §5): one of the shop's sections, or none.
+ * A classification only: no new moderation, the index and the public pages follow.
+ */
+export async function setSection(actor: Actor, id: string, input: SectionUpdateInput, now = new Date()) {
+  const listing = await ownedListing(actor, id);
+  if (!EDITABLE_STATUSES.includes(listing.status)) throw new HttpError(409, "conflict", "listing is read-only in this status");
+  if (listing.sellerType !== "pro" || !listing.proId) throw invalidField("sectionId", "section_pro_only");
+  if (input.sectionId !== null) {
+    const profile = await getProProfile(listing.proId);
+    if (!profile?.sections?.some((section) => section.id === input.sectionId)) throw invalidField("sectionId", "section_unknown");
+  }
+  if ((listing.sectionId ?? null) === input.sectionId) return toOwnerSummary(listing, now);
+  const user = await getUserRecord(actor.auth.user.uid);
+  if (!user) throw new HttpError(403, "forbidden", "account record missing");
+  const effects: TransitionEffects = { search: listing.status === "published" ? "upsert" : null, contentOp: null, audit: null, revalidate: hasPublicPage(listing.status), mail: null };
+  return toOwnerSummary(await commit(listing, { sectionId: input.sectionId }, effects, { actor, user, now }), now);
 }
 
 /** Statuses a promotion may be set on: shown or about to be shown again. */

@@ -2,6 +2,7 @@ import { CONDITIONS, RENTAL_SUBCATEGORY, categoryById, criterionById, searchCrit
 import { cityBySlug, regionByCode } from "@/config/regions";
 import { DAY_PATTERN, RENTAL_SEARCH_DAYS_MAX, dayNumber } from "@/lib/listings/rental-availability";
 import { z } from "@/lib/zod";
+import { SECTION_ID_PATTERN } from "@/lib/contracts/catalog";
 import { SEARCH_PATH, SEARCH_Q_MAX, SEARCH_QUERY_KEYS } from "./url-keys";
 
 // Search parameters (phase 4, design §2): the one whitelist shared by the search page, /api/search,
@@ -72,6 +73,8 @@ export interface SearchParams {
   includeSoldOut?: true;
   /** Running promotions only (catalogue §4); the « Réduction » sort implies it. */
   promo?: true;
+  /** A section of the shop's storefront (catalogue §5); kept with `shop` only. */
+  section?: string;
   conditions?: Condition[];
   /** Only for criteria of `subcategory` (select, multiselect, number, boolean). */
   criteria?: Record<string, CriterionFilter>;
@@ -182,6 +185,8 @@ export function parseSearchParams(source: Source): SearchParams {
   if (sellerId && PUBLIC_ID.test(sellerId)) params.sellerId = sellerId;
   const shop = read(source, k.shop);
   if (shop && PUBLIC_ID.test(shop)) params.shop = shop;
+  const section = read(source, k.section);
+  if (section && SECTION_ID_PATTERN.test(section)) params.section = section;
   if (read(source, k.donation) === "1") params.donation = true;
   if (read(source, k.withPhoto) === "1") params.withPhoto = true;
   if (read(source, k.includeSoldOut) === "1") params.includeSoldOut = true;
@@ -258,6 +263,7 @@ export function canonicalSearchParams(input: SearchParams): SearchParams {
     [params.priceMin, params.priceMax] = [params.priceMax, params.priceMin];
   }
   if (params.shop) params.sellerType = "pro";
+  else delete params.section;
   if (params.conditions) {
     const conditions = CONDITIONS.filter((value) => params.conditions?.includes(value));
     if (conditions.length) params.conditions = conditions;
@@ -324,6 +330,7 @@ export function searchParamsToQuery(input: SearchParams): URLSearchParams {
   if (params.sellerType && !params.shop) query.set(k.sellerType, SELLER_PARAM[params.sellerType]);
   if (params.sellerId) query.set(k.sellerId, params.sellerId);
   if (params.shop) query.set(k.shop, params.shop);
+  if (params.section) query.set(k.section, params.section);
   if (params.donation) query.set(k.donation, "1");
   if (params.withPhoto) query.set(k.withPhoto, "1");
   if (params.includeSoldOut) query.set(k.includeSoldOut, "1");
@@ -387,6 +394,7 @@ export const storedSearchParamsSchema = z
     sellerType: z.enum(SELLER_TYPES_FILTER).optional(),
     sellerId: z.string().regex(PUBLIC_ID).optional(),
     shop: z.string().regex(PUBLIC_ID).optional(),
+    section: z.string().regex(SECTION_ID_PATTERN).optional(),
     donation: z.literal(true).optional(),
     withPhoto: z.literal(true).optional(),
     includeSoldOut: z.literal(true).optional(),

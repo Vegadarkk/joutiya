@@ -18,6 +18,7 @@ export const SEARCH_QUERY_KEYS = {
   sellerType: "vendeur",
   sellerId: "vendeur-id",
   shop: "boutique",
+  section: "section",
   donation: "don",
   withPhoto: "photo",
   includeSoldOut: "epuises",

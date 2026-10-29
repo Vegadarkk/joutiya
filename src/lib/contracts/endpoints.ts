@@ -60,6 +60,8 @@ export const LISTING_API = {
   fleet: "/api/pro/fleet",
   /** PUT the declared stock alone (Pro catalogue). */
   stock: (id: string) => `/api/listings/${id}/stock`,
+  /** PUT the storefront section of a Pro listing (catalogue §5). */
+  section: (id: string) => `/api/listings/${id}/section`,
   /** PUT a promotion, DELETE to end it (Pro catalogue). */
   promo: (id: string) => `/api/listings/${id}/promo`,
 } as const;

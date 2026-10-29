@@ -1,7 +1,9 @@
 import "server-only";
+import { randomInt } from "node:crypto";
 import { launchOfferOpen, listingQuotas } from "@/config/pricing";
 import type { AuthContext } from "@/lib/auth/guards";
 import { getFlags, getPricing } from "@/lib/config/runtime";
+import type { SectionsInput, SectionsResponse, ShopSection } from "@/lib/contracts/catalog";
 import type { ProAgencyInput, ProAgencyResponse, ProApplyInput, ProMeResponse, ProRentalInput, ProRentalResponse } from "@/lib/contracts/pro";
 import { db } from "@/lib/firebase/admin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
@@ -161,6 +163,7 @@ export async function proSelf(auth: AuthContext): Promise<ProMeResponse> {
       storefront: storefrontShown(profile.lifecycle, profile.plan) ? `${profile.slug}-${profile.proId}` : null,
       sector: profile.sector ?? "general",
       feeSchedule: profile.agency?.feeSchedule ?? "",
+      sections: profile.sections ?? [],
       rental: profile.rental ?? null,
       rentalCheck: profile.rentalCheck ? rentalCheckView(profile.rentalCheck) : null,
     },
@@ -187,6 +190,34 @@ export async function updateAgency(auth: AuthContext, input: ProAgencyInput, now
   void consume("firestore.writes", 1);
   if (storefrontShown(profile.lifecycle, profile.plan)) revalidateListingPaths({ shopSegment: `${profile.slug}-${profile.proId}` });
   return { sector: input.sector, feeSchedule };
+}
+
+const SECTION_ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+const newSectionId = () => Array.from({ length: 6 }, () => SECTION_ID_ALPHABET[randomInt(SECTION_ID_ALPHABET.length)]).join("");
+
+/**
+ * PUT /api/pro/me/sections (catalogue §5): the storefront's sections, replaced whole in display
+ * order. A section keeps its id (its listings stay in it); an unknown id is a new section; a
+ * removed one leaves its listings' `sectionId` behind, ignored by every reader. Names pass the
+ * storefront text screen.
+ */
+export async function updateSections(auth: AuthContext, input: SectionsInput, now = new Date()): Promise<SectionsResponse> {
+  const profile = await ownedPublishingShop(auth);
+  const known = new Set((profile.sections ?? []).map((section) => section.id));
+  const used = new Set<string>();
+  const sections: ShopSection[] = input.sections.map((section, index) => {
+    const issue = firstStrictIssue(section.name);
+    if (issue) throw new HttpError(422, "invalid_text", "section name refused by the text screen", { details: { field: `sections.${index}.name`, issue } });
+    let id = section.id && known.has(section.id) && !used.has(section.id) ? section.id : newSectionId();
+    while (used.has(id) || (id !== section.id && known.has(id))) id = newSectionId();
+    used.add(id);
+    return { id, name: section.name };
+  });
+  await proProfileRef(profile.proId).update({ sections: sections.length > 0 ? sections : FieldValue.delete(), updatedAt: Timestamp.fromDate(now) });
+  void consume("firestore.reads", 1);
+  void consume("firestore.writes", 1);
+  if (storefrontShown(profile.lifecycle, profile.plan)) revalidateListingPaths({ shopSegment: `${profile.slug}-${profile.proId}` });
+  return { sections };
 }
 
 /** The owner's shop, verified and publishing (not suspended), from the session claims; else 409/403. */

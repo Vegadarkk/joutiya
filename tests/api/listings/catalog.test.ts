@@ -16,9 +16,12 @@ import { POST as create } from "@/app/api/listings/route";
 import { PATCH as patch } from "@/app/api/listings/[id]/route";
 import { POST as publish } from "@/app/api/listings/[id]/publish/route";
 import { DELETE as deletePromo, PUT as putPromo } from "@/app/api/listings/[id]/promo/route";
+import { PUT as putSection } from "@/app/api/listings/[id]/section/route";
 import { PUT as putStock } from "@/app/api/listings/[id]/stock/route";
-import type { ListingVariants } from "@/lib/contracts/catalog";
-import type { CreateListingResponse, ListingPatch, PromoResponse } from "@/lib/contracts/listings";
+import { GET as mine } from "@/app/api/listings/mine/route";
+import { PUT as putSections } from "@/app/api/pro/me/sections/route";
+import type { ListingVariants, SectionsResponse } from "@/lib/contracts/catalog";
+import type { CreateListingResponse, ListingPatch, OwnerListingsResponse, OwnerRowResponse } from "@/lib/contracts/listings";
 import { getListing } from "@/lib/db/repositories/listings";
 import { proProfileRef, proProfileToFirestore } from "@/lib/db/repositories/pro-profiles";
 import { COLLECTIONS } from "@/lib/db/schemas";
@@ -195,7 +198,7 @@ describe("Pro catalogue: variants and stock", () => {
 
 describe("Pro catalogue: promotions", () => {
   const inHours = (hours: number) => new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
-  type PromoBody = PromoResponse & ErrorBody;
+  type PromoBody = OwnerRowResponse & ErrorBody;
 
   async function publishedShirt(owner: Member, extra: Partial<ListingPatch> = { variants: undefined }): Promise<string> {
     const { id, saved } = await shirtDraft(owner, extra);
@@ -266,5 +269,67 @@ describe("Pro catalogue: promotions", () => {
     expect(individual.body.error.details).toEqual([{ path: "promo", code: "promo_pro_only" }]);
     const both = await api<ErrorBody>(putPromo, "PUT", `/api/listings/${id}/promo`, { member: seller, body: { kind: "promo", endsAt: inHours(72), percent: 20, price: 100 } });
     expect(both.status).toBe(400);
+  });
+});
+
+describe("Pro catalogue: shop sections", () => {
+  type SectionsBody = SectionsResponse & ErrorBody;
+  const save = (owner: Member, sections: { id?: string; name: string }[]) => api<SectionsBody>(putSections, "PUT", "/api/pro/me/sections", { member: owner, body: { sections } });
+
+  it("keeps the ids of the sections it knows, adds new ones and refuses a contact in a name", async () => {
+    const owner = await shop();
+    const first = await save(owner, [{ name: "Ramadan" }, { name: "Rentrée" }]);
+    expect(first.status, JSON.stringify(first.body)).toBe(200);
+    const [ramadan, rentree] = first.body.sections;
+    expect(ramadan).toMatchObject({ id: expect.stringMatching(/^[a-z0-9]{6}$/), name: "Ramadan" });
+
+    const second = await save(owner, [{ id: rentree!.id, name: "Rentrée scolaire" }, { id: "zzzzzz", name: "Mariage" }]);
+    expect(second.status, JSON.stringify(second.body)).toBe(200);
+    expect(second.body.sections[0]).toEqual({ id: rentree!.id, name: "Rentrée scolaire" });
+    expect(second.body.sections[1]?.id).not.toBe("zzzzzz");
+    expect(second.body.sections.map((section) => section.id)).not.toContain(ramadan!.id);
+
+    const contact = await save(owner, [{ name: "Appelez le 0612345678" }]);
+    expect(contact.status).toBe(422);
+    const duplicate = await save(owner, [{ name: "Mariage" }, { name: "mariage" }]);
+    expect(duplicate.status).toBe(400);
+
+    const cleared = await save(owner, []);
+    expect(cleared.body.sections).toEqual([]);
+    const stored = (await db().collection(COLLECTIONS.users).doc(owner.uid).get()).data() as { proId: string };
+    expect((await proProfileRef(stored.proId).get()).data()?.sections).toBeUndefined();
+  });
+
+  it("puts a listing in a section of its shop, lists the sections with the rows and refuses others", async () => {
+    const owner = await shop();
+    const { sections } = (await save(owner, [{ name: "Ramadan" }])).body;
+    const { id } = await shirtDraft(owner, { variants: undefined });
+
+    const unknown = await api<OwnerRowResponse & ErrorBody>(putSection, "PUT", `/api/listings/${id}/section`, { member: owner, body: { sectionId: "abc123" } });
+    expect(unknown.status).toBe(400);
+    expect(unknown.body.error.details).toEqual([{ path: "sectionId", code: "section_unknown" }]);
+
+    const set = await api<OwnerRowResponse & ErrorBody>(putSection, "PUT", `/api/listings/${id}/section`, { member: owner, body: { sectionId: sections[0]!.id } });
+    expect(set.status, JSON.stringify(set.body)).toBe(200);
+    expect(set.body.listing.sectionId).toBe(sections[0]!.id);
+    expect((await getListing(id))?.sectionId).toBe(sections[0]!.id);
+
+    const rows = await api<OwnerListingsResponse>(mine, "GET", "/api/listings/mine", { member: owner });
+    expect(rows.status).toBe(200);
+    expect(rows.body.sections).toEqual(sections);
+
+    const out = await api<OwnerRowResponse & ErrorBody>(putSection, "PUT", `/api/listings/${id}/section`, { member: owner, body: { sectionId: null } });
+    expect(out.status).toBe(200);
+    expect((await getListing(id))?.sectionId ?? null).toBeNull();
+  });
+
+  it("keeps sections for Pros", async () => {
+    const seller = await member();
+    const { id } = await shirtDraft(seller, { variants: undefined });
+    const individual = await api<ErrorBody>(putSection, "PUT", `/api/listings/${id}/section`, { member: seller, body: { sectionId: "abc123" } });
+    expect(individual.status).toBe(400);
+    expect(individual.body.error.details).toEqual([{ path: "sectionId", code: "section_pro_only" }]);
+    const settings = await save(seller, [{ name: "Ramadan" }]);
+    expect(settings.status).toBe(409);
   });
 });

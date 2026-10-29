@@ -2,7 +2,7 @@ import "server-only";
 import { RENTAL_SUBCATEGORY, type Condition } from "@/config/categories";
 import { REVIEWS_PAGE } from "@/config/reviews";
 import { DEFAULT_BANNER, type BannerKey } from "@/config/storefront";
-import { cardPromo, isSoldOut, priceRange, type CardPromo, type ListingVariants, type PromoView } from "@/lib/contracts/catalog";
+import { cardPromo, isSoldOut, priceRange, type CardPromo, type ListingVariants, type PromoView, type ShopSection } from "@/lib/contracts/catalog";
 import type { ListingAttributes, ListingStatus, RentalAvailability } from "@/lib/contracts/listings";
 import type { PhotoVariant } from "@/lib/contracts/photo-variants";
 import type { RatingSummary, ReviewPage } from "@/lib/contracts/reviews";
@@ -398,6 +398,8 @@ export interface PublicStorefront {
   seller: PublicProfileView;
   /** Example shop (src/lib/demo): labelled, never "vérifiée", not indexed. */
   example: boolean;
+  /** Sections of the storefront (catalogue §5), in display order. */
+  sections: ShopSection[];
 }
 
 /**
@@ -426,6 +428,7 @@ export async function getPublicStorefront(proId: string, limit = 24): Promise<Pu
     rentalCheckedAt: profile.sector === "car_rental" ? checkedOn(profile) : null,
     seller: await profileView(user, limit),
     example: profile.example === true,
+    sections: profile.sections ?? [],
   };
 }
 

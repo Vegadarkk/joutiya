@@ -42,6 +42,8 @@ export interface SearchDocument {
   district?: string;
   sellerType: "individual" | "pro";
   sellerPublicId: string;
+  /** Storefront section of a Pro listing (catalogue §5). */
+  sectionId?: string;
   /** Integer MAD; absent when null ("à discuter", donation). */
   price?: number;
   priceNegotiable: boolean;

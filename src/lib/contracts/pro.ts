@@ -1,4 +1,5 @@
 import { z } from "@/lib/zod";
+import type { ShopSection } from "@/lib/contracts/catalog";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
 import { citySlugSchema, regionCodeSchema } from "@/lib/contracts/listings";
 import { KYBC_DECLARED_TYPES, MAX_UPLOAD_BYTES, uploadIdSchema, type KybcDeclaredType } from "@/lib/contracts/media";
@@ -223,6 +224,7 @@ export const PRO_API = {
   apply: "/api/pro/apply",
   me: "/api/pro/me",
   agency: "/api/pro/me/agency",
+  sections: "/api/pro/me/sections",
   rental: "/api/pro/me/rental",
   rentalCheck: "/api/pro/me/rental/check",
   kybcSign: "/api/pro/kybc/uploads",
@@ -327,6 +329,8 @@ export interface ProSelfView {
   sector: ProSector;
   /** The agency's fee schedule ("" when none or not an agency). */
   feeSchedule: string;
+  /** Sections of the storefront (catalogue §5), in display order. */
+  sections: ShopSection[];
   /** Car rental agency settings, null until saved (publishing a rental needs the licence reference). */
   rental: RentalAgency | null;
   /** Check of the licence decision, null until a document is sent (or after the reference changed). */

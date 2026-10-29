@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut, csrfToken } from "@/lib/auth/client";
-import type { PromoInput, StockUpdateInput } from "@/lib/contracts/catalog";
+import type { PromoInput, SectionUpdateInput, StockUpdateInput } from "@/lib/contracts/catalog";
 import {
   LISTING_API,
   type CreateListingInput,
@@ -11,7 +11,7 @@ import {
   type ListingResponse,
   type OwnerListBucket,
   type OwnerListingsResponse,
-  type PromoResponse,
+  type OwnerRowResponse,
   type PublishListingInput,
   type PublishListingResponse,
   type RentalAvailabilityInput,
@@ -76,13 +76,18 @@ export function saveStock(id: string, input: StockUpdateInput): Promise<ListingR
   return apiPut<ListingResponse>(LISTING_API.stock(id), input);
 }
 
-/** A promotion of a Pro listing (catalogue §4); DELETE ends the current or scheduled one. */
-export function savePromo(id: string, input: PromoInput): Promise<PromoResponse> {
-  return apiPut<PromoResponse>(LISTING_API.promo(id), input);
+/** The storefront section of a Pro listing (catalogue §5). */
+export function saveSection(id: string, input: SectionUpdateInput): Promise<OwnerRowResponse> {
+  return apiPut<OwnerRowResponse>(LISTING_API.section(id), input);
 }
 
-export function endPromo(id: string): Promise<PromoResponse> {
-  return apiDelete<PromoResponse>(LISTING_API.promo(id));
+/** A promotion of a Pro listing (catalogue §4); DELETE ends the current or scheduled one. */
+export function savePromo(id: string, input: PromoInput): Promise<OwnerRowResponse> {
+  return apiPut<OwnerRowResponse>(LISTING_API.promo(id), input);
+}
+
+export function endPromo(id: string): Promise<OwnerRowResponse> {
+  return apiDelete<OwnerRowResponse>(LISTING_API.promo(id));
 }
 
 /** A car rental agency's fleet planning. */
