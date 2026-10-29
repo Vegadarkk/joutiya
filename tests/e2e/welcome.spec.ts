@@ -95,6 +95,8 @@ test.describe("welcome threshold", () => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto("/fr");
     await expect(welcome(page)).toBeVisible();
+    // Measured in the inscription's own font, not a fallback.
+    await page.evaluate(() => document.fonts.ready);
     for (const name of ["Bienvenue sur Joutiya", "Bienvenue sur Marrakchia Souk"]) {
       const fits = await page.evaluate((text) => {
         const crest = document.querySelector<HTMLElement>(".welcome-crest");

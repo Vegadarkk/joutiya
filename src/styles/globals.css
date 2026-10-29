@@ -422,8 +422,8 @@ html[data-welcome]:has(#main:target) .welcome {
   max-width: 100%;
   font-family: var(--font-ruqaa), var(--font-readex), serif;
   /* One line down to a 320 px phone, for a longer name too (issue #199): the text, its two rules and
-     gaps within 94% of the width, at about 0.53 em a letter. */
-  font-size: min(max(1.25rem, calc(var(--welcome-door-h) * 0.068)), 6vw, calc(82vw / (var(--welcome-crest-chars, 21) * 0.53 + 0.9)));
+     gaps within 94% of the width, at up to 0.56 em a letter. */
+  font-size: min(max(1.25rem, calc(var(--welcome-door-h) * 0.068)), 6vw, calc(82vw / (var(--welcome-crest-chars, 21) * 0.56 + 0.9)));
   white-space: nowrap;
   font-weight: 700;
   line-height: 1.3;
