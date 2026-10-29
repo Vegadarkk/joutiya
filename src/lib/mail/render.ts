@@ -26,6 +26,8 @@ import { sellerPaymentNotice } from "./templates/sellerPaymentNotice";
 import { proApproved } from "./templates/proApproved";
 import { proRejected } from "./templates/proRejected";
 import { reportReceived } from "./templates/reportReceived";
+import { reviewPublished } from "./templates/reviewPublished";
+import { reviewReceived } from "./templates/reviewReceived";
 import { resetPassword } from "./templates/resetPassword";
 import { savedSearchAlert } from "./templates/savedSearchAlert";
 import { newMessages } from "./templates/newMessages";
@@ -67,6 +69,8 @@ const TEMPLATES: { [T in TemplateId]: TemplateRenderer<T> } = {
   sellerPaymentNotice,
   newMessages,
   appointmentReminder,
+  reviewReceived,
+  reviewPublished,
   accountClosed,
   cguChanged,
 };
