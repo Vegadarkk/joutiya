@@ -24,6 +24,7 @@ const EQUALITY_BASE = [
   "sellerPublicId",
   "isDonation",
   "hasPhoto",
+  "soldOut",
   "condition",
   "sitemapShard",
   "rentUnavailableDays",
