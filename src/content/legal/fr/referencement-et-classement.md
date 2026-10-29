@@ -68,7 +68,7 @@ Les annonces marquées « Annonce exemple » sont rédigées par {brand} pour il
 
 ### 2.9 Vue carte {#tri-9}
 
-La page de recherche peut s'afficher en carte ou en liste. Sur la carte, chaque annonce est placée à une position approximative, arrondie à environ 1 km, jamais à l'adresse exacte. La liste à côté de la carte suit le tri choisi. Le bouton « Rechercher dans cette zone » limite les résultats aux annonces de la zone affichée ; il agit comme un filtre de lieu (§2.6).
+L'accueil et la page de recherche s'affichent en carte, ou en liste quand la carte ne peut pas s'afficher ; la recherche permet aussi de choisir la liste. La carte de l'accueil montre les 24 annonces les plus récentes, selon la date du §2.1, et les annonces À la Une (§3.2). Sur la carte, chaque annonce est placée à une position approximative, arrondie à environ 1 km, jamais à l'adresse exacte. Des annonces proches peuvent être regroupées en un seul repère, qui s'ouvre en zoomant. La liste à côté de la carte suit le tri choisi. Le bouton « Rechercher dans cette zone » limite les résultats aux annonces de la zone affichée ; il agit comme un filtre de lieu (§2.6).
 
 ## 3. Les options payantes {#options}
 
@@ -82,7 +82,7 @@ Deux options payantes permettent de mettre une annonce en avant. L'annonceur les
 
 ### 3.2 À la Une {#options-2}
 
-- **Effet.** L'annonce apparaît en plus, dans des emplacements séparés des résultats : deux emplacements en tête de la première page de résultats et le carrousel de l'accueil. Les annonces À la Une sont tirées au sort et placées à des positions fixes. L'option dure 7 ou 30 jours. L'annonce reste aussi dans les résultats ordinaires, à sa place habituelle. En vue carte (§2.9), les annonces À la Une sont regroupées en tête de la liste avec la même mention, et leur repère sur la carte montre une photo, dans une couleur expliquée par la légende.
+- **Effet.** L'annonce apparaît en plus, dans des emplacements séparés des résultats : deux emplacements en tête de la première page de résultats et jusqu'à 8 emplacements sur l'accueil. Les annonces À la Une sont tirées au sort et placées à des positions fixes. L'option dure 7 ou 30 jours. L'annonce reste aussi dans les résultats ordinaires, à sa place habituelle. Sur les cartes de l'accueil et de la recherche (§2.9), les annonces À la Une sont regroupées en tête de la liste avec la même mention ; leur repère montre une photo, n'est jamais regroupé avec d'autres et porte la mention « À la Une · Sponsorisé », reprise dans la légende. Quand la carte ne peut pas s'afficher, l'accueil les présente dans un carrousel.
 - **Mention.** « À la Une · Sponsorisé ».
 - **Info-bulle.** « Emplacement payé par l'annonceur. Il ne modifie pas le classement des autres résultats. »
 
@@ -91,7 +91,7 @@ Deux options payantes permettent de mettre une annonce en avant. L'annonceur les
 | Mention | Où | Pendant combien de temps | Info-bulle |
 |---|---|---|---|
 | Remontée | Carte de l'annonce, dans les résultats | Tant que la position vient d'une remontée payée | Le vendeur a payé pour remonter cette annonce. |
-| À la Une · Sponsorisé | Emplacements À la Une : résultats et accueil | Pendant la durée de l'option | Emplacement payé par l'annonceur. Il ne modifie pas le classement des autres résultats. |
+| À la Une · Sponsorisé | Emplacements À la Une : résultats, accueil et repères sur la carte | Pendant la durée de l'option | Emplacement payé par l'annonceur. Il ne modifie pas le classement des autres résultats. |
 
 L'info-bulle s'affiche au survol, au toucher et au clavier. Ces mentions ne peuvent pas être masquées par l'annonceur.
 
