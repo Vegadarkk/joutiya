@@ -168,7 +168,7 @@ Nous ne communiquons pas votre identité à la personne visée par votre signale
 
 ### 3.6 Les e-mails {#finalites-6}
 
-Nous vous envoyons des e-mails liés au service : confirmation de votre adresse, sécurité du compte, nouveaux messages, rappels de rendez-vous (la veille et 2 heures avant, avec le nom de votre interlocuteur, l'annonce, la date et le lieu), alertes de recherche, décisions de modération et recours ; pour un professionnel, l'activation ou la suspension de son lien de paiement ; à l'ouverture des ventes, confirmations d'achat, factures et avis de fin d'un Pass Boutique. Les rappels de rendez-vous suivent votre réglage des e-mails de nouveaux messages.
+Nous vous envoyons des e-mails liés au service : confirmation de votre adresse, sécurité du compte, nouveaux messages, rappels de rendez-vous (la veille et 2 heures avant, avec le nom de votre interlocuteur, l'annonce, la date et le lieu), alertes de recherche, avis reçus par un vendeur (pseudonyme de l'auteur, note, titre de l'annonce), publication de votre avis après examen par un modérateur, décisions de modération et recours ; pour un professionnel, l'activation ou la suspension de son lien de paiement ; à l'ouverture des ventes, confirmations d'achat, factures et avis de fin d'un Pass Boutique. Les rappels de rendez-vous et les e-mails d'avis reçus suivent votre réglage des e-mails de nouveaux messages.
 
 Nous ne vous envoyons des e-mails d'information (nouveautés, conseils) que si vous l'avez accepté, par une case non cochée à l'avance. Chaque e-mail d'information contient un lien de désinscription.
 
