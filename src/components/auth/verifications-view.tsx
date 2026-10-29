@@ -290,7 +290,7 @@ export function PendingCode({
   return (
     <section aria-labelledby="phone-code-title" className="flex flex-col gap-6 rounded-lg border border-border bg-surface p-6">
       <div className="flex flex-col gap-1">
-        <h2 id="phone-code-title" ref={heading} tabIndex={-1} className="rounded-sm text-lg font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
+        <h2 id="phone-code-title" ref={heading} tabIndex={-1} className="text-lg font-semibold outline-none">
           {t("codeTitle")}
         </h2>
         <p className="text-foreground-muted text-pretty">{t("codeBody", { phone: phoneArgument(state.phone) })}</p>

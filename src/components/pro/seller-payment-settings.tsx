@@ -261,7 +261,7 @@ function Settings({ data, onSaved }: { data: SellerPaymentView; onSaved: (data: 
         ) : null}
 
         <div className="flex justify-end">
-          <Button type="submit" variant="structure" loading={pending} className="w-full sm:w-auto">
+          <Button type="submit" loading={pending} className="w-full sm:w-auto">
             {t("submit")}
           </Button>
         </div>

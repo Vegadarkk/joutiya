@@ -243,7 +243,8 @@
   "NotFound": {
     "title": "Cette page n'existe pas",
     "body": "Le lien est peut-être incomplet, ou l'annonce a été retirée.",
-    "back": "Revenir à l'accueil"
+    "back": "Revenir à l'accueil",
+    "browse": "Ou parcourez une catégorie"
   },
   "Error": {
     "title": "La page n'a pas pu s'afficher",
@@ -629,6 +630,7 @@
       "stepCurrent": "en cours",
       "stepTodo": "à faire",
       "stepIncomplete": "à compléter",
+      "stepPrefilled": "préremplie, à vérifier",
       "requiredHint": "Les champs marqués d'une étoile sont obligatoires.",
       "optional": "facultatif",
       "newListing": "Déposer une annonce",

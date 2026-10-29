@@ -179,6 +179,9 @@ test.describe("posting wizard", () => {
     await page.getByRole("combobox", { name: /Ville/ }).fill("Casab");
     await page.getByRole("option", { name: "Casablanca", exact: true }).click();
     await expect(page.getByRole("textbox", { name: "Région" })).toHaveValue("Casablanca-Settat");
+    // The contact step ahead is prefilled from the account: shown as such, not as done.
+    const contactStep = page.locator('nav[aria-label="Étapes du dépôt"] li button', { hasText: "Contact" });
+    await expect(contactStep).toContainText("préremplie, à vérifier");
     await next(page);
 
     // 8. Contact: the verified badge unlocks the phone switch.
@@ -201,6 +204,8 @@ test.describe("posting wizard", () => {
     // Result screen, then the public page with its photo served as a WebP variant.
     await expect(page).toHaveURL(new RegExp(`/fr/deposer/${listingId}/termine$`));
     await expect(page.getByRole("heading", { level: 1, name: "Votre annonce est en ligne" })).toBeVisible();
+    // No share sheet in this browser: the button says what it does.
+    await expect(page.getByRole("button", { name: "Copier le lien" })).toBeVisible();
     const view = page.getByRole("link", { name: "Voir l'annonce" });
     await expect(view).toHaveAttribute("href", `/fr/annonce/${answer.slugId}`);
     await view.click();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Check, CircleCheck, CircleX, Clock, Link2, Share2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { StatusPanel } from "@/components/auth/status-panel";
@@ -20,11 +20,17 @@ interface DoneScreenProps {
   listingId: string;
 }
 
+const noSubscription = () => () => {};
+const shareSheetExists = () => typeof navigator.share === "function";
+
 export function DoneScreen({ status, slugId, url, listingId }: DoneScreenProps) {
   const t = useTranslations("Listing.done");
   const locale = useLocale();
   const config = usePublicConfig();
   const [copied, setCopied] = useState(false);
+  // The share sheet exists on phones and some desktops; elsewhere the button says what it does: copy
+  // (false on the server and at hydration, read from the browser right after).
+  const canShare = useSyncExternalStore(noSubscription, shareSheetExists, () => false);
   // The page in the language on screen (the API answers with the seller's stored locale).
   const path = slugId ? `/${locale}/annonce/${slugId}` : (url ?? null);
   const absolute = path ? new URL(path, config?.siteUrl ?? (typeof window !== "undefined" ? window.location.origin : "https://joutiya.ma")).toString() : null;
@@ -71,8 +77,8 @@ export function DoneScreen({ status, slugId, url, listingId }: DoneScreenProps) 
             ) : null}
             {absolute ? (
               <Button type="button" variant="outline" onClick={() => void share()}>
-                {copied ? <Check aria-hidden="true" /> : <Share2 aria-hidden="true" />}
-                {copied ? t("linkCopied") : t("share")}
+                {copied ? <Check aria-hidden="true" /> : canShare ? <Share2 aria-hidden="true" /> : <Link2 aria-hidden="true" />}
+                {copied ? t("linkCopied") : canShare ? t("share") : t("copyLink")}
               </Button>
             ) : null}
             {another}
@@ -81,7 +87,7 @@ export function DoneScreen({ status, slugId, url, listingId }: DoneScreenProps) 
         }
         extra={
           absolute ? (
-            <p dir="ltr" className="flex items-center justify-center gap-2 break-all text-center text-sm text-foreground-muted">
+            <p dir="ltr" className="flex items-center justify-center gap-2 text-center text-sm text-foreground-muted [overflow-wrap:anywhere]">
               <Link2 className="size-4 shrink-0" aria-hidden="true" />
               {absolute}
             </p>

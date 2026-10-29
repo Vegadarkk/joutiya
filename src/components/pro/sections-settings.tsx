@@ -115,7 +115,7 @@ export function SectionsSettings({ shop }: { shop: Pick<ProSelfView, "sections">
           <span className="text-sm text-foreground-muted tabular-nums">{t("count", { count: rows.length, max: SHOP_SECTIONS_MAX })}</span>
         </div>
         {failure ? <FormMessage error={failure} title={t("failed")} /> : null}
-        <Button type="submit" variant="structure" loading={pending} disabled={!dirty || invalid} className="self-start">
+        <Button type="submit" loading={pending} disabled={!dirty || invalid} className="self-start">
           {t("save")}
         </Button>
       </form>

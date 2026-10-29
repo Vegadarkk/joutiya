@@ -120,6 +120,11 @@ test.describe("public pages", () => {
     const response = await page.goto("/fr/cette-page-n-existe-pas");
     expect(response?.status()).toBe(404);
     await expect(page.locator("html")).toHaveAttribute("lang", "fr-MA");
+    // A dead link is not a dead end: home, then the first four categories.
+    await expect(page.getByRole("link", { name: "Revenir à l'accueil" })).toHaveAttribute("href", "/fr");
+    const browse = page.getByRole("navigation", { name: "Ou parcourez une catégorie" });
+    await expect(browse.getByRole("link")).toHaveCount(4);
+    await expect(browse.getByRole("link", { name: "Véhicules" })).toHaveAttribute("href", "/fr/c/vehicules");
   });
 
   test("the back office does not exist on the public host", async ({ request }) => {
