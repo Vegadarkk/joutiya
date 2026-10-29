@@ -23,13 +23,13 @@ async function watchCsp(page: Page): Promise<string[]> {
   return violations;
 }
 
-const LOGO_FILE = { light: "/brand/joutiya-logo.svg", dark: "/brand/joutiya-logo-dark.svg" } as const;
+const LOGO_FILE = { light: "/brand/aalan-logo.svg", dark: "/brand/aalan-logo-dark.svg" } as const;
 
 /** The header and footer each show the logo file of the theme, loaded and decoded. */
 async function expectLogos(page: Page, theme: keyof typeof LOGO_FILE): Promise<void> {
   await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
   for (const area of [page.getByRole("banner"), page.getByRole("contentinfo")]) {
-    const logo = area.locator('img[src^="/brand/joutiya-logo"]:visible');
+    const logo = area.locator('img[src^="/brand/aalan-logo"]:visible');
     await expect(logo).toHaveCount(1);
     await expect(logo).toHaveAttribute("src", LOGO_FILE[theme]);
     // Lazy (src/components/layout/logo.tsx): the footer one loads near the viewport only.

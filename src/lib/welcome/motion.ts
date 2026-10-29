@@ -7,7 +7,7 @@
 // the gate's tiles, the leaf casts its shadow on the threshold and dust floats in the light
 // (src/lib/welcome/dust.ts). The push waits 100 ms more, so that the bump shows before it: 2.5 s.
 
-/** The door artwork, in the coordinates of public/brand/joutiya-icon.svg (the door and its threshold). */
+/** The door artwork, in the coordinates of public/brand/aalan-icon.svg (the door and its threshold). */
 export const DOOR_VIEWBOX = { x: 136, y: 56, width: 240, height: 386 } as const;
 /** Rectangular part of the doorway: under the arch's springing line, down to the threshold. */
 export const DOORWAY = { left: 202.24, right: 309.76, top: 255.85, bottom: 414.16 } as const;

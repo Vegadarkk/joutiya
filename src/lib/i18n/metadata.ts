@@ -35,7 +35,7 @@ export async function rootMetadata(locale: Locale): Promise<Metadata> {
     description: t("description"),
     applicationName: SITE_NAME,
     alternates: alternates(locale),
-    icons: { icon: "/brand/joutiya-icon.svg" },
+    icons: { icon: "/brand/aalan-icon.svg" },
     formatDetection: { telephone: false, email: false, address: false },
     openGraph: { siteName: SITE_NAME, locale: LOCALE_TAGS[locale].replace("-", "_"), type: "website" },
     other: DARK_READER_LOCK,

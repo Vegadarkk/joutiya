@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { DOOR_VIEWBOX, PUSH_POINT } from "@/lib/welcome/motion";
 
-// The logo's door (public/brand/joutiya-icon.svg, same paths as DoorMark) in layers, so that it can
+// The logo's door (public/brand/aalan-icon.svg, same paths as DoorMark) in layers, so that it can
 // open: the gate's tiled frame (alfiz), the arch and its cream frame with a dark doorway behind, the light inside the doorway, the
 // gold threshold, the pool of light on the ground, the leaf's shadow, and the ochre leaf on top, an HTML element of its
 // own (SVG children cannot turn in 3D) with a front and a back face. A glint of the rising light crosses
