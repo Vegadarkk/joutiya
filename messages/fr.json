@@ -5140,7 +5140,7 @@
     "check": {
       "title": "Contrôle de l'agrément sur document",
       "saveFirst": "Enregistrez d'abord votre numéro d'agrément : vous pourrez ensuite envoyer votre décision d'agrément pour obtenir la mention « agrément contrôlé sur document » sur votre vitrine.",
-      "none": "Envoyez votre décision d'agrément (PDF ou photo nette). Si son numéro, la raison sociale ou l'ICE et sa date concordent avec votre compte Pro, votre vitrine affiche « agrément contrôlé sur document ».",
+      "none": "Envoyez votre décision d'agrément (PDF de 5 pages au plus ou photo nette). Si son numéro, l'ICE de votre société et sa date concordent avec votre compte Pro, votre vitrine affiche « agrément contrôlé sur document » ; si la décision ne porte pas d'ICE lisible, notre équipe la vérifie. 5 envois par mois au plus.",
       "pending": "Document reçu : contrôle en cours. Le résultat s'affiche ici en quelques minutes.",
       "review": "Notre équipe vérifie votre document : le résultat s'affichera ici.",
       "verified": "Agrément contrôlé sur document le {date}.",

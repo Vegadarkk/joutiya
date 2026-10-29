@@ -49,9 +49,12 @@ export const RENTAL_CHECK_ISSUE_LABEL: Record<string, string> = {
   not_agrement: "Ce n'est pas une décision d'agrément",
   unreadable: "Document illisible ou incomplet",
   reference: "Numéro différent de celui déclaré",
+  reference_taken: "Numéro déjà contrôlé pour une autre boutique",
   company: "Bénéficiaire différent de la boutique (ICE ou nom)",
+  no_ice: "Pas d'ICE lisible : bénéficiaire reconnu au nom seulement",
   date: "Date absente du calendrier ou future",
   tampering: "Signes de retouche relevés",
   low_confidence: "Lecture peu sûre",
+  too_long: "Document trop long pour la lecture IA",
   ai_unavailable: "Lecture IA indisponible",
 };

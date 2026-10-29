@@ -72,7 +72,19 @@ const ts = z.date();
 export const RENTAL_CHECK_STATUSES = ["pending", "verified", "review", "rejected"] as const;
 export type RentalCheckStatus = (typeof RENTAL_CHECK_STATUSES)[number];
 /** Why a document went to a moderator: not a licence decision, unreadable, reference, company or date not matching, signs of editing, low confidence, Claude unavailable. */
-export const RENTAL_CHECK_ISSUES = ["not_agrement", "unreadable", "reference", "company", "date", "tampering", "low_confidence", "ai_unavailable"] as const;
+export const RENTAL_CHECK_ISSUES = [
+  "not_agrement",
+  "unreadable",
+  "reference",
+  "reference_taken",
+  "company",
+  "no_ice",
+  "date",
+  "tampering",
+  "low_confidence",
+  "too_long",
+  "ai_unavailable",
+] as const;
 export type RentalCheckIssue = (typeof RENTAL_CHECK_ISSUES)[number];
 export const RENTAL_CHECK_REASON_MAX = 500;
 export const RENTAL_CHECK_SIGNS_MAX = 5;
@@ -84,6 +96,8 @@ export const rentalCheckSchema = z
     uploadId: z.string().min(1).max(64),
     /** Reference the document was checked against: a new reference in the settings drops the check. */
     agrementRef: z.string().max(40),
+    /** Its digits as compared across shops (rental-check-rules `referenceKey`): one shop per verified reference. */
+    referenceKey: z.string().max(40).optional(),
     submittedAt: ts,
     checkedAt: ts.optional(),
     method: z.enum(["ai", "staff"]).optional(),
@@ -193,6 +207,11 @@ export const proProfileSchema = z
     rental: rentalAgencySchema.optional(),
     /** Check of the licence decision (POST /api/pro/me/rental/check, then the agent queue or a moderator). */
     rentalCheck: rentalCheckSchema.optional(),
+    /** Licence documents sent in the calendar month (UTC, Morocco's time): each costs one Claude call. */
+    rentalCheckUsage: z
+      .object({ month: z.string().regex(/^\d{4}-\d{2}$/), count: z.number().int().min(0).max(1000) })
+      .strict()
+      .optional(),
     lifecycle: z.enum(PRO_STATES),
     /** Copy of subscriptions/pro_{proId}, or the launch offer's plan. */
     plan: z.enum(PRO_PLANS),
