@@ -931,7 +931,7 @@ html[data-welcome]:has(#main:target) .welcome {
   background: #cfe3e6; /* The search map's water (search-style.ts): an unloaded tile reads as sea. */
 }
 [data-theme="dark"] .search-stage {
-  background: #081e20;
+  background: #05171a;
 }
 .search-stage .maplibregl-canvas:focus-visible {
   outline: 2px solid var(--ring);

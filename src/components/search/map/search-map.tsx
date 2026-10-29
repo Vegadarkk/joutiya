@@ -272,7 +272,29 @@ export default function SearchMap({ onReady }: SearchMapProps) {
         marker.remove();
         markers.current.delete(key);
       }
+      lift();
       mark();
+    }
+
+    // An À la Une arch is never clustered: standing on the same spot as a count bubble or a price
+    // pill (listings share their city's rounded centre), it would hide it. The arch then rises just
+    // above it, its own pill still over the spot; back down once the map moves them apart.
+    function lift() {
+      if (!instance) return;
+      const others = [...markers.current.values()]
+        .filter(({ element }) => !element.classList.contains("search-pin-featured"))
+        .map(({ marker, element }) => ({ at: instance.project(marker.getLngLat()), halfWidth: element.offsetWidth / 2, halfHeight: element.offsetHeight / 2 }));
+      for (const { marker, element } of markers.current.values()) {
+        if (!element.classList.contains("search-pin-featured")) continue;
+        const at = instance.project(marker.getLngLat());
+        let rise = 0;
+        for (const other of others) {
+          const top = other.at.y - other.halfHeight;
+          if (Math.abs(other.at.x - at.x) >= other.halfWidth + element.offsetWidth / 2 || at.y <= top || at.y > other.at.y + other.halfHeight + 8) continue;
+          rise = Math.max(rise, at.y - top + 4);
+        }
+        if (marker.getOffset().y !== -rise) marker.setOffset([0, -rise]);
+      }
     }
 
     const onData = (event: { sourceId?: string; isSourceLoaded?: boolean }) => {
