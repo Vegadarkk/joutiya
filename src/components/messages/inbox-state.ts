@@ -14,6 +14,11 @@ export interface InboxList {
 
 export type InboxState = { kind: "loading"; archived: boolean } | { kind: "failed"; archived: boolean; error: unknown } | ({ kind: "ready" } & InboxList);
 
+/** A loaded view with nothing in it and nothing more to load (the list shows its own empty state). */
+export function inboxIsEmpty(inbox: InboxState): boolean {
+  return inbox.kind === "ready" && inbox.rows.length === 0 && !inbox.next;
+}
+
 /** The server's order: updatedAt desc, then cid desc. */
 export function compareRows(a: ConversationView, b: ConversationView): number {
   if (a.updatedAt !== b.updatedAt) return b.updatedAt - a.updatedAt;
