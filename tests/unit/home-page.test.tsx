@@ -111,7 +111,7 @@ beforeEach(() => {
 describe("home page", () => {
   it("is ISR for 5 minutes, rendered on the first visit and never at build (no engine there)", () => {
     expect(page.revalidate).toBe(300);
-    // An empty list here overrides the locales of the (public) layout: nothing is prerendered.
+    // No locale here nor in the (public) layout: nothing is prerendered (scripts/check-prerender.ts).
     expect(page.dynamicParams).toBe(true);
     expect(page.generateStaticParams()).toEqual([]);
   });

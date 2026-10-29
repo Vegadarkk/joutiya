@@ -7,7 +7,7 @@ import { AssistantLauncher } from "@/components/help/assistant-launcher";
 import { HelpSearch, type HelpSearchEntry } from "@/components/help/help-search";
 import { Container } from "@/components/layout/container";
 import { quietLinkClassName, textLinkClassName } from "@/components/ui/text-link";
-import { numbersLocale, pageLocale } from "@/i18n/params";
+import { localeParams, numbersLocale, pageLocale } from "@/i18n/params";
 import { loadHelpArticles } from "@/lib/help/search";
 import { alternates } from "@/lib/i18n/metadata";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,10 @@ import { cn } from "@/lib/utils";
 // articles, and the Assistant Joutiya. ISR like the legal pages: a limit read from config/legal
 // (the listing lifetime) reaches the text within 5 minutes.
 export const revalidate = 300;
+
+export function generateStaticParams() {
+  return localeParams();
+}
 
 type Params = Promise<{ locale: string }>;
 

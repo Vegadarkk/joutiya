@@ -7,7 +7,7 @@ import { LOCALE_TAGS } from "@/config/site";
 import { GuideDisclaimer, OfficialLink } from "@/components/guide/official-link";
 import { Container } from "@/components/layout/container";
 import { quietLinkClassName } from "@/components/ui/text-link";
-import { numbersLocale, pageLocale } from "@/i18n/params";
+import { localeParams, numbersLocale, pageLocale } from "@/i18n/params";
 import { linkDisplay } from "@/lib/guide/check";
 import { getGuideState } from "@/lib/guide/state";
 import { alternates } from "@/lib/i18n/metadata";
@@ -20,7 +20,7 @@ export const revalidate = 3600;
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return GUIDE_RUBRICS.map((rubric) => ({ rubric }));
+  return localeParams(GUIDE_RUBRICS.map((rubric) => ({ rubric })));
 }
 
 type Params = Promise<{ locale: string; rubric: string }>;
