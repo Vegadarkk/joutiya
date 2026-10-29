@@ -182,6 +182,8 @@ export const proProfileSchema = z
     /** Badge « Certifié »: pieces checked in detail (Business). */
     certified: z.object({ at: ts, by: uid }).strict().optional(),
     sector: z.enum(PRO_SECTORS).optional(),
+    /** Example shop (src/lib/demo): fictitious, labelled on its storefront, never shown as verified. */
+    example: z.literal(true).optional(),
     /** Real-estate agency details (sector "real_estate"), set by the owner (PUT /api/pro/me/agency). */
     agency: z.object({ feeSchedule: z.string().trim().max(AGENCY_FEE_SCHEDULE_MAX) }).strict().optional(),
     /** Car rental agency settings, set by the owner (PUT /api/pro/me/rental). */

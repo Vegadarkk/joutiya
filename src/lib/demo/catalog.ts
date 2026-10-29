@@ -14,6 +14,10 @@ export interface DemoSeller {
   city: string;
   bio?: string;
   locale?: "fr" | "ar" | "rif";
+  /** Pro shop sector: an agency or a car rental agency gets its specialised storefront. */
+  sector?: "real_estate" | "car_rental";
+  /** An agency's fee schedule, shown on its storefront. */
+  feeSchedule?: string;
 }
 
 export interface DemoEntry {
@@ -70,13 +74,16 @@ export const DEMO_SELLERS: readonly DemoSeller[] = [
     type: "pro",
     city: "agadir",
     bio: "Location de voitures récentes à Agadir et Marrakech. Livraison à l'aéroport, assurance tous risques incluse.",
+    sector: "car_rental",
   },
   {
     key: "dar-saada",
     name: "Dar Saâda Immobilier",
     type: "pro",
     city: "marrakech",
-    bio: "Agence immobilière : vente, location et gestion de biens à Marrakech, Rabat et Agadir.",
+    bio: "Agence immobilière basée à Marrakech : vente, location et location saisonnière, avec des biens à Casablanca, Rabat, Agadir et Essaouira.",
+    sector: "real_estate",
+    feeSchedule: "Vente : 2,5 % du prix, à la charge de l'acquéreur, sauf mention « honoraires inclus ». Location : un mois de loyer hors charges, à la charge du locataire.",
   },
   {
     key: "tech-corner",
@@ -432,7 +439,7 @@ export const DEMO_ENTRIES: readonly DemoEntry[] = [
       "Bel appartement au 4e étage avec ascenseur, quartier Maârif. Salon lumineux, 3 chambres, 2 salles de bain, cuisine équipée. Place de parking au sous-sol et gardiennage 24 h/24. Titre foncier.",
     price: 1650000,
     negotiable: true,
-    attributes: { "property-type": "appartement", surface: 110, bedrooms: 3, "living-rooms": 1, bathrooms: 2, floor: 4, standing: "haut", "property-age": "6-10-ans", furnished: false, amenities: ["parking", "ascenseur", "securite", "cuisine-equipee"] },
+    attributes: { "property-type": "appartement", surface: 110, rooms: 4, bedrooms: 3, "living-rooms": 1, bathrooms: 2, floor: 4, standing: "haut", "property-age": "6-10-ans", "property-title": "titre-foncier", furnished: false, amenities: ["parking", "ascenseur", "securite", "cuisine-equipee"], mandate: "exclusif", "agency-reference": "DS-V-0412", "agency-fees": "inclus" },
     photos: ["19239905"],
   },
   {
@@ -446,7 +453,7 @@ export const DEMO_ENTRIES: readonly DemoEntry[] = [
       "Villa de 320 m² sur un terrain de 500 m², à 10 minutes de la plage. 4 suites, grand salon, jardin arboré et piscine. Quartier calme et sécurisé. Visite sur rendez-vous.",
     price: 3200000,
     negotiable: true,
-    attributes: { "property-type": "villa-riad", surface: 320, bedrooms: 4, "living-rooms": 2, bathrooms: 4, standing: "haut", "property-age": "11-20-ans", furnished: false, amenities: ["parking", "piscine", "jardin", "terrasse", "climatisation"] },
+    attributes: { "property-type": "villa-riad", surface: 320, rooms: 6, bedrooms: 4, "living-rooms": 2, bathrooms: 4, standing: "haut", "property-age": "11-20-ans", "property-title": "titre-foncier", furnished: false, amenities: ["parking", "piscine", "jardin", "terrasse", "climatisation"], mandate: "simple", "agency-reference": "DS-V-0388", "agency-fees": "en-sus", "agency-fees-amount": 80000 },
     photos: ["29693423"],
   },
   {
@@ -495,7 +502,7 @@ export const DEMO_ENTRIES: readonly DemoEntry[] = [
     title: "Appartement meublé 2 chambres à l'Agdal",
     description: "Appartement meublé et équipé, 85 m², proche tramway et commerces. Wifi, climatisation, machine à laver. Bail d'un an minimum, deux mois de caution.",
     price: 7500,
-    attributes: { "property-type": "appartement", surface: 85, bedrooms: 2, bathrooms: 1, furnished: true, amenities: ["ascenseur", "climatisation", "cuisine-equipee"], deposit: 15000, availability: "immediate" },
+    attributes: { "property-type": "appartement", surface: 85, rooms: 3, bedrooms: 2, bathrooms: 1, furnished: true, amenities: ["ascenseur", "climatisation", "cuisine-equipee"], deposit: 15000, availability: "immediate", mandate: "exclusif", "agency-reference": "DS-L-0127", "agency-fees": "en-sus", "agency-fees-amount": 7500 },
     photos: ["7031736"],
   },
   {
@@ -567,7 +574,7 @@ export const DEMO_ENTRIES: readonly DemoEntry[] = [
     title: "Riad 5 chambres dans la médina d'Essaouira",
     description: "Riad entièrement privatisé pour 10 personnes, terrasse sur les toits, petit-déjeuner inclus. À deux pas du port et des remparts.",
     price: 1500,
-    attributes: { "property-type": "villa-riad", guests: 10, bedrooms: 5, bathrooms: 5, amenities: ["terrasse", "chauffage"], "min-nights": 2 },
+    attributes: { "property-type": "villa-riad", guests: 10, bedrooms: 5, bathrooms: 5, amenities: ["terrasse", "chauffage"], "min-nights": 2, "agency-reference": "DS-S-0031" },
     photos: ["15531322"],
   },
   {

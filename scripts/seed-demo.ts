@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { PHOTO_VARIANTS, type ListingPhoto } from "@/lib/contracts/media";
 import { COLLECTIONS } from "@/lib/db/schemas";
-import { demoListings, demoPhotoRefs, demoSellers, pexelsUrl, type DemoPhotoRef } from "@/lib/demo/data";
+import { demoListings, demoPhotoRefs, demoSellers, demoShops, pexelsUrl, type DemoPhotoRef } from "@/lib/demo/data";
 import { serverEnv } from "@/lib/env";
 import { db, isFirebaseConfigured } from "@/lib/firebase/admin";
 import { processImage } from "@/lib/media/process";
@@ -110,6 +110,7 @@ export async function seedDemo(target: SeedDemoTarget, now: Date): Promise<{ doc
   const listings = demoListings(now, (listingId) => photos.get(listingId) ?? []);
   const operations = [
     ...demoSellers(now).map(({ uid, doc }) => ({ path: `${COLLECTIONS.users}/${uid}`, data: doc as unknown as Record<string, unknown> })),
+    ...demoShops(now).map(({ proId, doc }) => ({ path: `${COLLECTIONS.proProfiles}/${proId}`, data: doc as unknown as Record<string, unknown> })),
     ...listings.map(({ id, ...doc }) => ({ path: `${COLLECTIONS.listings}/${id}`, data: doc as unknown as Record<string, unknown> })),
   ];
   await inBatches(operations, FIRESTORE_BATCH, (batch) => target.write(batch));
@@ -138,6 +139,7 @@ export async function removeDemo(target: SeedDemoTarget, now: Date = new Date())
 
   const operations = [
     ...listings.map((listing) => ({ path: `${COLLECTIONS.listings}/${listing.id}`, data: null })),
+    ...demoShops(now).map(({ proId }) => ({ path: `${COLLECTIONS.proProfiles}/${proId}`, data: null })),
     ...demoSellers(now).map(({ uid }) => ({ path: `${COLLECTIONS.users}/${uid}`, data: null })),
   ];
   await inBatches(operations, FIRESTORE_BATCH, (batch) => target.write(batch));

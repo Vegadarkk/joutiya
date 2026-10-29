@@ -19,6 +19,7 @@ import { ReportButton } from "@/components/report/report-button";
 import { RatingLink } from "@/components/reviews/rating-link";
 import { SellerReviews } from "@/components/reviews/seller-reviews";
 import { Button } from "@/components/ui/button";
+import { ExampleBanner } from "@/components/listing/example-banner";
 import { RENTAL_SUBCATEGORY, criterionById } from "@/config/categories";
 import { availablePromos } from "@/config/house-promos";
 import { cityBySlug, cityName } from "@/config/regions";
@@ -94,8 +95,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     description,
     alternates: alternates(locale, path),
     openGraph: { type: "website", siteName: "Joutiya", locale: LOCALE_TAGS[locale].replace("-", "_"), url: `/${locale}${path}`, title, description },
-    // An empty shop has nothing to show search engines yet.
-    ...(store.seller.publishedCount > 0 ? {} : { robots: { index: false, follow: true } }),
+    // An empty shop has nothing to show search engines yet; an example shop is not a business.
+    ...(store.seller.publishedCount > 0 && !store.example ? {} : { robots: { index: false, follow: true } }),
   };
 }
 
@@ -131,7 +132,9 @@ export default async function StorefrontPage({ params }: { params: Params }) {
   const counts = agency && seller.publishedCount > 0 ? await shopSubcategoryCounts(seller.publicId, "immobilier") : null;
   const label = agency ? t("agency.label") : rentalAgency ? t("rental.label") : t("label");
   const aside = (
-    <p className="rounded-md bg-surface-muted p-4 text-sm text-foreground-muted text-pretty">{agency ? t("agency.verifiedNote") : rentalAgency ? t("rental.verifiedNote") : t("verifiedNote")}</p>
+    <p className="rounded-md bg-surface-muted p-4 text-sm text-foreground-muted text-pretty">
+      {store.example ? t("example.note") : agency ? t("agency.verifiedNote") : rentalAgency ? t("rental.verifiedNote") : t("verifiedNote")}
+    </p>
   );
 
   return (
@@ -161,10 +164,11 @@ export default async function StorefrontPage({ params }: { params: Params }) {
           </div>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-sm bg-featured px-3 py-1 text-sm font-medium text-featured-foreground sm:ms-auto sm:self-start">
-          <BadgeCheck className="size-4" aria-hidden="true" />
-          {agency || rentalAgency ? t("agency.verified") : t("verified")}
+          {store.example ? null : <BadgeCheck className="size-4" aria-hidden="true" />}
+          {store.example ? t("example.badge") : agency || rentalAgency ? t("agency.verified") : t("verified")}
         </span>
       </header>
+      {store.example ? <ExampleBanner scope="shop" /> : null}
 
       {counts ? <AgencyTransactions counts={counts} shopPublicId={seller.publicId} /> : null}
       {fleet ? <RentalFleet fleet={fleet} labels={fleetLabels(fleet, (key) => criteria(key as Parameters<typeof criteria>[0]))} shopPublicId={seller.publicId} mediaBaseUrl={media} locale={locale} /> : null}

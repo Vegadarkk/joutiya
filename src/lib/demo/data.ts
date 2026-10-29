@@ -1,10 +1,12 @@
 import { sanitaryNumber, subcategoryById } from "@/config/categories";
+import { listingQuotas } from "@/config/pricing";
 import { cityBySlug } from "@/config/regions";
 import type { ListingPhoto } from "@/lib/contracts/media";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import type { UserDoc } from "@/lib/db/schemas";
-import { LISTING_ID_ALPHABET, buildSlugId } from "@/lib/listings/ids";
+import { LISTING_ID_ALPHABET, buildSlugId, slugify } from "@/lib/listings/ids";
 import { dayString, moroccoToday } from "@/lib/listings/rental-availability";
+import { PRO_SLUG_MAX, type ProProfileDoc } from "@/lib/pro/profile-schema";
 import { DEMO_ENTRIES, DEMO_SELLERS, type DemoEntry, type DemoSeller } from "./catalog";
 
 // Example listings (scripts/seed-demo.ts; owner decision of 2026-10-28): the catalog turned into
@@ -41,6 +43,11 @@ export function demoSellerUid(key: string): string {
 
 export function demoSellerPublicId(index: number): string {
   return sequenceId(DEMO_ID_PREFIX, index, 8);
+}
+
+/** Shop id of a Pro demo seller (PRO_ID_PATTERN; "zw", apart from listing ids). */
+export function demoProId(index: number): string {
+  return sequenceId("zw", index, 6);
 }
 
 /** Upload id of photo `position` of a listing (uploadIdSchema: 8 to 40 alphanumerics). */
@@ -90,6 +97,7 @@ export function demoListing(entry: DemoEntry, index: number, now: Date, photos: 
     sellerType: seller.type,
     sellerName: seller.name,
     sellerPublicId: demoSellerPublicId(sellerIndex),
+    ...(seller.type === "pro" ? { proId: demoProId(sellerIndex) } : {}),
     status: "published",
     slugId: buildSlugId({ id, title: entry.title, city: city.nameFr, categoryId: sub.categoryId }),
     title: entry.title,
@@ -136,10 +144,12 @@ export function demoSeller(seller: DemoSeller, index: number, now: Date): UserDo
     publicId: demoSellerPublicId(index),
     displayName: seller.name,
     type: seller.type,
+    ...(pro ? { proId: demoProId(index) } : {}),
     regionCode: city.regionCode,
     citySlug: city.slug,
     ...(seller.bio ? { storefront: { bio: seller.bio } } : {}),
-    badges: { emailVerified: true, phoneVerified: pro, proCertified: pro },
+    // Nothing was checked for a fictitious seller: no « Certifié » or phone badge (CGU §4.4).
+    badges: { emailVerified: true, phoneVerified: false, proCertified: false },
     stats: { activeListings: DEMO_ENTRIES.filter((entry) => entry.seller === seller.key).length, responseRate: pro ? 0.95 : 0.8, medianReplyMin: pro ? 20 : 90, ratingCount: 0 },
     status: "active",
     activation: "done",
@@ -151,4 +161,41 @@ export function demoSeller(seller: DemoSeller, index: number, now: Date): UserDo
 
 export function demoSellers(now: Date): { uid: string; doc: UserDoc }[] {
   return DEMO_SELLERS.map((seller, index) => ({ uid: demoSellerUid(seller.key), doc: demoSeller(seller, index, now) }));
+}
+
+/**
+ * The shop of a Pro demo seller, so its storefront (and an agency's or a rental agency's) can be
+ * seen. Labelled `example`: the storefront says it is fictitious and never "vérifiée". Nothing was
+ * checked: KYBC "none", placeholder identifiers that cannot be mistaken for real ones.
+ */
+export function demoShop(seller: DemoSeller, index: number, now: Date): ProProfileDoc {
+  const city = cityBySlug(seller.city);
+  if (!city) throw new Error(`unknown city ${seller.city}`);
+  const uid = demoSellerUid(seller.key);
+  return {
+    ownerUid: uid,
+    members: { [uid]: "owner" },
+    name: seller.name,
+    slug: slugify(`${seller.name} ${city.slug.replace(/-/g, " ")}`, PRO_SLUG_MAX) || "boutique",
+    description: seller.bio ?? "",
+    whatsapp: false,
+    regionCode: city.regionCode,
+    citySlug: city.slug,
+    legal: { form: "societe", ice: "000000000000000", rc: "EXEMPLE", if: "EXEMPLE" },
+    kybc: { status: "none", iceFormatOk: false, uploadIds: [] },
+    example: true,
+    ...(seller.sector ? { sector: seller.sector } : {}),
+    ...(seller.sector === "real_estate" ? { agency: { feeSchedule: seller.feeSchedule ?? "" } } : {}),
+    // A plan from a subscription: no job scans that source (the launch offer and the pass end on a date).
+    lifecycle: "active",
+    plan: "essentiel",
+    planSource: "subscription",
+    quotas: listingQuotas({ type: "pro", plan: "essentiel" }),
+    createdAt: new Date(now.getTime() - 90 * DAY_MS),
+    updatedAt: now,
+  } as ProProfileDoc;
+}
+
+export function demoShops(now: Date): { proId: string; doc: ProProfileDoc }[] {
+  return DEMO_SELLERS.flatMap((seller, index) => (seller.type === "pro" ? [{ proId: demoProId(index), doc: demoShop(seller, index, now) }] : []));
 }
