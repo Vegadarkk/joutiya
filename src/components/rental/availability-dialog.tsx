@@ -6,6 +6,7 @@ import { Dialog } from "radix-ui";
 import { toast } from "sonner";
 import { useApiErrorMessage } from "@/components/auth/form-message";
 import { Button } from "@/components/ui/button";
+import type { RentalUnit } from "@/config/categories";
 import type { Locale } from "@/config/site";
 import { isApiError } from "@/lib/auth/client";
 import type { RentalAvailability } from "@/lib/contracts/listings";
@@ -28,11 +29,13 @@ interface AvailabilityDialogProps {
   onSaved: (rental: RentalAvailability) => void;
   /** Tests: the clock. */
   now?: number;
+  /** "night": a holiday home, whose blocked days are nights (seasonal rental conception §2). */
+  unit?: RentalUnit;
 }
 
 const MONTHS_SHOWN = 2;
 
-export function AvailabilityDialog({ listingId, title, rental, onClose, onSaved, now }: AvailabilityDialogProps) {
+export function AvailabilityDialog({ listingId, title, rental, onClose, onSaved, now, unit = "day" }: AvailabilityDialogProps) {
   const t = useTranslations("Rental.availability");
   const locale = useLocale() as Locale;
   const apiMessage = useApiErrorMessage();
@@ -99,13 +102,17 @@ export function AvailabilityDialog({ listingId, title, rental, onClose, onSaved,
           <div className="flex flex-col gap-1.5 border-b border-border px-5 pt-5 pb-4 sm:px-6">
             <Dialog.Title className="text-lg font-semibold text-balance">{t("title", { title: isolate(title) })}</Dialog.Title>
             <Dialog.Description id={descriptionId} className="text-sm text-foreground-muted text-pretty">
-              {t("hint")}
+              {t(unit === "night" ? "home.hint" : "hint")}
             </Dialog.Description>
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-5 sm:px-6">
             <p className={cn("text-sm", fresh ? "text-foreground-muted" : "font-medium text-warning")} data-testid="availability-freshness">
-              {rental.updatedAt ? (fresh ? t("updatedOn", { date: formatDate(new Date(rental.updatedAt), locale) }) : t("stale", { date: formatDate(new Date(rental.updatedAt), locale) })) : t("never")}
+              {rental.updatedAt
+                ? fresh
+                  ? t("updatedOn", { date: formatDate(new Date(rental.updatedAt), locale) })
+                  : t(unit === "night" ? "home.stale" : "stale", { date: formatDate(new Date(rental.updatedAt), locale) })
+                : t(unit === "night" ? "home.never" : "never")}
             </p>
             <AvailabilityCalendar
               locale={locale}

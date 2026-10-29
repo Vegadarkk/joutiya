@@ -1,7 +1,8 @@
 import { moroccoClock } from "@/lib/appointments/time";
 
-// Car rental availability (rental pack §3): the agency blocks periods of days, Morocco's calendar,
-// bounds included; a blocked day means no vehicle of the listing is free. Pure and client-safe:
+// Rental availability by dates (rental pack §3, seasonal rental conception §2): the owner blocks
+// periods of days, Morocco's calendar, bounds included; a blocked day means no vehicle of the
+// listing is free, or for a home that its night is taken. Pure and client-safe:
 // the API, the indexer, the owner calendar and the listing page share it.
 
 /** Blocked periods kept per listing, after merging. */
@@ -34,6 +35,16 @@ export function dayNumber(day: string): number {
 
 export function dayString(day: number): string {
   return new Date(day * DAY_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * Days a rental occupies: a car every day from pick-up to return, a home every night from arrival
+ * to the eve of departure (the departure day stays free for the next guest).
+ */
+export function occupiedDays(dates: { from: string; to: string }, unit: "day" | "night"): number[] {
+  const from = dayNumber(dates.from);
+  const last = dayNumber(dates.to) - (unit === "night" ? 1 : 0);
+  return Array.from({ length: Math.max(0, last - from + 1) }, (_, index) => from + index);
 }
 
 /** Rental days of a period: the return day minus the pick-up day, at least one. */

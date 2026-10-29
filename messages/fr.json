@@ -2730,6 +2730,7 @@
     },
     "example": "Exemple",
     "rentalTotal": "≈ {total} pour {days, plural, one {# jour} other {# jours}}",
+    "rentalTotalNights": "≈ {total} pour {days, plural, one {# nuit} other {# nuits}}",
     "rentalToConfirm": "Disponibilité à confirmer",
     "from": "À partir de",
     "soldOut": "Épuisé",
@@ -3457,7 +3458,8 @@
       "condition": "État",
       "options": "Options",
       "criteria": "Critères : {subcategory}",
-      "rentalDates": "Dates de location"
+      "rentalDates": "Dates de location",
+      "stayDates": "Dates du séjour"
     },
     "allCategories": "Toutes les catégories",
     "allOfCategory": "Toute la catégorie {category}",
@@ -3508,10 +3510,12 @@
       "rangeTo": "{label} : jusqu'à {max}",
       "options": "{label} : {values}",
       "dates": "{from} – {to} · {days} j",
+      "datesNights": "{from} – {to} · {days, plural, one {# nuit} other {# nuits}}",
       "includeSoldOut": "Épuisés inclus",
       "promo": "En promotion"
     },
     "rentalDatesHint": "Les agences déclarent leurs jours indisponibles : les véhicules libres sur toute la période s'affichent, ceux à confirmer en dernier.",
+    "stayDatesHint": "Les annonceurs déclarent leurs nuits indisponibles : les logements libres sur tout le séjour s'affichent, ceux à confirmer en dernier.",
     "includeSoldOut": "Inclure les articles épuisés",
     "includeSoldOutHint": "Les boutiques laissent en ligne les articles dont le stock est à 0.",
     "promo": "En promotion"
@@ -5081,21 +5085,39 @@
       "confirm": "Tout est à jour",
       "saved": "Disponibilités enregistrées.",
       "confirmed": "Disponibilités confirmées.",
-      "conflict": "Le calendrier a changé entre-temps. Rouvrez-le pour voir la dernière version."
+      "conflict": "Le calendrier a changé entre-temps. Rouvrez-le pour voir la dernière version.",
+      "home": {
+        "hint": "Touchez la première puis la dernière nuit d'une période pour la bloquer (le jour du départ reste libre). Une période qui commence sur une nuit bloquée la libère.",
+        "stale": "À confirmer : dernière mise à jour le {date}. Les voyageurs voient « disponibilité à confirmer ».",
+        "never": "Disponibilités jamais renseignées : les voyageurs voient « disponibilité à confirmer »."
+      }
     },
     "listing": {
       "title": "Disponibilités",
       "updatedOn": "Déclarées par l'agence, mises à jour le {date}.",
       "stale": "Disponibilité à confirmer avec l'agence (dernière mise à jour le {date}).",
       "never": "Disponibilité à confirmer avec l'agence.",
-      "note": "Indication de l'agence, sans engagement : la réservation se confirme avec elle."
+      "note": "Indication de l'agence, sans engagement : la réservation se confirme avec elle.",
+      "home": {
+        "updatedOn": "Déclarées par l'annonceur, mises à jour le {date}.",
+        "stale": "Disponibilité à confirmer avec l'annonceur (dernière mise à jour le {date}).",
+        "never": "Disponibilité à confirmer avec l'annonceur.",
+        "note": "Indication de l'annonceur, sans engagement : le séjour se confirme avec lui. Une nuit indisponible est marquée sur le jour d'arrivée."
+      }
     },
     "search": {
       "from": "Départ",
       "to": "Retour",
       "note": "Totaux estimés hors caution, tarif dégressif appliqué : le prix final est celui du contrat de l'agence.",
       "barTitle": "Vos dates de location",
-      "submit": "Voir les véhicules libres"
+      "submit": "Voir les véhicules libres",
+      "home": {
+        "from": "Arrivée",
+        "to": "Départ",
+        "note": "Totaux estimés pour le nombre de nuits, hors caution, taxe de séjour et frais : le prix final est celui que l'annonceur confirme.",
+        "barTitle": "Vos dates de séjour",
+        "submit": "Voir les logements libres"
+      }
     },
     "home": {
       "title": "Louer une voiture",

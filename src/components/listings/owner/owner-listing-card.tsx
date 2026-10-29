@@ -2,6 +2,7 @@
 
 import { ImageOff, Pencil, Play, RefreshCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { datedRental } from "@/config/categories";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Button } from "@/components/ui/button";
@@ -115,7 +116,7 @@ export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, bu
         </div>
         {listing.status === "pending_review" ? <p className="text-xs text-foreground-muted text-pretty">{t("pending.body")}</p> : null}
         {listing.status === "rejected" ? <p className="text-xs text-danger text-pretty">{t("rejected.body")}</p> : null}
-        {listing.rental ? <OwnerAvailability listingId={listing.id} title={title} rental={listing.rental} now={now} /> : null}
+        {listing.rental ? <OwnerAvailability listingId={listing.id} title={title} rental={listing.rental} now={now} unit={datedRental(listing.subcategoryId)?.unit} /> : null}
         {listing.catalogue && STOCK_STATUSES.includes(listing.status) ? <OwnerStock listingId={listing.id} title={title} catalogue={listing.catalogue} /> : null}
         {onChanged && sections.length > 0 && listing.sectionId !== undefined && STOCK_STATUSES.includes(listing.status) ? <OwnerSection listing={listing} title={title} sections={sections} onChanged={onChanged} /> : null}
         {listing.catalogue && onChanged && showsPromo(listing) ? <OwnerPromo listing={{ ...listing, catalogue: listing.catalogue }} title={title} now={now} onChanged={onChanged} /> : null}

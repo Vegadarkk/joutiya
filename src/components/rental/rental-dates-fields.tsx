@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { useTranslations } from "next-intl";
 import { inputClassName } from "@/components/ui/input";
+import type { RentalUnit } from "@/config/categories";
 import { RENTAL_SEARCH_AHEAD_DAYS, RENTAL_SEARCH_DAYS_MAX, dayNumber, dayString, moroccoToday } from "@/lib/listings/rental-availability";
 import type { RentalDates } from "@/lib/search/params";
 import { cn } from "@/lib/utils";
@@ -10,7 +11,8 @@ import { cn } from "@/lib/utils";
 // Pick-up and return days of a car rental search (rental pack §4): native date fields (the
 // phone's own picker), Morocco's calendar, a pick-up from today to 180 days ahead and a return
 // up to 60 days later (the same day counts as one day). A pick-up after the return moves the
-// return to the next day.
+// return to the next day. A home (`unit` "night", seasonal rental conception §2): arrival and
+// departure, one night at least.
 
 export interface RentalDatesFieldsProps {
   value: Partial<RentalDates>;
@@ -19,14 +21,17 @@ export interface RentalDatesFieldsProps {
   /** Field names of a GET form (the home module). */
   names?: { from: string; to: string };
   inputClassName?: string;
+  /** "night": a stay's arrival and departure (the departure comes after the arrival). */
+  unit?: RentalUnit;
 }
 
-export function RentalDatesFields({ value, onChange, className, names, inputClassName: fieldClassName }: RentalDatesFieldsProps) {
+export function RentalDatesFields({ value, onChange, className, names, inputClassName: fieldClassName, unit = "day" }: RentalDatesFieldsProps) {
   const t = useTranslations("Rental.search");
   const ids = useId();
   const [today] = useState(() => moroccoToday(Date.now()));
   const from = value.from ? dayNumber(value.from) : Number.NaN;
-  const minReturn = Number.isNaN(from) ? today : from;
+  const nights = unit === "night";
+  const minReturn = (Number.isNaN(from) ? today : from) + (nights ? 1 : 0);
   const maxReturn = Number.isNaN(from) ? today + RENTAL_SEARCH_AHEAD_DAYS + RENTAL_SEARCH_DAYS_MAX : from + RENTAL_SEARCH_DAYS_MAX;
 
   function setFrom(next: string) {
@@ -34,7 +39,7 @@ export function RentalDatesFields({ value, onChange, className, names, inputClas
     const start = dayNumber(next);
     const end = value.to ? dayNumber(value.to) : Number.NaN;
     // Keep the return when it still fits, else the next day.
-    const to = !Number.isNaN(end) && end >= start && end - start <= RENTAL_SEARCH_DAYS_MAX ? value.to : dayString(start + 1);
+    const to = !Number.isNaN(end) && end >= start + (nights ? 1 : 0) && end - start <= RENTAL_SEARCH_DAYS_MAX ? value.to : dayString(start + 1);
     onChange({ from: next, to });
   }
 
@@ -42,7 +47,7 @@ export function RentalDatesFields({ value, onChange, className, names, inputClas
     <div className={cn("grid grid-cols-2 gap-2", className)}>
       <div className="flex min-w-0 flex-col gap-1">
         <label htmlFor={`${ids}-from`} className="text-xs text-foreground-muted">
-          {t("from")}
+          {t(nights ? "home.from" : "from")}
         </label>
         <input
           id={`${ids}-from`}
@@ -57,7 +62,7 @@ export function RentalDatesFields({ value, onChange, className, names, inputClas
       </div>
       <div className="flex min-w-0 flex-col gap-1">
         <label htmlFor={`${ids}-to`} className="text-xs text-foreground-muted">
-          {t("to")}
+          {t(nights ? "home.to" : "to")}
         </label>
         <input
           id={`${ids}-to`}
@@ -74,10 +79,11 @@ export function RentalDatesFields({ value, onChange, className, names, inputClas
   );
 }
 
-/** Both days set and in order: the dates a search can carry. */
-export function completeDates(value: Partial<RentalDates>): RentalDates | undefined {
+/** Both days set and in order (a stay: one night at least): the dates a search can carry. */
+export function completeDates(value: Partial<RentalDates>, unit: RentalUnit = "day"): RentalDates | undefined {
   if (!value.from || !value.to) return undefined;
   const from = dayNumber(value.from);
   const to = dayNumber(value.to);
-  return !Number.isNaN(from) && !Number.isNaN(to) && to >= from && to - from <= RENTAL_SEARCH_DAYS_MAX ? { from: value.from, to: value.to } : undefined;
+  const first = from + (unit === "night" ? 1 : 0);
+  return !Number.isNaN(from) && !Number.isNaN(to) && to >= first && to - from <= RENTAL_SEARCH_DAYS_MAX ? { from: value.from, to: value.to } : undefined;
 }

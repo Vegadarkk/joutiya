@@ -4,7 +4,7 @@ import { rentalFragment } from "@/components/rental/rental-day";
 import { BoostBadge } from "@/components/search/boost-badge";
 import type { CardBadge } from "@/components/search/filter-model";
 import { quietLinkClassName } from "@/components/ui/text-link";
-import { subcategoryById } from "@/config/categories";
+import { datedRental, subcategoryById } from "@/config/categories";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
@@ -96,7 +96,7 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
       />
       {listing.rental ? (
         <p data-testid="card-rental" className="flex flex-col text-xs tabular-nums">
-          {listing.rental.total !== null ? <span className="font-medium">{t("rentalTotal", { days: listing.rental.days, total: formatPrice(listing.rental.total, locale) })}</span> : null}
+          {listing.rental.total !== null ? <span className="font-medium">{t(datedRental(listing.subcategoryId)?.unit === "night" ? "rentalTotalNights" : "rentalTotal", { days: listing.rental.days, total: formatPrice(listing.rental.total, locale) })}</span> : null}
           {listing.rental.fresh ? null : <span className="text-warning">{t("rentalToConfirm")}</span>}
         </p>
       ) : null}

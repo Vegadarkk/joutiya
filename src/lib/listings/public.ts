@@ -1,5 +1,5 @@
 import "server-only";
-import { RENTAL_SUBCATEGORY, type Condition } from "@/config/categories";
+import { datedRental, type Condition } from "@/config/categories";
 import { REVIEWS_PAGE } from "@/config/reviews";
 import { DEFAULT_BANNER, type BannerKey } from "@/config/storefront";
 import { cardPromo, isSoldOut, priceRange, type CardPromo, type ListingVariants, type PromoView, type ShopSection } from "@/lib/contracts/catalog";
@@ -162,7 +162,7 @@ export interface PublicListing {
   seller: { publicId: string; name: string; type: UserRecord["type"] };
   /** Example listing (src/lib/demo): labelled, no contact action, not indexed by search engines. */
   example: boolean;
-  /** Car rentals: the agency's declared availability (rental pack §3); null otherwise. */
+  /** Rentals by dates (cars, holiday homes): the owner's declared availability (rental pack §3); null otherwise. */
   rental: RentalAvailability | null;
   /** A Pro's declared stock or variants (catalogue §2-3); null when the listing has neither. */
   catalogue: PublicCatalogue | null;
@@ -258,7 +258,7 @@ export function toPublicListing(record: ListingRecord, state: PublicState, slugI
     contact: { showPhone: record.contact.showPhone, whatsapp: record.contact.whatsapp },
     seller: { publicId: record.sellerPublicId, name: record.sellerName, type: record.sellerType },
     example: record.example === true,
-    rental: subcategoryId === RENTAL_SUBCATEGORY ? rentalAvailabilityOf(record) : null,
+    rental: datedRental(subcategoryId) ? rentalAvailabilityOf(record) : null,
     catalogue: catalogueOf(record, new Date()),
     publishedAt: publishedAt.toISOString(),
     sortAt: record.sortAt.toISOString(),

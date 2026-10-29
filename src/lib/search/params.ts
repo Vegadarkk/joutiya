@@ -1,4 +1,4 @@
-import { CONDITIONS, RENTAL_SUBCATEGORY, categoryById, criterionById, searchCriteria, subcategoryById, type Condition } from "@/config/categories";
+import { CONDITIONS, categoryById, datedRental, criterionById, searchCriteria, subcategoryById, type Condition, type RentalUnit } from "@/config/categories";
 import { cityBySlug, MOROCCO_BBOX, regionByCode } from "@/config/regions";
 import { DAY_PATTERN, RENTAL_SEARCH_DAYS_MAX, dayNumber } from "@/lib/listings/rental-availability";
 import { z } from "@/lib/zod";
@@ -117,11 +117,11 @@ export interface RentalDates {
   to: string;
 }
 
-function validDates(from: string | undefined, to: string | undefined): RentalDates | undefined {
+function validDates(from: string | undefined, to: string | undefined, unit: RentalUnit = "day"): RentalDates | undefined {
   if (!from || !to) return undefined;
   const start = dayNumber(from);
   const end = dayNumber(to);
-  if (Number.isNaN(start) || Number.isNaN(end) || end < start || end - start > RENTAL_SEARCH_DAYS_MAX) return undefined;
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start || (unit === "night" && end === start) || end - start > RENTAL_SEARCH_DAYS_MAX) return undefined;
   return { from, to };
 }
 
@@ -357,7 +357,9 @@ export function canonicalSearchParams(input: SearchParams): SearchParams {
     else delete params.criteria;
   }
   if (params.dates) {
-    const dates = params.subcategory === RENTAL_SUBCATEGORY ? validDates(params.dates.from, params.dates.to) : undefined;
+    const rental = datedRental(params.subcategory);
+    // A stay lasts one night at least: its departure comes after its arrival.
+    const dates = rental ? validDates(params.dates.from, params.dates.to, rental.unit) : undefined;
     if (dates) params.dates = dates;
     else delete params.dates;
   }

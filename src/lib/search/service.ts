@@ -1,11 +1,12 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { datedRental, type DatedRental } from "@/config/categories";
 import { cityBySlug } from "@/config/regions";
 import { searchEngine } from "@/lib/search/engine";
 import { normalizeQuery } from "@/lib/search/normalize";
 import { toSearchCard } from "./cards";
 import { FEATURED_POOL_SIZE, FEATURED_SEARCH_SLOTS, drawFeatured } from "./featured";
-import { dayNumber, moroccoToday } from "@/lib/listings/rental-availability";
+import { dayNumber, moroccoToday, occupiedDays } from "@/lib/listings/rental-availability";
 import { RENTAL_SEARCH_AHEAD_DAYS, SEARCH_MAX_PAGE, SEARCH_MAX_TOTAL_HITS, SEARCH_PAGE_SIZE, canonicalSearchParams, effectiveSort, rentalDuration, type RentalDates, type SearchParams, type SearchSort } from "./params";
 import { SearchUnavailableError, attributeField, type EngineQuery, type EngineResult, type FilterExpr, type SearchCard, type SearchEngine, type SearchFacets, type SearchResponse, type SortSpec } from "./types";
 
@@ -74,10 +75,9 @@ export function activeRentalDates(params: Pick<SearchParams, "dates">, now: Date
  * Car rentals free on every day from pick-up to return (rental pack §4) and whose minimum rental
  * fits the duration (none declared = any).
  */
-function rentalDatesFilter(dates: RentalDates): FilterExpr {
-  const from = dayNumber(dates.from);
-  const days = Array.from({ length: dayNumber(dates.to) - from + 1 }, (_, index) => from + index);
-  const minDays = attributeField("min-rental-days");
+function rentalDatesFilter(dates: RentalDates, rental: DatedRental): FilterExpr {
+  const days = occupiedDays(dates, rental.unit);
+  const minDays = attributeField(rental.minimum);
   return {
     and: [
       { not: { field: "rentUnavailableDays", op: "in", values: days } },
@@ -124,7 +124,8 @@ export function buildFilter(input: SearchParams, now: Date): FilterExpr | undefi
     }
   }
   const dates = activeRentalDates(params, now);
-  if (dates) parts.push(rentalDatesFilter(dates));
+  const rental = datedRental(params.subcategory);
+  if (dates && rental) parts.push(rentalDatesFilter(dates, rental));
   return and(parts);
 }
 

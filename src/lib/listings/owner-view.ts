@@ -5,7 +5,7 @@ import type { ListingRecord } from "@/lib/db/repositories/listings";
 import { listUploadsByTarget, type UploadRecord } from "@/lib/db/repositories/uploads";
 import { ownerPaymentLink } from "@/lib/pro/seller-payment-rules";
 import { MANUAL_ATTACH_STATUSES } from "@/lib/uploads/policy";
-import { RENTAL_SUBCATEGORY } from "@/config/categories";
+import { datedRental } from "@/config/categories";
 import { rentalAvailabilityOf } from "./availability";
 import { canRenew } from "./lifecycle";
 import { nextPromoFrom, promoView, referencePrices } from "./promo";
@@ -115,7 +115,7 @@ export function toOwnerSummary(listing: ListingRecord, now = new Date()): OwnerL
     publishedAt: iso(listing.publishedAt),
     expiresAt: iso(listing.expiresAt),
     canRenew: canRenew(listing, now),
-    ...(listing.subcategoryId === RENTAL_SUBCATEGORY ? { rental: rentalAvailabilityOf(listing) } : {}),
+    ...(datedRental(listing.subcategoryId) ? { rental: rentalAvailabilityOf(listing) } : {}),
     ...(listing.sellerType === "pro" && !listing.isDonation ? { catalogue: ownerCatalogue(listing, now) } : {}),
     ...(listing.sellerType === "pro" ? { sectionId: listing.sectionId ?? null, paymentLink: ownerPaymentLinkView(listing, now) } : {}),
   };
