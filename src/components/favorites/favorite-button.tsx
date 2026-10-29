@@ -33,7 +33,7 @@ export function FavoriteButton({ listingId, className, variant = "overlay" }: Fa
   const router = useRouter();
   const { status, session } = useSession();
   const favorites = useFavorites();
-  // Set by a click that added the favorite: plays the confirmation ring once.
+  // Set by a click that added the favorite: plays the confirmation ring and sparks once (globals.css).
   const [burst, setBurst] = useState(0);
 
   const uid = status === "ready" ? (session?.uid ?? null) : undefined;
@@ -83,15 +83,20 @@ export function FavoriteButton({ listingId, className, variant = "overlay" }: Fa
         strokeWidth={2}
         className={cn(
           "size-5 transition-colors duration-150 ease-door",
-          active ? "fill-primary text-primary animate-in zoom-in-50 fade-in-0 duration-300" : "fill-transparent text-current",
+          active ? "fill-primary text-primary" : "fill-transparent text-current",
+          // The beat only for a click, not for hearts already saved when the page loads.
+          active && burst > 0 && "favorite-pop",
         )}
       />
       {burst > 0 && active ? (
-        <span
-          key={burst}
-          aria-hidden="true"
-          className="pointer-events-none absolute -inset-2 rounded-full border-2 border-featured animate-out fade-out-0 zoom-out-150 duration-500 [animation-fill-mode:forwards]"
-        />
+        <span key={burst} aria-hidden="true">
+          <span className="pointer-events-none absolute -inset-2 rounded-full border-2 border-featured animate-out fade-out-0 zoom-out-150 duration-500 [animation-fill-mode:forwards]" />
+          <span className="favorite-sparks">
+            {Array.from({ length: 6 }, (_, index) => (
+              <i key={index} />
+            ))}
+          </span>
+        </span>
       ) : null}
     </span>
   );

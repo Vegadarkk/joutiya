@@ -14,6 +14,8 @@ interface StatusPanelProps {
   headingLevel?: "h1" | "h2" | "h3";
   /** Move focus to the title when the panel appears (default): the screen just changed. */
   autoFocus?: boolean;
+  /** A success worth marking (a listing published): the icon is sealed by the logo's star (globals.css). */
+  celebrate?: boolean;
   className?: string;
 }
 
@@ -23,7 +25,7 @@ interface StatusPanelProps {
  * on its title; only the message itself is a status region (the extra content and the actions are
  * ordinary interactive content).
  */
-export function StatusPanel({ icon: Icon, title, children, actions, extra, headingLevel = "h2", autoFocus = true, className }: StatusPanelProps) {
+export function StatusPanel({ icon: Icon, title, children, actions, extra, headingLevel = "h2", autoFocus = true, celebrate = false, className }: StatusPanelProps) {
   const Heading = headingLevel;
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -32,9 +34,18 @@ export function StatusPanel({ icon: Icon, title, children, actions, extra, headi
   return (
     <section className={cn("arch flex flex-col items-center gap-4 rounded-b-lg bg-surface-brand px-6 pb-8 pt-12 text-center", className)}>
       <div role="status" className="flex flex-col items-center gap-4">
-        <span className="flex size-14 items-center justify-center rounded-full bg-surface text-primary shadow-sm">
-          <Icon className="size-7" aria-hidden="true" />
-        </span>
+        {celebrate ? (
+          <span className="status-seal relative flex size-14">
+            <span className="status-star" aria-hidden="true" />
+            <span className="relative flex size-14 items-center justify-center rounded-full bg-surface text-primary shadow-sm">
+              <Icon className="size-7" aria-hidden="true" />
+            </span>
+          </span>
+        ) : (
+          <span className="flex size-14 items-center justify-center rounded-full bg-surface text-primary shadow-sm">
+            <Icon className="size-7" aria-hidden="true" />
+          </span>
+        )}
         <Heading ref={heading} tabIndex={-1} className="rounded-sm text-xl font-semibold text-balance outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
           {title}
         </Heading>

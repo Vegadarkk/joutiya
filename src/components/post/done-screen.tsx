@@ -61,6 +61,7 @@ export function DoneScreen({ status, slugId, url, listingId }: DoneScreenProps) 
         icon={CircleCheck}
         title={t("publishedTitle")}
         headingLevel="h1"
+        celebrate
         actions={
           <>
             {path ? (

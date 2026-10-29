@@ -65,6 +65,53 @@ test.describe("welcome threshold", () => {
     expect(violations).toEqual([]);
   });
 
+  test("the door leans towards a mouse pointer and stands upright as it opens; dust floats in its light", async ({ page }) => {
+    const violations = await watchCsp(page);
+    await page.goto("/fr");
+    const dialog = welcome(page);
+    await expect(dialog).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    const door = page.locator("[data-welcome-part='door']");
+    const box = await door.boundingBox();
+    if (!box) throw new Error("no door");
+    // The pointer listener is a passive effect: move until it answers.
+    await expect
+      .poll(async () => {
+        await page.mouse.move(box.x - 10, box.y + 5);
+        await page.mouse.move(box.x - 20, box.y);
+        return door.evaluate((element) => element.style.rotate);
+      })
+      .toMatch(/deg$/);
+    await dialog.getByRole("link", { name: "Découvrir sans compte" }).click();
+    expect(await door.evaluate((element) => element.style.rotate)).toBe("");
+    // One mote per element, moved by transform and opacity only.
+    await expect(page.locator(".welcome-dust i")).not.toHaveCount(0);
+    await expect(dialog).toHaveCount(0, { timeout: 5_000 });
+    await expect(page.locator("#main")).toBeFocused();
+    expect(violations).toEqual([]);
+  });
+
+  test("the inscription holds on one line on a 320 px phone, for a longer name too", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto("/fr");
+    await expect(welcome(page)).toBeVisible();
+    // Measured in the inscription's own font, not a fallback.
+    await page.evaluate(() => document.fonts.ready);
+    for (const name of ["Bienvenue sur Joutiya", "Bienvenue sur Marrakchia Souk"]) {
+      const fits = await page.evaluate((text) => {
+        const crest = document.querySelector<HTMLElement>(".welcome-crest");
+        const span = crest?.querySelector<HTMLElement>(".welcome-crest-text");
+        if (!crest || !span) return null;
+        // As the server writes it for the name (welcome-threshold.tsx).
+        span.textContent = text;
+        crest.style.setProperty("--welcome-crest-chars", String(text.length));
+        const parts = [span, ...crest.querySelectorAll(".welcome-crest-rule")].map((part) => part.getBoundingClientRect());
+        return Math.min(...parts.map((part) => part.left)) >= 0 && Math.max(...parts.map((part) => part.right)) <= window.innerWidth && span.getBoundingClientRect().height < 50;
+      }, name);
+      expect(fits, name).toBe(true);
+    }
+  });
+
   test("Escape opens the door; reduced motion crossfades", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/fr");

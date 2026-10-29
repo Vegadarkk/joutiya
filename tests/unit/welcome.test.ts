@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import { PINNED_SCRIPT_HASHES, scriptHash } from "@/lib/security/inline-hashes";
 import { cycleFocus } from "@/lib/welcome/focus";
 import { isHomePathname, queueDoorOpening, takeQueuedDoor, welcomeAfterSignIn } from "@/lib/welcome/flags";
-import { DOOR_DURATION_MS, doorSteps, MIN_PUSH_SCALE, pushScale, REDUCED_FADE_MS, reducedSteps, stepsEnd } from "@/lib/welcome/motion";
+import { DUST_COUNT, projectMote, scatterMotes } from "@/lib/welcome/dust";
+import { DOOR_DURATION_MS, doorSteps, LEAF_OPEN_DEG, LEAF_STOP_DEG, MIN_PUSH_SCALE, PUSH_DELAY_MS, pushScale, REDUCED_FADE_MS, reducedSteps, stepsEnd } from "@/lib/welcome/motion";
+import { doorTilt, MAX_TILT_DEG } from "@/lib/welcome/tilt";
 import { CSRF_COOKIE } from "@/lib/security/cookies";
 import { CRAWLER_AGENT, DOOR_FALLBACK_MS, HOME_PATH, SIGNED_IN_COOKIE, WELCOME_SCRIPT } from "@/lib/welcome/script";
 
@@ -197,8 +200,69 @@ describe("door timeline", () => {
     expect(stepsEnd(ltr)).toBeLessThanOrEqual(2500);
     expect(ltr.find((step) => step.part === "leaf")?.keyframes.at(-1)).toEqual({ transform: "rotateY(-100deg)" });
     expect(rtl.find((step) => step.part === "leaf")?.keyframes.at(-1)).toEqual({ transform: "rotateY(100deg)" });
-    for (const step of ltr) for (const frame of step.keyframes) for (const key of Object.keys(frame)) expect(["transform", "opacity"]).toContain(key);
+    // Per-keyframe easing and offsets are timing, not animated properties.
+    for (const step of ltr) for (const frame of step.keyframes) for (const key of Object.keys(frame)) expect(["transform", "opacity", "offset", "easing"]).toContain(key);
     expect(reducedSteps()).toEqual([expect.objectContaining({ part: "ground", duration: REDUCED_FADE_MS })]);
+  });
+
+  it("bumps the leaf against its stop before the push, the glint over by then", () => {
+    const steps = doorSteps({ rtl: false, scale: MIN_PUSH_SCALE });
+    const leaf = steps.find((step) => step.part === "leaf");
+    const stop = leaf?.keyframes.find((frame) => frame.offset !== undefined);
+    expect(stop?.transform).toBe(`rotateY(-${LEAF_STOP_DEG}deg)`);
+    expect(LEAF_STOP_DEG).toBeGreaterThan(LEAF_OPEN_DEG);
+    // The leaf reaches its stop before the camera moves.
+    expect((leaf?.delay ?? 0) + (leaf?.duration ?? 0) * Number(stop?.offset)).toBeLessThan(PUSH_DELAY_MS);
+    for (const name of ["glint", "sheen"] as const) {
+      const step = steps.find((candidate) => candidate.part === name);
+      expect((step?.delay ?? 0) + (step?.duration ?? 0), name).toBeLessThanOrEqual(PUSH_DELAY_MS);
+    }
+    // The shadow sweeps outwards: left of the hinge in French, right in Arabic.
+    const cast = (rtl: boolean) => doorSteps({ rtl, scale: MIN_PUSH_SCALE }).find((step) => step.part === "cast")?.keyframes.at(-1)?.transform;
+    expect(cast(false)).toContain("skewX(-");
+    expect(cast(true)).not.toContain("skewX(-");
+  });
+
+  it("leans the door towards a mouse pointer, never past the maximum", () => {
+    const door = { left: 400, top: 100, width: 300, height: 480 };
+    const angle = (value: string) => Number(/(-?[\d.]+)deg$/.exec(value)?.[1]);
+    expect(angle(doorTilt(door, { x: 550, y: 340 }))).toBe(0);
+    const right = doorTilt(door, { x: 1100, y: 340 }).split(" ");
+    // A pointer on the right: about the vertical axis.
+    expect(right.slice(0, 3).map((value) => Math.abs(Number(value)))).toEqual([0, 1, 0]);
+    expect(angle(doorTilt(door, { x: 5000, y: -5000 }))).toBeLessThanOrEqual(MAX_TILT_DEG);
+  });
+
+  it("floats the dust in the doorway, and lets the camera pass it during the push", () => {
+    const door = { left: 100, top: 50, width: 240, height: 386 };
+    const origin = { x: 220, y: 324 };
+    let seed = 1;
+    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const motes = scatterMotes(door, origin, random);
+    expect(motes).toHaveLength(DUST_COUNT);
+    for (const mote of motes) {
+      // Inside the doorway (x 202.24-309.76 of the door's 136-376) at rest.
+      expect(origin.x + mote.x).toBeGreaterThanOrEqual(door.left + 66);
+      expect(origin.x + mote.x).toBeLessThanOrEqual(door.left + 174);
+      expect(projectMote(mote, 1, 0)).not.toBeNull();
+      // At the end of the push (16 times), the camera is beyond every mote.
+      expect(projectMote(mote, 16, 2)).toBeNull();
+    }
+    const mote = motes[0];
+    if (!mote) throw new Error("no mote");
+    const near = projectMote(mote, 1.5, 0);
+    const far = projectMote(mote, 1, 0);
+    if (near && far) expect(Math.hypot(near.x, near.y)).toBeGreaterThan(Math.hypot(far.x, far.y));
+  });
+
+  it("never spells the brand: the inscription comes from the messages (rename without touching the door)", () => {
+    const sources = ["src/components/welcome/door-scene.tsx", "src/components/welcome/welcome-threshold.tsx", "src/components/welcome/welcome-dialog.tsx", "src/lib/welcome/motion.ts"];
+    for (const file of sources) {
+      const code = readFileSync(file, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      expect(code, file).not.toMatch(/joutiya|جوطية/i);
+    }
   });
 
   it("pushes far enough for the doorway to cover the viewport, at least 16 times", () => {
