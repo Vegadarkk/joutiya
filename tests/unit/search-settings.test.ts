@@ -32,7 +32,7 @@ describe("SEARCH_SETTINGS", () => {
   });
 
   it("makes every D4 field and every non-text criterion filterable, nothing private", () => {
-    for (const field of ["categoryId", "subcategoryId", "regionCode", "citySlug", "district", "sellerType", "sellerPublicId", "isDonation", "hasPhoto", "condition", "id", "sitemapShard"]) {
+    for (const field of ["categoryId", "subcategoryId", "regionCode", "citySlug", "district", "sellerType", "sellerPublicId", "isDonation", "hasPhoto", "isExample", "condition", "id", "sitemapShard"]) {
       expect(filterKind(field)).toBe("equality");
     }
     for (const field of ["price", "sortAt", "featuredUntil"]) expect(filterKind(field)).toBe("comparison");

@@ -4,7 +4,8 @@ import { phraseTokens, type Token } from "./tokens";
 // Prices and distances of a typed search: "moins de 500", "< 500 dh", "max 3000", "entre 1000 et
 // 2000", "500 dh max", "أقل من 500", "a9al mn 500"; "à 2 km", "dans un rayon de 5 km". A number
 // becomes a price only next to a price word or a currency, and never when another unit follows it
-// ("moins de 2 ans", "128 go", "100 000 km"). Pure.
+// ("moins de 2 ans", "128 go", "100 000 km"); the price words of such an amount are reported apart
+// (unreadPriceCues) so the words left do not keep them. Pure.
 
 export interface PriceMatch {
   kind: "price";
@@ -50,7 +51,7 @@ const THOUSANDS = new Set(["k", "mille", "alf", "alaf", "الف", "الاف", "�
 const AMBIGUOUS_SCALE = new Set(["million", "millions", "mlyoun", "melyoun", "مليون", "ملايين"].map((word) => phraseTokens(word).join(" ")));
 /** Any other unit after the number: not a price. Rials and centimes are prices in another unit: left as words. */
 const OTHER_UNITS = new Set(
-  ["km", "kms", "m", "m2", "cm", "mm", "kg", "g", "l", "litre", "litres", "go", "gb", "to", "tb", "mo", "mb", "cv", "ch", "an", "ans", "mois", "jour", "jours", "j", "h", "heures", "piece", "pieces", "chambre", "chambres", "place", "places", "pouce", "pouces", "personne", "personnes", "w", "kw", "v", "mah", "mp", "hz", "ryal", "rial", "rials", "ريال", "centime", "centimes", "سنتيم", "كم", "كلم", "متر", "سنة", "سنوات", "غرف"].map((word) => phraseTokens(word).join(" ")),
+  ["km", "kms", "m", "m2", "cm", "mm", "kg", "g", "l", "litre", "litres", "go", "gb", "to", "tb", "mo", "mb", "cc", "cv", "ch", "an", "ans", "mois", "jour", "jours", "j", "h", "heures", "piece", "pieces", "chambre", "chambres", "place", "places", "pouce", "pouces", "personne", "personnes", "w", "kw", "v", "mah", "mp", "hz", "ryal", "rial", "rials", "ريال", "centime", "centimes", "سنتيم", "كم", "كلم", "متر", "سنة", "سنوات", "غرف"].map((word) => phraseTokens(word).join(" ")),
 );
 const KM_UNITS = new Set(["km", "kms", "kilometre", "kilometres", "كم", "كلم", "كيلومتر"].map((word) => phraseTokens(word).join(" ")));
 const METRE_UNITS = new Set(["m", "metre", "metres", "متر"].map((word) => phraseTokens(word).join(" ")));
@@ -121,6 +122,11 @@ function readAmount(text: string, tokens: readonly Token[], index: number, taken
 
 const range = (from: number, to: number) => Array.from({ length: to - from }, (_, offset) => from + offset);
 
+/** A one-word cue ending a model name here ("pro max 256"): not a price word. */
+function modelCue(tokens: readonly Token[], index: number, cue: Cue): boolean {
+  return index > 0 && MODEL_WORDS.has(tokens[index - 1]?.norm ?? "") && cue.tokens.length === 1 && MODEL_CUES.has(cue.tokens[0] ?? "");
+}
+
 function priceAmount(amount: Amount | null, strong: boolean): amount is Amount {
   return amount !== null && amount.otherUnit === null && (amount.currency || (strong && amount.value >= BARE_AMOUNT_MIN));
 }
@@ -161,8 +167,7 @@ function priceAt(text: string, tokens: readonly Token[], index: number, taken: R
       }
     }
   }
-  const modelBefore = index > 0 && MODEL_WORDS.has(tokens[index - 1]?.norm ?? "");
-  const strength = (cue: Cue) => cue.strong && !(modelBefore && cue.tokens.length === 1 && MODEL_CUES.has(cue.tokens[0] ?? ""));
+  const strength = (cue: Cue) => cue.strong && !modelCue(tokens, index, cue);
   const max = longestCue(tokens, index, MAX_CUES, taken);
   if (max) {
     const amount = readAmount(text, tokens, index + max.tokens.length, taken);
@@ -182,6 +187,35 @@ function priceAt(text: string, tokens: readonly Token[], index: number, taken: R
     if (floor > 0 && priceAmount(amount, true)) return { kind: "price", min: amount.value, tokens: range(index, amount.end + floor) };
   }
   return null;
+}
+
+const PRICE_CUES: Cue[] = [...MAX_CUES, ...MIN_CUES].filter((cue) => cue.strong);
+const PRICE_AFTER = [...MAX_AFTER, ...MIN_AFTER];
+
+/**
+ * Price words left without a price, their amount read with another unit: "moins de" in "moins de
+ * 100 000 km", "plus de" in "plus de 2 ans", "max" in "100 000 km max". Token indices of those
+ * words only: the amount and its unit stay words, like any number with a unit ("voiture 150 000
+ * km"). Strong cues only ("des", "sous" are ordinary words too); `taken`: tokens already matched.
+ */
+export function unreadPriceCues(text: string, tokens: readonly Token[], taken: ReadonlySet<number>): number[] {
+  const out: number[] = [];
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (taken.has(index)) continue;
+    const cue = longestCue(tokens, index, PRICE_CUES, taken);
+    if (cue && !modelCue(tokens, index, cue) && readAmount(text, tokens, index + cue.tokens.length, taken)?.otherUnit) {
+      out.push(...range(index, index + cue.tokens.length));
+      // The amount comes next: a cue after it ("moins de 2 ans max") is read there.
+      index += cue.tokens.length - 1;
+      continue;
+    }
+    const amount = readAmount(text, tokens, index, taken);
+    if (!amount?.otherUnit) continue;
+    const after = longest(tokens, amount.end + 1, PRICE_AFTER, taken);
+    out.push(...range(amount.end + 1, amount.end + 1 + after));
+    index = amount.end + after;
+  }
+  return out;
 }
 
 /** Prices and distances, left to right; each token belongs to one match at most. */

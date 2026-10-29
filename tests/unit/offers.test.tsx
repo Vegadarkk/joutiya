@@ -219,7 +219,6 @@ describe("limits", () => {
   it("caps offers per buyer and per conversation like the messaging", () => {
     expect(RATE_LIMITS["offer.thread"]).toMatchObject({ points: 5, key: "uid+cid" });
     expect(RATE_LIMITS["offer.uid"].points).toBeGreaterThan(RATE_LIMITS["offer.thread"].points);
-    expect(RATE_LIMITS["priceguide.ip"]).toBeDefined();
   });
 });
 

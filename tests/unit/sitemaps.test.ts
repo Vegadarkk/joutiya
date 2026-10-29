@@ -150,9 +150,11 @@ describe("buildSitemapFile", () => {
       doc("d2345678", "voitures", "rabat"),
       doc("e2345678", "velos", "casablanca"),
       doc("f2345678", "velos", "casablanca"),
-      // immobilier: 2 listings only.
+      // immobilier: 2 listings only, plus 2 example listings that never count.
       doc("g2345678", "vente", "rabat"),
       doc("h2345678", "location", "rabat"),
+      { ...doc("j2345678", "vente", "rabat"), isExample: true },
+      { ...doc("k2345678", "vente", "rabat"), isExample: true },
     ]);
     const xml = (await buildSitemapFile("pages.xml", PROD)) ?? "";
     const paths = [...xml.matchAll(/<loc>https:\/\/joutiya\.ma\/fr([^<]*)<\/loc>/g)].map((match) => match[1]);

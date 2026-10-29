@@ -44,6 +44,12 @@ function and(parts: (FilterExpr | undefined)[]): FilterExpr | undefined {
 }
 
 /**
+ * Real listings only: example listings (src/lib/demo) stay out of what stands for real activity,
+ * the alert digests and the SEO landing thresholds; the results keep them, labelled.
+ */
+export const NOT_EXAMPLE: FilterExpr = { not: eq("isExample", true) };
+
+/**
  * Category, subcategory and place (D7): the scope shared by the results and the À la Une query.
  * Map zone or city + radius = `_geoRadius` (crosses region borders; listings sit at their rounded
  * city centroid), city alone = `citySlug` equality, else region.

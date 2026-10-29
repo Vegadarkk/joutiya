@@ -26,6 +26,7 @@ const EQUALITY_BASE = [
   "isDonation",
   "hasPhoto",
   "soldOut",
+  "isExample",
   "condition",
   "sitemapShard",
   "rentUnavailableDays",

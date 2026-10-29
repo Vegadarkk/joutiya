@@ -1,6 +1,4 @@
 import "server-only";
-import { priceRange } from "@/lib/contracts/catalog";
-import type { ListingRecord } from "@/lib/db/repositories/listings";
 import { logger } from "@/lib/logging/logger";
 import { searchEngine } from "@/lib/search/engine";
 import { attributeField, type EngineQuery, type FilterExpr, type SearchEngine } from "@/lib/search/types";
@@ -10,7 +8,7 @@ import {
   PRICE_GUIDE_SCOPES,
   PRICE_GUIDE_TTL_SECONDS,
   comparableSpec,
-  priceStats,
+  comparableStats,
   specKey,
   type ComparableSpec,
   type GuideListing,
@@ -22,8 +20,9 @@ import {
 // (published, visible listings only, src/lib/search/document.ts), never from Firestore. One
 // multi-search round trip asks the city, the region and Morocco at once (at most
 // PRICE_GUIDE_MAX_PRICES prices each, the most recent first); the first area with enough
-// comparables wins. Example listings (not filterable) are dropped from the hits, the listing itself,
-// donations and sold-out Pro listings by the filter. The result, or its absence, is kept 24 h in
+// comparables wins, each seller counting twice at most (rules.ts). Example listings are dropped from
+// the hits (so the guide never depends on the index settings), the listing itself, donations and
+// sold-out Pro listings by the filter. The result, or its absence, is kept 24 h in
 // valkey-ratelimit (allkeys-lru: a cache may be evicted, never the queue's jobs), keyed by listing,
 // with the comparables' description so an edited listing gets a fresh guide.
 
@@ -33,8 +32,8 @@ export interface GuideSubject extends GuideListing {
   regionCode: string;
 }
 
-/** Fields read per hit: the price, and the example mark that the engine cannot filter on. */
-const HIT_FIELDS = ["id", "price", "isExample"] as const;
+/** Fields read per hit: the price, its seller (per-seller cap), and the example mark. */
+const HIT_FIELDS = ["id", "price", "isExample", "sellerPublicId"] as const;
 
 function criteriaFilters(spec: ComparableSpec): FilterExpr[] {
   return [
@@ -84,9 +83,11 @@ export async function computePriceGuide(subject: GuideSubject, engine: SearchEng
   // Region and Morocco are the same area when the city is unknown to the index: still asked, cheap.
   const results = await engine.search(PRICE_GUIDE_SCOPES.map((scope) => comparablesQuery(spec, subject, scope)));
   for (const [index, scope] of PRICE_GUIDE_SCOPES.entries()) {
-    const hits = (results[index]?.hits ?? []) as { id?: string; price?: number; isExample?: boolean }[];
-    const prices = hits.filter((hit) => hit.isExample !== true && hit.id !== subject.id).flatMap((hit) => (typeof hit.price === "number" ? [hit.price] : []));
-    const stats = priceStats(prices);
+    const hits = (results[index]?.hits ?? []) as { id?: string; price?: number; isExample?: boolean; sellerPublicId?: string }[];
+    const comparables = hits
+      .filter((hit) => hit.isExample !== true && hit.id !== subject.id)
+      .flatMap((hit) => (typeof hit.price === "number" && typeof hit.sellerPublicId === "string" ? [{ price: hit.price, seller: hit.sellerPublicId }] : []));
+    const stats = comparableStats(comparables);
     if (stats) return { ...stats, scope, place: placeOf(scope, subject) };
   }
   return null;
@@ -99,11 +100,10 @@ export interface GuideCache {
   set(key: string, value: string, ttlSeconds: number): Promise<void>;
 }
 
-/** What one cache entry holds: the comparables' description, the guide (or null), the listing's price. */
-export interface CachedGuide {
+/** What one cache entry holds: the comparables' description and the guide (or null). */
+interface CachedGuide {
   key: string;
   guide: PriceGuide | null;
-  price: number | null;
 }
 
 let override: GuideCache | null | undefined;
@@ -113,7 +113,7 @@ export function setPriceGuideCacheForTests(cache: GuideCache | null | undefined)
   override = cache;
 }
 
-/** A cache call never holds a page render or the API for long. */
+/** A cache call never holds a page render for long. */
 const CACHE_TIMEOUT_MS = 300;
 
 function timed<T>(promise: Promise<T>): Promise<T> {
@@ -136,17 +136,18 @@ function guideCache(): GuideCache | null {
   };
 }
 
-export const priceGuideCacheKey = (listingId: string) => `pg:v1:${listingId}`;
+/** v2: the per-seller cap (guides cached by v1 without it are left to expire). */
+export const priceGuideCacheKey = (listingId: string) => `pg:v2:${listingId}`;
 
 /** The entry of `listingId`, or null (none, unreadable, Valkey down). */
-export async function cachedGuide(listingId: string): Promise<CachedGuide | null> {
+async function cachedGuide(listingId: string): Promise<CachedGuide | null> {
   const cache = guideCache();
   if (!cache) return null;
   try {
     const raw = await cache.get(priceGuideCacheKey(listingId));
     if (!raw) return null;
     const value = JSON.parse(raw) as Partial<CachedGuide>;
-    return typeof value.key === "string" && value.guide !== undefined ? { key: value.key, guide: value.guide ?? null, price: value.price ?? null } : null;
+    return typeof value.key === "string" && value.guide !== undefined ? { key: value.key, guide: value.guide ?? null } : null;
   } catch (error) {
     logger.warn({ err: (error as Error).message }, "price guide: cache unavailable");
     return null;
@@ -172,22 +173,6 @@ export function subjectKey(subject: GuideSubject): string {
   return spec ? `${specKey(spec)}|${subject.citySlug}|${subject.regionCode}` : NO_GUIDE;
 }
 
-/** The guide subject of a stored listing; null without the fields every published listing has. */
-export function subjectOfListing(listing: ListingRecord): GuideSubject | null {
-  if (!listing.subcategoryId || !listing.location) return null;
-  const range = priceRange(listing);
-  return {
-    id: listing.id,
-    subcategoryId: listing.subcategoryId,
-    attributes: listing.attributes,
-    price: range ? range.min : null,
-    isDonation: listing.isDonation,
-    example: listing.example === true,
-    citySlug: listing.location.citySlug,
-    regionCode: listing.location.regionCode,
-  };
-}
-
 /**
  * The guide of a listing, from the cache when it still describes the same comparables, else
  * computed and cached (an absent guide too). Never throws: the engine down or misconfigured means
@@ -206,6 +191,6 @@ export async function priceGuideFor(subject: GuideSubject, engine?: SearchEngine
       return null;
     }
   }
-  await storeGuide(subject.id, { key, guide, price: subject.price });
+  await storeGuide(subject.id, { key, guide });
   return guide;
 }

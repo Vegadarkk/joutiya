@@ -1,7 +1,7 @@
 import { categoryById, subcategoryById, type Condition } from "@/config/categories";
 import { canonicalSearchParams, effectiveSort, type CriterionFilter, type SearchParams, type SearchSort, type SellerTypeFilter } from "@/lib/search/params";
 import { FILLER_WORDS, PLACE_WORDS, lexiconPhrases, type Entry, type PhraseEntry, type ThingEntry } from "./lexicon";
-import { findAmounts } from "./prices";
+import { findAmounts, unreadPriceCues } from "./prices";
 import { keptText, tokenForms, tokenizeQuery, type Token } from "./tokens";
 
 // "Chercher en parlant" (Carte vivante, lot 4): a typed sentence turned into the search filters it
@@ -42,6 +42,8 @@ export interface Interpretation {
   understood: Understood[];
   /** Words consumed without a filter ("occasion" where no condition applies). */
   dropped: readonly number[];
+  /** Price words whose amount has another unit ("moins de" in "moins de 100 000 km"): out of the words left, like fillers. */
+  unreadCues: readonly number[];
   /** Every understood patch together (canonical). */
   patch: SearchParams;
   /** The words left when every item applies. */
@@ -179,6 +181,7 @@ export function interpretQuery(input: string): Interpretation {
     for (const token of span(match)) taken.add(token);
     at += match.length - 1;
   }
+  const unreadCues = unreadPriceCues(text, tokens, taken);
   const of = <K extends Entry["kind"]>(kind: K) => matches.filter((match): match is Match & { entry: Extract<Entry, { kind: K }> } => match.entry.kind === kind);
 
   // What: one category (and subcategory) for every thing named, else nothing.
@@ -285,7 +288,7 @@ export function interpretQuery(input: string): Interpretation {
   }
 
   understood.sort((a, b) => rank(a.key) - rank(b.key));
-  const interpretation: Interpretation = { text, tokens, understood, dropped, patch: {}, q: text };
+  const interpretation: Interpretation = { text, tokens, understood, dropped, unreadCues, patch: {}, q: text };
   const all = build(interpretation, {}, new Set(understood));
   interpretation.q = all.q ?? "";
   interpretation.patch = canonicalSearchParams({ ...all, q: undefined });
@@ -299,12 +302,13 @@ function mergeCriteria(a: Record<string, CriterionFilter> | undefined, b: Record
   return { ...a, ...b };
 }
 
-/** The words left: those no applied item (or a dropped word) consumed, fillers out once anything was. */
+/** The words left: those no applied item (or a dropped word) consumed, fillers and unread price words out once anything was. */
 function residual(interpretation: Interpretation, accepted: ReadonlySet<Understood>): string {
   const consumed = new Set<number>(interpretation.dropped);
   for (const item of interpretation.understood) if (!item.content || accepted.has(item)) for (const token of item.tokens) consumed.add(token);
   if (consumed.size === 0) return interpretation.text;
-  return keptText(interpretation.text, interpretation.tokens, (at) => !consumed.has(at) && !FILLER_WORDS.has(interpretation.tokens[at]?.norm ?? ""));
+  const unread = new Set(interpretation.unreadCues);
+  return keptText(interpretation.text, interpretation.tokens, (at) => !consumed.has(at) && !unread.has(at) && !FILLER_WORDS.has(interpretation.tokens[at]?.norm ?? ""));
 }
 
 /** URL filters + the accepted items, words left as `q`; canonical. */
@@ -376,7 +380,10 @@ export interface AppliedItem {
 }
 
 export interface AppliedNear {
-  /** "ask": the page offers « Utiliser ma position »; "zone": the URL already holds the visitor's circle. */
+  /**
+   * "ask": the page offers « Utiliser ma position »; "zone": the URL already holds the visitor's
+   * circle (`fromPosition`). A map area of the URL is not the visitor's: still "ask".
+   */
   state: "ask" | "zone";
   km: number;
   /** The search to run with the visitor's circle as `zone` (the sentence kept: its items stay understood). */
@@ -425,7 +432,7 @@ export function applyInterpretation(url: SearchParams, interpretation: Interpret
   for (const item of interpretation.understood) {
     if (!accepted.has(item)) continue;
     if (item.key === "near") {
-      const zone = url.zone;
+      const zone = url.zone && url.fromPosition ? url.zone : undefined;
       near = { state: zone ? "zone" : "ask", km: zone?.km ?? item.km ?? NEAR_KM, target: canonicalSearchParams({ ...url, raw: undefined }) };
       const rest = { ...params, raw: true as const };
       if (zone) delete rest.zone;

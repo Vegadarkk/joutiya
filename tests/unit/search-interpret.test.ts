@@ -122,6 +122,16 @@ const NO_AMOUNTS: [text: string, q: string][] = [
   ["voiture 150 000 km", "150 000 km"],
   ["moto 125 cc 2018", "125 cc 2018"],
   ["iphone 13 pro max 256 go", "iphone 13 pro max 256 go"],
+  // Price words before (or after) an amount of another unit leave with the understood words.
+  ["voiture moins de 100 000 km", "100 000 km"],
+  ["voiture 100 000 km max", "100 000 km"],
+  ["voiture plus de 2 ans", "2 ans"],
+  ["frigo max 300 litres", "300 litres"],
+  ["moto plus de 125 cc", "125 cc"],
+  ["appartement au moins 3 pièces", "3 pièces"],
+  ["سيارة أقل من 100000 كلم", "100000 كلم"],
+  // A weak cue is an ordinary word too: it stays.
+  ["voiture sous 3 ans", "sous 3 ans"],
 ];
 
 describe("interpretQuery", () => {
@@ -148,6 +158,13 @@ describe("interpretQuery", () => {
     const result = interpretQuery(text);
     expect(result.understood.filter((item) => !["category", "location"].includes(item.key) && !item.key.startsWith("criterion:"))).toEqual([]);
     expect(result.q).toBe(q);
+  });
+
+  it("keeps the price words of an unread amount when nothing else is understood", () => {
+    // The sentence is then searched as typed (no interpretation): nothing to tidy.
+    expect(interpretQuery("moins de 2 ans").q).toBe("moins de 2 ans");
+    expect(interpretSearch({ q: "moins de 2 ans" })).toBeNull();
+    expect(interpretSearch({ q: "voiture moins de 100 000 km" })?.params).toEqual({ q: "100 000 km", category: "vehicules", subcategory: "voitures" });
   });
 
   it("names a property type without an offer at the category level", () => {
@@ -242,12 +259,25 @@ describe("applyInterpretation", () => {
     expect(asked?.near).toEqual({ state: "ask", km: NEAR_KM, target: { q: "vélo à côté" } });
     expect(asked?.params).toEqual({ category: "vehicules", subcategory: "velos" });
     const zone = { lat: 33.599, lng: -7.62, km: 3 };
-    const located = interpretSearch({ q: "vélo à côté", zone });
+    const located = interpretSearch({ q: "vélo à côté", zone, fromPosition: true });
     expect(located?.near?.state).toBe("zone");
-    expect(located?.params).toEqual({ category: "vehicules", subcategory: "velos", zone });
+    expect(located?.params).toEqual({ category: "vehicules", subcategory: "velos", zone, fromPosition: true });
     expect(located?.items.find((item) => item.key === "near")?.without).toEqual({ category: "vehicules", subcategory: "velos" });
     // A city of the URL: the near words go, no position asked.
     expect(interpretSearch({ q: "vélo à côté", city: "rabat" })?.near).toBeUndefined();
+  });
+
+  it("never calls a map area « de vous »: the position is still asked, the zone kept", () => {
+    // « Rechercher dans cette zone » around Agadir, then « vélo à côté » typed in the header.
+    const area = { lat: 30.421, lng: -9.598, km: 15 };
+    const applied = interpretSearch({ q: "vélo à côté", zone: area });
+    expect(applied?.near).toEqual({ state: "ask", km: NEAR_KM, target: { q: "vélo à côté", zone: area } });
+    expect(applied?.params).toEqual({ category: "vehicules", subcategory: "velos", zone: area });
+    // The flag lives with a zone only, and round-trips in the URL.
+    expect(parseSearchParams(new URLSearchParams("q=velo&position=1"))).toEqual({ q: "velo" });
+    const located = parseSearchParams(new URLSearchParams("q=velo&zone=33.599,-7.62,3&position=1"));
+    expect(located).toEqual({ q: "velo", zone: { lat: 33.599, lng: -7.62, km: 3 }, fromPosition: true });
+    expect(searchParamsToQuery(located).toString()).toBe("q=velo&zone=33.599%2C-7.62%2C3&position=1");
   });
 
   it("leaves a raw search and a search without understood words alone", () => {

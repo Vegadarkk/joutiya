@@ -176,9 +176,6 @@ export const RATE_LIMITS = {
   // Public listing and profile reads (API; the SSR page limit lives in the proxy, phase 4).
   "listing.read.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
   "profile.read.ip": { points: 1200, duration: HOUR, policy: "open", key: "ip" },
-  // « Prix repère » API (Carte vivante lot 5): the map panel asks it once per listing opened;
-  // cached 24 h server side and an hour at the edge, so a few hundred per hour per IP is plenty.
-  "priceguide.ip": { points: 600, duration: HOUR, policy: "open", key: "ip" },
   // Staff moderation decisions (admin host, behind Access): a moderator working the queue.
   "moderation.decision.uid": { points: 300, duration: HOUR, policy: "closed", key: "uid" },
   // Pro applications (phase 7): a moderator's verify or reject; each verification retags the

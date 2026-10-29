@@ -82,6 +82,11 @@ export interface SearchParams {
   district?: string;
   /** Map area; replaces the city, region, radius and district (the last place chosen wins). */
   zone?: SearchZone;
+  /**
+   * Only with `zone`: the zone is around the visitor's own position (« Utiliser ma position »), not
+   * an area of the map. Only then does an understood « près de moi » read « À N km de vous ».
+   */
+  fromPosition?: true;
   priceMin?: number;
   priceMax?: number;
   sellerType?: SellerTypeFilter;
@@ -230,6 +235,7 @@ export function parseSearchParams(source: Source): SearchParams {
   if (district) params.district = districtKey(district);
   const zone = parseZone(read(source, k.zone));
   if (zone) params.zone = zone;
+  if (read(source, k.fromPosition) === "1") params.fromPosition = true;
   const priceMin = int(read(source, k.priceMin), 0, SEARCH_PRICE_MAX);
   if (priceMin !== undefined) params.priceMin = priceMin;
   const priceMax = int(read(source, k.priceMax), 0, SEARCH_PRICE_MAX);
@@ -307,6 +313,7 @@ export function canonicalSearchParams(input: SearchParams): SearchParams {
     delete params.city;
     delete params.region;
   } else delete params.zone;
+  if (!params.zone || params.fromPosition !== true) delete params.fromPosition;
   const city = params.city ? cityBySlug(params.city) : undefined;
   if (params.city && !city) delete params.city;
   if (city) params.region = city.regionCode;
@@ -393,6 +400,7 @@ export function searchParamsToQuery(input: SearchParams): URLSearchParams {
   if (params.radiusKm) query.set(k.radius, String(params.radiusKm));
   if (params.district) query.set(k.district, params.district);
   if (params.zone) query.set(k.zone, formatZone(params.zone));
+  if (params.fromPosition) query.set(k.fromPosition, "1");
   if (params.priceMin !== undefined) query.set(k.priceMin, String(params.priceMin));
   if (params.priceMax !== undefined) query.set(k.priceMax, String(params.priceMax));
   if (params.sellerType && !params.shop) query.set(k.sellerType, SELLER_PARAM[params.sellerType]);
@@ -466,6 +474,7 @@ export const storedSearchParamsSchema = z
       })
       .strict()
       .optional(),
+    fromPosition: z.literal(true).optional(),
     priceMin: z.number().int().min(0).max(SEARCH_PRICE_MAX).optional(),
     priceMax: z.number().int().min(0).max(SEARCH_PRICE_MAX).optional(),
     sellerType: z.enum(SELLER_TYPES_FILTER).optional(),

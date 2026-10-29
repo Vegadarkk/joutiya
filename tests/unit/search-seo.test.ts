@@ -9,7 +9,7 @@ import { sitemapShardOf, type SearchDocument } from "@/lib/search/types";
 
 // Category landing pages (design D15): segment resolution from config, thresholds, facet counts.
 
-function doc(id: string, subcategoryId: string, citySlug: string): SearchDocument {
+function doc(id: string, subcategoryId: string, citySlug: string, example = false): SearchDocument {
   const sub = subcategoryById(subcategoryId);
   const city = cityBySlug(citySlug);
   if (!sub || !city) throw new Error("fixture");
@@ -37,6 +37,7 @@ function doc(id: string, subcategoryId: string, citySlug: string): SearchDocumen
     isBumped: false,
     _geo: { lat: city.lat, lng: city.lng },
     version: 1,
+    ...(example ? { isExample: true as const } : {}),
   };
 }
 
@@ -141,13 +142,27 @@ describe("seoCounts", () => {
       subcategories: { voitures: 3, velos: 1 },
       cities: { casablanca: 3, rabat: 1 },
       total: 4,
+      indexable: 4,
     });
     await expect(seoCounts({ category: "vehicules", subcategory: "voitures", city: "casablanca" })).resolves.toEqual({
       subcategories: { voitures: 2, velos: 1 },
       cities: { casablanca: 2, rabat: 1 },
       total: 2,
+      indexable: 2,
     });
     await expect(seoCounts({ category: "vehicules", city: "rabat" })).resolves.toMatchObject({ subcategories: { voitures: 1 }, total: 1 });
     await expect(seoCounts({ category: "immobilier", subcategory: "location" })).resolves.toMatchObject({ total: 0 });
+  });
+
+  it("never lets example listings make a page indexable", async () => {
+    const engine = new MemoryEngine({ synonyms: {} });
+    await engine.upsert([doc("a2345678", "voitures", "dakhla"), doc("b2345678", "voitures", "dakhla", true), doc("c2345678", "voitures", "dakhla", true)]);
+    setSearchEngineForTests(engine);
+    const target = { category: "vehicules", subcategory: "voitures", city: "dakhla" };
+    const counts = await seoCounts(target);
+    expect(counts).toMatchObject({ total: 3, indexable: 1 });
+    expect(seoVerdict(target, counts.total, counts.indexable)).toBe("noindex");
+    // Examples alone: still a page (noindex), never a 404 while it shows cards.
+    expect(seoVerdict(target, 2, 0)).toBe("noindex");
   });
 });

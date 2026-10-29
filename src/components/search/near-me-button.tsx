@@ -12,8 +12,8 @@ import { useSearchNavigation } from "./search-navigation";
 
 // « Utiliser ma position » of an understood « près de moi » (Carte vivante, lot 4). The browser is
 // asked for its position only on this click; the point becomes the search's `zone` (centre rounded
-// to ~110 m like every map zone, the radius asked), part of the search URL and nothing else: it is
-// sent nowhere else and stored nowhere. Outside Morocco, denied or unavailable: a message and the
+// to ~110 m like every map zone, the radius asked) marked `position=1` (« À N km de vous »), part of
+// the search URL and nothing else: it is sent nowhere else and stored nowhere. Outside Morocco, denied or unavailable: a message and the
 // filters' city instead.
 
 type Status = "idle" | "locating" | "denied" | "unavailable" | "outside";
@@ -45,7 +45,7 @@ export function NearMeButton({ target, km, className }: { target: SearchParams; 
           setStatus("unavailable");
           return;
         }
-        const next: SearchParams = { ...target, zone, page: undefined };
+        const next: SearchParams = { ...target, zone, fromPosition: true, page: undefined };
         if (navigation) navigation.navigate(next, { scroll: false });
         else router.push(searchLinkHref(next), { scroll: false });
       },

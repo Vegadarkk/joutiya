@@ -4,6 +4,7 @@ import { searchDoc } from "../search/fixtures";
 import { PriceGuideBlock } from "@/components/listing/price-guide";
 import {
   comparableSpec,
+  comparableStats,
   percentile,
   priceGuideApplies,
   priceStats,
@@ -17,8 +18,8 @@ import { comparablesQuery, computePriceGuide, priceGuideCacheKey, priceGuideFor,
 import { MemoryEngine } from "@/lib/search/memory";
 import type { EngineQuery, SearchEngine } from "@/lib/search/types";
 
-// « Prix repère » (Carte vivante lot 5): the statistics, which listings get one, the comparables
-// query, the widening city -> region -> Morocco, the cache, and the block in FR and AR.
+// « Prix repère » (Carte vivante lot 5): the statistics, the per-seller cap, which listings get one,
+// the comparables query, the widening city -> region -> Morocco, the cache, and the block in FR and AR.
 
 vi.mock("next-intl/server", async () => {
   const { createTranslator } = await import("next-intl");
@@ -31,7 +32,8 @@ vi.mock("next-intl/server", async () => {
 
 const BIKES = "Véhicules مركبات Vélos دراجات";
 
-function bike(id: string, citySlug: string, price: number, extra: { bikeType?: string; example?: boolean; soldOut?: boolean; donation?: boolean } = {}) {
+/** A comparable bike; its seller is its own unless `seller` is given. */
+function bike(id: string, citySlug: string, price: number, extra: { bikeType?: string; example?: boolean; soldOut?: boolean; donation?: boolean; seller?: string } = {}) {
   const doc = searchDoc({
     id,
     title: `Vélo ${id}`,
@@ -44,6 +46,7 @@ function bike(id: string, citySlug: string, price: number, extra: { bikeType?: s
     daysAgo: 1,
     attributes: { "bike-type": extra.bikeType ?? "enfant" },
   });
+  doc.sellerPublicId = extra.seller ?? `seller-${id}`;
   if (extra.example) doc.isExample = true;
   if (extra.soldOut) doc.soldOut = true;
   return doc;
@@ -93,6 +96,13 @@ describe("statistics", () => {
     expect(stats.high).toBeGreaterThanOrEqual(stats.p75);
   });
 
+  it("drops one price off each end even below 10 comparables", () => {
+    const stats = priceStats([100, 300, 320, 350, 380, 400, 420, 2_000]);
+    expect(stats?.count).toBe(8);
+    expect(stats?.low).toBeGreaterThanOrEqual(300);
+    expect(stats?.high).toBeLessThanOrEqual(420);
+  });
+
   it("places a price on the scale and against the range, never judging it", () => {
     const guide = { low: 250, high: 700, p25: 350, p75: 500 };
     expect(scalePosition(guide, 250)).toBe(0);
@@ -101,6 +111,32 @@ describe("statistics", () => {
     expect(rangePosition(guide, 300)).toBe("below");
     expect(rangePosition(guide, 450)).toBe("within");
     expect(rangePosition(guide, 600)).toBe("above");
+  });
+});
+
+describe("one seller never makes the guide", () => {
+  const others = (count: number, from = 300) => Array.from({ length: count }, (_, index) => ({ price: from + index * 20, seller: `other${index}` }));
+
+  it("counts two prices per seller at most, the most recent", () => {
+    // A dealer's 10 cheap listings first (most recent), then 6 other sellers: 2 + 6 = 8 prices.
+    const dealer = Array.from({ length: 10 }, (_, index) => ({ price: 100 + index, seller: "dealer" }));
+    const stats = comparableStats([...dealer, ...others(6)]);
+    expect(stats?.count).toBe(8);
+    // Without the cap the dealer's prices would be the whole lower half of the range.
+    expect(stats?.p25).toBeGreaterThanOrEqual(300);
+    expect(comparableStats([...dealer, ...others(5)])).toBeNull();
+  });
+
+  it("needs 5 distinct sellers, even with 8 prices", () => {
+    const fourSellers = [0, 1, 2, 3].flatMap((n) => [
+      { price: 300 + n * 10, seller: `s${n}` },
+      { price: 305 + n * 10, seller: `s${n}` },
+    ]);
+    expect(fourSellers).toHaveLength(8);
+    expect(comparableStats(fourSellers)).toBeNull();
+    expect(comparableStats([...fourSellers, { price: 400, seller: "s4" }])).toMatchObject({ count: 9 });
+    // A comparable without a seller id is not counted.
+    expect(comparableStats([...fourSellers, { price: 400, seller: "" }])).toBeNull();
   });
 });
 
@@ -136,7 +172,7 @@ describe("which listings get a guide", () => {
     if (!spec) throw new Error("spec expected");
     const query: EngineQuery = comparablesQuery(spec, subject(), "city");
     expect(query.hitsPerPage).toBe(200);
-    expect(query.fields).toEqual(["id", "price", "isExample"]);
+    expect(query.fields).toEqual(["id", "price", "isExample", "sellerPublicId"]);
     expect(query.filter).toEqual({
       and: [
         { field: "subcategoryId", op: "eq", value: "velos" },
@@ -178,6 +214,21 @@ describe("computing", () => {
     expect(await computePriceGuide(subject({ citySlug: "rabat", regionCode: "04" }), engine)).toMatchObject({ scope: "country", place: "ma", count: 8 });
     await engine.remove(["m0"]);
     expect(await computePriceGuide(subject(), engine)).toBeNull();
+  });
+
+  it("does not let a dealer's stock in the city set its range: the guide widens instead", async () => {
+    const engine = new MemoryEngine();
+    await engine.upsert([
+      // One dealer: 12 listings in Casablanca, plus 3 other sellers there (2 + 3 = 5 prices, 4 sellers).
+      ...Array.from({ length: 12 }, (_, index) => bike(`d${index}`, "casablanca", 900 + index, { seller: "dealer" })),
+      ...prices.slice(0, 3).map((price, index) => bike(`c${index}`, "casablanca", price)),
+      // Five more sellers elsewhere in the region.
+      ...prices.slice(3, 8).map((price, index) => bike(`m${index}`, "mohammedia", price)),
+    ]);
+    const guide = await computePriceGuide(subject(), engine);
+    // Region: 2 dealer prices + 8 others, 9 sellers.
+    expect(guide).toMatchObject({ scope: "region", place: "06", count: 10 });
+    expect(guide?.p75).toBeLessThan(900);
   });
 });
 

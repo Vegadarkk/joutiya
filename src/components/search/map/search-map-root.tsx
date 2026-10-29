@@ -151,7 +151,8 @@ export function SearchMapRoot({ serverView, variant = "search", startSnap = "pee
   const searchZone = useCallback(
     (zone: SearchZone) => {
       // From the home page this opens the search page on that zone (its params are empty).
-      const next = canonicalSearchParams({ ...params, zone, page: undefined });
+      // An area of the map, not the visitor's position: « À N km de vous » no longer applies.
+      const next = canonicalSearchParams({ ...params, zone, fromPosition: undefined, page: undefined });
       navigation?.navigate(next, { scroll: variant === "home" });
     },
     [navigation, params, variant],

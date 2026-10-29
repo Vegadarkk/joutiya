@@ -11,7 +11,7 @@ import { listingRecipient, siteUrl } from "@/lib/mail/recipients";
 import { isDegraded } from "@/lib/quota";
 import { accountEndPath, listDailySearches, markSearchesNotified, readAlertsCursor, writeAlertsCursor, type AlertSearchRecord } from "@/lib/saved-searches/repository";
 import { LAG_ALERT_SECONDS, readOutboxLag } from "@/lib/search/indexer";
-import { activeRentalDates, runSearch } from "@/lib/search/service";
+import { activeRentalDates, NOT_EXAMPLE, runSearch } from "@/lib/search/service";
 import { SearchUnavailableError, type FilterExpr, type SearchCard } from "@/lib/search/types";
 
 // Daily at 07:00 UTC (design D19): one digest e-mail per account for its saved searches with an
@@ -29,6 +29,8 @@ import { SearchUnavailableError, type FilterExpr, type SearchCard } from "@/lib/
 // Rotation: the cursor (system/savedSearchAlerts) holds the last account served; the next run
 // starts after it and wraps around, so a capped run never starves the end of the list. An account
 // left out keeps its search cursors: its listings come in a later digest, none is lost.
+// Example listings (src/lib/demo) are never announced: a seed dates them "now", and a digest has no
+// « Annonce exemple » label.
 // Favorites (catalogue §4): an account served also hears of its favorites whose promotion started
 // in the day before the run (one engine query on the favorite ids, from the hearts cache), in the
 // same e-mail. No cursor: a promotion started on a day without a run, or for an account the cap
@@ -113,6 +115,7 @@ async function newsOf(search: AlertSearchRecord, now: Date, horizon: number): Pr
     and: [
       { field: "sortAt", op: "gt", value: search.lastNotifiedSortAt },
       { field: "sortAt", op: "lte", value: horizon },
+      NOT_EXAMPLE,
     ],
   };
   const response = await runSearch({ ...search.params, sort: "recent" }, { extraFilter, hitsPerPage: ALERT_LISTINGS_PER_SEARCH, featured: false, facets: false, approximate: false, now });
@@ -138,6 +141,7 @@ async function favoriteDropsOf(uid: string, now: Date, horizon: number): Promise
       { field: "id", op: "in", values: ids },
       { field: "promoStartsAt", op: "gt", value: now.getTime() - FAVORITE_DROPS_WINDOW_MS },
       { field: "promoStartsAt", op: "lte", value: horizon },
+      NOT_EXAMPLE,
     ],
   };
   const response = await runSearch({ promo: true, sort: "discount" }, { extraFilter, hitsPerPage: ALERT_LISTINGS_PER_SEARCH, featured: false, facets: false, approximate: false, now });
