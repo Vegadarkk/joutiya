@@ -56,6 +56,8 @@ Le tri « Plus forte réduction » ne garde que les annonces dont une promotion 
 
 Les filtres (catégorie, prix, lieu, etc.) restreignent la liste des résultats. Ils ne changent pas l'ordre du tri choisi, sauf les dates de location (§2.7).
 
+**Recherche écrite en phrase.** Quand vous tapez une phrase, par exemple « appartement à Tanger moins de 5000 DH », {brand} en déduit des filtres par des règles fixes, sans intelligence artificielle : catégorie, critères, ville, prix, état ou don. Un mot ambigu reste dans la recherche par mots, et « pas cher » trie par prix croissant sans fixer de plafond. Les filtres déduits s'affichent sous « Compris dans votre recherche » ; vous pouvez retirer chacun d'eux ou cliquer sur « Chercher le texte exact ». Une recherche sauvegardée garde ce choix et n'est jamais réinterprétée.
+
 Une annonce Pro dont le stock déclaré est épuisé, pour toutes ses variantes, ne figure plus dans les résultats par défaut. Elle reste en ligne avec la mention « Épuisé », et l'option « Inclure les articles épuisés » la fait réapparaître dans les résultats.
 
 ### 2.7 Location de voitures par dates {#tri-7}
