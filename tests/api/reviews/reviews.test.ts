@@ -99,7 +99,7 @@ describe("POST /api/reviews", () => {
     const { buyer, seller, cid } = await exchange({ ago: 2 * DAY_MS });
     const created = await create(buyer, { cid, rating: 4, text: TEXT, exchangeConfirmed: true });
     expect(created.status, JSON.stringify(created.body)).toBe(201);
-    expect(created.body).toEqual({ id: reviewId(cid), status: "published" });
+    expect(created.body).toEqual({ id: reviewId(buyer.uid, seller.uid), status: "published", replaced: false });
     expect(await stats(seller.uid)).toEqual({ count: 1, sum: 4, avg: 4, histogram: [0, 0, 0, 1, 0] });
     const conversation = (await db().collection(COLLECTIONS.conversations).doc(cid).get()).data()!;
     expect(conversation.reviewedAt).toBeInstanceOf(Timestamp);
@@ -187,7 +187,7 @@ describe("storefront reviews, reply, Mes avis, delete", () => {
     expect(answered.status, JSON.stringify(answered.body)).toBe(200);
     expect(answered.body.reply).toEqual({ text: "Merci pour votre achat, bonne continuation.", at: expect.any(Number) });
     expectError(await reply(seller, id, "Encore merci"), 409, "review_unavailable");
-    expectError(await reply(seller, reviewId("x".repeat(22)), "Merci"), 404, "not_found");
+    expectError(await reply(seller, reviewId("x".repeat(22), "y".repeat(22)), "Merci"), 404, "not_found");
 
     const received = await mine(seller, "recus");
     expect(received.body.reviews).toEqual([expect.objectContaining({ id, status: "published", counterpartName: "Youssef Acheteur", canReply: false, canDelete: false })]);
@@ -227,6 +227,51 @@ describe("storefront reviews, reply, Mes avis, delete", () => {
     expect(new Set([...first.body.reviews, ...second.body.reviews].map((review) => review.id)).size).toBe(11);
     expectError(await list(publicId, "not a cursor!"), 400, "invalid_body");
     expect(await stats(seller.uid)).toEqual({ count: 11, sum: 31, avg: 2.82, histogram: [3, 2, 2, 2, 2] });
+  });
+
+  it("keeps one review per buyer and seller: a later exchange replaces it, never a hidden one", async () => {
+    const { buyer, seller, cid } = await exchange({ ago: 2 * DAY_MS });
+    const first = await create(buyer, { cid, rating: 2, text: TEXT, exchangeConfirmed: true });
+    expect(first.body).toEqual({ id: reviewId(buyer.uid, seller.uid), status: "published", replaced: false });
+    const id = first.body.id;
+    expect((await reply(seller, id, "Désolée pour le retard de la dernière fois.")).status).toBe(200);
+
+    // A second listing of the same seller: the new review takes the same place.
+    const { id: listingId } = await seedListing(seller);
+    const { cid: second } = await startOk(buyer, listingId);
+    await send(seller, second, "Bonjour, oui, toujours disponible.");
+    await db().collection(COLLECTIONS.conversations).doc(second).update({ sellerRepliedAt: Timestamp.fromMillis(Date.now() - 2 * DAY_MS) });
+    const replaced = await create(buyer, { cid: second, rating: 5, text: TEXT, exchangeConfirmed: true });
+    expect(replaced.status, JSON.stringify(replaced.body)).toBe(201);
+    expect(replaced.body).toEqual({ id, status: "published", replaced: true });
+    expect(await stats(seller.uid)).toEqual({ count: 1, sum: 5, avg: 5, histogram: [0, 0, 0, 0, 1] });
+    const doc = (await db().collection(COLLECTIONS.reviews).doc(id).get()).data()!;
+    expect(doc).toMatchObject({ conversationId: second, listingId, rating: 5 });
+    expect(doc.reply).toBeUndefined();
+    const publicId = (await getUserRecord(seller.uid))!.publicId;
+    expect((await list(publicId)).body.reviews).toHaveLength(1);
+
+    // A review a moderator hid stays as it is: no new review of that seller replaces it.
+    await setReviewStatus(id, "hidden", new Date(), "decision:test");
+    const { id: thirdListing } = await seedListing(seller);
+    const { cid: third } = await startOk(buyer, thirdListing);
+    await send(seller, third, "Bonjour.");
+    await db().collection(COLLECTIONS.conversations).doc(third).update({ sellerRepliedAt: Timestamp.fromMillis(Date.now() - 2 * DAY_MS) });
+    expectError(await create(buyer, { cid: third, rating: 5, text: TEXT, exchangeConfirmed: true }), 409, "review_unavailable");
+    expect(await stats(seller.uid)).toMatchObject({ count: 0, sum: 0 });
+  });
+
+  it("opens no review on a one-click decline of the seller, only on a real answer", async () => {
+    const { verifiesExchange } = await import("@/lib/messaging/repository");
+    const seller = "seller-uid";
+    expect(verifiesExchange({ senderUid: seller }, seller)).toBe(true);
+    expect(verifiesExchange({ senderUid: "buyer-uid" }, seller)).toBe(false);
+    expect(verifiesExchange({ senderUid: seller, offer: { id: "o", event: "declined", amount: 100 } as never }, seller)).toBe(false);
+    expect(verifiesExchange({ senderUid: "buyer-uid", offer: { id: "o", event: "accepted", amount: 100 } as never }, seller)).toBe(true);
+    expect(verifiesExchange({ senderUid: seller, appointment: { event: "proposed" } as never }, seller)).toBe(false);
+    expect(verifiesExchange({ senderUid: "buyer-uid", appointment: { event: "confirmed" } as never }, seller)).toBe(true);
+    expect(verifiesExchange({ senderUid: seller, rentalRequest: { event: "declined" } as never }, seller)).toBe(false);
+    expect(verifiesExchange({ senderUid: seller, rentalRequest: { event: "accepted" } as never }, seller)).toBe(true);
   });
 
   it("drops the author's name when the author's account closes", async () => {

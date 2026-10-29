@@ -108,7 +108,7 @@ export async function handleCreateReview(request: Request): Promise<Response> {
     revalidateListingPaths({ publicId: review.targetPublicId });
     await notifyReviewPublished(review, { held: false });
   } else await holdForModerator(review);
-  const body: ReviewCreated = { id: review.id, status: review.status === "published" ? "published" : "pending" };
+  const body: ReviewCreated = { id: review.id, status: review.status === "published" ? "published" : "pending", replaced: review.replaced };
   return json(body, { status: 201 });
 }
 

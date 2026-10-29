@@ -14,11 +14,11 @@ Un avis porte sur un vendeur, particulier ou professionnel, et sur l'échange qu
 
 Vous pouvez laisser un avis si toutes ces conditions sont remplies :
 
-- vous avez écrit au vendeur par la messagerie de {brand}, et il vous a répondu au moins une fois ;
-- 24 heures se sont écoulées depuis sa première réponse, le temps de vous rencontrer ;
+- vous avez écrit au vendeur par la messagerie de {brand}, et l'échange a eu lieu : le vendeur vous a écrit un message, ou une offre a été acceptée, un rendez-vous confirmé ou une réservation acceptée (un simple refus ne suffit pas) ;
+- 24 heures se sont écoulées depuis ce premier échange, le temps de vous rencontrer ;
 - le dernier message de la conversation date de moins de 60 jours ;
 - la conversation n'est ni bloquée ni gelée, et vos deux comptes sont actifs ;
-- vous n'avez pas encore laissé d'avis pour cette conversation : un seul avis par conversation ;
+- vous n'avez pas encore laissé d'avis pour cette conversation. Un seul avis par vendeur : l'avis déposé après un nouvel échange avec le même vendeur remplace le précédent (sa note, son texte et la réponse du vendeur), sauf s'il a été retiré par la modération ;
 - vous déclarez : « Nous avons conclu un échange ou une rencontre ».
 
 Vous pouvez déposer au plus 5 avis par jour.
@@ -35,7 +35,7 @@ Un avis comprend une note de 1 à 5 et un texte de 20 à 1 000 caractères. Il d
 
 ### 2.1 Un échange vérifié, pas un achat {#verification-1}
 
-Chaque avis porte la mention « Échange vérifié ». Elle signifie que {brand} a vérifié, par ses propres données, qu'une conversation réelle a eu lieu entre l'auteur et le vendeur, et que le vendeur y a répondu (§1.2). Elle ne signifie pas que l'achat est vérifié.
+Chaque avis porte la mention « Échange vérifié ». Elle signifie que {brand} a vérifié, par ses propres données, qu'une conversation réelle a eu lieu entre l'auteur et le vendeur, et que le vendeur y a pris part (§1.2). Elle ne signifie pas que l'achat est vérifié.
 
 Aucun paiement ne passe par {brand} : elle ne peut pas vérifier qu'une vente ou une rencontre a eu lieu. Elle s'appuie sur la déclaration de l'auteur.
 
@@ -117,7 +117,7 @@ Signaler en série des avis conformes pour les faire disparaître est un abus, s
 
 ### 6.1 Supprimer son avis {#delais-1}
 
-Vous pouvez supprimer votre avis à tout moment depuis « Mes avis ». Un avis ne se modifie pas, et une conversation dont l'avis a été supprimé n'en reçoit pas d'autre.
+Vous pouvez supprimer votre avis à tout moment depuis « Mes avis ». Un avis ne se modifie pas, mais un nouvel échange avec le même vendeur permet d'en déposer un qui le remplace (§1.2). Une conversation dont l'avis a été supprimé n'en reçoit pas d'autre.
 
 ### 6.2 Durée d'affichage {#delais-2}
 

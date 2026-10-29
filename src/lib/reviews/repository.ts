@@ -18,11 +18,15 @@ export interface ReviewRecord extends ReviewDoc {
   id: string;
 }
 
-const VERSION = "review:v1";
+const VERSION = "review:v2";
 
-/** base64url(sha256("review:v1:" + cid)), 22 characters: one review per conversation, the cid never public. */
-export function reviewId(cid: string): string {
-  return createHash("sha256").update(`${VERSION}:${cid}`).digest("base64url").slice(0, 22);
+/**
+ * base64url(sha256("review:v2:" + author + ":" + seller)), 22 characters: one review per buyer and
+ * seller (owner, 29 Oct: a later exchange replaces it), no uid ever public. v1 ids (one per
+ * conversation, staging only) stay readable under their own ids.
+ */
+export function reviewId(authorUid: string, sellerUid: string): string {
+  return createHash("sha256").update(`${VERSION}:${authorUid}:${sellerUid}`).digest("base64url").slice(0, 22);
 }
 
 const reviews = () => db().collection(COLLECTIONS.reviews);
@@ -80,18 +84,27 @@ export function ratingStatsOf(snapshot: DocumentSnapshot): RatingStats {
   return { ratingCount: count, ratingSum: sum, ratingHistogram: histogram };
 }
 
-/** Adds (delta 1) or removes (delta -1) one published rating; the dotted fields of `stats` only. */
-function applyRating(tx: Transaction, sellerUid: string, current: RatingStats, rating: number, delta: 1 | -1): void {
-  const count = Math.max(0, current.ratingCount + delta);
-  const sum = Math.max(0, current.ratingSum + delta * rating);
+/** The aggregates with one published rating added (delta 1) or removed (delta -1). Pure. */
+export function withRating(current: RatingStats, rating: number, delta: 1 | -1): RatingStats {
   const histogram = [...current.ratingHistogram] as Histogram;
   histogram[rating - 1] = Math.max(0, histogram[rating - 1]! + delta);
+  return { ratingCount: Math.max(0, current.ratingCount + delta), ratingSum: Math.max(0, current.ratingSum + delta * rating), ratingHistogram: histogram };
+}
+
+/** Writes the aggregates; the dotted fields of `stats` only. */
+function writeRatings(tx: Transaction, sellerUid: string, stats: RatingStats): void {
+  const { ratingCount: count, ratingSum: sum } = stats;
   tx.update(userRef(sellerUid), {
     "stats.ratingCount": count,
     "stats.ratingSum": sum,
-    "stats.ratingHistogram": histogram,
+    "stats.ratingHistogram": stats.ratingHistogram,
     "stats.ratingAvg": count > 0 ? Math.round((sum / count) * 100) / 100 : 0,
   });
+}
+
+/** Adds (delta 1) or removes (delta -1) one published rating. */
+function applyRating(tx: Transaction, sellerUid: string, current: RatingStats, rating: number, delta: 1 | -1): void {
+  writeRatings(tx, sellerUid, withRating(current, rating, delta));
 }
 
 export interface NewReview {
@@ -106,11 +119,13 @@ export interface NewReview {
 
 /**
  * Creates the review of a conversation by its buyer, in one transaction: the conversation (buyer,
- * window, not frozen, nobody blocked or closed), no review yet, the seller's aggregates. Marks the
- * conversation `reviewedAt` (its `updatedAt` stays: the inbox order does not move).
+ * window, not frozen, nobody blocked or closed), the seller's aggregates. One review per buyer and
+ * seller (owner, 29 Oct): the buyer's earlier review of this seller, from another conversation, is
+ * replaced (its rating leaves the aggregates, its seller reply goes with its text), unless a
+ * moderator hid it or it is under legal hold. Marks the conversation `reviewedAt` (its `updatedAt`
+ * stays: the inbox order does not move). `replaced` says an earlier review was replaced.
  */
-export async function createReview(input: NewReview): Promise<ReviewRecord> {
-  const id = reviewId(input.cid);
+export async function createReview(input: NewReview): Promise<ReviewRecord & { replaced: boolean }> {
   const record = await db().runTransaction(async (tx) => {
     const conversation = conversationFromSnapshot(await tx.get(conversationRef(input.cid)));
     if (!conversation || conversation.buyerUid !== input.authorUid) throw new ReviewError("missing");
@@ -118,6 +133,7 @@ export async function createReview(input: NewReview): Promise<ReviewRecord> {
     const window = conversationWindow(conversation, input.now);
     if (window.state === "done") throw new ReviewError("exists", window);
     if (window.state !== "open") throw new ReviewError("window", window);
+    const id = reviewId(input.authorUid, conversation.sellerUid);
     const [existing, seller, author, authorBlocks, sellerBlocks] = await tx.getAll(
       reviewRef(id),
       userRef(conversation.sellerUid),
@@ -125,7 +141,11 @@ export async function createReview(input: NewReview): Promise<ReviewRecord> {
       userBlocksRef(input.authorUid),
       userBlocksRef(conversation.sellerUid),
     );
-    if (existing!.exists) throw new ReviewError("exists");
+    const earlier = reviewFromSnapshot(existing!);
+    if (existing!.exists && !earlier) throw new ReviewError("state");
+    // This conversation's own review is the one in force; a hidden or held one is never overwritten.
+    if (earlier?.conversationId === input.cid && earlier.status !== "deleted") throw new ReviewError("exists");
+    if (earlier && (earlier.status === "hidden" || earlier.legalHold.length > 0)) throw new ReviewError("exists");
     // Both accounts active (Avis utilisateurs §1.2): a restricted, suspended, banned or closed account neither reviews nor is reviewed.
     if (!seller!.exists || !author!.exists || seller!.get("status") !== "active" || author!.get("status") !== "active") throw new ReviewError("not_allowed");
     if (isPairBlocked(blocksOf([authorBlocks!, sellerBlocks!]), input.authorUid, conversation.sellerUid)) throw new ReviewError("not_allowed");
@@ -151,14 +171,21 @@ export async function createReview(input: NewReview): Promise<ReviewRecord> {
       updatedAt: input.now,
       legalHold: [],
     });
-    tx.create(reviewRef(id), datesToTimestamps(doc) as Record<string, unknown>);
+    // A full set: the earlier review's reply, hide trace and purge date go with it.
+    tx.set(reviewRef(id), datesToTimestamps(doc) as Record<string, unknown>);
     tx.update(conversationRef(input.cid), { reviewedAt: Timestamp.fromDate(input.now) });
-    if (input.status === "published") applyRating(tx, conversation.sellerUid, ratingStatsOf(seller!), input.rating, 1);
-    return { id, ...doc };
+    let stats = ratingStatsOf(seller!);
+    const before = stats;
+    if (earlier?.status === "published") stats = withRating(stats, earlier.rating, -1);
+    if (input.status === "published") stats = withRating(stats, input.rating, 1);
+    const ratingsMoved = stats !== before;
+    if (ratingsMoved) writeRatings(tx, conversation.sellerUid, stats);
+    return { id, ...doc, replaced: earlier !== null && earlier.status !== "deleted", ratingsMoved };
   });
   void consume("firestore.reads", 6);
-  void consume("firestore.writes", record.status === "published" ? 3 : 2);
-  return record;
+  void consume("firestore.writes", record.ratingsMoved ? 3 : 2);
+  const { ratingsMoved: _moved, ...review } = record;
+  return review;
 }
 
 /** The author deletes the review: status `deleted`, purge in 12 months, the rating leaves the average. */
@@ -245,7 +272,7 @@ export async function listAuthoredReviews(authorUid: string, limit: number): Pro
   return snapshot.docs.map(reviewFromSnapshot).filter((review): review is ReviewRecord => review !== null && review.status !== "deleted");
 }
 
-/** Reviews anonymized per closure: more is unlikely (one per conversation as a buyer). */
+/** Reviews anonymized per closure: more is unlikely (one per seller as a buyer). */
 const CLOSURE_REVIEWS = 500;
 
 /**

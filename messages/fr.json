@@ -3085,7 +3085,7 @@
       "confirm": "Nous avons conclu un échange ou une rencontre",
       "confirmHint": "Un avis porte sur un échange réel. Un faux avis est retiré et peut entraîner la suspension du compte.",
       "rules": "Règles des avis",
-      "public": "Votre nom affiché et votre avis seront visibles sur la vitrine du vendeur, qui pourra y répondre une fois. Vous pourrez supprimer votre avis à tout moment depuis « Mes avis ».",
+      "public": "Votre nom affiché et votre avis seront visibles sur la vitrine du vendeur, qui pourra y répondre une fois. Vous pourrez supprimer votre avis à tout moment depuis « Mes avis ». Un seul avis par vendeur : si vous en avez déjà laissé un sur ce vendeur, celui-ci le remplace.",
       "submit": "Publier mon avis",
       "cancel": "Annuler",
       "close": "Fermer",
@@ -3098,6 +3098,7 @@
       "publishedBody": "Il apparaît sur la vitrine de {name}.",
       "pendingTitle": "Merci, votre avis sera publié après vérification",
       "pendingBody": "Il contient peut-être des informations personnelles : un modérateur le relit avant sa publication.",
+      "replacedNote": "Il remplace votre avis précédent sur ce vendeur.",
       "viewStorefront": "Voir la vitrine"
     },
     "mine": {

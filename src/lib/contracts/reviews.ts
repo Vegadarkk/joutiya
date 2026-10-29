@@ -80,6 +80,8 @@ export interface ReviewCreated {
   id: string;
   /** "pending": held for a moderator (sensitive data), published once checked. */
   status: "published" | "pending";
+  /** The buyer's earlier review of this seller (another conversation) was replaced: one per seller. */
+  replaced: boolean;
 }
 
 /** "Mes avis": a review the member wrote or received, with its state. */
