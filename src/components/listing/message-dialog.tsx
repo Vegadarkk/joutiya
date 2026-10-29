@@ -16,7 +16,7 @@ import { AmountField, amountProblem } from "@/components/offers/amount-field";
 import { offerErrorKey } from "@/components/offers/error-keys";
 import { OfferNotice } from "@/components/offers/offer-notice";
 import type { RentalUnit } from "@/config/categories";
-import type { Locale } from "@/config/site";
+import { SITE_NAME, type Locale } from "@/config/site";
 import { Link, useRouter } from "@/i18n/navigation";
 import { ApiError, refreshSession } from "@/lib/auth/client";
 import { MESSAGE_TEXT_MAX } from "@/lib/contracts/endpoints";
@@ -339,7 +339,7 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
             <p className="flex items-start gap-2 text-sm text-foreground-muted text-pretty">
               <LockKeyhole className="mt-0.5 size-4 shrink-0 text-structure dark:text-gold-300" aria-hidden="true" />
               <span>
-                {t("privacy")} {visit ? t("visitSafety") : rental ? t(r("rentalSafety")) : t("safety")}{" "}
+                {t("privacy")} {visit ? t("visitSafety") : rental ? t(r("rentalSafety"), { site: SITE_NAME }) : t("safety")}{" "}
                 {t.rich("scanned", {
                   link: (chunks) => (
                     <Link href="/legal/confidentialite#finalites-3" target="_blank" rel="noopener" className="font-medium text-link underline underline-offset-2">

@@ -2881,7 +2881,7 @@
           "rentalDraft": "Bonjour, je souhaite séjourner à « {title} » du {from} au {to} ({days, plural, one {# nuit} other {# nuits}}). Est-ce disponible ?",
           "rentalDraftPickup": "Bonjour, je souhaite séjourner à « {title} » du {from} au {to} ({days, plural, one {# nuit} other {# nuits}}) : {pickup}. Est-ce disponible ?",
           "rentalDatesMissing": "Choisissez les dates d'arrivée et de départ.",
-          "rentalSafety": "Le séjour se conclut directement avec l'annonceur : ne versez ni acompte ni caution sur le site, ni avant d'avoir vérifié l'annonceur et le logement."
+          "rentalSafety": "Le séjour se conclut directement avec l'annonceur. {site} ne prend ni acompte ni caution : ne versez rien avant d'avoir vérifié l'annonceur et le logement."
         }
       },
       "visit": "Demander une visite",
