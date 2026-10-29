@@ -1,7 +1,7 @@
 import "server-only";
 import { requireUser } from "@/lib/auth/guards";
 import { uploadIdSchema } from "@/lib/contracts/media";
-import { kybcSignSchema, proAgencySchema, proApplySchema, proRentalSchema, type ProApplyResponse } from "@/lib/contracts/pro";
+import { kybcSignSchema, proAgencySchema, proApplySchema, proRentalSchema, rentalCheckSubmitSchema, type ProApplyResponse } from "@/lib/contracts/pro";
 import { STOCK_IMPORT_BODY_MAX_BYTES, stockImportRequestSchema } from "@/lib/contracts/stock-import";
 import { serverEnv } from "@/lib/env";
 import { HttpError, notFound } from "@/lib/http/errors";
@@ -12,6 +12,7 @@ import { requestIdentity } from "@/lib/rate-limit/keys";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 import { completeKybcUpload, deleteKybcUpload, signKybcUpload } from "./kybc-uploads";
+import { submitRentalCheck } from "./rental-check";
 import { proSelf, submitApplication, updateAgency, updateRentalAgency } from "./service";
 import { importStock, stockList } from "./stock-import/service";
 
@@ -77,6 +78,13 @@ export async function handleRentalAgency(request: Request): Promise<Response> {
   const input = await readJson(request, proRentalSchema);
   await enforceLimit("pro.agency.uid", auth.user.uid);
   return json(await updateRentalAgency(auth, input));
+}
+
+/** POST /api/pro/me/rental/check: sends the licence decision for its check (decision 5). */
+export async function handleRentalCheck(request: Request): Promise<Response> {
+  const auth = await requireUser(request, { mutation: true });
+  const input = await readJson(request, rentalCheckSubmitSchema);
+  return json(await submitRentalCheck(auth, input));
 }
 
 /** GET /api/pro/stock: the shop's listings with a stock reference (Concession pack). */

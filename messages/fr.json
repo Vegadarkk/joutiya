@@ -3821,7 +3821,9 @@
       "insurance": "Assurance incluse",
       "handover": "Remise du véhicule",
       "oneWay": "retour dans une autre ville possible",
-      "otherListings": "{count, plural, one {# autre annonce} other {# autres annonces}}"
+      "otherListings": "{count, plural, one {# autre annonce} other {# autres annonces}}",
+      "agrementChecked": "Agrément contrôlé sur document le {date}",
+      "agrementCheckedNote": "Contrôle de cohérence du document fourni par l'agence (numéro, raison sociale, date). L'agence reste seule responsable de ses déclarations."
     },
     "fleet": {
       "fleetTitle": "La flotte",
@@ -4610,6 +4612,28 @@
       "step3Action": "Mon planning",
       "doneLabel": "Étape {index} faite :",
       "todoLabel": "Étape {index} à faire :"
+    },
+    "check": {
+      "title": "Contrôle de l'agrément sur document",
+      "saveFirst": "Enregistrez d'abord votre numéro d'agrément : vous pourrez ensuite envoyer votre décision d'agrément pour obtenir la mention « agrément contrôlé sur document » sur votre vitrine.",
+      "none": "Envoyez votre décision d'agrément (PDF ou photo nette). Si son numéro, la raison sociale ou l'ICE et sa date concordent avec votre compte Pro, votre vitrine affiche « agrément contrôlé sur document ».",
+      "pending": "Document reçu : contrôle en cours. Le résultat s'affiche ici en quelques minutes.",
+      "review": "Notre équipe vérifie votre document : le résultat s'affichera ici.",
+      "verified": "Agrément contrôlé sur document le {date}.",
+      "verifiedNote": "La mention s'affiche sur votre vitrine. Elle disparaît si vous changez de numéro d'agrément.",
+      "rejected": "Document refusé. Envoyez une décision d'agrément lisible, à jour et au nom de votre société.",
+      "notice": "Le document est lu par un outil d'intelligence artificielle (Claude, d'Anthropic), qui en relève le numéro, la raison sociale, l'ICE et la date, puis, en cas de doute, par notre équipe de modération. Il est conservé dans un espace privé tant que votre compte Pro est actif, puis 6 mois. Masquez tout numéro de CNIE avant l'envoi.",
+      "send": "Envoyer ma décision d'agrément",
+      "sendAnother": "Envoyer un autre document",
+      "refresh": "Actualiser",
+      "uploading": "Envoi : {percent} %",
+      "sending": "Contrôle du document…",
+      "pieceRejected": {
+        "too_large": "Ce fichier dépasse 10 Mo.",
+        "bad_type": "Seuls les fichiers PDF, JPEG et PNG sont acceptés.",
+        "active_content": "Ce PDF contient du contenu actif (script, formulaire) : exportez-le à nouveau en PDF simple.",
+        "expired": "L'envoi n'a pas abouti à temps. Réessayez."
+      }
     }
   }
 }

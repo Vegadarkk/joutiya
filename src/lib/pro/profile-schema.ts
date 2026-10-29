@@ -58,6 +58,51 @@ export type RentalAgency = z.infer<typeof rentalAgencySchema>;
 
 const uid = z.string().min(1).max(128);
 const ts = z.date();
+
+/**
+ * Check of the agency's licence decision (decision 5): Claude reads the uploaded document, the
+ * server compares what it read with the declared reference and the verified ICE or name; all
+ * consistent gives the badge « agrément contrôlé sur document », any doubt goes to a moderator.
+ * The agency stays solely responsible for its declaration (no online authentication exists).
+ */
+export const RENTAL_CHECK_STATUSES = ["pending", "verified", "review", "rejected"] as const;
+export type RentalCheckStatus = (typeof RENTAL_CHECK_STATUSES)[number];
+/** Why a document went to a moderator: not a licence decision, unreadable, reference, company or date not matching, signs of editing, low confidence, Claude unavailable. */
+export const RENTAL_CHECK_ISSUES = ["not_agrement", "unreadable", "reference", "company", "date", "tampering", "low_confidence", "ai_unavailable"] as const;
+export type RentalCheckIssue = (typeof RENTAL_CHECK_ISSUES)[number];
+export const RENTAL_CHECK_REASON_MAX = 500;
+export const RENTAL_CHECK_SIGNS_MAX = 5;
+
+export const rentalCheckSchema = z
+  .object({
+    status: z.enum(RENTAL_CHECK_STATUSES),
+    /** The document (uploads purpose `kyb`, private bucket), kept with the profile like the KYBC pieces. */
+    uploadId: z.string().min(1).max(64),
+    /** Reference the document was checked against: a new reference in the settings drops the check. */
+    agrementRef: z.string().max(40),
+    submittedAt: ts,
+    checkedAt: ts.optional(),
+    method: z.enum(["ai", "staff"]).optional(),
+    /** The moderator who decided (method "staff"). */
+    by: uid.optional(),
+    issues: z.array(z.enum(RENTAL_CHECK_ISSUES)).max(RENTAL_CHECK_ISSUES.length),
+    /** What Claude read on the document (business identifiers only), for the moderator. */
+    extracted: z
+      .object({
+        companyName: z.string().max(200),
+        ice: z.string().max(40),
+        reference: z.string().max(80),
+        decisionDate: z.string().max(20),
+        signs: z.array(z.string().max(200)).max(RENTAL_CHECK_SIGNS_MAX),
+        note: z.string().max(500),
+      })
+      .strict()
+      .optional(),
+    /** The moderator's reason for a refusal, shown to the agency. */
+    reason: z.string().max(RENTAL_CHECK_REASON_MAX).optional(),
+  })
+  .strict();
+export type RentalCheck = z.infer<typeof rentalCheckSchema>;
 /** Moroccan mobile in E.164, as users/{uid}/private/account.phoneE164 (src/lib/db/schemas.ts). */
 const mobileE164 = z.string().regex(/^\+212[67]\d{8}$/);
 
@@ -138,6 +183,8 @@ export const proProfileSchema = z
     agency: z.object({ feeSchedule: z.string().trim().max(AGENCY_FEE_SCHEDULE_MAX) }).strict().optional(),
     /** Car rental agency settings, set by the owner (PUT /api/pro/me/rental). */
     rental: rentalAgencySchema.optional(),
+    /** Check of the licence decision (POST /api/pro/me/rental/check, then the agent queue or a moderator). */
+    rentalCheck: rentalCheckSchema.optional(),
     lifecycle: z.enum(PRO_STATES),
     /** Copy of subscriptions/pro_{proId}, or the launch offer's plan. */
     plan: z.enum(PRO_PLANS),
