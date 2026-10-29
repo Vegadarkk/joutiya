@@ -54,6 +54,10 @@ vi.mock("@/lib/saved-searches/repository", () => ({
   }),
 }));
 
+/** Favorite ids per account (hearts cache). */
+const favoriteIds = new Map<string, string[]>();
+vi.mock("@/lib/favorites/service", () => ({ favoriteIdsOf: vi.fn(async (uid: string) => favoriteIds.get(uid) ?? []) }));
+
 vi.mock("@/lib/search/service", async (importOriginal) => ({ activeRentalDates: (await importOriginal<typeof SearchService>()).activeRentalDates, runSearch: vi.fn() }));
 
 const repository = await import("@/lib/saved-searches/repository");
@@ -123,6 +127,7 @@ beforeEach(() => {
   listings = new Map();
   cursor = null;
   approximateFor = new Set();
+  favoriteIds.clear();
   lag.value = null;
   vi.mocked(deliverMail).mockReset().mockResolvedValue(SENT);
   vi.mocked(repository.listDailySearches).mockClear();
@@ -185,6 +190,35 @@ describe("sendSavedSearchAlerts", () => {
     // The same listings are never sent twice.
     vi.mocked(deliverMail).mockClear();
     expect((await sendSavedSearchAlerts(NOW)).mails).toBe(0);
+  });
+
+  it("adds the favorites whose promotion started since the last run, in the same digest", async () => {
+    store = [search("bilal", "s1"), search("dounia", "s2")];
+    favoriteIds.set("bilal", ["fav00001", "fav00002"]);
+    favoriteIds.set("dounia", ["fav00003"]);
+    const searches = vi.mocked(runSearch).getMockImplementation()!;
+    const promo = { kind: "soldes" as const, price: 720, reference: 900, percent: 20, endsAt: NOW.getTime() + 86_400_000 };
+    vi.mocked(runSearch).mockImplementation(async (params, options = {}) => {
+      if (!params.promo) return searches(params, options);
+      const ids = (options.extraFilter as { and: { op: string; values?: string[] }[] }).and.find((item) => item.op === "in")?.values ?? [];
+      const hits = ids.includes("fav00001") ? [{ ...card("fav00001", LAST), promo }] : [];
+      return { params, hits, total: hits.length, approximate: false } as unknown as SearchResponse;
+    });
+    const result = await sendSavedSearchAlerts(NOW);
+    // bilal: no new listing for its search, a favorite on promotion: a digest with it alone.
+    expect(result).toMatchObject({ accounts: 2, mails: 1 });
+    expect(digestOf("bilal")?.data).toMatchObject({ searches: [], favorites: [{ title: "Vélo fav00001", price: 720, before: 900, percent: 20, kind: "soldes", url: "https://joutiya.ma/fr/annonce/velo-fav00001" }] });
+    const query = vi.mocked(runSearch).mock.calls.find(([params]) => params.promo)!;
+    expect(query[0]).toEqual({ promo: true, sort: "discount" });
+    expect(query[1]?.extraFilter).toEqual({
+      and: [
+        { field: "id", op: "in", values: ["fav00001", "fav00002"] },
+        { field: "promoStartsAt", op: "gt", value: NOW.getTime() - 86_400_000 },
+        { field: "promoStartsAt", op: "lte", value: NOW.getTime() - ALERT_INDEXING_MARGIN_MS },
+      ],
+    });
+    // No search moved: their listings are still to come.
+    expect(repository.markSearchesNotified).not.toHaveBeenCalled();
   });
 
   it("skips a car rental search whose pick-up day has passed", async () => {

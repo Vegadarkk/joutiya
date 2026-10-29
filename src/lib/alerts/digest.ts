@@ -1,5 +1,5 @@
 import type { Locale } from "@/config/site";
-import type { SavedSearchAlertSection } from "@/lib/mail/types";
+import type { FavoriteDropListing, SavedSearchAlertSection } from "@/lib/mail/types";
 import { searchPath, type SearchParams } from "@/lib/search/params";
 import type { SearchCard } from "@/lib/search/types";
 
@@ -56,5 +56,23 @@ export function digestSections(news: readonly SearchNews[], locale: Locale, url:
         isDonation: hit.isDonation,
         citySlug: hit.citySlug,
       })),
+    }));
+}
+
+/** Favorites of the digest whose promotion runs (catalogue §4), deepest cut first. */
+export function favoriteDrops(hits: readonly SearchCard[], locale: Locale, url: (locale: Locale, path: string) => string): FavoriteDropListing[] {
+  return hits
+    .flatMap((hit) => (hit.promo ? [{ hit, promo: hit.promo }] : []))
+    .sort((a, b) => b.promo.percent - a.promo.percent)
+    .slice(0, ALERT_LISTINGS_PER_SEARCH)
+    .map(({ hit, promo }) => ({
+      title: hit.title,
+      url: url(locale, `annonce/${hit.slugId}`),
+      price: promo.price,
+      isDonation: false,
+      citySlug: hit.citySlug,
+      kind: promo.kind,
+      before: promo.reference,
+      percent: promo.percent,
     }));
 }

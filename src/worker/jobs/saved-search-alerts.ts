@@ -1,6 +1,7 @@
 import { setTimeout as delay } from "node:timers/promises";
-import { ALERT_LISTINGS_PER_SEARCH, digestIdempotencyKey, digestSections, newestSortAt, type SearchNews } from "@/lib/alerts/digest";
+import { ALERT_LISTINGS_PER_SEARCH, digestIdempotencyKey, digestSections, favoriteDrops, newestSortAt, type SearchNews } from "@/lib/alerts/digest";
 import { unsubscribeToken } from "@/lib/alerts/unsubscribe-token";
+import { favoriteIdsOf } from "@/lib/favorites/service";
 import { isFirestoreConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
 import { deliverMail, type DeliverOutcome } from "@/lib/mail/deliver";
@@ -11,7 +12,7 @@ import { isDegraded } from "@/lib/quota";
 import { accountEndPath, listDailySearches, markSearchesNotified, readAlertsCursor, writeAlertsCursor, type AlertSearchRecord } from "@/lib/saved-searches/repository";
 import { LAG_ALERT_SECONDS, readOutboxLag } from "@/lib/search/indexer";
 import { activeRentalDates, runSearch } from "@/lib/search/service";
-import { SearchUnavailableError, type FilterExpr } from "@/lib/search/types";
+import { SearchUnavailableError, type FilterExpr, type SearchCard } from "@/lib/search/types";
 
 // Daily at 07:00 UTC (design D19): one digest e-mail per account for its saved searches with an
 // alert and new listings. Searches are read from the collection group in document path order, so
@@ -28,6 +29,10 @@ import { SearchUnavailableError, type FilterExpr } from "@/lib/search/types";
 // Rotation: the cursor (system/savedSearchAlerts) holds the last account served; the next run
 // starts after it and wraps around, so a capped run never starves the end of the list. An account
 // left out keeps its search cursors: its listings come in a later digest, none is lost.
+// Favorites (catalogue §4): an account served also hears of its favorites whose promotion started
+// in the day before the run (one engine query on the favorite ids, from the hearts cache), in the
+// same e-mail. No cursor: a promotion started on a day without a run, or for an account the cap
+// left out, is not announced (it is on the listing and in the « En promotion » filter anyway).
 
 export const SAVED_SEARCH_ALERTS_MAX_MAILS = 40;
 export const ALERTS_PAGE_SIZE = 200;
@@ -115,6 +120,30 @@ async function newsOf(search: AlertSearchRecord, now: Date, horizon: number): Pr
   return { searchId: search.id, name: search.name, params: search.params, createdAt: search.createdAt, total: response.total, hits: response.hits };
 }
 
+/** Window of the favorites' promotions: since the previous daily run. */
+export const FAVORITE_DROPS_WINDOW_MS = 24 * 3_600_000;
+
+/** Favorites of `uid` whose promotion started in the window and still runs (an error leaves them out). */
+async function favoriteDropsOf(uid: string, now: Date, horizon: number): Promise<SearchCard[]> {
+  let ids: string[];
+  try {
+    ids = await favoriteIdsOf(uid);
+  } catch (error) {
+    logger.warn({ err: (error as Error).message }, "favorite ids not read for the alert digest");
+    return [];
+  }
+  if (ids.length === 0) return [];
+  const extraFilter: FilterExpr = {
+    and: [
+      { field: "id", op: "in", values: ids },
+      { field: "promoStartsAt", op: "gt", value: now.getTime() - FAVORITE_DROPS_WINDOW_MS },
+      { field: "promoStartsAt", op: "lte", value: horizon },
+    ],
+  };
+  const response = await runSearch({ promo: true, sort: "discount" }, { extraFilter, hitsPerPage: ALERT_LISTINGS_PER_SEARCH, featured: false, facets: false, approximate: false, now });
+  return response.approximate ? [] : response.hits;
+}
+
 type AccountOutcome = "none" | "sent" | "skipped" | "failed" | "cap" | "quota" | "mail";
 
 /** Attempts for a transient provider failure (429, 5xx, network): the mail queue's quick retries. */
@@ -150,17 +179,25 @@ async function serveAccount(group: AlertSearchRecord[], now: Date, horizon: numb
       logger.warn({ searchId: search.id, err: (error as Error).message }, "saved search alert query failed");
     }
   }
-  if (news.length === 0) return "none";
+  let drops: SearchCard[] = [];
+  try {
+    drops = await favoriteDropsOf(uid, now, horizon);
+  } catch (error) {
+    if (error instanceof SearchUnavailableError) throw error;
+    logger.warn({ err: (error as Error).message }, "favorite drops query failed");
+  }
+  if (news.length === 0 && drops.length === 0) return "none";
   if (result.mails >= SAVED_SEARCH_ALERTS_MAX_MAILS) return "cap";
   const to = await listingRecipient(uid);
   if (!to) return "skipped";
+  const favorites = favoriteDrops(drops, to.locale, siteUrl);
   let delivered: DeliverOutcome;
   try {
     delivered = await deliverWithRetries({
       template: "savedSearchAlert",
       locale: to.locale,
       to: to.email,
-      data: { displayName: to.displayName, searches: digestSections(news, to.locale, siteUrl), unsubscribeToken: unsubscribeToken(uid) },
+      data: { displayName: to.displayName, searches: digestSections(news, to.locale, siteUrl), ...(favorites.length > 0 ? { favorites } : {}), unsubscribeToken: unsubscribeToken(uid) },
       priority: "bulk",
       idempotencyKey: digestIdempotencyKey(uid, now),
     });
@@ -175,6 +212,7 @@ async function serveAccount(group: AlertSearchRecord[], now: Date, horizon: numb
     logger.info({ reason: delivered.skipped }, "saved search alert skipped");
     return "skipped";
   }
+  if (news.length === 0) return "sent";
   try {
     await markSearchesNotified(
       news.map((item) => ({ uid, id: item.searchId, lastNotifiedSortAt: newestSortAt(item.hits) })),

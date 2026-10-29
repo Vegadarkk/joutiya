@@ -166,7 +166,8 @@ export interface TemplateData {
    * `unsubscribeToken` (src/lib/alerts/unsubscribe-token.ts, every alert of the account) builds the
    * List-Unsubscribe header and the "Se désabonner" link.
    */
-  savedSearchAlert: { displayName: string; searches: SavedSearchAlertSection[]; unsubscribeToken: string };
+  /** `favorites`: favorite listings whose promotion started since the last run (catalogue §4). */
+  savedSearchAlert: { displayName: string; searches: SavedSearchAlertSection[]; favorites?: FavoriteDropListing[]; unsubscribeToken: string };
   /** `launchOffer`: Essentiel offered until sales open, `noticeDays` of notice before any payment. */
   proApproved: { displayName: string; shopName: string; launchOffer: boolean; noticeDays: number };
   /** The moderator's reason; `contact` is where to object (legal configuration). */
@@ -223,6 +224,13 @@ export interface SavedSearchAlertListing {
   price: number | null;
   isDonation: boolean;
   citySlug: string | null;
+}
+
+/** A favorite on promotion: `price` is the promotional one, `before` its struck-out price (none under 30 days of history). */
+export interface FavoriteDropListing extends SavedSearchAlertListing {
+  kind: "promo" | "soldes" | "flash";
+  before: number | null;
+  percent: number;
 }
 
 /** Templates whose Firebase action link (live oobCode) the worker generates at delivery. */
