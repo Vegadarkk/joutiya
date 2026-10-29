@@ -122,6 +122,16 @@ const NO_AMOUNTS: [text: string, q: string][] = [
   ["voiture 150 000 km", "150 000 km"],
   ["moto 125 cc 2018", "125 cc 2018"],
   ["iphone 13 pro max 256 go", "iphone 13 pro max 256 go"],
+  // Price words before (or after) an amount of another unit leave with the understood words.
+  ["voiture moins de 100 000 km", "100 000 km"],
+  ["voiture 100 000 km max", "100 000 km"],
+  ["voiture plus de 2 ans", "2 ans"],
+  ["frigo max 300 litres", "300 litres"],
+  ["moto plus de 125 cc", "125 cc"],
+  ["appartement au moins 3 pièces", "3 pièces"],
+  ["سيارة أقل من 100000 كلم", "100000 كلم"],
+  // A weak cue is an ordinary word too: it stays.
+  ["voiture sous 3 ans", "sous 3 ans"],
 ];
 
 describe("interpretQuery", () => {
@@ -148,6 +158,13 @@ describe("interpretQuery", () => {
     const result = interpretQuery(text);
     expect(result.understood.filter((item) => !["category", "location"].includes(item.key) && !item.key.startsWith("criterion:"))).toEqual([]);
     expect(result.q).toBe(q);
+  });
+
+  it("keeps the price words of an unread amount when nothing else is understood", () => {
+    // The sentence is then searched as typed (no interpretation): nothing to tidy.
+    expect(interpretQuery("moins de 2 ans").q).toBe("moins de 2 ans");
+    expect(interpretSearch({ q: "moins de 2 ans" })).toBeNull();
+    expect(interpretSearch({ q: "voiture moins de 100 000 km" })?.params).toEqual({ q: "100 000 km", category: "vehicules", subcategory: "voitures" });
   });
 
   it("names a property type without an offer at the category level", () => {
