@@ -276,24 +276,41 @@ export default function SearchMap({ onReady }: SearchMapProps) {
       mark();
     }
 
-    // An À la Une arch is never clustered: standing on the same spot as a count bubble or a price
-    // pill (listings share their city's rounded centre), it would hide it. The arch then rises just
-    // above it, its own pill still over the spot; back down once the map moves them apart.
+    // An À la Une arch is never clustered: standing on the same spot as a count bubble, a price pill
+    // or another arch (listings share their city's rounded centre), it would hide it. The arch then
+    // moves the shortest way clear (up or aside, a few steps at most) and comes back once the map
+    // moves them apart.
     function lift() {
       if (!instance) return;
-      const others = [...markers.current.values()]
+      type Box = { left: number; right: number; top: number; bottom: number };
+      const obstacles: Box[] = [...markers.current.values()]
         .filter(({ element }) => !element.classList.contains("search-pin-featured"))
-        .map(({ marker, element }) => ({ at: instance.project(marker.getLngLat()), halfWidth: element.offsetWidth / 2, halfHeight: element.offsetHeight / 2 }));
+        .map(({ marker, element }) => {
+          const at = instance.project(marker.getLngLat());
+          const halfWidth = element.offsetWidth / 2;
+          const halfHeight = element.offsetHeight / 2;
+          return { left: at.x - halfWidth, right: at.x + halfWidth, top: at.y - halfHeight, bottom: at.y + halfHeight };
+        });
       for (const { marker, element } of markers.current.values()) {
         if (!element.classList.contains("search-pin-featured")) continue;
         const at = instance.project(marker.getLngLat());
-        let rise = 0;
-        for (const other of others) {
-          const top = other.at.y - other.halfHeight;
-          if (Math.abs(other.at.x - at.x) >= other.halfWidth + element.offsetWidth / 2 || at.y <= top || at.y > other.at.y + other.halfHeight + 8) continue;
-          rise = Math.max(rise, at.y - top + 4);
+        const width = element.offsetWidth;
+        const height = element.offsetHeight;
+        let dx = 0;
+        let dy = 0;
+        const box = (): Box => ({ left: at.x + dx - width / 2, right: at.x + dx + width / 2, top: at.y + dy - height, bottom: at.y + dy });
+        for (let step = 0; step < 8; step += 1) {
+          const current = box();
+          const hit = obstacles.find((o) => current.left < o.right && o.left < current.right && current.top < o.bottom && o.top < current.bottom);
+          if (!hit) break;
+          const up = hit.top - 4 - at.y;
+          const aside = at.x + dx >= (hit.left + hit.right) / 2 ? hit.right + 4 - (at.x - width / 2) : hit.left - 4 - (at.x + width / 2);
+          if (Math.abs(up - dy) <= Math.abs(aside - dx)) dy = up;
+          else dx = aside;
         }
-        if (marker.getOffset().y !== -rise) marker.setOffset([0, -rise]);
+        obstacles.push(box());
+        const offset = marker.getOffset();
+        if (offset.x !== dx || offset.y !== dy) marker.setOffset([dx, dy]);
       }
     }
 
