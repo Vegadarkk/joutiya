@@ -21,6 +21,7 @@ import { ExampleBanner, ExampleContactNotice } from "@/components/listing/exampl
 import { ListingStatusBanner } from "@/components/listing/listing-status-banner";
 import { ListingCatalogue } from "@/components/listing/listing-catalogue";
 import { ListingPrice } from "@/components/listing/listing-price";
+import { PriceGuideBlock } from "@/components/listing/price-guide";
 import { SafetyTips } from "@/components/listing/safety-tips";
 import { GuideCategoryLink } from "@/components/guide/category-link";
 import { rubricForCategory } from "@/content/guide/catalog";
@@ -36,12 +37,15 @@ import { pageLocale } from "@/i18n/params";
 import { getFlags } from "@/lib/config/runtime";
 import { isolate } from "@/lib/i18n/bidi";
 import { alternates } from "@/lib/i18n/metadata";
-import { isVariantCriterion, priceRange } from "@/lib/contracts/catalog";
+import { isSoldOut, isVariantCriterion, priceRange } from "@/lib/contracts/catalog";
 import { getLegalConfig } from "@/lib/legal/config";
 import { formatDate, formatPrice } from "@/lib/listings/client/format";
 import { photoUrl } from "@/lib/listings/client/photo-url";
 import { listingJsonLd } from "@/lib/listings/jsonld";
 import { getPublishedBySlugId, getSeller, listingPath, toPublicListing, type PublicListing, type PublicSeller } from "@/lib/listings/public";
+import { offerAllowed } from "@/lib/offers/eligibility";
+import { offerReferencePrice } from "@/lib/offers/rules";
+import { priceGuideFor } from "@/lib/price-guide/service";
 import { logger } from "@/lib/logging/logger";
 import type { ListingPaymentLink } from "@/lib/db/schemas";
 import { shopPaymentFor } from "@/lib/pro/seller-payment";
@@ -147,7 +151,16 @@ export default async function ListingPage({ params }: { params: Params }) {
   if (found.redirect) permanentRedirect(listingPath(locale, found.listing.slugId));
 
   const { listing } = found;
-  const [seller, payment, legal, flags, t, names, criteria] = await Promise.all([
+  const variants = listing.catalogue?.variants;
+  const range = variants ? priceRange({ variants, price: listing.price, isDonation: listing.isDonation }) : null;
+  const shownPrice = range ? range.min : listing.price;
+  // « Prix repère » (Carte vivante lot 5): computed with the page (ISR), from the search index and its
+  // 24 h cache; null when the listing gets none. Published, real listings only.
+  const guideOf = () =>
+    listing.state === "published" && !listing.example && shownPrice !== null
+      ? priceGuideFor({ id: listing.id, subcategoryId: listing.subcategoryId, attributes: listing.attributes, price: shownPrice, isDonation: listing.isDonation, citySlug: listing.location.citySlug, regionCode: listing.location.regionCode })
+      : Promise.resolve(null);
+  const [seller, payment, legal, flags, t, names, criteria, guide] = await Promise.all([
     sellerOf(found.ownerUid),
     listing.state === "published" && !listing.example ? shopPaymentFor(found.proId, new Date(), found.paymentLink) : Promise.resolve(null),
     getLegalConfig(),
@@ -155,6 +168,7 @@ export default async function ListingPage({ params }: { params: Params }) {
     getTranslations({ locale, namespace: "ListingPage" }),
     getTranslations({ locale, namespace: "Categories" }),
     getTranslations({ locale, namespace: "Criteria" }),
+    guideOf(),
   ]);
   const media = mediaBaseUrl();
   const category = categoryById(listing.categoryId);
@@ -182,8 +196,23 @@ export default async function ListingPage({ params }: { params: Params }) {
   // Pro catalogue: the lowest price of the combinations, « À partir de » when they differ; a
   // promotion runs on the page's own clock (ISR HTML can be minutes old).
   const renderedAt = new Date().getTime();
-  const variants = listing.catalogue?.variants;
-  const range = variants ? priceRange({ variants, price: listing.price, isDonation: listing.isDonation }) : null;
+  // « Faire une offre » (Carte vivante lot 5): goods with one price, measured against the running
+  // promotion's price when there is one. The API checks again on its own clock.
+  const catalogue = listing.catalogue;
+  const offerPrice = offerReferencePrice({ price: listing.price, promo: catalogue?.promo ?? null }, renderedAt);
+  const offer =
+    contactable &&
+    offerAllowed({
+      subcategoryId: listing.subcategoryId,
+      price: offerPrice,
+      isDonation: listing.isDonation,
+      example: listing.example,
+      soldOut: catalogue ? isSoldOut({ stock: catalogue.stock ?? undefined, variants: catalogue.variants ?? undefined }) : false,
+      severalPrices: range !== null && range.max > range.min,
+    }) &&
+    offerPrice !== null
+      ? { price: offerPrice }
+      : null;
   // The picker's axes named here: the criteria labels stay out of the page's JavaScript.
   type CriteriaKey = Parameters<typeof criteria>[0];
   const criterionText = (key: string, fallback: string) => (criteria.has(key as CriteriaKey) ? criteria(key as CriteriaKey) : fallback);
@@ -246,6 +275,7 @@ export default async function ListingPage({ params }: { params: Params }) {
               promo={published ? (listing.catalogue?.promo ?? null) : null}
               renderedAt={renderedAt}
             />
+            {guide && shownPrice !== null ? <PriceGuideBlock guide={guide} price={shownPrice} locale={locale} className="self-stretch sm:max-w-md" /> : null}
             {listing.catalogue && published ? (
               <ListingCatalogue listingId={listing.id} catalogue={listing.catalogue} axes={pickerAxes} price={listing.price} locale={locale} renderedAt={renderedAt} />
             ) : null}
@@ -290,6 +320,7 @@ export default async function ListingPage({ params }: { params: Params }) {
                     visit={realEstate}
                     testDrive={listing.seller.type === "pro" && VEHICLE_SALE_SUBCATEGORIES.includes(listing.subcategoryId)}
                     rental={listing.subcategoryId === RENTAL_SUBCATEGORY}
+                    offer={offer}
                   />
                 ) : null}
                 {contactable && payment ? <PayAtSeller payment={payment} listingId={listing.id} /> : null}

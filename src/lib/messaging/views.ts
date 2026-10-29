@@ -2,12 +2,13 @@ import "server-only";
 import { cidSchema, messageIdSchema, type ConversationView, type MessageView } from "@/lib/contracts/messaging";
 import { appointmentEventView, appointmentView } from "@/lib/appointments/views";
 import { rentalRequestEventView, rentalRequestView } from "@/lib/rental-requests/views";
+import { offerEventView, offerView } from "@/lib/offers/views";
 import { counterpartOf, type ConversationRecord, type MessageRecord, type PagePosition } from "./repository";
 
 // What a participant sees of a conversation and its messages (design D2): documents mapped to the
 // client contracts, and the opaque page cursors. Never the evidence, never the other side's count.
 
-export function conversationView(conversation: ConversationRecord, uid: string): ConversationView {
+export function conversationView(conversation: ConversationRecord, uid: string, now = Date.now()): ConversationView {
   const buyer = conversation.buyerUid === uid;
   const other = counterpartOf(conversation, uid);
   const { listingSnapshot: listing, lastMessage } = conversation;
@@ -27,6 +28,9 @@ export function conversationView(conversation: ConversationRecord, uid: string):
     counterpartClosed: (conversation.accountClosed ?? []).includes(other),
     appointment: conversation.appointment ? appointmentView(conversation.appointment, uid) : null,
     rentalRequest: conversation.rentalRequest ? rentalRequestView(conversation.rentalRequest, buyer) : null,
+    offer: conversation.offer ? offerView(conversation.offer, buyer, now) : null,
+    // Conversations started before offers existed: a priced listing that is no donation (the server decides).
+    offersAllowed: listing.offers ?? (listing.price !== null && listing.price > 0 && !listing.isDonation),
     updatedAt: conversation.updatedAt.getTime(),
     review: { sellerRepliedAt: conversation.sellerRepliedAt?.getTime() ?? null, reviewedAt: conversation.reviewedAt?.getTime() ?? null },
   };
@@ -43,6 +47,7 @@ export function messageView(message: MessageRecord, uid: string): MessageView {
     hidden: message.hidden === true,
     ...(message.appointment ? { appointment: appointmentEventView(message.appointment, message.senderUid === uid) } : {}),
     ...(message.rentalRequest ? { rentalRequest: rentalRequestEventView(message.rentalRequest, message.senderUid === uid) } : {}),
+    ...(message.offer ? { offer: offerEventView(message.offer, message.senderUid === uid) } : {}),
     createdAt: message.createdAt.getTime(),
     readAt: message.readAt?.getTime() ?? null,
   };

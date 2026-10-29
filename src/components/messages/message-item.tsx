@@ -5,6 +5,7 @@ import { Check, CheckCheck, Clock3, EyeOff, Flag, Link2Off, ShieldAlert } from "
 import { useTranslations } from "next-intl";
 import { AppointmentEventItem } from "@/components/appointments/appointment-event";
 import { RentalRequestEventItem } from "@/components/rental/rental-request-event";
+import { OfferEventItem } from "@/components/offers/offer-event";
 import { Link } from "@/i18n/navigation";
 import { HIDDEN_MARKER, URL_MARKER, type MessageRiskFlag, type MessageView } from "@/lib/contracts/messaging";
 import { cn } from "@/lib/utils";
@@ -104,6 +105,9 @@ export function MessageItem({ message, time, status, sender, onReport }: Message
   }
   if (message.type === "system" && message.rentalRequest) {
     return <RentalRequestEventItem step={message.rentalRequest} counterpartName={sender} time={time} />;
+  }
+  if (message.type === "system" && message.offer) {
+    return <OfferEventItem step={message.offer} counterpartName={sender} time={time} />;
   }
   if (message.type === "system") {
     return (

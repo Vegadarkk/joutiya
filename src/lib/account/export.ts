@@ -110,6 +110,7 @@ function messageOf(message: MessageRecord, uid: string): ExportConversation["mes
     hidden: message.hidden === true,
     createdAt: message.createdAt.toISOString(),
     readAt: iso(message.readAt),
+    ...(message.offer ? { offer: { event: message.offer.event, amount: message.offer.amount } } : {}),
   };
 }
 
@@ -129,6 +130,18 @@ function conversationOf(conversation: ConversationRecord, uid: string, messages:
     updatedAt: conversation.updatedAt.toISOString(),
     messages: [...messages].reverse().map((message) => messageOf(message, uid)),
     messagesTruncated: truncated,
+    ...(conversation.offer
+      ? {
+          offer: {
+            status: conversation.offer.status,
+            amount: conversation.offer.amount,
+            counter: conversation.offer.counter ?? null,
+            price: conversation.offer.price,
+            createdAt: conversation.offer.createdAt.toISOString(),
+            expiresAt: conversation.offer.expiresAt.toISOString(),
+          },
+        }
+      : {}),
   };
 }
 

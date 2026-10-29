@@ -65,6 +65,8 @@ export interface ExportMessage {
   hidden: boolean;
   createdAt: string;
   readAt: string | null;
+  /** A price offer step (Carte vivante lot 5): the marker in `text` names the event, this its amount (DH). */
+  offer?: { event: string; amount: number };
 }
 
 export interface ExportConversation {
@@ -81,6 +83,8 @@ export interface ExportConversation {
   /** Oldest first; the newest ones when the conversation is longer than the limit. */
   messages: ExportMessage[];
   messagesTruncated: boolean;
+  /** The conversation's last price offer (Carte vivante lot 5), amounts in DH. */
+  offer?: { status: string; amount: number; counter: number | null; price: number; createdAt: string; expiresAt: string };
 }
 
 export interface ExportReport {

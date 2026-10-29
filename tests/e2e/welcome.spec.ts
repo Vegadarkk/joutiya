@@ -72,15 +72,20 @@ test.describe("welcome threshold", () => {
     await page.waitForLoadState("networkidle");
     // What Escape starts, read in the same task: one 200 ms crossfade, no swing or push. The key
     // listener is a passive effect that can land after networkidle on a loaded runner: press again
-    // until it answers (a press it missed starts nothing).
+    // until the door opens (a press it missed starts nothing), then never again, since a second
+    // Escape would skip the opening. The animations of the press that opened it are kept.
     await expect
       .poll(() =>
         page.evaluate(() => {
+          const seen = window as unknown as { __opening?: unknown };
+          if (seen.__opening !== undefined) return seen.__opening;
           document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-          return document
+          if (!document.documentElement.getAttribute("data-welcome")?.includes("open")) return null;
+          seen.__opening = document
             .querySelector(".welcome")
             ?.getAnimations({ subtree: true })
             .map((animation) => ({ target: (animation.effect as KeyframeEffect).target?.className, duration: animation.effect?.getTiming().duration }));
+          return seen.__opening;
         }),
       )
       .toEqual([{ target: "welcome", duration: 200 }]);

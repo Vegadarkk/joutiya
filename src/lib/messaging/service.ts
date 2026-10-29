@@ -9,6 +9,7 @@ import type { Claims } from "@/lib/firebase/claims";
 import { HttpError, notFound, unavailable } from "@/lib/http/errors";
 import { PUBLIC_STATES, acceptsContact } from "@/lib/listings/public";
 import { logger } from "@/lib/logging/logger";
+import { listingOfferPrice } from "@/lib/offers/listing";
 import { enforceLimit } from "@/lib/rate-limit/limiter";
 import { publishConversationChange, publishNewMessage, publishRead } from "./events";
 import { conversationId } from "./ids";
@@ -172,7 +173,13 @@ export async function startConversation(actor: MessagingActor, input: { listingI
     sellerPublicId: seller.publicId,
     buyerName: buyer.displayName,
     buyerPublicId: buyer.publicId,
-    listingSnapshot: { title: listing.title, price: listing.price, isDonation: listing.isDonation, photo: photo ? { id: photo.id, blurhash: photo.blurhash } : null },
+    listingSnapshot: {
+      title: listing.title,
+      price: listing.price,
+      isDonation: listing.isDonation,
+      photo: photo ? { id: photo.id, blurhash: photo.blurhash } : null,
+      offers: listingOfferPrice(listing, now) !== null,
+    },
     lastMessage: lastMessageOf(message),
     unread: { [seller.uid]: 1, [actor.uid]: 0 },
     blockedBy: [],
@@ -207,7 +214,7 @@ export async function sendMessage(actor: MessagingActor, cid: string, text: stri
 }
 
 /**
- * An appointment or booking request step (src/lib/appointments, src/lib/rental-requests): a system
+ * An appointment, booking request or price offer step (src/lib/appointments, src/lib/rental-requests, src/lib/offers): a system
  * message whose text and conversation fields `extend` sets inside the append transaction (same
  * access checks as a message), then what follows every message (the other participant's badge,
  * live events, digest mail).

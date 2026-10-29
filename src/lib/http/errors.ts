@@ -147,6 +147,14 @@ export type ErrorCode =
   | "rental_request_past"
   /** A booking request about a listing that is no published car rental (409). */
   | "rental_request_unavailable"
+  /** The price offer changed since the caller saw it (answered, withdrawn, replaced; 409). */
+  | "offer_changed"
+  /** The offer or counter-offer waited 48 h without an answer (409). */
+  | "offer_expired"
+  /** The buyer already has an offer waiting for an answer on this listing (409). */
+  | "offer_pending"
+  /** The listing takes no offer: donation, no price, rental, service, example, sold out (409). */
+  | "offer_unavailable"
   /** Reporter abusive (art. 23) or target not reportable by this account (403). */
   | "report_not_allowed"
   /** The reported target does not exist or is not visible to the reporter (404 semantics, 422). */

@@ -12,6 +12,7 @@ import { Link } from "@/i18n/navigation";
 import { appointmentEventOf, type AppointmentEvent } from "@/lib/contracts/appointments";
 import { HIDDEN_MARKER, URL_MARKER, type ConversationView } from "@/lib/contracts/messaging";
 import { rentalRequestEventOf, type RentalRequestEvent } from "@/lib/contracts/rental-requests";
+import { offerEventOf, type OfferEvent } from "@/lib/offers/rules";
 import { cn } from "@/lib/utils";
 import { formatRowTime } from "./format";
 import { shouldLoadMore } from "./inbox-state";
@@ -26,13 +27,21 @@ import { useMessages } from "./messages-provider";
 /** The last message as one line: moderation and masked links in words ("Vous :" is set apart). */
 export function previewText(
   row: Pick<ConversationView, "lastMessage">,
-  labels: { hidden: string; maskedLink: string; appointment?: (event: AppointmentEvent) => string; rentalRequest?: (event: RentalRequestEvent) => string },
+  labels: {
+    hidden: string;
+    maskedLink: string;
+    appointment?: (event: AppointmentEvent) => string;
+    rentalRequest?: (event: RentalRequestEvent) => string;
+    offer?: (event: OfferEvent) => string;
+  },
 ): string {
   const { preview } = row.lastMessage;
   const step = appointmentEventOf(preview);
   if (step && labels.appointment) return labels.appointment(step);
   const rental = rentalRequestEventOf(preview);
   if (rental && labels.rentalRequest) return labels.rentalRequest(rental);
+  const offer = offerEventOf(preview);
+  if (offer && labels.offer) return labels.offer(offer);
   return preview === HIDDEN_MARKER ? labels.hidden : preview.split(URL_MARKER).join(labels.maskedLink).replace(/\s+/g, " ").trim();
 }
 
@@ -48,7 +57,14 @@ function ConversationRow({ row, selected, archived, now }: { row: ConversationVi
   const unread = row.unread > 0;
   const appointment = useTranslations("Appointments.preview");
   const rentalRequest = useTranslations("RentalRequest.preview");
-  const preview = previewText(row, { hidden: t("hidden"), maskedLink: t("maskedLink"), appointment: (event) => appointment(event), rentalRequest: (event) => rentalRequest(event) });
+  const offer = useTranslations("Offers.preview");
+  const preview = previewText(row, {
+    hidden: t("hidden"),
+    maskedLink: t("maskedLink"),
+    appointment: (event) => appointment(event),
+    rentalRequest: (event) => rentalRequest(event),
+    offer: (event) => offer(event),
+  });
   return (
     <li>
       <Link
