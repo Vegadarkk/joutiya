@@ -2852,7 +2852,8 @@
           "later": "plus tard",
           "quota_exhausted": "La messagerie est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc).",
           "adult_confirmation_required": "Cet article est réservé aux personnes majeures : confirmez avoir 18 ans ou plus pour écrire au vendeur.",
-          "rental_request_unavailable": "Cette annonce ne prend plus de demande de location."
+          "rental_request_unavailable": "Cette annonce ne prend plus de demande de location.",
+          "place_payment_details": "Le lieu ne peut contenir ni coordonnées bancaires ni conditions de paiement. Indiquez seulement le lieu ; le reste se discute dans la conversation."
         },
         "adultConfirm": "Je confirme avoir 18 ans ou plus.",
         "adultMissing": "Confirmez avoir 18 ans ou plus pour écrire au vendeur.",
@@ -3943,6 +3944,7 @@
     },
     "event": {
       "when": "{day} à {time}",
+      "place": "lieu : {place}",
       "proposed": {
         "mine": "Vous avez proposé {kind}",
         "theirs": "{name} propose {kind}"
@@ -3980,7 +3982,8 @@
     },
     "errors": {
       "appointment_changed": "Ce rendez-vous a changé entre-temps : voici sa dernière version.",
-      "appointment_slot_past": "Ce créneau est déjà passé. Choisissez-en un autre ou proposez d'autres créneaux."
+      "appointment_slot_past": "Ce créneau est déjà passé. Choisissez-en un autre ou proposez d'autres créneaux.",
+      "place_payment_details": "Le lieu ne peut contenir ni coordonnées bancaires ni conditions de paiement. Indiquez seulement le lieu ; le reste se discute dans la conversation."
     }
   },
   "PriceGuide": {
@@ -5269,7 +5272,8 @@
     "errors": {
       "rental_request_changed": "Cette demande a changé entre-temps : voici sa dernière version.",
       "rental_request_past": "Le jour de prise en charge est passé : le locataire doit demander d'autres dates.",
-      "rental_request_unavailable": "Cette annonce ne prend plus de demande de location."
+      "rental_request_unavailable": "Cette annonce ne prend plus de demande de location.",
+      "place_payment_details": "Le lieu ne peut contenir ni coordonnées bancaires ni conditions de paiement. Indiquez seulement le lieu ; le reste se discute dans la conversation."
     }
   },
   "SearchInterpret": {

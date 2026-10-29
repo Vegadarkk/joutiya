@@ -250,7 +250,7 @@ describe("components", () => {
   });
 
   it("renders each thread step in French and Arabic", () => {
-    const step = (patch: Partial<Parameters<typeof AppointmentEventItem>[0]["step"]>) => ({ event: "proposed" as const, kind: "test_drive" as const, byMe: false, slot: null, reason: null, ...patch });
+    const step = (patch: Partial<Parameters<typeof AppointmentEventItem>[0]["step"]>) => ({ event: "proposed" as const, kind: "test_drive" as const, byMe: false, slot: null, reason: null, place: null, ...patch });
     expect(render(<AppointmentEventItem step={step({})} counterpartName="Karim" time="10:00" />)).toContain("\u2068Karim\u2069 propose un essai");
     expect(render(<AppointmentEventItem step={step({ event: "confirmed", byMe: true, slot: { start: moroccoTime("2026-11-05", 14 * 60 + 30), minutes: 30 } })} counterpartName="Karim" time="10:00" />)).toContain(
       "Vous avez confirmé un essai : jeudi 5 novembre à 14:30",

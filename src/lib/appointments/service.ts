@@ -4,7 +4,7 @@ import { appointmentMarker, type AppointmentAction, type AppointmentEvent, type 
 import { appointmentSchema, type AppointmentDoc, type AppointmentEventDoc, type StoredSlot } from "@/lib/db/schemas";
 import { HttpError } from "@/lib/http/errors";
 import { appendSystemStep, type MessagingActor } from "@/lib/messaging/service";
-import { maskLinks } from "@/lib/messaging/risk";
+import { screenPlace } from "@/lib/messaging/place";
 import { isActive, nextReminderAt, slotsProblem, sortSlots } from "./rules";
 import { appointmentView } from "./views";
 
@@ -43,7 +43,7 @@ export function nextStep(current: AppointmentDoc | undefined, action: Appointmen
     const slots = sortSlots(action.slots);
     const problem = slotsProblem(action.slots, at);
     if (problem) invalidSlot(...problem);
-    const place = action.place ? maskLinks(action.place).text : undefined;
+    const place = action.place ? screenPlace(action.place) : undefined;
     const rescheduled = current !== undefined && isActive(viewOf(current), at);
     const appointment = appointmentSchema.parse({
       id: newAppointmentId(),
@@ -105,6 +105,8 @@ export async function actOnAppointment(actor: MessagingActor, cid: string, actio
         event: step.event,
         kind: step.appointment.kind,
         ...(step.slot ? { slot: step.slot } : {}),
+        // The proposer's own words travel with the proposal only: that message is the one a member reports (A-02).
+        ...(step.appointment.place && (step.event === "proposed" || step.event === "rescheduled") ? { place: step.appointment.place } : {}),
         ...(step.appointment.reason && step.event === "cancelled" ? { reason: step.appointment.reason } : {}),
       };
       return {

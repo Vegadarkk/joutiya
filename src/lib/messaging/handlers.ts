@@ -27,6 +27,7 @@ import { assertOfferListing } from "@/lib/offers/listing";
 import { actOnOffer, makeAction } from "@/lib/offers/service";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 import { conversationId } from "./ids";
+import { screenPlace } from "./place";
 import { MESSAGING_READ_QUOTAS, conversationRow, inboxPage, threadPage, type Charged } from "./reads";
 import { MESSAGING_QUOTAS, changeConversationState, readConversation, sendMessage, startConversation, unreadBadge, type MessagingActor } from "./service";
 import { markSeen } from "./unread";
@@ -129,6 +130,8 @@ export async function handleStart(request: Request): Promise<Response> {
   if (rental) {
     const problem = rentalRequestProblem(rental, moroccoToday(now));
     if (problem) throw new HttpError(400, "invalid_body", undefined, { details: [{ path: "rentalRequest.from", code: problem }] });
+    // Refused before the message is sent: the conversation never starts half way (A-02).
+    if (rental.pickup) screenPlace(rental.pickup);
     assertLimit("rental.request.uid", await consumeLimit("rental.request.uid", auth.user.uid));
   }
   if (offer) {

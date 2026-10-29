@@ -8,6 +8,7 @@ import { getUserRecord } from "@/lib/db/repositories/profiles";
 import { logger } from "@/lib/logging/logger";
 import { openImage } from "@/lib/media/sharp-setup";
 import { mediaObjectKey } from "@/lib/media/urls";
+import { staffMemberText, staffPlaceLabel } from "@/lib/messaging/member-text";
 import { containsProhibited } from "@/lib/moderation/prohibited";
 import { consume } from "@/lib/quota";
 import { getReport, type ReportRecord } from "@/lib/reports/repository";
@@ -124,9 +125,12 @@ async function reportedMessage(id: string): Promise<{ text: string; names: strin
   if (!ids) return null;
   const [conversation, message, evidence] = await Promise.all([readConversationFacts(ids.cid), messageRef(ids.cid, ids.mid).get(), evidenceRef(ids.cid, ids.mid).get()]);
   void consume("firestore.reads", 2);
-  const stored: unknown = message.get("text");
+  const data = message.data() ?? {};
+  const stored = staffMemberText(data);
   const original: unknown = evidence.exists ? evidence.get("text") : undefined;
-  const text = typeof original === "string" ? original : typeof stored === "string" && stored !== HIDDEN_MARKER ? stored : null;
+  // A system step's place reads with what it is (A-02), its original too once hidden.
+  const label = staffPlaceLabel(data);
+  const text = typeof original === "string" ? (label ? `${label} : ${original}` : original) : stored !== null && stored !== HIDDEN_MARKER ? stored : null;
   if (text === null) return null;
   const names: string[] = [];
   if (conversation) {

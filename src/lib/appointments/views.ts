@@ -21,5 +21,5 @@ export function appointmentView(appointment: AppointmentDoc, uid: string): Appoi
 }
 
 export function appointmentEventView(step: AppointmentEventDoc, byMe: boolean): AppointmentEventView {
-  return { event: step.event, kind: step.kind, byMe, slot: step.slot ? slotView(step.slot) : null, reason: step.reason ?? null };
+  return { event: step.event, kind: step.kind, byMe, slot: step.slot ? slotView(step.slot) : null, reason: step.reason ?? null, place: step.place ?? null };
 }

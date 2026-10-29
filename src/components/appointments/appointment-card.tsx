@@ -9,7 +9,6 @@ import { InlineError } from "@/components/feedback/inline-error";
 import { Button } from "@/components/ui/button";
 import { SITE_NAME, type Locale } from "@/config/site";
 import { APPOINTMENT_CANCEL_REASONS, type AppointmentAction, type AppointmentCancelReason, type AppointmentKind, type AppointmentResponse, type AppointmentView, type Slot } from "@/lib/contracts/appointments";
-import { URL_MARKER } from "@/lib/contracts/messaging";
 import { postAppointmentAction } from "@/lib/appointments/client";
 import { appointmentIcs, downloadIcs } from "@/lib/appointments/ics";
 import { isActive } from "@/lib/appointments/rules";
@@ -17,7 +16,7 @@ import { moroccoClock } from "@/lib/appointments/time";
 import { isolate } from "@/lib/i18n/bidi";
 import { cn } from "@/lib/utils";
 import { useAppointmentErrorMessage } from "./errors";
-import { dayTile, formatSlotDay, formatSlotRange } from "./format";
+import { dayTile, formatSlotDay, formatSlotRange, placeText } from "./format";
 
 // The conversation's current appointment, pinned under the thread header while it is active
 // (architecture §5, 28 Oct). For the one who answers: the proposed slots to pick from, confirm or
@@ -49,8 +48,6 @@ export function DateDoor({ slot, locale, className }: { slot: Slot; locale: Loca
 export const cancelReasonsFor = (role: "buyer" | "seller"): AppointmentCancelReason[] =>
   APPOINTMENT_CANCEL_REASONS.filter((reason) => reason !== "sold" || role === "seller");
 
-/** The place with its masked links shown as such. */
-export const placeText = (place: string, masked: string) => place.split(URL_MARKER).join(masked);
 
 export interface AppointmentCardProps {
   cid: string;

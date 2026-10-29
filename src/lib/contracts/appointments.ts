@@ -109,6 +109,8 @@ export interface AppointmentEventView {
   /** The confirmed or cancelled slot, the slot a reminder is about. */
   slot: Slot | null;
   reason: AppointmentCancelReason | null;
+  /** The proposer's place, on a proposal or a rescheduling (URL_MARKER for masked links). */
+  place: string | null;
 }
 
 /** POST /api/conversations/{cid}/appointment -> 201. */

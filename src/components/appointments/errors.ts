@@ -5,10 +5,10 @@ import { useTranslations } from "next-intl";
 import { useMessagingErrorMessage } from "@/components/messages/errors";
 import { ApiError } from "@/lib/auth/client";
 
-// Refusals of the appointment route: its own two codes, then the messaging wording (blocked,
+// Refusals of the appointment route: its own codes (a place with payment details, A-02), then the messaging wording (blocked,
 // frozen, rate limited, quota...).
 
-const APPOINTMENT_ERROR_KEYS = ["appointment_changed", "appointment_slot_past"] as const;
+const APPOINTMENT_ERROR_KEYS = ["appointment_changed", "appointment_slot_past", "place_payment_details"] as const;
 
 export function useAppointmentErrorMessage(): (error: unknown) => string {
   const t = useTranslations("Appointments.errors");

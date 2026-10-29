@@ -9,6 +9,7 @@ import { timestampsToDates } from "@/lib/db/repositories/timestamps";
 import { aiDecisionSchema, COLLECTIONS, HIDE_SIGNALS, messageEvidenceSchema, moderationDecisionSchema, type AiDecisionDoc, type HideSignal } from "@/lib/db/schemas";
 import { db } from "@/lib/firebase/admin";
 import { HttpError } from "@/lib/http/errors";
+import { staffMemberText, staffPlaceLabel } from "@/lib/messaging/member-text";
 import { consume } from "@/lib/quota";
 import type { RequestIdentity } from "@/lib/rate-limit/keys";
 import { getReview } from "@/lib/reviews/repository";
@@ -360,6 +361,17 @@ async function ownerSummary(uid: string): Promise<OwnerSummary | null> {
 
 const isSignal = (value: unknown): value is HideSignal => typeof value === "string" && (HIDE_SIGNALS as readonly string[]).includes(value);
 
+/** What staff read as the message: its text, a system step's place with what it is (A-02), or the hidden place's label. */
+function messageText(data: Record<string, unknown>): string {
+  const member = staffMemberText(data);
+  if (member !== null) return member;
+  if (data.hidden === true) {
+    const label = staffPlaceLabel(data);
+    if (label) return `${label} : (masqué par la modération)`;
+  }
+  return typeof data.text === "string" ? data.text : "";
+}
+
 /** Who reads the view (the message snapshot's audit entry): an API staff context or a page's staff session. */
 export type TargetViewReader = { user: Pick<StaffContext["user"], "uid">; role: StaffContext["role"] };
 
@@ -388,7 +400,7 @@ async function messageSnapshot(id: string, staff: TargetViewReader, identity: Re
     cid: ids.cid,
     mid: ids.mid,
     listingId: conversation?.listingId ?? null,
-    text: typeof message.get("text") === "string" ? (message.get("text") as string) : "",
+    text: messageText(message.data() ?? {}),
     original: evidenceDoc?.success ? evidenceDoc.data.text : null,
     hidden: message.get("hidden") === true,
     createdAt: createdAt && typeof (createdAt as { toDate?: unknown }).toDate === "function" ? (createdAt as { toDate(): Date }).toDate().toISOString() : null,

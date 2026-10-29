@@ -25,6 +25,7 @@ import { IllegalTransitionError, transition, type Lifetime } from "@/lib/listing
 import { revalidateListingPaths } from "@/lib/listings/revalidate";
 import { logger } from "@/lib/logging/logger";
 import { hideMessage, publishRevoked, unhideMessage } from "@/lib/messaging";
+import { memberTextOf } from "@/lib/messaging/member-text";
 import { consume } from "@/lib/quota";
 import { adsEligibleOf, closeReportsTx, openReportsForTarget, recordReporterOutcomes, targetKey, unhideTarget, type TargetRef } from "@/lib/reports";
 import { splitMessageId } from "@/lib/reports/target-key";
@@ -192,7 +193,9 @@ async function readSubject(target: DecisionTarget): Promise<Subject> {
       const snapshot = await messageRef(ids.cid, ids.mid).get();
       void consume("firestore.reads", 1);
       const sender: unknown = snapshot.get("senderUid");
-      if (!snapshot.exists || typeof sender !== "string" || snapshot.get("type") === "system") throw notFound();
+      // A system step is decidable when it carries its sender's place (A-02), or once hidden (to restore it).
+      const system = snapshot.get("type") === "system";
+      if (!snapshot.exists || typeof sender !== "string" || (system && snapshot.get("hidden") !== true && memberTextOf(snapshot.data() ?? {}) === null)) throw notFound();
       return { ownerUid: sender, title: null, message: ids, review: null };
     }
     case "user":

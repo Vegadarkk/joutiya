@@ -14,6 +14,7 @@ import {
 import { datesToTimestamps, timestampsToDates } from "@/lib/db/repositories/timestamps";
 import { db } from "@/lib/firebase/admin";
 import { consume } from "@/lib/quota";
+import { memberTextOf, type MemberTextField } from "./member-text";
 import { maskLinks, messagePreview } from "./risk";
 
 // conversations/{cid}, their messages and evidence, userBlocks/{uid} (design D4-D7, D18). The
@@ -582,24 +583,42 @@ function isLastMessage(conversation: ConversationRecord, message: MessageRecord)
 }
 
 /**
+ * The conversation's current step that shows the same place as a system message (the card, the
+ * reminder mail): the place is removed or restored there too (audit A-02).
+ */
+function currentStepPlace(conversation: ConversationRecord | null, message: MessageRecord, field: Exclude<MemberTextField, "text">): boolean {
+  if (!conversation) return false;
+  if (field === "appointment.place") return conversation.appointment?.id !== undefined && conversation.appointment.id === message.appointment?.id;
+  return conversation.rentalRequest?.id !== undefined && conversation.rentalRequest.id === message.rentalRequest?.id;
+}
+
+/**
  * Hides a message (D11, D13): text replaced by HIDDEN_MARKER, original kept in evidence (an
- * existing "masked" evidence already holds it). Returns the participants (the live event goes to
- * them), or null when the message is missing or already hidden.
+ * existing "masked" evidence already holds it). A system step hides its member text instead (the
+ * place of an appointment proposal or of a booking request, A-02): removed from the message and
+ * from the conversation's current step when it is that step. Returns the participants (the live
+ * event goes to them), or null when the message is missing, already hidden or has no member text.
  */
 export async function hideMessageDoc(cid: string, mid: string, now: Date): Promise<readonly string[] | null> {
   const changed = await db().runTransaction(async (tx) => {
     const [messageSnap, evidenceSnap, conversationSnap] = await Promise.all([tx.get(messagesRef(cid).doc(mid)), tx.get(evidenceRef(cid, mid)), tx.get(conversationRef(cid))]);
     const message = messageFromSnapshot(messageSnap);
-    if (!message || message.hidden) return null;
+    const member = message ? memberTextOf(message) : null;
+    if (!message || message.hidden || !member) return null;
     const evidence = evidenceFromSnapshot(evidenceSnap);
     if (evidence) tx.update(evidenceRef(cid, mid), { reason: "hidden" });
     else {
-      const original = messageEvidenceSchema.parse({ text: message.text.slice(0, 2000), flags: message.risk?.flags ?? [], reason: "hidden", createdAt: now });
+      const original = messageEvidenceSchema.parse({ text: member.text.slice(0, 2000), flags: message.risk?.flags ?? [], reason: "hidden", createdAt: now });
       tx.set(evidenceRef(cid, mid), toFirestore(original));
     }
-    tx.update(messagesRef(cid).doc(mid), { text: HIDDEN_MARKER, hidden: true });
     const conversation = conversationFromSnapshot(conversationSnap);
-    if (conversation && isLastMessage(conversation, message)) tx.update(conversationRef(cid), { "lastMessage.preview": HIDDEN_MARKER });
+    if (member.field === "text") {
+      tx.update(messagesRef(cid).doc(mid), { text: HIDDEN_MARKER, hidden: true });
+      if (conversation && isLastMessage(conversation, message)) tx.update(conversationRef(cid), { "lastMessage.preview": HIDDEN_MARKER });
+    } else {
+      tx.update(messagesRef(cid).doc(mid), { [member.field]: FieldValue.delete(), hidden: true });
+      if (currentStepPlace(conversation, message, member.field)) tx.update(conversationRef(cid), { [member.field]: FieldValue.delete() });
+    }
     return message.participants;
   });
   void consume("firestore.reads", 3);
@@ -609,8 +628,9 @@ export async function hideMessageDoc(cid: string, mid: string, now: Date): Promi
 
 /**
  * Restores a hidden message from its evidence (links masked again; the evidence stays as "masked"
- * when there were links, else it is deleted). Returns the participants, or null when the message
- * is missing, not hidden, or has no evidence to restore from.
+ * when there were links, else it is deleted). A system step gets its place back, and so does the
+ * conversation's current step when it is that step and shows no place. Returns the participants,
+ * or null when the message is missing, not hidden, or has no evidence to restore from.
  */
 export async function unhideMessageDoc(cid: string, mid: string): Promise<readonly string[] | null> {
   const changed = await db().runTransaction(async (tx) => {
@@ -618,12 +638,19 @@ export async function unhideMessageDoc(cid: string, mid: string): Promise<readon
     const message = messageFromSnapshot(messageSnap);
     const evidence = evidenceFromSnapshot(evidenceSnap);
     if (!message?.hidden || !evidence) return null;
+    const field: MemberTextField | null = message.type === "text" ? "text" : message.appointment ? "appointment.place" : message.rentalRequest ? "rentalRequest.pickup" : null;
+    if (!field) return null;
     const restored = maskLinks(evidence.text);
-    tx.update(messagesRef(cid).doc(mid), { text: restored.text, hidden: FieldValue.delete() });
+    tx.update(messagesRef(cid).doc(mid), { [field]: restored.text, hidden: FieldValue.delete() });
     if (restored.count > 0) tx.update(evidenceRef(cid, mid), { reason: "masked" });
     else tx.delete(evidenceRef(cid, mid));
     const conversation = conversationFromSnapshot(conversationSnap);
-    if (conversation && isLastMessage(conversation, message)) tx.update(conversationRef(cid), { "lastMessage.preview": messagePreview(restored.text) });
+    if (field === "text") {
+      if (conversation && isLastMessage(conversation, message)) tx.update(conversationRef(cid), { "lastMessage.preview": messagePreview(restored.text) });
+    } else if (currentStepPlace(conversation, message, field)) {
+      const shown = field === "appointment.place" ? conversation?.appointment?.place : conversation?.rentalRequest?.pickup;
+      if (!shown) tx.update(conversationRef(cid), { [field]: restored.text });
+    }
     return message.participants;
   });
   void consume("firestore.reads", 3);
