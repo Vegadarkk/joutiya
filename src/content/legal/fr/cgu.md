@@ -168,6 +168,8 @@ Avant votre première annonce en tant que professionnel, {brand} vérifie votre 
 
 Un modérateur contrôle le format de l'ICE puis son existence dans un registre public ou une base d'entreprises. Tant que la vérification n'est pas validée, votre compte reste un compte de particulier et ne publie pas en tant que Pro.
 
+**Vos engagements.** Pour demander le statut Pro, pour passer en agence immobilière ou en agence de location de voitures, et pour acheter un Pass Boutique, vous acceptez une liste d'engagements propres à votre activité, sous votre seule responsabilité ; {brand} enregistre la version acceptée et sa date. Une fausse déclaration, ou l'usage du nom, de l'ICE ou des documents d'une autre entreprise, entraîne le refus de la demande ou la suspension du compte Pro, et le retrait de ses annonces (§11). Elle peut aussi constituer une infraction pénale (faux, escroquerie) : {brand} conserve les éléments de la demande pendant la durée prévue par la politique de confidentialité et les transmet aux autorités qui les demandent légalement (§9.5).
+
 Un refus est motivé (§10). Vous pouvez le contester (§12) ou déposer une nouvelle demande.
 
 Les copies de vos pièces sont gardées dans un espace privé, accessible seulement au personnel habilité, et supprimées 6 mois après la fin de votre activité Pro sur {brand}. Signalez-nous sans délai tout changement : nom, ICE, cessation d'activité.
@@ -187,6 +189,12 @@ Avant la fin ou toute modification de cette offre, {brand} vous prévient au moi
 Les modérateurs et administrateurs de {brand} utilisent des comptes séparés, sur un espace réservé et protégé par une double authentification. Ils ne publient pas d'annonces et n'écrivent pas dans les conversations entre utilisateurs.
 
 {brand} vous contacte par e-mail ou par une notification dans votre espace. Un message qui prétend venir de {brand} et vous demande un paiement, un mot de passe ou un code est une tentative d'arnaque : signalez-le.
+
+### 4.7 Boutique Pro et liens externes {#roles-7}
+
+La boutique d'un professionnel (nom, présentation, bannière, rayons, horaires, liens) est rédigée par lui, sous sa seule responsabilité, et suit les mêmes règles que les annonces (§6 et §7).
+
+Un professionnel peut y afficher des liens vers ses comptes sur une liste fermée de réseaux sociaux (Instagram, TikTok, Facebook, YouTube, X, LinkedIn, Snapchat) et le lien court de son compte WhatsApp Business. Ces liens figurent seulement sur sa boutique, jamais dans ses annonces, et mènent à des sites que {brand} ne contrôle pas : {brand} ne répond ni de leur contenu ni de ce qui s'y conclut. Un lien trompeur, qui ne mène pas au compte du professionnel, ou qui sert à contourner les règles (coordonnées interdites, paiement en dehors du bouton prévu au §15.2, contenu interdit) peut être signalé. Un modérateur peut alors masquer les liens de la boutique ; le motif est envoyé au professionnel (§10), qui peut contester la mesure (§12).
 
 ## 5. Règles d'utilisation du service {#utilisation}
 
@@ -602,7 +610,7 @@ Expliquez pourquoi la décision vous paraît injustifiée et joignez tout élém
 
 ### 12.2 Examen de la réclamation {#recours-2}
 
-- Votre réclamation est examinée par un autre modérateur que celui qui a pris la décision. L'agent de modération peut l'aider à préparer l'examen, mais la réponse est toujours décidée par une personne.
+- Votre réclamation est réexaminée sur l'ensemble du dossier par un autre modérateur que celui qui a pris la décision, ou par un administrateur de {brand}, qui peut être la personne qui a pris la décision. Chaque examen est enregistré avec son auteur, sa date et ses motifs. L'agent de modération peut aider à préparer l'examen, mais la réponse est toujours décidée par une personne.
 - {brand} vous répond en moins de 14 jours, avec ses motifs.
 - Si la réclamation est fondée, la décision est annulée sans délai : le contenu ou le compte est rétabli.
 
@@ -878,12 +886,12 @@ Si {brand} arrête définitivement le service, elle vous prévient au moins 30 j
 
 ### 22.1 Préavis de 30 jours {#modification-1}
 
-{brand} peut modifier les CGU, notamment pour suivre l'évolution de la loi ou du service. Toute modification vous est notifiée au moins 30 jours avant son entrée en vigueur :
+{brand} peut modifier les CGU, notamment pour suivre l'évolution de la loi ou du service. Toute modification vous est annoncée au moins 30 jours avant son entrée en vigueur :
 
-- par un message dans votre espace, affiché jusqu'à ce que vous en ayez pris connaissance ;
-- et par e-mail.
+- par un message dans votre espace, affiché dès l'annonce et jusqu'à ce que vous en ayez pris connaissance ;
+- et par e-mail, envoyé par lots quotidiens à partir de l'annonce.
 
-La notification résume les changements et donne un lien vers la nouvelle version.
+Le message et l'e-mail résument les changements et donnent un lien vers la nouvelle version. Si ni l'un ni l'autre ne vous a atteint 30 jours avant l'entrée en vigueur, la nouvelle version ne s'applique à vous que 30 jours après l'envoi de l'e-mail ou l'affichage du message, à la première de ces deux dates.
 
 ### 22.2 Exceptions {#modification-2}
 

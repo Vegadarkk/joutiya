@@ -69,7 +69,7 @@ Quand {brand} retire, masque ou fait descendre un contenu, suspend ou ferme un c
 
 ### 4.2 Contester une décision {#dsa-2}
 
-La réclamation interne est gratuite et ouverte pendant 6 mois. Elle est examinée par un autre modérateur, et {brand} vous répond en moins de 14 jours. L'auteur d'un signalement peut aussi contester la décision prise. Vous pouvez en outre saisir un organisme de règlement extrajudiciaire ou le tribunal compétent. Voir les [CGU](/legal/cgu#recours).
+La réclamation interne est gratuite et ouverte pendant 6 mois. Elle est réexaminée par un autre modérateur que celui qui a décidé, ou par un administrateur de {brand}, qui peut être la personne qui a pris la décision, et chaque examen est enregistré ; {brand} vous répond en moins de 14 jours. L'auteur d'un signalement peut aussi contester la décision prise. Vous pouvez en outre saisir un organisme de règlement extrajudiciaire ou le tribunal compétent. Voir les [CGU](/legal/cgu#recours).
 
 ### 4.3 Signaler un contenu et connaître la suite {#dsa-3}
 

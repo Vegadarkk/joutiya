@@ -10,7 +10,9 @@ vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(),
 vi.mock("@/lib/firebase/admin", () => ({ isFirestoreConfigured: () => true, isFirebaseConfigured: () => true, db: vi.fn() }));
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn(async () => undefined) }));
 const degraded = { value: false };
-vi.mock("@/lib/quota", () => ({ isDegraded: vi.fn(async () => degraded.value), consume: vi.fn() }));
+/** Resend headroom under the job's share (null: counter unreadable, the cap applies). */
+const room = { value: null as number | null };
+vi.mock("@/lib/quota", () => ({ isDegraded: vi.fn(async () => degraded.value), headroom: vi.fn(async () => room.value), consume: vi.fn() }));
 vi.mock("@/lib/db/repositories/profiles", () => ({ listUserRecordsAfter: vi.fn() }));
 vi.mock("@/lib/db/repositories/users", () => ({ getUserPrivate: vi.fn(), readCguNoticeCursor: vi.fn(), writeCguNoticeCursor: vi.fn(async () => undefined) }));
 
@@ -32,6 +34,7 @@ let pages: UserRecord[][];
 
 beforeEach(() => {
   degraded.value = false;
+  room.value = null;
   accepted = {};
   pages = [];
   vi.mocked(sendMail).mockReset();
@@ -100,6 +103,14 @@ describe("cgu-notice job", () => {
     const second = await sendCguNotices();
     expect(second).toMatchObject({ mails: 5, complete: true });
     expect(vi.mocked(sendMail).mock.calls.map(([mail]) => mail.to)).toEqual(many.map((entry) => `${entry.uid}@example.com`));
+  });
+
+  it("sends no more than the Resend headroom left by the other mails", async () => {
+    room.value = 2;
+    pages = [[user("a"), user("b"), user("c")]];
+    accepted = { a: "0.9", b: "0.9", c: "0.9" };
+    expect(await sendCguNotices()).toMatchObject({ mails: 2, stopped: "cap", complete: false });
+    expect(users.writeCguNoticeCursor).toHaveBeenLastCalledWith({ version: CURRENT, lastUid: "b", done: false }, expect.any(Date));
   });
 
   it("sends nothing while a Resend quota is degraded, and keeps its place", async () => {

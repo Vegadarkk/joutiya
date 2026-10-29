@@ -7,7 +7,13 @@ en production sans tag. Pousser un tag et promouvoir la production attendent ton
 ## Étapes
 
 1. **Version** : `package.json` porte le numéro de la version (`1.0.0` pour le lancement). Un
-   changement de numéro passe par une PR, comme le reste.
+   changement de numéro passe par une PR, comme le reste. Pour le lancement, la même PR remet les
+   textes légaux à zéro (spec §10) : dans `src/config/legal-versions.ts`, chaque page (sauf les CGV
+   provisoires) en version `1.0`, en vigueur le jour de l'ouverture, sans `replaces` ni résumé, et
+   `LEGAL_TEXTS_FROZEN = true` ; puis `node scripts/legal-hash.ts --apply` enregistre les empreintes
+   des textes. Ensuite, tout changement d'un texte demande une nouvelle version (CGU §22 : annonce
+   `announced`, résumé FR/AR, 30 jours de préavis), ou `--form-only` pour une simple correction de
+   forme.
 2. **Staging** : le commit à publier tourne en staging (*Deploy staging* vert, contrôle « Release
    images » présent sur le commit) et a été vérifié dans le staging.
 3. **Tag** (après ton feu vert) :
@@ -39,14 +45,19 @@ en production sans tag. Pousser un tag et promouvoir la production attendent ton
    - la page d'accueil applique sa CSP (pas en `report-only`) et HSTS ;
    - note A ou A+ à l'HTTP Observatory de MDN (un balayage public, au plus un par minute) ;
    - répétition B de la restauration notée dans `docs/backups.md`, test de charge
-     (`docs/lancement/charge.md`) et audit de sécurité (`docs/lancement/audit-securite.md`) présents.
+     (`docs/lancement/charge.md`) et audit de sécurité (`docs/lancement/audit-securite.md`) présents ;
+   - textes légaux remis à zéro : versions `1.0` en vigueur le jour de l'ouverture (aujourd'hui, ou
+     `--opening=AAAA-MM-JJ`), textes figés et empreintes à jour.
 
    Il liste ensuite ce qu'aucune adresse publique ne montre, à confirmer à la main : application
    OAuth de production publiée dans Google Auth Platform, `salesEnabled=false` et offre de lancement
    Pro au back-office, aucune alerte « Sauvegarde Firestore trop ancienne », seuils anti-abus et
    listes de modération changés, tarifit relu par un locuteur natif, annonces exemple posées en
    production seulement sur feu vert du propriétaire (`docs/staging-demo.md`), règles Firestore de production déployées, dépôt
-   repassé en privé le jour de l'ouverture.
+   repassé en privé le jour de l'ouverture, contournement du test de charge retiré
+   (`docs/lancement/charge-procedure.md` : règle Cloudflare `loadtest` désactivée et `zone --check`
+   propre, `LOADTEST_BYPASS_SECRET` retiré de l'`app.env` du staging, secret GitHub
+   `LOADTEST_BYPASS_SECRET` supprimé et variable `LOAD_TEST_ENABLED` retirée).
 6. **Ouverture** : quand tout est vert et coché.
 
 ## Écarts avec le design

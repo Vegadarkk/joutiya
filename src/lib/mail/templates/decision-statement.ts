@@ -43,7 +43,7 @@ const COPY: Record<
       human: "Cette décision a été prise par un modérateur de Joutiya.",
     },
     redress: (deadline) =>
-      `Vous pouvez contester cette décision gratuitement, en ligne, jusqu'au ${deadline}, avec le bouton ci-dessous. Une autre personne que celle qui a décidé la réexaminera et vous répondra sous 14 jours. Vous pouvez aussi saisir le tribunal compétent.`,
+      `Vous pouvez contester cette décision gratuitement, en ligne, jusqu'au ${deadline}, avec le bouton ci-dessous. Un autre modérateur, ou un administrateur, la réexaminera et vous répondra sous 14 jours. Vous pouvez aussi saisir le tribunal compétent.`,
     authorityRedress: "Cette mesure exécute l'injonction d'une autorité : vous pouvez la contester devant les juridictions de l'État qui l'a émise.",
     host: "Joutiya héberge les contenus de ses utilisateurs sans en être l'auteur et n'est pas partie aux échanges ni aux transactions entre utilisateurs.",
     reference: (id) => `Référence de la décision : ${id}.`,
@@ -64,7 +64,7 @@ const COPY: Record<
       human: "اتخذ هذا القرار مشرف لدى Joutiya.",
     },
     redress: (deadline) =>
-      `يمكنك الطعن في هذا القرار مجانًا وعبر الإنترنت إلى غاية ${deadline} بواسطة الزر أدناه. سيعيد فحصه شخص آخر غير الذي اتخذه، وسيجيبك خلال 14 يومًا. يمكنك أيضًا اللجوء إلى المحكمة المختصة.`,
+      `يمكنك الطعن في هذا القرار مجانًا وعبر الإنترنت إلى غاية ${deadline} بواسطة الزر أدناه. سيعيد فحصه مشرف آخر أو مدير، وسيجيبك خلال 14 يومًا. يمكنك أيضًا اللجوء إلى المحكمة المختصة.`,
     authorityRedress: "ينفّذ هذا الإجراء أمرًا صادرًا عن سلطة: يمكنك الطعن فيه أمام محاكم الدولة التي أصدرته.",
     host: "تستضيف Joutiya محتويات مستخدميها دون أن تكون كاتبتها، وليست طرفًا في التبادلات أو المعاملات بين المستخدمين.",
     reference: (id) => `مرجع القرار: ${id}.`,
