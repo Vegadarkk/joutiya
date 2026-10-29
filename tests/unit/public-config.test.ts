@@ -54,7 +54,7 @@ describe("publicConfig", () => {
     expect(config).toEqual({
       env: "staging",
       siteUrl: "https://staging.joutiya.ma",
-      firebase: { apiKey: "AIza-browser", projectId: "joutiya-staging", appId: "1:123456789:web:abc", authDomain: "joutiya-staging.firebaseapp.com" },
+      firebase: { projectId: "joutiya-staging" },
       turnstileSiteKey: "0x4AAAAAAA-site",
       googleClientId: "123456789-abc.apps.googleusercontent.com",
       sentry: { dsn: DSN, environment: "staging", release: "0123456789ab" },
@@ -105,14 +105,9 @@ describe("publicConfig", () => {
     expect(JSON.stringify(staging)).not.toContain("joutiya-staging-media");
     expect(publicConfig(parseEnv({ MEDIA_BASE_URL: "http://localhost:3000/media/" }).env).mediaBaseUrl).toBe("http://localhost:3000/media");
     expect(publicConfig(parseEnv({ SENTRY_DSN: DSN }).env).sentry).toEqual({ dsn: DSN, environment: "dev", release: "dev" });
-    // Firebase needs both the browser key and the project; the app id and auth domain have defaults.
+    // The project only: the Web API key never reaches the browser.
     expect(publicConfig(parseEnv({ FIREBASE_API_KEY: "AIza-browser" }).env).firebase).toBeNull();
-    expect(publicConfig(parseEnv({ FIREBASE_PROJECT_ID: "joutiya-dev", FIREBASE_API_KEY: "AIza-browser", FIREBASE_AUTH_DOMAIN: "auth.joutiya.ma" }).env).firebase).toEqual({
-      apiKey: "AIza-browser",
-      projectId: "joutiya-dev",
-      appId: "",
-      authDomain: "auth.joutiya.ma",
-    });
+    expect(publicConfig(parseEnv({ FIREBASE_PROJECT_ID: "joutiya-dev", FIREBASE_API_KEY: "AIza-browser", FIREBASE_AUTH_DOMAIN: "auth.joutiya.ma" }).env).firebase).toEqual({ projectId: "joutiya-dev" });
   });
 
   it("gives the search and home maps the same runtime basemap as the browser config", () => {
@@ -123,11 +118,11 @@ describe("publicConfig", () => {
     expect(searchMapConfig(parseEnv({}).env)).toBeNull();
   });
 
-  it("names the Auth emulator in dev only", () => {
-    const emulated = { FIREBASE_PROJECT_ID: "demo-joutiya", FIREBASE_API_KEY: "fake", FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099" };
-    expect(publicConfig(parseEnv(emulated).env).firebase?.authEmulatorUrl).toBe("http://127.0.0.1:9099");
-    // Refused at startup outside dev (env.ts); never advertised to the browser either.
-    expect(publicConfig(parseEnv({ ...configured, ...emulated }).env).firebase).not.toHaveProperty("authEmulatorUrl");
+  it("never hands the browser the Web API key or the Auth emulator", () => {
+    const emulated = { FIREBASE_PROJECT_ID: "demo-joutiya", FIREBASE_API_KEY: "AIza-fake-key", FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099" };
+    const json = JSON.stringify(publicConfig(parseEnv(emulated).env));
+    expect(json).not.toContain("AIza-fake-key");
+    expect(json).not.toContain("9099");
   });
 
   it("offers the phone check only when a WhatsApp challenge can complete", () => {

@@ -262,7 +262,8 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  // Everything but build assets and files with an extension (brand images, robots.txt). Page
-  // slugs must never contain a dot (phase 3 slug rules), or they would skip the CSP set here.
-  matcher: ["/((?!_next/static|_next/image|.*\\..*).*)"],
+  // Everything but build assets and files with an asset extension (brand images, map worker,
+  // robots.txt, ads.txt, sitemaps). Any other dotted path (`/fr/annonce/x.1-{id}`) still gets the
+  // CSP and the page limits set here; tests/unit/proxy.test.ts checks both lists.
+  matcher: ["/((?!_next/static|_next/image|.*\\.(?:svg|png|jpe?g|webp|avif|gif|ico|txt|xml|json|webmanifest|js|mjs|css|map|woff2?|wasm)$).*)"],
 };

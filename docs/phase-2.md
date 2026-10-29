@@ -20,7 +20,7 @@ Le code de la phase 2 est fusionné sur `main` (PR #37) : inscription par e-mail
 
 | Service | Jeton ou identifiant | Portée minimale | Où il va | Qui |
 |---|---|---|---|---|
-| Firebase | `FIREBASE_API_KEY` (clé navigateur de l'app web) | Restrictions : référents `https://joutiya.ma/*`, `https://www.joutiya.ma/*` (staging : `https://staging.joutiya.ma/*`) ; API Identity Toolkit, Token Service, Cloud Firestore | `.env.local`, `app.env` (publique par conception, mais hors du dépôt) | Nav crée, vous copiez |
+| Firebase | `FIREBASE_API_KEY` (clé navigateur de l'app web) | Restrictions : référents `https://joutiya.ma/*`, `https://www.joutiya.ma/*` (staging : `https://staging.joutiya.ma/*`) ; API Identity Toolkit, Token Service, Cloud Firestore | `.env.local`, `app.env` (jamais servie au navigateur, qui n’a pas de SDK Firebase : le serveur ne s’en sert qu’à défaut de `FIREBASE_SERVER_API_KEY`) | Nav crée, vous copiez |
 | Firebase | `FIREBASE_SERVER_API_KEY` (clé `joutiya-server`, optionnelle) | Sans restriction de référent ; API Identity Toolkit uniquement | `app.env` | Nav crée, **Vous :** copie |
 | Firebase | `FIREBASE_APP_ID` | Identifiant public `1:<numéro>:web:<hash>` | `.env.local`, `app.env`, `infra/targets.json` | Nav rapporte, Claude consigne |
 | Firebase | `FIREBASE_SERVICE_ACCOUNT` | `joutiya-web@<projet>.iam.gserviceaccount.com` (créé en phase 1, étape 9) | `app.env` | Claude, depuis le registre (étape 16 de la phase 1) |
