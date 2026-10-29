@@ -57,6 +57,12 @@ export const STOCK_ROW_CODES = [
   "periods_invalid",
   "periods_ignored",
   "failed",
+  // Shop catalogue (lot 4): variant cells and stock.
+  "variant_invalid",
+  "variant_axes",
+  "variant_duplicate",
+  "variant_too_many",
+  "stock_invalid",
 ] as const;
 export type StockRowCode = (typeof STOCK_ROW_CODES)[number];
 
@@ -68,6 +74,8 @@ export interface StockRowIssue {
   code: StockRowCode;
   /** The value read, cut to 80 characters (shown to help the fix). */
   value?: string;
+  /** Another line of the same reference (its variant lines make one row). */
+  line?: number;
 }
 
 export interface StockRowResult {

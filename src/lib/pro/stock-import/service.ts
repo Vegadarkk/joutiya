@@ -59,6 +59,8 @@ function entryOf(listing: ListingRecord, ref: string, today: number): StockEntry
       attributes: listing.attributes,
       location,
       ...(listing.rental ? { unavailable: currentPeriods(listing, today) } : {}),
+      ...(listing.variants ? { variants: listing.variants } : {}),
+      ...(listing.stock !== undefined ? { stock: listing.stock } : {}),
     },
   };
 }
@@ -130,6 +132,8 @@ function patchOf(row: ParsedRow): ListingPatch | null {
     price: fields.price,
     priceNegotiable: fields.priceNegotiable,
     ...(fields.location ? { location: fields.location } : {}),
+    ...(fields.variants ? { variants: fields.variants } : {}),
+    ...(fields.stock !== undefined ? { stock: fields.stock } : {}),
   });
 }
 

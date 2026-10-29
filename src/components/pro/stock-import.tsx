@@ -13,7 +13,7 @@ import { Link } from "@/i18n/navigation";
 import { isApiError } from "@/lib/auth/client";
 import { STOCK_IMPORT_MAX_BYTES, STOCK_IMPORT_MAX_ROWS, type StockImportResponse, type StockListing, type StockRowAction, type StockRowResult } from "@/lib/contracts/stock-import";
 import { importStockFile, loadStock } from "@/lib/pro/client";
-import { stockTemplateCsv } from "@/lib/pro/stock-import/template";
+import { stockTemplateCsv, type StockTemplateKind } from "@/lib/pro/stock-import/template";
 import { cn } from "@/lib/utils";
 import { AbsentStep, PhotosStep, PublishStep } from "./stock-steps";
 import { FileDrop, Step } from "./stock-ui";
@@ -43,11 +43,13 @@ export function decodeCsv(bytes: ArrayBuffer): string {
   }
 }
 
-function downloadTemplate(kind: "sale" | "rental") {
+const TEMPLATE_FILES: Record<StockTemplateKind, string> = { sale: "modele-stock.csv", rental: "modele-flotte-location.csv", shop: "modele-boutique.csv" };
+
+function downloadTemplate(kind: StockTemplateKind) {
   const url = URL.createObjectURL(new Blob([stockTemplateCsv(kind)], { type: "text/csv;charset=utf-8" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = kind === "rental" ? "modele-flotte-location.csv" : "modele-stock.csv";
+  link.download = TEMPLATE_FILES[kind];
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -147,12 +149,17 @@ export function StockImport({ nonce }: { nonce?: string }) {
             <Download aria-hidden="true" />
             {t("file.templateRental")}
           </Button>
+          <Button variant="outline" onClick={() => downloadTemplate("shop")}>
+            <Download aria-hidden="true" />
+            {t("file.templateShop")}
+          </Button>
         </div>
         <FileDrop accept=".csv,text/csv,.txt,.tsv" label={t("file.pick")} hint={file ? t("file.chosen", { name: file.name }) : t("file.hint")} icon={<FileSpreadsheet aria-hidden="true" className="size-6" />} onFiles={(files) => void pick(files[0])} busy={busy === "preview"} />
         {fileError ? <ErrorBanner title={t(`file.errors.${fileError}`)} /> : null}
         <details className="group rounded-md border border-border bg-surface px-4 py-3 text-sm">
           <summary className="cursor-pointer font-medium">{t("file.columnsTitle")}</summary>
           <p className="mt-2 text-foreground-muted text-pretty">{t("file.columns")}</p>
+          <p className="mt-2 text-foreground-muted text-pretty">{t("file.columnsShop")}</p>
         </details>
       </Step>
 
@@ -248,7 +255,7 @@ function Preview({ result }: { result: StockImportResponse }) {
                     <ul className="mt-1 flex flex-col gap-0.5 text-xs">
                       {row.issues.map((issue, index) => (
                         <li key={index} className={row.action === "error" ? "text-danger" : "text-warning"}>
-                          {t("preview.issue", { column: issue.column, message: t(`codes.${issue.code}`) })}
+                          {issue.line !== undefined ? t("preview.issueAt", { line: issue.line, column: issue.column, message: t(`codes.${issue.code}`) }) : t("preview.issue", { column: issue.column, message: t(`codes.${issue.code}`) })}
                           {issue.value && issue.code !== "failed" ? <span className="text-foreground-muted"> « {issue.value} »</span> : null}
                         </li>
                       ))}
@@ -267,5 +274,5 @@ function Preview({ result }: { result: StockImportResponse }) {
   );
 }
 
-const FIELD_KEYS = ["subcategoryId", "title", "description", "price", "priceNegotiable", "condition", "attributes", "location", "unavailable"] as const;
+const FIELD_KEYS = ["subcategoryId", "title", "description", "price", "priceNegotiable", "condition", "attributes", "location", "unavailable", "variants", "stock"] as const;
 const fieldKey = (field: string) => ((FIELD_KEYS as readonly string[]).includes(field) ? (field as (typeof FIELD_KEYS)[number]) : "attributes");

@@ -4649,7 +4649,7 @@
   "StockImport": {
     "metaTitle": "Importer mon stock",
     "title": "Importer mon stock",
-    "lead": "Mettez en ligne tout votre parc depuis un tableur : un fichier CSV, une ligne par véhicule, la référence de stock comme clé. Un nouvel envoi met à jour les annonces existantes.",
+    "lead": "Mettez en ligne tout votre stock depuis un tableur : un fichier CSV, une ligne par véhicule ou par article (une ligne par taille ou couleur), la référence de stock comme clé. Un nouvel envoi met à jour les annonces existantes.",
     "back": "Espace Pro",
     "notPro": {
       "title": "L'import de stock est réservé aux boutiques Pro vérifiées",
@@ -4658,7 +4658,7 @@
     },
     "upgrade": {
       "title": "L’import de stock est inclus dans les offres Business et Premium",
-      "body": "Avec votre offre actuelle, publiez vos véhicules un par un depuis « Déposer une annonce ».",
+      "body": "Avec votre offre actuelle, publiez vos annonces une par une depuis « Déposer une annonce ».",
       "link": "Voir les offres"
     },
     "file": {
@@ -4674,10 +4674,12 @@
       "errors": {
         "too_large": "Ce fichier dépasse 1 Mo : découpez-le en plusieurs fichiers.",
         "not_csv": "Ce fichier n'est pas un CSV. Dans votre tableur, choisissez « Enregistrer sous », format CSV."
-      }
+      },
+      "templateShop": "Modèle pour une boutique (tailles, couleurs, stock)",
+      "columnsShop": "Boutique : categorie (le nom du site : « Vêtements », « Miel », « Smartphones »…), etat, les critères de la catégorie, puis variante_1 et variante_2 sous la forme « Taille : M », « Couleur : Noir » ou un axe libre (« Contenance : 500 g »), et stock (0 pour épuisé, vide pour ne pas suivre). Une ligne par combinaison : les lignes d'une même référence forment une seule annonce ; après la première, seules les colonnes variante, stock et, si elle change, prix sont nécessaires."
     },
     "csvErrors": {
-      "empty": "Le fichier ne contient aucune ligne de véhicule sous l'en-tête.",
+      "empty": "Le fichier ne contient aucune ligne sous l'en-tête.",
       "unclosed_quote": "Un guillemet ouvert ligne {line} n'est jamais fermé : corrigez la cellule puis renvoyez le fichier.",
       "too_many_rows": "Le fichier dépasse 300 lignes (ligne {line}) : découpez-le en plusieurs fichiers."
     },
@@ -4689,13 +4691,14 @@
       "errorsOnly": "Afficher seulement les lignes à corriger",
       "line": "Ligne",
       "ref": "Référence",
-      "vehicle": "Véhicule",
+      "vehicle": "Annonce",
       "action": "Action",
       "changes": "Modifie : {fields}",
       "issue": "{column} : {message}",
       "apply": "Importer {count, plural, one {# ligne} other {# lignes}}",
       "remaining": "Place pour {count, plural, one {# nouveau brouillon} other {# nouveaux brouillons}} sous votre offre",
-      "done": "Import terminé : {created, plural, one {# brouillon créé} other {# brouillons créés}}, {updated, plural, one {# annonce mise à jour} other {# annonces mises à jour}}."
+      "done": "Import terminé : {created, plural, one {# brouillon créé} other {# brouillons créés}}, {updated, plural, one {# annonce mise à jour} other {# annonces mises à jour}}.",
+      "issueAt": "Ligne {line}, {column} : {message}"
     },
     "actions": {
       "create": "Nouveau",
@@ -4716,13 +4719,15 @@
       "condition": "état",
       "attributes": "caractéristiques",
       "location": "ville",
-      "unavailable": "jours bloqués"
+      "unavailable": "jours bloqués",
+      "variants": "déclinaisons",
+      "stock": "stock"
     },
     "codes": {
       "ref_required": "référence manquante",
       "ref_invalid": "référence invalide (lettres, chiffres, - _ . /, 40 caractères au plus)",
       "ref_duplicate": "référence déjà présente plus haut dans le fichier",
-      "category_unknown": "catégorie non importable (voitures, utilitaires, motos, location de voitures)",
+      "category_unknown": "catégorie inconnue ou non importable (immobilier, services)",
       "value_unknown": "valeur non reconnue",
       "number_invalid": "nombre invalide ou hors limites",
       "required": "obligatoire",
@@ -4737,7 +4742,12 @@
       "column_ignored": "ignoré, la colonne dont il dépend ne l'ouvre pas",
       "periods_invalid": "périodes illisibles : écrivez 2026-11-02/2026-11-05; 2026-12-24 (365 jours au plus, 40 périodes au plus)",
       "periods_ignored": "ignoré : seules les locations de voitures ont des jours bloqués",
-      "failed": "non enregistré, réessayez"
+      "failed": "non enregistré, réessayez",
+      "variant_invalid": "déclinaison illisible : écrivez « Taille : M » ou « Couleur : Noir » (20 caractères au plus par valeur)",
+      "variant_axes": "pas les mêmes axes que la première ligne de cette référence",
+      "variant_duplicate": "combinaison déjà présente pour cette référence",
+      "variant_too_many": "trop de déclinaisons : 50 combinaisons et 20 valeurs par axe au plus",
+      "stock_invalid": "stock invalide (nombre de 0 à 9 999)"
     },
     "photos": {
       "title": "Photos",
@@ -4768,8 +4778,8 @@
       "rental": "Pour les locations de voitures : je déclare que mon agence détient l'agrément de location sans chauffeur et que ces véhicules sont immatriculés pour la location, dans la limite d'âge de la flotte et assurés. Leurs informations, disponibilités et conditions engagent ma seule responsabilité : {brand} ne les vérifie pas."
     },
     "absent": {
-      "title": "Véhicules absents du fichier",
-      "lead": "Ces annonces en ligne n'apparaissent plus dans votre dernier fichier. Rien n'est retiré automatiquement : marquez comme vendus ceux qui ont quitté votre parc.",
+      "title": "Annonces absentes du fichier",
+      "lead": "Ces annonces en ligne n'apparaissent plus dans votre dernier fichier. Rien n'est retiré automatiquement : marquez comme vendues celles qui ne sont plus en vente.",
       "empty": "Toutes vos annonces en ligne figurent dans le fichier.",
       "markOne": "Marquer vendu",
       "markAll": "Tout marquer vendu ({count})",

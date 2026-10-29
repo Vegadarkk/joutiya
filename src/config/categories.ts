@@ -342,7 +342,7 @@ const RENTAL_TERMS = [
 const proRequired = (id: CriterionId): Criterion => ({ ...FIELDS[id], required: true, proOnly: true });
 const proOptional = (id: CriterionId): Criterion => ({ ...FIELDS[id], proOnly: true });
 
-export const CATEGORIES: readonly Category[] = [
+const TREE: readonly Category[] = [
   {
     id: "vehicules",
     subcategories: [
@@ -471,6 +471,19 @@ export const CATEGORIES: readonly Category[] = [
     ],
   },
 ];
+
+/**
+ * Goods a shop lists with its own reference (catalogue §2, the stock import of lot 4): the
+ * `stock-ref` criterion, Pro only, on every subcategory of these categories. Vehicles and car
+ * rentals carry it in their dossier and terms.
+ */
+const SHOP_GOODS_CATEGORIES: ReadonlySet<string> = new Set(["electronique", "maison-jardin", "mode", "terroir", "famille", "loisirs", "animaux", "materiel-pro", "divers"]);
+
+export const CATEGORIES: readonly Category[] = TREE.map((category) =>
+  SHOP_GOODS_CATEGORIES.has(category.id)
+    ? { ...category, subcategories: category.subcategories.map((subcategory) => (subcategory.criteria.some((criterion) => criterion.id === "stock-ref") ? subcategory : { ...subcategory, criteria: [...subcategory.criteria, proOptional("stock-ref")] })) }
+    : category,
+);
 
 const categoryIndex = new Map(CATEGORIES.map((category) => [category.id, category]));
 const subcategoryIndex = new Map(CATEGORIES.flatMap((category) => category.subcategories.map((subcategory) => [subcategory.id, subcategory] as const)));

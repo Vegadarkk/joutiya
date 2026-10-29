@@ -255,3 +255,70 @@ describe("matchPhotos", () => {
     expect(photoNameParts("R1 (4).png")).toEqual({ base: "R1", position: 4 });
   });
 });
+
+describe("shop lines: variants and stock (catalogue §2)", () => {
+  const SHOP = "reference;categorie;titre;description;prix;etat;ville;pour qui;type de vetement;variante_1;variante_2;stock";
+  const SHIRT = "Chemise en lin lavé, broderie faite main dans notre atelier de Fès, coupe droite.";
+  const first = `CHM-LIN;Vêtements;Chemise en lin brodée main;${SHIRT};250;Neuf avec étiquette;Fès;Homme;Haut & t-shirt;Taille : M;Couleur : Bleu;4`;
+
+  it("reads the shop template as one shirt in sizes and colours, with its stock and a price of its own", () => {
+    const { rows, ignoredColumns } = rowsOf(stockTemplateCsv("shop"));
+    expect(ignoredColumns).toEqual([]);
+    expect(rows).toHaveLength(1);
+    const [row] = rows;
+    expect(row!.issues).toEqual([]);
+    expect(row!.subcategoryId).toBe("vetements");
+    // The size axis takes over the size criterion; the reference is the listing's.
+    expect(row!.fields.attributes).toEqual({ "stock-ref": "CHM-LIN", audience: "homme", "clothing-type": "haut" });
+    expect(row!.fields.variants).toEqual({
+      axes: [
+        { id: "clothing-size", values: ["m", "l", "xl"] },
+        { id: "color", values: ["bleu", "noir"] },
+      ],
+      items: [
+        { key: "m|bleu", stock: 4 },
+        { key: "l|bleu", stock: 2 },
+        { key: "xl|noir", stock: 0, price: 290 },
+      ],
+    });
+  });
+
+  it("takes a free axis as written, and a stock alone without variants", () => {
+    const honey = "reference;categorie;titre;description;prix;ville;numero onssa;type de miel;variante_1;stock";
+    const text = `${honey}\nMIEL-T;Miel;Miel de thym d'Imouzzer;Miel de thym récolté à Imouzzer, extraction à froid, pot en verre.;120;Fès;ONSSA-12345;Thym;Contenance : 500 g;10\nmiel-t;;;;220;;;;Contenance : 1 kg;\nAML-1;Amlou & pâtes à tartiner;Amlou maison;Amlou aux amandes grillées et huile d'argan, préparé chaque semaine.;90;Fès;ONSSA-12345;;;7`;
+    const { rows } = rowsOf(text);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.fields.variants).toEqual({ axes: [{ id: "free-1", label: "Contenance", values: ["500 g", "1 kg"] }], items: [{ key: "500 g", stock: 10 }, { key: "1 kg", price: 220 }] });
+    expect(rows[1]!.fields.stock).toBe(7);
+    expect(rows[1]!.fields.variants).toBeUndefined();
+  });
+
+  it("refuses an unreadable cell, other axes, a repeated combination and a bad stock, with their lines", () => {
+    const text = [SHOP, first, "CHM-LIN;;;;;;;;;Taille : M;Couleur : Bleu;2", "CHM-LIN;;;;;;;;;Couleur : Noir;;1", "CHM-LIN;;;;;;;;;Taille M;Couleur : Noir;1", "CHM-LIN;;;;;;;;;Taille : L;Couleur : Noir;beaucoup"].join("\n");
+    const [row] = rowsOf(text).rows;
+    expect(row!.fields.variants).toBeUndefined();
+    expect(row!.issues).toEqual(
+      expect.arrayContaining([
+        { column: "variante_1", code: "variant_duplicate", value: "m / bleu", line: 3 },
+        { column: "variante_1", code: "variant_axes", line: 4 },
+        { column: "variante_1", code: "variant_invalid", value: "Taille M", line: 5 },
+        { column: "stock", code: "stock_invalid", value: "beaucoup", line: 6 },
+      ]),
+    );
+  });
+
+  it("updates the variants it changes and keeps the references set on the site", () => {
+    const [row] = rowsOf([SHOP, first, "CHM-LIN;;;;;;;;;Taille : L;Couleur : Bleu;0"].join("\n")).rows;
+    const entry: Pick<StockEntry, "subcategoryId" | "fields"> = {
+      subcategoryId: "vetements",
+      fields: {
+        ...row!.fields,
+        variants: { axes: [{ id: "clothing-size", values: ["m", "l"] }, { id: "color", values: ["bleu"] }], items: [{ key: "m|bleu", stock: 4, ref: "CHM-M-B" }, { key: "l|bleu", stock: 2 }] },
+      },
+    };
+    const { patch, changes } = diffFields(row!, entry);
+    expect(changes).toEqual(["variants"]);
+    expect(patch.variants?.items).toEqual([{ key: "m|bleu", stock: 4, ref: "CHM-M-B" }, { key: "l|bleu", stock: 0 }]);
+    expect(diffFields(rowsOf([SHOP, first, "CHM-LIN;;;;;;;;;Taille : L;Couleur : Bleu;2"].join("\n")).rows[0]!, entry).changes).toEqual([]);
+  });
+});
