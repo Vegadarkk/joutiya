@@ -11,12 +11,15 @@ import { MessagesLinkPlain } from "@/components/messages/messages-link-plain";
 import type { SessionSummary } from "@/lib/contracts/auth";
 import { cn } from "@/lib/utils";
 import type { AccountDropdownProps } from "./account-dropdown";
+import { VisitorEntry } from "./visitor-entry";
+import type { SignInHref } from "./visitor-menu";
 
 // Header account state, inside the header's pill of round 44 px buttons: messages (members),
 // favourites (from md), then the avatar or the sign-in link. Private pages render with the session
 // the layout already knows. Public pages are static and carry no session: the anonymous state
 // renders first (server and client alike) and swaps once GET /api/auth/me has answered. Both
-// states are 44 px tall, so nothing shifts.
+// states are 44 px tall, so nothing shifts. Below lg the anonymous state is a visitor menu
+// (visitor-entry.tsx): the rentals and the Pro space, buttons of the wide header, live there.
 // The menu itself (account-dropdown.tsx) is a separate chunk, loaded once a session is known:
 // anonymous visitors never download it, and the same trigger shows as a plain button meanwhile.
 // If that chunk cannot be loaded, the trigger links to the account settings (sign-out included).
@@ -72,14 +75,18 @@ export function AccountMenu() {
 
   if (status !== "ready" || !session) {
     const next = nextFor(locale, pathname);
+    const signInHref: SignInHref = next ? { pathname: "/connexion", query: { next } } : "/connexion";
     return (
       <>
         <FavoritesLink />
-        <Link href={next ? { pathname: "/connexion", query: { next } } : "/connexion"} className={cn(PILL_BUTTON_CLASS, "lg:px-3.5")}>
+        {/* From lg the sign-in link, its text from xl ("Louer" and "Espace Pro" take the room at lg);
+            below lg the visitor menu: sign in, create an account, the rentals, the Pro space. */}
+        <Link href={signInHref} className={cn(PILL_BUTTON_CLASS, "hidden lg:inline-flex xl:px-3.5")}>
           <UserRound aria-hidden="true" />
-          <span className="hidden lg:inline">{nav("signIn")}</span>
-          <span className="sr-only lg:hidden">{nav("signIn")}</span>
+          <span className="hidden xl:inline">{nav("signIn")}</span>
+          <span className="sr-only xl:hidden">{nav("signIn")}</span>
         </Link>
+        <VisitorEntry signInHref={signInHref} className={cn(PILL_BUTTON_CLASS, "lg:hidden")} />
       </>
     );
   }

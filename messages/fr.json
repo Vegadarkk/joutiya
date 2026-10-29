@@ -16,7 +16,17 @@
     "searchSubmit": "Rechercher",
     "signIn": "Se connecter",
     "guide": "Démarches",
-    "categories": "Catégories"
+    "categories": "Catégories",
+    "rent": "Louer",
+    "rentCar": "Louer une voiture",
+    "rentCarHint": "Ville et dates, agences vérifiées",
+    "holidayRental": "Location de vacances",
+    "holidayRentalHint": "Logements meublés, à la nuit ou à la semaine",
+    "proSpace": "Espace Pro",
+    "proShort": "Pro",
+    "proHint": "Créer ma boutique ou mon agence",
+    "visitorMenu": "Menu",
+    "signUp": "Créer un compte"
   },
   "Locale": {
     "label": "Langue",
@@ -5431,5 +5441,54 @@
       "unavailable": "Position introuvable pour le moment : choisissez une ville dans les filtres.",
       "outside": "Votre position est hors du Maroc : choisissez une ville dans les filtres."
     }
+  },
+  "ProLanding": {
+    "metaTitle": "Professionnels : boutique, concession, agence",
+    "metaDescription": "Ouvrez votre boutique ou votre agence : une vitrine à votre nom, des annonces marquées Pro, la messagerie et les avis vérifiés. Commerces, concessions, agences immobilières, location de voitures et location saisonnière.",
+    "eyebrow": "Professionnels",
+    "title": "Créez votre boutique ou votre agence",
+    "lead": "Une vitrine à votre nom, vos annonces marquées Pro, la messagerie et les avis vérifiés : pour les commerçants, les concessions, les agences immobilières, les loueurs de voitures et les agences de location saisonnière.",
+    "cta": "Créer ma boutique",
+    "already": "Déjà Pro ? Accéder à mon espace",
+    "sectorsTitle": "Une vitrine adaptée à votre activité",
+    "sectors": {
+      "shop": {
+        "title": "Boutique",
+        "body": "Commerces, artisans, coopératives et auto-entrepreneurs : votre catalogue en ligne, avec le stock et les variantes."
+      },
+      "dealer": {
+        "title": "Concession automobile",
+        "body": "Vos véhicules d'occasion avec leur dossier : kilométrage, historique, garantie, et les demandes d'essai par messagerie."
+      },
+      "real_estate": {
+        "title": "Agence immobilière",
+        "body": "Vos biens à la vente et à la location, votre mandat et votre barème d'honoraires affichés sur la vitrine."
+      },
+      "car_rental": {
+        "title": "Location de voitures",
+        "body": "Votre flotte par catégorie, les disponibilités par dates et les demandes de réservation."
+      },
+      "holiday_rental": {
+        "title": "Location saisonnière",
+        "body": "Vos logements meublés à la nuit ou à la semaine, avec le calendrier et les demandes de séjour."
+      }
+    },
+    "includedTitle": "Compris avec votre compte Pro",
+    "included": {
+      "storefront": "Une vitrine publique à votre nom, avec vos horaires, votre adresse et vos liens",
+      "listings": "Jusqu'à {count} annonces en ligne avec l'offre Essentiel, marquées Pro",
+      "messaging": "La messagerie, la prise de rendez-vous et les avis vérifiés de vos clients",
+      "stock": "L'import de votre stock par fichier, les variantes de taille et de couleur",
+      "planning": "Pour les loueurs, le planning de flotte et les demandes par dates"
+    },
+    "offer": "Offre de lancement : l'offre Essentiel est offerte aux boutiques validées jusqu'à l'ouverture des ventes. Vous serez prévenu {days} jours avant tout paiement.",
+    "pass": "Une boutique pour un mois ? Le Pass Boutique ouvre une vitrine pour {days} jours, sans abonnement, dès l'ouverture des ventes.",
+    "stepsTitle": "Comment ça se passe",
+    "steps": {
+      "account": "Créez votre compte et confirmez votre adresse e-mail.",
+      "request": "Déposez votre demande : ICE, registre et une pièce justificative.",
+      "review": "Notre équipe vérifie vos identifiants et vous appelle, en général sous deux jours ouvrés. Votre vitrine s'ouvre ensuite."
+    },
+    "legal": "Les engagements légaux de chaque activité sont rappelés à la création de la vitrine. Vos démarches administratives : <link>le guide des professionnels et coopératives</link>."
   }
 }

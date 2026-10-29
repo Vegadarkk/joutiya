@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { BadgeCheck, BellRing, CircleHelp, Heart, LogOut, MessageSquare, Scale, Settings, Star, Store, Wallet } from "lucide-react";
+import { BadgeCheck, BellRing, CarFront, CircleHelp, Heart, House, LogOut, MessageSquare, Scale, Settings, Star, Store, Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import { canMessage } from "@/components/messages/can-message";
 import { useLiveSnapshot } from "@/components/messages/use-live";
 import { Link, useRouter } from "@/i18n/navigation";
 import { signOut } from "@/lib/auth/client";
+import { HOLIDAY_RENTAL_SEARCH, RENT_CAR_SEARCH } from "@/lib/search/shortcuts";
 import type { SessionSummary } from "@/lib/contracts/auth";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,7 @@ export interface AccountDropdownProps {
 export default function AccountDropdown({ session, name, triggerClassName, children }: AccountDropdownProps) {
   const t = useTranslations("Auth.menu");
   const s = useTranslations("Auth.settings");
+  const nav = useTranslations("Nav");
   const router = useRouter();
   // The header's messages link holds the stream; the menu only reads its total.
   const unread = useLiveSnapshot().unread ?? 0;
@@ -64,6 +66,20 @@ export default function AccountDropdown({ session, name, triggerClassName, child
             ) : null}
           </div>
           <DropdownMenu.Separator className="my-1 h-px bg-border" />
+          {/* Below lg the header has no "Louer": the two rental searches sit here (owner's choice B, 29 Oct 2026). */}
+          <DropdownMenu.Item asChild>
+            <Link href={RENT_CAR_SEARCH} prefetch={false} className={cn(item, "lg:hidden")}>
+              <CarFront aria-hidden="true" />
+              {nav("rentCar")}
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild>
+            <Link href={HOLIDAY_RENTAL_SEARCH} prefetch={false} className={cn(item, "lg:hidden")}>
+              <House aria-hidden="true" />
+              {nav("holidayRental")}
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Separator className="my-1 h-px bg-border lg:hidden" />
           {canMessage(session) ? (
             <DropdownMenu.Item asChild>
               <Link href="/messages" className={item}>
