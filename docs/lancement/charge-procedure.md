@@ -12,17 +12,25 @@ Outils : `load/k6.js` (k6 v2.3.0), `.github/workflows/load-test.yml` (lancement 
 
 ## Une fois
 
-1. **Jeton Access** `joutiya-scan` (Zero Trust > Access > Service Auth), en mode *single header*,
-   autorisé sur l'application `staging.joutiya.ma` (policy *Service Auth*, comme la sonde). Il sert
-   aussi au scan de sécurité.
-2. **GitHub** (variables et secrets du dépôt) :
-   - variable `ACCESS_TOKEN_HEADER` : le nom de l'en-tête choisi pour le mode single header ;
-   - secret `STAGING_SCAN_ACCESS_TOKEN` : `{"cf-access-client-id":"…","cf-access-client-secret":"…"}` ;
-   - secret `LOADTEST_BYPASS_SECRET` : 32 à 128 lettres et chiffres, tirés au hasard ;
-   - variable `LOAD_TEST_ENABLED=true` (le workflow ne fait rien sans elle).
-3. **Staging** : `LOADTEST_BYPASS_SECRET` (même valeur) dans l'app.env du staging (scellé, comme les
-   autres secrets), puis redémarrage. L'application refuse cette variable en production.
-4. **PC2** : `JOUTIYA_LOADTEST_BYPASS_SECRET` (même valeur) dans `.env.local`, pour la règle Cloudflare.
+Claude prépare tout depuis le cloud, Nav n'envoie que les secrets GitHub (le proxy du cloud refuse
+l'API Actions). Le jeton sert aussi au scan de sécurité.
+
+1. **Nav** (PC2) : `node scripts/github-ci.ts public-key` donne la clé publique Actions du dépôt
+   (publique).
+2. **Claude** : `NODE_USE_ENV_PROXY=1 node scripts/github-ci.ts seal-scan --public-key=<fichier>
+   --age-recipient=<age1…> --out=<fichier> --apply` crée (ou renouvelle) le jeton Access
+   `joutiya-scan`, tire un `LOADTEST_BYPASS_SECRET` et scelle pour GitHub les secrets
+   `STAGING_SCAN_ACCESS_TOKEN` (JSON `cf-access-client-id` / `cf-access-client-secret`) et
+   `LOADTEST_BYPASS_SECRET`, avec les variables `ACCESS_TOKEN_HEADER=x-joutiya-access-token`,
+   `SCAN_REPORT_AGE_RECIPIENT`, `SECURITY_SCAN_ENABLED=true` et `LOAD_TEST_ENABLED=true`. Il affiche
+   l'identifiant du jeton (`ACCESS_SCAN_TOKEN_ID`).
+3. **Claude** : `node scripts/cloudflare.ts access --apply` avec `ACCESS_SCAN_TOKEN_ID` : le staging
+   accepte ce jeton, y compris dans l'en-tête unique `x-joutiya-access-token`.
+4. **Claude** : `LOADTEST_BYPASS_SECRET` scellé pour la VM (`seal-env.ts app staging --only=…`),
+   posé par `oracle-vm.ts env staging --sealed=…`, puis web et worker redémarrés. L'application
+   refuse cette variable en production. La règle Cloudflare lit le même secret dans
+   `<fichier>.cloudflare.env` (`JOUTIYA_LOADTEST_BYPASS_SECRET`).
+5. **Nav** (PC2) : `node scripts/github-ci.ts apply <fichier> --apply`.
 
 ## Le jour du test
 
@@ -37,13 +45,13 @@ enregistrées 07:00 UTC). Au plus deux passages par jour (lectures Firestore des
 2. Limites de production sur le staging :
    `NODE_USE_ENV_PROXY=1 node scripts/oracle-vm.ts run load/staging-limits-prod.sh --apply`
 3. Règle Cloudflare (le secret n'est jamais affiché) :
-   `node --env-file=.env.local scripts/cloudflare.ts loadtest --on --apply`
+   `NODE_USE_ENV_PROXY=1 node --env-file=<fichier>.cloudflare.env scripts/cloudflare.ts loadtest --on --apply`
 4. Mesure CPU, lancée juste avant le test (elle démarre quand l'agent Oracle prend la commande) :
    `NODE_USE_ENV_PROXY=1 node scripts/oracle-vm.ts cpu --minutes=9`
 5. Lancer le workflow **Load test** (Actions > Load test > Run workflow). Sept minutes de charge.
 6. Défaire, même si le test a échoué :
    ```
-   node --env-file=.env.local scripts/cloudflare.ts loadtest --off --apply
+   NODE_USE_ENV_PROXY=1 node scripts/cloudflare.ts loadtest --off --apply
    NODE_USE_ENV_PROXY=1 node scripts/oracle-vm.ts run load/staging-limits-reset.sh --apply
    NODE_USE_ENV_PROXY=1 node scripts/oracle-vm.ts run load/seed-remove.sh --apply
    ```
