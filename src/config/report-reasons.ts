@@ -154,7 +154,7 @@ export const REPORT_REASONS = [
     targets: ["user", "pro"],
     label: { fr: "Lien de réseau social suspect", ar: "رابط شبكة اجتماعية مشبوه" },
     hint: { fr: "Un lien de la vitrine mène au compte d'un autre vendeur, à une page douteuse ou à un contenu interdit.", ar: "رابط في الواجهة يقود إلى حساب بائع آخر أو إلى صفحة مريبة أو محتوى ممنوع." },
-    ground: { type: "terms", ref: "CGU, vitrines professionnelles" },
+    ground: { type: "terms", ref: "CGU §4.7" },
   },
   // P3: 7 days.
   {
