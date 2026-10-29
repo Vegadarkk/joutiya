@@ -21,11 +21,11 @@ l'API Actions). Le jeton sert aussi au scan de sécurité.
    --age-recipient=<age1…> --out=<fichier> --apply` crée (ou renouvelle) le jeton Access
    `joutiya-scan`, tire un `LOADTEST_BYPASS_SECRET` et scelle pour GitHub les secrets
    `STAGING_SCAN_ACCESS_TOKEN` (JSON `cf-access-client-id` / `cf-access-client-secret`) et
-   `LOADTEST_BYPASS_SECRET`, avec les variables `ACCESS_TOKEN_HEADER=x-joutiya-access-token`,
+   `LOADTEST_BYPASS_SECRET`, avec les variables `ACCESS_TOKEN_HEADER=Authorization`,
    `SCAN_REPORT_AGE_RECIPIENT`, `SECURITY_SCAN_ENABLED=true` et `LOAD_TEST_ENABLED=true`. Il affiche
    l'identifiant du jeton (`ACCESS_SCAN_TOKEN_ID`).
 3. **Claude** : `node scripts/cloudflare.ts access --apply` avec `ACCESS_SCAN_TOKEN_ID` : le staging
-   accepte ce jeton, y compris dans l'en-tête unique `x-joutiya-access-token`.
+   accepte ce jeton, y compris dans l'en-tête unique `Authorization`.
 4. **Claude** : `LOADTEST_BYPASS_SECRET` scellé pour la VM (`seal-env.ts app staging --only=…`),
    posé par `oracle-vm.ts env staging --sealed=…`, puis web et worker redémarrés. L'application
    refuse cette variable en production. La règle Cloudflare lit le même secret dans

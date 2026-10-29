@@ -24,7 +24,7 @@ describe("github-ci bundles", () => {
   it("refuses unknown names, a switch other than true, another header and a bad age key", () => {
     expect(() => parseBundle(bundle({ OTHER: "c2VhbGVk" }, {}), REPOSITORY)).toThrow(/OTHER/);
     expect(() => parseBundle(bundle({}, { LOAD_TEST_ENABLED: "false" }), REPOSITORY)).toThrow(/LOAD_TEST_ENABLED can only be true/);
-    expect(() => parseBundle(bundle({}, { ACCESS_TOKEN_HEADER: "authorization" }), REPOSITORY)).toThrow(/ACCESS_TOKEN_HEADER/);
+    expect(() => parseBundle(bundle({}, { ACCESS_TOKEN_HEADER: "x-other-header" }), REPOSITORY)).toThrow(/ACCESS_TOKEN_HEADER/);
     expect(() => parseBundle(bundle({}, { SCAN_REPORT_AGE_RECIPIENT: "age1short" }), REPOSITORY)).toThrow(/age public key/);
     expect(AGE_RECIPIENT.test(RECIPIENT)).toBe(true);
   });

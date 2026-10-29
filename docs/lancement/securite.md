@@ -20,7 +20,7 @@ avertissement (`jt_consent` est lisible par le script de la page, voulu) et `102
 
 Réglages (une fois) : `scripts/github-ci.ts seal-scan`, avec le test de charge
 (`docs/lancement/charge-procedure.md`, « Une fois ») : jeton Access `joutiya-scan` en en-tête unique
-`x-joutiya-access-token`, variable `ACCESS_TOKEN_HEADER`, secret `STAGING_SCAN_ACCESS_TOKEN`,
+`Authorization` (seul nom accepté par Access), variable `ACCESS_TOKEN_HEADER`, secret `STAGING_SCAN_ACCESS_TOKEN`,
 `SECURITY_SCAN_ENABLED=true` et `SCAN_REPORT_AGE_RECIPIENT`, la clé publique [age](https://age-encryption.org)
 des sauvegardes (`BACKUP_AGE_RECIPIENT`, docs/backups.md) : la clé privée, sur le PC2, ouvre aussi
 les rapports.
