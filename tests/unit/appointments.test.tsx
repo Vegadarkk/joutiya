@@ -3,7 +3,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it } from "vitest";
 import ar from "../../messages/ar.json";
 import fr from "../../messages/fr.json";
-import { AppointmentCard } from "@/components/appointments/appointment-card";
+import { AppointmentCard, cancelReasonsFor } from "@/components/appointments/appointment-card";
 import { AppointmentEventItem } from "@/components/appointments/appointment-event";
 import { GRID_MINUTES, SlotPicker, firstOpenDay, timeOff } from "@/components/appointments/slot-picker";
 import { previewText } from "@/components/messages/inbox";
@@ -208,7 +208,7 @@ const view = (patch: Partial<AppointmentView> = {}): AppointmentView => ({
 
 describe("components", () => {
   const card = (appointment: AppointmentView, locale: "fr" | "ar" = "fr", writable = true) =>
-    render(<AppointmentCard cid="c000000000000000000001" appointment={appointment} counterpartName="Salma" listingTitle="Appartement" writable={writable} now={NOW} onChange={() => {}} onReschedule={() => {}} />, locale);
+    render(<AppointmentCard cid="c000000000000000000001" appointment={appointment} role="buyer" counterpartName="Salma" listingTitle="Appartement" writable={writable} now={NOW} onChange={() => {}} onReschedule={() => {}} />, locale);
 
   it("shows the slots to pick from, confirm and none-suits-me to the one who answers", () => {
     const html = card(view());
@@ -234,6 +234,11 @@ describe("components", () => {
     expect(html).toContain("Ajouter à mon agenda");
     expect(html).toContain("Reporter");
     expect(card(view({ status: "confirmed", chosen: slot(26) }), "ar")).toContain("تأكّدت الزيارة");
+  });
+
+  it("offers the item-gone reason to the seller only", () => {
+    expect(cancelReasonsFor("seller")).toEqual(["unavailable", "sold", "other"]);
+    expect(cancelReasonsFor("buyer")).toEqual(["unavailable", "other"]);
   });
 
   it("hides an ended appointment", () => {
