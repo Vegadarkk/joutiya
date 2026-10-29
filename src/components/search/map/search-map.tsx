@@ -259,7 +259,12 @@ export default function SearchMap({ onReady }: SearchMapProps) {
             }, 320);
           });
         }
-        const marker = new Marker({ element, anchor }).setLngLat([lng, lat]).addTo(instance);
+        // MapLibre places the marker with `transform`: a `scale` on that same element would scale its
+        // offset too (the pin leaps away from the pointer, then back). The pin grows inside a holder.
+        const holder = document.createElement("div");
+        holder.className = "search-marker";
+        holder.append(element);
+        const marker = new Marker({ element: holder, anchor }).setLngLat([lng, lat]).addTo(instance);
         markers.current.set(key, { marker, element });
       }
       for (const [key, { marker }] of markers.current) {
@@ -371,7 +376,7 @@ export default function SearchMap({ onReady }: SearchMapProps) {
       const value = key === open ? "selected" : key === lit ? "highlight" : undefined;
       if (value) element.dataset.state = value;
       else delete element.dataset.state;
-      const wrapper = element.closest<HTMLElement>(".maplibregl-marker") ?? element;
+      const wrapper = element.closest<HTMLElement>(".search-marker") ?? element;
       wrapper.style.zIndex = value ? "3" : element.classList.contains("search-pin-featured") ? "2" : "";
     }
   }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CITIES,
   MOROCCO_BBOX,
+  QUICK_CITY_SLUGS,
   REGIONS,
   approximatePosition,
   cityBySlug,
@@ -14,7 +15,7 @@ import { includesNormalized, normalizeText, tokenize } from "@/lib/text/normaliz
 describe("regions dataset", () => {
   it("has the 12 regions in decree order and ~100 cities", () => {
     expect(REGIONS.map((r) => r.code)).toEqual(["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]);
-    expect(CITIES.length).toBe(100);
+    expect(CITIES.length).toBe(104);
   });
 
   it("has unique ASCII slugs and valid references", () => {
@@ -57,6 +58,20 @@ describe("regions dataset", () => {
     expect(searchCities("casa", "ar")[0]?.slug).toBe("casablanca");
     expect(searchCities("", "fr").every((c) => c.major)).toBe(true);
     expect(searchCities("zzzz", "fr")).toEqual([]);
+  });
+
+  it("lists the shortlist first, Nador included, and finds the local spellings", () => {
+    expect(searchCities("", "fr", 12).map((c) => c.slug)).toEqual([...QUICK_CITY_SLUGS]);
+    expect(searchCities("", "fr", 10).map((c) => c.slug)).toContain("nador");
+    for (const slug of QUICK_CITY_SLUGS) expect(cityBySlug(slug)?.major).toBe(true);
+    expect(searchCities("Aarouit", "fr")[0]?.slug).toBe("al-aaroui");
+    expect(searchCities("laaroui", "fr")[0]?.slug).toBe("al-aaroui");
+    expect(searchCities("العروي", "ar")[0]?.slug).toBe("al-aaroui");
+    expect(searchCities("bni ansar", "fr")[0]?.slug).toBe("beni-ensar");
+    expect(searchCities("zghanghan", "fr")[0]?.slug).toBe("zeghanghane");
+    expect(searchCities("selouane", "fr")[0]?.slug).toBe("selouane");
+    // A city's own name still ranks before another city's local spelling.
+    expect(searchCities("nador", "fr")[0]?.slug).toBe("nador");
   });
 
   it("offsets the approximate marker deterministically within ~1 km", () => {

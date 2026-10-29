@@ -25,6 +25,8 @@ export interface CityData {
   major: boolean;
   /** Latest Wikidata population (census or communal figure). */
   population: number;
+  /** Local spellings the city picker also matches ("Laaroui" for Al Aaroui); never displayed. */
+  aliases?: readonly string[];
 }
 
 export const REGIONS_DATA: readonly RegionData[] = [
@@ -65,6 +67,10 @@ export const CITIES_DATA: readonly CityData[] = [
   { slug: "saidia", nameFr: "Saïdia", nameAr: "السعيدية", regionCode: "02", lat: 35.085, lng: -2.2392, major: false, population: 10514 },
   { slug: "ahfir", nameFr: "Ahfir", nameAr: "أحفير", regionCode: "02", lat: 34.9514, lng: -2.1025, major: false, population: 16310 },
   { slug: "zaio", nameFr: "Zaïo", nameAr: "زايو", regionCode: "02", lat: 34.9419, lng: -2.7342, major: false, population: 36766 },
+  { slug: "al-aaroui", nameFr: "Al Aaroui", nameAr: "العروي", regionCode: "02", lat: 35.0102, lng: -3.0123, major: false, population: 46540, aliases: ["Al Aroui", "Laaroui", "Laroui", "El Aroui", "Aroui", "Aarouit"] },
+  { slug: "beni-ensar", nameFr: "Beni Ensar", nameAr: "بني انصار", regionCode: "02", lat: 35.2597, lng: -2.9336, major: false, population: 50508, aliases: ["Beni Ansar", "Bni Ansar", "Beni Nsar", "Bni Nsar", "بني أنصار"] },
+  { slug: "zeghanghane", nameFr: "Zeghanghane", nameAr: "أزغنغان", regionCode: "02", lat: 35.1549, lng: -3.0046, major: false, population: 31431, aliases: ["Zghanghan", "Azghanghan", "Zeghanghan", "Izeghenghan", "ازغنغان"] },
+  { slug: "selouane", nameFr: "Selouane", nameAr: "سلوان", regionCode: "02", lat: 35.0728, lng: -2.9417, major: false, population: 29628, aliases: ["Slouane", "Slwan", "Sélouane"] },
   { slug: "fes", nameFr: "Fès", nameAr: "فاس", regionCode: "03", lat: 34.0433, lng: -5.0033, major: true, population: 1167842 },
   { slug: "meknes", nameFr: "Meknès", nameAr: "مكناس", regionCode: "03", lat: 33.8833, lng: -5.55, major: true, population: 551503 },
   { slug: "taza", nameFr: "Taza", nameAr: "تازة", regionCode: "03", lat: 34.2144, lng: -4.0088, major: true, population: 150763 },

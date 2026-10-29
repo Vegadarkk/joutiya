@@ -1057,6 +1057,10 @@ html[data-welcome]:has(#main:target) .welcome {
 }
 
 /* Pins: price pills, À la Une photo arches ringed in gold, count bubbles. Real buttons (44 px hit area). */
+/* The element MapLibre moves (its `transform`): the pin inside scales without moving its anchor. */
+.search-marker {
+  display: flex;
+}
 .search-pin {
   position: relative;
   display: inline-flex;

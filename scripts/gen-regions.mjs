@@ -1,5 +1,5 @@
 // Regenerates src/config/geo/regions-data.ts from scripts/data/regions-cities.json (phase 3 dataset:
-// 12 regions in décret 2.15.40 order, 100 cities, Wikidata coordinates and populations).
+// 12 regions in décret 2.15.40 order, 104 cities, Wikidata coordinates and populations).
 //   node scripts/gen-regions.mjs
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -36,6 +36,8 @@ export interface CityData {
   major: boolean;
   /** Latest Wikidata population (census or communal figure). */
   population: number;
+  /** Local spellings the city picker also matches ("Laaroui" for Al Aaroui); never displayed. */
+  aliases?: readonly string[];
 }
 
 export const REGIONS_DATA: readonly RegionData[] = [
@@ -48,7 +50,7 @@ out += `];
 export const CITIES_DATA: readonly CityData[] = [
 `;
 for (const c of data.cities) {
-  out += `  { slug: ${q(c.slug)}, nameFr: ${q(c.nameFr)}, nameAr: ${q(c.nameAr)}, regionCode: ${q(c.regionCode)}, lat: ${c.lat}, lng: ${c.lng}, major: ${c.major}, population: ${c.population} },\n`;
+  out += `  { slug: ${q(c.slug)}, nameFr: ${q(c.nameFr)}, nameAr: ${q(c.nameAr)}, regionCode: ${q(c.regionCode)}, lat: ${c.lat}, lng: ${c.lng}, major: ${c.major}, population: ${c.population}${c.aliases ? `, aliases: [${c.aliases.map(q).join(", ")}]` : ""} },\n`;
 }
 out += `];\n`;
 

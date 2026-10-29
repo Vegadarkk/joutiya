@@ -11,6 +11,13 @@ export type City = CityData;
 export const REGIONS: readonly Region[] = REGIONS_DATA;
 export const CITIES: readonly City[] = CITIES_DATA;
 
+/**
+ * The pickers' shortlist before anything is typed, in this order: the big hubs, then the Rif's
+ * (Nador, for Tarifit speakers and the diaspora; owner, 2026-10-29). Every other city is one
+ * typed letter away.
+ */
+export const QUICK_CITY_SLUGS: readonly string[] = ["casablanca", "rabat", "marrakech", "tanger", "fes", "agadir", "meknes", "oujda", "nador", "tetouan", "kenitra", "laayoune"];
+
 /** Bounding box of the dataset and of the map extract (lng/lat), design D10. */
 export const MOROCCO_BBOX = { west: -17.3, south: 20.7, east: -0.9, north: 36.1 } as const;
 
@@ -57,6 +64,7 @@ interface SearchIndexEntry {
   city: City;
   fr: string;
   ar: string;
+  aliases: string[];
   region: string;
 }
 
@@ -66,25 +74,23 @@ function index(): SearchIndexEntry[] {
     city,
     fr: normalizeText(city.nameFr),
     ar: normalizeText(city.nameAr),
+    aliases: (city.aliases ?? []).map(normalizeText),
     region: normalizeText(regionsByCode.get(city.regionCode)?.nameFr ?? ""),
   }));
   return searchIndex;
 }
 
 /**
- * Accent- and script-insensitive city search for the picker. Empty query: the major cities.
- * Ranking: word-start matches first, then any match, major cities and population as tie breakers.
+ * Accent- and script-insensitive city search for the picker. Empty query: the shortlist
+ * (QUICK_CITY_SLUGS). Ranking: word-start matches first, then any match, major cities and
+ * population as tie breakers; a local spelling (aliases) ranks after the city's own names.
  */
 export function searchCities(query: string, locale: Locale, limit = 12): City[] {
   const q = normalizeText(query);
-  if (!q) {
-    return CITIES.filter((c) => c.major)
-      .sort((a, b) => b.population - a.population)
-      .slice(0, limit);
-  }
+  if (!q) return QUICK_CITY_SLUGS.slice(0, limit).map((slug) => citiesBySlug.get(slug)!);
   const scored: { city: City; score: number }[] = [];
   for (const entry of index()) {
-    const names = locale === "ar" ? [entry.ar, entry.fr] : [entry.fr, entry.ar];
+    const names = [...(locale === "ar" ? [entry.ar, entry.fr] : [entry.fr, entry.ar]), ...entry.aliases];
     let score = 0;
     for (const [i, name] of names.entries()) {
       if (name.startsWith(q)) score = Math.max(score, 100 - i * 10);

@@ -8,7 +8,8 @@
   "Rissani, Aousserd and Fquih Ben Salah carry several P625 values in Wikidata; the town-centre one was chosen. Rissani population is the commune figure (Wikidata Q27536174 is a rural commune item).",
   "Erfoud: Wikidata French label is 'Arfoud' (Q648987); nameFr kept as 'Erfoud' per the spec.",
   "Region nameAr are the Wikidata Arabic labels normalized to hyphenated form without the leading 'جهة'.",
-  "2026-10-16 07:25 UTC (Phase 3 thread): major flags adjusted for the city picker: Nador and Taza set to true (large cities and well-known), Dar Bouazza and Bouskoura set to false (Casablanca suburbs). 27 majors."
+  "2026-10-16 07:25 UTC (Phase 3 thread): major flags adjusted for the city picker: Nador and Taza set to true (large cities and well-known), Dar Bouazza and Bouskoura set to false (Casablanca suburbs). 27 majors.",
+  "2026-10-29 (owner request): Nador's surroundings added from Wikidata (2024 census, P625): Al Aaroui (Q613913, by Nador airport), Beni Ensar (Q537462), Zeghanghane (Q184459), Selouane (Q280853). 'aliases' = local spellings the city picker also matches (not Wikidata). 104 cities."
  ],
  "regions": [
   {
@@ -432,6 +433,81 @@
    "coordSource": "Q144416",
    "population": 36766,
    "major": false
+  },
+  {
+   "slug": "al-aaroui",
+   "nameFr": "Al Aaroui",
+   "nameAr": "العروي",
+   "regionCode": "02",
+   "lat": 35.0102,
+   "lng": -3.0123,
+   "wikidataId": "Q613913",
+   "coordSource": "Q613913",
+   "population": 46540,
+   "major": false,
+   "aliases": [
+    "Al Aroui",
+    "Laaroui",
+    "Laroui",
+    "El Aroui",
+    "Aroui",
+    "Aarouit"
+   ]
+  },
+  {
+   "slug": "beni-ensar",
+   "nameFr": "Beni Ensar",
+   "nameAr": "بني انصار",
+   "regionCode": "02",
+   "lat": 35.2597,
+   "lng": -2.9336,
+   "wikidataId": "Q537462",
+   "coordSource": "Q537462",
+   "population": 50508,
+   "major": false,
+   "aliases": [
+    "Beni Ansar",
+    "Bni Ansar",
+    "Beni Nsar",
+    "Bni Nsar",
+    "بني أنصار"
+   ]
+  },
+  {
+   "slug": "zeghanghane",
+   "nameFr": "Zeghanghane",
+   "nameAr": "أزغنغان",
+   "regionCode": "02",
+   "lat": 35.1549,
+   "lng": -3.0046,
+   "wikidataId": "Q184459",
+   "coordSource": "Q184459",
+   "population": 31431,
+   "major": false,
+   "aliases": [
+    "Zghanghan",
+    "Azghanghan",
+    "Zeghanghan",
+    "Izeghenghan",
+    "ازغنغان"
+   ]
+  },
+  {
+   "slug": "selouane",
+   "nameFr": "Selouane",
+   "nameAr": "سلوان",
+   "regionCode": "02",
+   "lat": 35.0728,
+   "lng": -2.9417,
+   "wikidataId": "Q280853",
+   "coordSource": "Q280853",
+   "population": 29628,
+   "major": false,
+   "aliases": [
+    "Slouane",
+    "Slwan",
+    "Sélouane"
+   ]
   },
   {
    "slug": "fes",
