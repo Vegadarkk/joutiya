@@ -226,6 +226,8 @@ export const RATE_LIMITS = {
   "message.send.thread": { points: 60, duration: HOUR, policy: "open", key: "uid+cid" },
   // Appointment steps (propose, confirm, decline, withdraw, cancel), on top of the send limiters.
   "appointment.uid": { points: 30, duration: HOUR, policy: "open", key: "uid" },
+  // Car rental booking requests (rental pack §6): 20 new requests a day per renter, on top of the send limiters.
+  "rental.request.uid": { points: 20, duration: DAY, policy: "open", key: "uid" },
   "conversation.new.uid": { points: 50, duration: DAY, policy: "open", key: "uid" },
   "conversation.new.young.uid": { points: 10, duration: DAY, policy: "open", key: "uid" },
   // Read, archive, hide, block calls of the inbox, and the unread badge.

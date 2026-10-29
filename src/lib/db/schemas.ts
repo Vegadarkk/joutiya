@@ -33,6 +33,7 @@ import {
   appointmentIdSchema,
   slotSchema,
 } from "@/lib/contracts/appointments";
+import { RENTAL_PICKUP_MAX, RENTAL_REQUEST_EVENTS, RENTAL_REQUEST_STATUSES, rentalRequestIdSchema } from "@/lib/contracts/rental-requests";
 import { REPORT_PRIORITIES, REPORT_REASON_IDS, REPORT_TARGET_TYPES } from "@/config/report-reasons";
 import type { LedgerReason } from "@/lib/payments/wallet";
 
@@ -584,6 +585,31 @@ export const appointmentEventSchema = z
   .strict();
 export type AppointmentEventDoc = z.infer<typeof appointmentEventSchema>;
 
+const rentalDay = z.string().regex(DAY_PATTERN);
+
+/** Conversation.rentalRequest: the renter's current booking request of a car rental (rental pack §6). */
+export const rentalRequestSchema = z
+  .object({
+    id: rentalRequestIdSchema,
+    status: z.enum(RENTAL_REQUEST_STATUSES),
+    from: rentalDay,
+    to: rentalDay,
+    /** Links masked like a message (URL_MARKER). */
+    pickup: z.string().max(RENTAL_PICKUP_MAX + 40).optional(),
+    /** Accepted with the days written on the listing as unavailable. */
+    blocked: z.boolean().optional(),
+    createdAt: ts,
+    updatedAt: ts,
+  })
+  .strict();
+export type RentalRequestDoc = z.infer<typeof rentalRequestSchema>;
+
+/** Message.rentalRequest: the step a booking request system message shows. */
+export const rentalRequestEventSchema = z
+  .object({ id: rentalRequestIdSchema, event: z.enum(RENTAL_REQUEST_EVENTS), from: rentalDay, to: rentalDay, pickup: z.string().max(RENTAL_PICKUP_MAX + 40).optional() })
+  .strict();
+export type RentalRequestEventDoc = z.infer<typeof rentalRequestEventSchema>;
+
 /** conversations/{cid}: one per (listing, buyer); cid derived on the server (D1). Served to participants by the API (D2). */
 export const conversationSchema = z
   .object({
@@ -630,6 +656,8 @@ export const conversationSchema = z
     appointment: appointmentSchema.optional(),
     /** Due time of the confirmed appointment's next reminder (job appointment-reminders). */
     appointmentRemindAt: ts.optional(),
+    /** The current booking request of a car rental (requested, answered or withdrawn); the thread keeps every step. */
+    rentalRequest: rentalRequestSchema.optional(),
     /** The buyer reviewed the seller from this conversation (once, even if the review is deleted later). */
     reviewedAt: ts.optional(),
     /** The seller's first message: the exchange is reciprocal, a review opens 24 h later (vitrine-avis §2). */
@@ -651,6 +679,8 @@ export const messageSchema = z
     hidden: z.boolean().optional(),
     /** Appointment system message: its text is the appointmentMarker of the event. */
     appointment: appointmentEventSchema.optional(),
+    /** Booking request system message: its text is the rentalRequestMarker of the event. */
+    rentalRequest: rentalRequestEventSchema.optional(),
     createdAt: ts,
     readAt: ts.optional(),
   })

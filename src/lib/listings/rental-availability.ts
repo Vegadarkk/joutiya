@@ -11,6 +11,10 @@ export const RENTAL_AHEAD_DAYS = 365;
 /** Availability not confirmed for this long reads "à confirmer" and ranks after the fresh ones (owner decision 4). */
 export const RENTAL_FRESH_DAYS = 14;
 
+/** Car rental dates of a search or a booking request (rental pack §4, §6): at most 60 days of rental, a start within 180 days. */
+export const RENTAL_SEARCH_DAYS_MAX = 60;
+export const RENTAL_SEARCH_AHEAD_DAYS = 180;
+
 const DAY_MS = 86_400_000;
 export const DAY_PATTERN = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
@@ -30,6 +34,11 @@ export function dayNumber(day: string): number {
 
 export function dayString(day: number): string {
   return new Date(day * DAY_MS).toISOString().slice(0, 10);
+}
+
+/** Rental days of a period: the return day minus the pick-up day, at least one. */
+export function rentalDuration(dates: { from: string; to: string }): number {
+  return Math.max(1, dayNumber(dates.to) - dayNumber(dates.from));
 }
 
 /** Today in Morocco, as a day number. */

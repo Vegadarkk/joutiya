@@ -8,22 +8,41 @@ import { formatWait, FormMessage, useApiErrorMessage } from "@/components/auth/f
 import { TurnstileWidget, type TurnstileHandle } from "@/components/auth/turnstile-widget";
 import { InlineError } from "@/components/feedback/inline-error";
 import { Textarea } from "@/components/post/controls/textarea";
+import { RentalDatesFields, completeDates } from "@/components/rental/rental-dates-fields";
+import { formatRentalDay, fragmentDates } from "@/components/rental/rental-day";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import type { Locale } from "@/config/site";
 import { Link, useRouter } from "@/i18n/navigation";
 import { ApiError, refreshSession } from "@/lib/auth/client";
 import { MESSAGE_TEXT_MAX } from "@/lib/contracts/endpoints";
 import { isolate } from "@/lib/i18n/bidi";
+import { moroccoToday, rentalDuration } from "@/lib/listings/rental-availability";
 import { startConversation } from "@/lib/messaging/client";
+import { RENTAL_PICKUP_MAX, rentalRequestProblem } from "@/lib/rental-requests/rules";
+import type { RentalDates } from "@/lib/search/params";
 import { cn } from "@/lib/utils";
 
 // First message about a listing (design phase-5 D4, D8): loaded on demand by the contact bar. The
 // text, a Turnstile check (always on the first message of a conversation, AF §6), then POST
 // /api/conversations and the thread page. A conversation that already exists takes the message too
 // (the server answers its cid), so the buyer lands in it either way. Phone checks play no part.
-// An adults-only listing (decorative koumiyas) adds the buyer's 18+ confirmation, required.
+// An adults-only listing (decorative koumiyas) adds the buyer's 18+ confirmation, required. A car
+// rental's booking request (rental pack §6) adds its days (those of the search the renter came
+// from, when the URL fragment carries them) and a pick-up place; the message is drafted from them until
+// the renter edits it, and the request shows as a card in the thread.
 
 /** Codes with their own wording here; the rest take the generic API message. */
-export const COMPOSE_ERROR_KEYS = ["listing_unavailable", "not_found", "conversation_blocked", "account_suspended", "rate_limited", "quota_exhausted", "adult_confirmation_required"] as const;
+export const COMPOSE_ERROR_KEYS = [
+  "listing_unavailable",
+  "not_found",
+  "conversation_blocked",
+  "account_suspended",
+  "rate_limited",
+  "quota_exhausted",
+  "adult_confirmation_required",
+  "rental_request_unavailable",
+] as const;
 export type ComposeErrorKey = (typeof COMPOSE_ERROR_KEYS)[number];
 
 export function composeErrorKey(error: unknown): ComposeErrorKey | null {
@@ -38,6 +57,15 @@ export function composeProblem(text: string): "empty" | "reserved" | null {
   return /[⟦⟧]/.test(trimmed) ? "reserved" : null;
 }
 
+/**
+ * The days of the search the renter came from, when they can still be requested: the results put
+ * them in the listing URL's fragment (`#du=&au=`), which never reaches the server or the edge cache.
+ */
+export function requestedDates(hash: string, today: number): Partial<RentalDates> {
+  const dates = completeDates(fragmentDates(hash) ?? {});
+  return dates && rentalRequestProblem(dates, today) === null ? dates : {};
+}
+
 export interface MessageDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -46,8 +74,8 @@ export interface MessageDialogProps {
   sellerName?: string;
   /** Adults-only listing: the buyer confirms being 18 or older before the first message. */
   adultsOnly?: boolean;
-  /** "visit": a visit request (real estate), with its draft, then the thread on the slots. */
-  intent?: "message" | "visit";
+  /** "visit": a visit request (real estate), with its draft, then the thread on the slots. "rental": a car rental's booking request. */
+  intent?: "message" | "visit" | "rental";
   /** The session ended meanwhile: the bar shows its sign-in prompt. */
   onSignedOut: () => void;
   /** First words of the message (a test drive request), the buyer edits them freely. */
@@ -64,7 +92,18 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
   const counterId = useId();
   const turnstile = useRef<TurnstileHandle>(null);
   const visit = intent === "visit";
-  const [text, setText] = useState(() => initialText ?? (visit ? t("visitDraft") : ""));
+  const rental = intent === "rental";
+  const [dates, setDates] = useState<Partial<RentalDates>>(() => (rental && typeof window !== "undefined" ? requestedDates(window.location.hash, moroccoToday(Date.now())) : {}));
+  const [pickup, setPickup] = useState("");
+  const [edited, setEdited] = useState(false);
+  const [datesMissing, setDatesMissing] = useState(false);
+  const draft = (next: Partial<RentalDates>, place: string): string => {
+    const complete = completeDates(next);
+    if (!complete) return "";
+    const values = { title: listingTitle ?? "", from: formatRentalDay(complete.from, locale as Locale), to: formatRentalDay(complete.to, locale as Locale), days: rentalDuration(complete) };
+    return place.trim() ? t("rentalDraftPickup", { ...values, pickup: place.trim() }) : t("rentalDraft", values);
+  };
+  const [text, setText] = useState(() => initialText ?? (visit ? t("visitDraft") : rental ? draft(dates, "") : ""));
   const [token, setToken] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<"empty" | "reserved" | null>(null);
@@ -87,7 +126,9 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
     const found = composeProblem(text);
     setProblem(found);
     if (adultsOnly && !adult) setAdultMissing(true);
-    if (found || (adultsOnly && !adult)) return;
+    const period = rental ? completeDates(dates) : undefined;
+    if (rental && !period) setDatesMissing(true);
+    if (found || (adultsOnly && !adult) || (rental && !period)) return;
     if (!token) {
       setChallengeMissing(true);
       return;
@@ -95,7 +136,13 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
     setPending(true);
     setError(null);
     try {
-      const { cid } = await startConversation({ listingId, text: text.trim(), turnstileToken: token, ...(adultsOnly ? { adultConfirmed: true as const } : {}) });
+      const { cid } = await startConversation({
+        listingId,
+        text: text.trim(),
+        turnstileToken: token,
+        ...(adultsOnly ? { adultConfirmed: true as const } : {}),
+        ...(period ? { rentalRequest: { ...period, ...(pickup.trim() ? { pickup: pickup.trim() } : {}) } } : {}),
+      });
       const query = threadQuery ?? (visit ? "rdv=visit" : undefined);
       router.push(`/messages/${cid}${query ? `?${query}` : ""}`);
     } catch (caught) {
@@ -127,10 +174,54 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
           <form onSubmit={(event) => void onSubmit(event)} noValidate className="flex flex-col gap-5 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
             <div className="flex flex-col gap-1.5">
               <Dialog.Title className="text-xl font-semibold text-balance">
-                {visit ? (sellerName ? t("visitTitle", { name: isolate(sellerName) }) : t("visitTitleFallback")) : sellerName ? t("title", { name: isolate(sellerName) }) : t("titleFallback")}
+                {visit
+                  ? sellerName
+                    ? t("visitTitle", { name: isolate(sellerName) })
+                    : t("visitTitleFallback")
+                  : rental
+                    ? sellerName
+                      ? t("rentalTitle", { name: isolate(sellerName) })
+                      : t("rentalTitleFallback")
+                    : sellerName
+                      ? t("title", { name: isolate(sellerName) })
+                      : t("titleFallback")}
               </Dialog.Title>
               {listingTitle ? <Dialog.Description className="text-foreground-muted text-pretty">{t("about", { title: isolate(listingTitle) })}</Dialog.Description> : null}
             </div>
+
+            {rental ? (
+              <div className="flex flex-col gap-4" data-testid="rental-request-fields">
+                <fieldset className="flex flex-col gap-1.5">
+                  <legend className="mb-1.5 text-sm font-medium">{t("rentalDates")}</legend>
+                  <RentalDatesFields
+                    value={dates}
+                    onChange={(next) => {
+                      setDates(next);
+                      if (completeDates(next)) setDatesMissing(false);
+                      if (!edited) setText(draft(next, pickup));
+                    }}
+                  />
+                  {datesMissing && !completeDates(dates) ? <InlineError>{t("rentalDatesMissing")}</InlineError> : null}
+                </fieldset>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor={`${counterId}-pickup`} className="text-sm font-medium">
+                    {t("rentalPickup")}
+                  </label>
+                  <Input
+                    id={`${counterId}-pickup`}
+                    dir="auto"
+                    value={pickup}
+                    maxLength={RENTAL_PICKUP_MAX}
+                    placeholder={t("rentalPickupPlaceholder")}
+                    onChange={(event) => {
+                      const place = event.target.value.replace(/[⟦⟧]/g, "");
+                      setPickup(place);
+                      if (!edited) setText(draft(dates, place));
+                    }}
+                  />
+                </div>
+              </div>
+            ) : null}
 
             <div className="flex flex-col gap-1.5">
               <label htmlFor={`${counterId}-text`} className="text-sm font-medium">
@@ -148,6 +239,7 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
                 className="min-h-28 resize-none"
                 onChange={(event) => {
                   setText(event.target.value);
+                  setEdited(true);
                   if (problem) setProblem(null);
                 }}
               />
@@ -189,7 +281,7 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
             <p className="flex items-start gap-2 text-sm text-foreground-muted text-pretty">
               <LockKeyhole className="mt-0.5 size-4 shrink-0 text-structure dark:text-gold-300" aria-hidden="true" />
               <span>
-                {t("privacy")} {visit ? t("visitSafety") : t("safety")}{" "}
+                {t("privacy")} {visit ? t("visitSafety") : rental ? t("rentalSafety") : t("safety")}{" "}
                 {t.rich("scanned", {
                   link: (chunks) => (
                     <Link href="/legal/confidentialite#finalites-3" target="_blank" rel="noopener" className="font-medium text-link underline underline-offset-2">
@@ -221,7 +313,7 @@ export function MessageDialog({ open, onOpenChange, listingId, listingTitle, sel
               </Dialog.Close>
               <Button type="submit" loading={pending}>
                 <Send className="rtl:-scale-x-100" aria-hidden="true" />
-                {t("send")}
+                {rental ? t("rentalSend") : t("send")}
               </Button>
             </div>
           </form>

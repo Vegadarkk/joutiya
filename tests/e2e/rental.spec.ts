@@ -78,8 +78,8 @@ async function photo(): Promise<Buffer> {
 const next = (page: Page) => page.getByRole("button", { name: "Continuer" }).click();
 
 test.describe("Car rental", () => {
-  test("an agency posts a car with its rental terms and its attestation", async ({ page, request }) => {
-    test.setTimeout(180_000);
+  test("an agency posts a car with its rental terms and its attestation", async ({ browser, page, request }) => {
+    test.setTimeout(300_000);
     const email = `rental-${randomId(10)}@joutiya.test`;
     const title = `Dacia Logan ou similaire ${randomId(4)}`;
     await signUpAndIn(page, request, email, "Océan Rent");
@@ -269,6 +269,47 @@ test.describe("Car rental", () => {
       await expect(card).toHaveAttribute("data-status", "blocked");
       await page.setViewportSize({ width: 390, height: 844 });
       await page.screenshot({ path: "test-results/rental-storefront-mobile.png", fullPage: true });
+      await page.setViewportSize({ width: 1280, height: 900 });
+
+      // Booking request (rental pack §6): a renter comes from the search by dates, the dialog takes
+      // those days; the agency answers "Disponible" on the card, which blocks them on the listing.
+      const renterContext = await browser.newContext();
+      const renter = await renterContext.newPage();
+      await signUpAndIn(renter, request, `rental-renter-${randomId(10)}@joutiya.test`, "Youssef Locataire");
+      await renter.goto(`/fr/recherche?sous-categorie=location-voitures&q=${word}&du=${day(6)}&au=${day(9)}`);
+      await renter.locator("#main").getByRole("link", { name: title }).click();
+      await expect(renter).toHaveURL(new RegExp(`#du=${day(6)}&au=${day(9)}$`));
+      await renter.getByTestId("rental-request-button").click();
+      const compose = renter.getByTestId("message-dialog");
+      await expect(compose.getByLabel("Départ")).toHaveValue(day(6));
+      await expect(compose.getByLabel("Retour")).toHaveValue(day(9));
+      await compose.getByLabel("Lieu de remise (facultatif)").fill("Aéroport Marrakech-Ménara");
+      await expect(compose.getByLabel("Votre message")).toHaveValue(/du .+ au .+ \(3 jours\), remise à Aéroport Marrakech-Ménara\. Est-ce disponible \?$/u);
+      await expect(compose.locator("[data-turnstile]")).toHaveAttribute("data-turnstile", "ready", { timeout: 20_000 });
+      await renter.screenshot({ path: "test-results/rental-request-compose.png" });
+      await compose.getByRole("button", { name: "Envoyer la demande" }).click();
+      await expect(renter).toHaveURL(/\/fr\/messages\/[A-Za-z0-9_-]{22}$/, { timeout: 20_000 });
+      const cid = new URL(renter.url()).pathname.split("/").at(-1)!;
+      await expect(renter.getByTestId("rental-request-card")).toHaveAttribute("data-status", "requested-mine", { timeout: 15_000 });
+      await expect(renter.getByTestId("rental-request-event").first()).toContainText("Vous avez demandé ce véhicule");
+
+      await page.goto(`/fr/messages/${cid}`);
+      const requestCard = page.getByTestId("rental-request-card");
+      await expect(requestCard).toHaveAttribute("data-status", "requested-theirs", { timeout: 15_000 });
+      await expect(requestCard).toContainText("3 jours");
+      await expect(requestCard.getByTestId("rental-request-block")).toBeChecked();
+      await page.screenshot({ path: "test-results/rental-request-agency.png" });
+      await requestCard.getByTestId("rental-request-accept").click();
+      await expect(requestCard).toHaveAttribute("data-status", "accepted", { timeout: 15_000 });
+      await expect(requestCard).toContainText("Dates bloquées sur l'annonce.");
+      await expect(requestCard.getByTestId("rental-request-pickup")).toBeVisible();
+      await renter.reload();
+      await expect(renter.getByTestId("rental-request-card")).toHaveAttribute("data-status", "accepted", { timeout: 15_000 });
+      await renter.setViewportSize({ width: 390, height: 844 });
+      await renter.screenshot({ path: "test-results/rental-request-accepted-mobile.png" });
+      await page.goto(`/fr/annonce/${answer.slugId}`);
+      await expect(page.getByTestId("rental-availability").locator(`[data-day="${day(7)}"]`)).toHaveAttribute("data-state", "blocked");
+      await renterContext.close();
     }
   });
 });

@@ -77,6 +77,8 @@ export const MESSAGING_API = {
   state: (cid: string) => `/api/conversations/${cid}/state`,
   /** POST AppointmentAction -> 201 AppointmentResponse (contracts/appointments.ts). */
   appointment: (cid: string) => `/api/conversations/${cid}/appointment`,
+  /** POST RentalRequestAction -> 201 RentalRequestResponse (contracts/rental-requests.ts). */
+  rentalRequest: (cid: string) => `/api/conversations/${cid}/rental-request`,
   /** GET { total } (Valkey). */
   unread: "/api/messages/unread",
   /** GET text/event-stream of MessagingEvent (session cookie; one per tab, D2). */

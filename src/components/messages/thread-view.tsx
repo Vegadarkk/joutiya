@@ -6,6 +6,7 @@ import { ArrowLeft, CalendarPlus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { AppointmentCard } from "@/components/appointments/appointment-card";
+import { RentalRequestCard } from "@/components/rental/rental-request-card";
 import type { AppointmentDialogProps } from "@/components/appointments/appointment-dialog";
 import { FormMessage } from "@/components/auth/form-message";
 import { ErrorBanner } from "@/components/feedback/error-banner";
@@ -21,6 +22,7 @@ import { isApiError, refreshSession, useSession } from "@/lib/auth/client";
 import { APPOINTMENT_KINDS, type AppointmentKind, type AppointmentResponse } from "@/lib/contracts/appointments";
 import { URL_MARKER, type ConversationView, type MessageView } from "@/lib/contracts/messaging";
 import { isActive } from "@/lib/appointments/rules";
+import type { RentalRequestResponse } from "@/lib/contracts/rental-requests";
 import { isolate } from "@/lib/i18n/bidi";
 import { formatPrice } from "@/lib/listings/client/format";
 import { changeConversationState, fetchConversation, fetchThread, markConversationRead, sendMessage } from "@/lib/messaging/client";
@@ -367,6 +369,12 @@ export function ThreadView({ cid }: { cid: string }) {
     if (view.kind === "ready") putRow(view.data.conversation);
     void fetchNewer();
   }
+  function onRentalRequest(response: RentalRequestResponse) {
+    updateData((data) => ({ ...data, conversation: { ...data.conversation, rentalRequest: response.rentalRequest } }));
+    const view = current.current;
+    if (view.kind === "ready") putRow(view.data.conversation);
+    void fetchNewer();
+  }
   const [unblocking, setUnblocking] = useState(false);
   async function unblock(conversation: ConversationView) {
     setUnblocking(true);
@@ -480,6 +488,19 @@ export function ThreadView({ cid }: { cid: string }) {
         />
       ) : conversation.blockedMe ? (
         <ErrorBanner tone="info" title={t("blockedMe")} className="mx-3 mt-3 lg:mx-5" />
+      ) : null}
+
+      {conversation.rentalRequest ? (
+        <RentalRequestCard
+          key={conversation.rentalRequest.id}
+          cid={cid}
+          request={conversation.rentalRequest}
+          counterpartName={name}
+          writable={writable}
+          now={now}
+          onChange={onRentalRequest}
+          onPickup={conversation.appointment && isActive(conversation.appointment, now) ? undefined : () => setPicker({ open: true, kind: "pickup" })}
+        />
       ) : null}
 
       {conversation.appointment ? (

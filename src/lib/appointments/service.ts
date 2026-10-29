@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { appointmentMarker, type AppointmentAction, type AppointmentEvent, type AppointmentResponse } from "@/lib/contracts/appointments";
 import { appointmentSchema, type AppointmentDoc, type AppointmentEventDoc, type StoredSlot } from "@/lib/db/schemas";
 import { HttpError } from "@/lib/http/errors";
-import { appendAppointmentStep, type MessagingActor } from "@/lib/messaging/service";
+import { appendSystemStep, type MessagingActor } from "@/lib/messaging/service";
 import { maskLinks } from "@/lib/messaging/risk";
 import { isActive, nextReminderAt, slotsProblem, sortSlots } from "./rules";
 import { appointmentView } from "./views";
@@ -90,7 +90,7 @@ function viewOf(appointment: AppointmentDoc) {
 /** One appointment step in `cid` by `actor` (the route handler authenticated, limited and gated it). */
 export async function actOnAppointment(actor: MessagingActor, cid: string, action: AppointmentAction, now = new Date()): Promise<AppointmentResponse> {
   let result: AppointmentDoc | undefined;
-  const messageId = await appendAppointmentStep(
+  const messageId = await appendSystemStep(
     actor,
     cid,
     (conversation) => {

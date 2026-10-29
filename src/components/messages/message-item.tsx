@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import { Check, CheckCheck, Clock3, EyeOff, Flag, Link2Off, ShieldAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { AppointmentEventItem } from "@/components/appointments/appointment-event";
+import { RentalRequestEventItem } from "@/components/rental/rental-request-event";
 import { Link } from "@/i18n/navigation";
 import { HIDDEN_MARKER, URL_MARKER, type MessageRiskFlag, type MessageView } from "@/lib/contracts/messaging";
 import { cn } from "@/lib/utils";
@@ -100,6 +101,9 @@ export function MessageItem({ message, time, status, sender, onReport }: Message
   if (message.type === "system" && message.appointment) {
     // `sender` is the other participant's name whenever the step is theirs.
     return <AppointmentEventItem step={message.appointment} counterpartName={sender} time={time} />;
+  }
+  if (message.type === "system" && message.rentalRequest) {
+    return <RentalRequestEventItem step={message.rentalRequest} counterpartName={sender} time={time} />;
   }
   if (message.type === "system") {
     return (

@@ -3,7 +3,7 @@
 import { useId, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { CalendarClock, CarFront, LogIn, MessageCircle, MessageSquare, Phone, RotateCw, Settings2 } from "lucide-react";
+import { CalendarClock, CalendarRange, CarFront, LogIn, MessageCircle, MessageSquare, Phone, RotateCw, Settings2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { InlineError } from "@/components/feedback/inline-error";
 import { loadWithRetry } from "@/components/layout/chunk-retry";
@@ -85,13 +85,19 @@ export interface ContactBarProps {
    * opens the thread with the slot picker of a test drive (`?rdv=test_drive`).
    */
   testDrive?: boolean;
+  /**
+   * A car rental (rental pack §6): "Demander une réservation" always opens the first-message dialog
+   * with the days and the pick-up place (an existing conversation takes the request too); the
+   * agency answers on the request's card in the thread.
+   */
+  rental?: boolean;
 }
 
-export type ComposeIntent = "message" | "visit" | "test_drive";
+export type ComposeIntent = "message" | "visit" | "test_drive" | "rental";
 
 /** The conversation page, opened on the slots of a visit or a test drive. */
 export function threadHref(cid: string, intent: ComposeIntent): string {
-  return intent === "message" ? `/messages/${cid}` : `/messages/${cid}?rdv=${intent}`;
+  return intent === "message" || intent === "rental" ? `/messages/${cid}` : `/messages/${cid}?rdv=${intent}`;
 }
 
 type Phone = PhoneRevealResponse["phone"];
@@ -148,7 +154,7 @@ function BarSpacer() {
   return mounted ? createPortal(<div aria-hidden="true" data-testid="contact-bar-spacer" className="h-24 lg:hidden" />, document.body) : null;
 }
 
-export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, listingTitle, showPhone, whatsapp, adultsOnly = false, visit = false, testDrive = false }: ContactBarProps) {
+export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, listingTitle, showPhone, whatsapp, adultsOnly = false, visit = false, testDrive = false, rental = false }: ContactBarProps) {
   const t = useTranslations("ListingPage.contact");
   const locale = useLocale();
   const { status, session } = useSession();
@@ -193,7 +199,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
     const step = await messageStep(listingId);
     if (step.kind === "signin") {
       setCompose("signin");
-    } else if (step.kind === "thread") {
+    } else if (step.kind === "thread" && next !== "rental") {
       // Another root layout (private pages): a document load either way. The button spins until then.
       window.location.assign(getPathname({ href: threadHref(step.cid, next), locale }));
     } else {
@@ -299,7 +305,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
         <RevealChallenge failed={state.failed} onToken={(token) => void reveal(token)} />
       ) : null
     ) : compose === "signin" ? (
-      signIn(intent === "visit" ? t("signInVisit") : t("signInMessage"))
+      signIn(intent === "visit" ? t("signInVisit") : intent === "rental" ? t("signInRental") : t("signInMessage"))
     ) : state.kind === "signin" ? (
       signIn(t("signInBody"))
     ) : state.kind === "error" ? (
@@ -322,6 +328,23 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
         {visitButton(false)}
         {hint}
       </div>
+      {rental ? (
+        <div className="mt-3 flex flex-col gap-1.5">
+          <Button
+            type="button"
+            variant="structure"
+            onClick={() => void openComposer("rental")}
+            loading={compose === "checking" && intent === "rental"}
+            aria-haspopup="dialog"
+            data-testid="rental-request-button"
+            className="w-full"
+          >
+            <CalendarRange aria-hidden="true" />
+            {t("rental")}
+          </Button>
+          <p className="text-xs text-foreground-muted text-pretty">{t("rentalHint")}</p>
+        </div>
+      ) : null}
       {testDrive ? (
         <div className="mt-3 flex flex-col gap-1.5">
           <Button type="button" variant="structure" onClick={() => void openComposer("test_drive")} loading={compose === "checking" && intent === "test_drive"} aria-haspopup="dialog" className="w-full">
@@ -349,7 +372,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
         <MessageDialog
           // A fresh form per intent: the visit request comes with its own draft.
           key={intent}
-          intent={intent === "visit" ? "visit" : "message"}
+          intent={intent === "visit" || intent === "rental" ? intent : "message"}
           open={compose === "open"}
           onOpenChange={(open) => setCompose(open ? "open" : "closed")}
           listingId={listingId}

@@ -2601,18 +2601,32 @@
           "rate_limited": "Vous avez envoyé beaucoup de messages. Réessayez {wait}.",
           "later": "plus tard",
           "quota_exhausted": "La messagerie est momentanément suspendue : la limite quotidienne de notre service est atteinte. Réessayez après 9 h (heure du Maroc).",
-          "adult_confirmation_required": "Cet article est réservé aux personnes majeures : confirmez avoir 18 ans ou plus pour écrire au vendeur."
+          "adult_confirmation_required": "Cet article est réservé aux personnes majeures : confirmez avoir 18 ans ou plus pour écrire au vendeur.",
+          "rental_request_unavailable": "Cette annonce ne prend plus de demande de location."
         },
         "adultConfirm": "Je confirme avoir 18 ans ou plus.",
         "adultMissing": "Confirmez avoir 18 ans ou plus pour écrire au vendeur.",
         "visitTitle": "Demander une visite à {name}",
         "visitTitleFallback": "Demander une visite",
         "visitDraft": "Bonjour, votre bien m'intéresse et je souhaiterais le visiter. Quelles sont vos disponibilités ?",
-        "visitSafety": "Une visite ne se paie jamais : ne versez ni acompte ni frais de réservation avant d'avoir vu le bien et signé un contrat. Après l'envoi, proposez vos créneaux dans la conversation."
+        "visitSafety": "Une visite ne se paie jamais : ne versez ni acompte ni frais de réservation avant d'avoir vu le bien et signé un contrat. Après l'envoi, proposez vos créneaux dans la conversation.",
+        "rentalTitle": "Demande de réservation à {name}",
+        "rentalTitleFallback": "Demande de réservation",
+        "rentalDates": "Dates de location",
+        "rentalPickup": "Lieu de remise (facultatif)",
+        "rentalPickupPlaceholder": "Ex. : aéroport Mohammed V, agence de Maârif",
+        "rentalDraft": "Bonjour, je souhaite louer « {title} » du {from} au {to} ({days, plural, one {# jour} other {# jours}}). Est-ce disponible ?",
+        "rentalDraftPickup": "Bonjour, je souhaite louer « {title} » du {from} au {to} ({days, plural, one {# jour} other {# jours}}), remise à {pickup}. Est-ce disponible ?",
+        "rentalDatesMissing": "Choisissez les dates de prise en charge et de retour.",
+        "rentalSafety": "La location se conclut par le contrat écrit de l'agence : ne versez ni acompte ni caution sur le site ou avant d'avoir vu le véhicule.",
+        "rentalSend": "Envoyer la demande"
       },
       "visit": "Demander une visite",
       "visitShort": "Visite",
-      "signInVisit": "Connectez-vous pour demander une visite. Vous reviendrez ensuite sur cette annonce."
+      "signInVisit": "Connectez-vous pour demander une visite. Vous reviendrez ensuite sur cette annonce.",
+      "rental": "Demander une réservation",
+      "rentalHint": "Envoyez vos dates à l'agence : elle confirme la disponibilité dans la messagerie. Rien ne se paie sur le site.",
+      "signInRental": "Connectez-vous pour envoyer une demande de réservation. Vous reviendrez ensuite sur cette annonce."
     },
     "safety": {
       "title": "Conseils de sécurité",
@@ -4634,6 +4648,68 @@
         "active_content": "Ce PDF contient du contenu actif (script, formulaire) : exportez-le à nouveau en PDF simple.",
         "expired": "L'envoi n'a pas abouti à temps. Réessayez."
       }
+    }
+  },
+  "RentalRequest": {
+    "card": {
+      "title": "Demande de location",
+      "period": "Du {from} au {to} · {days, plural, one {# jour} other {# jours}}",
+      "pickup": "Remise : {place}",
+      "maskedLink": "[lien masqué]",
+      "requestedMine": "Demande envoyée à {name}",
+      "waiting": "En attente de la réponse de l'agence.",
+      "withdraw": "Retirer ma demande",
+      "withdrawnToast": "Demande retirée",
+      "requestedTheirs": "{name} demande ce véhicule",
+      "block": "Bloquer ces dates sur l'annonce",
+      "blockHint": "Cochez si plus aucun véhicule de ce modèle n'est libre sur la période : l'annonce sortira des recherches à ces dates.",
+      "accept": "Disponible",
+      "acceptedToast": "Disponibilité confirmée",
+      "blockFailed": "La disponibilité est confirmée, mais les dates n'ont pas pu être bloquées. Mettez votre planning à jour.",
+      "planning": "Ouvrir mon planning",
+      "decline": "Pas disponible",
+      "declinedToast": "Réponse envoyée : pas disponible",
+      "acceptedMine": "Vous avez confirmé la disponibilité",
+      "acceptedTheirs": "{name} confirme la disponibilité",
+      "blockedNote": "Dates bloquées sur l'annonce.",
+      "pickupAppointment": "Proposer la remise du véhicule",
+      "safety": "La location se conclut par le contrat écrit de l'agence. {site} ne prend ni acompte ni caution : ne versez rien avant d'avoir vu le véhicule et signé le contrat."
+    },
+    "event": {
+      "period": "du {from} au {to}",
+      "requested": {
+        "mine": "Vous avez demandé ce véhicule {period}",
+        "theirs": "{name} demande ce véhicule {period}"
+      },
+      "changed": {
+        "mine": "Vous avez modifié votre demande : {period}",
+        "theirs": "{name} a modifié sa demande : {period}"
+      },
+      "accepted": {
+        "mine": "Vous avez confirmé la disponibilité {period}",
+        "theirs": "{name} confirme la disponibilité {period}"
+      },
+      "declined": {
+        "mine": "Vous avez répondu « pas disponible » {period}",
+        "theirs": "{name} n'a pas de véhicule disponible {period}"
+      },
+      "withdrawn": {
+        "mine": "Vous avez retiré votre demande",
+        "theirs": "{name} a retiré sa demande"
+      },
+      "pickup": "remise : {place}"
+    },
+    "preview": {
+      "requested": "Demande de location",
+      "changed": "Demande de location modifiée",
+      "accepted": "Disponibilité confirmée",
+      "declined": "Pas de véhicule disponible",
+      "withdrawn": "Demande de location retirée"
+    },
+    "errors": {
+      "rental_request_changed": "Cette demande a changé entre-temps : voici sa dernière version.",
+      "rental_request_past": "Le jour de prise en charge est passé : le locataire doit demander d'autres dates.",
+      "rental_request_unavailable": "Cette annonce ne prend plus de demande de location."
     }
   }
 }
