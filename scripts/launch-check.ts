@@ -2,7 +2,7 @@
 // and of the launch records, run after `oracle-vm.ts promote --tag=vX.Y.Z` and before the site
 // opens to visitors. Public URLs only (no key, no sign-in), plus files of this repository.
 //
-//   NODE_USE_ENV_PROXY=1 node scripts/launch-check.ts [--tag=vX.Y.Z] [--site=https://joutiya.ma] [--ads=off|test|live]
+//   NODE_USE_ENV_PROXY=1 node scripts/launch-check.ts [--tag=vX.Y.Z] [--site=https://joutiya.ma] [--ads=off|test|live] [--opening=YYYY-MM-DD]
 //
 // Automatic checks (exit code 1 when one fails):
 //   - /api/health answers 200 "ok" with the tag's release: production started, so its startup gate
@@ -11,15 +11,20 @@
 //     Google sign-in and Firebase configured;
 //   - the home page enforces its CSP (not report-only) and HSTS;
 //   - MDN HTTP Observatory grade A or A+ (one public scan, at most one a minute per host);
-//   - the restore drill B, the load test and the security audit are recorded.
+//   - the restore drill B, the load test and the security audit are recorded;
+//   - the legal reset (spec §10): every page at version 1.0 in force on the opening day (today by
+//     default; Morocco is on UTC), the texts frozen and their hashes recorded (scripts/legal-hash.ts).
 // Then the items no public URL shows are listed, to confirm by hand.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { LAUNCH_LEGAL_VERSION, LEGAL_TEXTS_FROZEN, LEGAL_VERSIONS, PROVISIONAL_LEGAL_PAGES } from "../src/config/legal-versions.ts";
 import { requireEnvProxy } from "./env-proxy.ts";
+import { legalTextHashes, readHashRecord, staleHashes, type HashRecord, type TextHashes } from "./legal-hash.ts";
 
-const USAGE = "usage: scripts/launch-check.ts [--tag=vX.Y.Z] [--site=https://joutiya.ma] [--ads=off|test|live]";
+const USAGE = "usage: scripts/launch-check.ts [--tag=vX.Y.Z] [--site=https://joutiya.ma] [--ads=off|test|live] [--opening=YYYY-MM-DD]";
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const RELEASE_TAG = /^v\d+\.\d+\.\d+(?:-rc\.[1-9]\d*)?$/;
 const ADS_MODES = ["off", "test", "live"] as const;
 const OBSERVATORY = "https://observatory-api.mdn.mozilla.net/api/v2/scan";
@@ -31,6 +36,8 @@ export interface LaunchArgs {
   tag: string | null;
   site: string;
   ads: AdsMode;
+  /** Opening day (ISO): the date every legal page comes into force. */
+  opening: string;
 }
 
 export interface Check {
@@ -48,10 +55,12 @@ export const MANUAL_ITEMS = [
   "Example listings: in prod only if the owner said go (worker: node dist/worker/seed-demo.mjs --production --apply), each one labelled 'Annonce exemple' and not contactable",
   "Prod Firestore rules and indexes deployed (scripts/deploy-prod.ts firestore)",
   "Repository back to private on the day the site opens to visitors (spec §10)",
+  "Load-test bypass removed (docs/lancement/charge-procedure.md): `cloudflare.ts loadtest --off` applied and `cloudflare.ts zone --check` clean, LOADTEST_BYPASS_SECRET gone from the staging app.env, GitHub secret LOADTEST_BYPASS_SECRET deleted and variable LOAD_TEST_ENABLED unset",
 ] as const;
 
-export function parseLaunchCli(argv: readonly string[]): LaunchArgs {
+export function parseLaunchCli(argv: readonly string[], now = new Date()): LaunchArgs {
   let tag: string | null = null;
+  let opening = now.toISOString().slice(0, 10);
   let site = "https://joutiya.ma";
   let ads: AdsMode = "off";
   for (const arg of argv) {
@@ -60,9 +69,10 @@ export function parseLaunchCli(argv: readonly string[]): LaunchArgs {
     if (name === "--tag" && RELEASE_TAG.test(value)) tag = value;
     else if (name === "--site" && /^https:\/\/[a-z0-9.-]+$/.test(value)) site = value;
     else if (name === "--ads" && (ADS_MODES as readonly string[]).includes(value)) ads = value as AdsMode;
+    else if (name === "--opening" && ISO_DAY.test(value) && !Number.isNaN(Date.parse(value))) opening = value;
     else throw new Error(`${arg}: not understood\n${USAGE}`);
   }
-  return { tag, site, ads };
+  return { tag, site, ads, opening };
 }
 
 /** /api/health: 200 "ok" and the release expected (`release`: 12 hex of the tag's commit, or null for any built release). */
@@ -127,6 +137,31 @@ export function checkRecords(read: (path: string) => string | null): Check[] {
   ];
 }
 
+export interface LegalState {
+  versions: Record<string, { version: string; effective: string }>;
+  provisional: ReadonlySet<string>;
+  frozen: boolean;
+  recorded: HashRecord | null;
+  actual: Record<string, TextHashes>;
+}
+
+/**
+ * The legal reset of the opening day (spec §10, D11): every page but the provisional ones at
+ * version 1.0 in force on `opening`, the texts frozen, their hashes recorded for these versions.
+ */
+export function checkLegal(state: LegalState, opening: string): Check {
+  const problems: string[] = [];
+  const pages = Object.entries(state.versions).filter(([slug]) => !state.provisional.has(slug));
+  const notReset = pages.filter(([, entry]) => entry.version !== LAUNCH_LEGAL_VERSION).map(([slug, entry]) => `${slug} ${entry.version}`);
+  const notDated = pages.filter(([, entry]) => entry.effective !== opening).map(([slug, entry]) => `${slug} ${entry.effective}`);
+  if (notReset.length > 0) problems.push(`not at ${LAUNCH_LEGAL_VERSION}: ${notReset.join(", ")}`);
+  if (notDated.length > 0) problems.push(`not in force on ${opening}: ${notDated.join(", ")}`);
+  if (!state.frozen) problems.push("LEGAL_TEXTS_FROZEN is false");
+  const stale = staleHashes(state.recorded, state.actual, state.versions);
+  if (stale.length > 0) problems.push(`hashes not recorded (node scripts/legal-hash.ts --apply): ${stale.join(", ")}`);
+  return { name: "Legal reset", ok: problems.length === 0, detail: problems.length === 0 ? `${pages.length} pages at ${LAUNCH_LEGAL_VERSION} from ${opening}, texts frozen` : problems.join("; ") };
+}
+
 /** The 12 hex of the tag's commit, from origin (null when the tag is not there). */
 function tagRelease(tag: string): string | null {
   spawnSync("git", ["fetch", "--quiet", "--force", "origin", `refs/tags/${tag}:refs/tags/${tag}`], { cwd: root, stdio: "ignore" });
@@ -154,6 +189,11 @@ async function attempt(name: string, check: () => Promise<Check>): Promise<Check
   }
 }
 
+function readRepo(path: string): string | null {
+  const file = `${root}/${path}`;
+  return existsSync(file) ? readFileSync(file, "utf8") : null;
+}
+
 async function main(): Promise<void> {
   requireEnvProxy();
   const args = parseLaunchCli(process.argv.slice(2));
@@ -176,10 +216,8 @@ async function main(): Promise<void> {
       return checkHeaders(response.status, response.headers);
     }),
     await attempt("HTTP Observatory", async () => checkObservatory((await getJson(`${OBSERVATORY}?host=${encodeURIComponent(host)}`, { method: "POST" })).body)),
-    ...checkRecords((path) => {
-      const file = `${root}/${path}`;
-      return existsSync(file) ? readFileSync(file, "utf8") : null;
-    }),
+    ...checkRecords(readRepo),
+    checkLegal({ versions: LEGAL_VERSIONS, provisional: PROVISIONAL_LEGAL_PAGES, frozen: LEGAL_TEXTS_FROZEN, recorded: readHashRecord(readRepo), actual: legalTextHashes(readRepo) }, args.opening),
   ];
   for (const check of checks) console.log(`${check.ok ? "ok  " : "FAIL"}  ${check.name}: ${check.detail}`);
   console.log("\nTo confirm by hand:");

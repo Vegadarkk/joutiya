@@ -107,7 +107,7 @@ La décision est prise par une personne, de façon diligente, objective et non a
 
 ### 5.4 Contester la décision {#signalement-4}
 
-L'auteur de l'avis et l'auteur du signalement peuvent contester gratuitement la décision pendant 6 mois. Elle est réexaminée par une autre personne (art. 20 du DSA ; voir les [CGU](/legal/cgu#recours)). Un avis rétabli est republié et son auteur en est prévenu.
+L'auteur de l'avis et l'auteur du signalement peuvent contester gratuitement la décision pendant 6 mois. Elle est réexaminée par un autre modérateur, ou par un administrateur qui peut être l'auteur de la décision (art. 20 du DSA ; voir les [CGU](/legal/cgu#recours)). Un avis rétabli est republié et son auteur en est prévenu.
 
 ### 5.5 Signalements abusifs {#signalement-5}
 

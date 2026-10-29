@@ -5,6 +5,7 @@ import { ScrollText } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/layout/container";
+import { LEGAL_VERSIONS } from "@/config/legal-versions";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
 import { numbersLocale } from "@/i18n/params";
@@ -16,6 +17,7 @@ import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 // CGU change notice (phase 6, D11; DSA art. 14 § 2): a signed-in member who accepted an earlier
 // version sees this band under the header, on every page, until they acknowledge the new text.
 // Acknowledging records the current version (POST /api/auth/consents { cgu: true }, journaled).
+// The band lists the summary of the changes (CGU §22.1): Arabic on the Arabic site, else French.
 
 /** Today's date in Casablanca, as the ISO day of LEGAL_VERSIONS. */
 function today(): string {
@@ -32,6 +34,7 @@ export function CguNotice() {
   const update = status === "ready" ? session?.cguUpdate : null;
   if (!session || !update) return null;
 
+  const summary = LEGAL_VERSIONS.cgu.version === update.version ? (LEGAL_VERSIONS.cgu.summary?.[locale === "ar" ? "ar" : "fr"] ?? []) : [];
   const date = new Intl.DateTimeFormat(numbersLocale(locale), { dateStyle: "long", timeZone: "UTC" }).format(new Date(`${update.effective}T00:00:00Z`));
 
   async function acknowledge() {
@@ -57,6 +60,13 @@ export function CguNotice() {
             <h2 id="cgu-notice-title" className="text-sm font-semibold text-balance">
               {t(update.effective > today() ? "titleUpcoming" : "titleChanged", { date })}
             </h2>
+            {summary.length > 0 ? (
+              <ul className="list-disc ps-5 text-sm text-pretty" data-testid="cgu-notice-summary">
+                {summary.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            ) : null}
             <p className="text-sm text-foreground-muted text-pretty">{t("body")}</p>
             {failed ? (
               <p role="alert" className="text-sm text-danger">

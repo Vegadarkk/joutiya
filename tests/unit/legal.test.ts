@@ -76,12 +76,12 @@ describe("legal pages", () => {
     return JSON.stringify(blocks.slice(start, end < 0 ? undefined : end));
   }
 
-  it("has a version, a French source for every page and an Arabic one for all but the provisional CGV", () => {
+  it("has a version, a French and an Arabic source for every page", () => {
     expect(Object.keys(LEGAL_VERSIONS).sort()).toEqual(LEGAL_PAGES.map((page) => page.slug).sort());
     expect(LEGAL_PAGES.filter((page) => page.column === "legal")).toHaveLength(9);
     expect([...PROVISIONAL_LEGAL_PAGES]).toEqual(["cgv"]);
     expect(sources).toHaveLength(LEGAL_PAGES.length + ARABIC_LEGAL_PAGES.size);
-    expect(ARABIC_LEGAL_PAGES.has("cgv")).toBe(false);
+    expect(ARABIC_LEGAL_PAGES.size).toBe(LEGAL_PAGES.length);
   });
 
   it("renders every page with every key known and no marker left, whatever the configuration", () => {

@@ -4211,7 +4211,7 @@
   "Appeals": {
     "page": {
       "title": "Décisions et recours",
-      "intro": "Les décisions de modération qui concernent votre compte, vos annonces ou vos messages, avec leurs motifs. Vous pouvez contester une décision pendant 6 mois : une autre personne que celle qui a décidé la réexamine et vous répond sous 14 jours.",
+      "intro": "Les décisions de modération qui concernent votre compte, vos annonces ou vos messages, avec leurs motifs. Vous pouvez contester une décision pendant 6 mois : un autre modérateur, ou un administrateur, la réexamine et vous répond sous 14 jours.",
       "loading": "Chargement de vos décisions",
       "loadFailed": "Vos décisions n'ont pas pu être chargées",
       "retry": "Réessayer",
@@ -4280,8 +4280,8 @@
       "reversed": "Décision annulée"
     },
     "appeal": {
-      "intro": "Vous pouvez contester cette décision jusqu'au {date}. Une autre personne que celle qui a décidé la réexaminera et vous répondra sous 14 jours. Vous pouvez aussi saisir le tribunal compétent.",
-      "reporterIntro": "Vous pouvez contester ce classement jusqu'au {date}. Une autre personne que celle qui a décidé réexaminera votre signalement et vous répondra sous 14 jours.",
+      "intro": "Vous pouvez contester cette décision jusqu'au {date}. Un autre modérateur, ou un administrateur, la réexaminera et vous répondra sous 14 jours. Vous pouvez aussi saisir le tribunal compétent.",
+      "reporterIntro": "Vous pouvez contester ce classement jusqu'au {date}. Un autre modérateur, ou un administrateur, réexaminera votre signalement et vous répondra sous 14 jours.",
       "start": "Contester la décision",
       "label": "Pourquoi contestez-vous cette décision ?",
       "hint": "Expliquez les faits de votre point de vue et ce qui, selon vous, a été mal apprécié. {min} caractères au moins.",

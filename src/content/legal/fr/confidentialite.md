@@ -61,7 +61,7 @@ Pour signaler un contenu, utilisez le bouton « Signaler » présent sur chaque 
 - **Messages :** le contenu de vos conversations avec les autres utilisateurs, y compris les rendez-vous proposés (créneaux, lieu), les demandes de réservation d'un véhicule (dates, lieu de prise en charge) et les offres de prix (montant, statut, dates, note facultative).
 - **Avis :** la note, le texte et votre déclaration d'échange, pour un avis que vous laissez à un vendeur ; la réponse d'un vendeur à un avis (§3.7).
 - **Signalements et recours :** le contenu visé, le motif, votre explication, votre déclaration de bonne foi, et votre nom et votre e-mail si vous les donnez.
-- **Compte Pro :** nom et forme de l'entreprise, identifiants légaux selon la forme (ICE, registre du commerce, identifiant fiscal, numéro d'auto-entrepreneur, de coopérative ou de taxe professionnelle), ville, description, logo, site web, téléphone public, pièces justificatives et engagement de conformité ; selon l'activité, les informations de vente à distance (adresse, e-mail de contact, livraison, retours), le lien de paiement, le barème d'honoraires d'une agence immobilière, le numéro d'agrément, les agences et horaires d'un loueur de voitures, et les numéros sanitaires ONSSA.
+- **Compte Pro :** nom et forme de l'entreprise, identifiants légaux selon la forme (ICE, registre du commerce, identifiant fiscal, numéro d'auto-entrepreneur, de coopérative ou de taxe professionnelle), ville, description, logo, site web, téléphone public, pièces justificatives, engagements acceptés (liste, version et date) ; les liens vers ses comptes de réseaux sociaux (nom de compte) ; selon l'activité, les informations de vente à distance (adresse, e-mail de contact, livraison, retours), le lien de paiement, le barème d'honoraires d'une agence immobilière, le numéro d'agrément, les agences et horaires d'un loueur de voitures, et les numéros sanitaires ONSSA.
 - **Achats, à l'ouverture des ventes :** options achetées, crédits, abonnements, données de facturation. Les données de votre carte sont saisies directement chez notre prestataire de paiement.
 - **Assistant {brand} :** les questions que vous lui posez.
 - **Vos choix :** acceptation des CGU, consentement aux transferts (§7.2), accord pour recevoir nos e-mails d'information, choix en matière de cookies.
@@ -76,7 +76,7 @@ Pour signaler un contenu, utilisez le bouton « Signaler » présent sur chaque 
 - **Activité :** favoris, recherches sauvegardées et alertes, statistiques de vos annonces (vues, favoris, contacts).
 - **Rapports d'erreur :** type d'erreur, page, navigateur et système, après suppression des données personnelles détectées.
 
-Nous n'accédons pas à la géolocalisation de votre appareil.
+Nous n'accédons à la position de votre appareil que si vous cliquez sur « Utiliser ma position » dans la recherche (§3.7).
 
 ### 2.3 Les données que nous recevons d'autres personnes {#donnees-3}
 
@@ -178,7 +178,7 @@ Nos e-mails ne contiennent ni pixel de suivi d'ouverture ni lien de suivi des cl
 
 Vous pouvez enregistrer des annonces en favoris et sauvegarder jusqu'à 10 recherches. Si vous activez une alerte, nous vous envoyons au plus un e-mail par jour avec les nouvelles annonces. Ce même e-mail signale aussi vos favoris dont une promotion a commencé la veille, avec leur prix promotionnel et leur prix barré. Vous pouvez supprimer un favori, une recherche ou une alerte à tout moment.
 
-**« Utiliser ma position ».** Votre navigateur ne vous demande votre position que si vous cliquez sur ce bouton. Elle est arrondie à environ 100 m, refusée si elle est hors du Maroc, puis transformée en une zone de 3 km placée dans l'adresse de la page de recherche, comme les autres critères. Elle n'est envoyée à personne d'autre et n'est pas enregistrée, sauf si vous sauvegardez cette recherche : la zone est alors gardée avec elle, et l'e-mail d'alerte la désigne par la ville la plus proche.
+**« Utiliser ma position ».** Votre navigateur ne vous demande votre position que si vous cliquez sur ce bouton. Elle est arrondie à environ 100 m, refusée si elle est hors du Maroc, puis transformée en une zone de recherche autour de ce point : 3 km, ou la distance que vous avez écrite dans votre recherche (de 1 à 100 km). Cette zone est placée dans l'adresse de la page de recherche, comme les autres critères. Elle n'est envoyée à personne d'autre et n'est pas enregistrée, sauf si vous sauvegardez cette recherche : la zone est alors gardée avec elle, et l'e-mail d'alerte la désigne par la ville la plus proche.
 
 Après un échange par la messagerie, l'acheteur peut noter le vendeur (voir [Avis utilisateurs](/legal/avis-utilisateurs)). Nous vérifions à partir de la conversation que l'échange a eu lieu. Le texte passe par des contrôles automatiques, et un avis qui semble contenir une donnée sensible est examiné par un modérateur avant publication. Un avis publié est public : il montre le pseudonyme de son auteur, la note, le texte, la date de l'avis et celle de l'échange, et le titre de l'annonce, sur le profil ou la boutique du vendeur, qui peut y répondre une fois. L'auteur peut supprimer son avis à tout moment. S'il ferme son compte, ses avis restent affichés et son nom est remplacé par « Ancien membre ». Si le vendeur ferme son compte, les avis qu'il a reçus sont masqués.
 

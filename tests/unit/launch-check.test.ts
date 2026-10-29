@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { checkConfig, checkHeaders, checkHealth, checkObservatory, checkRecords, drillRecorded, parseLaunchCli } from "../../scripts/launch-check.ts";
+import { checkConfig, checkHeaders, checkHealth, checkLegal, checkObservatory, checkRecords, drillRecorded, MANUAL_ITEMS, parseLaunchCli, type LegalState } from "../../scripts/launch-check.ts";
 
 // scripts/launch-check.ts (D21): what each public answer must say before the site opens.
 
@@ -9,12 +9,13 @@ const SITE = "https://joutiya.ma";
 
 describe("parseLaunchCli", () => {
   it("defaults to the production site with ads off", () => {
-    expect(parseLaunchCli([])).toEqual({ tag: null, site: SITE, ads: "off" });
-    expect(parseLaunchCli(["--tag=v1.0.0", "--site=https://staging.joutiya.ma", "--ads=test"])).toEqual({ tag: "v1.0.0", site: "https://staging.joutiya.ma", ads: "test" });
+    const now = new Date("2026-12-01T23:30:00Z");
+    expect(parseLaunchCli([], now)).toEqual({ tag: null, site: SITE, ads: "off", opening: "2026-12-01" });
+    expect(parseLaunchCli(["--tag=v1.0.0", "--site=https://staging.joutiya.ma", "--ads=test", "--opening=2026-12-03"], now)).toEqual({ tag: "v1.0.0", site: "https://staging.joutiya.ma", ads: "test", opening: "2026-12-03" });
   });
 
   it("refuses anything else", () => {
-    for (const arg of ["--tag=1.0.0", "--site=http://joutiya.ma", "--site=https://joutiya.ma/fr", "--ads=on", "--apply"]) expect(() => parseLaunchCli([arg])).toThrow(/not understood/);
+    for (const arg of ["--tag=1.0.0", "--site=http://joutiya.ma", "--site=https://joutiya.ma/fr", "--ads=on", "--apply", "--opening=2026-13-45", "--opening=1er décembre"]) expect(() => parseLaunchCli([arg])).toThrow(/not understood/);
   });
 });
 
@@ -80,6 +81,39 @@ describe("launch records", () => {
     const markdown = readFileSync(new URL("../../docs/backups.md", import.meta.url), "utf8");
     expect(markdown).toMatch(/^\| \| B \|/m);
     expect(drillRecorded(markdown)).toBe(false);
+  });
+});
+
+describe("legal reset", () => {
+  const hashes = { fr: "f", ar: "a" };
+  function state(overrides: Partial<LegalState> = {}): LegalState {
+    return {
+      versions: { cgu: { version: "1.0", effective: "2026-12-01" }, cookies: { version: "1.0", effective: "2026-12-01" }, cgv: { version: "0.3", effective: "2026-11-20" } },
+      provisional: new Set(["cgv"]),
+      frozen: true,
+      recorded: { cgu: { version: "1.0", ...hashes }, cookies: { version: "1.0", ...hashes }, cgv: { version: "0.3", ...hashes } },
+      actual: { cgu: hashes, cookies: hashes, cgv: hashes },
+      ...overrides,
+    };
+  }
+
+  it("passes when every page is at 1.0 from the opening day, frozen and hashed (provisional pages aside)", () => {
+    expect(checkLegal(state(), "2026-12-01")).toMatchObject({ ok: true, detail: "2 pages at 1.0 from 2026-12-01, texts frozen" });
+  });
+
+  it("names what is not reset", () => {
+    const bumped = state({ versions: { ...state().versions, cgu: { version: "1.2", effective: "2026-10-28" } }, frozen: false, recorded: null });
+    const check = checkLegal(bumped, "2026-12-01");
+    expect(check.ok).toBe(false);
+    expect(check.detail).toContain("not at 1.0: cgu 1.2");
+    expect(check.detail).toContain("not in force on 2026-12-01: cgu 2026-10-28");
+    expect(check.detail).toContain("LEGAL_TEXTS_FROZEN is false");
+    expect(check.detail).toContain("hashes not recorded (node scripts/legal-hash.ts --apply): cgu, cookies, cgv");
+    expect(checkLegal(state({ actual: { ...state().actual, cookies: { fr: "changed", ar: "a" } } }), "2026-12-01").detail).toBe("hashes not recorded (node scripts/legal-hash.ts --apply): cookies");
+  });
+
+  it("lists the load-test bypass removal among the manual items", () => {
+    expect(MANUAL_ITEMS.some((item) => item.includes("loadtest --off") && item.includes("LOADTEST_BYPASS_SECRET") && item.includes("LOAD_TEST_ENABLED"))).toBe(true);
   });
 });
 
