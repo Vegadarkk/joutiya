@@ -88,6 +88,8 @@ export const RATE_LIMITS = {
   "listing.stock.uid": { points: 2000, duration: DAY, policy: "open", key: "uid" },
   // PUT and DELETE /api/listings/{id}/promo (catalogue §7): 200 per day per account.
   "listing.promo.uid": { points: 200, duration: DAY, policy: "open", key: "uid" },
+  // PUT /api/listings/{id}/payment-link (catalogue §6): each new link mails the owner, 50 per day per account.
+  "listing.payment.uid": { points: 50, duration: DAY, policy: "open", key: "uid" },
   // POST /api/pro/apply (phase 7): a few attempts a day per account (reads the account, the
   // owner's shop and up to 6 uploads, then one transaction).
   "pro.apply.uid": { points: 5, duration: DAY, policy: "open", key: "uid" },

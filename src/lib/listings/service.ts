@@ -7,7 +7,10 @@ import type { AuthContext } from "@/lib/auth/guards";
 import { requireOwner } from "@/lib/auth/guards";
 import type { Device } from "@/lib/auth/respond";
 import { enqueueAiTask } from "@/lib/ai/queue";
+import { isRecentSignIn } from "@/lib/account/rules";
 import { audit } from "@/lib/audit";
+import { isAllowedPaymentHost, PAYMENT_LINK_DELAY_MS, PAYMENT_LINK_RECENT_AUTH_SECONDS, parsePaymentLink } from "@/config/seller-payments";
+import type { ListingPaymentLinkInput } from "@/lib/contracts/seller-payment";
 import { variantCriteria, type PromoInput, type SectionUpdateInput, type StockUpdateInput } from "@/lib/contracts/catalog";
 import { MAX_DRAFTS, type CreateListingInput, type FieldIssue, type ListingPatch, type ListingStatus, type ModerationFlag, type PublishListingResponse } from "@/lib/contracts/listings";
 import { listingPhotoSchema, type ListingPhoto } from "@/lib/contracts/media";
@@ -36,8 +39,8 @@ import { enqueueSearchOutboxTx } from "@/lib/db/repositories/search-outbox";
 import { getUploads, updateUpload } from "@/lib/db/repositories/uploads";
 import { getUserPrivate } from "@/lib/db/repositories/users";
 import { getProProfile } from "@/lib/db/repositories/pro-profiles";
-import { listingSchema, type ListingDoc, type ListingModeration } from "@/lib/db/schemas";
-import { getPricing } from "@/lib/config/runtime";
+import { listingSchema, type ListingDoc, type ListingModeration, type ListingPaymentLink } from "@/lib/db/schemas";
+import { getPricing, getSellerPayments } from "@/lib/config/runtime";
 import { serverEnv } from "@/lib/env";
 import { db } from "@/lib/firebase/admin";
 import { HttpError, notFound } from "@/lib/http/errors";
@@ -47,6 +50,8 @@ import { sendMail } from "@/lib/mail";
 import type { ModerationStatement, TemplateData } from "@/lib/mail/types";
 import { consumeLimit, enforceLimit } from "@/lib/rate-limit/limiter";
 import { publishesAsPro } from "@/lib/pro/lifecycle";
+import { notifyOwner } from "@/lib/pro/seller-payment";
+import { ownerPaymentLink, paymentShown } from "@/lib/pro/seller-payment-rules";
 import { notifySearchIndex } from "@/lib/search/queue";
 import { escalateOnIp } from "./escalation";
 import { buildSlugId, newListingId } from "./ids";
@@ -496,6 +501,54 @@ export async function setSection(actor: Actor, id: string, input: SectionUpdateI
   if (!user) throw new HttpError(403, "forbidden", "account record missing");
   const effects: TransitionEffects = { search: listing.status === "published" ? "upsert" : null, contentOp: null, audit: null, revalidate: hasPublicPage(listing.status), mail: null };
   return toOwnerSummary(await commit(listing, { sectionId: input.sectionId }, effects, { actor, user, now }), now);
+}
+
+/**
+ * A Pro listing's own payment link (catalogue §6), over the shop's, with its rules: the shop's
+ * « Payer chez le vendeur » set up and shown, a host already on the allowlist (a new host goes
+ * through the shop's link and its review), a recent sign-in for a new link, the owner mailed, and
+ * the link opened 24 hours after saving. Going back to the link in force, or removing it, is
+ * immediate (neither can divert a payment). Never shown on the page: the click asks for it.
+ */
+export async function setPaymentLink(actor: Actor, id: string, input: ListingPaymentLinkInput, now = new Date()) {
+  const listing = await ownedListing(actor, id);
+  if (!EDITABLE_STATUSES.includes(listing.status)) throw new HttpError(409, "conflict", "listing is read-only in this status");
+  if (listing.sellerType !== "pro" || !listing.proId) throw invalidField("paymentLink", "payment_pro_only");
+  const [profile, config] = await Promise.all([getProProfile(listing.proId), getSellerPayments()]);
+  if (!profile || !paymentShown(profile.lifecycle, profile.plan, profile.sellerPayment)) throw new HttpError(409, "payment_setup_required");
+  const current = ownerPaymentLink(listing.paymentLink, now);
+  let next: ListingPaymentLink | null;
+  let added: string | null = null;
+  if (input.url === null) {
+    if (!listing.paymentLink) return toOwnerSummary(listing, now);
+    next = null;
+  } else {
+    const parsed = parsePaymentLink(input.url);
+    if ("problem" in parsed) throw new HttpError(422, "payment_link_invalid", "payment link refused", { details: { problem: parsed.problem } });
+    // The same pending link keeps its delay.
+    if (parsed.url === current.pending?.url) return toOwnerSummary(listing, now);
+    if (parsed.url === current.url) {
+      if (!current.pending) return toOwnerSummary(listing, now);
+      next = { url: parsed.url, updatedAt: now };
+    } else {
+      if (!isAllowedPaymentHost(parsed.host, config)) throw new HttpError(422, "payment_link_invalid", "payment host not checked", { details: { problem: "unlisted" } });
+      if (!isRecentSignIn(actor.auth.user.authTime, now, PAYMENT_LINK_RECENT_AUTH_SECONDS)) throw new HttpError(403, "recent_auth_required");
+      next = { ...(current.url ? { url: current.url } : {}), pendingUrl: parsed.url, pendingFrom: now, updatedAt: now };
+      added = parsed.host;
+    }
+  }
+  const user = await getUserRecord(actor.auth.user.uid);
+  if (!user) throw new HttpError(403, "forbidden", "account record missing");
+  const effects: TransitionEffects = { search: null, contentOp: null, audit: null, revalidate: hasPublicPage(listing.status), mail: null };
+  const updated = await commit(listing, { paymentLink: next }, effects, { actor, user, now });
+  const removed = next === null;
+  await audit({ actorUid: actor.auth.user.uid, actorRole: "pro", action: "listing.payment.updated", target: { type: "listing", id }, automated: false, reason: added ? `link: ${added}` : removed ? "link removed" : "pending cancelled", at: now }).catch(
+    (error: unknown) => logger.error({ listingId: id, err: (error as Error).message }, "listing payment audit failed"),
+  );
+  const title = listing.title || listing.id;
+  if (added) await notifyOwner(profile, { kind: "changed", host: added, activeFrom: new Date(now.getTime() + PAYMENT_LINK_DELAY_MS).toISOString(), listingTitle: title }, `listing-${id}-changed-${now.getTime()}`);
+  else if (removed) await notifyOwner(profile, { kind: "removed", listingTitle: title }, `listing-${id}-removed-${now.getTime()}`);
+  return toOwnerSummary(updated, now);
 }
 
 /** Statuses a promotion may be set on: shown or about to be shown again. */

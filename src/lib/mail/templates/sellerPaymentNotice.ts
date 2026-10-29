@@ -8,11 +8,15 @@ import { formatDate, GREETING, pageUrl, renderLayout, type BuiltMail, type MailL
 
 type Data = TemplateData["sellerPaymentNotice"];
 
+type ListingKind = Extract<Data["kind"], "changed" | "removed">;
+
 interface Copy {
   subject: Record<Data["kind"], string>;
   body: (data: Data, at: string | null) => string[];
   button: string;
   notYou: string;
+  /** A listing's own link (catalogue §6): always on a checked host, so always dated. */
+  listing: { subject: Record<ListingKind, string>; body: (kind: ListingKind, title: string, host: string, at: string) => string[]; button: string; notYou: string };
 }
 
 const COPY: Record<MailLocale, Copy> = {
@@ -49,6 +53,15 @@ const COPY: Record<MailLocale, Copy> = {
     },
     button: "Gérer le paiement de ma boutique",
     notYou: "Si vous n'êtes pas à l'origine de ce changement, retirez le lien depuis votre espace Pro, changez votre mot de passe et écrivez-nous sans attendre.",
+    listing: {
+      subject: { changed: "Nouveau lien de paiement pour une annonce", removed: "Lien de paiement retiré d'une annonce" },
+      body: (kind, title, host, at) =>
+        kind === "changed"
+          ? [`Un lien de paiement vers ${host} a été enregistré pour votre annonce « ${title} ».`, `Le bouton « Payer chez le vendeur » de cette annonce l'ouvrira à partir du ${at}. D'ici là, rien ne change pour vos acheteurs.`]
+          : [`Le lien de paiement propre à votre annonce « ${title} » a été retiré. Son bouton « Payer chez le vendeur » ouvre de nouveau le lien de votre boutique, s'il y en a un.`],
+      button: "Voir mes annonces",
+      notYou: "Si vous n'êtes pas à l'origine de ce changement, retirez le lien depuis « Mes annonces », changez votre mot de passe et écrivez-nous sans attendre.",
+    },
   },
   ar: {
     subject: {
@@ -81,12 +94,34 @@ const COPY: Record<MailLocale, Copy> = {
     },
     button: "إدارة الدفع في متجري",
     notYou: "إذا لم تكن أنت من قام بهذا التغيير، فأزل الرابط من فضائك المهني، وغيّر كلمة المرور، وراسلنا فورًا.",
+    listing: {
+      subject: { changed: "رابط دفع جديد لإعلان", removed: "تمت إزالة رابط الدفع من إعلان" },
+      body: (kind, title, host, at) =>
+        kind === "changed"
+          ? [`تم تسجيل رابط دفع نحو ${host} لإعلانك «${title}».`, `سيفتحه زر «الدفع لدى البائع» لهذا الإعلان ابتداءً من ${at}. حتى ذلك الحين لا يتغير شيء بالنسبة لمشتريك.`]
+          : [`تمت إزالة رابط الدفع الخاص بإعلانك «${title}». يفتح زر «الدفع لدى البائع» من جديد رابط متجرك إن وُجد.`],
+      button: "عرض إعلاناتي",
+      notYou: "إذا لم تكن أنت من قام بهذا التغيير، فأزل الرابط من «إعلاناتي»، وغيّر كلمة المرور، وراسلنا فورًا.",
+    },
   },
 };
 
 export function sellerPaymentNotice(data: Data, ctx: TemplateContext): BuiltMail {
   const copy = COPY[ctx.lang];
   const at = data.activeFrom ? formatDate(data.activeFrom, ctx.locale) : null;
+  if (data.listingTitle !== undefined && (data.kind === "changed" || data.kind === "removed")) {
+    const subject = copy.listing.subject[data.kind];
+    return renderLayout({
+      lang: ctx.lang,
+      siteUrl: ctx.siteUrl,
+      subject,
+      title: subject,
+      greeting: GREETING[ctx.lang](data.displayName),
+      paragraphs: copy.listing.body(data.kind, data.listingTitle, data.host ?? "", at ?? ""),
+      action: { label: copy.listing.button, url: pageUrl(ctx, "mes-annonces") },
+      closing: [copy.listing.notYou],
+    });
+  }
   return renderLayout({
     lang: ctx.lang,
     siteUrl: ctx.siteUrl,

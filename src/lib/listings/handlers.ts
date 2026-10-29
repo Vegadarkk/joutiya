@@ -5,6 +5,8 @@ import { applyDevice, applyTurnstilePass, deviceOf, jsonResponse } from "@/lib/a
 import { FLEET_MAX, OWNER_LIST_BUCKETS, createListingSchema, fleetSaveSchema, listingPatchSchema, publishListingSchema, rentalAvailabilityInputSchema, type CreateListingResponse, type ListingResponse, type OwnerListingsResponse, type OwnerRowResponse, type RentalAvailabilityResponse } from "@/lib/contracts/listings";
 import { turnstileTokenSchema } from "@/lib/contracts/auth";
 import { promoInputSchema, sectionUpdateSchema, stockUpdateSchema } from "@/lib/contracts/catalog";
+import { listingPaymentLinkInputSchema } from "@/lib/contracts/seller-payment";
+import { paymentShown } from "@/lib/pro/seller-payment-rules";
 import { getListing, listOwnerListings } from "@/lib/db/repositories/listings";
 import { getProProfile } from "@/lib/db/repositories/pro-profiles";
 import { getFlags } from "@/lib/config/runtime";
@@ -19,7 +21,7 @@ import { listFleet, saveFleet } from "./fleet";
 import { isListingId } from "./ids";
 import { ownerListingView, toOwnerSummary } from "./owner-view";
 import { revealPhone } from "./phone-reveal";
-import { changeStatus, createDraft, patchListing, publish, endListingPromo, setPromo, setSection, updateStock, type Actor, type OwnerAction } from "./service";
+import { changeStatus, createDraft, patchListing, publish, endListingPromo, setPromo, setPaymentLink, setSection, updateStock, type Actor, type OwnerAction } from "./service";
 
 // Route handlers of /api/listings/** (design §3): thin, every one through requireUser (Origin +
 // CSRF on mutations, 401 anonymous, 403 role_missing / account_suspended), the owner check inside
@@ -77,8 +79,16 @@ export async function handleMine(request: Request): Promise<Response> {
   const now = new Date();
   // A shop's sections, for the « Rayon » picker of its rows (catalogue §5).
   const profile = auth.user.claims.proId ? await getProProfile(auth.user.claims.proId) : null;
-  const sections = profile && profile.ownerUid === auth.user.uid ? (profile.sections ?? []) : [];
-  const body: OwnerListingsResponse = { listings: listings.map((listing) => toOwnerSummary(listing, now)), salesOpen: (await getFlags()).salesEnabled, ...(sections.length > 0 ? { sections } : {}) };
+  const owned = profile && profile.ownerUid === auth.user.uid ? profile : null;
+  const sections = owned?.sections ?? [];
+  // A listing's own payment link needs the shop's « Payer chez le vendeur » shown (catalogue §6).
+  const paymentReady = owned !== null && paymentShown(owned.lifecycle, owned.plan, owned.sellerPayment);
+  const body: OwnerListingsResponse = {
+    listings: listings.map((listing) => toOwnerSummary(listing, now)),
+    salesOpen: (await getFlags()).salesEnabled,
+    ...(sections.length > 0 ? { sections } : {}),
+    ...(paymentReady ? { paymentReady } : {}),
+  };
   return json(body);
 }
 
@@ -117,6 +127,19 @@ export async function handleStock(request: Request, params: Params): Promise<Res
   await enforceLimit("listing.owner.read.uid", auth.user.uid);
   const body: ListingResponse = { listing: await updateStock(actorOf(request, auth), id, input) };
   await chargeOwnerRead(auth.user.uid, 1 + body.listing.photos.length);
+  return json(body);
+}
+
+/** PUT /api/listings/{id}/payment-link: the listing's own « Payer chez le vendeur » link (catalogue §6). */
+export async function handlePaymentLink(request: Request, params: Params): Promise<Response> {
+  const auth = await requireUser(request, { mutation: true });
+  const id = await listingIdOf(params);
+  const input = await readJson(request, listingPaymentLinkInputSchema);
+  await enforceLimit("listing.payment.uid", auth.user.uid);
+  await assertQuotas(DEPOSIT_QUOTAS);
+  await enforceLimit("listing.owner.read.uid", auth.user.uid);
+  const body: OwnerRowResponse = { listing: await setPaymentLink(actorOf(request, auth), id, input) };
+  await chargeOwnerRead(auth.user.uid, 1);
   return json(body);
 }
 

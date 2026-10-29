@@ -114,6 +114,8 @@ export type ErrorCode =
   | "payment_info_required"
   /** The shop's button is off now (state, suspension, host withdrawn). */
   | "payment_unavailable"
+  /** A listing's own payment link needs the shop's « Payer chez le vendeur » shown (409). */
+  | "payment_setup_required"
   /** The shop's KYBC is not verified, or the shop is suspended (409). */
   | "pro_not_verified"
   /** The shop's plan does not include this feature (the stock import: Business and up) (403). */

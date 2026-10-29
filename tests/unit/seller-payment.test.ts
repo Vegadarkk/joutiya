@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parsePaymentLink, resolveSellerPaymentsConfig } from "@/config/seller-payments";
-import { effectivePayment, foldPending, paymentShown } from "@/lib/pro/seller-payment-rules";
+import { effectivePayment, foldPending, ownerPaymentLink, paymentShown } from "@/lib/pro/seller-payment-rules";
 import type { SellerPaymentDoc } from "@/lib/pro/profile-schema";
 
 // « Payer chez le vendeur » rules (design phase-7/boutique-temporaire.md §2): link shape, allowlist,
@@ -68,5 +68,15 @@ describe("link in force", () => {
     expect(paymentShown("active", "essentiel", { ...base, suspendedAt: at("2026-11-01T00:00:00Z") })).toBe(false);
     expect(paymentShown("active", "essentiel", { suspendedAt: undefined, info: undefined })).toBe(false);
     expect(paymentShown("active", "essentiel", undefined)).toBe(false);
+  });
+});
+
+describe("a listing's own link as its owner sees it (catalogue §6)", () => {
+  const at = new Date("2026-11-02T10:00:00Z");
+  it("counts a pending link once 24 hours old", () => {
+    const link = { url: "https://paiement.banque-test.ma/a", pendingUrl: "https://paiement.banque-test.ma/b", pendingFrom: new Date(at.getTime() - 23 * 3_600_000) };
+    expect(ownerPaymentLink(link, at)).toEqual({ url: "https://paiement.banque-test.ma/a", pending: { url: "https://paiement.banque-test.ma/b", host: "paiement.banque-test.ma", activeFrom: new Date(at.getTime() + 3_600_000) } });
+    expect(ownerPaymentLink({ ...link, pendingFrom: new Date(at.getTime() - 24 * 3_600_000) }, at)).toEqual({ url: "https://paiement.banque-test.ma/b", pending: null });
+    expect(ownerPaymentLink(undefined, at)).toEqual({ url: null, pending: null });
   });
 });

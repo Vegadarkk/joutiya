@@ -19,6 +19,7 @@ import { wizardPath } from "@/lib/listings/client/routes";
 import { cn } from "@/lib/utils";
 import { primaryAction } from "./buckets";
 import { ListingActions } from "./listing-actions";
+import { OwnerPaymentLinkRow, showsPaymentLink } from "./owner-payment-link";
 import { OwnerPromo, showsPromo } from "./owner-promo";
 import { OwnerSection } from "./owner-section";
 import { OwnerStock } from "./owner-stock";
@@ -40,13 +41,15 @@ interface OwnerListingCardProps {
   onChanged?: (listing: OwnerListingSummary) => void;
   /** The shop's storefront sections (catalogue §5): the row offers them. */
   sections?: ShopSection[];
+  /** The shop's « Payer chez le vendeur » is shown: the row offers the listing's own link (catalogue §6). */
+  paymentReady?: boolean;
 }
 
 /**
  * One row of "Mes annonces": cover, title, price, city, status, expiry, actions. On phones the
  * primary action takes the full row under the cover (its label is longer than the text column).
  */
-export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, busy = false, salesOpen = false, now = new Date(), onChanged, sections = [] }: OwnerListingCardProps) {
+export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, busy = false, salesOpen = false, now = new Date(), onChanged, sections = [], paymentReady = false }: OwnerListingCardProps) {
   const t = useTranslations("MyListings");
   const locale = useLocale() as Locale;
   const city = listing.citySlug ? cityBySlug(listing.citySlug) : undefined;
@@ -116,6 +119,7 @@ export function OwnerListingCard({ listing, mediaBaseUrl, onAction, onDelete, bu
         {listing.catalogue && STOCK_STATUSES.includes(listing.status) ? <OwnerStock listingId={listing.id} title={title} catalogue={listing.catalogue} /> : null}
         {onChanged && sections.length > 0 && listing.sectionId !== undefined && STOCK_STATUSES.includes(listing.status) ? <OwnerSection listing={listing} title={title} sections={sections} onChanged={onChanged} /> : null}
         {listing.catalogue && onChanged && showsPromo(listing) ? <OwnerPromo listing={{ ...listing, catalogue: listing.catalogue }} title={title} now={now} onChanged={onChanged} /> : null}
+        {listing.paymentLink && onChanged && paymentReady && showsPaymentLink(listing) ? <OwnerPaymentLinkRow listing={{ ...listing, paymentLink: listing.paymentLink }} title={title} onChanged={onChanged} /> : null}
       </div>
       {primary ? (
         <div className="col-span-2 mt-3 flex min-w-0 sm:col-span-1 sm:col-start-2 sm:mt-2">

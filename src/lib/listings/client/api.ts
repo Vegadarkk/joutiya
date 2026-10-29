@@ -1,5 +1,6 @@
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut, csrfToken } from "@/lib/auth/client";
 import type { PromoInput, SectionUpdateInput, StockUpdateInput } from "@/lib/contracts/catalog";
+import type { ListingPaymentLinkInput } from "@/lib/contracts/seller-payment";
 import {
   LISTING_API,
   type CreateListingInput,
@@ -79,6 +80,11 @@ export function saveStock(id: string, input: StockUpdateInput): Promise<ListingR
 /** The storefront section of a Pro listing (catalogue §5). */
 export function saveSection(id: string, input: SectionUpdateInput): Promise<OwnerRowResponse> {
   return apiPut<OwnerRowResponse>(LISTING_API.section(id), input);
+}
+
+/** A Pro listing's own payment link (catalogue §6); null goes back to the shop's. */
+export function savePaymentLink(id: string, input: ListingPaymentLinkInput): Promise<OwnerRowResponse> {
+  return apiPut<OwnerRowResponse>(LISTING_API.paymentLink(id), input);
 }
 
 /** A promotion of a Pro listing (catalogue §4); DELETE ends the current or scheduled one. */

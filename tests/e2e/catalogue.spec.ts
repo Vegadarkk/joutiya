@@ -378,4 +378,47 @@ test.describe("shop catalogue", () => {
     await expect(tabs.getByRole("tab", { name: /^Promotions/ })).toHaveAttribute("aria-selected", "true");
     await buyer.screenshot({ path: "test-results/catalogue-storefront-promotions.png", fullPage: true });
   });
+
+  test("a shop gives a listing its own payment link from Mes annonces, then goes back to the shop's", async ({ page, request }) => {
+    test.setTimeout(120_000);
+    const email = `catalogue-${randomId(10)}@joutiya.test`;
+    await signUpAndIn(page, request, email, "Lalla Atelier");
+    const { proId, jacket } = await seedShop(email);
+    const firestore = getFirestore(firebase());
+    const now = new Date();
+    await firestore
+      .collection("proProfiles")
+      .doc(proId)
+      .update({
+        sellerPayment: {
+          cashOnDelivery: true,
+          info: { address: "6 derb Lalla, Fès médina", email: "contact@maison-lalla.ma", delivery: "Partout au Maroc en 3 jours, 30 MAD.", returns: "7 jours pour changer d'avis, retour à nos frais." },
+          updatedAt: now,
+        },
+      });
+    await firestore.collection("listings").doc(jacket.id).update({ paymentLink: { pendingUrl: "https://paiement.banque-test.ma/veste", pendingFrom: now, updatedAt: now } });
+
+    // Signed in again: the session carries the shop's claims.
+    await page.context().clearCookies();
+    await page.goto("/fr/mes-annonces");
+    await expect(page).toHaveURL(/\/connexion/);
+    await page.getByLabel("Adresse e-mail").fill(email);
+    await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+    await waitForTurnstile(page);
+    await page.getByRole("button", { name: "Se connecter" }).click();
+    await expect(page).toHaveURL(/\/fr\/mes-annonces/, { timeout: 15_000 });
+    const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: jacket.title }) });
+    await expect(row.getByTestId("owner-payment-link")).toHaveText(/Lien propre vers paiement\.banque-test\.ma : actif le/);
+    await row.getByRole("button", { name: /^Lien de paiement : / }).click();
+    const dialog = page.getByTestId("payment-link-dialog");
+    await expect(dialog.getByRole("textbox", { name: "Page de paiement de cette annonce" })).toHaveValue("https://paiement.banque-test.ma/veste");
+    await dialog.getByRole("textbox", { name: "Page de paiement de cette annonce" }).fill("https://psp-inconnu.ma/veste");
+    await dialog.getByRole("button", { name: "Enregistrer le lien" }).click();
+    await expect(dialog.getByText(/Ce site de paiement n'est pas encore vérifié/)).toBeVisible();
+    await page.screenshot({ path: "test-results/catalogue-payment-link-dialog.png" });
+    await dialog.getByRole("button", { name: "Revenir au lien de la boutique" }).click();
+    await expect(page.getByText("L'annonce utilise de nouveau le lien de votre boutique.")).toBeVisible();
+    await expect(row.getByTestId("owner-payment-link")).toHaveCount(0);
+    expect((await firestore.collection("listings").doc(jacket.id).get()).data()?.paymentLink).toBeUndefined();
+  });
 });

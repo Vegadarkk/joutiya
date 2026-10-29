@@ -94,6 +94,7 @@ export function MyListingsView() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [salesOpen, setSalesOpen] = useState(false);
   const [sections, setSections] = useState<ShopSection[]>([]);
+  const [paymentReady, setPaymentReady] = useState(false);
   // Answers that arrive out of order: only the latest request of a bucket is kept.
   const requests = useRef<Partial<Record<OwnerListBucket, number>>>({});
   const tabRefs = useRef<Partial<Record<OwnerListBucket, HTMLButtonElement | null>>>({});
@@ -105,10 +106,11 @@ export function MyListingsView() {
     const request = (requests.current[bucket] ?? 0) + 1;
     requests.current[bucket] = request;
     try {
-      const { listings, salesOpen: open, sections: shelves } = await listMine(bucket);
+      const { listings, salesOpen: open, sections: shelves, paymentReady: ready } = await listMine(bucket);
       if (requests.current[bucket] !== request) return;
       setSalesOpen(open);
       setSections(shelves ?? []);
+      setPaymentReady(ready === true);
       setBuckets((current) => ({ ...current, [bucket]: { kind: "ready", listings: visibleListings(bucket, listings) } }));
     } catch (error) {
       if (requests.current[bucket] !== request) return;
@@ -348,7 +350,7 @@ export function MyListingsView() {
             ) : null}
             <ul className={cn("flex flex-col divide-y divide-border transition-opacity duration-200", current.refreshing && "opacity-80")} aria-busy={busyId !== null || current.refreshing || undefined}>
               {current.listings.map((listing) => (
-                <OwnerListingCard key={listing.id} listing={listing} mediaBaseUrl={mediaBaseUrl} busy={busyId === listing.id} salesOpen={salesOpen} onAction={(action) => onAction(listing.id, action)} onDelete={() => onDelete(listing.id)} onChanged={onChanged} sections={sections} />
+                <OwnerListingCard key={listing.id} listing={listing} mediaBaseUrl={mediaBaseUrl} busy={busyId === listing.id} salesOpen={salesOpen} onAction={(action) => onAction(listing.id, action)} onDelete={() => onDelete(listing.id)} onChanged={onChanged} sections={sections} paymentReady={paymentReady} />
               ))}
             </ul>
           </>

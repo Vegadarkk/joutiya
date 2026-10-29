@@ -240,6 +240,14 @@ export interface OwnerCatalogue {
   promoFrom: string;
 }
 
+/** A listing's own « Payer chez le vendeur » link as its owner sees it (catalogue §6). */
+export interface OwnerPaymentLink {
+  /** The saved link in force (its host is checked again when a buyer clicks). */
+  url: string | null;
+  /** A new link, active from `activeFrom` (ISO). */
+  pending: { url: string; host: string; activeFrom: string } | null;
+}
+
 export interface OwnerListingSummary {
   id: string;
   slugId: string | null;
@@ -263,6 +271,8 @@ export interface OwnerListingSummary {
   catalogue?: OwnerCatalogue;
   /** Pro listing (catalogue §5): its storefront section, null when none. */
   sectionId?: string | null;
+  /** Pro listing (catalogue §6): its own payment link, over the shop's. */
+  paymentLink?: OwnerPaymentLink;
   /** Car rentals only: the blocked periods the availability calendar edits. */
   rental?: RentalAvailability;
 }
@@ -302,7 +312,8 @@ export interface OwnerListing {
 export type CreateListingResponse = { id: string };
 /** `salesOpen`: paid options can be bought (config/flags.salesEnabled, phase 7). */
 /** `sections`: the shop's storefront sections (catalogue §5), for a Pro owner that has some. */
-export type OwnerListingsResponse = { listings: OwnerListingSummary[]; salesOpen: boolean; sections?: ShopSection[] };
+/** `paymentReady`: the shop's « Payer chez le vendeur » is shown, so a listing may have its own link (catalogue §6). */
+export type OwnerListingsResponse = { listings: OwnerListingSummary[]; salesOpen: boolean; sections?: ShopSection[]; paymentReady?: boolean };
 export type ListingResponse = { listing: OwnerListing };
 /** A change made in place from « Mes annonces » (promotion, section): the row (status included: a deep cut is held). */
 export type OwnerRowResponse = { listing: OwnerListingSummary };

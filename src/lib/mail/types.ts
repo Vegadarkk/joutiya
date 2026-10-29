@@ -184,7 +184,7 @@ export interface TemplateData {
    * while the host waits for review), `removed`, `suspended` / `restored` by a moderator, or the
    * host `rejected` (`reason`).
    */
-  sellerPaymentNotice: { displayName: string; shopName: string; kind: "changed" | "removed" | "contact" | "suspended" | "restored" | "rejected"; host?: string; activeFrom?: string | null; reason?: string };
+  sellerPaymentNotice: { displayName: string; shopName: string; kind: "changed" | "removed" | "contact" | "suspended" | "restored" | "rejected"; host?: string; activeFrom?: string | null; reason?: string; listingTitle?: string };
   /**
    * Grouped new-messages mail (bulk, D21): the unread total and up to 3 conversations (listing
    * title, the other member's display name). Never the text of a message.

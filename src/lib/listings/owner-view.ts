@@ -1,8 +1,9 @@
 import "server-only";
-import type { OwnerCatalogue, OwnerListing, OwnerListingSummary, OwnerPhoto } from "@/lib/contracts/listings";
+import type { OwnerCatalogue, OwnerListing, OwnerListingSummary, OwnerPaymentLink, OwnerPhoto } from "@/lib/contracts/listings";
 import type { UploadStatus } from "@/lib/contracts/media";
 import type { ListingRecord } from "@/lib/db/repositories/listings";
 import { listUploadsByTarget, type UploadRecord } from "@/lib/db/repositories/uploads";
+import { ownerPaymentLink } from "@/lib/pro/seller-payment-rules";
 import { MANUAL_ATTACH_STATUSES } from "@/lib/uploads/policy";
 import { RENTAL_SUBCATEGORY } from "@/config/categories";
 import { rentalAvailabilityOf } from "./availability";
@@ -80,6 +81,11 @@ export function toOwnerListing(listing: ListingRecord, uploads: readonly UploadR
   };
 }
 
+function ownerPaymentLinkView(listing: ListingRecord, now: Date): OwnerPaymentLink {
+  const { url, pending } = ownerPaymentLink(listing.paymentLink, now);
+  return { url, pending: pending ? { ...pending, activeFrom: pending.activeFrom.toISOString() } : null };
+}
+
 function ownerCatalogue(listing: ListingRecord, now: Date): OwnerCatalogue {
   return {
     stock: listing.stock ?? null,
@@ -111,7 +117,7 @@ export function toOwnerSummary(listing: ListingRecord, now = new Date()): OwnerL
     canRenew: canRenew(listing, now),
     ...(listing.subcategoryId === RENTAL_SUBCATEGORY ? { rental: rentalAvailabilityOf(listing) } : {}),
     ...(listing.sellerType === "pro" && !listing.isDonation ? { catalogue: ownerCatalogue(listing, now) } : {}),
-    ...(listing.sellerType === "pro" ? { sectionId: listing.sectionId ?? null } : {}),
+    ...(listing.sellerType === "pro" ? { sectionId: listing.sectionId ?? null, paymentLink: ownerPaymentLinkView(listing, now) } : {}),
   };
 }
 

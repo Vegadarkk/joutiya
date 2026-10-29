@@ -48,7 +48,8 @@ const SHORTENERS: ReadonlySet<string> = new Set([
   "bit.ly", "bitly.com", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "is.gd", "buff.ly", "rebrand.ly", "cutt.ly", "shorturl.at", "rb.gy", "t.ly", "tiny.cc", "s.id", "lnkd.in", "linktr.ee", "qr.io",
 ]);
 
-export type PaymentLinkProblem = "invalid" | "https" | "credentials" | "port" | "ip" | "shortener";
+/** `unlisted`: a listing's own link must be on a host already checked (catalogue §6); the shop's link goes to review instead. */
+export type PaymentLinkProblem = "invalid" | "https" | "credentials" | "port" | "ip" | "shortener" | "unlisted";
 
 /** The host of an acceptable payment link, or why the link is refused (the allowlist is checked apart). */
 export function parsePaymentLink(raw: string): { host: string; url: string } | { problem: PaymentLinkProblem } {
