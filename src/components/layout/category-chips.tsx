@@ -27,7 +27,7 @@ export function CategoryChips({ items, label, guide }: { items: readonly Categor
   if (!showsCategoryRow(pathname)) return null;
   return (
     <nav aria-label={label} data-testid="category-chips">
-      <Container>
+      <Container className="max-w-7xl xl:max-w-[88rem]">
         <ul
           className={cn(
             "-mx-4 flex snap-x scroll-px-4 items-center gap-1.5 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:-mx-6 sm:scroll-px-6 sm:px-6 [&::-webkit-scrollbar]:hidden",
