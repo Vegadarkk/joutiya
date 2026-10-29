@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScrollText } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
 // version sees this band under the header, on every page, until they acknowledge the new text.
 // Acknowledging records the current version (POST /api/auth/consents { cgu: true }, journaled).
 // The band lists the summary of the changes (CGU §22.1): Arabic on the Arabic site, else French.
+// Its first display records the notice ({ cguNotice: true }): a member notified late gets the
+// 30 days of §22.1 from that day, and the band shows the date the version applies to them.
 
 /** Today's date in Casablanca, as the ISO day of LEGAL_VERSIONS. */
 function today(): string {
@@ -31,7 +33,23 @@ export function CguNotice() {
   const { status, session } = useSession();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const recorded = useRef<string | null>(null);
   const update = status === "ready" ? session?.cguUpdate : null;
+
+  useEffect(() => {
+    if (!session?.cguUpdate || session.cguUpdate.noticed) return;
+    const key = `${session.uid}:${session.cguUpdate.version}`;
+    if (recorded.current === key) return;
+    recorded.current = key;
+    const pending = session.cguUpdate;
+    apiPost<ConsentsResponse>(AUTH_API.consents, { cguNotice: true })
+      .then((answer) => setSession({ ...session, cguUpdate: { ...pending, effective: answer.effective ?? pending.effective, noticed: true } }))
+      // Not recorded: the next page asks again.
+      .catch(() => {
+        recorded.current = null;
+      });
+  }, [session]);
+
   if (!session || !update) return null;
 
   const summary = LEGAL_VERSIONS.cgu.version === update.version ? (LEGAL_VERSIONS.cgu.summary?.[locale === "ar" ? "ar" : "fr"] ?? []) : [];

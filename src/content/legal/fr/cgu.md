@@ -908,7 +908,7 @@ Si vous n'acceptez pas les nouvelles conditions, vous pouvez fermer votre compte
 
 ### 22.4 Versions {#modification-4}
 
-Chaque version porte un numéro et une date d'entrée en vigueur, indiqués en haut de cette page. Les versions précédentes vous sont communiquées sur simple demande à {email}.
+Chaque version porte un numéro et une date d'entrée en vigueur, indiqués en haut de cette page. Les versions précédentes restent consultables depuis cette page, notamment celle qui reste en vigueur pendant le préavis, et vous sont aussi communiquées sur simple demande à {email}.
 
 ## 23. Droit applicable et juridiction {#droit}
 

@@ -1,5 +1,5 @@
 import "server-only";
-import { cguAccepted, LEGAL_VERSIONS } from "@/config/legal-versions";
+import { cguAccepted, cguEffectiveFor, LEGAL_VERSIONS } from "@/config/legal-versions";
 import type { SessionSummary } from "@/lib/contracts/auth";
 import { getUser, getUserPrivate } from "@/lib/db/repositories/users";
 import type { SessionUser } from "@/lib/firebase/session";
@@ -22,6 +22,13 @@ export async function sessionSummary(user: SessionUser, readPrivate: typeof getU
     locale: profile?.locale ?? null,
     providers: account?.providers ?? [],
     // No private document (an account being created): nothing to acknowledge.
-    cguUpdate: account && !cguAccepted(account.consents?.cgu?.version) ? { version: LEGAL_VERSIONS.cgu.version, effective: LEGAL_VERSIONS.cgu.effective } : null,
+    cguUpdate: account && !cguAccepted(account.consents?.cgu?.version) ? cguUpdate(account.consents?.cguNotice) : null,
   };
+}
+
+/** The pending CGU notice of a member: not yet noticed, it is dated as if given now (the banner records it). */
+function cguUpdate(notice: { version: string; at: Date } | undefined): NonNullable<SessionSummary["cguUpdate"]> {
+  const version = LEGAL_VERSIONS.cgu.version;
+  const noticeAt = notice?.version === version ? notice.at : null;
+  return { version, effective: cguEffectiveFor(noticeAt), noticed: noticeAt !== null };
 }

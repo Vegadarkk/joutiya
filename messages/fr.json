@@ -121,7 +121,16 @@
     "provisionalBody": "Ce texte sera finalisé avant l'ouverture du site. Il décrit déjà les règles qui s'appliqueront.",
     "frenchPrevails": "Les textes légaux font foi en français.",
     "contents": "Sommaire",
-    "frenchOnly": "Ce texte n'existe qu'en français pour le moment. Il fait foi."
+    "frenchOnly": "Ce texte n'existe qu'en français pour le moment. Il fait foi.",
+    "upcomingTitle": "Nouvelle version en vigueur le {date}",
+    "upcomingBody": "D'ici là, la version {version} reste en vigueur. Pour un membre prévenu moins de 30 jours avant cette date, elle le reste jusqu'à la date indiquée dans son avis.",
+    "upcomingLink": "Lire la version {version}, en vigueur",
+    "archiveTitle": "Versions précédentes",
+    "archiveItem": "Version {version}, en vigueur à partir du {from}, remplacée le {date}",
+    "archivedTitle": "Version précédente ({version})",
+    "archivedInForce": "Cette version reste en vigueur jusqu'à son remplacement par la nouvelle version le {date} (plus tard pour un membre prévenu moins de 30 jours avant).",
+    "archivedPast": "Cette version a été remplacée le {date}.",
+    "archivedCurrent": "Lire la version actuelle"
   },
   "Help": {
     "metaTitle": "Centre d'aide",

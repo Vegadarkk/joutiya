@@ -125,6 +125,11 @@ export const userPrivateSchema = z
         marketing: z.boolean(),
         /** Proof of the opt-in to information e-mails (text version and date); absent when refused or before 2026-10-28. */
         marketingConsent: consentSchema.optional(),
+        /**
+         * First notice of a CGU change to this member (banner shown or e-mail sent), per version: the
+         * 30-day notice of CGU §22.1 runs from it when it came late (cguEffectiveFor).
+         */
+        cguNotice: consentSchema.optional(),
       })
       .strict(),
     strikes: z.object({ level: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), lastAt: ts.optional(), suspendedUntil: ts.optional() }).strict(),

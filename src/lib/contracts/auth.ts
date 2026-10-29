@@ -115,7 +115,9 @@ export const profileSchema = z.object({ displayName: displayNameSchema.optional(
 export const transfersConsentSchema = z.object({ transfers: z.literal(true) }).strict();
 /** POST /api/auth/consents: the current CGU acknowledged from the change notice (design D11). */
 export const cguConsentSchema = z.object({ cgu: z.literal(true) }).strict();
-export const consentsRequestSchema = z.union([transfersConsentSchema, cguConsentSchema]);
+/** POST /api/auth/consents: the change notice was shown (CGU §22.1), recorded once per version. */
+export const cguNoticeSchema = z.object({ cguNotice: z.literal(true) }).strict();
+export const consentsRequestSchema = z.union([transfersConsentSchema, cguConsentSchema, cguNoticeSchema]);
 
 /** Moroccan mobile only (06, 07): national or international format, as typed by the user. */
 export const phoneStartSchema = z.object({ phone: z.string().trim().min(9).max(20) }).strict();
@@ -132,8 +134,11 @@ export interface SessionSummary {
   phoneVerified: boolean;
   locale: (typeof LOCALES)[number] | null;
   providers: ("password" | "google.com")[];
-  /** The CGU changed since this member accepted them: the notice shows until acknowledged (D11). */
-  cguUpdate: { version: string; effective: string } | null;
+  /**
+   * The CGU changed since this member accepted them: the notice shows until acknowledged (D11).
+   * `effective`: the day it applies to this member (CGU §22.1); `noticed`: the first notice is recorded.
+   */
+  cguUpdate: { version: string; effective: string; noticed: boolean } | null;
 }
 
 export type SignupResponse = { status: "verification_sent" };
@@ -147,6 +152,6 @@ export type VerifyResendResponse = { status: "verification_sent" };
 export type ResetConfirmResponse = { status: "password_reset" };
 export type PasswordChangeResponse = { status: "changed"; session: SessionSummary };
 export type ProfileResponse = { session: SessionSummary };
-export type ConsentsResponse = { status: "recorded"; version: string };
+export type ConsentsResponse = { status: "recorded"; version: string; effective?: string };
 export type SessionResponse = { status: "signed_in"; session: SessionSummary };
 export type MeResponse = { session: SessionSummary | null };

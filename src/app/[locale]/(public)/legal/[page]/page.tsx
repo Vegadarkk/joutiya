@@ -5,7 +5,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import { localeParams } from "@/i18n/params";
 import { LEGAL_PAGES, legalPage } from "@/config/legal-pages";
-import { ARABIC_LEGAL_PAGES, LEGAL_VERSIONS, PROVISIONAL_LEGAL_PAGES } from "@/config/legal-versions";
+import { ARABIC_LEGAL_PAGES, legalDay, LEGAL_VERSIONS, PROVISIONAL_LEGAL_PAGES } from "@/config/legal-versions";
 import { LegalPage } from "@/components/legal/legal-page";
 import { getFlags } from "@/lib/config/runtime";
 import { getLegalConfig } from "@/lib/legal/config";
@@ -13,12 +13,15 @@ import { parseMarkdown } from "@/lib/legal/markdown";
 import { legalSource } from "@/lib/legal/sources";
 import { renderTemplate } from "@/lib/legal/template";
 import { legalScope } from "@/lib/legal/values";
+import { currentVersionNotes } from "@/lib/legal/versions";
 import { alternates } from "@/lib/i18n/metadata";
 import { isPhoneVerificationConfigured } from "@/lib/phone-verify/config";
 
 // The 12 legal pages (§7, phase 6 D11): Markdown sources in src/content/legal/{fr,ar}, filled from
 // config/legal and the live switches (WhatsApp, ads). ISR: config/legal and the flags are cached 5
-// minutes server side, so the pages follow them within 5 minutes, without a redeploy.
+// minutes server side, so the pages follow them within 5 minutes, without a redeploy. A page with
+// earlier versions kept online lists them, and names the one still in force while a new text is
+// announced (CGU §22.1): the regeneration drops that note within 5 minutes of the effective day.
 export const revalidate = 300;
 export const dynamicParams = false;
 
@@ -58,6 +61,7 @@ export default async function LegalRoute({ params }: { params: Params }) {
       translated={language === "ar"}
       frenchOnly={locale !== "fr" && language === "fr"}
       provisional={PROVISIONAL_LEGAL_PAGES.has(page.slug)}
+      {...currentVersionNotes(page.slug, language, legalDay(new Date()))}
     />
   );
 }

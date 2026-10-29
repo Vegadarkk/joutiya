@@ -192,6 +192,12 @@ export async function updateCguConsent(uid: string, version: string, now = new D
   void consume("firestore.writes", 1);
 }
 
+/** First notice of a CGU version to this member (CGU §22.1): only consents.cguNotice changes. */
+export async function recordCguNotice(uid: string, version: string, now = new Date()): Promise<void> {
+  await privateRef(uid).update({ "consents.cguNotice": { version, at: now } });
+  void consume("firestore.writes", 1);
+}
+
 /** system/cguNotice: the CGU version the cgu-notice job works on and the last account it visited. */
 export interface CguNoticeCursor {
   version: string;

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TRANSFERS_CONSENT_VERSION } from "@/lib/contracts/auth";
+import { cguEffectiveFor } from "@/config/legal-versions";
+import { CGU_VERSION, TRANSFERS_CONSENT_VERSION } from "@/lib/contracts/auth";
 import { getUserPrivate } from "@/lib/db/repositories/users";
 import { COLLECTIONS } from "@/lib/db/schemas";
 import { db } from "@/lib/firebase/admin";
@@ -108,6 +109,30 @@ describe("POST /api/auth/consents", () => {
       expect(refused.body.error.code).toBe("invalid_body");
     }
     expect((await getUserPrivate(uid))?.consents.transfers.version).toBe("2026-10");
+  });
+
+  it("records the first notice of a CGU change once, and answers the day it applies to the member", async () => {
+    const { jar, uid } = await verifiedAccount();
+    // Accepted the current text: nothing to notice, nothing written.
+    const current = await call<{ status: string; version: string; effective: string }>(consents, CONSENTS_PATH, { jar, body: { cguNotice: true } });
+    expect(current.status).toBe(200);
+    expect((await getUserPrivate(uid))?.consents.cguNotice).toBeUndefined();
+
+    await privateDoc(uid).update({ "consents.cgu": { version: "0.9", at: new Date("2026-10-01T10:00:00Z") } });
+    const started = new Date();
+    const first = await call<{ status: string; version: string; effective: string }>(consents, CONSENTS_PATH, { jar, body: { cguNotice: true } });
+    expect(first.status).toBe(200);
+    const notice = (await getUserPrivate(uid))?.consents.cguNotice;
+    expect(notice?.version).toBe(CGU_VERSION);
+    expect(notice!.at.getTime()).toBeGreaterThanOrEqual(started.getTime() - 1000);
+    expect(first.body).toEqual({ status: "recorded", version: CGU_VERSION, effective: cguEffectiveFor(notice!.at) });
+
+    const again = await call<{ effective: string }>(consents, CONSENTS_PATH, { jar, body: { cguNotice: true } });
+    expect(again.body.effective).toBe(first.body.effective);
+    expect((await getUserPrivate(uid))?.consents.cguNotice?.at.getTime()).toBe(notice!.at.getTime());
+    // Not an acknowledgement: the CGU stay to accept, and nothing is audited.
+    expect((await getUserPrivate(uid))?.consents.cgu.version).toBe("0.9");
+    expect(await auditEntries(uid)).toEqual([]);
   });
 
   it("answers 401 when signed out", async () => {

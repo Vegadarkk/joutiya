@@ -55,6 +55,47 @@ export const LEGAL_VERSIONS: Record<LegalSlug, LegalVersion> = {
   "objets-interdits": { version: "1.0", effective: "2026-10-28" },
 };
 
+/**
+ * Earlier versions kept online (CGU §22.1 and §22.4), newest first, served at
+ * /legal/{slug}/{archiveSegment(version)} from src/content/legal/{fr,ar}/archive/{slug}-{version}.md.
+ * A CGU bump copies the outgoing text there and lists it here, with `replacedOn` the new version's
+ * `effective`: until then (and later for a member notified late) it is the text in force.
+ */
+export interface ArchivedLegalVersion {
+  version: string;
+  effective: string;
+  /** ISO day the next version came into force (for the members notified in time). */
+  replacedOn: string;
+}
+
+export const LEGAL_ARCHIVE: Partial<Record<LegalSlug, readonly ArchivedLegalVersion[]>> = {};
+
+/** URL segment of an archived version ("1.0" → "v1-0": no dot, which the proxy matcher reads as a file). */
+export function archiveSegment(version: string): string {
+  return `v${version.replace(/\./g, "-")}`;
+}
+
+export function archivedVersion(slug: LegalSlug, segment: string): ArchivedLegalVersion | undefined {
+  return LEGAL_ARCHIVE[slug]?.find((entry) => archiveSegment(entry.version) === segment);
+}
+
+/** An ISO day in Casablanca, as the dates of LEGAL_VERSIONS. */
+export function legalDay(at: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Casablanca" }).format(at);
+}
+
+/**
+ * Day the current CGU applies to a member first notified (banner shown or e-mail sent) at
+ * `noticeAt`, null when the notice is given now (CGU §22.1): the version's `effective`, or 30 days
+ * after the notice when it came later than 30 days before. An urgent change (§22.2) keeps its date.
+ */
+export function cguEffectiveFor(noticeAt: Date | null, now = new Date(), cgu: Pick<LegalVersion, "effective" | "urgent"> = LEGAL_VERSIONS.cgu): string {
+  const { effective, urgent } = cgu;
+  if (urgent) return effective;
+  const floor = legalDay(new Date((noticeAt ?? now).getTime() + CGU_NOTICE_DAYS * 86_400_000));
+  return floor > effective ? floor : effective;
+}
+
 /** Pages whose Arabic text exists (all of them since the CGV, audit D-15); the others would show the French text on the Arabic site. */
 export const ARABIC_LEGAL_PAGES: ReadonlySet<LegalSlug> = new Set(Object.keys(LEGAL_VERSIONS) as LegalSlug[]);
 
