@@ -87,6 +87,8 @@ const DATA: { [T in TemplateId]: TemplateData[T] } = {
     place: "Parking du Morocco Mall",
     cid: "AbCdEfGhIjKlMnOpQrStUv",
   },
+  reviewReceived: { displayName: "Nadia", authorName: "Karim", rating: 4, listingTitle: "Lampe en laiton" },
+  reviewPublished: { displayName: "Nadia", sellerName: "Karim", sellerPublicId: "u_AbCdEfGhIj" },
 };
 
 /** Every URL a template receives must appear in both bodies. */

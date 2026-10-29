@@ -106,6 +106,8 @@ describe("review moderation", () => {
     const [queued] = await openReports(id);
     expect(queued).toMatchObject({ source: "system", reasonId: "personal_data", status: "open", target: { type: "review", id, ownerUid: buyer.uid } });
     expect(JSON.stringify(queued)).not.toContain("diabétique");
+    // Not public yet: no mail to the seller.
+    expect(mailTo(sendMail, "reviewReceived", seller.email)).toBeUndefined();
     expect((await reviewDoc(id)).legalHold).toContain(`report:${queued!.id}`);
 
     const decided = await decide(`review:${id}`, "review.no_action");
@@ -115,6 +117,10 @@ describe("review moderation", () => {
     expect((await openReports(id))[0]).toMatchObject({ status: "dismissed" });
     // Nothing was restored (the review was never public): no restoration mail.
     expect(mailTo(sendMail, "contentRestored", buyer.email)).toBeUndefined();
+    // Published now: the seller hears of it, the author learns it is online.
+    expect(mailTo(sendMail, "reviewReceived", seller.email)).toMatchObject({ priority: "bulk", data: { authorName: "Youssef Acheteur", rating: 2 } });
+    expect(JSON.stringify(mailTo(sendMail, "reviewReceived", seller.email))).not.toContain("diabétique");
+    expect(mailTo(sendMail, "reviewPublished", buyer.email)?.data).toMatchObject({ sellerName: "Salma Vendeuse", sellerPublicId: (await getUserRecord(seller.uid))!.publicId });
     // A second decision with no open report has nothing to decide.
     refused(await decide(`review:${id}`, "review.no_action"), 409, "conflict");
   });
@@ -158,6 +164,22 @@ describe("review moderation", () => {
     expect(shown).not.toHaveProperty("hiddenBy");
     expect(await ratingCount(seller.uid)).toBe(1);
     expect(mailTo(sendMail, "contentRestored", buyer.email)?.data).toMatchObject({ targetType: "review" });
+  });
+
+  it("mails the seller a published review, unless the messaging mails are off", async () => {
+    const { buyer, seller } = await reviewed(TEXT, 5);
+    expect(mailTo(sendMail, "reviewReceived", seller.email)?.data).toMatchObject({ displayName: "Salma Vendeuse", authorName: "Youssef Acheteur", rating: 5 });
+    // Published at once: no "your review is published" mail to its author.
+    expect(mailTo(sendMail, "reviewPublished", buyer.email)).toBeUndefined();
+
+    const [other, quiet] = await Promise.all([member({ displayName: "Youssef Acheteur" }), member({ displayName: "Salma Vendeuse" })]);
+    await db().collection(COLLECTIONS.users).doc(quiet.uid).collection(COLLECTIONS.userPrivate).doc(COLLECTIONS.userPrivateDoc).update({ notifications: { messagesEmail: false } });
+    const { id: listingId } = await seedListing(quiet);
+    const { cid } = await startOk(other, listingId);
+    expect((await send(quiet, cid, "Oui, toujours disponible.")).status).toBe(201);
+    await db().collection(COLLECTIONS.conversations).doc(cid).update({ sellerRepliedAt: Timestamp.fromMillis(Date.now() - 2 * DAY_MS) });
+    expect((await create(other, { cid, rating: 4, text: TEXT, exchangeConfirmed: true })).status).toBe(201);
+    expect(mailTo(sendMail, "reviewReceived", quiet.email)).toBeUndefined();
   });
 
   it("hides the reviews a seller received when the seller's account closes", async () => {

@@ -46,6 +46,10 @@ export type TemplateId =
   | "newMessages"
   // Appointments in messaging (28 Oct): reminder the day before and 2 hours before a confirmed slot.
   | "appointmentReminder"
+  // Verified reviews (vitrine-avis): a review published on the seller's storefront, and a held
+  // review published by a moderator (to its author).
+  | "reviewReceived"
+  | "reviewPublished"
   // Account closure (phase 5, L7, D26): confirmation with what is kept and until when.
   | "accountClosed"
   // Legal (phase 6, D11): the CGU changed since the member accepted them (DSA art. 14 § 2).
@@ -147,6 +151,10 @@ export interface TemplateData {
   };
   /** Hidden content shown again, or an account restriction lifted (report dismissed or appeal granted). */
   contentRestored: { displayName: string; targetType: "listing" | "user" | "message" | "review"; title: string | null; via: "report" | "appeal"; decisionId: string };
+  /** A review of the seller is published: the author's display name, the note (1-5) and the listing title; never the text. */
+  reviewReceived: { displayName: string; authorName: string; rating: number; listingTitle: string };
+  /** A held review was published by a moderator: the seller's name and public id (storefront link). */
+  reviewPublished: { displayName: string; sellerName: string; sellerPublicId: string };
   /** Appeal received (art. 20 DSA): reference, date (ISO), answer delay. */
   appealReceived: { displayName: string | null; decisionId: string; receivedAt: string; slaDays: number };
   /** Appeal decided by another moderator: upheld or reversed, with the reasons. */

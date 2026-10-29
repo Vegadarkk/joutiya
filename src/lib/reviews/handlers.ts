@@ -26,6 +26,7 @@ import {
   replyToReview,
   type ReviewRecord,
 } from "./repository";
+import { notifyReviewPublished } from "./notify";
 import { sellerReviews } from "./seller";
 import { decodeReviewCursor, reviewView } from "./views";
 
@@ -99,8 +100,10 @@ export async function handleCreateReview(request: Request): Promise<Response> {
   // Sensitive data (Russmedia): held for a moderator instead of refused.
   const { sensitive } = screened(input.text, "text");
   const review = await createReview({ cid: input.cid, authorUid: user.uid, rating: input.rating, text: input.text, status: sensitive ? "pending" : "published", now: new Date() }).catch(reviewErrorToHttp);
-  if (review.status === "published") revalidateListingPaths({ publicId: review.targetPublicId });
-  else await holdForModerator(review);
+  if (review.status === "published") {
+    revalidateListingPaths({ publicId: review.targetPublicId });
+    await notifyReviewPublished(review, { held: false });
+  } else await holdForModerator(review);
   const body: ReviewCreated = { id: review.id, status: review.status === "published" ? "published" : "pending" };
   return json(body, { status: 201 });
 }
