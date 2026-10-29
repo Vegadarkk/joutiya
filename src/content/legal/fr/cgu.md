@@ -340,6 +340,7 @@ Une annonce pour un objet interdit est bloquée ou mise en vérification au dép
 - Il respecte les règles propres à son activité, par exemple dans l'immobilier (§7.10), la vente ou la location de véhicules (§7.11).
 - **Produits alimentaires.** La catégorie « Produits du terroir » est réservée aux professionnels. Chaque annonce indique le numéro d'autorisation ou d'agrément sanitaire de l'ONSSA, affiché sur l'annonce. La première annonce qui porte un nouveau numéro est examinée par un modérateur, qui le vérifie sur les listes publiques de l'ONSSA. Le professionnel reste seul responsable de la conformité de ses produits.
 - **Publicité pour un crédit.** Une annonce qui indique une mensualité ou un financement donne aussi le nom du prêteur, la durée, le coût total et le taux effectif global (loi n° 31-08). À défaut, elle est examinée par un modérateur avant publication. {brand} ne propose ni n'intermédie aucun crédit.
+- **Variantes et stock.** Un professionnel peut proposer un article en plusieurs variantes (taille, couleur, contenance), chacune avec son prix et son stock. Le stock et les prix sont ceux qu'il déclare : {brand} ne les vérifie pas, et il les tient à jour sous sa seule responsabilité. {brand} garde l'historique des prix de l'annonce sur les 31 derniers jours.
 - Un professionnel ne publie jamais depuis un compte de particulier (§4.3).
 
 ### 7.9 Durée, renouvellement et retrait {#annonces-9}
