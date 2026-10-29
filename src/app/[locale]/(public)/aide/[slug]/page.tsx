@@ -10,7 +10,7 @@ import { AssistantLauncher } from "@/components/help/assistant-launcher";
 import { ArticleBody } from "@/components/help/article-body";
 import { Container } from "@/components/layout/container";
 import { quietLinkClassName } from "@/components/ui/text-link";
-import { pageLocale } from "@/i18n/params";
+import { localeParams, pageLocale } from "@/i18n/params";
 import { alternates } from "@/lib/i18n/metadata";
 import { getLegalConfig } from "@/lib/legal/config";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,7 @@ export const revalidate = 300;
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return HELP_SLUGS.map((slug) => ({ slug }));
+  return localeParams(HELP_SLUGS.map((slug) => ({ slug })));
 }
 
 type Params = Promise<{ locale: string; slug: string }>;

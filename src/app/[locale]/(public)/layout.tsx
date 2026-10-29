@@ -9,10 +9,9 @@ import { PUBLIC_CLIENT_NAMESPACES } from "@/i18n/client-messages";
 import { rootMetadata, SITE_VIEWPORT } from "@/lib/i18n/metadata";
 
 // Public anonymous pages: static or ISR, hash-based CSP, cacheable by Cloudflare (§1, §6).
-
-export function generateStaticParams() {
-  return routing.locales.map((locale) => ({ locale }));
-}
+// No generateStaticParams here: each page built ahead lists its locales (localeParams), so a page
+// rendered on its first visit (the home) can stay out of the build. Checked after each build by
+// scripts/check-prerender.ts.
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;

@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "node scripts/copy-vendor.mjs && next dev",
-    "build": "node scripts/copy-vendor.mjs && next build && npm run build:node",
+    "build": "node scripts/copy-vendor.mjs && next build && node scripts/check-prerender.ts && npm run build:node",
     "build:node": "node scripts/build-node.ts && node --experimental-import-meta-resolve scripts/check-worker-imports.ts",
     "start": "next start",
     "worker": "node dist/worker/index.mjs",
@@ -18,7 +18,7 @@
     "test:rules": "firebase emulators:exec --only firestore --project demo-joutiya \"vitest run --config vitest.rules.config.ts\"",
     "test:e2e": "firebase emulators:exec --only auth,firestore --project demo-joutiya \"playwright test\"",
     "assert-target": "node scripts/assert-target.ts",
-    "check": "npm run lint && npm run typecheck && tsc -p workers/uptime-probe --noEmit && tsc -p workers/vm-launcher --noEmit && npm run test && node --test scripts/assert-target.test.ts scripts/github-ci.test.ts scripts/env-proxy.test.ts",
+    "check": "npm run lint && npm run typecheck && tsc -p workers/uptime-probe --noEmit && tsc -p workers/vm-launcher --noEmit && npm run test && node --test scripts/assert-target.test.ts scripts/github-ci.test.ts scripts/env-proxy.test.ts scripts/check-prerender.test.ts",
     "test:api": "firebase emulators:exec --only auth,firestore --project demo-joutiya \"vitest run --config vitest.api.config.ts\"",
     "test:search": "vitest run --config vitest.search.config.ts",
     "test:e2e:only": "playwright test",

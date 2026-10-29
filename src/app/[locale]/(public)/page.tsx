@@ -55,7 +55,9 @@ const rowFavorite = (listing: MapListing) => <FavoriteButton listingId={listing.
 export const revalidate = 300;
 // Rendered on the first visit, never at build: the image is built without a search engine, so a
 // build-time page has no listing sections, and after each deploy the purged edge would cache it
-// (served stale by the origin, then re-stamped for 5 minutes). Overrides the locales of the layout.
+// (served stale by the origin, then re-stamped for 5 minutes). Hence no locale here, and none in the
+// (public) layout either: a parent's params would be prerendered whatever this list says
+// (localeParams, src/i18n/params.ts); scripts/check-prerender.ts fails the build otherwise.
 // The basemap is read at that render too (runtime config, one image for staging and production).
 export const dynamicParams = true;
 

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
+import { localeParams } from "@/i18n/params";
 import { LEGAL_PAGES, legalPage } from "@/config/legal-pages";
 import { ARABIC_LEGAL_PAGES, LEGAL_VERSIONS, PROVISIONAL_LEGAL_PAGES } from "@/config/legal-versions";
 import { LegalPage } from "@/components/legal/legal-page";
@@ -22,7 +23,7 @@ export const revalidate = 300;
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return LEGAL_PAGES.map((page) => ({ page: page.slug }));
+  return localeParams(LEGAL_PAGES.map((page) => ({ page: page.slug })));
 }
 
 type Params = Promise<{ locale: string; page: string }>;

@@ -8,7 +8,7 @@ import { DoorMark } from "@/components/feedback/door-mark";
 import { GuideDisclaimer, OfficialLink } from "@/components/guide/official-link";
 import { Container } from "@/components/layout/container";
 import { quietLinkClassName } from "@/components/ui/text-link";
-import { numbersLocale, pageLocale } from "@/i18n/params";
+import { localeParams, numbersLocale, pageLocale } from "@/i18n/params";
 import { linkDisplay } from "@/lib/guide/check";
 import { getGuideState } from "@/lib/guide/state";
 import { alternates } from "@/lib/i18n/metadata";
@@ -18,6 +18,10 @@ import { cn } from "@/lib/utils";
 // 28 Oct): the rubrics by visitor profile and the portals for every procedure. ISR, one hour: the
 // weekly checker's state (system/guide-links) can withdraw or reveal a link.
 export const revalidate = 3600;
+
+export function generateStaticParams() {
+  return localeParams();
+}
 
 type Params = Promise<{ locale: string }>;
 
