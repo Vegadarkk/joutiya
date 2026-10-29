@@ -433,6 +433,7 @@
       "verification": {
         "title": "Vérifications",
         "body": "Un numéro vérifié rassure les acheteurs et vous permet d'être contacté sur WhatsApp.",
+        "bodyClosed": "Une adresse e-mail confirmée rassure les acheteurs. Les échanges passent par la messagerie de Joutiya.",
         "email": "Adresse e-mail",
         "emailVerified": "Confirmée",
         "emailPending": "À confirmer",
