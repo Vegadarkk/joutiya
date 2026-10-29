@@ -7,13 +7,23 @@ export { roundingStep };
 // comparable published listings (same subcategory and the criteria that drive the price), widening
 // the area from the city to the region, then Morocco, until enough are found. Pure and zod-free:
 // the server (service.ts), the listing page and the tests share it. Joutiya is a neutral host: the
-// guide gives a position, never a verdict ("bon prix", "trop cher").
+// guide gives a position, never a verdict ("bon prix", "trop cher"), and no single seller makes it:
+// each seller counts for PRICE_GUIDE_MAX_PER_SELLER prices at most, and a guide needs
+// PRICE_GUIDE_MIN_SELLERS distinct sellers (a dealer's stock or sock-puppet listings cannot set the
+// "fourchette habituelle" their own listing is then placed in).
 
-/** Fewer comparables than this: no guide. */
+/** Fewer comparables than this (after the per-seller cap): no guide. */
 export const PRICE_GUIDE_MIN_COMPARABLES = 8;
+/** Fewer distinct sellers than this among the comparables: no guide. */
+export const PRICE_GUIDE_MIN_SELLERS = 5;
+/**
+ * Prices kept per seller at most (their most recent listings). Two, not one: a seller often has two
+ * comparable listings, and with 8 comparables from 5 sellers one seller weighs 25 % at most.
+ */
+export const PRICE_GUIDE_MAX_PER_SELLER = 2;
 /** Prices read per area at most (the most recent first). */
 export const PRICE_GUIDE_MAX_PRICES = 200;
-/** Share of the lowest and of the highest prices dropped as outliers. */
+/** Share of the lowest and of the highest prices dropped as outliers (one on each side at least). */
 export const PRICE_GUIDE_TRIM = 0.1;
 /** A computed guide (or its absence) is kept this long (Valkey). */
 export const PRICE_GUIDE_TTL_SECONDS = 24 * 60 * 60;
@@ -179,7 +189,9 @@ export interface PriceStats {
 export function priceStats(prices: readonly number[]): PriceStats | null {
   const sorted = prices.filter((price) => Number.isFinite(price) && price > 0).sort((a, b) => a - b);
   if (sorted.length < PRICE_GUIDE_MIN_COMPARABLES) return null;
-  const cut = Math.floor(sorted.length * PRICE_GUIDE_TRIM);
+  // At least one price off each end: below 10 comparables 10 % rounds to none, and the scale would
+  // end on single listings.
+  const cut = Math.max(1, Math.floor(sorted.length * PRICE_GUIDE_TRIM));
   const kept = sorted.slice(cut, sorted.length - cut);
   const step = roundingStep(percentile(kept, 0.75));
   const down = (value: number) => Math.max(step, Math.floor(value / step) * step);
@@ -187,6 +199,30 @@ export function priceStats(prices: readonly number[]): PriceStats | null {
   const p25 = down(percentile(kept, 0.25));
   const p75 = Math.max(p25, up(percentile(kept, 0.75)));
   return { low: Math.min(p25, down(kept[0] ?? p25)), high: Math.max(p75, up(kept.at(-1) ?? p75)), p25, p75, count: sorted.length };
+}
+
+/** One comparable listing: its price and its seller (`sellerPublicId`). */
+export interface ComparablePrice {
+  price: number;
+  seller: string;
+}
+
+/**
+ * The range of `comparables` (most recent first), each seller counted for PRICE_GUIDE_MAX_PER_SELLER
+ * prices at most; null below PRICE_GUIDE_MIN_SELLERS sellers or PRICE_GUIDE_MIN_COMPARABLES prices.
+ */
+export function comparableStats(comparables: readonly ComparablePrice[]): PriceStats | null {
+  const perSeller = new Map<string, number>();
+  const prices: number[] = [];
+  for (const { price, seller } of comparables) {
+    if (!seller || !Number.isFinite(price) || price <= 0) continue;
+    const taken = perSeller.get(seller) ?? 0;
+    if (taken >= PRICE_GUIDE_MAX_PER_SELLER) continue;
+    perSeller.set(seller, taken + 1);
+    prices.push(price);
+  }
+  if (perSeller.size < PRICE_GUIDE_MIN_SELLERS) return null;
+  return priceStats(prices);
 }
 
 /** The guide of a listing as the listing page shows it. */

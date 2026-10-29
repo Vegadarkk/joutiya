@@ -8,7 +8,7 @@ import {
   PRICE_GUIDE_SCOPES,
   PRICE_GUIDE_TTL_SECONDS,
   comparableSpec,
-  priceStats,
+  comparableStats,
   specKey,
   type ComparableSpec,
   type GuideListing,
@@ -20,8 +20,9 @@ import {
 // (published, visible listings only, src/lib/search/document.ts), never from Firestore. One
 // multi-search round trip asks the city, the region and Morocco at once (at most
 // PRICE_GUIDE_MAX_PRICES prices each, the most recent first); the first area with enough
-// comparables wins. Example listings (not filterable) are dropped from the hits, the listing itself,
-// donations and sold-out Pro listings by the filter. The result, or its absence, is kept 24 h in
+// comparables wins, each seller counting twice at most (rules.ts). Example listings are dropped from
+// the hits (so the guide never depends on the index settings), the listing itself, donations and
+// sold-out Pro listings by the filter. The result, or its absence, is kept 24 h in
 // valkey-ratelimit (allkeys-lru: a cache may be evicted, never the queue's jobs), keyed by listing,
 // with the comparables' description so an edited listing gets a fresh guide.
 
@@ -31,8 +32,8 @@ export interface GuideSubject extends GuideListing {
   regionCode: string;
 }
 
-/** Fields read per hit: the price, and the example mark that the engine cannot filter on. */
-const HIT_FIELDS = ["id", "price", "isExample"] as const;
+/** Fields read per hit: the price, its seller (per-seller cap), and the example mark. */
+const HIT_FIELDS = ["id", "price", "isExample", "sellerPublicId"] as const;
 
 function criteriaFilters(spec: ComparableSpec): FilterExpr[] {
   return [
@@ -82,9 +83,11 @@ export async function computePriceGuide(subject: GuideSubject, engine: SearchEng
   // Region and Morocco are the same area when the city is unknown to the index: still asked, cheap.
   const results = await engine.search(PRICE_GUIDE_SCOPES.map((scope) => comparablesQuery(spec, subject, scope)));
   for (const [index, scope] of PRICE_GUIDE_SCOPES.entries()) {
-    const hits = (results[index]?.hits ?? []) as { id?: string; price?: number; isExample?: boolean }[];
-    const prices = hits.filter((hit) => hit.isExample !== true && hit.id !== subject.id).flatMap((hit) => (typeof hit.price === "number" ? [hit.price] : []));
-    const stats = priceStats(prices);
+    const hits = (results[index]?.hits ?? []) as { id?: string; price?: number; isExample?: boolean; sellerPublicId?: string }[];
+    const comparables = hits
+      .filter((hit) => hit.isExample !== true && hit.id !== subject.id)
+      .flatMap((hit) => (typeof hit.price === "number" && typeof hit.sellerPublicId === "string" ? [{ price: hit.price, seller: hit.sellerPublicId }] : []));
+    const stats = comparableStats(comparables);
     if (stats) return { ...stats, scope, place: placeOf(scope, subject) };
   }
   return null;
@@ -133,7 +136,8 @@ function guideCache(): GuideCache | null {
   };
 }
 
-export const priceGuideCacheKey = (listingId: string) => `pg:v1:${listingId}`;
+/** v2: the per-seller cap (guides cached by v1 without it are left to expire). */
+export const priceGuideCacheKey = (listingId: string) => `pg:v2:${listingId}`;
 
 /** The entry of `listingId`, or null (none, unreadable, Valkey down). */
 async function cachedGuide(listingId: string): Promise<CachedGuide | null> {

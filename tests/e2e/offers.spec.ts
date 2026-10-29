@@ -117,9 +117,11 @@ test.describe("price guide and offers", () => {
     await signUpAndIn(buyerPage, request, `e2e-offer-buyer-${stamp}@test.joutiya.ma`, "Youssef Acheteur");
     const seller = await session(sellerPage);
 
-    // Ten comparables in the city (BMX bikes), one outlier type elsewhere, then the listing itself.
+    // Ten comparables in the city (BMX bikes) from five other sellers (a guide needs five, two
+    // prices each at most), then the listing itself.
     const place = { citySlug: "chefchaouen", regionCode: "01" };
-    for (const price of [900, 1000, 1100, 1200, 1250, 1300, 1400, 1500, 1600, 1800]) await seedBike(seller, { title: `BMX ${price} ${stamp}`, price, ...place });
+    const others: Member[] = Array.from({ length: 5 }, (_, n) => ({ uid: `e2e-offer-other-${n}-${stamp}`, publicId: randomId(10), displayName: `Vendeur ${n + 1}` }));
+    for (const [n, price] of [900, 1000, 1100, 1200, 1250, 1300, 1400, 1500, 1600, 1800].entries()) await seedBike(others[n % others.length]!, { title: `BMX ${price} ${stamp}`, price, ...place });
     const listing = await seedBike(seller, { title: `Vélo BMX 20 pouces ${stamp}`, price: 1350, ...place, photo: true });
     await expect.poll(async () => (await request.post("/api/dev/search/rebuild")).ok(), { timeout: 20_000, message: "listings indexed" }).toBe(true);
 
