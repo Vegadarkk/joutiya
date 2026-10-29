@@ -262,7 +262,7 @@ describe("thread", () => {
     expect(html).toContain('data-testid="offer-counter"');
     expect(html).toContain('data-testid="offer-decline"');
     expect(html).toContain("Expire dans 20 heures");
-    expect(html).toContain("n&#x27;engage pas à vendre");
+    expect(html).toContain("n&#x27;engage ni à vendre ni à acheter");
     expect(card(view(), { writable: false })).not.toContain('data-testid="offer-accept"');
   });
 
@@ -285,7 +285,7 @@ describe("thread", () => {
     expect(html).toContain("⁨Youssef⁩ fait une contre-offre");
     expect(render(<OfferEventItem step={{ event: "expired", byMe: false, amount: 900 }} counterpartName="Youssef" time="10:02" />)).toContain("a expiré sans réponse");
     expect(render(<OfferEventItem step={step} counterpartName="Youssef" time="10:02" />, "ar")).toContain("عرضًا مضادًا");
-    expect(card(view(), { locale: "ar" })).toContain("العرض المقبول لا يُلزم بالبيع");
+    expect(card(view(), { locale: "ar" })).toContain("العرض المقبول لا يحجز السلعة ولا يُلزم بالبيع ولا بالشراء");
     const row = { lastMessage: { preview: offerMarker("accepted"), mine: false, at: NOW, flagged: false } };
     expect(previewText(row, { hidden: "", maskedLink: "", offer: (event) => fr.Offers.preview[event] })).toBe("Offre acceptée");
   });

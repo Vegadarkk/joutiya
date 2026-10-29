@@ -141,7 +141,7 @@ test.describe("price guide and offers", () => {
     const dialog = buyerPage.getByTestId("message-dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("heading")).toContainText("Faire une offre à");
-    await expect(dialog.getByTestId("offer-notice")).toContainText("Une offre acceptée n'engage pas à vendre");
+    await expect(dialog.getByTestId("offer-notice")).toContainText("Une offre acceptée ne réserve pas l'article et n'engage ni à vendre ni à acheter");
     const amount = dialog.getByLabel("Votre offre");
     await amount.fill("300");
     await dialog.getByRole("button", { name: "Envoyer l'offre" }).click();

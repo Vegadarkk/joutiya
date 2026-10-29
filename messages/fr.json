@@ -3951,7 +3951,7 @@
       "make": "Faire une offre",
       "makeHint": "Proposez votre prix : le vendeur peut accepter, refuser ou vous faire une contre-offre sous 48 heures.",
       "signIn": "Connectez-vous pour faire une offre. Vous reviendrez ensuite sur cette annonce.",
-      "notice": "Une offre acceptée n'engage pas à vendre ; le paiement et la remise se règlent entre vous.",
+      "notice": "Une offre acceptée ne réserve pas l'article et n'engage ni à vendre ni à acheter : la remise et le paiement se règlent entre vous.",
       "safety": "{site} n'encaisse rien : ne versez jamais d'acompte avant d'avoir vu l'article.",
       "draft": "Bonjour, je vous propose {amount} pour « {title} ». Est-ce toujours disponible ?"
     },
