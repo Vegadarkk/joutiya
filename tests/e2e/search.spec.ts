@@ -244,6 +244,20 @@ test.describe("search page", () => {
     expect(body.hits.map((hit) => hit.id)).toEqual([listings.car.id]);
   });
 
+  test("previews a listing for the map's detail panel from the index, in the asked language", async ({ request }) => {
+    const response = await request.get(`/api/listings/${listings.car.id}/preview?locale=fr`);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["cache-control"]).toContain("no-store");
+    const body = (await response.json()) as { criteria: { id: string; value: string }[]; description: string; seller: { type: string } | null };
+    expect(body.criteria.find((row) => row.id === "model")?.value).toBe("Sandero");
+    expect(body.criteria.find((row) => row.id === "mileage")?.value).toMatch(/^85\s000 km$/);
+    expect(body.description).toContain(WORD);
+    expect(body.seller?.type).toBe("individual");
+    const arabic = (await (await request.get(`/api/listings/${listings.car.id}/preview?locale=ar`)).json()) as { criteria: { id: string; label: string }[] };
+    expect(arabic.criteria.find((row) => row.id === "fuel")?.label).toBe("نوع الوقود");
+    expect((await request.get("/api/listings/zzzzzzzz/preview?locale=fr")).status()).toBe(404);
+  });
+
   test("finds the Rabat listing within 50 km of Rabat only", async ({ request }) => {
     const response = await request.get(`/api/search?q=${WORD}&ville=rabat&rayon=50`);
     const body = (await response.json()) as { hits: { id: string }[] };

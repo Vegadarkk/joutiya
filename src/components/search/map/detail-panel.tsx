@@ -1,18 +1,51 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
-import { Camera, CalendarDays, Flag, ImageOff, MapPin, MessageCircle, SquareArrowOutUpRight, X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useEffect, useId, useRef, useState } from "react";
+import { ArrowUpRight, BadgeCheck, Camera, CalendarDays, Flag, ImageOff, MapPin, MessageCircle, UserRound, X } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
+import { PriceGuideScale } from "@/components/listing/price-guide-scale";
 import { BoostBadge } from "@/components/search/boost-badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@/i18n/navigation";
+import { listingPreviewPath, type ListingPreview } from "@/lib/contracts/listing-preview";
 import { cn } from "@/lib/utils";
 import { useSearchMap } from "./search-map-root";
 
 // Detail of a result beside the desktop map (Carte vivante, lot 2): opened by a pin or a row, at the
-// end side. Only what the results card already carries (photo, price, place, date, key facts, Pro
-// mention, §8 mentions): contact, report and the full page stay on the listing page itself. A
-// non-modal dialog: Escape and the close button shut it and focus returns to the opener.
+// end side. At once, what the results card already carries (photo, price, place, date, key facts,
+// §8 mentions) and the way to the full page right under it; then the cards of the preview API
+// (criteria, description, « Prix repère », seller), fetched per listing and kept for the visit.
+// Contact and report stay on the listing page itself. A non-modal dialog: Escape and the close
+// button shut it and focus returns to the opener.
+
+/** Main criteria shown in the panel; the rest is on the full page. */
+const CRITERIA_MAX = 8;
+/** Previews kept per visit (pins opened back and forth answer at once). */
+const PREVIEWS_KEPT = 40;
+const previews = new Map<string, ListingPreview | null>();
+
+/** The preview of `id`, fetched once per locale; null once it failed (the panel keeps its first part). */
+function useListingPreview(id: string | null, locale: string): { preview: ListingPreview | null; loading: boolean } {
+  const key = id ? `${locale}:${id}` : "";
+  const [, rerender] = useState(0);
+  useEffect(() => {
+    if (!id || previews.has(key)) return;
+    const controller = new AbortController();
+    fetch(listingPreviewPath(id, locale), { signal: controller.signal, credentials: "same-origin" })
+      .then(async (response) => (response.ok ? ((await response.json()) as ListingPreview) : null))
+      .catch((error: unknown) => ((error as Error).name === "AbortError" ? undefined : null))
+      .then((preview) => {
+        if (preview === undefined) return;
+        const oldest = previews.size >= PREVIEWS_KEPT ? previews.keys().next().value : undefined;
+        if (oldest !== undefined) previews.delete(oldest);
+        previews.set(key, preview);
+        rerender((count) => count + 1);
+      });
+    return () => controller.abort();
+  }, [id, key, locale]);
+  return { preview: previews.get(key) ?? null, loading: Boolean(id) && !previews.has(key) };
+}
 
 export function DetailPanel() {
   const t = useTranslations("SearchMap.detail");
@@ -22,6 +55,9 @@ export function DetailPanel() {
   const open = state !== null && state.desktop && state.view === "map" && state.canMap ? state.selected : null;
   const listing = open ? state?.listings.find((item) => item.id === open) : undefined;
   const select = state?.select;
+  const locale = useLocale();
+  const { preview, loading } = useListingPreview(listing?.id ?? null, locale);
+  const guideId = useId();
 
   useEffect(() => {
     if (!listing) return;
@@ -39,9 +75,8 @@ export function DetailPanel() {
 
   if (!listing || !select) return null;
   const href = `/annonce/${listing.slugId}`;
-  // An example listing (src/lib/demo) names no seller type: it has no seller to contact.
-  const seller = listing.example ? [] : listing.pro ? [t("pro")] : [t("individual")];
-  const chips = [...listing.facts, ...seller, ...(listing.exclusive ? [t("exclusive")] : [])];
+  const chips = [...listing.facts, ...(listing.exclusive ? [t("exclusive")] : [])];
+  const criteria = preview?.criteria.slice(0, CRITERIA_MAX) ?? [];
 
   return (
     <section role="dialog" aria-modal="false" aria-labelledby={titleId} data-testid="search-detail" className="search-detail float-card">
@@ -113,18 +148,88 @@ export function DetailPanel() {
             ))}
           </ul>
         ) : null}
-        <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-3 text-sm">
-          <Link href={href} prefetch={false} className="inline-flex min-h-11 items-center gap-1.5 font-medium text-link underline-offset-4 hover:underline" data-testid="search-detail-open">
-            <SquareArrowOutUpRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
-            {t("open")}
-          </Link>
-          {listing.example ? null : (
-            <Link href={`${href}#signaler`} prefetch={false} className="inline-flex min-h-11 items-center gap-1.5 text-foreground-muted underline-offset-4 hover:text-foreground hover:underline">
-              <Flag className="size-4" aria-hidden="true" />
-              {t("report")}
-            </Link>
+        <Link
+          href={href}
+          prefetch={false}
+          data-testid="search-detail-open"
+          className={cn(
+            "group/open mt-1 inline-flex min-h-12 items-center justify-between gap-3 rounded-md bg-structure ps-4 pe-3 font-semibold text-structure-foreground shadow-sm shadow-bab-950/15",
+            "transition-[background-color,scale] duration-150 ease-door hover:bg-bab-800 active:scale-[0.99] dark:bg-gold-300 dark:text-bab-950 dark:hover:bg-gold-200",
           )}
-        </div>
+        >
+          {t("open")}
+          <span className="inline-flex size-8 items-center justify-center rounded-full bg-structure-foreground/15 transition-transform dark:bg-bab-950/10 duration-200 ease-door group-hover/open:translate-x-0.5 rtl:group-hover/open:-translate-x-0.5">
+            <ArrowUpRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
+          </span>
+        </Link>
+
+        {loading ? (
+          <div role="status" data-testid="search-detail-loading" className="flex flex-col gap-3">
+            <span className="sr-only">{t("loading")}</span>
+            <Skeleton className="h-28 w-full rounded-lg" />
+            <Skeleton className="h-20 w-full rounded-lg" />
+          </div>
+        ) : null}
+
+        {criteria.length > 0 ? (
+          <section aria-labelledby={`${guideId}-criteria`} data-testid="search-detail-criteria" className="rounded-lg border border-border bg-surface px-4 pt-3 pb-4">
+            <h3 id={`${guideId}-criteria`} className="mb-3 text-sm font-semibold">
+              {t("criteria")}
+            </h3>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+              {criteria.map((row) => (
+                <div key={row.id} className="flex min-w-0 flex-col gap-0.5 border-s-2 border-border ps-2.5">
+                  <dt className="text-xs text-foreground-muted">{row.label}</dt>
+                  <dd dir={row.userText ? "auto" : undefined} className="text-sm font-medium break-words">
+                    {row.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ) : null}
+
+        {preview?.description ? (
+          <section aria-labelledby={`${guideId}-description`} data-testid="search-detail-description" className="rounded-lg border border-border bg-surface px-4 pt-3 pb-3.5">
+            <h3 id={`${guideId}-description`} className="mb-1.5 text-sm font-semibold">
+              {t("description")}
+            </h3>
+            <p dir="auto" className="line-clamp-5 text-sm leading-relaxed whitespace-pre-line text-foreground-muted">
+              {preview.description}
+            </p>
+            <Link href={href} prefetch={false} tabIndex={-1} className="mt-1.5 inline-block text-sm font-medium text-link underline-offset-4 hover:underline">
+              {t("readMore")}
+            </Link>
+          </section>
+        ) : null}
+
+        {preview?.guide ? <PriceGuideScale view={preview.guide} titleId={`${guideId}-guide`} /> : null}
+
+        {listing.example ? null : (
+          <section aria-labelledby={`${guideId}-seller`} data-testid="search-detail-seller" className="flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3">
+            <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-brand text-structure dark:text-gold-300">
+              {listing.pro ? <BadgeCheck className="size-5" aria-hidden="true" /> : <UserRound className="size-5" aria-hidden="true" />}
+            </span>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <h3 id={`${guideId}-seller`} className="text-xs text-foreground-muted">
+                {t("seller")}
+              </h3>
+              <p className="text-sm font-semibold">{listing.pro ? t("pro") : t("individual")}</p>
+            </div>
+            {preview?.seller ? (
+              <Link href={`/profil/${preview.seller.publicId}`} prefetch={false} className="inline-flex min-h-11 shrink-0 items-center text-sm font-medium text-link underline-offset-4 hover:underline">
+                {t("profile")}
+              </Link>
+            ) : null}
+          </section>
+        )}
+
+        {listing.example ? null : (
+          <Link href={`${href}#signaler`} prefetch={false} className="inline-flex min-h-11 items-center gap-1.5 self-end text-sm text-foreground-muted underline-offset-4 hover:text-foreground hover:underline">
+            <Flag className="size-4" aria-hidden="true" />
+            {t("report")}
+          </Link>
+        )}
       </div>
 
       {listing.example ? null : (

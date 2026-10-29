@@ -97,6 +97,7 @@ describe("toSearchDocument", () => {
       priceNegotiable: true,
       isDonation: false,
       condition: "good",
+      attributes: { "bike-type": "ville", brand: "Peugeot" },
       hasPhoto: true,
       photo: { id: "photo-1", w: 1600, h: 1200, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj" },
       photoCount: 2,
@@ -131,6 +132,7 @@ describe("toSearchDocument", () => {
     expect(doc).toMatchObject({ a_property_type: "appartement", a_surface: 85, a_furnished: true, a_amenities: ["parking", "ascenseur"], a_availability: "immediate", district: "maarif extension" });
     // A criterion the subcategory does not declare is ignored.
     expect(doc).not.toHaveProperty("a_car_brand");
+    expect(doc.attributes).not.toHaveProperty("car-brand");
     expect(doc.attrsText).toContain("Meublé مفروش");
     expect(doc.attrsText).toContain("Parking");
     expect(doc.attrsText).toContain("مصعد");
