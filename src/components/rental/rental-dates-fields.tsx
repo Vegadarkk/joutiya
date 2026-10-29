@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, type MouseEvent } from "react";
+import { CalendarDays } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { inputClassName } from "@/components/ui/input";
 import type { RentalUnit } from "@/config/categories";
@@ -12,7 +13,20 @@ import { cn } from "@/lib/utils";
 // phone's own picker), Morocco's calendar, a pick-up from today to 180 days ahead and a return
 // up to 60 days later (the same day counts as one day). A pick-up after the return moves the
 // return to the next day. A home (`unit` "night", seasonal rental conception §2): arrival and
-// departure, one night at least.
+// departure, one night at least. The fields stay native (the phone's own picker, the browser's own
+// date order) but dress like the city field: a calendar glyph in place of the browser's indicator,
+// and a click anywhere in the field opens the picker where the browser allows it (UX audit, 12).
+
+/** Hides the browser's own indicator; the glyph beside the field stands for it. */
+const DATE_INPUT = "min-w-0 ps-9 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-date-and-time-value]:text-start";
+
+function openPicker(event: MouseEvent<HTMLInputElement>) {
+  try {
+    event.currentTarget.showPicker?.();
+  } catch {
+    // Not a user gesture for the browser, or no picker here: the field still takes typed input.
+  }
+}
 
 export interface RentalDatesFieldsProps {
   value: Partial<RentalDates>;
@@ -49,31 +63,39 @@ export function RentalDatesFields({ value, onChange, className, names, inputClas
         <label htmlFor={`${ids}-from`} className="text-xs text-foreground-muted">
           {t(nights ? "home.from" : "from")}
         </label>
-        <input
-          id={`${ids}-from`}
-          type="date"
-          name={names?.from}
-          className={cn(inputClassName, "min-w-0", fieldClassName)}
-          value={value.from ?? ""}
-          min={dayString(today)}
-          max={dayString(today + RENTAL_SEARCH_AHEAD_DAYS)}
-          onChange={(event) => setFrom(event.target.value)}
-        />
+        <span className="relative flex">
+          <CalendarDays className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-structure dark:text-gold-300" aria-hidden="true" />
+          <input
+            id={`${ids}-from`}
+            type="date"
+            name={names?.from}
+            className={cn(inputClassName, DATE_INPUT, fieldClassName)}
+            value={value.from ?? ""}
+            min={dayString(today)}
+            max={dayString(today + RENTAL_SEARCH_AHEAD_DAYS)}
+            onChange={(event) => setFrom(event.target.value)}
+            onClick={openPicker}
+          />
+        </span>
       </div>
       <div className="flex min-w-0 flex-col gap-1">
         <label htmlFor={`${ids}-to`} className="text-xs text-foreground-muted">
           {t(nights ? "home.to" : "to")}
         </label>
-        <input
-          id={`${ids}-to`}
-          type="date"
-          name={names?.to}
-          className={cn(inputClassName, "min-w-0", fieldClassName)}
-          value={value.to ?? ""}
-          min={dayString(minReturn)}
-          max={dayString(maxReturn)}
-          onChange={(event) => onChange({ ...value, to: event.target.value || undefined })}
-        />
+        <span className="relative flex">
+          <CalendarDays className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-structure dark:text-gold-300" aria-hidden="true" />
+          <input
+            id={`${ids}-to`}
+            type="date"
+            name={names?.to}
+            className={cn(inputClassName, DATE_INPUT, fieldClassName)}
+            value={value.to ?? ""}
+            min={dayString(minReturn)}
+            max={dayString(maxReturn)}
+            onChange={(event) => onChange({ ...value, to: event.target.value || undefined })}
+            onClick={openPicker}
+          />
+        </span>
       </div>
     </div>
   );
