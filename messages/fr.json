@@ -4636,7 +4636,7 @@
       "verified": "Agrément contrôlé sur document le {date}.",
       "verifiedNote": "La mention s'affiche sur votre vitrine. Elle disparaît si vous changez de numéro d'agrément.",
       "rejected": "Document refusé. Envoyez une décision d'agrément lisible, à jour et au nom de votre société.",
-      "notice": "Le document est lu par un outil d'intelligence artificielle (Claude, d'Anthropic), qui en relève le numéro, la raison sociale, l'ICE et la date, puis, en cas de doute, par notre équipe de modération. Il est conservé dans un espace privé tant que votre compte Pro est actif, puis 6 mois. Masquez tout numéro de CNIE avant l'envoi.",
+      "notice": "Le document est lu par un outil d'intelligence artificielle (Claude, d'Anthropic), qui en relève le numéro, la raison sociale, l'ICE et la date, puis, en cas de doute, par notre équipe de modération. Il est conservé dans un espace privé tant que votre compte Pro est actif, puis 6 mois. Masquez tout numéro de CNIE avant l'envoi. <link>En savoir plus</link>",
       "send": "Envoyer ma décision d'agrément",
       "sendAnother": "Envoyer un autre document",
       "refresh": "Actualiser",
