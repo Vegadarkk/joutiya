@@ -46,7 +46,7 @@ Quand vous choisissez un lieu et un rayon, vous pouvez trier du plus proche au p
 
 Vous pouvez trier du prix le plus bas au plus haut, ou l'inverse. Une annonce Pro proposée en plusieurs variantes (taille, couleur, contenance) à des prix différents est triée et filtrée selon son prix le plus bas. Le tri par prix retient le prix hors promotion.
 
-Le tri « Plus forte réduction » ne garde que les annonces dont une promotion est en cours, et les range de la plus forte réduction à la plus faible, puis de la plus récente à la plus ancienne. La réduction se mesure par rapport au prix barré calculé par {brand} (le prix le plus bas des 30 jours avant la promotion, voir les [CGU](/legal/cgu#annonces-8)) ; une promotion sans prix barré compte pour une réduction nulle et vient après les autres. Le filtre « En promotion » garde les mêmes annonces sans changer le tri choisi.
+Le tri « Plus forte réduction » ne garde que les annonces dont une promotion est en cours, et les range de la plus forte réduction à la plus faible, puis de la plus récente à la plus ancienne. La réduction est le pourcentage affiché sur l'annonce : l'écart entre le prix affiché et son prix barré calculé par {brand} (le prix le plus bas affiché aux acheteurs pendant les 30 jours avant la promotion, voir les [CGU](/legal/cgu#annonces-8)) ; une promotion sans prix barré compte pour une réduction nulle et vient après les autres. Le filtre « En promotion » garde les mêmes annonces sans changer le tri choisi.
 
 ### 2.5 Mesures de modération {#tri-5}
 
