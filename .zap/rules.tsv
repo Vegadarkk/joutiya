@@ -19,6 +19,8 @@
 10202	IGNORE	(Absence of Anti-CSRF Tokens)
 # Cloudflare's own responses, not the app's: the WAF block page that answers /sitemap* to anything but a
 # verified bot (infra/cloudflare/waf-rules.json) and the /cdn-cgi/ files it loads carry none of the app's
-# headers (scan of 30 Oct 2026: HSTS, nosniff, CSP, CORP, Permissions-Policy). Out of scope for every rule.
-*	OUTOFSCOPE	^https?://[^/]+/cdn-cgi/
-*	OUTOFSCOPE	^https?://[^/]+/sitemap
+# headers (scan of 30 Oct 2026: HSTS, nosniff, CSP, CORP, Permissions-Policy). Out of scope: "*" becomes a context
+# exclusion (not crawled), the rule ids an alert filter (still fetched, never counted). Both are Java full matches,
+# hence the trailing .* (zap-baseline.py of ZAP 2.17.0, Automation Framework mode).
+*	OUTOFSCOPE	^https?://[^/]+/(cdn-cgi|sitemap).*
+10020,10021,10035,10038	OUTOFSCOPE	^https?://[^/]+/(cdn-cgi|sitemap).*
