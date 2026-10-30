@@ -2906,6 +2906,7 @@
       "messageShort": "Message",
       "messageHint": "Votre message arrive dans la messagerie Aalan du vendeur. Ni votre e-mail ni votre numéro ne lui sont transmis.",
       "testDrive": "Demander un essai",
+      "testDriveShort": "Essai",
       "testDriveHint": "Écrivez au vendeur, puis proposez-lui vos créneaux dans la conversation.",
       "testDriveText": "Bonjour, je souhaite essayer « {title} ». Quels créneaux vous conviennent ?",
       "signInBody": "Connectez-vous pour voir le numéro du vendeur. Vous reviendrez ensuite sur cette annonce.",
@@ -2987,10 +2988,12 @@
       "visitShort": "Visite",
       "signInVisit": "Connectez-vous pour demander une visite. Vous reviendrez ensuite sur cette annonce.",
       "rental": "Demander une réservation",
+      "rentalShort": "Réservation",
       "rentalHint": "Envoyez vos dates à l'agence : elle confirme la disponibilité dans la messagerie. Rien ne se paie sur le site.",
       "signInRental": "Connectez-vous pour envoyer une demande de réservation. Vous reviendrez ensuite sur cette annonce.",
       "home": {
         "rental": "Demander un séjour",
+        "rentalShort": "Séjour",
         "rentalHint": "Envoyez vos dates d'arrivée et de départ : l'annonceur confirme la disponibilité dans la messagerie. Rien ne se paie sur le site.",
         "signInRental": "Connectez-vous pour envoyer une demande de séjour. Vous reviendrez ensuite sur cette annonce."
       },
@@ -4202,6 +4205,7 @@
   "Offers": {
     "listing": {
       "make": "Faire une offre",
+      "makeShort": "Offre",
       "makeHint": "Proposez votre prix : le vendeur peut accepter, refuser ou vous faire une contre-offre sous 48 heures.",
       "signIn": "Connectez-vous pour faire une offre. Vous reviendrez ensuite sur cette annonce.",
       "notice": "Une offre acceptée ne réserve pas l'article et n'engage ni à vendre ni à acheter : la remise et le paiement se règlent entre vous.",

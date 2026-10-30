@@ -236,6 +236,11 @@ test.describe("listing page", () => {
     // control within reach of the contact, leading to the dialog below (UX journeys counter-review, 8).
     await expect(page.getByTestId("share-button")).toHaveText(/Partager|Copier le lien/);
     await expect(page.getByRole("complementary", { name: "Vendeur et contact" }).getByRole("link", { name: "Signaler l'annonce" })).toHaveAttribute("href", "#signaler");
+    // The phone bar: the message, the listing's own action (an offer here) and the number as an icon.
+    const bar = page.getByTestId("contact-bar");
+    await expect(bar.getByRole("button", { name: "Message", exact: true })).toBeVisible();
+    await expect(bar.getByTestId("contact-bar-action")).toHaveText("Offre");
+    await expect(bar.locator('button[aria-label="Voir le numéro"]')).toBeVisible();
 
     // Gallery: the first photo is the LCP image and actually loads from the media host. The title is
     // bidi-isolated inside the translated alt text.
@@ -275,6 +280,7 @@ test.describe("listing page", () => {
     const guide = page.getByTestId("vehicle-buying-guide");
     await expect(guide.getByRole("heading", { name: "Acheter ce véhicule au Maroc" })).toBeVisible();
     await expect(guide).toContainText("NARSA");
+    await expect(page.getByTestId("contact-bar").getByTestId("contact-bar-action")).toHaveText("Offre");
     await expect(guide.getByTestId("buying-guide-customs")).toBeVisible();
     // A bicycle gets neither.
     await page.goto(`/fr/annonce/${fixture.published.slugId}`);
@@ -291,6 +297,8 @@ test.describe("listing page", () => {
     await expect(terms.getByTestId("rental-deposit")).toContainText("Caution de 4");
     await expect(terms.getByTestId("rental-deposit")).toContainText("000 DH");
     await expect(terms).toContainText("sous sa seule responsabilité");
+    // The phone bar asks for the dates instead of an offer (a rental takes no offer).
+    await expect(page.getByTestId("contact-bar").getByTestId("contact-bar-action")).toHaveText("Réservation");
     // The terms stay out of the main criteria.
     await expect(page.getByTestId("criteria-grid")).toContainText("Berline");
     await expect(page.getByTestId("criteria-grid")).not.toContainText("Caution");
