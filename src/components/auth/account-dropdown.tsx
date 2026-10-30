@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { BadgeCheck, BellRing, CarFront, CircleHelp, Heart, House, LogOut, MessageSquare, Scale, ScrollText, Settings, Star, Store, Tag, Wallet } from "lucide-react";
+import { BadgeCheck, BellRing, CarFront, CircleHelp, Heart, House, LogOut, Mail, MessageSquare, Scale, ScrollText, Settings, Star, Store, Tag, Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { toast } from "sonner";
@@ -156,6 +156,12 @@ export default function AccountDropdown({ session, name, triggerClassName, child
             <Link href={`/aide${ASSISTANT_HASH}`} className={item} onClick={openAssistant}>
               <CircleHelp aria-hidden="true" />
               {t("help")}
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild>
+            <Link href="/aide/contact" prefetch={false} className={item}>
+              <Mail aria-hidden="true" />
+              {t("contact")}
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Item asChild>
