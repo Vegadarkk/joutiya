@@ -56,11 +56,11 @@ Quand {brand} apprend des informations laissant soupçonner une infraction péna
 
 ### 3.1 Pour quelles questions {#utilisateurs-1}
 
-Écrivez à {dsaEmail} pour toute question sur l'application des conditions d'utilisation, la modération, un signalement ou une décision, ou sur le fonctionnement de la plateforme.
+Écrivez à {dsaEmail} pour toute question sur l'application des conditions d'utilisation, la modération, un signalement ou une décision, ou sur le fonctionnement de la plateforme. La page [Nous contacter](/aide/contact) reprend ces informations et oriente selon votre cas.
 
 ### 3.2 Pour signaler un contenu {#utilisateurs-2}
 
-Utilisez de préférence le bouton « Signaler » de l'annonce, du profil, de la conversation ou du message : il identifie précisément le contenu. Si le bouton n'est pas disponible, écrivez à {dsaEmail} en indiquant l'adresse exacte (URL) du contenu, le motif, une explication précise, et si possible votre nom et votre e-mail (facultatifs pour les motifs les plus graves). Voir les [CGU](/legal/cgu#signalement-2).
+Utilisez de préférence le bouton « Signaler » de l'annonce, du profil, de la conversation ou du message : il identifie précisément le contenu. Si le bouton n'est pas disponible, utilisez le [formulaire de signalement par adresse](/aide/contact#signaler) ou écrivez à {dsaEmail} en indiquant l'adresse exacte (URL) du contenu, le motif, une explication précise, et si possible votre nom et votre e-mail (facultatifs pour les motifs les plus graves). Voir les [CGU](/legal/cgu#signalement-2).
 
 ### 3.3 Pour contester une décision {#utilisateurs-3}
 
