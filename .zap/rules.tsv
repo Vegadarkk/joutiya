@@ -13,7 +13,12 @@
 90020	FAIL	(Remote OS Command Injection)
 6	FAIL	(Path Traversal)
 7	FAIL	(Remote File Inclusion)
-# jt_consent is read by the page script (consent banner, D1): not HttpOnly on purpose.
+# jt_consent (consent banner, D1) and NEXT_LOCALE (locale switcher) are read or written by the page script: not HttpOnly on purpose.
 10010	WARN	(Cookie No HttpOnly Flag)
 # State-changing requests carry the CSRF header (§6), not a form token.
 10202	IGNORE	(Absence of Anti-CSRF Tokens)
+# Cloudflare's own responses, not the app's: the WAF block page that answers /sitemap* to anything but a
+# verified bot (infra/cloudflare/waf-rules.json) and the /cdn-cgi/ files it loads carry none of the app's
+# headers (scan of 30 Oct 2026: HSTS, nosniff, CSP, CORP, Permissions-Policy). Out of scope for every rule.
+*	OUTOFSCOPE	^https?://[^/]+/cdn-cgi/
+*	OUTOFSCOPE	^https?://[^/]+/sitemap

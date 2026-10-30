@@ -16,8 +16,11 @@ le cherche).
 
 Règles : `.zap/rules.tsv`. Une alerte `FAIL` fait échouer le workflow (en-têtes de sécurité, CSP,
 cookies, injections SQL, XSS, injection de commande, traversée de répertoire). `10010` reste en
-avertissement (`jt_consent` est lisible par le script de la page, voulu) et `10202` est ignorée
+avertissement (`jt_consent` et `NEXT_LOCALE` sont lus ou écrits par le script de la page, voulu) et `10202` est ignorée
 (la protection CSRF passe par un en-tête, pas par un champ de formulaire).
+Les réponses de Cloudflare lui-même sont hors du scan : la page de blocage du WAF (qui répond à
+`/sitemap*` pour tout ce qui n'est pas un robot vérifié) et ses fichiers `/cdn-cgi/` n'ont pas les
+en-têtes de l'application et faisaient échouer chaque scan (30 octobre 2026).
 
 Réglages (une fois) : `scripts/github-ci.ts seal-scan`, avec le test de charge
 (`docs/lancement/charge-procedure.md`, « Une fois ») : jeton Access `joutiya-scan` en en-tête unique
