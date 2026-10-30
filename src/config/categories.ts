@@ -463,6 +463,17 @@ const TREE: readonly Category[] = [
     ],
   },
   {
+    // Its own category (owner, 2026-10-30): farm machinery and livestock moved here from Matériel pro
+    // and Animaux, with seeds, plants and harvests. Food for the table stays in Produits du terroir.
+    id: "agriculture",
+    subcategories: [
+      { id: "agricole-tracteurs", categoryId: "agriculture", condition: "optional", priceOptional: true, criteria: [required("agri-type"), optional("brand"), optional("year")] },
+      { id: "betail-moutons", categoryId: "agriculture", criteria: [required("livestock-type"), optional("head-count"), optional("livestock-age"), optional("breed")] },
+      { id: "semences-plants", categoryId: "agriculture", condition: "optional", priceOptional: true, criteria: [] },
+      { id: "fourrage-recoltes", categoryId: "agriculture", priceOptional: true, criteria: [optional("quantity")] },
+    ],
+  },
+  {
     id: "famille",
     subcategories: [
       { id: "equipement-bebe", categoryId: "famille", condition: "required", donationAllowed: true, criteria: [required("baby-type"), optional("brand"), optional("child-age")] },
@@ -481,17 +492,24 @@ const TREE: readonly Category[] = [
     ],
   },
   {
+    // Its own category (owner, 2026-10-30): gear only. Firearms, ammunition and blades stay refused
+    // by the prohibited-items filter (config/prohibited.ts): a hunting weapon is sold under permit.
+    id: "chasse-peche",
+    subcategories: [
+      { id: "equipement-chasse", categoryId: "chasse-peche", condition: "required", criteria: [optional("brand")] },
+      { id: "peche", categoryId: "chasse-peche", condition: "required", criteria: [optional("brand")] },
+    ],
+  },
+  {
     id: "animaux",
     subcategories: [
       { id: "accessoires-animaux", categoryId: "animaux", condition: "required", donationAllowed: true, criteria: [required("pet-accessory-type"), optional("animal-type")] },
       { id: "animaux-compagnie", categoryId: "animaux", donationAllowed: true, criteria: [required("animal-type"), optional("breed"), optional("animal-age"), optional("animal-sex"), optional("vaccinated")] },
-      { id: "betail-moutons", categoryId: "animaux", criteria: [required("livestock-type"), optional("head-count"), optional("livestock-age"), optional("breed")] },
     ],
   },
   {
     id: "materiel-pro",
     subcategories: [
-      { id: "agricole-tracteurs", categoryId: "materiel-pro", condition: "optional", priceOptional: true, criteria: [required("agri-type"), optional("brand"), optional("year")] },
       { id: "btp", categoryId: "materiel-pro", condition: "optional", priceOptional: true, criteria: [required("construction-type"), optional("brand"), optional("year")] },
       { id: "chr", categoryId: "materiel-pro", condition: "optional", priceOptional: true, criteria: [required("horeca-type"), optional("brand")] },
       { id: "commerce-bureau", categoryId: "materiel-pro", condition: "optional", priceOptional: true, criteria: [required("office-type"), optional("brand")] },

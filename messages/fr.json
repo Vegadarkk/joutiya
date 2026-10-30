@@ -1153,6 +1153,15 @@
         "autres-produits-terroir": "Autres produits du terroir"
       }
     },
+    "agriculture": {
+      "name": "Agriculture",
+      "sub": {
+        "agricole-tracteurs": "Agricole & tracteurs",
+        "betail-moutons": "Bétail & moutons",
+        "semences-plants": "Semences et plants",
+        "fourrage-recoltes": "Fourrage et récoltes"
+      }
+    },
     "famille": {
       "name": "Famille",
       "sub": {
@@ -1171,18 +1180,23 @@
         "collection-antiquites": "Collection & antiquités"
       }
     },
+    "chasse-peche": {
+      "name": "Chasse et pêche",
+      "sub": {
+        "equipement-chasse": "Équipement de chasse",
+        "peche": "Pêche"
+      }
+    },
     "animaux": {
       "name": "Animaux",
       "sub": {
         "accessoires-animaux": "Accessoires",
-        "animaux-compagnie": "Animaux de compagnie",
-        "betail-moutons": "Bétail & moutons"
+        "animaux-compagnie": "Animaux de compagnie"
       }
     },
     "materiel-pro": {
       "name": "Matériel professionnel",
       "sub": {
-        "agricole-tracteurs": "Agricole & tracteurs",
         "btp": "BTP",
         "chr": "Cafés, hôtels & restaurants",
         "commerce-bureau": "Commerce & bureau",

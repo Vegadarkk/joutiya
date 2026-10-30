@@ -33,8 +33,8 @@ type Labels = { Categories: Record<string, { name: string; sub: Record<string, s
 const messages: Record<"fr" | "ar", Labels> = { fr: fr as unknown as Labels, ar: ar as unknown as Labels };
 
 describe("category tree", () => {
-  it("has the 11 categories of the product research plus the Pros' terroir and the jobs, each with subcategories", () => {
-    expect(CATEGORY_IDS).toEqual(["vehicules", "immobilier", "electronique", "maison-jardin", "mode", "terroir", "famille", "loisirs", "animaux", "materiel-pro", "services", "emploi", "divers"]);
+  it("has the 11 categories of the product research plus the Pros' terroir, agriculture, hunting and fishing, and the jobs, each with subcategories", () => {
+    expect(CATEGORY_IDS).toEqual(["vehicules", "immobilier", "electronique", "maison-jardin", "mode", "terroir", "agriculture", "famille", "loisirs", "chasse-peche", "animaux", "materiel-pro", "services", "emploi", "divers"]);
     for (const category of CATEGORIES) expect(category.subcategories.length, category.id).toBeGreaterThan(0);
     expect(SUBCATEGORY_IDS.length).toBeGreaterThanOrEqual(50);
   });

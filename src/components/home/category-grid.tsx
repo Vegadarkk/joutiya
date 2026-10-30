@@ -1,4 +1,4 @@
-import { Baby, BriefcaseBusiness, Building2, Car, Dumbbell, Handshake, Package, PawPrint, Shirt, Smartphone, Sofa, Wheat, Wrench, type LucideIcon } from "lucide-react";
+import { Baby, Binoculars, BriefcaseBusiness, Building2, Car, Dumbbell, Handshake, Package, PawPrint, Shirt, Smartphone, Sofa, Tractor, Wheat, Wrench, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { CATEGORIES } from "@/config/categories";
 import { Link } from "@/i18n/navigation";
@@ -19,8 +19,10 @@ const ICONS: Record<string, LucideIcon> = {
   "maison-jardin": Sofa,
   mode: Shirt,
   terroir: Wheat,
+  agriculture: Tractor,
   famille: Baby,
   loisirs: Dumbbell,
+  "chasse-peche": Binoculars,
   animaux: PawPrint,
   "materiel-pro": Wrench,
   services: Handshake,

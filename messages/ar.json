@@ -1143,6 +1143,15 @@
         "autres-produits-terroir": "منتجات مجالية أخرى"
       }
     },
+    "agriculture": {
+      "name": "الفلاحة",
+      "sub": {
+        "agricole-tracteurs": "معدات فلاحية وجرارات",
+        "betail-moutons": "مواشي وأغنام",
+        "semences-plants": "البذور والشتلات",
+        "fourrage-recoltes": "العلف والمحاصيل"
+      }
+    },
     "famille": {
       "name": "الأسرة والطفل",
       "sub": {
@@ -1161,18 +1170,23 @@
         "collection-antiquites": "مقتنيات وتحف"
       }
     },
+    "chasse-peche": {
+      "name": "القنص والصيد",
+      "sub": {
+        "equipement-chasse": "معدات القنص",
+        "peche": "الصيد بالقصبة"
+      }
+    },
     "animaux": {
       "name": "حيوانات",
       "sub": {
         "accessoires-animaux": "مستلزمات الحيوانات",
-        "animaux-compagnie": "حيوانات أليفة",
-        "betail-moutons": "مواشي وأغنام"
+        "animaux-compagnie": "حيوانات أليفة"
       }
     },
     "materiel-pro": {
       "name": "معدات مهنية",
       "sub": {
-        "agricole-tracteurs": "معدات فلاحية وجرارات",
         "btp": "معدات البناء والأشغال",
         "chr": "مقاهي وفنادق ومطاعم",
         "commerce-bureau": "تجارة ومكاتب",
