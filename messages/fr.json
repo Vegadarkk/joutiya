@@ -26,6 +26,7 @@
     "proShort": "Pro",
     "proHint": "Créer ma boutique ou mon agence",
     "help": "Aide",
+    "procedures": "Démarches administratives",
     "visitorMenu": "Menu",
     "signUp": "Créer un compte"
   },
@@ -219,6 +220,13 @@
     "guideHome": "Démarches administratives",
     "breadcrumb": "Fil d'Ariane",
     "rubricsTitle": "Choisissez votre situation",
+    "search": {
+      "label": "Rechercher une démarche",
+      "placeholder": "Carte grise, CNIE, ICE, bourse, bail…",
+      "hint": "Tapez un mot : les démarches qui en parlent s'affichent, avec leur rubrique.",
+      "results": "{count, plural, one {# démarche} other {# démarches}}",
+      "none": "Aucune démarche ne correspond. Parcourez les rubriques ci-dessous ou essayez un autre mot."
+    },
     "procedureCount": "{count, plural, one {# démarche} other {# démarches}}",
     "generalTitle": "Portails pour toutes les démarches",
     "disclaimerTitle": "Une information, pas une démarche officielle",
@@ -525,6 +533,7 @@
       "listings": "Mes annonces",
       "decisions": "Décisions et recours",
       "help": "Aide",
+      "procedures": "Démarches administratives",
       "messages": "Mes messages",
       "messagesLink": "Messages",
       "unreadCount": "{count, plural, one {# message non lu} other {# messages non lus}}",
@@ -658,6 +667,8 @@
     "start": {
       "title": "Déposer une annonce",
       "lead": "Choisissez la catégorie qui correspond le mieux à ce que vous proposez. Vous pourrez la changer ensuite.",
+      "giveLabel": "Je donne",
+      "giveHint": "Gratuit : l'annonce part sans prix, avec la mention « Don ». Possible dans la plupart des catégories.",
       "resuming": "Reprise de votre brouillon…",
       "creating": "Création de votre annonce…",
       "draftsTitle": "{count, plural, one {# brouillon vous attend} other {# brouillons vous attendent}}",

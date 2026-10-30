@@ -26,6 +26,7 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   "ListingPage.promo",
   // "Partager" beside the favourite button (UX journeys counter-review, 8).
   "ListingPage.share",
+  "Guide.search",
   "Map",
   "Auth.common",
   "Auth.errors",

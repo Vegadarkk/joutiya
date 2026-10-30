@@ -27,6 +27,11 @@ const CASES: Case[] = [
   ["pc portable gamer 5000 dh max", { category: "electronique", subcategory: "ordinateurs", criteria: opts("computer-type", "portable"), priceMax: 5000 }, "gamer"],
   ["poussette gratuite", { category: "famille", subcategory: "equipement-bebe", criteria: opts("baby-type", "poussette"), donation: true }, ""],
   ["livres à donner", { category: "loisirs", subcategory: "livres", donation: true }, ""],
+  // Giving verbs and a holiday rental named alone (journey review 2026-10-29).
+  ["je donne un canapé", { category: "maison-jardin", subcategory: "ameublement", criteria: opts("furniture-type", "salon"), donation: true }, ""],
+  ["donner", { donation: true }, ""],
+  ["location saisonnière à Agadir", { category: "immobilier", subcategory: "location-vacances", city: "agadir", region: "09" }, ""],
+  ["location vacances", { category: "immobilier", subcategory: "location-vacances" }, ""],
   ["chaussures femme pointure 38", { category: "mode", subcategory: "chaussures", criteria: opts("audience", "femme") }, "pointure 38"],
   ["caftan pour femme", { category: "mode", subcategory: "tenues-traditionnelles", criteria: { audience: { kind: "options", values: ["femme"] }, "traditional-type": { kind: "options", values: ["caftan"] } } }, ""],
   ["vtt à partir de 1000 dh", { category: "vehicules", subcategory: "velos", criteria: opts("bike-type", "vtt"), priceMin: 1000 }, ""],

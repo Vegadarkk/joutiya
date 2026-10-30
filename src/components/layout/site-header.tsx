@@ -68,7 +68,7 @@ export function SiteHeader({ locale }: { locale: string }) {
         </Container>
       </header>
       <CategoryChips items={chips} label={t("categories")} guide={t("guide")} />
-      <SellFab label={t("post")} />
+      <SellFab label={t("post")} text={t("sell")} />
     </>
   );
 }

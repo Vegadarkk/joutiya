@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ShieldCheck } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { GUIDE_GENERAL_SOURCES, GUIDE_RUBRICS, GUIDE_SOURCES, guideRubricCard, guideSourceLabel, rubricProcedures } from "@/content/guide";
+import { GUIDE_GENERAL_SOURCES, GUIDE_RUBRICS, GUIDE_SOURCES, guideRubricCard, guideRubricPage, guideSourceLabel, rubricProcedures } from "@/content/guide";
 import { LOCALE_TAGS } from "@/config/site";
 import { DoorMark } from "@/components/feedback/door-mark";
+import { GuideSearch, type GuideSearchEntry } from "@/components/guide/guide-search";
 import { GuideDisclaimer, OfficialLink } from "@/components/guide/official-link";
 import { Container } from "@/components/layout/container";
 import { quietLinkClassName } from "@/components/ui/text-link";
@@ -42,6 +43,11 @@ export default async function GuideHome({ params }: { params: Params }) {
   ]);
   const date = new Intl.DateTimeFormat(LOCALE_TAGS[numbersLocale(locale)], { dateStyle: "long", timeZone: "Africa/Casablanca" });
   const general = GUIDE_GENERAL_SOURCES.map((id) => ({ id, display: linkDisplay(GUIDE_SOURCES[id], state.links[id]) })).filter((link) => link.display !== "hidden");
+  // Every procedure of the guide for the search field (journey review 2026-10-29), built with the page.
+  const entries: GuideSearchEntry[] = GUIDE_RUBRICS.flatMap((rubric) => {
+    const page = guideRubricPage(locale, rubric);
+    return page.procedures.map((procedure) => ({ id: procedure.id, title: procedure.title, rubric, rubricTitle: page.title }));
+  });
 
   return (
     <>
@@ -63,6 +69,8 @@ export default async function GuideHome({ params }: { params: Params }) {
 
       <Container className="flex flex-col gap-12 py-10 sm:py-12">
         <GuideDisclaimer className="max-w-3xl" />
+
+        <GuideSearch entries={entries} className="max-w-2xl" />
 
         <section aria-labelledby="guide-rubrics" className="max-w-4xl">
           <h2 id="guide-rubrics" className="mb-6 text-xl font-semibold">

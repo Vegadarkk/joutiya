@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { CarFront, CircleHelp, House, LogIn, Store, UserPlus } from "lucide-react";
+import { CarFront, CircleHelp, House, LogIn, ScrollText, Store, UserPlus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { LocaleMenuItems } from "@/components/layout/locale-menu-items";
@@ -84,6 +84,12 @@ export default function VisitorMenu({ signInHref, triggerClassName, label, child
             <Link href="/aide" prefetch={false} className={item}>
               <CircleHelp aria-hidden="true" />
               {t("help")}
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild>
+            <Link href="/demarches" prefetch={false} className={item}>
+              <ScrollText aria-hidden="true" />
+              {t("procedures")}
             </Link>
           </DropdownMenu.Item>
           <LocaleMenuItems itemClassName={item} className="md:hidden" />

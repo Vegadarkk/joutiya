@@ -155,7 +155,7 @@ const OTHER: [string[], Entry][] = [
   [["tres bon etat", "en tres bon etat"], { kind: "conditions", values: ["new_tagged", "like_new", "very_good"] }],
   [["pour pieces", "pour piece", "en panne", "a reparer", "معطل", "معطلة"], { kind: "conditions", values: ["for_parts"], keepWhenIdle: true }],
   // Free, photos, sellers.
-  [["gratuit", "gratuite", "gratuits", "gratuites", "gratuitement", "don", "dons", "a donner", "fabor", "fabour", "blach", "بلاش", "مجانا", "مجاني", "مجانية", "فابور"], { kind: "donation" }],
+  [["gratuit", "gratuite", "gratuits", "gratuites", "gratuitement", "don", "dons", "a donner", "donner", "donne", "donnes", "je donne", "on donne", "fabor", "fabour", "blach", "بلاش", "مجانا", "مجاني", "مجانية", "فابور"], { kind: "donation" }],
   [["avec photo", "avec photos", "avec des photos", "avec images", "مع صور", "مع الصور", "بالصور"], { kind: "photo" }],
   [["particulier", "particuliers", "entre particuliers", "de particulier", "de particulier a particulier", "vendeur particulier", "sans agence", "sans intermediaire", "bla samsar", "بدون سمسار", "بدون وسيط"], { kind: "seller", type: "individual" }],
   [["vendeur pro", "vendeurs pro", "vendeur professionnel", "vendeurs professionnels", "chez un pro", "chez un professionnel", "de professionnel", "par un professionnel"], { kind: "seller", type: "pro" }],
