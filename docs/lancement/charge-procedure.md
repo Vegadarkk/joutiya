@@ -46,8 +46,12 @@ enregistrées 07:00 UTC). Au plus deux passages par jour (lectures Firestore des
    `NODE_USE_ENV_PROXY=1 node scripts/oracle-vm.ts run load/staging-limits-prod.sh --apply`
 3. Règle Cloudflare (le secret n'est jamais affiché) :
    `NODE_USE_ENV_PROXY=1 node --env-file=<fichier>.cloudflare.env scripts/cloudflare.ts loadtest --on --apply`
-4. Mesure CPU, lancée juste avant le test (elle démarre quand l'agent Oracle prend la commande) :
-   `NODE_USE_ENV_PROXY=1 node scripts/oracle-vm.ts cpu --minutes=9`
+4. Mesure CPU, lancée juste avant le test : un échantillonneur détaché relève toutes les 5 s, pendant
+   10 minutes, le CPU de la VM et celui de chaque conteneur du staging :
+   `NODE_USE_ENV_PROXY=1 node scripts/oracle-vm.ts run load/sampler-start.sh --apply`, puis, après
+   le test, `NODE_USE_ENV_PROXY=1 node scripts/oracle-vm.ts run load/sampler-read.sh --apply`.
+   `oracle-vm.ts cpu --minutes=9` ne sert plus ici : Run Command perd la sortie d'une commande de
+   plusieurs minutes (constaté le 30 octobre 2026, sortie vide).
 5. Lancer le workflow **Load test** (Actions > Load test > Run workflow). Sept minutes de charge.
 6. Défaire, même si le test a échoué :
    ```
@@ -63,8 +67,11 @@ enregistrées 07:00 UTC). Au plus deux passages par jour (lectures Firestore des
 - Artefact `k6-summary` du workflow : p95 et taux d'échec par scénario, seuils tenus ou non
   (code de sortie 99 si un seuil échoue), itérations perdues (`droppedIterations` : la charge
   demandée n'a pas pu partir, signe de saturation côté serveur ou runner).
-- Sortie de `cpu` : moyenne et pic de chaque CPU et de la VM.
-- Réussi si les quatre seuils tiennent et que le pic CPU reste sous 70 %.
+- Sortie de `sampler-read.sh` : par minute, la part occupée de la VM et les cœurs pris par chaque
+  conteneur, puis le pic de chacun. Le web est un seul processus Node : il plafonne vers 1 cœur (son
+  fil JavaScript), même quand sa limite est 1,5 et que la VM reste sous 70 %.
+- Réussi si les quatre seuils tiennent et que le pic CPU reste sous 70 %. Sinon, la marge mesurée
+  fixe le moment de la bascule vers un VPS (spec §10, critère de sortie de la phase 6).
 
 `docs/lancement/charge.md` reprend : date, commit du staging, chiffres k6 et CPU, verdict, et le
 seuil de trafic au-delà duquel passer à un VPS.
