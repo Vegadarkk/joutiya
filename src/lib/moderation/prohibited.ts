@@ -1,10 +1,11 @@
 import type { ProhibitedExtraTerms } from "@/config/abuse";
-import { PROHIBITED_GROUPS, type ProhibitedGroupId } from "@/config/prohibited";
+import { PROHIBITED_GROUPS, type ProhibitedGroupId, type ProhibitedScope } from "@/config/prohibited";
 import { TokenizedText, compileKeywords, type CompiledKeyword } from "@/lib/moderation/keywords";
 
 // Prohibited objects (architecture §7 step 2). Lists in src/config/prohibited.ts; matching rules in
 // src/lib/moderation/keywords.ts. Pure, client-safe. The server adds the private terms of Firestore
 // `config/abuse` (compileProhibited, passed as `terms`); the browser only ever has the committed lists.
+// A group with a `scope` (the job ad groups) is matched only when the caller names that category.
 
 export type ProhibitedLevel = "hard" | "soft";
 
@@ -27,6 +28,12 @@ interface CompiledGroup {
   id: ProhibitedGroupId;
   hard: CompiledKeyword[];
   soft: CompiledKeyword[];
+  scope?: ProhibitedScope;
+}
+
+export interface ProhibitedScopeOptions {
+  /** Category of the listing: opens the groups scoped to it (none without it). */
+  categoryId?: string;
 }
 
 /** The committed lists plus extra terms, compiled (compileProhibited). */
@@ -48,16 +55,22 @@ export function compileProhibited(extra: ProhibitedExtraTerms): CompiledProhibit
       id: group.id,
       hard: compileKeywords([...group.hard, ...(extra[group.id]?.hard ?? [])]),
       soft: compileKeywords([...group.soft, ...(extra[group.id]?.soft ?? [])]),
+      ...(group.scope ? { scope: group.scope } : {}),
     })),
   };
 }
 
-/** Hard and soft prohibited groups mentioned in a text; `terms`: the server's compiled config/abuse lists (default: the committed ones). */
-export function containsProhibited(text: string, terms: CompiledProhibited = committedTerms()): ProhibitedResult {
+/**
+ * Hard and soft prohibited groups mentioned in a text; `terms`: the server's compiled config/abuse
+ * lists (default: the committed ones); `scope.categoryId`: the listing's category, which opens the
+ * groups scoped to it (a job ad's groups stay closed on a rental, where "caution" is a deposit).
+ */
+export function containsProhibited(text: string, terms: CompiledProhibited = committedTerms(), scope: ProhibitedScopeOptions = {}): ProhibitedResult {
   const result: ProhibitedResult = { hard: [], soft: [], matches: [] };
   if (!text) return result;
   const tokens = new TokenizedText(text);
   for (const group of terms.groups) {
+    if (group.scope && group.scope !== scope.categoryId) continue;
     const hardHits = tokens.find(group.hard);
     const softHits = tokens.find(group.soft);
     for (const hit of hardHits) result.matches.push({ group: group.id, level: "hard", term: hit.term });

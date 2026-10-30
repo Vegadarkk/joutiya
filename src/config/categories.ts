@@ -120,6 +120,8 @@ export interface Subcategory {
   priceMode?: "salary" | "none";
   /** Photos optional (job ads): no `photos_required`, a placeholder on the card and the page. */
   photosOptional?: boolean;
+  /** No bump or À la Une (a job seeker's ad): nothing is sold to a candidate, `boost_not_allowed` at purchase. */
+  noPaidOptions?: boolean;
 }
 
 export interface Category {
@@ -516,7 +518,7 @@ const TREE: readonly Category[] = [
     sharedFilters: ["job-contract", "job-sector", "job-experience", "job-mode"],
     subcategories: [
       { id: "offres-emploi", categoryId: "emploi", proOnly: true, priceOptional: true, priceMode: "salary", priceUnit: "month", photosOptional: true, criteria: [required("job-contract"), required("job-sector"), required("job-experience"), optional("job-education"), required("job-mode"), required("job-location"), optional("job-time"), optional("availability")] },
-      { id: "demandes-emploi", categoryId: "emploi", individualOnly: true, messagingOnly: true, priceOptional: true, priceMode: "none", photosOptional: true, criteria: [required("job-sector"), optional("job-contract"), required("job-experience"), optional("job-education"), required("job-mobility"), optional("availability")] },
+      { id: "demandes-emploi", categoryId: "emploi", individualOnly: true, messagingOnly: true, priceOptional: true, priceMode: "none", photosOptional: true, noPaidOptions: true, criteria: [required("job-sector"), optional("job-contract"), required("job-experience"), optional("job-education"), required("job-mobility"), optional("availability")] },
     ],
   },
   {
@@ -569,6 +571,24 @@ export function subcategoryAllowsAds(id: string | undefined): boolean {
  */
 export function contactMessagingOnly(subcategory: Pick<Subcategory, "adultsOnly" | "messagingOnly"> | undefined): boolean {
   return Boolean(subcategory?.adultsOnly || subcategory?.messagingOnly);
+}
+
+/** `job-location` value of a job offer outside Morocco. */
+export const JOB_ABROAD = "etranger";
+
+/**
+ * A job offer (never a seeker's ad) for a post abroad: the contract needs the visa of the ministry
+ * in charge of labour and ANAPEC's services are free (Code du travail arts. 489, 512-515). The form
+ * says so, and a moderator checks the offer before it goes public (`work_abroad`).
+ */
+export function jobOfferAbroad(subcategoryId: string | null | undefined, attributes: Readonly<Record<string, unknown>>): boolean {
+  const subcategory = subcategoryId ? subcategoryById(subcategoryId) : undefined;
+  return subcategory?.categoryId === "emploi" && !subcategory.individualOnly && attributes["job-location"] === JOB_ABROAD;
+}
+
+/** Bumps and À la Une exist for the subcategory; a job seeker's ad has none (`noPaidOptions`). */
+export function paidOptionsAllowed(subcategoryId: string | null | undefined): boolean {
+  return !(subcategoryId && subcategoryById(subcategoryId)?.noPaidOptions);
 }
 
 /** False when the criterion depends on another one whose value does not open it. */

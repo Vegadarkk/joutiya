@@ -8,6 +8,9 @@
 // `hard`: unambiguous in a classifieds context -> 422 `prohibited` field issue at publish.
 // `soft`: has legitimate uses too -> `prohibited_soft` flag -> `needs_review`.
 // Keep traps (notes-moderation.md) out of `hard`; the owner can move terms between the lists.
+// A group with a `scope` is matched on listings of that category only: the job ad groups (fees
+// asked from a candidate, discriminatory wording, minors; Code du travail arts. 9, 143, 480, 485)
+// name words that are ordinary elsewhere ("caution" is a rental's deposit).
 // Client-safe (no dependency).
 
 export const PROHIBITED_GROUP_IDS = [
@@ -22,13 +25,21 @@ export const PROHIBITED_GROUP_IDS = [
   "hacking_piracy",
   "gambling",
   "inalienable_land",
+  "job_scam",
+  "job_discrimination",
+  "job_minors",
 ] as const;
 export type ProhibitedGroupId = (typeof PROHIBITED_GROUP_IDS)[number];
+
+/** Category ids a group can be limited to. */
+export type ProhibitedScope = "emploi";
 
 export interface ProhibitedGroup {
   id: ProhibitedGroupId;
   hard: readonly string[];
   soft: readonly string[];
+  /** Matched on listings of this category only (absent: everywhere). */
+  scope?: ProhibitedScope;
 }
 
 export const PROHIBITED_GROUPS: readonly ProhibitedGroup[] = [
@@ -155,6 +166,49 @@ export const PROHIBITED_GROUPS: readonly ProhibitedGroup[] = [
     id: "inalienable_land",
     hard: [],
     soft: ["terre collective", "terres collectives", "terrain collectif", "soulaliyate", "soulalia", "soulaliya", "habous", "أراضي الجموع", "أرض الجموع", "أرض سلالية", "أراضي سلالية", "حبوس", "أرض الحبوس"],
+  },
+  {
+    // Job ads only (Emploi frame of 2026-10-30): a candidate never pays (Code du travail arts. 480,
+    // 485). Fees, deposits, advances, a visa against money, a top-up or a cash transfer asked in a
+    // job ad: review only ("aucun frais de dossier" is honest wording).
+    id: "job_scam",
+    hard: [],
+    soft: [
+      "frais de dossier", "frais d'inscription", "frais de formation", "formation payante", "caution", "acompte", "avance de frais", "verser une avance",
+      "envoyer une avance", "payer pour", "payez pour", "paiement avant", "visa contre", "garantie de visa", "visa assure", "recharge", "western union",
+      "wafacash", "cash plus", "moneygram",
+      "رسوم الملف", "رسوم التسجيل", "واجب التسجيل", "دفع مسبق", "تسبيق", "ضمانة الفيزا", "مقابل الفيزا", "ريشارج", "ويسترن يونيون", "وافاكاش", "كاش بلوس",
+    ],
+    scope: "emploi",
+  },
+  {
+    // Job ads only: a requirement on sex, age, looks, marital status, religion, origin or handicap
+    // (Code du travail art. 9) goes to a moderator; a genuine occupational requirement is theirs to judge.
+    id: "job_discrimination",
+    hard: [],
+    soft: [
+      "homme seulement", "femme seulement", "homme uniquement", "femme uniquement", "reserve aux hommes", "reserve aux femmes", "uniquement des hommes",
+      "uniquement des femmes", "pas de femme", "jeune fille", "jolie fille", "belle fille", "bonne presentation", "belle presentation", "physique agreable",
+      "sans voile", "sans hijab", "non voilee", "moins de 25 ans", "moins de 30 ans", "moins de 35 ans", "moins de 40 ans", "age maximum", "age maximal",
+      "age limite", "celibataire", "sans enfant", "non mariee", "non marie", "musulman uniquement", "musulmane uniquement", "non musulman", "marocain uniquement",
+      "marocaine uniquement", "pas de noir", "pas d'africain", "pas de subsaharien", "sans handicap", "pas de handicap",
+      "رجال فقط", "نساء فقط", "ذكور فقط", "اناث فقط", "للرجال فقط", "للنساء فقط", "عازب", "عازبة", "غير متزوج", "غير متزوجة", "بدون أطفال", "مظهر جميل",
+      "حسنة المظهر", "أقل من 25 سنة", "أقل من 30 سنة", "أقل من 35 سنة", "أقل من 40 سنة", "بدون حجاب", "غير محجبة", "محجبة فقط", "مسلم فقط", "مسلمة فقط",
+      "مغربي فقط", "مغربية فقط",
+    ],
+    scope: "emploi",
+  },
+  {
+    // Job ads only: work under 15 is forbidden, 15-18 restricted and domestic work under 18 banned
+    // (Code du travail art. 143, loi 19-12). "mineur" is also a miner, "petite fille" a daughter: review.
+    id: "job_minors",
+    hard: [],
+    soft: [
+      "mineur", "mineure", "petite bonne", "petite fille", "petit garcon", "moins de 18 ans", "moins de 16 ans", "moins de 15 ans", "moins de 14 ans",
+      "a partir de 12 ans", "a partir de 13 ans", "a partir de 14 ans", "a partir de 15 ans", "des 12 ans", "des 13 ans", "des 14 ans", "des 15 ans",
+      "قاصر", "قاصرة", "قاصرين", "أقل من 18 سنة", "أقل من 16 سنة", "أقل من 15 سنة", "خدامة صغيرة", "بنت صغيرة", "طفلة للعمل", "طفل للعمل",
+    ],
+    scope: "emploi",
   },
 ];
 

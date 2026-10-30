@@ -949,7 +949,7 @@ Avant toute action, vous pouvez nous écrire à {email} pour chercher une soluti
 
 Pour toute question sur l'application des CGU, la modération, un signalement ou une décision : {dsaEmail}. Langues acceptées : {languages}.
 
-Vos messages sont lus et traités par une personne, pas uniquement par un outil automatisé. Pour signaler un contenu, utilisez de préférence le bouton « Signaler » (§9.1).
+Vos messages sont lus et traités par une personne, pas uniquement par un outil automatisé. Ces informations figurent aussi sur la page [Nous contacter](/aide/contact), accessible depuis chaque page du site. Pour signaler un contenu, utilisez de préférence le bouton « Signaler » (§9.1), ou le [formulaire de signalement par adresse](/aide/contact#signaler) si le contenu n'a pas de bouton sous vos yeux.
 
 ### 24.3 Point de contact des autorités (DSA, art. 11) {#contact-3}
 

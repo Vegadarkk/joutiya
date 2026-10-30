@@ -55,6 +55,8 @@ export interface ListingOptionsResponse {
   salesOpen: boolean;
   /** Not published, hidden by moderation: nothing can be bought for it. */
   promotable: boolean;
+  /** The subcategory has paid options at all (a job seeker's ad has none: `boost_not_allowed`). */
+  allowed: boolean;
   options: OptionOffer[];
   wallet: WalletSummary;
   boosts: { bumpedAt: string | null; featuredUntil: string | null };

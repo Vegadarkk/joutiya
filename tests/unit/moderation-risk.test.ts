@@ -20,6 +20,7 @@ describe("risk table", () => {
     for (const flag of ALWAYS_REVIEW_FLAGS) expect(MODERATION_FLAGS).toContain(flag);
     // A face the seller kept instead of cropping: a moderator checks it (CGU §7).
     expect(HUMAN_REVIEW_FLAGS.has("face")).toBe(true);
+    expect(HUMAN_REVIEW_FLAGS.has("work_abroad")).toBe(true);
   });
 });
 

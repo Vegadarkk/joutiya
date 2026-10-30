@@ -35,7 +35,9 @@ import { requireEnvProxy } from "./env-proxy.ts";
 export type SetupEnv = "staging" | "prod";
 type StripeParam = string | number | boolean | null | undefined | readonly StripeParam[] | { readonly [key: string]: StripeParam };
 export const KEY_VARIABLE = "JOUTIYA_STRIPE_SETUP_KEY";
-export const SITES: Record<SetupEnv, string> = { staging: "https://staging.joutiya.ma", prod: "https://joutiya.ma" };
+const REGISTRY = JSON.parse(readFileSync(new URL("../infra/targets.json", import.meta.url), "utf8")) as Targets;
+/** SITE_URL of each environment, from environments.<env>.hosts.site of infra/targets.json. */
+export const SITES: Record<SetupEnv, string> = { staging: `https://${REGISTRY.environments.staging.hosts.site}`, prod: `https://${REGISTRY.environments.prod.hosts.site}` };
 /** The events src/lib/payments/stripe-events.ts handles (STRIPE_EVENT_TYPES; a unit test keeps them equal). */
 export const WEBHOOK_EVENTS = ["checkout.session.completed", "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted", "invoice.paid", "invoice.payment_failed"];
 export const PORTAL_TAG = "pro-plans";
@@ -46,11 +48,11 @@ const API = "https://api.stripe.com";
 export const STRIPE_API_VERSION = "2026-09-30.endive";
 
 export const PRODUCTS: Record<PaidPlanId, { id: string; name: string; description: string }> = {
-  essentiel: { id: "joutiya_essentiel", name: "Joutiya Pro Essentiel", description: "Offre Pro Essentiel : annonces en ligne, crédits chaque mois, vitrine et badge Pro." },
-  business: { id: "joutiya_business", name: "Joutiya Pro Business", description: "Offre Pro Business : annonces en ligne, crédits et « À la Une » chaque mois, vitrine et badge Pro." },
+  essentiel: { id: "joutiya_essentiel", name: "Aalan Pro Essentiel", description: "Offre Pro Essentiel : annonces en ligne, crédits chaque mois, vitrine et badge Pro." },
+  business: { id: "joutiya_business", name: "Aalan Pro Business", description: "Offre Pro Business : annonces en ligne, crédits et « À la Une » chaque mois, vitrine et badge Pro." },
 };
 
-export const PASS_PRODUCT = { id: "joutiya_pass_boutique", name: "Joutiya Pass Boutique", description: "Pass Boutique : annonces en ligne, vitrine et badge Pro pour une durée fixe, en un seul paiement, sans renouvellement." };
+export const PASS_PRODUCT = { id: "joutiya_pass_boutique", name: "Aalan Pass Boutique", description: "Pass Boutique : annonces en ligne, vitrine et badge Pro pour une durée fixe, en un seul paiement, sans renouvellement." };
 
 export interface DesiredPassPrice {
   passId: string;
@@ -127,10 +129,10 @@ export function priceParams(wanted: DesiredPrice): Record<string, StripeParam> {
 export function portalParams(env: SetupEnv, prices: Readonly<Record<string, string>>): Record<string, StripeParam> {
   const site = SITES[env];
   return {
-    name: "Joutiya Pro",
+    name: "Aalan Pro",
     metadata: { joutiya: PORTAL_TAG },
     default_return_url: `${site}/fr/pro/abonnement`,
-    business_profile: { headline: "Joutiya : l'abonnement de votre boutique", privacy_policy_url: `${site}/fr/legal/confidentialite`, terms_of_service_url: `${site}/fr/legal/cgv` },
+    business_profile: { headline: "Aalan : l'abonnement de votre boutique", privacy_policy_url: `${site}/fr/legal/confidentialite`, terms_of_service_url: `${site}/fr/legal/cgv` },
     features: {
       // Name, address and tax ids come from the shop's verified identifiers, not from the portal.
       customer_update: { enabled: false },

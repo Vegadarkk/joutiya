@@ -45,6 +45,7 @@ export const MODERATION_FLAGS = [
   "sanitary_check",
   "rental_review",
   "promo_check",
+  "work_abroad",
 ] as const;
 export type ModerationFlag = (typeof MODERATION_FLAGS)[number];
 

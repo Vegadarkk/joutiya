@@ -24,6 +24,8 @@ import type { ScreenState } from "@/lib/moderation/types";
 //   vehicle past the fleet age limit (rental pack §2) -> always review.
 // - promo_check 0: a promotion of more than 70 % (catalogue §4), raised by the promotion service
 //   itself, never by the pre-moderation screen; the listing is held until a moderator checks it.
+// - work_abroad 0: a job offer for a post abroad (Emploi frame of 2026-10-30; Code du travail
+//   arts. 489, 512-515): a moderator checks the visa and agency mentions, never the agent.
 // - previous rejections: +10 each, max 30, no flag (history, not content).
 // Live values: Firestore `config/abuse` `risk` (src/config/abuse.ts) overrides the thresholds, the
 // weights and the rejection terms through `riskRules`; the committed values here are the defaults.
@@ -50,16 +52,17 @@ export const RISK_WEIGHTS: Readonly<Record<ModerationFlag, RiskWeight>> = {
   sanitary_check: { weight: 0, reason: "ONSSA number new for the shop, human check required" },
   rental_review: { weight: 25, reason: "car rental with driver, identity paper or blank cheque as a guarantee, or vehicle past the fleet age limit, human review required" },
   promo_check: { weight: 0, reason: "promotion cutting more than 70 % off the struck-out price, human check of the starting price required" },
+  work_abroad: { weight: 0, reason: "job offer for a post abroad, human check of the visa and agency mentions required" },
 };
 
 export const PREVIOUS_REJECTION_WEIGHT = DEFAULT_ABUSE.risk.previousRejectionWeight;
 export const PREVIOUS_REJECTION_CAP = DEFAULT_ABUSE.risk.previousRejectionCap;
 
 /** Flags that send the listing to review whatever the score (step 2 soft hits, step 3 legal review, step 5 nudity). */
-export const ALWAYS_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["prohibited_kw", "prohibited_soft", "sensitive_text", "third_party_phone", "nsfw_review", "restricted_category", "face", "credit_ad", "sanitary_check", "rental_review", "promo_check"]);
+export const ALWAYS_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["prohibited_kw", "prohibited_soft", "sensitive_text", "third_party_phone", "nsfw_review", "restricted_category", "face", "credit_ad", "sanitary_check", "rental_review", "promo_check", "work_abroad"]);
 
 /** Flags the agent may never lift alone, whatever `agent.autoApproveSoftFlags` says (a moderator decides). */
-export const HUMAN_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["restricted_category", "face", "sanitary_check", "promo_check"]);
+export const HUMAN_REVIEW_FLAGS: ReadonlySet<ModerationFlag> = new Set<ModerationFlag>(["restricted_category", "face", "sanitary_check", "promo_check", "work_abroad"]);
 
 /** `accountAgeDays` below which `new_account` is raised (lot decision; architecture §7 cites 7 days for the AI agent context). */
 export const NEW_ACCOUNT_DAYS = DEFAULT_ABUSE.risk.newAccountDays;

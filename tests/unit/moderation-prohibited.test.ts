@@ -96,6 +96,48 @@ describe("containsProhibited: soft hits (needs_review)", () => {
   });
 });
 
+describe("containsProhibited: job ad groups, matched on job ads only (PR 14b)", () => {
+  const emploi = { categoryId: "emploi" };
+  const jobSoft = (text: string) => containsProhibited(text, undefined, emploi).soft;
+
+  it("keeps the scoped groups soft (review, never a 422) and closed without the category", () => {
+    for (const group of PROHIBITED_GROUPS) if (group.scope) expect(group.hard, group.id).toEqual([]);
+    expect(soft("Frais de dossier de 500 DH à régler avant l'entretien")).toEqual([]);
+    expect(containsProhibited("Caution de 2 000 DH à l'entrée", undefined, { categoryId: "immobilier" }).soft).toEqual([]);
+  });
+
+  it.each([
+    ["Frais de dossier de 500 DH à régler avant l'entretien", "job_scam"],
+    ["Une caution est demandée au candidat", "job_scam"],
+    ["Envoyez une recharge de 100 DH pour recevoir le contrat", "job_scam"],
+    ["Paiement par Western Union avant l'entretien", "job_scam"],
+    ["رسوم الملف 300 درهم قبل المقابلة", "job_scam"],
+    ["Cherche jeune fille de bonne présentation, célibataire", "job_discrimination"],
+    ["Poste réservé aux hommes de moins de 30 ans", "job_discrimination"],
+    ["Sans enfants et non mariée de préférence", "job_discrimination"],
+    ["المطلوب نساء فقط، أقل من 30 سنة", "job_discrimination"],
+    ["Recrute petite bonne à partir de 14 ans", "job_minors"],
+    ["Serveurs mineurs acceptés pour la saison", "job_minors"],
+    ["خدامة صغيرة للسكن مع العائلة", "job_minors"],
+  ])("%j on a job ad -> soft %s", (text, group) => {
+    expect(containsProhibited(text, undefined, emploi).hard).toEqual([]);
+    expect(jobSoft(text)).toEqual([group]);
+  });
+
+  it("reports every group hit, in config order, with the matched term", () => {
+    const result = containsProhibited("Frais de dossier 300 DH, femme uniquement, moins de 25 ans", undefined, emploi);
+    expect(result.soft).toEqual(["job_scam", "job_discrimination"]);
+    expect(result.matches).toContainEqual({ group: "job_scam", level: "soft", term: "frais de dossier" });
+    expect(result.matches.map((match) => match.term)).toContain("femme uniquement");
+  });
+
+  it("leaves ordinary job wording alone", () => {
+    for (const text of ["Anglais niveau avancé exigé", "15 ans d'expérience en cuisine", "Aucun frais, logement fourni", "Poste ouvert à tous, débutants acceptés"]) {
+      expect(jobSoft(text), text).toEqual([]);
+    }
+  });
+});
+
 describe("containsProhibited: traps stay clean", () => {
   it.each([
     "droguerie à vendre",

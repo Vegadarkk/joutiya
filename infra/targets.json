@@ -3,6 +3,8 @@
     "cloudflare": {
       "accountId": "795e3aeafd644dbdf1810fc0e29a5e97",
       "zoneId": "f09bd1e8b2f7ae0d61472b0eb617b0b0",
+      "aalanZoneId": "738ec0a3107ec7973ac5abd9acc80eb8",
+      "a3lanZoneId": "e7b4053eb9c2496ffc7b7c71b0819109",
       "accessTeamDomain": "joutiya.cloudflareaccess.com",
       "sshTunnelId": "fddd6cc1-24d3-4fad-83b1-09e2ac432fe9",
       "accessOauthClientId": "365736224142-b7gv3fng8tv3uj2g6c9pffqcqu5sn1cp.apps.googleusercontent.com"
@@ -64,6 +66,12 @@
       "cloudflare": {
         "tunnelId": null,
         "accessAud": null
+      },
+      "hosts": {
+        "site": null,
+        "www": null,
+        "admin": null,
+        "media": null
       }
     },
     "staging": {
@@ -94,6 +102,12 @@
       "cloudflare": {
         "tunnelId": "9131a94f-52ec-46c6-b6cd-ec87792eabf1",
         "accessAud": "294202afc611b88c2126921f60dcccbddab1d14def1f7b69289cc4bd8bade31e"
+      },
+      "hosts": {
+        "site": "staging.joutiya.ma",
+        "www": null,
+        "admin": "admin-staging.joutiya.ma",
+        "media": "media-staging.joutiya.ma"
       }
     },
     "prod": {
@@ -124,6 +138,12 @@
       "cloudflare": {
         "tunnelId": "91426433-7a77-46cb-b3ca-ff68067a2007",
         "accessAud": "d173b7a8dcfa63f3e7460d732d0b5061544c1f46761a85dbd357e3a0e9661030"
+      },
+      "hosts": {
+        "site": "joutiya.ma",
+        "www": "www.joutiya.ma",
+        "admin": "admin.joutiya.ma",
+        "media": "media.joutiya.ma"
       }
     }
   }

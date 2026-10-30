@@ -25,6 +25,7 @@ const FLAGS: Record<MailLocale, Record<string, string>> = {
     sanitary_check: "numéro sanitaire ONSSA utilisé pour la première fois par votre boutique : un modérateur le vérifie avant la mise en ligne",
     rental_review: "location de véhicule à vérifier : location avec chauffeur, pièce d'identité ou chèque en blanc demandé en garantie, ou véhicule au-delà de l'âge limite des flottes de location",
     promo_check: "promotion de plus de 70 % : un modérateur vérifie le prix de départ avant la remise en ligne",
+    work_abroad: "offre d'emploi à l'étranger : un modérateur vérifie les mentions du visa du ministère chargé du Travail et de l'agence de recrutement avant la mise en ligne",
   },
   ar: {
     prohibited_kw: "ذكر غرض أو خدمة ممنوعة على Aalan",
@@ -43,6 +44,7 @@ const FLAGS: Record<MailLocale, Record<string, string>> = {
     sanitary_check: "رقم صحي (ONSSA) يستعمله متجرك لأول مرة: يتحقق منه مشرف قبل النشر",
     rental_review: "كراء سيارة يحتاج إلى مراجعة: كراء مع سائق، أو طلب وثيقة هوية أو شيك على بياض كضمان، أو سيارة تجاوزت السن المسموح بها لأساطيل الكراء",
     promo_check: "تخفيض يفوق 70 %: يتحقق مشرف من الثمن الأصلي قبل إعادة النشر",
+    work_abroad: "عرض عمل في الخارج: يتحقق مشرف من ذكر تأشيرة الوزارة المكلفة بالشغل ووكالة التشغيل قبل النشر",
   },
 };
 

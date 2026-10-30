@@ -5,6 +5,7 @@ import { Eye, MoreHorizontal, Pause, Pencil, Play, RefreshCw, Tag, Trash2, Trend
 import { useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { Button } from "@/components/ui/button";
+import { paidOptionsAllowed } from "@/config/categories";
 import { Link } from "@/i18n/navigation";
 import type { OwnerListingSummary } from "@/lib/contracts/listings";
 import { isolate } from "@/lib/i18n/bidi";
@@ -89,7 +90,7 @@ export function ListingActions({ listing, onAction, onDelete, busy, publicHref, 
                 </Link>
               </DropdownMenu.Item>
             ) : null}
-            {salesOpen && listing.status === "published" ? (
+            {salesOpen && listing.status === "published" && paidOptionsAllowed(listing.subcategoryId) ? (
               <DropdownMenu.Item className={item} onSelect={() => setPromote(true)}>
                 <TrendingUp aria-hidden="true" />
                 {t("actions.promote")}

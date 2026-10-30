@@ -6,7 +6,8 @@ import ar from "../../messages/ar.json";
 import fr from "../../messages/fr.json";
 import { Breadcrumb, SEARCH_QUERY, searchHref } from "@/components/listing/breadcrumb";
 import { CriteriaGrid, CriteriaSection } from "@/components/listing/criteria-grid";
-import { JOB_ABROAD, JobNotice } from "@/components/listing/job-notice";
+import { JobNotice } from "@/components/listing/job-notice";
+import { JOB_ABROAD } from "@/config/categories";
 import { ListingCard } from "@/components/listing/listing-card";
 import { ListingPrice } from "@/components/listing/listing-price";
 import { ListingStatusBanner } from "@/components/listing/listing-status-banner";
@@ -341,7 +342,7 @@ describe("JobNotice", () => {
     expect(text(html)).toContain(fr.ListingPage.jobs.offer.publisher);
     expect(text(html)).toContain(fr.ListingPage.jobs.offer.noFees);
     expect(text(html)).not.toContain(fr.ListingPage.jobs.seeker.publisher);
-    expect(html).toContain('href="/fr/legal/cgu"');
+    expect(html).toContain('href="/fr/legal/cgu#annonces-12"');
     expect(html).toContain('href="#signaler"');
     expect(html).not.toContain("job-abroad-notice");
     expect(text(render(<JobNotice subcategoryId="offres-emploi" attributes={offer} />, "ar"))).toContain(ar.ListingPage.jobs.title);
