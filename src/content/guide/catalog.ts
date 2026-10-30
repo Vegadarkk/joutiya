@@ -6,7 +6,7 @@ import type { GuideSourceId } from "./sources";
 // Texts may hold `{brand}` (SITE_NAME). They never quote a fee, a delay or a URL: the official page
 // states them and may change them at any time. Client-safe.
 
-export const GUIDE_RUBRICS = ["etudiant", "auto-entrepreneur", "vehicule", "immobilier", "mre", "pro-cooperative", "identite"] as const;
+export const GUIDE_RUBRICS = ["identite", "sante", "aides-sociales", "retraite", "eau-electricite", "assurances", "etudiant", "vehicule", "immobilier", "mre", "auto-entrepreneur", "pro-cooperative"] as const;
 export type GuideRubric = (typeof GUIDE_RUBRICS)[number];
 
 export interface GuideProcedureMeta {
@@ -21,6 +21,8 @@ export const GUIDE_PROCEDURES = {
   "logement-universitaire": { rubric: "etudiant", sources: ["onousc-logement"] },
   "amo-etudiant": { rubric: "etudiant", sources: ["onousc-amo"] },
   "massar": { rubric: "etudiant", sources: ["massar"] },
+  "orientation-postbac": { rubric: "etudiant", sources: ["cursussup", "cpge"] },
+  "etudes-france": { rubric: "etudiant", sources: ["campusfrance-procedures", "parcoursup"] },
   // Auto-entrepreneurs
   "ae-inscription": { rubric: "auto-entrepreneur", sources: ["ae-portail"] },
   "ae-impots": { rubric: "auto-entrepreneur", sources: ["dgi-teleservices"] },
@@ -54,6 +56,25 @@ export const GUIDE_PROCEDURES = {
   "id-livret": { rubric: "identite", sources: ["consulat-livret"] },
   "id-casier": { rubric: "identite", sources: ["casier", "consulat-casier"] },
   "id-nationalite": { rubric: "identite", sources: ["nationalite"] },
+  "id-service-militaire": { rubric: "identite", sources: ["tajnid"] },
+  // Health cover (AMO)
+  "amo-salaries": { rubric: "sante", sources: ["cnss"] },
+  "amo-tadamon": { rubric: "sante", sources: ["rsu", "cnss"] },
+  "amo-fonctionnaires": { rubric: "sante", sources: ["cnops"] },
+  // Retirement
+  "retraite-cnss": { rubric: "retraite", sources: ["cnss"] },
+  "retraite-public": { rubric: "retraite", sources: ["cmr", "rcar-affiliation"] },
+  "retraite-complementaire": { rubric: "retraite", sources: ["cimr-pension"] },
+  // Social aid (RSU)
+  "rsu-inscription": { rubric: "aides-sociales", sources: ["rnp", "rsu"] },
+  "aide-sociale-directe": { rubric: "aides-sociales", sources: ["asd"] },
+  "aide-logement": { rubric: "aides-sociales", sources: ["daam-sakane"] },
+  // Water and electricity
+  "energie-abonnement": { rubric: "eau-electricite", sources: ["srm-casablanca", "redal-particuliers", "amendis-abonnement", "onee"] },
+  "energie-gestion": { rubric: "eau-electricite", sources: ["amendis-gestion", "redal-particuliers"] },
+  // Insurance
+  "assurance-auto": { rubric: "assurances", sources: ["acaps"] },
+  "assurance-reclamation": { rubric: "assurances", sources: ["acaps-reclamation", "acaps"] },
 } as const satisfies Record<string, GuideProcedureMeta>;
 export type GuideProcedureId = keyof typeof GUIDE_PROCEDURES;
 export const GUIDE_PROCEDURE_IDS = Object.keys(GUIDE_PROCEDURES) as GuideProcedureId[];

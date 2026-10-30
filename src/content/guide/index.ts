@@ -3,7 +3,7 @@ import { GUIDE_AR } from "./ar";
 import { GUIDE_GENERAL_SOURCES, GUIDE_PROCEDURE_IDS, GUIDE_PROCEDURES, GUIDE_RUBRICS, rubricProcedures, type GuideLocaleContent, type GuideProcedureId, type GuideRubric } from "./catalog";
 import { GUIDE_FR } from "./fr";
 import { GUIDE_RIF } from "./rif";
-import { GUIDE_SOURCE_IDS, GUIDE_SOURCES, isOfficialHost, type GuideSourceId } from "./sources";
+import { FOREIGN_OFFICIAL_HOSTS, GUIDE_SOURCE_IDS, GUIDE_SOURCES, isOfficialHost, type GuideSourceId } from "./sources";
 
 // Admin procedures guide loader (design guide-demarches G1-G2): the locale's texts with `{brand}`
 // filled, and the validator the unit tests run (closed host list, no URL in a text, no stray id).
@@ -80,7 +80,7 @@ export function validateGuide(contents: Readonly<Record<Locale, GuideLocaleConte
     }
     if (url.protocol !== "https:") problems.push(`source ${id}: not https`);
     if (!isOfficialHost(url.hostname)) problems.push(`source ${id}: host ${url.hostname} is not in OFFICIAL_HOSTS`);
-    if (!/\.(?:gov\.)?ma$/.test(url.hostname)) problems.push(`source ${id}: host ${url.hostname} is not a .ma host`);
+    if (!/\.(?:gov\.)?ma$/.test(url.hostname) && !FOREIGN_OFFICIAL_HOSTS.has(url.hostname)) problems.push(`source ${id}: host ${url.hostname} is not a .ma host`);
     if (url.username || url.password || url.port) problems.push(`source ${id}: credentials or port in the URL`);
     if (FILE_URL.test(url.pathname)) problems.push(`source ${id}: links a file, link the official page that lists it`);
     if (!DAY.test(source.reviewedAt)) problems.push(`source ${id}: reviewedAt is not YYYY-MM-DD`);

@@ -8,7 +8,7 @@ export const GUIDE_FR: GuideLocaleContent = {
   rubrics: {
     etudiant: {
       title: "Étudiants",
-      summary: "Bourses, logement universitaire, couverture médicale et suivi de scolarité.",
+      summary: "Orientation après le bac, bourses, logement universitaire, couverture médicale, études en France.",
       intro: "Les aides aux étudiants relèvent de l'ONOUSC (bourses, cités universitaires, couverture médicale) et du ministère de l'Enseignement supérieur. Les demandes se font en ligne, pendant des périodes ouvertes chaque année : surveillez les calendriers publiés.",
     },
     "auto-entrepreneur": {
@@ -38,8 +38,33 @@ export const GUIDE_FR: GuideLocaleContent = {
     },
     identite: {
       title: "Identité et état civil",
-      summary: "CNIE, passeport, acte de naissance, casier judiciaire, nationalité.",
+      summary: "CNIE, passeport, acte de naissance, casier judiciaire, nationalité, service militaire.",
       intro: "Au Maroc, la CNIE et le passeport relèvent de la DGSN et l'acte de naissance du bureau d'état civil de la commune d'inscription. À l'étranger, le consulat s'en charge.",
+    },
+    sante: {
+      title: "Couverture médicale (AMO)",
+      summary: "AMO des salariés et des indépendants, AMO Tadamon (ex-RAMED), fonctionnaires.",
+      intro: "Depuis la généralisation de la protection sociale, l'assurance maladie obligatoire (AMO) couvre les salariés, les indépendants et les personnes sans revenus. La CNSS gère la plupart des régimes ; le secteur public relève encore de la CNOPS pendant son transfert vers la CNSS.",
+    },
+    retraite: {
+      title: "Retraite",
+      summary: "Pension de la CNSS, de la CMR ou du RCAR, retraite complémentaire.",
+      intro: "Votre caisse de retraite dépend de votre employeur : la CNSS pour le secteur privé, la CMR pour les fonctionnaires titulaires et les militaires, le RCAR pour les contractuels et le personnel de nombreux établissements publics. Une retraite complémentaire (CIMR) peut s'y ajouter.",
+    },
+    "aides-sociales": {
+      title: "Aides sociales (RSU)",
+      summary: "Inscription au RSU, aide sociale directe, aide au logement.",
+      intro: "Les aides de l'État passent par le registre social unifié (RSU) : l'inscription du foyer donne un indice socio-économique qui ouvre, ou non, l'aide sociale directe et l'AMO Tadamon. Méfiez-vous de quiconque demande de l'argent pour vous inscrire : passez uniquement par les portails officiels.",
+    },
+    "eau-electricite": {
+      title: "Eau et électricité",
+      summary: "Abonnement, changement de titulaire, résiliation, factures et réclamations.",
+      intro: "La distribution de l'eau, de l'électricité et l'assainissement passent, région par région, à des sociétés régionales multiservices (SRM), qui reprennent les services de l'ONEE, des régies et des anciens délégataires comme Lydec. Dans certaines villes, l'ancien distributeur reste votre interlocuteur pendant la transition : le nom de votre distributeur figure sur votre facture.",
+    },
+    assurances: {
+      title: "Assurances",
+      summary: "Assurance auto obligatoire, accident, réclamation contre un assureur.",
+      intro: "Les compagnies d'assurance sont contrôlées par l'ACAPS. En cas de désaccord avec votre assureur, adressez-lui d'abord une réclamation écrite ; si sa réponse ne vous convient pas, l'ACAPS reçoit les réclamations des assurés.",
     },
   },
   procedures: {
@@ -185,6 +210,116 @@ export const GUIDE_FR: GuideLocaleContent = {
       title: "Certificat de nationalité",
       body: ["Le certificat de nationalité se demande en ligne sur la plateforme du ministère de la Justice (en arabe)."],
     },
+    "orientation-postbac": {
+      title: "Candidater après le bac (écoles, médecine, classes préparatoires)",
+      body: [
+        "Les candidatures aux établissements à accès régulé (écoles d'ingénieurs et de commerce, médecine et pharmacie, EST, FST…) se déposent sur la plateforme nationale Cursussup, avec le code Massar. Les facultés à accès ouvert inscrivent directement leurs étudiants.",
+        "Les classes préparatoires aux grandes écoles (CPGE) ont leur propre plateforme de candidature. Les calendriers sont publiés chaque année : notez les dates dès leur parution.",
+      ],
+      prepare: ["Votre code Massar", "Vos relevés de notes"],
+    },
+    "etudes-france": {
+      title: "Étudier en France (Campus France, Parcoursup)",
+      body: [
+        "La plupart des étudiants marocains qui visent la France passent par Campus France Maroc : le parcours (plateforme Études en France ou Parcoursup) dépend de votre baccalauréat et de la formation visée. Les élèves des lycées français au Maroc candidatent en général sur Parcoursup.",
+        "Une fois accepté, la demande de visa étudiant suit la procédure indiquée par Campus France.",
+      ],
+    },
+    "amo-salaries": {
+      title: "AMO des salariés et des indépendants",
+      body: [
+        "Les salariés du secteur privé sont déclarés à la CNSS par leur employeur ; les indépendants, les professions libérales et les auto-entrepreneurs s'immatriculent eux-mêmes et paient leurs cotisations à la CNSS.",
+        "Les dossiers maladie se déposent en agence ou en ligne. Vérifiez que vos ayants droit (conjoint, enfants) sont bien déclarés.",
+      ],
+      prepare: ["Votre CNIE", "Votre numéro d'immatriculation à la CNSS"],
+    },
+    "amo-tadamon": {
+      title: "AMO Tadamon (ex-RAMED)",
+      body: [
+        "L'AMO Tadamon a remplacé le RAMED : l'État paie la cotisation des personnes qui ne peuvent pas la payer. L'éligibilité dépend de l'indice socio-économique du foyer, calculé après l'inscription au RSU ; la CNSS gère ensuite la couverture.",
+        "Si votre indice dépasse le seuil, l'AMO Achamil permet de vous affilier à la CNSS en payant vous-même la cotisation.",
+      ],
+    },
+    "amo-fonctionnaires": {
+      title: "AMO des fonctionnaires et agents publics",
+      body: [
+        "L'assurance maladie des fonctionnaires et agents de l'État relève de la CNOPS et des mutuelles du secteur public. La loi 54-23 transfère cette gestion à la CNSS : jusqu'à la date de transfert fixée par les textes, les dossiers restent traités par la CNOPS. Suivez les annonces officielles.",
+      ],
+    },
+    "retraite-cnss": {
+      title: "Retraite des salariés du privé (CNSS)",
+      body: [
+        "La CNSS verse la pension de vieillesse des salariés du secteur privé ; la demande se dépose auprès d'elle à l'approche de l'âge de départ. Le droit et le montant dépendent des jours déclarés : vérifiez régulièrement que votre employeur vous déclare.",
+      ],
+      prepare: ["Votre CNIE", "Votre numéro d'immatriculation à la CNSS", "Un relevé d'identité bancaire à votre nom"],
+    },
+    "retraite-public": {
+      title: "Retraite des fonctionnaires et agents publics (CMR, RCAR)",
+      body: [
+        "Les fonctionnaires titulaires et les militaires cotisent à la Caisse marocaine des retraites (CMR). Les agents contractuels de l'État et des collectivités, ainsi que le personnel de nombreux établissements publics, relèvent du RCAR, géré par la CDG.",
+        "Chaque caisse propose un espace en ligne pour suivre sa carrière, demander sa pension ou une pension de réversion.",
+      ],
+    },
+    "retraite-complementaire": {
+      title: "Retraite complémentaire (CIMR)",
+      body: [
+        "Si votre employeur adhère à la CIMR, une pension complémentaire s'ajoute à celle de la CNSS. La CIMR propose aussi une épargne retraite individuelle. La pension se demande auprès d'elle au moment du départ.",
+      ],
+    },
+    "rsu-inscription": {
+      title: "S'inscrire au RNP puis au RSU",
+      body: [
+        "Chaque membre du foyer s'inscrit d'abord au registre national de la population (RNP), qui délivre un identifiant numérique. Le chef de foyer inscrit ensuite le ménage au registre social unifié (RSU), en ligne ou dans un point d'enregistrement de sa commune ou de son caïdat.",
+        "Le RSU calcule un indice socio-économique. Déclarez tout changement (naissance, déménagement, revenus) pour qu'il reste exact.",
+      ],
+      prepare: ["Les CNIE des membres majeurs du foyer", "Le livret de famille ou les actes de naissance des enfants"],
+    },
+    "aide-sociale-directe": {
+      title: "Demander l'aide sociale directe",
+      body: [
+        "L'aide sociale directe verse une allocation mensuelle aux foyers éligibles selon leur indice RSU : aides liées aux enfants, à leur scolarité et à une naissance, ou montant forfaitaire par foyer. La demande se fait en ligne, une fois le foyer inscrit au RSU.",
+      ],
+    },
+    "aide-logement": {
+      title: "Aide directe à l'achat d'un logement",
+      body: [
+        "Le programme d'aide au logement verse une aide directe aux Marocains, résidents ou MRE, qui ne possèdent pas de logement au Maroc et achètent un logement neuf. La demande se dépose en ligne avant la signature de la vente ; l'aide est versée chez le notaire.",
+        "Sur {brand}, vérifiez avec le vendeur que le logement entre dans le programme avant de vous engager.",
+      ],
+    },
+    "energie-abonnement": {
+      title: "S'abonner à l'eau et à l'électricité",
+      body: [
+        "L'abonnement se demande en agence ou sur l'agence en ligne du distributeur de votre ville (SRM, ancien délégataire ou ONEE selon la zone). Un logement neuf demande d'abord un branchement au réseau, à prévoir avant d'emménager.",
+      ],
+      prepare: ["Votre CNIE", "Le titre de propriété ou le contrat de bail", "Le numéro du compteur, s'il existe"],
+    },
+    "energie-gestion": {
+      title: "Changer de titulaire, résilier, payer, réclamer",
+      body: [
+        "À un déménagement, une vente ou une location, demandez le changement de titulaire ou la résiliation de l'abonnement et relevez l'index du compteur avec l'autre partie : sinon, les consommations restent à votre nom.",
+        "Les factures se consultent et se paient en ligne ; une contestation se dépose par écrit auprès du distributeur, en gardant une copie.",
+      ],
+    },
+    "assurance-auto": {
+      title: "Assurance auto : obligation et accident",
+      body: [
+        "L'assurance responsabilité civile est obligatoire pour tout véhicule qui circule. Après l'achat d'un véhicule sur {brand}, souscrivez votre propre contrat avant de rouler et gardez l'attestation dans le véhicule.",
+        "En cas d'accident, remplissez un constat amiable avec l'autre conducteur et déclarez le sinistre à votre assureur dans le délai prévu par votre contrat.",
+      ],
+    },
+    "assurance-reclamation": {
+      title: "Réclamer contre un assureur",
+      body: [
+        "Adressez d'abord une réclamation écrite à votre assureur ou à son intermédiaire, en gardant une preuve d'envoi. Sans réponse ou en cas de désaccord, déposez une réclamation auprès de l'ACAPS sur sa plateforme en ligne.",
+      ],
+    },
+    "id-service-militaire": {
+      title: "Service militaire",
+      body: [
+        "Le service militaire concerne les jeunes de 19 à 25 ans. Lors de chaque campagne de recensement, les personnes concernées remplissent le formulaire en ligne puis reçoivent, le cas échéant, une convocation. Les cas de dispense et de report sont précisés sur le portail officiel.",
+      ],
+    },
   },
   sources: {
     "idarati-entreprises": "Services en ligne pour les entreprises (Idarati)",
@@ -232,5 +367,25 @@ export const GUIDE_FR: GuideLocaleContent = {
     "ompic-creation": "Création et vie de l'entreprise",
     "ompic-rcc": "Services du registre du commerce",
     "ompic-ice": "Identifiant commun de l'entreprise (ICE)",
+    cursussup: "Candidatures post-bac aux établissements à accès régulé (Cursussup)",
+    cpge: "Candidature aux classes préparatoires (CPGE)",
+    "campusfrance-procedures": "Procédures pour étudier en France (Campus France Maroc)",
+    parcoursup: "Plateforme Parcoursup",
+    cnops: "Portail de la CNOPS",
+    rsu: "Registre social unifié (RSU)",
+    rnp: "Registre national de la population (RNP)",
+    asd: "Aide sociale directe",
+    "daam-sakane": "Aide directe au logement",
+    cmr: "Caisse marocaine des retraites (CMR)",
+    "rcar-affiliation": "Affiliation et prestations du RCAR",
+    "cimr-pension": "Pension de retraite de la CIMR",
+    "srm-casablanca": "SRM Casablanca-Settat",
+    "redal-particuliers": "Espace clients particuliers de Redal",
+    "amendis-abonnement": "Branchement et abonnement (Amendis)",
+    "amendis-gestion": "Gestion d'un abonnement (Amendis)",
+    onee: "Office national de l'électricité et de l'eau potable (ONEE)",
+    acaps: "Autorité de contrôle des assurances et de la prévoyance sociale (ACAPS)",
+    "acaps-reclamation": "Déposer une réclamation contre un assureur (ACAPS)",
+    tajnid: "Portail du service militaire",
   },
 };
