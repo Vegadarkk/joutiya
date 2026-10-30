@@ -4,21 +4,21 @@
   "defaultMultipartAbort": { "name": "Default Multipart Abort Rule", "abortAfterDays": 7 },
   "buckets": {
     "joutiya-prod-quarantine": {
-      "cors": [{ "AllowedOrigins": ["https://joutiya.ma", "https://www.joutiya.ma"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }],
+      "cors": [{ "AllowedOrigins": ["https://joutiya.ma", "https://www.joutiya.ma", "https://aalan.ma", "https://www.aalan.ma"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }],
       "lifecycle": [{ "name": "delete-after-1-day", "prefix": "", "deleteAfterDays": 1 }]
     },
     "joutiya-staging-quarantine": {
-      "cors": [{ "AllowedOrigins": ["https://staging.joutiya.ma"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }],
+      "cors": [{ "AllowedOrigins": ["https://staging.joutiya.ma", "https://staging.aalan.ma"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }],
       "lifecycle": [{ "name": "delete-after-1-day", "prefix": "", "deleteAfterDays": 1 }]
     },
     "joutiya-dev-quarantine": {
       "lifecycle": [{ "name": "delete-after-1-day", "prefix": "", "deleteAfterDays": 1 }]
     },
     "joutiya-prod-media": {
-      "cors": [{ "AllowedOrigins": ["https://joutiya.ma", "https://www.joutiya.ma"], "AllowedMethods": ["GET", "HEAD"], "AllowedHeaders": ["Range"], "ExposeHeaders": ["ETag", "Content-Range", "Content-Length"], "MaxAgeSeconds": 3600 }]
+      "cors": [{ "AllowedOrigins": ["https://joutiya.ma", "https://www.joutiya.ma", "https://aalan.ma", "https://www.aalan.ma"], "AllowedMethods": ["GET", "HEAD"], "AllowedHeaders": ["Range"], "ExposeHeaders": ["ETag", "Content-Range", "Content-Length"], "MaxAgeSeconds": 3600 }]
     },
     "joutiya-staging-media": {
-      "cors": [{ "AllowedOrigins": ["https://staging.joutiya.ma"], "AllowedMethods": ["GET", "HEAD"], "AllowedHeaders": ["Range"], "ExposeHeaders": ["ETag", "Content-Range", "Content-Length"], "MaxAgeSeconds": 3600 }]
+      "cors": [{ "AllowedOrigins": ["https://staging.joutiya.ma", "https://staging.aalan.ma"], "AllowedMethods": ["GET", "HEAD"], "AllowedHeaders": ["Range"], "ExposeHeaders": ["ETag", "Content-Range", "Content-Length"], "MaxAgeSeconds": 3600 }]
     },
     "joutiya-prod-private": {
       "lifecycle": [{ "name": "delete-backups-after-98-days", "prefix": "backups/", "deleteAfterDays": 98 }]

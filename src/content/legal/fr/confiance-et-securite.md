@@ -42,7 +42,7 @@ Quelqu'un vous demande le code reçu par SMS ou WhatsApp, en disant l'avoir envo
 
 ### 2.5 Les offres de visa, d'emploi ou de diplôme {#arnaques-5}
 
-Un contrat de travail « garanti » à l'étranger, un visa, un permis de conduire sans examen ou un diplôme contre paiement sont interdits sur {brand} et presque toujours des escroqueries. **Les démarches officielles se font auprès des administrations. Signalez l'annonce.**
+Un emploi ou un contrat de travail à l'étranger « garanti » contre paiement, un visa, un permis de conduire sans examen ou un diplôme contre paiement sont interdits sur {brand} et presque toujours des escroqueries. Une vraie offre d'emploi ne demande jamais d'argent au candidat, et les services de l'ANAPEC sont gratuits. **Les démarches officielles se font auprès des administrations. Signalez l'annonce.**
 
 ### 2.6 Les téléphones et appareils douteux {#arnaques-6}
 

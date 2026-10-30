@@ -101,6 +101,8 @@ jobs:
           if [[ -s "$work/report.json" ]]; then
             jq -r '[.site[]?.alerts[]? | .riskcode] | "Alerts: high \(map(select(. == "3")) | length), medium \(map(select(. == "2")) | length), low \(map(select(. == "1")) | length), info \(map(select(. == "0")) | length)"' "$work/report.json"
           fi
+          # Which FAIL rules matched (name, id, count; their URLs stay in the encrypted report).
+          grep -E '^FAIL-(NEW|INPROG):' "$work/console.txt" || true
           echo "ZAP exit code $code"
       - name: Encrypt the reports
         if: always() && steps.scan.outcome != 'skipped'

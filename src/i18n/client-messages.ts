@@ -57,6 +57,8 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   "ListingCard",
   "Search.bar",
   "Search.location",
+  // « Masquer les annonces exemples »: the example banner's button and the results' notice.
+  "Examples",
 ] as const;
 
 /**

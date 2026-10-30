@@ -36,6 +36,7 @@ export function ResultRows({ listings, cards, renderAction, priorityCount = 0, l
             key={listing.id}
             data-map-row=""
             data-listing-id={listing.id}
+            data-example={listing.example ? "" : undefined}
             className={cn(
               "group/row relative grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-transparent p-2",
               "transition-[background-color,border-color] duration-150 ease-door hover:bg-surface-muted",

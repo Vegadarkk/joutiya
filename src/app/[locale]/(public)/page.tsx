@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { AdSlot } from "@/components/ads/ad-slot";
+import { ExamplesHiddenNotice } from "@/components/examples/examples-controls";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { CategoryGrid } from "@/components/home/category-grid";
 import { FeaturedCarousel } from "@/components/home/featured-carousel";
@@ -147,6 +148,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                         <h2 id="home-recent-rows" className="px-2 text-base font-semibold sm:text-lg">
                           {t("recent.title")}
                         </h2>
+                        <ExamplesHiddenNotice className="px-2" />
                         <ResultRows listings={recentRows} cards={cards} renderAction={rowFavorite} priorityCount={featuredRows.length > 0 ? 0 : 2} label={t("recent.title")} />
                       </section>
                     ) : null}
@@ -172,6 +174,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                         <h2 id="home-recent" className="text-xl font-semibold">
                           {t("recent.title")}
                         </h2>
+                        <ExamplesHiddenNotice />
                         <ResultsGrid cards={recent.slice(0, HOME_GRID_COUNT)} locale={locale} renderAction={favoriteAction} />
                         <Button asChild variant="outline" className="self-center">
                           <Link href={SEARCH_PATH}>{t("recent.all")}</Link>

@@ -72,6 +72,10 @@ Les annonces marquées « Annonce exemple » sont rédigées par {brand} pour il
 
 L'accueil et la page de recherche s'affichent en carte, ou en liste quand la carte ne peut pas s'afficher ; la recherche permet aussi de choisir la liste. La carte de l'accueil montre les 24 annonces les plus récentes, selon la date du §2.1, et les annonces À la Une (§3.2). Sur la carte, chaque annonce est placée à une position approximative, arrondie à environ 1 km, jamais à l'adresse exacte. Des annonces proches peuvent être regroupées en un seul repère, qui s'ouvre en zoomant. La liste à côté de la carte suit le tri choisi. Le bouton « Rechercher dans cette zone » limite les résultats aux annonces de la zone affichée ; il agit comme un filtre de lieu (§2.6).
 
+### 2.10 Offres et demandes d'emploi {#tri-10}
+
+Les offres et les demandes d'emploi sont triées et filtrées comme les autres annonces (contrat, secteur, expérience, mode de travail). {brand} ne rapproche pas automatiquement les offres et les demandes et ne classe pas les candidats. Une demande d'emploi ne reçoit aucune option payante.
+
 ## 3. Les options payantes {#options}
 
 Deux options payantes permettent de mettre une annonce en avant. L'annonceur les achète lui-même, en crédits, à l'unité, pour une annonce de son choix. {brand} n'intervient pas sur le contenu de l'annonce, et ne choisit pas au cas par cas les annonces mises en avant : l'effet de chaque option est automatique et identique pour tous. Les options ne sont pas encore en vente : tant que les ventes sont fermées, aucune annonce n'est remontée ni mise à la Une contre paiement.

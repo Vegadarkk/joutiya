@@ -36,6 +36,8 @@ vi.mock("@/components/map/listing-map-block", () => ({
 }));
 vi.mock("next/navigation", async (importOriginal) => ({
   ...(await importOriginal<typeof NextNavigation>()),
+  // « Masquer les annonces exemples » refreshes the page through the router (src/components/examples).
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn(), back: vi.fn(), forward: vi.fn() }),
   notFound: () => {
     throw new Error("NEXT_NOT_FOUND");
   },
