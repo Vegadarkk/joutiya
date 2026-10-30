@@ -114,6 +114,8 @@ export const createListingSchema = z
   .object({
     categoryId: treeIdSchema.optional(),
     subcategoryId: treeIdSchema.optional(),
+    /** "Je donne" chosen on the first screen (journey review 2026-10-29); kept when the subcategory allows donations. */
+    isDonation: z.boolean().optional(),
   })
   .strict()
   .superRefine(checkTree);

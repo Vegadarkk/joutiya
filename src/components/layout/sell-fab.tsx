@@ -9,9 +9,10 @@ import { showsSellButton } from "./shell-paths";
 // home indicator. Left out where it would sit on a form or a bottom bar (shell-paths.ts), and
 // hidden while the cookie banner is up: it never covers that choice. It also steps aside while a
 // field of the page has the focus (the rental module's dates, a filter): UX audit, finding 13. The
-// footer keeps a lane for it at the end of the page; `data-sell-fab` is the tests' hook.
+// footer keeps a lane for it at the end of the page; `data-sell-fab` is the tests' hook. It says
+// "Vendre" beside the plus (journey review 2026-10-29: the sign alone did not read as the way in).
 
-export function SellFab({ label }: { label: string }) {
+export function SellFab({ label, text }: { label: string; text: string }) {
   const pathname = usePathname();
   if (!showsSellButton(pathname)) return null;
   return (
@@ -20,14 +21,15 @@ export function SellFab({ label }: { label: string }) {
       aria-label={label}
       data-sell-fab=""
       className={cn(
-        "sell-arch fixed end-4 bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] z-30 flex h-15 w-13 items-end justify-center pb-3.5 md:hidden",
+        "sell-arch fixed end-4 bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] z-30 flex h-15 min-w-13 items-end justify-center gap-1 px-4 pb-3.5 text-sm font-semibold md:hidden",
         "transition-[background-color,scale] duration-150 ease-door hover:bg-ochre-700 active:scale-95",
         "[:root:has([data-testid=consent-banner])_&]:hidden [:root:has(main_:is(input,select,textarea):focus)_&]:hidden",
         // The search map's sheet (lot 2): the arch stands above it, and leaves when it fills the screen.
         "search-map:bottom-[calc(var(--search-sheet,0px)+0.75rem)] search-map:transition-[bottom] [:root[data-search-snap=full]_&]:search-map:hidden",
       )}
     >
-      <Plus className="size-6" strokeWidth={2.25} aria-hidden="true" />
+      <Plus className="size-5" strokeWidth={2.25} aria-hidden="true" />
+      {text}
     </Link>
   );
 }

@@ -148,8 +148,10 @@ describe("SiteHeader", () => {
 
   it("floats 'Vendre' on phones, out of the cookie banner's way", () => {
     const html = render(<SiteHeader locale="fr" />);
-    const fab = /<a aria-label="([^"]+)" data-sell-fab="" class="(sell-arch fixed [^"]*)" href="\/fr\/deposer"/.exec(html);
+    const fab = /<a aria-label="([^"]+)" data-sell-fab="" class="(sell-arch fixed [^"]*)" href="\/fr\/deposer"[^>]*>(.*?)<\/a>/.exec(html);
     expect(fab?.[1]).toBe(fr.Nav.post);
+    // The word beside the plus (journey review, 10).
+    expect(fab?.[3]).toContain(fr.Nav.sell);
     expect(fab?.[2]).toContain("md:hidden");
     expect(fab?.[2]).toContain("env(safe-area-inset-bottom)");
     expect(fab?.[2]).toContain("[:root:has([data-testid=consent-banner])_&amp;]:hidden");
