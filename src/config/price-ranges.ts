@@ -73,6 +73,10 @@ export const PRICE_RANGES: Readonly<Record<string, PriceRange>> = {
   "betail-moutons": { min: 500, max: 100_000 },
   // materiel-pro
   "agricole-tracteurs": { min: 1_000, max: 2_000_000 },
+  "semences-plants": { min: 5, max: 500_000 },
+  "fourrage-recoltes": { min: 20, max: 2_000_000 },
+  "equipement-chasse": { min: 20, max: 100_000 },
+  "peche": { min: 10, max: 100_000 },
   btp: { min: 500, max: 5_000_000 },
   chr: { min: 200, max: 1_000_000 },
   "commerce-bureau": { min: 50, max: 500_000 },

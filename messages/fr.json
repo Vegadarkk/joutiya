@@ -145,7 +145,8 @@
       "autorites": "Contact autorités (DSA)",
       "interdits": "Objets interdits"
     },
-    "guide": "Démarches administratives"
+    "guide": "Démarches administratives",
+    "pricing": "Tarifs"
   },
   "Legal": {
     "provisionalTitle": "Version provisoire",
@@ -1153,6 +1154,15 @@
         "autres-produits-terroir": "Autres produits du terroir"
       }
     },
+    "agriculture": {
+      "name": "Agriculture",
+      "sub": {
+        "agricole-tracteurs": "Agricole & tracteurs",
+        "betail-moutons": "Bétail & moutons",
+        "semences-plants": "Semences et plants",
+        "fourrage-recoltes": "Fourrage et récoltes"
+      }
+    },
     "famille": {
       "name": "Famille",
       "sub": {
@@ -1171,18 +1181,23 @@
         "collection-antiquites": "Collection & antiquités"
       }
     },
+    "chasse-peche": {
+      "name": "Chasse et pêche",
+      "sub": {
+        "equipement-chasse": "Équipement de chasse",
+        "peche": "Pêche"
+      }
+    },
     "animaux": {
       "name": "Animaux",
       "sub": {
         "accessoires-animaux": "Accessoires",
-        "animaux-compagnie": "Animaux de compagnie",
-        "betail-moutons": "Bétail & moutons"
+        "animaux-compagnie": "Animaux de compagnie"
       }
     },
     "materiel-pro": {
       "name": "Matériel professionnel",
       "sub": {
-        "agricole-tracteurs": "Agricole & tracteurs",
         "btp": "BTP",
         "chr": "Cafés, hôtels & restaurants",
         "commerce-bureau": "Commerce & bureau",
@@ -5810,5 +5825,66 @@
     "hiddenNotice": "Les annonces exemples sont masquées sur cet appareil.",
     "hiddenToast": "Annonces exemples masquées",
     "shownToast": "Annonces exemples affichées"
+  },
+  "Pricing": {
+    "metaTitle": "Tarifs : particuliers et professionnels",
+    "metaDescription": "Publier est gratuit pour les particuliers. Options de visibilité, packs de crédits et offres Pro : tous les tarifs d'Aalan.",
+    "eyebrow": "Tarifs",
+    "title": "Des prix clairs, sans commission sur vos ventes",
+    "lead": "Publier une annonce est gratuit pour les particuliers. Vous ne payez que pour plus de visibilité ou pour une boutique professionnelle.",
+    "free": "Gratuit",
+    "unlimited": "Illimité",
+    "count": "{count, number}",
+    "fromCredits": "Dès {count, number} crédits",
+    "fromMad": "Dès {amount, number} DH",
+    "perMonth": "{amount, number} DH HT / mois",
+    "perYear": "ou {amount, number} DH HT / an",
+    "perDays": "{amount, number} DH HT / {days, number} jours",
+    "exclVat": "Hors taxes, sans engagement",
+    "individuals": {
+      "title": "Particuliers",
+      "free": {
+        "title": "Publier",
+        "listings": "{count, plural, one {# annonce active} other {# annonces actives}} à la fois",
+        "photos": "Jusqu'à {count, number} photos par annonce",
+        "messaging": "Messagerie sécurisée avec les acheteurs"
+      },
+      "options": {
+        "title": "Options de visibilité",
+        "note": "Prix standard, puis véhicules et immobilier",
+        "bump": "Remonter en tête : {standard, number} ou {premium, number} crédits",
+        "featured7": "À la Une 7 jours : {standard, number} ou {premium, number} crédits",
+        "featured30": "À la Une 30 jours : {standard, number} ou {premium, number} crédits"
+      },
+      "packs": {
+        "title": "Packs de crédits",
+        "note": "TTC, 1 crédit = 1 DH",
+        "pack": "{amount, number} DH : {credits, number} crédits",
+        "packBonus": "{amount, number} DH : {credits, number} crédits + {bonus, number} offerts"
+      }
+    },
+    "pros": {
+      "title": "Professionnels",
+      "launchOffer": "Offre de lancement : la formule Essentiel est offerte aux boutiques validées jusqu'à l'ouverture des ventes, avec un préavis de {days, number} jours avant tout paiement.",
+      "pass": {
+        "title": "Pass Boutique",
+        "noCommitment": "Sans abonnement ni reconduction"
+      },
+      "essentiel": "Essentiel",
+      "business": "Business",
+      "premium": "Premium",
+      "popular": "Le plus choisi",
+      "onQuote": "Sur devis",
+      "credits": "{count, number} crédits de visibilité inclus",
+      "listings": "{count, plural, one {# annonce active} other {# annonces actives}}",
+      "featured": "{count, plural, one {# annonce À la Une incluse} other {# annonces À la Une incluses}}",
+      "activeListings": "annonces actives",
+      "storefront": "Boutique en ligne, page vérifiée et statistiques",
+      "premiumSupport": "Accompagnement dédié et import du stock",
+      "payAtSeller": "Paiement chez le vendeur : Aalan ne prend aucune commission sur vos ventes.",
+      "cta": "Créer ma boutique",
+      "more": "Découvrir l'offre Pro"
+    },
+    "footnote": "Les ventes ouvrent avec le lancement du site. Les prix affichés sont ceux prévus à l'ouverture."
   }
 }

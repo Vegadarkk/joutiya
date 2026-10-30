@@ -15,6 +15,7 @@ import { DealerStock } from "@/components/pro/dealer-stock";
 import { RentalFleet, type FleetLabels } from "@/components/rental/rental-fleet";
 import { RentalAgencyCard, RentalBranches, RentalConditions } from "@/components/rental/rental-storefront";
 import { SellerInfo } from "@/components/pro/seller-info";
+import { ShopEmblem } from "@/components/pro/shop-emblem";
 import { SocialLinks } from "@/components/pro/social-links";
 import { StorefrontTabs } from "@/components/storefront/storefront-tabs";
 import { LandingBreadcrumb } from "@/components/seo/landing";
@@ -136,7 +137,6 @@ export default async function StorefrontPage({ params }: { params: Params }) {
   const listings = fleet ? seller.listings.filter((listing) => listing.subcategoryId !== RENTAL_SUBCATEGORY) : seller.listings;
   const listedCount = fleet ? Math.max(0, seller.publishedCount - fleet.total) : seller.publishedCount;
   const hidden = listedCount - listings.length;
-  const initial = Array.from(store.name.trim())[0]?.toLocaleUpperCase() ?? "?";
   const agency = store.sector === "real_estate";
   const holidayAgency = store.sector === "holiday_rental";
   const counts = agency && seller.publishedCount > 0 ? await shopSubcategoryCounts(seller.publicId, "immobilier") : null;
@@ -177,11 +177,9 @@ export default async function StorefrontPage({ params }: { params: Params }) {
     <Container className="flex flex-col gap-10 py-8 lg:gap-12 lg:py-12">
       {/* Back to the directory of shops (owner's choice of 30 Oct 2026), the way the category landings lead home. */}
       <LandingBreadcrumb steps={[{ label: seo("home"), href: "/" }, { label: t("directory"), href: DIRECTORY_PATH }, { label: store.name }]} className="-mb-4 lg:-mb-6" />
-      {/* The shop's door: the Pro green under the arch, its gold threshold, the monogram where a logo will go. */}
+      {/* The shop's door: the Pro green under the arch, its gold threshold, its emblem until a logo is uploaded. */}
       <header data-testid="storefront-header" className="arch threshold flex flex-col items-center gap-5 rounded-b-lg bg-structure px-6 pt-12 pb-9 text-center text-structure-foreground sm:flex-row sm:items-end sm:gap-7 sm:px-10 sm:text-start">
-        <span aria-hidden="true" className="flex size-20 shrink-0 items-center justify-center rounded-full bg-featured text-3xl font-semibold text-featured-foreground shadow-sm">
-          {initial}
-        </span>
+        <ShopEmblem name={store.name} sector={store.sector ?? "general"} size="lg" />
         <div className="flex min-w-0 flex-col items-center gap-2 sm:items-start">
           <p className="text-sm text-structure-foreground/80">{label}</p>
           <h1 dir="auto" className="text-3xl font-semibold text-balance break-words sm:text-4xl">

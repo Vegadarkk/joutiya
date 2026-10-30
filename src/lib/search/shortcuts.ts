@@ -16,3 +16,6 @@ export const PRO_SPACE_PATH = "/pro";
 
 /** The directory of verified shops and agencies, by city and activity (owner's choice of 30 Oct 2026). */
 export const DIRECTORY_PATH = "/boutiques";
+
+/** Public price list for individuals and Pros (owner, 2026-10-30). */
+export const PRICING_PATH = "/tarifs";

@@ -132,7 +132,7 @@ describe("home page", () => {
     expect(html.match(/<form[^>]*>/g)).toHaveLength(1);
     expect(html).toContain('data-testid="home-rent-car"');
     expect(html).toContain('data-testid="home-categories"');
-    expect(CATEGORIES).toHaveLength(13);
+    expect(CATEGORIES).toHaveLength(15);
     for (const category of CATEGORIES) expect(html).toContain(`href="/fr/c/${category.id}"`);
     expect(html).toContain(fr.Home.categories.title);
     expect(html).toContain('data-testid="home-featured"');
