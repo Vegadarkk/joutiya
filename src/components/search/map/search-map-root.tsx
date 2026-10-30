@@ -6,7 +6,7 @@ import { supportsWebGL2 } from "@/lib/map/webgl";
 import { canonicalSearchParams, type SearchParams, type SearchZone } from "@/lib/search/params";
 import { useExamplesHidden } from "@/components/examples/use-examples";
 import { useSearchNavigation } from "../search-navigation";
-import type { MapListing } from "./map-listings";
+import { JOB_SEEKER_SUBCATEGORY, type MapListing } from "./map-listings";
 import { SHEET_SNAPS, type SheetSnap } from "./sheet";
 import { browserViewContext, initialView, mapPossible, rememberView, type SearchView } from "./view-mode";
 
@@ -32,6 +32,8 @@ interface SearchMapState {
   map: PublicMapConfig | null;
   desktop: boolean;
   listings: readonly MapListing[];
+  /** Job seekers' ads on this page, and whether the map shows them (hidden unless searched for). */
+  jobSeekers: { count: number; shown: boolean; setShown: (shown: boolean) => void };
   params: SearchParams;
   highlighted: string | null;
   highlight: (id: string | null) => void;
@@ -108,7 +110,14 @@ export function SearchMapRoot({ serverView, variant = "search", startSnap = "pee
   const navigation = useSearchNavigation();
   // « Masquer les annonces exemples »: the home page is rendered once for everyone, its pins are not.
   const examplesHidden = useExamplesHidden();
-  const listings = useMemo(() => (examplesHidden ? given.filter((listing) => !listing.example) : given), [examplesHidden, given]);
+  // Job seekers' ads stay off the map unless the visitor searches for them or turns the filter off:
+  // they would crowd a search for anything else (owner, 2026-10-30).
+  const [jobSeekersShown, setJobSeekersShown] = useState(params.subcategory === JOB_SEEKER_SUBCATEGORY);
+  const jobSeekerCount = useMemo(() => given.filter((listing) => listing.jobSeeker && !(examplesHidden && listing.example)).length, [examplesHidden, given]);
+  const listings = useMemo(
+    () => given.filter((listing) => !(examplesHidden && listing.example) && (jobSeekersShown || !listing.jobSeeker)),
+    [examplesHidden, given, jobSeekersShown],
+  );
   const webgl2 = useSyncExternalStore(subscribeNever, supportsWebGL2, () => false);
   const desktop = useDesktop();
   const [failed, setFailed] = useState(false);
@@ -185,6 +194,7 @@ export function SearchMapRoot({ serverView, variant = "search", startSnap = "pee
       map,
       desktop,
       listings,
+      jobSeekers: { count: jobSeekerCount, shown: jobSeekersShown, setShown: setJobSeekersShown },
       params,
       highlighted,
       highlight: setHighlighted,
@@ -196,7 +206,7 @@ export function SearchMapRoot({ serverView, variant = "search", startSnap = "pee
       setSnap: (next: SheetSnap) => setSnap(SHEET_SNAPS.includes(next) ? next : "peek"),
       searchZone,
     }),
-    [variant, view, setView, enhanced, canMap, failed, map, desktop, listings, params, highlighted, selected, select, collapsed, snap, searchZone],
+    [variant, view, setView, enhanced, canMap, failed, map, desktop, listings, jobSeekerCount, jobSeekersShown, params, highlighted, selected, select, collapsed, snap, searchZone],
   );
 
   return (

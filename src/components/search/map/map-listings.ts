@@ -38,7 +38,12 @@ export interface MapListing {
   pro: boolean;
   exclusive: boolean;
   example: boolean;
+  /** A job seeker's ad (« Demandes d'emploi »): off the map by default, a filter brings it back. */
+  jobSeeker: boolean;
 }
+
+/** The subcategory of job seekers' ads (job, internship, work-study requests). */
+export const JOB_SEEKER_SUBCATEGORY = "demandes-emploi";
 
 export interface MapListingLabels {
   donation: string;
@@ -95,6 +100,7 @@ export function buildMapListings(input: { featured: readonly SearchCard[]; hits:
       pro: card.sellerType === "pro",
       exclusive: card.facts?.exclusive === true,
       example: card.example === true,
+      jobSeeker: card.subcategoryId === JOB_SEEKER_SUBCATEGORY,
     };
     return [listing];
   });
