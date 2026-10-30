@@ -6,7 +6,7 @@ import { Container } from "@/components/layout/container";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { Logo } from "@/components/layout/logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { DIRECTORY_PATH } from "@/lib/search/shortcuts";
+import { DIRECTORY_PATH, PRICING_PATH } from "@/lib/search/shortcuts";
 import { SITE_NAME } from "@/config/site";
 import { quietLinkClassName } from "@/components/ui/text-link";
 import { cn } from "@/lib/utils";
@@ -67,6 +67,11 @@ export function Footer({ publisher }: { publisher: string }) {
               {/* The directory is rendered from live data (ISR): no prefetch from every page, like its other doors. */}
               <Link href={DIRECTORY_PATH} prefetch={false} className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>
                 {t("shops")}
+              </Link>
+            </li>
+            <li>
+              <Link href={PRICING_PATH} prefetch={false} className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>
+                {t("pricing")}
               </Link>
             </li>
             <li>

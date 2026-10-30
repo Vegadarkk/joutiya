@@ -135,7 +135,8 @@
       "autorites": "التواصل مع السلطات (DSA)",
       "interdits": "المواد المحظورة"
     },
-    "guide": "الإجراءات الإدارية"
+    "guide": "الإجراءات الإدارية",
+    "pricing": "الأثمنة"
   },
   "Legal": {
     "provisionalTitle": "نسخة مؤقتة",
@@ -5813,5 +5814,66 @@
     "hiddenNotice": "الإعلانات النموذجية مخفية على هذا الجهاز.",
     "hiddenToast": "تم إخفاء الإعلانات النموذجية",
     "shownToast": "تم إظهار الإعلانات النموذجية"
+  },
+  "Pricing": {
+    "metaTitle": "الأثمنة: الخواص والمهنيون",
+    "metaDescription": "النشر مجاني للخواص. خيارات الظهور وباقات الأرصدة وعروض المهنيين: جميع أثمنة علان.",
+    "eyebrow": "الأثمنة",
+    "title": "أثمنة واضحة، بدون عمولة على مبيعاتكم",
+    "lead": "نشر الإعلان مجاني للخواص. لا تؤدون إلا مقابل ظهور أكبر أو متجر مهني.",
+    "free": "مجاني",
+    "unlimited": "غير محدود",
+    "count": "{count, number}",
+    "fromCredits": "ابتداءً من {count, number} رصيد",
+    "fromMad": "ابتداءً من {amount, number} درهم",
+    "perMonth": "{amount, number} درهم دون رسوم / شهر",
+    "perYear": "أو {amount, number} درهم دون رسوم / سنة",
+    "perDays": "{amount, number} درهم دون رسوم / {days, number} يوم",
+    "exclVat": "دون احتساب الرسوم، بدون التزام",
+    "individuals": {
+      "title": "الخواص",
+      "free": {
+        "title": "النشر",
+        "listings": "{count, plural, one {إعلان نشط واحد} other {# إعلانات نشطة}} في نفس الوقت",
+        "photos": "حتى {count, number} صور لكل إعلان",
+        "messaging": "مراسلة آمنة مع المشترين"
+      },
+      "options": {
+        "title": "خيارات الظهور",
+        "note": "الثمن العادي، ثم السيارات والعقار",
+        "bump": "الرفع إلى الأعلى: {standard, number} أو {premium, number} رصيد",
+        "featured7": "في الواجهة 7 أيام: {standard, number} أو {premium, number} رصيد",
+        "featured30": "في الواجهة 30 يوماً: {standard, number} أو {premium, number} رصيد"
+      },
+      "packs": {
+        "title": "باقات الأرصدة",
+        "note": "شاملة للرسوم، رصيد واحد = درهم واحد",
+        "pack": "{amount, number} درهم: {credits, number} رصيد",
+        "packBonus": "{amount, number} درهم: {credits, number} رصيد + {bonus, number} هدية"
+      }
+    },
+    "pros": {
+      "title": "المهنيون",
+      "launchOffer": "عرض الإطلاق: باقة Essentiel مجانية للمتاجر المقبولة إلى غاية فتح المبيعات، مع إشعار قبل {days, number} يوماً من أي أداء.",
+      "pass": {
+        "title": "Pass Boutique",
+        "noCommitment": "بدون اشتراك ولا تجديد تلقائي"
+      },
+      "essentiel": "Essentiel",
+      "business": "Business",
+      "premium": "Premium",
+      "popular": "الأكثر اختياراً",
+      "onQuote": "حسب الطلب",
+      "credits": "{count, number} رصيد ظهور مشمول",
+      "listings": "{count, plural, one {إعلان نشط واحد} other {# إعلانات نشطة}}",
+      "featured": "{count, plural, one {إعلان واحد في الواجهة مشمول} other {# إعلانات في الواجهة مشمولة}}",
+      "activeListings": "إعلانات نشطة",
+      "storefront": "متجر إلكتروني وصفحة موثقة وإحصائيات",
+      "premiumSupport": "مرافقة خاصة واستيراد المخزون",
+      "payAtSeller": "الأداء عند البائع: علان لا يأخذ أي عمولة على مبيعاتكم.",
+      "cta": "إنشاء متجري",
+      "more": "اكتشاف عرض المهنيين"
+    },
+    "footnote": "تنطلق المبيعات مع إطلاق الموقع. الأثمنة المعروضة هي المقررة عند الافتتاح."
   }
 }
