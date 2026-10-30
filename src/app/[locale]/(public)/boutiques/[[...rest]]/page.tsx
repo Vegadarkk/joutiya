@@ -11,6 +11,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cityBySlug, cityName } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
+import { ShopBand, ShopEmblem } from "@/components/pro/shop-emblem";
 import { numbersLocale, pageLocale } from "@/i18n/params";
 import { alternates } from "@/lib/i18n/metadata";
 import { listDirectoryShops } from "@/lib/pro/directory";
@@ -138,16 +139,14 @@ export default async function DirectoryPage({ params }: { params: Params }) {
             <ul data-testid="directory-list" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {results.map((shop) => {
                 const city = cityBySlug(shop.citySlug);
-                const initial = Array.from(shop.name.trim())[0]?.toLocaleUpperCase() ?? "?";
                 return (
                   <li key={shop.proId} className="min-w-0">
                     {/* The whole card leads to the storefront: the name's link stretches over it. */}
-                    <article className="relative flex h-full flex-col gap-3 rounded-lg border border-border bg-surface p-5 transition-[border-color,box-shadow] duration-150 ease-door focus-within:border-foreground/40 hover:border-foreground/40 hover:shadow-sm">
-                      <div className="flex items-start gap-4">
-                        <span aria-hidden="true" className={cn("flex size-12 shrink-0 items-center justify-center rounded-full text-xl font-semibold", shop.example ? "bg-surface-muted text-foreground-muted" : "bg-structure text-structure-foreground")}>
-                          {initial}
-                        </span>
-                        <div className="flex min-w-0 flex-col gap-1">
+                    <article className="relative flex h-full flex-col gap-3 overflow-hidden rounded-lg border border-border bg-surface px-5 pb-5 transition-[border-color,box-shadow] duration-150 ease-door focus-within:border-foreground/40 hover:border-foreground/40 hover:shadow-sm">
+                      <ShopBand name={shop.name} className="-mx-5 w-auto" />
+                      <div className="-mt-9 flex items-end gap-4">
+                        <ShopEmblem name={shop.name} sector={shop.sector} />
+                        <div className="flex min-w-0 flex-col gap-1 pb-0.5">
                           <h3 className="text-lg leading-tight font-semibold">
                             <Link href={`/boutique/${shop.segment}`} prefetch={false} dir="auto" className="break-words after:absolute after:inset-0 after:rounded-lg">
                               {shop.name}
