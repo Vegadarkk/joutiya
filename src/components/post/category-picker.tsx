@@ -1,10 +1,12 @@
 "use client";
 
-import { Baby, Building2, Car, Check, ChevronRight, Dumbbell, Handshake, Package, PawPrint, Shirt, Smartphone, Sofa, Wheat, Wrench, type LucideIcon } from "lucide-react";
+import { ArrowRight, Baby, Building2, Car, Check, ChevronRight, Dumbbell, Handshake, Package, PawPrint, Shirt, Smartphone, Sofa, Wheat, Wrench, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Button } from "@/components/ui/button";
+import { textLinkClassName } from "@/components/ui/text-link";
 import { CATEGORIES, categoryById, type Subcategory } from "@/config/categories";
+import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { useCategoryLabels } from "./labels";
 
@@ -110,7 +112,21 @@ export function CategoryPicker({ categoryId, subcategoryId, onCategory, onSubcat
           );
         })}
       </div>
-      {category.subcategories.some((s) => s.proOnly) && !isPro ? <ErrorBanner tone="info" title={t("proOnly")}>{t("proOnlyBody")}</ErrorBanner> : null}
+      {category.subcategories.some((s) => s.proOnly) && !isPro ? (
+        // The lock names the offer and leads to it (journey review 2026-10-29): it said the Pro accounts were not open yet.
+        <ErrorBanner
+          tone="info"
+          title={t("proOnly")}
+          action={
+            <Link href="/professionnels" prefetch={false} className={cn("inline-flex min-h-11 items-center gap-1.5 rounded-sm text-sm font-medium text-link sm:min-h-9", textLinkClassName)}>
+              {t("proOnlyLink")}
+              <ArrowRight aria-hidden="true" className="size-4 shrink-0 rtl:rotate-180" />
+            </Link>
+          }
+        >
+          {t("proOnlyBody")}
+        </ErrorBanner>
+      ) : null}
     </div>
   );
 }

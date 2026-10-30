@@ -697,7 +697,8 @@
       "change": "Changer de catégorie",
       "chosen": "Catégorie choisie",
       "proOnly": "Réservé aux comptes Pro",
-      "proOnlyBody": "Cette sous-catégorie ouvrira avec les comptes Pro. Choisissez-en une autre pour l'instant.",
+      "proOnlyBody": "Cette sous-catégorie est réservée aux comptes Pro : une boutique ou une agence vérifiée.",
+      "proOnlyLink": "Découvrir l'espace Pro",
       "resetWarning": "Changer de sous-catégorie efface les critères déjà saisis."
     },
     "fields": {
@@ -3606,6 +3607,25 @@
     "closed": "Les demandes de compte Pro sont fermées pour le moment. Revenez bientôt.",
     "form": {
       "shopTitle": "Votre boutique",
+      "activityTitle": "Votre activité",
+      "agencyTitle": "Votre agence",
+      "agencyName": "Nom de l'agence",
+      "activities": {
+        "shop": "Boutique",
+        "dealer": "Concession automobile",
+        "real_estate": "Agence immobilière",
+        "car_rental": "Location de voitures",
+        "holiday_rental": "Location saisonnière"
+      },
+      "activityHints": {
+        "shop": "Commerce, artisan, coopérative, services : votre catalogue en ligne.",
+        "dealer": "Votre stock de véhicules s'affiche de lui-même sur votre vitrine.",
+        "real_estate": "Vitrine d'agence : vos biens par transaction, mandat et honoraires.",
+        "car_rental": "Vitrine de flotte, disponibilités par dates, réservation par messagerie.",
+        "holiday_rental": "Logements meublés à la nuit ou à la semaine, réservés aux agences (loi 80-14)."
+      },
+      "activityRequired": "Choisissez votre activité.",
+      "sectorCommitmentRequired": "Cochez aussi les engagements de votre activité pour envoyer la demande.",
       "legalTitle": "Votre statut",
       "piecesTitle": "Vos justificatifs",
       "commitTitle": "Engagements juridiques",
@@ -4518,7 +4538,7 @@
       "badge": "Boutique exemple",
       "title": "Boutique exemple",
       "body": "Aalan a créé cette boutique fictive pour montrer à quoi ressemble la vitrine d'un professionnel. Ses identifiants n'ont pas été vérifiés et ses annonces sont des exemples : on ne peut ni la contacter, ni acheter, ni réserver.",
-      "cta": "Créer ma boutique",
+      "cta": "Créer ma boutique ou mon agence",
       "note": "Boutique fictive créée par Aalan à titre d'exemple : aucun identifiant professionnel n'a été vérifié."
     },
     "shelves": {
@@ -5464,7 +5484,7 @@
     "eyebrow": "Professionnels",
     "title": "Créez votre boutique ou votre agence",
     "lead": "Une vitrine à votre nom, vos annonces marquées Pro, la messagerie et les avis vérifiés : pour les commerçants, les concessions, les agences immobilières, les loueurs de voitures et les agences de location saisonnière.",
-    "cta": "Créer ma boutique",
+    "cta": "Créer ma boutique ou mon agence",
     "already": "Déjà Pro ? Accéder à mon espace",
     "sectorsTitle": "Une vitrine adaptée à votre activité",
     "sectors": {

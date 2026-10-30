@@ -7,6 +7,14 @@ export const LEGAL_FORM_LABEL: Record<string, string> = {
   cooperative: "Coopérative",
 };
 
+/** Business sector chosen with the application (src/lib/pro/profile-schema.ts). */
+export const SECTOR_LABEL: Record<string, string> = {
+  general: "Commerce et services",
+  real_estate: "Agence immobilière",
+  car_rental: "Location de voitures",
+  holiday_rental: "Location saisonnière",
+};
+
 export const IDENTIFIER_LABEL: Record<string, string> = {
   ice: "ICE",
   rc: "Registre du commerce (RC)",

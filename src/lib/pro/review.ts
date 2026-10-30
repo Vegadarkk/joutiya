@@ -75,6 +75,7 @@ export async function proReview(proId: string): Promise<ProReview | null> {
     description: record.description,
     regionCode: record.regionCode,
     citySlug: record.citySlug,
+    sector: record.sector ?? "general",
     legal: { form, ...Object.fromEntries(Object.entries(identifiers).filter((entry): entry is [string, string] => typeof entry[1] === "string")) },
     kybc: {
       status: record.kybc.status,

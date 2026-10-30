@@ -12,7 +12,7 @@ import { proReview } from "@/lib/pro/review";
 import { shopPaymentAdmin } from "@/lib/pro/seller-payment";
 import { shopSocialAdmin } from "@/lib/pro/social-links";
 import { ProDecisionForm, ProEffectsRerun } from "../../../_components/pro-decision-form";
-import { IDENTIFIER_LABEL, LEGAL_FORM_LABEL, LIFECYCLE_LABEL, PHONE_OUTCOME_LABEL, RENTAL_CHECK_ISSUE_LABEL, RENTAL_CHECK_STATUS_LABEL, formatIce } from "../../../_components/pro-labels";
+import { IDENTIFIER_LABEL, LEGAL_FORM_LABEL, LIFECYCLE_LABEL, PHONE_OUTCOME_LABEL, RENTAL_CHECK_ISSUE_LABEL, RENTAL_CHECK_STATUS_LABEL, SECTOR_LABEL, formatIce } from "../../../_components/pro-labels";
 import { ProPhoneCheckForm } from "../../../_components/pro-phone-check-form";
 import { RentalCheckDecisionForm } from "../../../_components/rental-check-decision-form";
 import { ShopPaymentPanel } from "../../../_components/shop-payment-panel";
@@ -107,6 +107,7 @@ export default async function ProReviewPage({ params }: { params: Promise<{ proI
               rows={[
                 ["Nom", <span key="name" dir="auto">{review.name}</span>],
                 ["Ville", city ? cityName(city, "fr") : review.citySlug],
+                ["Activité", SECTOR_LABEL[review.sector] ?? review.sector],
                 ["Présentation", review.description ? <span key="description" dir="auto" className="whitespace-pre-line">{review.description}</span> : "Aucune"],
               ]}
             />
