@@ -46,6 +46,8 @@ export function SearchCityCombobox({ value, onChange, label, hideLabel, names, i
   const listId = `${id}-list`;
   const input = useRef<HTMLInputElement>(null);
   const blurTimer = useRef<number | undefined>(undefined);
+  // A tap or a click opens the list on focus; Tab lands quietly (UX audit, 17).
+  const pointer = useRef(false);
   // null: not typing, the input shows the chosen place.
   const [query, setQuery] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -110,10 +112,16 @@ export function SearchCityCombobox({ value, onChange, label, hideLabel, names, i
             setActive(event.target.value.trim() ? 0 : -1);
             setOpen(true);
           }}
+          onPointerDown={() => {
+            pointer.current = true;
+          }}
+          onClick={() => setOpen(true)}
           onFocus={(event) => {
             window.clearTimeout(blurTimer.current);
             event.currentTarget.select();
-            setOpen(true);
+            // From the keyboard the list waits for a key (typing, ArrowDown) instead of opening on Tab.
+            if (pointer.current) setOpen(true);
+            pointer.current = false;
           }}
           onBlur={() => {
             // Typed text counts without a pick (Tab, or a click on "Rechercher": blur is a discrete

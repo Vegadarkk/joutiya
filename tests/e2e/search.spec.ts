@@ -296,6 +296,25 @@ test.describe("search page", () => {
     await expect(results(page).getByTestId("search-count")).toHaveText("1 annonce");
   });
 
+  test("the place field stays quiet on keyboard focus and opens on a key or a click", async ({ page }) => {
+    // The place segment of the pill shows from xl (UX audit, 17: Tab must not open the list).
+    await page.setViewportSize({ width: 1366, height: 800 });
+    await page.goto(`/fr/recherche?q=${WORD}`);
+    const place = page.getByRole("banner").getByRole("combobox");
+    // Under load a focus given before hydration is lost when the pill re-renders: retry until it holds.
+    await expect(async () => {
+      await place.focus();
+      await expect(place).toBeFocused({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
+    await expect(place).toHaveAttribute("aria-expanded", "false");
+    await place.press("ArrowDown");
+    await expect(place).toHaveAttribute("aria-expanded", "true");
+    await place.press("Escape");
+    await expect(place).toHaveAttribute("aria-expanded", "false");
+    await place.click();
+    await expect(place).toHaveAttribute("aria-expanded", "true");
+  });
+
   test("reads a sentence typed in the header pill as removable filters", async ({ page }) => {
     await page.goto(`/fr/recherche?q=${WORD}`);
     const pill = page.getByRole("banner").getByRole("search");

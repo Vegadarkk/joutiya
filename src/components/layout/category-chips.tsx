@@ -8,8 +8,8 @@ import { showsCategoryRow } from "./shell-paths";
 
 // The category row under the header (Carte vivante, lot 1): the category pages as floating
 // chips, then the admin procedures guide. One scrolling line at every width, bleeding to the screen
-// edge below lg and fading out at the container's end from lg (room after the last chip so that it
-// scrolls clear of the fade). Each link is a 44 px target around a 36 px chip. Labels come from the server
+// edge below lg, fading out at its end at every width (room after the last chip so that it scrolls
+// clear of the fade). Each link is a 44 px target around a 36 px chip. Labels come from the server
 // (the Categories catalog stays out of the browser). Left out of the focused flows.
 
 export interface CategoryChip {
@@ -30,7 +30,9 @@ export function CategoryChips({ items, label, guide }: { items: readonly Categor
       <Container className="max-w-7xl xl:max-w-[88rem]">
         <ul
           className={cn(
-            "-mx-4 flex snap-x scroll-px-4 items-center gap-1.5 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:-mx-6 sm:scroll-px-6 sm:px-6 [&::-webkit-scrollbar]:hidden",
+            "-mx-4 flex snap-x scroll-px-4 items-center gap-1.5 overflow-x-auto ps-4 pe-16 pb-2 [scrollbar-width:none] sm:-mx-6 sm:scroll-px-6 sm:ps-6 [&::-webkit-scrollbar]:hidden",
+            // The row never ends on a hard cut: a fade at its end, the last chip scrolls clear of it (UX audit, 8).
+            "[mask-image:linear-gradient(to_right,#000_calc(100%-3rem),transparent)] rtl:[mask-image:linear-gradient(to_left,#000_calc(100%-3rem),transparent)]",
             "lg:mx-0 lg:scroll-px-0 lg:ps-0 lg:pe-16 lg:[mask-image:linear-gradient(to_right,#000_calc(100%-4rem),transparent)] lg:rtl:[mask-image:linear-gradient(to_left,#000_calc(100%-4rem),transparent)]",
           )}
         >
