@@ -1,5 +1,5 @@
 // Bundles the Node entry points that run outside Next.js into dist/ (ESM files): the BullMQ
-// worker, the CSP hash hook preloaded by the web server, and the target guard.
+// worker, the web entry point (web-cluster) and the CSP hash hook it preloads, and the target guard.
 // Run after `next build`; the Docker image copies dist/ next to the standalone server.
 //
 // The worker keeps its npm packages external: firebase-admin (google-gax) reads proto files and
@@ -35,6 +35,7 @@ await build({
   ...common,
   entryPoints: {
     "server/csp-hash-hook": "src/server/csp-hash-hook.ts",
+    "server/web-cluster": "src/server/web-cluster.ts",
     "assert-target": "scripts/assert-target.ts",
   },
   // CommonJS code calls require() on Node built-ins.

@@ -3,11 +3,13 @@
 services:
   web:
     user: "1000:2002"
+    # Two servers like production, so the load test measures the same layout (heap limit per process).
     environment:
-      NODE_OPTIONS: --max-old-space-size=576
+      WEB_PROCESSES: "2"
+      NODE_OPTIONS: --max-old-space-size=320
     deploy:
       resources:
-        limits: { cpus: "0.75", memory: 768M }
+        limits: { cpus: "0.75", memory: 1024M }
   # sharp (libvips) and the ONNX moderation models allocate outside the V8 heap: half the limit stays native.
   worker:
     user: "1000:2002"
