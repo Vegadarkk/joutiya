@@ -209,7 +209,7 @@ describe("map listings (server formatting)", () => {
     expect(today).toMatchObject({ featured: false, today: true, date: "Aujourd'hui", pro: true });
     expect(donation).toMatchObject({ amount: "Don", pin: "Don", negotiable: false });
     expect(Object.keys(featured!).sort()).toEqual(
-      ["amount", "bumped", "date", "dateTime", "example", "exclusive", "facts", "featured", "id", "negotiable", "photo", "photoCount", "pin", "place", "position", "pro", "slugId", "title", "today"].sort(),
+      ["amount", "bumped", "date", "dateTime", "example", "exclusive", "facts", "featured", "id", "jobSeeker", "negotiable", "photo", "photoCount", "pin", "place", "position", "pro", "slugId", "title", "today"].sort(),
     );
   });
 });

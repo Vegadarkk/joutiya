@@ -1027,6 +1027,17 @@ html[data-welcome]:has(#main:target) .welcome {
 [data-theme="dark"] .search-zoom-button {
   color: var(--color-cream-100);
 }
+.search-jobfilter {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
 .search-attribution {
   flex: none;
   max-width: 100%;

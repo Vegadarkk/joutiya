@@ -3662,6 +3662,7 @@
     "mapLabel": "Carte des résultats, positions approximatives",
     "loading": "Chargement de la carte…",
     "unavailable": "La carte n'a pas pu s'afficher : les résultats restent en liste.",
+    "jobSeekers": "Masquer les demandes d'emploi ({count})",
     "zoneButton": "Rechercher dans cette zone",
     "today": "Aujourd'hui",
     "featuredRows": "Annonces À la Une",
