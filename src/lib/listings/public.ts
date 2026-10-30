@@ -447,6 +447,12 @@ export function storefrontSegment(slug: string, proId: string): string {
   return `${slug}-${proId}`;
 }
 
+/** The /boutique segment of a Pro's shop while its storefront is shown, else null: the seller card of a listing links there (UX journeys, 6). */
+export async function publicStorefrontSegment(proId: string): Promise<string | null> {
+  const profile = await getProProfile(proId);
+  return profile && storefrontShown(profile.lifecycle, profile.plan) ? storefrontSegment(profile.slug, profile.proId) : null;
+}
+
 /** The proId of a /boutique segment "{slug}-{proId}", or null when it cannot be one. */
 export function parseStorefrontSegment(segment: string): { slug: string; proId: string } | null {
   const cut = segment.lastIndexOf("-");

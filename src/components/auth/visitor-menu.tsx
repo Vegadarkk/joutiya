@@ -1,9 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { CarFront, House, LogIn, Store, UserPlus } from "lucide-react";
+import { CarFront, CircleHelp, House, LogIn, Store, UserPlus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
+import { LocaleMenuItems } from "@/components/layout/locale-menu-items";
 import { Link } from "@/i18n/navigation";
 import { HOLIDAY_RENTAL_SEARCH, PRO_LANDING_PATH, RENT_CAR_SEARCH } from "@/lib/search/shortcuts";
 import { cn } from "@/lib/utils";
@@ -11,7 +12,8 @@ import { cn } from "@/lib/utils";
 // The visitor menu of the header on phones and tablets (below lg), its own chunk (visitor-entry.tsx
 // loads it when the pointer reaches the trigger): sign in, create an account, then what the wide
 // header shows as buttons (owner's choice B, 29 Oct 2026), the two rental searches and the Pro
-// space. Open at once: the click that asked for it already happened.
+// space, then the help centre and, below md, the other languages (UX journeys counter-review, 10).
+// Open at once: the click that asked for it already happened.
 
 export type SignInHref = "/connexion" | { pathname: "/connexion"; query: { next: string } };
 
@@ -77,6 +79,14 @@ export default function VisitorMenu({ signInHref, triggerClassName, label, child
               </span>
             </Link>
           </DropdownMenu.Item>
+          <DropdownMenu.Separator className="my-1 h-px bg-border" />
+          <DropdownMenu.Item asChild>
+            <Link href="/aide" prefetch={false} className={item}>
+              <CircleHelp aria-hidden="true" />
+              {t("help")}
+            </Link>
+          </DropdownMenu.Item>
+          <LocaleMenuItems itemClassName={item} className="md:hidden" />
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

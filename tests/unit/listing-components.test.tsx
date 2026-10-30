@@ -193,6 +193,15 @@ describe("SellerCard", () => {
     expect(html).toMatch(/<a [^>]*dir="auto"[^>]*>Salma<\/a>/);
   });
 
+  it("sends a Pro with a storefront to /boutique: name and 'Voir la boutique' with the count", () => {
+    const html = render(<SellerCard seller={{ ...seller, sellerType: "pro" }} fallbackName="" fallbackType="pro" locale="fr" storefront="maison-lalla-abcd1234" />);
+    expect(html).not.toContain("/profil/");
+    expect(html.match(/href="\/fr\/boutique\/maison-lalla-abcd1234"/g)).toHaveLength(2);
+    const content = text(html);
+    expect(content).toContain("Voir la boutique");
+    expect(content).toContain("2 annonces en ligne");
+  });
+
   it("falls back to the denormalized name, without profile link, when the account has no public face", () => {
     const html = render(<SellerCard seller={null} fallbackName="Garage Atlas" fallbackType="pro" locale="fr" />);
     expect(html).not.toContain("/profil/");

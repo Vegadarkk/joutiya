@@ -232,6 +232,10 @@ test.describe("listing page", () => {
     await expect(page.getByTestId("criteria-grid")).toContainText("Très bon état");
     await expect(page.getByTestId("listing-description")).toContainText("pneus neufs.");
     await expect(page.getByRole("navigation", { name: "Fil d'Ariane" })).toContainText("Vélos");
+    // Beside the favourite: "Partager" (the share sheet on a phone, the link copied elsewhere); the report
+    // control within reach of the contact, leading to the dialog below (UX journeys counter-review, 8).
+    await expect(page.getByTestId("share-button")).toHaveText(/Partager|Copier le lien/);
+    await expect(page.getByRole("complementary", { name: "Vendeur et contact" }).getByRole("link", { name: "Signaler l'annonce" })).toHaveAttribute("href", "#signaler");
 
     // Gallery: the first photo is the LCP image and actually loads from the media host. The title is
     // bidi-isolated inside the translated alt text.

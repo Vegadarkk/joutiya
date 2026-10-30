@@ -25,6 +25,7 @@
     "proSpace": "Espace Pro",
     "proShort": "Pro",
     "proHint": "Créer ma boutique ou mon agence",
+    "help": "Aide",
     "visitorMenu": "Menu",
     "signUp": "Créer un compte"
   },
@@ -521,6 +522,7 @@
       "favorites": "Mes favoris",
       "reviews": "Mes avis",
       "savedSearches": "Mes recherches",
+      "listings": "Mes annonces",
       "decisions": "Décisions et recours",
       "help": "Aide",
       "messages": "Mes messages",
@@ -2773,6 +2775,12 @@
     "home": "Accueil",
     "breadcrumb": "Fil d'Ariane",
     "sellerLabel": "Vendeur et contact",
+    "reportLink": "Signaler l'annonce",
+    "share": {
+      "share": "Partager",
+      "copyLink": "Copier le lien",
+      "copied": "Lien copié"
+    },
     "place": "{place}, {region}",
     "publishedOn": "Publiée le {date}",
     "criteriaTitle": "Caractéristiques",
@@ -2821,6 +2829,7 @@
       "pro": "Pro",
       "memberSince": "Membre depuis {date}",
       "listingsOnline": "{count, plural, one {# annonce en ligne} other {# annonces en ligne}}",
+      "storefront": "Voir la boutique",
       "phoneVerified": "Téléphone vérifié",
       "emailVerified": "E-mail vérifié",
       "proCertified": "Pro certifié"
