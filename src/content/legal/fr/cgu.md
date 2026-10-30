@@ -384,6 +384,22 @@ Une annonce pour un objet interdit est bloquée ou mise en vérification au dép
 
 **Garanties.** Une annonce qui demande de laisser un passeport ou une carte d'identité en garantie, ou un chèque en blanc, ou qui propose un véhicule plus ancien que les limites du parc, est examinée par un modérateur avant publication.
 
+### 7.12 Offres et demandes d'emploi {#annonces-12}
+
+**Une simple publication d'annonces.** La catégorie « Emploi » publie les offres d'employeurs et les demandes de personnes qui cherchent un emploi. {brand} les publie comme une publication publie des annonces (Code du travail, art. 491). Elle ne rapproche pas les offres et les demandes, ne présélectionne ni ne classe les candidats, ne cherche pas de CV pour un employeur et ne prend aucune part au recrutement. {brand} n'est pas une agence de recrutement et n'est pas partie à la relation de travail.
+
+**Qui publie.** Seuls les comptes Pro vérifiés (§4.4) publient des offres. Ils le font comme employeurs, ou comme agences de recrutement privées autorisées par le ministère chargé du travail (Code du travail, art. 477). Les demandes d'emploi sont publiées par des particuliers. Elles se contactent par la messagerie uniquement : le numéro de la personne n'est jamais affiché. En publiant une offre, le professionnel déclare, sous sa seule responsabilité, être l'employeur ou une agence autorisée et décrire un poste réel ; une fausse déclaration entraîne le retrait de l'offre et peut entraîner la suspension du compte (§11).
+
+**Rien à payer pour le candidat.** Une demande d'emploi est gratuite et ne reçoit aucune option payante. Une offre ne peut demander au candidat aucun paiement : frais de dossier, d'inscription ou de formation, caution, avance, recharge, visa ou contrat contre de l'argent. Une telle offre est refusée et son auteur peut être sanctionné (§11).
+
+**Des offres licites.** L'employeur répond seul de son offre, du recrutement et du contrat de travail. Une offre ne peut écarter personne en raison de la race, de la couleur, du sexe, du handicap, de la situation conjugale, de la religion, de l'opinion politique, de l'affiliation syndicale, de l'ascendance nationale ou de l'origine sociale (Code du travail, art. 9). Par choix d'{brand}, elle ne fixe pas non plus de limite d'âge ni d'exigence d'apparence physique, sauf l'âge minimum fixé par la loi. Aucune offre ne vise un enfant de moins de 15 ans, un travail interdit aux moins de 18 ans ou un travail domestique avant 18 ans (Code du travail, art. 143 et 147 ; loi n° 19-12). Une offre qui en présente les signes est examinée par un modérateur avant sa mise en ligne.
+
+**Travail à l'étranger.** Une offre pour un poste hors du Maroc est examinée par un modérateur avant sa mise en ligne. Le contrat d'un salarié marocain à l'étranger doit être visé par le ministère chargé du travail (Code du travail, art. 512 et suivants), et les services de l'ANAPEC sont gratuits. Ne payez jamais pour obtenir un emploi, un contrat ou un visa.
+
+**Informations sur l'auteur.** Comme tout responsable d'une publication d'annonces (Code du travail, art. 491), {brand} communique aux inspecteurs du travail qui le demandent les informations dont elle dispose sur l'auteur d'une offre ou d'une demande d'emploi (voir la [politique de confidentialité](/legal/confidentialite#destinataires-4)).
+
+**Signaler une offre.** Signalez une offre frauduleuse ou discriminatoire avec le bouton « Signaler » de l'annonce (§9).
+
 ## 8. Modération des contenus {#moderation}
 
 ### 8.1 Principes {#moderation-1}

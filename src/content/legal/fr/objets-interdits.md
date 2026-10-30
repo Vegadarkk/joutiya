@@ -90,10 +90,10 @@ En plus des dix catégories du §2, sont aussi interdits (voir les [CGU](/legal/
 - la vente des terres collectives (soulaliyate) et des biens habous, qui ne peuvent pas être vendus comme un bien privé : une annonce qui les mentionne est examinée par un modérateur avant sa mise en ligne ;
 - les drones, les brouilleurs de signaux et les émetteurs radio sans agrément de l'Agence nationale de réglementation des télécommunications (les téléphones et appareils grand public restent autorisés), les sacs en plastique interdits par la loi depuis 2016 (les sacs isothermes, de congélation, les sacs poubelle et les sacs à usage agricole ou industriel restent autorisés) ;
 - les services dont l'exercice exige un diplôme ou un agrément, proposés par une personne qui ne le détient pas ;
-- tant que cette catégorie n'existe pas, les offres d'emploi ;
+- dans la catégorie « Emploi », une offre qui demande un paiement au candidat, une offre discriminatoire, le travail d'un enfant ou d'un mineur hors des cas permis par la loi, et le placement à l'étranger par un intermédiaire non autorisé : une annonce qui en présente les signes est examinée par un modérateur avant sa mise en ligne (voir les [CGU](/legal/cgu#annonces-12)) ;
 - tout contenu qui porte atteinte aux droits d'un tiers.
 
-Sauf les terres collectives et les biens habous, ces contenus ne sont pas repérés par une liste de mots : ils sont relevés lors de la modération ou après un signalement.
+Sauf les terres collectives, les biens habous et les signes repérés dans les annonces d'emploi, ces contenus ne sont pas repérés par une liste de mots : ils sont relevés lors de la modération ou après un signalement.
 
 ## 4. Ce qui se passe à la publication {#effets}
 
