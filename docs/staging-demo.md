@@ -38,7 +38,9 @@ commerciale trompeuse. Le contenu est dans `src/lib/demo/catalog.ts`, le script 
 `scripts/seed-demo.ts`.
 
 - **Photos** : photos Pexels (licence Pexels : usage libre, sans attribution), choisies pour
-  correspondre à l'annonce et sans visage reconnaissable. Le script les télécharge depuis
+  correspondre exactement à l'annonce (produit, marque, modèle, couleur, nombre), sans visage
+  reconnaissable, plaque lisible, enseigne ni marque tierce. Une photo ne sert qu'à une annonce (test
+  `demo-data`). Audit complet du 30 octobre 2026 : chaque photo revue et corrigée, puis revérifiée. Le script les télécharge depuis
   `images.pexels.com`, les passe par le traitement des photos d'annonce (métadonnées retirées,
   variantes WebP) et les range comme celles d'un membre.
 - **Repérage** : identifiants d'annonce en `zx…`, vendeurs `demo-…`, photos `demo…`. Les vendeurs
