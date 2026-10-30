@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input, inputClassName } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LOCALES, type Locale } from "@/config/site";
+import { SWITCHABLE_LOCALES, type Locale } from "@/config/site";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { ApiError, apiPost, isApiError, setSession, signOut, useSession } from "@/lib/auth/client";
 import { usePublicConfig } from "@/lib/config/client";
@@ -154,7 +154,8 @@ function ProfileSection({ session }: { session: SessionSummary }) {
         </Field>
         <Field label={t("locale")} error={fieldMessage("locale", errors.locale)}>
           <select className={inputClassName} {...register("locale")}>
-            {LOCALES.map((locale: Locale) => (
+            {/* Tarifit is not offered until its review; an account that chose it keeps its value. */}
+            {(SWITCHABLE_LOCALES.includes(session.locale as Locale) || !session.locale ? SWITCHABLE_LOCALES : [...SWITCHABLE_LOCALES, session.locale as Locale]).map((locale: Locale) => (
               <option key={locale} value={locale} lang={locale === "rif" ? "rif-Latn" : locale}>
                 {names(locale)}
               </option>

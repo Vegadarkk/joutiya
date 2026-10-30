@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
+import { ArrowUp, ChevronDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Container } from "@/components/layout/container";
 import { quietLinkClassName, textLinkClassName } from "@/components/ui/text-link";
@@ -264,6 +264,13 @@ export function LegalPage({ blocks, language, translated, frenchOnly, provisiona
           {body.map((block, index) => (
             <BlockView key={index} block={block} french={french} />
           ))}
+          {/* Long texts (the CGU run 39 000 px on a phone): the way back without the thumb (UX audit, 10). */}
+          <p className="mt-6 border-t border-border pt-4">
+            <a href="#" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-link underline underline-offset-4">
+              <ArrowUp className="size-4" aria-hidden="true" />
+              {t("backToTop")}
+            </a>
+          </p>
         </article>
       </div>
     </Container>

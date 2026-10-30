@@ -61,17 +61,18 @@ describe.each([
 ])("language %s", (_name, element) => {
   it("keeps the query string of the page in every language", () => {
     nav.search = "q=velo&ville=rabat&prix-max=2000&etat=neuf&etat=bon";
-    expect(hrefs(render(element()))).toEqual(["fr", "ar", "rif"].map((locale) => `/${locale}/recherche?q=velo&ville=rabat&prix-max=2000&etat=neuf&etat=bon`));
+    // Tarifit stays out of the menu until its native review (owner, 29 Oct 2026).
+    expect(hrefs(render(element()))).toEqual(["fr", "ar"].map((locale) => `/${locale}/recherche?q=velo&ville=rabat&prix-max=2000&etat=neuf&etat=bon`));
 
     nav.pathname = "/ar/alertes/desabonnement";
     nav.search = "t=abc.def";
-    expect(hrefs(render(element(), "ar"))).toEqual(["/fr/alertes/desabonnement?t=abc.def", "/ar/alertes/desabonnement?t=abc.def", "/rif/alertes/desabonnement?t=abc.def"]);
+    expect(hrefs(render(element(), "ar"))).toEqual(["/fr/alertes/desabonnement?t=abc.def", "/ar/alertes/desabonnement?t=abc.def"]);
   });
 
   it("links the bare path when there is no query, with 44 px rows", () => {
     nav.pathname = "/fr";
     const html = render(element());
-    expect(hrefs(html)).toEqual(["/fr", "/ar", "/rif"]);
-    expect(html.match(/<a [^>]*class="flex min-h-11 /g)).toHaveLength(3);
+    expect(hrefs(html)).toEqual(["/fr", "/ar"]);
+    expect(html.match(/<a [^>]*class="flex min-h-11 /g)).toHaveLength(2);
   });
 });

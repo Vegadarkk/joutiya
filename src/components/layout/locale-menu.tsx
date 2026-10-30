@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { Link } from "@/i18n/navigation";
-import { LOCALES, type Locale } from "@/config/site";
+import { SWITCHABLE_LOCALES, type Locale } from "@/config/site";
 import { cn } from "@/lib/utils";
 import { useSamePageHref } from "./same-page-href";
 
@@ -37,7 +37,7 @@ export default function LocaleMenu({ triggerClassName, label, children }: Locale
             "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           )}
         >
-          {LOCALES.map((locale) => (
+          {SWITCHABLE_LOCALES.map((locale) => (
             <DropdownMenu.Item key={locale} asChild>
               <Link
                 href={href}

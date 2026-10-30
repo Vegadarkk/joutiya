@@ -83,7 +83,7 @@ describe("AccountMenu without its chunk", () => {
 });
 
 describe("LocaleLinks (the language menu without its chunk)", () => {
-  it("opens on the three languages of this page, the current one marked", () => {
+  it("opens on the two offered languages of this page (Tarifit waits for its review), the current one marked", () => {
     const html = renderToStaticMarkup(
       <NextIntlClientProvider locale="fr" messages={fr} timeZone="Africa/Casablanca">
         <LocaleLinks triggerClassName="trigger" label="FR, Langue">
@@ -93,10 +93,10 @@ describe("LocaleLinks (the language menu without its chunk)", () => {
     );
     expect(html).toMatch(/<button type="button" aria-expanded="true" aria-controls="[^"]+" aria-label="FR, Langue" data-state="open" class="trigger">FR<\/button>/);
     const links = [...html.matchAll(/<a [^>]*>/g)].map((match) => match[0]);
-    expect(links).toHaveLength(3);
-    expect(links.map((link) => /href="([^"]+)"/.exec(link)?.[1])).toEqual(["/fr/annonce/velo-abcd2345", "/ar/annonce/velo-abcd2345", "/rif/annonce/velo-abcd2345"]);
+    expect(links).toHaveLength(2);
+    expect(links.map((link) => /href="([^"]+)"/.exec(link)?.[1])).toEqual(["/fr/annonce/velo-abcd2345", "/ar/annonce/velo-abcd2345"]);
     expect(links[0]).toContain('aria-current="true"');
-    expect(links[2]).toContain('lang="rif-Latn"');
+    expect(links[1]).toContain('lang="ar"');
     expect(html).toContain(fr.Locale.names.ar);
   });
 });
