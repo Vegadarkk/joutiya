@@ -4616,7 +4616,8 @@
       "title": "Retrouvez la boutique",
       "newTab": "(s'ouvre dans un nouvel onglet)",
       "note": "Liens déclarés par la boutique, vers des sites extérieurs au nôtre. Gardez vos échanges et vos rendez-vous dans la messagerie, et ne versez jamais d'acompte à un compte qui vous contacte en dehors du site."
-    }
+    },
+    "directory": "Annuaire des boutiques"
   },
   "Options": {
     "title": "Mettre en avant « {title} »",
@@ -5590,6 +5591,53 @@
       "request": "Déposez votre demande : ICE, registre et une pièce justificative.",
       "review": "Notre équipe vérifie vos identifiants et vous appelle, en général sous deux jours ouvrés. Votre vitrine s'ouvre ensuite."
     },
-    "legal": "Les engagements légaux de chaque activité sont rappelés à la création de la vitrine. Vos démarches administratives : <link>le guide des professionnels et coopératives</link>."
+    "legal": "Les engagements légaux de chaque activité sont rappelés à la création de la vitrine. Vos démarches administratives : <link>le guide des professionnels et coopératives</link>.",
+    "directory": "Voir l'annuaire des boutiques"
+  },
+  "Directory": {
+    "metaTitle": "{heading} · Annuaire des professionnels",
+    "metaDescription": "{count, plural, one {# boutique vérifiée par Aalan : identifiants professionnels contrôlés, annonces et messagerie.} other {# boutiques et agences vérifiées par Aalan : identifiants professionnels contrôlés, annonces et messagerie.}}",
+    "metaDescriptionEmpty": "Aucune boutique vérifiée ici pour le moment : l'annuaire des professionnels d'Aalan s'ouvre aux commerces, concessions et agences du Maroc.",
+    "eyebrow": "Annuaire des professionnels",
+    "title": "Boutiques et agences vérifiées",
+    "titleCity": "Boutiques et agences à {city}",
+    "titleSectorCity": "{sector} à {city}",
+    "crumb": "Annuaire des boutiques",
+    "lead": "Chaque boutique de l'annuaire a présenté ses identifiants professionnels (ICE, registre) à Aalan, qui les contrôle avant d'ouvrir la vitrine. Les ventes se font directement entre vous et le professionnel.",
+    "open": "Ouvrir ma boutique",
+    "activities": "Activités",
+    "cities": "Villes",
+    "allActivities": "Toutes",
+    "allCities": "Toutes les villes",
+    "sectors": {
+      "general": "Boutiques",
+      "real_estate": "Agences immobilières",
+      "car_rental": "Location de voitures",
+      "holiday_rental": "Location saisonnière"
+    },
+    "sectorOne": {
+      "general": "Boutique",
+      "real_estate": "Agence immobilière",
+      "car_rental": "Agence de location de voitures",
+      "holiday_rental": "Agence de location saisonnière"
+    },
+    "count": "{count, plural, one {# boutique} other {# boutiques et agences}}",
+    "countZero": "Aucune boutique",
+    "listings": "{count, plural, one {# annonce en ligne} other {# annonces en ligne}}",
+    "listingsNone": "Aucune annonce en ligne",
+    "badges": {
+      "verified": "Vérifiée",
+      "certified": "Certifiée",
+      "example": "Boutique exemple"
+    },
+    "empty": {
+      "title": "Aucune boutique ici pour le moment",
+      "body": "Élargissez à toutes les villes ou à toutes les activités, ou ouvrez la vôtre : les premières boutiques d'un quartier sont celles qu'on retient.",
+      "all": "Voir toutes les boutiques"
+    },
+    "none": {
+      "title": "Les premières boutiques arrivent",
+      "body": "L'annuaire s'ouvre avec les premiers professionnels vérifiés. Commerce, concession, agence : ouvrez votre boutique dès maintenant."
+    }
   }
 }

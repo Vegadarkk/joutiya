@@ -13,3 +13,6 @@ export const HOLIDAY_RENTAL_SEARCH = "/recherche?categorie=immobilier&sous-categ
 /** Public page of the Pro offer (visitors and members); a Pro goes straight to their space. */
 export const PRO_LANDING_PATH = "/professionnels";
 export const PRO_SPACE_PATH = "/pro";
+
+/** The directory of verified shops and agencies, by city and activity (owner's choice of 30 Oct 2026). */
+export const DIRECTORY_PATH = "/boutiques";

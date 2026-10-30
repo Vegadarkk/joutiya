@@ -17,6 +17,7 @@ import { RentalAgencyCard, RentalBranches, RentalConditions } from "@/components
 import { SellerInfo } from "@/components/pro/seller-info";
 import { SocialLinks } from "@/components/pro/social-links";
 import { StorefrontTabs } from "@/components/storefront/storefront-tabs";
+import { LandingBreadcrumb } from "@/components/seo/landing";
 import { ReportButton } from "@/components/report/report-button";
 import { RatingLink } from "@/components/reviews/rating-link";
 import { SellerReviews } from "@/components/reviews/seller-reviews";
@@ -38,6 +39,7 @@ import { dealerStock } from "@/lib/search/dealer";
 import { rentalFleet } from "@/lib/search/rental-fleet";
 import type { RentalFleetView } from "@/lib/search/rental-fleet-view";
 import { searchPath } from "@/lib/search/params";
+import { DIRECTORY_PATH } from "@/lib/search/shortcuts";
 import { shopShelves, shopSubcategoryCounts } from "@/lib/search/storefront";
 import { mediaBaseUrl } from "@/lib/storage/keys";
 
@@ -113,9 +115,10 @@ export default async function StorefrontPage({ params }: { params: Params }) {
   if (store.segment !== shop) permanentRedirect(storefrontPath(locale, store.segment));
 
   const rentalAgency = store.sector === "car_rental";
-  const [t, profile, criteria, legal, flags, vehicles, fleet, shelves] = await Promise.all([
+  const [t, profile, seo, criteria, legal, flags, vehicles, fleet, shelves] = await Promise.all([
     getTranslations({ locale: numbersLocale(locale), namespace: "Storefront" }),
     getTranslations({ locale: numbersLocale(locale), namespace: "Profile" }),
+    getTranslations({ locale, namespace: "Seo" }),
     getTranslations({ locale, namespace: "Criteria" }),
     getLegalConfig(),
     getFlags(),
@@ -172,6 +175,8 @@ export default async function StorefrontPage({ params }: { params: Params }) {
 
   return (
     <Container className="flex flex-col gap-10 py-8 lg:gap-12 lg:py-12">
+      {/* Back to the directory of shops (owner's choice of 30 Oct 2026), the way the category landings lead home. */}
+      <LandingBreadcrumb steps={[{ label: seo("home"), href: "/" }, { label: t("directory"), href: DIRECTORY_PATH }, { label: store.name }]} className="-mb-4 lg:-mb-6" />
       {/* The shop's door: the Pro green under the arch, its gold threshold, the monogram where a logo will go. */}
       <header data-testid="storefront-header" className="arch threshold flex flex-col items-center gap-5 rounded-b-lg bg-structure px-6 pt-12 pb-9 text-center text-structure-foreground sm:flex-row sm:items-end sm:gap-7 sm:px-10 sm:text-start">
         <span aria-hidden="true" className="flex size-20 shrink-0 items-center justify-center rounded-full bg-featured text-3xl font-semibold text-featured-foreground shadow-sm">

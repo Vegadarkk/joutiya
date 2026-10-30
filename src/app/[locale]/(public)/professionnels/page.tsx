@@ -9,7 +9,7 @@ import { Link } from "@/i18n/navigation";
 import { localeParams, numbersLocale, pageLocale } from "@/i18n/params";
 import { getPricing } from "@/lib/config/runtime";
 import { alternates } from "@/lib/i18n/metadata";
-import { PRO_LANDING_PATH, PRO_SPACE_PATH } from "@/lib/search/shortcuts";
+import { DIRECTORY_PATH, PRO_LANDING_PATH, PRO_SPACE_PATH } from "@/lib/search/shortcuts";
 import { cn } from "@/lib/utils";
 
 // The public page of the Pro offer (owner's choice B of 29 Oct 2026, UX audit): what a shop, a
@@ -80,6 +80,10 @@ export default async function ProLandingPage({ params }: { params: Params }) {
           </Link>
           <Link href={PRO_SPACE_PATH} prefetch={false} className={cn(quietLinkClassName, "text-sm font-medium text-structure-foreground/85 underline underline-offset-4 hover:text-structure-foreground")}>
             {t("already")}
+          </Link>
+          {/* The directory of verified shops (owner's choice of 30 Oct 2026): what a Pro gets, seen on others. */}
+          <Link href={DIRECTORY_PATH} prefetch={false} className={cn(quietLinkClassName, "text-sm font-medium text-structure-foreground/85 underline underline-offset-4 hover:text-structure-foreground")}>
+            {t("directory")}
           </Link>
         </div>
       </section>
