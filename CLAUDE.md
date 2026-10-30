@@ -114,7 +114,10 @@ subscriptions, Google Ads slots, moderation).
 - Skills in `.claude/skills/`: `frontend-design` for any UI work (premium look is
   a requirement), `webapp-testing` to check UI in a real browser (the repo's Node
   Playwright) before handing back, `gemini-crosscheck` to second-check public-info
-  research (free tier: no user, listing or repo data).
+  research (free tier: no user, listing or repo data). `gsap-*` (vendored
+  greensock/gsap-skills, MIT) are reference only: GSAP is not a dependency and animations
+  stay CSS/WAAPI unless the owner approves otherwise (owner, 2026-10-30; costing in the
+  project files, `joutiya/chiffrage-tickets/199-gsap.md`).
 - `.claude/settings.json` denies reading secret files (`.env`, `.env.local`, `.envrc`,
   `secrets/`, `*.pem`, service-account JSON) and generated output (`.next/`, `dist/`,
   `build/`, `coverage/`), through Read and through `cat`/`head`/`tail`/`sed` in Bash, and
