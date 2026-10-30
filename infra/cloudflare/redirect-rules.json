@@ -1,6 +1,6 @@
 {
   "phase": "http_request_dynamic_redirect",
-  "description": "Single Redirects: www.joutiya.ma to joutiya.ma (301, path and query kept).",
+  "description": "Single Redirects (301, path and query kept): www to apex on joutiya.ma and aalan.ma; a3lan.ma to aalan.ma. joutiya.ma itself redirects to aalan.ma only after the ANRT validation of aalan.ma (owner, 30 Oct 2026); ssh.joutiya.ma and /api/webhooks/* never redirect.",
   "rules": [
     {
       "ref": "www_to_apex",
@@ -12,6 +12,32 @@
           "status_code": 301,
           "preserve_query_string": true,
           "target_url": { "expression": "concat(\"https://joutiya.ma\", http.request.uri.path)" }
+        }
+      }
+    },
+    {
+      "ref": "www_to_apex_aalan",
+      "description": "www.aalan.ma to aalan.ma",
+      "expression": "http.host eq \"www.aalan.ma\"",
+      "action": "redirect",
+      "action_parameters": {
+        "from_value": {
+          "status_code": 301,
+          "preserve_query_string": true,
+          "target_url": { "expression": "concat(\"https://aalan.ma\", http.request.uri.path)" }
+        }
+      }
+    },
+    {
+      "ref": "a3lan_to_aalan",
+      "description": "a3lan.ma and www.a3lan.ma to aalan.ma",
+      "expression": "http.host in {\"a3lan.ma\" \"www.a3lan.ma\"}",
+      "action": "redirect",
+      "action_parameters": {
+        "from_value": {
+          "status_code": 301,
+          "preserve_query_string": true,
+          "target_url": { "expression": "concat(\"https://aalan.ma\", http.request.uri.path)" }
         }
       }
     }
