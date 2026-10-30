@@ -11,6 +11,7 @@ import { pickMessages } from "@/i18n/client-messages";
 import { readex, ruqaa, tarifitFallback } from "@/lib/fonts";
 import { Providers } from "./providers";
 import { SiteHeader } from "./site-header";
+import { ExamplesScript } from "@/components/examples/examples-script";
 import { WelcomeScript } from "@/components/welcome/welcome-script";
 import { ThemeScript } from "./theme-script";
 import "@/styles/globals.css";
@@ -44,6 +45,8 @@ export async function RootShell({ locale, nonce, config, initialSession, clientN
         <ThemeScript nonce={nonce} />
         {/* Before anything paints too: the welcome threshold of a first visit to the home page. */}
         <WelcomeScript nonce={nonce} />
+        {/* And whether this device hides the example listings (« Masquer les annonces exemples »). */}
+        <ExamplesScript nonce={nonce} />
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:shadow-lg"

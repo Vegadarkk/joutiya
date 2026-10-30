@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CATEGORIES, criteriaSchema, subcategoryById } from "@/config/categories";
+import { CATEGORIES, criteriaSchema, jobOfferAbroad, subcategoryById } from "@/config/categories";
 import { REGIONS, cityBySlug } from "@/config/regions";
 import { withVariantAnswers } from "@/lib/contracts/catalog";
 import { publishedListingSchema, userSchema } from "@/lib/db/schemas";
@@ -7,6 +7,7 @@ import { DEMO_ENTRIES, DEMO_SELLERS } from "@/lib/demo/catalog";
 import { DEMO_ID_PREFIX, DEMO_LIFETIME_DAYS, DEMO_UID_PREFIX, demoListings, demoPhotoRefs, demoSellers, demoShops, pexelsUrl } from "@/lib/demo/data";
 import { PRO_ID_PATTERN, proProfileSchema } from "@/lib/pro/profile-schema";
 import { LISTING_ID_PATTERN, parseSlugId } from "@/lib/listings/ids";
+import { containsProhibited } from "@/lib/moderation/prohibited";
 import { toSearchDocument } from "@/lib/search/document";
 import { downloadPhoto, parseSeedDemoCli, removeDemo, seedDemo, type SeedDemoTarget } from "../../scripts/seed-demo";
 
@@ -55,6 +56,28 @@ describe("demo catalog", () => {
       if (sub.individualOnly) expect(pros.has(entry.seller), entry.key).toBe(false);
       if (sub.priceMode === "none") expect(entry.price, entry.key).toBeNull();
     }
+  });
+
+  it("reads as a listing a member could publish: no prohibited or flagged term in its category", () => {
+    for (const entry of DEMO_ENTRIES) {
+      const sub = subcategoryById(entry.sub);
+      const result = containsProhibited(`${entry.title}\n${entry.description}`, undefined, { categoryId: sub?.categoryId });
+      // Restricted goods (koumiyas) are flagged by name and reviewed by a moderator: shown as reviewed (data.ts).
+      expect(sub?.adultsOnly ? result.hard : result.matches, entry.key).toEqual([]);
+    }
+  });
+
+  it("gives Emploi offers of every kind, each with its salary and in Morocco, and job-seeker ads", () => {
+    const offers = DEMO_ENTRIES.filter((entry) => entry.sub === "offres-emploi");
+    const seekers = DEMO_ENTRIES.filter((entry) => entry.sub === "demandes-emploi");
+    // Interim apart: only an agency authorised by the ministry may offer it (CGU §7.12).
+    expect(new Set(offers.map((entry) => entry.attributes["job-contract"]))).toEqual(new Set(["cdi", "cdd", "stage", "alternance", "freelance", "saisonnier"]));
+    expect(new Set(offers.map((entry) => entry.attributes["job-mode"]))).toEqual(new Set(["sur-place", "hybride", "teletravail"]));
+    for (const entry of offers) {
+      expect(entry.price, entry.key).toBeGreaterThan(0);
+      expect(jobOfferAbroad(entry.sub, entry.attributes), entry.key).toBe(false);
+    }
+    expect(seekers.length).toBeGreaterThanOrEqual(5);
   });
 });
 

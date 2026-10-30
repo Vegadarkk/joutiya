@@ -1,12 +1,14 @@
 import { Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { HideExamplesButton } from "@/components/examples/examples-controls";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 // Example listing or shop (owner decision of 2026-10-28, src/lib/demo): written by Joutiya to show
 // what a good listing or a Pro storefront looks like. The page says so, and the contact actions are
-// gone (the API refuses them too: acceptsContact).
+// gone (the API refuses them too: acceptsContact). On an example shop, `data-example-page` keeps its
+// own listings in view when the visitor hides the examples (globals.css): they asked for this shop.
 
 export function ExampleBanner({ scope = "listing", className }: { scope?: "listing" | "shop"; className?: string }) {
   const listing = useTranslations("ListingPage.example");
@@ -16,6 +18,7 @@ export function ExampleBanner({ scope = "listing", className }: { scope?: "listi
     <div
       role="note"
       data-testid="example-banner"
+      data-example-page={scope === "shop" ? "" : undefined}
       className={cn("flex flex-col gap-3 rounded-lg border border-featured/70 bg-gold-100/60 p-4 text-foreground dark:bg-surface sm:flex-row sm:items-center sm:justify-between", className)}
     >
       <div className="flex items-start gap-3">
@@ -23,6 +26,7 @@ export function ExampleBanner({ scope = "listing", className }: { scope?: "listi
         <div className="flex flex-col gap-0.5">
           <p className="font-semibold">{t("title")}</p>
           <p className="text-sm text-foreground-muted text-pretty">{t("body")}</p>
+          <HideExamplesButton className="-ms-3 mt-1" />
         </div>
       </div>
       <Button asChild variant="outline" className="self-start sm:self-center">

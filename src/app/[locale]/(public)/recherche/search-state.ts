@@ -4,11 +4,12 @@ import { getTranslations } from "next-intl/server";
 import { makeFilterLabels, type LooseTranslator } from "@/components/search/filter-labels";
 import { searchTitle } from "@/components/search/filter-model";
 import { CANONICAL_ORIGIN, type Locale } from "@/config/site";
+import { examplesHiddenIn } from "@/lib/examples/script";
 import { HttpError } from "@/lib/http/errors";
 import { logger } from "@/lib/logging/logger";
 import { enforceSearchLimit } from "@/lib/search/limits";
 import { SEARCH_PATH, type SearchParams } from "@/lib/search/params";
-import { runSearch } from "@/lib/search/service";
+import { NOT_EXAMPLE, runSearch } from "@/lib/search/service";
 import { SearchUnavailableError, type SearchResponse } from "@/lib/search/types";
 
 // Server side of the /recherche page (design D2, D13): the same limits as /api/search, then one
@@ -43,7 +44,9 @@ export async function loadSearch(params: SearchParams, request: Request): Promis
     return { kind: "unavailable" };
   }
   try {
-    return { kind: "results", response: await runSearch(params) };
+    // « Masquer les annonces exemples » (cookie of this device): left out here, so counts and pages stay right.
+    const hideExamples = examplesHiddenIn(request.headers.get("cookie"));
+    return { kind: "results", response: await (hideExamples ? runSearch(params, { extraFilter: NOT_EXAMPLE }) : runSearch(params)) };
   } catch (error) {
     if (error instanceof SearchUnavailableError) logger.warn({ err: error.message }, "search page: engine unavailable");
     else logger.error({ err: (error as Error).message }, "search page: search failed");

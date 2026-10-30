@@ -8,6 +8,7 @@
 // blocks it (and reports it to /api/csp-report).
 
 import { createHash } from "node:crypto";
+import { EXAMPLES_SCRIPT } from "../examples/script.ts";
 import { THEME_SCRIPT } from "../theme/script.ts";
 import { WELCOME_SCRIPT } from "../welcome/script.ts";
 import { ADSENSE_SCRIPT_HOSTS, TURNSTILE_ORIGIN } from "./csp.ts";
@@ -43,7 +44,7 @@ export function scriptHash(body: string): string {
 }
 
 /** Our own constant inline scripts (string literals: same hash in every build). */
-export const PINNED_SCRIPT_HASHES: ReadonlySet<string> = new Set([scriptHash(THEME_SCRIPT), scriptHash(WELCOME_SCRIPT)]);
+export const PINNED_SCRIPT_HASHES: ReadonlySet<string> = new Set([scriptHash(THEME_SCRIPT), scriptHash(WELCOME_SCRIPT), scriptHash(EXAMPLES_SCRIPT)]);
 
 export function isFrameworkScript(body: string, hash = scriptHash(body)): boolean {
   return PINNED_SCRIPT_HASHES.has(hash) || FRAMEWORK_SCRIPTS.some((shape) => shape.test(body));
