@@ -1,11 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { BadgeCheck, BellRing, CarFront, CircleHelp, Heart, House, LogOut, MessageSquare, Scale, Settings, Star, Store, Wallet } from "lucide-react";
+import { BadgeCheck, BellRing, CarFront, CircleHelp, Heart, House, LogOut, MessageSquare, Scale, Settings, Star, Store, Tag, Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { toast } from "sonner";
 import { ASSISTANT_HASH, openAssistant } from "@/components/help/assistant-event";
+import { LocaleMenuItems } from "@/components/layout/locale-menu-items";
 import { canMessage } from "@/components/messages/can-message";
 import { useLiveSnapshot } from "@/components/messages/use-live";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -66,6 +67,13 @@ export default function AccountDropdown({ session, name, triggerClassName, child
             ) : null}
           </div>
           <DropdownMenu.Separator className="my-1 h-px bg-border" />
+          {/* The member's own listings first: the only way to them from the menu tree (UX journeys, 1). */}
+          <DropdownMenu.Item asChild>
+            <Link href="/mes-annonces" className={item}>
+              <Tag aria-hidden="true" />
+              {t("listings")}
+            </Link>
+          </DropdownMenu.Item>
           {/* Below lg the header has no "Louer": the two rental searches sit here (owner's choice B, 29 Oct 2026). */}
           <DropdownMenu.Item asChild>
             <Link href={RENT_CAR_SEARCH} prefetch={false} className={cn(item, "lg:hidden")}>
@@ -150,6 +158,8 @@ export default function AccountDropdown({ session, name, triggerClassName, child
               {t("help")}
             </Link>
           </DropdownMenu.Item>
+          {/* Below md the header has no language pill: the other languages sit here. */}
+          <LocaleMenuItems itemClassName={item} className="md:hidden" />
           <DropdownMenu.Separator className="my-1 h-px bg-border" />
           <DropdownMenu.Item className={item} onSelect={() => void onSignOut()}>
             <LogOut aria-hidden="true" />
