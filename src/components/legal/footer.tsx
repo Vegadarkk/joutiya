@@ -51,6 +51,12 @@ export function Footer({ publisher }: { publisher: string }) {
             {t("trustTitle")}
           </h2>
           <ul className="flex flex-col gap-2.5 text-sm">
+            {/* The users' point of contact (DSA art. 12), first: a visitor reads it before the authorities' one. */}
+            <li>
+              <Link href="/aide/contact" className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>
+                {t("contact")}
+              </Link>
+            </li>
             <li>
               <Link href="/aide" className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>
                 {t("help")}

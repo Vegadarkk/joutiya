@@ -1,7 +1,7 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CalendarDays, MapPin, Search } from "lucide-react";
+import { CalendarDays, Flag, MapPin, Search } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { EmptyState } from "@/components/feedback/empty-state";
@@ -15,6 +15,7 @@ import { ReportButton } from "@/components/report/report-button";
 import { RatingLink } from "@/components/reviews/rating-link";
 import { SellerReviews } from "@/components/reviews/seller-reviews";
 import { Button } from "@/components/ui/button";
+import { quietLinkClassName } from "@/components/ui/text-link";
 import { subcategoryById } from "@/config/categories";
 import { availablePromos } from "@/config/house-promos";
 import { cityBySlug, cityName } from "@/config/regions";
@@ -118,6 +119,11 @@ export default async function ProfilePage({ params }: { params: Params }) {
                 </span>
               ) : null}
               <RatingLink rating={profile.rating} locale={locale} />
+              {/* "Signaler" within reach of the header (DSA art. 16(1), Phase 6 review); the dialog itself stays below. */}
+              <a href="#signaler" className={`inline-flex min-h-11 items-center gap-1.5 ${quietLinkClassName}`}>
+                <Flag className="size-4 shrink-0" aria-hidden="true" />
+                {t("reportLink")}
+              </a>
             </div>
             <SellerBadges badges={profile.badges} sellerType={profile.sellerType} className="mt-1" />
           </div>
@@ -186,13 +192,16 @@ export default async function ProfilePage({ params }: { params: Params }) {
 
       {/* Profiles stay out of the ad inventory (AF §8 table): house promotion only. */}
       <AdSlot placement="profile-bottom" eligible={false} promos={availablePromos(flags)} seed={publicId} />
-      <ReportButton
-        target={{ type: "user", id: profile.publicId }}
-        subject={profile.displayName}
-        ownerPublicId={profile.publicId}
-        email={legal.dsaContactEmail}
-        url={`${CANONICAL_ORIGIN}${profilePath(locale, profile.publicId)}`}
-      />
+      {/* The report buttons' link from the header lands here (DSA art. 16, Phase 6 review). */}
+      <div id="signaler" className="scroll-mt-24">
+        <ReportButton
+          target={{ type: "user", id: profile.publicId }}
+          subject={profile.displayName}
+          ownerPublicId={profile.publicId}
+          email={legal.dsaContactEmail}
+          url={`${CANONICAL_ORIGIN}${profilePath(locale, profile.publicId)}`}
+        />
+      </div>
     </Container>
   );
 }

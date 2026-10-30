@@ -108,7 +108,7 @@ describe("public client messages", () => {
   });
 
   it("covers what the help pages' islands read with the public and help lists", () => {
-    expect(helpEntries.length).toBe(2);
+    expect(helpEntries.length).toBe(3);
     const help = clientNamespaces(helpEntries);
     expect(help.has("Help.assistant")).toBe(true);
     const both = coveredBy([...PUBLIC_CLIENT_NAMESPACES, ...HELP_PAGE_CLIENT_NAMESPACES]);

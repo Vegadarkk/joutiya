@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 
 // Foot of the map panel (Carte vivante, lot 2): the map view has no page footer, so the legal
 // links, the neutral-host notice, the theme and (phones) the languages live here. The four most
-// asked links stay in sight; every other one sits in a disclosure that works without script.
+// asked links and the users' contact (DSA art. 12) stay in sight; every other one sits in a
+// disclosure that works without script.
 
 const SHORT = ["cgu", "confidentialite", "cookies", "mentions-legales"] as const;
 const link = cn("text-foreground-muted hover:text-foreground", quietLinkClassName);
@@ -34,6 +35,11 @@ export function PanelLegal({ publisher, className }: { publisher: string; classN
               </li>
             );
           })}
+          <li>
+            <Link href="/aide/contact" className={cn(link, "inline-flex min-h-6 items-center pointer-coarse:min-h-11")}>
+              {t("contact")}
+            </Link>
+          </li>
         </ul>
       </nav>
       <details className="group/legal">
@@ -56,6 +62,11 @@ export function PanelLegal({ publisher, className }: { publisher: string; classN
             <li>
               <Link href="/aide" className={link}>
                 {t("help")}
+              </Link>
+            </li>
+            <li>
+              <Link href="/aide/contact" className={link}>
+                {t("contact")}
               </Link>
             </li>
           </ul>

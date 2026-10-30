@@ -26,6 +26,7 @@
     "proShort": "Pro",
     "proHint": "Créer ma boutique ou mon agence",
     "help": "Aide",
+    "contact": "Nous contacter",
     "procedures": "Démarches administratives",
     "visitorMenu": "Menu",
     "signUp": "Créer un compte"
@@ -114,6 +115,7 @@
     "about": "Aalan, la place de marché des petites annonces au Maroc. Une porte ouverte sur le monde.",
     "legalTitle": "Informations légales",
     "trustTitle": "Mentions et autorités",
+    "contact": "Nous contacter",
     "help": "Centre d'aide",
     "disclaimer": "Aalan héberge les annonces de ses utilisateurs : elle n'est ni vendeur, ni acheteur, ni partie aux ventes conclues entre eux.",
     "copyright": "© {year} {publisher}",
@@ -211,6 +213,54 @@
         "turnstile_failed": "La vérification anti-robots a échoué. Cochez à nouveau la case, puis renvoyez votre question."
       }
     }
+  },
+  "Contact": {
+    "metaTitle": "Nous contacter",
+    "metaDescription": "L'adresse e-mail d'Aalan, lue par une personne, les langues acceptées et la marche à suivre pour signaler un contenu, contester une décision, exercer vos droits ou saisir une autorité.",
+    "title": "Nous contacter",
+    "lead": "Une personne lit et répond à chaque message, en {languages}.",
+    "email": {
+      "title": "Par e-mail",
+      "languages": "Langues acceptées",
+      "person": "Lu et traité par une personne",
+      "personHint": "L'équipe d'Aalan répond elle-même ; aucun outil automatique ne décide à sa place.",
+      "assistant": "Pour une question sur l'utilisation du site, le centre d'aide et son assistant répondent souvent plus vite.",
+      "assistantLink": "Ouvrir le centre d'aide"
+    },
+    "cases": {
+      "title": "Selon votre cas",
+      "report": {
+        "title": "Signaler un contenu",
+        "body": "Chaque annonce, profil, boutique et avis porte un bouton « Signaler » qui ouvre le formulaire de signalement : motif, explication, vos coordonnées si vous les laissez. Sans bouton sous les yeux, utilisez le champ ci-dessous.",
+        "link": "Signaler un contenu illicite"
+      },
+      "appeal": {
+        "title": "Contester une décision",
+        "body": "Annonce retirée, compte suspendu, signalement classé : chaque décision se conteste depuis votre compte.",
+        "link": "Décisions et recours"
+      },
+      "data": {
+        "title": "Mes données",
+        "body": "Accès, rectification, effacement, opposition : écrivez au délégué à la protection des données.",
+        "link": "Vos droits sur vos données"
+      },
+      "authorities": {
+        "title": "Autorités",
+        "body": "Réquisitions, injonctions et signalements des autorités et des signaleurs de confiance passent par le point de contact dédié.",
+        "link": "Contact autorités (DSA)"
+      }
+    },
+    "report": {
+      "title": "Signaler un contenu illicite",
+      "body": "Vous avez reçu le lien d'une annonce ou d'un profil, ou le contenu n'est plus sous vos yeux : collez son adresse ou la référence de l'annonce. Le formulaire habituel s'ouvre ; un modérateur examine chaque signalement.",
+      "label": "Adresse ou référence du contenu",
+      "placeholder": "Adresse de l'annonce ou du profil, ou référence de l'annonce",
+      "hint": "L'adresse complète d'une annonce ou d'un profil, ou la référence à 8 caractères de l'annonce. Pour une boutique ou un avis, le bouton « Signaler » de sa page.",
+      "submit": "Signaler",
+      "invalid": "Adresse non reconnue : collez l'adresse complète d'une annonce (…/annonce/…) ou d'un profil (…/profil/…), ou la référence de l'annonce."
+    },
+    "limits": "Aalan héberge les annonces de ses utilisateurs : elle n'arbitre pas les litiges entre eux et ne reçoit aucun paiement de leur part.",
+    "limitsLink": "Ce que nous ne traitons pas"
   },
   "Guide": {
     "metaTitle": "Démarches administratives au Maroc",
@@ -533,6 +583,7 @@
       "listings": "Mes annonces",
       "decisions": "Décisions et recours",
       "help": "Aide",
+      "contact": "Nous contacter",
       "procedures": "Démarches administratives",
       "messages": "Mes messages",
       "messagesLink": "Messages",
@@ -2956,6 +3007,7 @@
         "visitFirst": "Visitez le bien en personne et vérifiez l'identité du propriétaire ou de l'agence.",
         "checkTitle": "Pour un achat, vérifiez le titre foncier auprès de la Conservation foncière (ANCFCC) et signez chez un notaire ou des adouls."
       },
+      "report": "Un doute sur cette annonce ? <report>Signalez-la</report> ou <contact>écrivez-nous</contact>.",
       "host": "Aalan héberge les annonces de ses utilisateurs : elle n'est ni vendeur ni acheteur, et n'est partie ni aux transactions ni aux litiges entre eux.",
       "more": "Tous nos conseils de confiance et de sécurité"
     },
@@ -3094,6 +3146,7 @@
     "roleBusiness": "Professionnel",
     "pro": "Pro",
     "memberSince": "Membre depuis {date}",
+    "reportLink": "Signaler ce profil",
     "listingsTitle": "{count, plural, one {# annonce en ligne} other {# annonces en ligne}}",
     "emptyTitle": "Aucune annonce en ligne pour le moment",
     "emptyBody": "Les prochaines annonces de {name} apparaîtront ici.",
@@ -4458,6 +4511,7 @@
     "label": "Boutique professionnelle",
     "verified": "Boutique vérifiée",
     "verifiedNote": "Aalan a vérifié les identifiants professionnels de cette boutique (ICE, registre). Les ventes se font directement entre vous et la boutique : Aalan n'est pas partie à la vente et ne garantit pas les produits. La boutique reste tenue de ses obligations de vendeur professionnel envers les consommateurs (loi n° 31-08 sur la protection du consommateur).",
+    "reportLink": "Signaler la boutique",
     "about": "Présentation",
     "meta": {
       "title": "{name}, boutique à {city}",

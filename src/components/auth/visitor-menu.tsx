@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { CarFront, CircleHelp, House, LogIn, ScrollText, Store, UserPlus } from "lucide-react";
+import { CarFront, CircleHelp, House, LogIn, Mail, ScrollText, Store, UserPlus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { LocaleMenuItems } from "@/components/layout/locale-menu-items";
@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils";
 // The visitor menu of the header on phones and tablets (below lg), its own chunk (visitor-entry.tsx
 // loads it when the pointer reaches the trigger): sign in, create an account, then what the wide
 // header shows as buttons (owner's choice B, 29 Oct 2026), the two rental searches and the Pro
-// space, then the help centre and, below md, the other languages (UX journeys counter-review, 10).
+// space, then the help centre, the users' contact (DSA art. 12) and, below md, the other languages
+// (UX journeys counter-review, 10).
 // Open at once: the click that asked for it already happened.
 
 export type SignInHref = "/connexion" | { pathname: "/connexion"; query: { next: string } };
@@ -84,6 +85,12 @@ export default function VisitorMenu({ signInHref, triggerClassName, label, child
             <Link href="/aide" prefetch={false} className={item}>
               <CircleHelp aria-hidden="true" />
               {t("help")}
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild>
+            <Link href="/aide/contact" prefetch={false} className={item}>
+              <Mail aria-hidden="true" />
+              {t("contact")}
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Item asChild>

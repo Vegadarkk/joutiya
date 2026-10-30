@@ -31,9 +31,14 @@ export function formatLegalDate(day: string, language: "fr" | "ar"): string {
   return new Intl.DateTimeFormat(language === "ar" ? "ar-MA" : "fr-MA", { dateStyle: "long", timeZone: "Africa/Casablanca" }).format(new Date(`${day}T12:00:00Z`));
 }
 
+/** The languages the DSA point of contact answers in, written out in the text's language. */
+export function dsaLanguages(config: Pick<LegalConfig, "dsaContactLanguages">, language: "fr" | "ar"): string {
+  return config.dsaContactLanguages.map((code) => LANGUAGE_NAMES[language][code]).join(language === "ar" ? "، " : ", ");
+}
+
 export function legalScope(config: LegalConfig, switches: LegalSwitches, version: Pick<LegalVersion, "version" | "effective">, language: "fr" | "ar"): TemplateScope {
   const date = formatLegalDate(version.effective, language);
-  const languages = config.dsaContactLanguages.map((code) => LANGUAGE_NAMES[language][code]).join(language === "ar" ? "، " : ", ");
+  const languages = dsaLanguages(config, language);
   const host = hostState(config.host);
   return {
     brand: SITE_NAME,

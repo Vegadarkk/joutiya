@@ -51,6 +51,7 @@ test.describe("header shortcuts", () => {
     await expect(page.getByRole("menuitem", { name: /Se connecter/ })).toHaveAttribute("href", /\/fr\/connexion\?next=/);
     // Help and the other language too (the map home has no footer on a phone).
     await expect(page.getByRole("menuitem", { name: "Aide" })).toHaveAttribute("href", "/fr/aide");
+    await expect(page.getByRole("menuitem", { name: "Nous contacter" })).toHaveAttribute("href", "/fr/aide/contact");
     await expect(page.getByRole("menuitem", { name: "العربية" })).toHaveAttribute("href", /^\/ar/);
     await page.getByRole("menuitem", { name: /Espace Pro/ }).click();
     await expect(page).toHaveURL(/\/fr\/professionnels$/);
