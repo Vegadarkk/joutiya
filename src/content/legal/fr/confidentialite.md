@@ -57,7 +57,7 @@ Pour signaler un contenu, utilisez le bouton « Signaler » présent sur chaque 
 - **Compte :** adresse e-mail, pseudonyme, mot de passe, langue, et si vous le souhaitez ville ou région, photo de profil, texte de présentation et bannière de votre vitrine. Le mot de passe est conservé par notre prestataire d'authentification sous une forme illisible (hachée) ; {brand} ne le stocke pas.
 - **Connexion avec Google :** Google nous transmet un jeton qui contient notamment votre adresse e-mail, l'indication qu'elle est vérifiée et l'identifiant de votre compte Google.
 - **Téléphone :** votre numéro, si vous le faites vérifier<!--if:whatsappEnabled--> (§3.13)<!--endif-->.
-- **Annonces :** titre, description, prix, catégorie et critères, photos, ville, quartier si vous l'indiquez, position sur la carte arrondie à environ 1 km, et vos choix de contact (messagerie, affichage du numéro, WhatsApp).
+- **Annonces :** titre, description, prix, catégorie et critères, photos, ville, quartier si vous l'indiquez, position sur la carte arrondie à environ 1 km, et vos choix de contact (messagerie, affichage du numéro, WhatsApp). Une offre ou une demande d'emploi contient en plus ses critères (contrat, secteur, expérience, formation, mode de travail, lieu ou mobilité, disponibilité, salaire pour une offre) : nous ne demandons ni CV, ni photo, ni âge, ni donnée sensible.
 - **Messages :** le contenu de vos conversations avec les autres utilisateurs, y compris les rendez-vous proposés (créneaux, lieu), les demandes de réservation d'un véhicule (dates, lieu de prise en charge) ou de séjour dans un logement (dates d'arrivée et de départ, précisions) et les offres de prix (montant, statut, dates, note facultative).
 - **Avis :** la note, le texte et votre déclaration d'échange, pour un avis que vous laissez à un vendeur ; la réponse d'un vendeur à un avis (§3.7).
 - **Signalements et recours :** le contenu visé, le motif, votre explication, votre déclaration de bonne foi, et votre nom et votre e-mail si vous les donnez.
@@ -373,6 +373,8 @@ Certains services traitent aussi des données pour leurs propres besoins, selon 
 Nous communiquons des données aux autorités judiciaires, aux services de police et aux autorités administratives habilitées, en France, dans l'Union européenne ou au Maroc, seulement quand la loi le permet ou l'exige. Nous vérifions l'identité de l'autorité et le fondement de sa demande, et nous enregistrons chaque demande et notre réponse.
 
 Quand une information laisse soupçonner une infraction qui menace la vie ou la sécurité de personnes, nous en informons les autorités compétentes (article 18 du règlement sur les services numériques).
+
+Pour une offre ou une demande d'emploi, nous communiquons aux inspecteurs du travail qui le demandent les informations dont nous disposons sur son auteur, comme le prévoit l'article 491 du Code du travail marocain.
 
 ### 6.5 Les autres utilisateurs et le public {#destinataires-5}
 
