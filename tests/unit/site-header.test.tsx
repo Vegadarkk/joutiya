@@ -71,12 +71,17 @@ describe("AccountMenu", () => {
     expect(html).toMatch(new RegExp(`<a aria-label="${fr.Auth.menu.favorites}" class="[^"]*hidden md:inline-flex[^"]*" href="/fr/favoris"`));
   });
 
-  it("gives the anonymous sign-in link a 44 px target, named by its text from lg", () => {
+  it("gives the anonymous sign-in link a 44 px target from lg, named by its text from xl, and phones a visitor menu", () => {
     const html = render(<AccountMenu />);
-    expect(html).toMatch(/<a class="[^"]*min-w-11[^"]*" href="\/fr\/connexion\?next=/);
-    expect(html).toContain(`<span class="hidden lg:inline">${fr.Nav.signIn}</span><span class="sr-only lg:hidden">${fr.Nav.signIn}</span>`);
+    expect(html).toMatch(/<a class="[^"]*min-w-11[^"]*hidden lg:inline-flex[^"]*" href="\/fr\/connexion\?next=/);
+    expect(html).toContain(`<span class="hidden xl:inline">${fr.Nav.signIn}</span><span class="sr-only xl:hidden">${fr.Nav.signIn}</span>`);
     expect(html).toContain('href="/fr/favoris"');
     expect(html).not.toContain(`aria-label="${fr.Auth.menu.messagesLink}"`);
+    // Below lg: the visitor menu (sign in, create an account, the rentals, the Pro space), a plain 44 px button until its chunk runs.
+    const menu = /<button type="button" aria-haspopup="menu" aria-expanded="false" aria-label="([^"]+)" data-testid="visitor-menu" class="([^"]*)"/.exec(html);
+    expect(menu?.[1]).toBe(fr.Nav.visitorMenu);
+    expect(menu?.[2]).toContain("min-w-11");
+    expect(menu?.[2]).toContain("lg:hidden");
   });
 });
 
@@ -84,7 +89,7 @@ describe("SiteHeader", () => {
   it("names its search landmark and keeps the logo link 44 px or more", () => {
     const html = render(<SiteHeader locale="fr" />);
     expect(html).toContain(`role="search" aria-label="${fr.Nav.searchLabel}"`);
-    expect(html).toMatch(/<a aria-label="Accueil Joutiya" class="flex size-12 [^"]*md:h-13[^"]*" href="\/fr"/);
+    expect(html).toMatch(/<a aria-label="Accueil Aalan" class="flex size-12 [^"]*md:h-13[^"]*" href="\/fr"/);
     expect(html).toContain(`placeholder="${fr.Nav.searchPlaceholder}"`);
     expect(html).toContain('data-testid="header-actions"');
   });
@@ -113,13 +118,45 @@ describe("SiteHeader", () => {
     expect(row?.[2]?.match(/class="group flex h-11 /g)).toHaveLength(CATEGORIES.length + 1);
   });
 
+  it("stands 'Louer' (the car and the house, a menu) and 'Espace Pro' beside 'Vendre' from lg, compact until xl", () => {
+    const html = render(<SiteHeader locale="fr" />);
+    const rent = /<button type="button" aria-haspopup="menu" aria-expanded="false" data-testid="header-rent" class="([^"]*)">([\s\S]*?)<\/button>/.exec(html);
+    expect(rent?.[1]).toContain("hidden");
+    expect(rent?.[1]).toContain("lg:inline-flex");
+    expect(rent?.[1]).toContain("h-13");
+    expect(rent?.[2]).toContain("lucide-car-front");
+    expect(rent?.[2]).toContain("lucide-house");
+    expect(rent?.[2]).toContain(`<span class="hidden xl:inline">${fr.Nav.rent}</span><span class="sr-only xl:hidden">${fr.Nav.rent}</span>`);
+    const pro = /<a data-testid="header-pro" class="([^"]*)" href="([^"]+)">([\s\S]*?)<\/a>/.exec(html);
+    expect(pro?.[2]).toBe("/fr/professionnels");
+    expect(pro?.[1]).toContain("lg:inline-flex");
+    expect(pro?.[3]).toContain(`<span class="hidden xl:inline">${fr.Nav.proSpace}</span><span class="xl:hidden">${fr.Nav.proShort}</span>`);
+    // The order of the right group: the account pill, "Louer", "Espace Pro", then the arch.
+    expect(html.indexOf('data-testid="header-actions"')).toBeLessThan(html.indexOf('data-testid="header-rent"'));
+    expect(html.indexOf('data-testid="header-rent"')).toBeLessThan(html.indexOf('data-testid="header-pro"'));
+    expect(html.indexOf('data-testid="header-pro"')).toBeLessThan(html.indexOf('href="/fr/deposer"'));
+  });
+
+  it("sends a Pro straight to their space from 'Espace Pro'", () => {
+    const html = render(<SiteHeader locale="fr" />, "fr", { ...session, role: "pro" });
+    expect(html).toMatch(/<a data-testid="header-pro" class="[^"]*" href="\/fr\/pro">/);
+    // Arabic: the same pieces, the labels translated.
+    const arabic = render(<SiteHeader locale="ar" />, "ar");
+    expect(arabic).toContain(`<span class="hidden xl:inline">${ar.Nav.rent}</span>`);
+    expect(arabic).toContain(`<span class="hidden xl:inline">${ar.Nav.proSpace}</span>`);
+  });
+
   it("floats 'Vendre' on phones, out of the cookie banner's way", () => {
     const html = render(<SiteHeader locale="fr" />);
-    const fab = /<a aria-label="([^"]+)" class="(sell-arch fixed [^"]*)" href="\/fr\/deposer"/.exec(html);
+    const fab = /<a aria-label="([^"]+)" data-sell-fab="" class="(sell-arch fixed [^"]*)" href="\/fr\/deposer"[^>]*>(.*?)<\/a>/.exec(html);
     expect(fab?.[1]).toBe(fr.Nav.post);
+    // The word beside the plus (journey review, 10).
+    expect(fab?.[3]).toContain(fr.Nav.sell);
     expect(fab?.[2]).toContain("md:hidden");
     expect(fab?.[2]).toContain("env(safe-area-inset-bottom)");
     expect(fab?.[2]).toContain("[:root:has([data-testid=consent-banner])_&amp;]:hidden");
+    // Out of the way of a field being filled, too (UX audit, 13); the footer keeps a lane for it.
+    expect(fab?.[2]).toContain("[:root:has(main_:is(input,select,textarea):focus)_&amp;]:hidden");
   });
 });
 

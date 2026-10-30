@@ -160,6 +160,12 @@ test.describe("messaging", () => {
     const seller = await session(sellerPage);
     const listing = await seedListing(seller);
 
+    // Buyer, nothing yet: the list says so and the thread pane beside it stays neutral (one empty state).
+    await buyerPage.goto("/fr/messages");
+    await expect(buyerPage.getByRole("heading", { level: 2, name: "Aucune conversation pour l'instant" })).toBeVisible({ timeout: 15_000 });
+    await expect(buyerPage.getByTestId("thread-placeholder")).toHaveAttribute("data-quiet", "1");
+    await expect(buyerPage.getByText("Choisissez une conversation")).toHaveCount(0);
+
     // Buyer: the message button opens the first-message dialog (no phone actions on this listing).
     await buyerPage.goto(`/fr/annonce/${listing.slugId}`);
     const contact = buyerPage.getByTestId("contact-bar");
@@ -178,9 +184,13 @@ test.describe("messaging", () => {
     await expect(buyerPage.getByTestId("thread-counterpart")).toHaveText(seller.displayName);
     await expect(buyerPage.getByTestId("thread").getByText(first)).toBeVisible();
 
-    // Seller: the conversation is in the inbox, unread, with the badge in the header.
+    // Seller: the conversation is in the inbox, unread, with the badge in the header; the thread pane
+    // now invites to pick one.
     await sellerPage.goto("/fr/messages");
     await expect(sellerPage.getByRole("heading", { level: 1, name: "Messages" })).toBeVisible();
+    await expect(sellerPage.getByTestId("thread-placeholder")).toHaveAttribute("data-quiet", "0", { timeout: 15_000 });
+    await expect(sellerPage.getByRole("heading", { level: 2, name: "Choisissez une conversation" })).toBeVisible();
+    await expect(sellerPage.locator("footer")).toBeVisible();
     const row = sellerPage.getByTestId("conversation-row").filter({ hasText: "Youssef Acheteur" });
     await expect(row).toBeVisible({ timeout: 15_000 });
     await expect(row).toHaveAttribute("data-unread", "1");
@@ -214,9 +224,12 @@ test.describe("messaging", () => {
     const box = (await row.boundingBox())!;
     expect(box.x + box.width).toBeLessThanOrEqual(360);
     expect(await sellerPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    // An application screen: no site footer under the list or the thread on a phone.
+    await expect(sellerPage.locator("footer")).toBeHidden();
     await row.click();
     await expect(sellerPage.getByTestId("thread-view")).toBeVisible({ timeout: 15_000 });
     await expect(row).toBeHidden();
+    await expect(sellerPage.locator("footer")).toBeHidden();
     await sellerPage.getByRole("link", { name: "Toutes les conversations" }).click();
     await expect(row).toBeVisible();
 

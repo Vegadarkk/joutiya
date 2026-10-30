@@ -27,18 +27,7 @@ export function searchMapConfig(env: ServerEnv = serverEnv()): PublicConfig["map
  * come from config/flags (getFlags), the defaults (ads off) when the caller has none.
  */
 export function publicConfig(env: ServerEnv = serverEnv(), flags: Pick<FlagsConfig, "adsMode" | "adsCmpEea"> = DEFAULT_FLAGS): PublicConfig {
-  const { FIREBASE_API_KEY: apiKey, FIREBASE_PROJECT_ID: projectId, FIREBASE_APP_ID: appId } = env;
-  const emulator = env.APP_ENV === "dev" && env.FIREBASE_AUTH_EMULATOR_HOST ? `http://${env.FIREBASE_AUTH_EMULATOR_HOST}` : undefined;
-  const firebase =
-    apiKey && projectId
-      ? {
-          apiKey,
-          projectId,
-          appId: appId ?? "",
-          authDomain: env.FIREBASE_AUTH_DOMAIN ?? `${projectId}.firebaseapp.com`,
-          ...(emulator ? { authEmulatorUrl: emulator } : {}),
-        }
-      : null;
+  const firebase = env.FIREBASE_PROJECT_ID ? { projectId: env.FIREBASE_PROJECT_ID } : null;
   return {
     env: env.APP_ENV,
     siteUrl: new URL(env.SITE_URL).origin,

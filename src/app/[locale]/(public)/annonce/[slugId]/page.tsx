@@ -1,7 +1,7 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
-import { CalendarDays, MapPin, ShieldAlert } from "lucide-react";
+import { CalendarDays, Flag, MapPin, ShieldAlert } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { Container } from "@/components/layout/container";
@@ -27,12 +27,13 @@ import { GuideCategoryLink } from "@/components/guide/category-link";
 import { rubricForCategory } from "@/content/guide/catalog";
 import { PayAtSeller } from "@/components/listing/pay-at-seller";
 import { SellerCard } from "@/components/listing/seller-card";
+import { ShareButton } from "@/components/listing/share-button";
 import { ListingMapBlock } from "@/components/map/listing-map-block";
 import { ReportButton } from "@/components/report/report-button";
 import { RENTAL_SUBCATEGORY, VEHICLE_SALE_SUBCATEGORIES, categoryById, datedRental, subcategoryById } from "@/config/categories";
 import { availablePromos } from "@/config/house-promos";
 import { cityBySlug, cityName, regionByCode, regionName } from "@/config/regions";
-import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
+import { CANONICAL_ORIGIN, SITE_NAME, LOCALE_TAGS, type Locale } from "@/config/site";
 import { pageLocale } from "@/i18n/params";
 import { getFlags } from "@/lib/config/runtime";
 import { isolate } from "@/lib/i18n/bidi";
@@ -42,7 +43,8 @@ import { getLegalConfig } from "@/lib/legal/config";
 import { formatDate, formatPrice } from "@/lib/listings/client/format";
 import { photoUrl } from "@/lib/listings/client/photo-url";
 import { listingJsonLd } from "@/lib/listings/jsonld";
-import { getPublishedBySlugId, getSeller, listingPath, toPublicListing, type PublicListing, type PublicSeller } from "@/lib/listings/public";
+import { getPublishedBySlugId, getSeller, listingPath, publicStorefrontSegment, toPublicListing, type PublicListing, type PublicSeller } from "@/lib/listings/public";
+import { quietLinkClassName } from "@/components/ui/text-link";
 import { offerAllowed } from "@/lib/offers/eligibility";
 import { offerReferencePrice } from "@/lib/offers/rules";
 import { priceGuideFor } from "@/lib/price-guide/service";
@@ -109,6 +111,17 @@ async function sellerOf(ownerUid: string): Promise<PublicSeller | null> {
   }
 }
 
+/** The shop's /boutique segment for a Pro listing, null for the others or when the lookup fails. */
+async function storefrontOf(proId: string | undefined): Promise<string | null> {
+  if (!proId) return null;
+  try {
+    return await publicStorefrontSegment(proId);
+  } catch (error) {
+    logger.warn({ err: (error as Error).message }, "listing page: storefront lookup failed");
+    return null;
+  }
+}
+
 function flatten(text: string, max: number): string {
   const flat = text.replace(/\s+/g, " ").trim();
   return flat.length <= max ? flat : `${flat.slice(0, max - 1).trimEnd()}…`;
@@ -134,7 +147,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     title,
     description,
     alternates: alternates(locale, path),
-    openGraph: { type: "website", siteName: "Joutiya", locale: LOCALE_TAGS[locale].replace("-", "_"), url: `/${locale}${path}`, title, description, images },
+    openGraph: { type: "website", siteName: SITE_NAME, locale: LOCALE_TAGS[locale].replace("-", "_"), url: `/${locale}${path}`, title, description, images },
     twitter: { card: images ? "summary_large_image" : "summary", title, description, images: images?.map((image) => image.url) },
     // Paused, sold and expired pages stay reachable for buyers who saved them, not for search engines;
     // example listings are not offers.
@@ -160,8 +173,9 @@ export default async function ListingPage({ params }: { params: Params }) {
     listing.state === "published" && !listing.example && shownPrice !== null
       ? priceGuideFor({ id: listing.id, subcategoryId: listing.subcategoryId, attributes: listing.attributes, price: shownPrice, isDonation: listing.isDonation, citySlug: listing.location.citySlug, regionCode: listing.location.regionCode })
       : Promise.resolve(null);
-  const [seller, payment, legal, flags, t, names, criteria, guide] = await Promise.all([
+  const [seller, storefront, payment, legal, flags, t, names, criteria, guide] = await Promise.all([
     sellerOf(found.ownerUid),
+    listing.state === "published" ? storefrontOf(found.proId) : Promise.resolve(null),
     listing.state === "published" && !listing.example ? shopPaymentFor(found.proId, new Date(), found.paymentLink) : Promise.resolve(null),
     getLegalConfig(),
     getFlags(),
@@ -256,13 +270,16 @@ export default async function ListingPage({ params }: { params: Params }) {
         <ListingStatusBanner state={listing.state} />
         {listing.example ? <ExampleBanner /> : null}
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-x-10 lg:[grid-template-areas:'gallery_aside'_'header_aside'_'body_aside'] xl:grid-cols-[minmax(0,1fr)_24rem]">
+        {/* From lg the title, the price and the seller card share the right column, so the first screen
+            says what is sold, for how much and how to contact (UX audit, 29 Oct 2026); the gallery
+            and the body take the left one. On phones the four blocks stack in DOM order. */}
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-x-10 lg:gap-y-6 lg:[grid-template-areas:'gallery_header'_'gallery_aside'_'body_aside'] xl:grid-cols-[minmax(0,1fr)_24rem]">
           <div className="-mx-4 sm:mx-0 lg:[grid-area:gallery]">
             <Gallery listingId={listing.id} title={listing.title} photos={listing.photos} mediaBaseUrl={media} />
           </div>
 
           <header className="flex min-w-0 flex-col gap-3 lg:[grid-area:header]">
-            <h1 dir="auto" className="text-2xl font-semibold text-balance break-words sm:text-3xl">
+            <h1 dir="auto" className="text-2xl font-semibold text-balance break-words sm:text-3xl lg:text-xl">
               {listing.title}
             </h1>
             <ListingPrice
@@ -300,12 +317,17 @@ export default async function ListingPage({ params }: { params: Params }) {
                 <time dateTime={listing.publishedAt}>{t("publishedOn", { date: formatDate(new Date(listing.publishedAt), locale) })}</time>
               </span>
             </div>
-            {contactable ? <FavoriteButton listingId={listing.id} variant="inline" className="self-start" /> : null}
+            {contactable ? (
+              <div className="flex flex-wrap gap-2 self-start">
+                <FavoriteButton listingId={listing.id} variant="inline" />
+                <ShareButton url={canonicalUrl} title={listing.title} />
+              </div>
+            ) : null}
           </header>
 
           <aside id="contact" aria-label={t("sellerLabel")} className="min-w-0 scroll-mt-24 lg:[grid-area:aside]">
             <div className="flex flex-col gap-6 lg:sticky lg:top-24">
-              <SellerCard seller={seller} fallbackName={listing.seller.name} fallbackType={listing.seller.type} locale={locale}>
+              <SellerCard seller={seller} fallbackName={listing.seller.name} fallbackType={listing.seller.type} locale={locale} storefront={storefront}>
                 {listing.example ? <ExampleContactNotice /> : null}
                 {contactable ? (
                   <ContactBar
@@ -324,6 +346,13 @@ export default async function ListingPage({ params }: { params: Params }) {
                   />
                 ) : null}
                 {contactable && payment ? <PayAtSeller payment={payment} listingId={listing.id} /> : null}
+                {/* The report control within reach of the contact (DSA art. 16, UX journeys 8); the dialog itself stays below. */}
+                {contactable ? (
+                  <a href="#signaler" className={`inline-flex min-h-11 items-center gap-1.5 self-start text-sm text-foreground-muted ${quietLinkClassName}`}>
+                    <Flag className="size-4 shrink-0" aria-hidden="true" />
+                    {t("reportLink")}
+                  </a>
+                ) : null}
               </SellerCard>
             </div>
           </aside>
@@ -350,7 +379,7 @@ export default async function ListingPage({ params }: { params: Params }) {
                 {t("locationTitle")}
               </h2>
               <p className="text-sm text-foreground-muted">{t("locationHint")}</p>
-              <ListingMapBlock citySlug={listing.location.citySlug} regionCode={listing.location.regionCode} seed={listing.id} locale={locale} className="w-full max-w-[35rem]" />
+              <ListingMapBlock citySlug={listing.location.citySlug} regionCode={listing.location.regionCode} seed={listing.id} locale={locale} className="w-full max-w-[26rem]" />
             </section>
 
             {VEHICLE_SALE_SUBCATEGORIES.includes(listing.subcategoryId) ? <VehicleBuyingGuide attributes={listing.attributes} sellerType={listing.seller.type} /> : null}

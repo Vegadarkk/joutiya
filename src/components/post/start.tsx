@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { FormMessage, useApiErrorMessage } from "@/components/auth/form-message";
 import { ErrorBanner } from "@/components/feedback/error-banner";
+import { SwitchField } from "@/components/post/controls/switch";
 import { Button } from "@/components/ui/button";
 import { KhatamLoader } from "@/components/ui/khatam-loader";
 import type { Subcategory } from "@/config/categories";
@@ -15,7 +16,9 @@ import { wizardPath } from "@/lib/listings/client/routes";
 import { CategoryPicker } from "./category-picker";
 
 // `/deposer` without an id (design D3): resumes the most recent draft, or shows the category grid
-// and creates the draft after the subcategory pick. `?nouveau=1` skips the resume (another listing).
+// and creates the draft after the subcategory pick. `?nouveau=1` skips the resume (another listing);
+// `?don=1` presets "Je donne" (journey review 2026-10-29: the gift was asked at the price step only),
+// which the draft carries from its creation when the subcategory allows donations.
 
 type State = { kind: "checking" } | { kind: "pick"; failed?: unknown } | { kind: "creating" } | { kind: "resuming" } | { kind: "draftLimit" };
 
@@ -28,6 +31,7 @@ export function WizardStart() {
   const forceNew = params.get("nouveau") === "1";
   const [state, setState] = useState<State>({ kind: forceNew ? "pick" : "checking" });
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [giving, setGiving] = useState(params.get("don") === "1");
   const started = useRef(false);
   const creating = useRef(false);
 
@@ -57,7 +61,7 @@ export function WizardStart() {
       creating.current = true;
       setState({ kind: "creating" });
       try {
-        const { id } = await createListing({ categoryId: subcategory.categoryId, subcategoryId: subcategory.id });
+        const { id } = await createListing({ categoryId: subcategory.categoryId, subcategoryId: subcategory.id, ...(giving && subcategory.donationAllowed ? { isDonation: true } : {}) });
         router.replace(wizardPath(id, "criteres"));
       } catch (error) {
         creating.current = false;
@@ -65,7 +69,7 @@ export function WizardStart() {
         else setState({ kind: "pick", failed: error });
       }
     },
-    [router],
+    [giving, router],
   );
 
   if (state.kind === "checking" || state.kind === "resuming" || state.kind === "creating") {
@@ -101,6 +105,7 @@ export function WizardStart() {
           {apiMessage(state.failed)}
         </FormMessage>
       ) : null}
+      <SwitchField label={t("giveLabel")} hint={t("giveHint")} checked={giving} onCheckedChange={setGiving} name="don" className="rounded-md border border-border bg-surface px-4 py-3" />
       <CategoryPicker categoryId={categoryId} subcategoryId={null} isPro={session?.role === "pro"} onCategory={setCategoryId} onSubcategory={(subcategory) => void onSubcategory(subcategory)} />
     </div>
   );

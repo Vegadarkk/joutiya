@@ -53,13 +53,43 @@ en production sans tag. Pousser un tag et promouvoir la production attendent ton
    Il liste ensuite ce qu'aucune adresse publique ne montre, à confirmer à la main : application
    OAuth de production publiée dans Google Auth Platform, `salesEnabled=false` et offre de lancement
    Pro au back-office, aucune alerte « Sauvegarde Firestore trop ancienne », seuils anti-abus et
-   listes de modération changés, tarifit relu par un locuteur natif, annonces exemple posées en
+   listes de modération changés (voir ci-dessous), tarifit relu par un locuteur natif, annonces exemple posées en
    production seulement sur feu vert du propriétaire (`docs/staging-demo.md`), règles Firestore de production déployées, dépôt
    repassé en privé le jour de l'ouverture, contournement du test de charge retiré
    (`docs/lancement/charge-procedure.md` : règle Cloudflare `loadtest` désactivée et `zone --check`
    propre, `LOADTEST_BYPASS_SECRET` retiré de l'`app.env` du staging, secret GitHub
    `LOADTEST_BYPASS_SECRET` supprimé et variable `LOAD_TEST_ENABLED` retirée).
 6. **Ouverture** : quand tout est vert et coché.
+
+## Seuils anti-abus et listes de modération
+
+Les valeurs du dépôt (seuils de risque de `src/lib/moderation/risk.ts`, listes de
+`src/config/prohibited.ts` et `src/config/payment-keywords.ts`, limites de
+`src/config/rate-limits.ts`) sont publiques tant que le dépôt l'est. Le point de la liste se coche en
+écrivant des valeurs privées dans le document Firestore `config/abuse` de la **production**, jamais
+dans le dépôt (ni commit, ni PR, ni fichier ignoré du dépôt). Le serveur seul le lit (cache de
+5 minutes) ; rien n'en part vers le navigateur. Document absent : les valeurs du dépôt s'appliquent.
+
+- `risk` : `newAccountDays` (1), `volumePerDay` (3), `weights` (poids par signal, ceux du dépôt par
+  défaut), `previousRejectionWeight` (10) et `previousRejectionCap` (30). Le seuil de mise en examen
+  reste `risk.reviewAt` de `config/ai`.
+- `prohibited` : par groupe (`weapons`, `drugs`…), des termes `hard` (refus à la publication) et `soft`
+  (examen par un modérateur), ajoutés aux listes du dépôt.
+- `messaging` : `paymentKeywords` et `contactAppKeywords`, ajoutés aux mots de paiement et
+  d'applications de messagerie qui déclenchent l'avertissement d'un message.
+- `rateLimits` : par identifiant de `RATE_LIMITS`, `points`, `duration` et `blockDuration` (secondes).
+  Les limites de pages `pages.*` (appliquées par le proxy, sans lecture Firestore) gardent les valeurs
+  du dépôt.
+
+Écriture, depuis un fichier JSON hors du dépôt (par exemple `~/.joutiya/abuse-prod.json`), avec la
+connexion gcloud de `scripts/google-wif.ts login` ; le script refuse un fichier situé dans le dépôt et
+n'affiche que des nombres, jamais les termes :
+```
+NODE_USE_ENV_PROXY=1 node scripts/abuse-config.ts prod ~/.joutiya/abuse-prod.json          # simulation
+NODE_USE_ENV_PROXY=1 node scripts/abuse-config.ts prod ~/.joutiya/abuse-prod.json --apply
+```
+Le document est remplacé en entier. Un champ invalide garde sa valeur par défaut et déclenche une
+alerte P1 « Document config/abuse invalide ». Le back-office pourra l'éditer plus tard.
 
 ## Écarts avec le design
 

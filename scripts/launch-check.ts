@@ -50,7 +50,7 @@ export interface Check {
 export const MANUAL_ITEMS = [
   "Google Auth Platform: the production OAuth app is published (In production), not in Testing",
   "Back office: salesEnabled=false, the Pro launch offer active, no 'Sauvegarde Firestore trop ancienne' alert in the last days",
-  "Anti-abuse thresholds and moderation word lists changed or moved to config/ (their committed values are public)",
+  "Private anti-abuse values written in prod Firestore config/abuse (node scripts/abuse-config.ts prod <file outside the repo> --apply, or the back office), never in the repository: their committed values are public",
   "Tarifit catalogue reviewed by a native speaker",
   "Example listings: in prod only if the owner said go (worker: node dist/worker/seed-demo.mjs --production --apply), each one labelled 'Annonce exemple' and not contactable",
   "Prod Firestore rules and indexes deployed (scripts/deploy-prod.ts firestore)",

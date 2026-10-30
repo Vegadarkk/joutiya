@@ -56,7 +56,7 @@ async function member(): Promise<Member> {
   await createAccountDocuments({
     uid,
     email,
-    displayName: "Testeur Joutiya",
+    displayName: "Testeur Aalan",
     locale: "fr",
     consents: { cguVersion: "2026-10", transfersVersion: "2026-10", marketing: false },
     provider: "password",
@@ -160,7 +160,7 @@ describe("POST /api/auth/phone/start", () => {
     expect(body.status).toBe("pending");
     expect(body.code).toMatch(/^\d{6}$/);
     expect(body.number).toBe(ENV.WHATSAPP_DISPLAY_NUMBER);
-    expect(body.waLink).toBe(`https://wa.me/${ENV.WHATSAPP_DISPLAY_NUMBER}?text=${encodeURIComponent(`JOUTIYA ${body.code}`)}`);
+    expect(body.waLink).toBe(`https://wa.me/${ENV.WHATSAPP_DISPLAY_NUMBER}?text=${encodeURIComponent(`AALAN ${body.code}`)}`);
     const expiresAt = Date.parse(body.expiresAt);
     expect(expiresAt).toBeGreaterThan(before + 9 * 60 * 1000);
     expect(expiresAt).toBeLessThanOrEqual(Date.now() + 10 * 60 * 1000);
@@ -220,7 +220,7 @@ describe("POST /api/auth/phone/start", () => {
     const pending = (await (await getStatus(m)).json()) as { status: string; phone: string };
     expect(pending).toEqual({ status: "pending", phone: second.national });
     // The old number no longer verifies anything.
-    expect((await postWebhook(inbound(first.from, `JOUTIYA ${challenge.code}`, wamid()))).status).toBe(200);
+    expect((await postWebhook(inbound(first.from, `AALAN ${challenge.code}`, wamid()))).status).toBe(200);
     expect(((await (await getStatus(m)).json()) as { status: string }).status).toBe("pending");
   });
 });
@@ -268,7 +268,7 @@ describe("POST /api/webhooks/whatsapp", () => {
     const m = await member();
     const number = freshNumber();
     const challenge = await startPending(m, number.typed);
-    const response = await postWebhook(inbound(number.from, `JOUTIYA ${challenge.code}`, wamid()));
+    const response = await postWebhook(inbound(number.from, `AALAN ${challenge.code}`, wamid()));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ received: true });
 
@@ -284,7 +284,7 @@ describe("POST /api/webhooks/whatsapp", () => {
     expect(audits.docs.map((doc) => doc.get("action"))).toContain("phone.verified");
 
     expect(sendMailMock).toHaveBeenCalledTimes(1);
-    expect(sendMailMock.mock.calls[0]?.[0]).toMatchObject({ template: "phoneVerified", locale: "fr", to: m.email, data: { displayName: "Testeur Joutiya", phone: state.phone } });
+    expect(sendMailMock.mock.calls[0]?.[0]).toMatchObject({ template: "phoneVerified", locale: "fr", to: m.email, data: { displayName: "Testeur Aalan", phone: state.phone } });
   });
 
   it("accepts the bare code as message text", async () => {
@@ -301,13 +301,13 @@ describe("POST /api/webhooks/whatsapp", () => {
     const other = freshNumber();
     const challenge = await startPending(m, number.typed);
     const wrong = String((Number(challenge.code) + 1) % 1_000_000).padStart(6, "0");
-    expect((await postWebhook(inbound(number.from, `JOUTIYA ${wrong}`, wamid()))).status).toBe(200);
-    expect((await postWebhook(inbound(other.from, `JOUTIYA ${challenge.code}`, wamid()))).status).toBe(200);
+    expect((await postWebhook(inbound(number.from, `AALAN ${wrong}`, wamid()))).status).toBe(200);
+    expect((await postWebhook(inbound(other.from, `AALAN ${challenge.code}`, wamid()))).status).toBe(200);
     expect((await postWebhook(inbound(number.from, "Salam, c'est bien ici ?", wamid()))).status).toBe(200);
     expect(((await (await getStatus(m)).json()) as { status: string }).status).toBe("pending");
     expect(sendMailMock).not.toHaveBeenCalled();
     // The right code still works afterwards.
-    expect((await postWebhook(inbound(number.from, `JOUTIYA ${challenge.code}`, wamid()))).status).toBe(200);
+    expect((await postWebhook(inbound(number.from, `AALAN ${challenge.code}`, wamid()))).status).toBe(200);
     expect(((await (await getStatus(m)).json()) as { status: string }).status).toBe("verified");
   });
 
@@ -317,9 +317,9 @@ describe("POST /api/webhooks/whatsapp", () => {
     const challenge = await startPending(m, number.typed);
     const id = wamid();
     const wrong = String((Number(challenge.code) + 1) % 1_000_000).padStart(6, "0");
-    expect((await postWebhook(inbound(number.from, `JOUTIYA ${wrong}`, id))).status).toBe(200);
+    expect((await postWebhook(inbound(number.from, `AALAN ${wrong}`, id))).status).toBe(200);
     // Same message id, now with the right code: already processed, so nothing happens.
-    expect((await postWebhook(inbound(number.from, `JOUTIYA ${challenge.code}`, id))).status).toBe(200);
+    expect((await postWebhook(inbound(number.from, `AALAN ${challenge.code}`, id))).status).toBe(200);
     expect(((await (await getStatus(m)).json()) as { status: string }).status).toBe("pending");
   });
 
@@ -329,7 +329,7 @@ describe("POST /api/webhooks/whatsapp", () => {
     const challenge = await startPending(m, number.typed);
     const statuses = { object: "whatsapp_business_account", entry: [{ id: "WABA", changes: [{ field: "messages", value: { messaging_product: "whatsapp", metadata: { phone_number_id: ENV.WHATSAPP_PHONE_NUMBER_ID }, statuses: [{ id: wamid(), status: "read" }] } }] }] };
     expect((await postWebhook(statuses)).status).toBe(200);
-    expect((await postWebhook(inbound(number.from, `JOUTIYA ${challenge.code}`, wamid(), "999"))).status).toBe(200);
+    expect((await postWebhook(inbound(number.from, `AALAN ${challenge.code}`, wamid(), "999"))).status).toBe(200);
     expect(((await (await getStatus(m)).json()) as { status: string }).status).toBe("pending");
   });
 
@@ -337,7 +337,7 @@ describe("POST /api/webhooks/whatsapp", () => {
     const m = await member();
     const number = freshNumber();
     const challenge = await startPending(m, number.typed);
-    const payload = inbound(number.from, `JOUTIYA ${challenge.code}`, wamid());
+    const payload = inbound(number.from, `AALAN ${challenge.code}`, wamid());
     const bad = await postWebhook(payload, sign(JSON.stringify(payload), "wrong-secret"));
     expect(bad.status).toBe(403);
     expect(((await bad.json()) as { error: { code: string } }).error.code).toBe("forbidden");
@@ -363,7 +363,7 @@ describe("one verified number per account, one account per number", () => {
     const alice = await member();
     const number = freshNumber();
     const challenge = await startPending(alice, number.typed);
-    expect((await postWebhook(inbound(number.from, `JOUTIYA ${challenge.code}`, wamid()))).status).toBe(200);
+    expect((await postWebhook(inbound(number.from, `AALAN ${challenge.code}`, wamid()))).status).toBe(200);
     resetRateLimiters();
     const again = await postStart(alice, freshNumber().typed);
     expect(again.status).toBe(409);
@@ -374,14 +374,14 @@ describe("one verified number per account, one account per number", () => {
     const alice = await member();
     const number = freshNumber();
     const forAlice = await startPending(alice, number.typed);
-    expect((await postWebhook(inbound(number.from, `JOUTIYA ${forAlice.code}`, wamid()))).status).toBe(200);
+    expect((await postWebhook(inbound(number.from, `AALAN ${forAlice.code}`, wamid()))).status).toBe(200);
     expect(((await (await getStatus(alice)).json()) as { status: string }).status).toBe("verified");
     sendMailMock.mockClear();
 
     // A number verified by another account is not refused (that would reveal it is registered).
     const bob = await member();
     const forBob = await startPending(bob, number.typed);
-    expect((await postWebhook(inbound(number.from, `JOUTIYA ${forBob.code}`, wamid()))).status).toBe(200);
+    expect((await postWebhook(inbound(number.from, `AALAN ${forBob.code}`, wamid()))).status).toBe(200);
     expect((await (await getStatus(bob)).json()) as unknown).toEqual({ status: "verified", phone: number.national });
     expect((await (await getStatus(alice)).json()) as unknown).toEqual({ status: "none", phone: null });
 
@@ -397,7 +397,7 @@ describe("one verified number per account, one account per number", () => {
     expect(await auditActions(alice.uid)).toContain("phone.transferred");
 
     expect(sendMailMock).toHaveBeenCalledTimes(2);
-    expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({ template: "phoneRemoved", locale: "fr", to: alice.email, priority: "security", data: { displayName: "Testeur Joutiya", phone: number.national } }));
+    expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({ template: "phoneRemoved", locale: "fr", to: alice.email, priority: "security", data: { displayName: "Testeur Aalan", phone: number.national } }));
     expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({ template: "phoneVerified", to: bob.email }));
 
     // Alice can verify a new number (or take this one back) afterwards.
@@ -412,12 +412,12 @@ describe("one verified number per account, one account per number", () => {
     const forAlice = await startPending(alice, number.typed);
     const forBob = await startPending(bob, number.typed);
     // Bob started last, but Alice's code arrives: Alice is verified, Bob stays pending.
-    expect((await postWebhook(inbound(number.from, `JOUTIYA ${forAlice.code}`, wamid()))).status).toBe(200);
+    expect((await postWebhook(inbound(number.from, `AALAN ${forAlice.code}`, wamid()))).status).toBe(200);
     expect(((await (await getStatus(alice)).json()) as { status: string }).status).toBe("verified");
     expect(((await (await getStatus(bob)).json()) as { status: string }).status).toBe("pending");
     expect(await auditActions(alice.uid)).not.toContain("phone.transferred");
     // Bob's code then proves possession too: the number moves to Bob.
-    expect((await postWebhook(inbound(number.from, `JOUTIYA ${forBob.code}`, wamid()))).status).toBe(200);
+    expect((await postWebhook(inbound(number.from, `AALAN ${forBob.code}`, wamid()))).status).toBe(200);
     expect(((await (await getStatus(bob)).json()) as { status: string }).status).toBe("verified");
     expect(((await (await getStatus(alice)).json()) as { status: string }).status).toBe("none");
     expect(await auditActions(alice.uid)).toContain("phone.transferred");

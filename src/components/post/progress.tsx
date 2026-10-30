@@ -31,7 +31,11 @@ export function StepProgress({ current, states, onSelect, reachable }: StepProgr
   // Open for the step it was unfolded on: reaching another step folds it again.
   const [openOn, setOpenOn] = useState<WizardStep | null>(null);
   const open = openOn === current;
-  const status = (step: WizardStep) => (step === current ? t("stepCurrent") : states[step] === "complete" ? t("stepDone") : states[step] === "incomplete" ? t("stepIncomplete") : t("stepTodo"));
+  // A step ahead of the current one with nothing missing was prefilled (the contact step from the
+  // account's choices): shown as such, not as done, until the person has passed it (UX audit, 16).
+  const prefilled = (step: WizardStep) => states[step] === "complete" && WIZARD_STEPS.indexOf(step) > currentIndex;
+  const status = (step: WizardStep) =>
+    step === current ? t("stepCurrent") : prefilled(step) ? t("stepPrefilled") : states[step] === "complete" ? t("stepDone") : states[step] === "incomplete" ? t("stepIncomplete") : t("stepTodo");
 
   return (
     <nav aria-label={t("stepsNav")} className="flex flex-col gap-3">
@@ -56,7 +60,7 @@ export function StepProgress({ current, states, onSelect, reachable }: StepProgr
                 className={cn(
                   "block h-1.5 min-w-0 flex-1 rounded-full transition-[background-color,scale] duration-150 ease-door",
                   isCurrent && "scale-y-[1.35]",
-                  isCurrent ? "bg-featured" : state === "complete" ? "bg-structure" : state === "incomplete" && index < currentIndex ? "bg-danger/70" : "bg-border",
+                  isCurrent ? "bg-featured" : state === "complete" ? (index > currentIndex ? "bg-structure/35" : "bg-structure") : state === "incomplete" && index < currentIndex ? "bg-danger/70" : "bg-border",
                 )}
               />
             );
@@ -88,7 +92,7 @@ export function StepProgress({ current, states, onSelect, reachable }: StepProgr
                 <span
                   className={cn(
                     "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
-                    isCurrent ? "bg-featured text-featured-foreground" : state === "complete" ? "bg-structure text-structure-foreground" : "border border-border-strong text-foreground-muted",
+                    isCurrent ? "bg-featured text-featured-foreground" : state === "complete" ? (index > currentIndex ? "border border-structure/60 text-structure dark:text-bab-200" : "bg-structure text-structure-foreground") : "border border-border-strong text-foreground-muted",
                   )}
                   aria-hidden="true"
                 >

@@ -58,7 +58,7 @@ jobs:
       - name: Third-party targets
         run: |
           node scripts/assert-target.ts
-          node --test scripts/assert-target.test.ts
+          node --test scripts/assert-target.test.ts scripts/legal-config.test.ts
       - run: npm run lint
       - name: Typecheck (app and uptime Worker)
         run: |

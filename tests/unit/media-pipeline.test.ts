@@ -137,7 +137,7 @@ async function exifGpsJpeg(): Promise<Buffer> {
     .jpeg()
     .withMetadata({ orientation: 6 })
     .withExifMerge({
-      IFD0: { Make: "Joutiya test", Model: "Fixture" },
+      IFD0: { Make: "Aalan test", Model: "Fixture" },
       IFD3: { GPSLatitudeRef: "N", GPSLatitude: "33/1 35/1 0/1", GPSLongitudeRef: "W", GPSLongitude: "7/1 36/1 0/1" },
     })
     .toBuffer();
@@ -200,7 +200,7 @@ describe("processUpload: happy path", () => {
       expect(meta.exif).toBeUndefined();
       expect(meta.orientation).toBeUndefined();
       expect([meta.width, meta.height]).toEqual([50, 100]);
-      expect(body.includes("Joutiya test")).toBe(false);
+      expect(body.includes("Aalan test")).toBe(false);
       expect(await store.head("media", key)).toMatchObject({ contentType: MEDIA_CONTENT_TYPE });
     }
     expect(classifier.calls).toBe(1);

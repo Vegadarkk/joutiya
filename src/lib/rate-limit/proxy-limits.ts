@@ -5,16 +5,18 @@ import type { RateLimitId } from "@/config/rate-limits";
 import { readCookie } from "@/lib/http/cookies";
 import { hasChallengePass } from "@/lib/security/challenge-pass";
 import { SESSION_COOKIE } from "@/lib/security/cookies";
-import { consumeLimit, type LimitOutcome } from "./limiter";
+import { consumeLimit, type LimitOutcome } from "./core";
 import { requestIdentity } from "./keys";
 import { isLoadTestRequest } from "./loadtest";
 
 // Page-view limits of the server-rendered pages (§6 table, design D14), checked in proxy.ts. The
 // proxy bundle has its own module instances, so these limiters use their own valkey-ratelimit
-// client (limiter.ts connects it). Visitor: 120/h per device; signed in: 600/h keyed by the session
+// client (core.ts connects it). Visitor: 120/h per device; signed in: 600/h keyed by the session
 // cookie (never verified here: a forged cookie only buys a bucket the IP limit still caps); always
 // 1 200/h per IP /64, and 12 000/h per /48 for an IPv6 client. Over a limit: a valid challenge pass gets its own allowance, else the visitor
 // is sent to the Turnstile page. Store down: open. Verified bots (Cloudflare header) are exempt.
+// Committed values only (core.ts, not limiter.ts): the `config/abuse` overrides would put a
+// Firestore client and its reads on the path of every page view, so `pages.*` overrides are ignored.
 
 /** Second path segment of the metered pages: /{locale}/annonce/..., /c/..., /profil/..., /boutique/... */
 export const METERED_SEGMENTS: readonly string[] = ["annonce", "c", "profil", "boutique"];
@@ -101,7 +103,7 @@ export function tooManyPagesHtml(locale: Locale): string {
   return (
     `<!doctype html><html lang="${lang}" dir="${lang === "ar" ? "rtl" : "ltr"}"><head><meta charset="utf-8">` +
     `<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">` +
-    `<title>${text.title} · Joutiya</title><style>${STYLE}</style></head>` +
+    `<title>${text.title} · Aalan</title><style>${STYLE}</style></head>` +
     `<body><main><h1>${text.title}</h1><p>${text.body}</p><p><a href="/${locale}">${text.home}</a></p></main></body></html>`
   );
 }

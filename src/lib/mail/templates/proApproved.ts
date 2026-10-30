@@ -23,7 +23,7 @@ const COPY: Record<MailLocale, Copy> = {
     offer: (days) => `L'offre Essentiel vous est offerte jusqu'à l'ouverture des ventes : vous serez prévenu ${days} jours avant tout paiement.`,
     noPlan: "Choisissez une offre depuis votre espace Pro pour publier vos annonces en tant que professionnel.",
     button: "Ouvrir mon espace Pro",
-    closing: "Joutiya ne vous demandera jamais de paiement par message et n'envoie aucun lien de paiement par e-mail.",
+    closing: "Aalan ne vous demandera jamais de paiement par message et n'envoie aucun lien de paiement par e-mail.",
   },
   ar: {
     subject: (shop) => `تم اعتماد حسابك المهني «${shop}»`,
@@ -32,7 +32,7 @@ const COPY: Record<MailLocale, Copy> = {
     offer: (days) => `باقة Essentiel مجانية لك إلى حين فتح المبيعات، وسنخبرك قبل ${days} يومًا من أي دفع.`,
     noPlan: "اختر باقة من فضائك المهني لنشر إعلاناتك بصفتك مهنيًا.",
     button: "فتح فضائي المهني",
-    closing: "لن تطلب منك Joutiya أي دفع عبر الرسائل ولا ترسل روابط دفع عبر البريد الإلكتروني.",
+    closing: "لن تطلب منك Aalan أي دفع عبر الرسائل ولا ترسل روابط دفع عبر البريد الإلكتروني.",
   },
 };
 

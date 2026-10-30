@@ -228,7 +228,7 @@ export const HELP_AR: HelpLocaleContent = {
       ],
       keywords: ["بيانات", "خصوصية", "rgpd", "cndp", "حذف بياناتي", "كوكيز", "سرية", "حقوق"],
     },
-    "role-de-joutiya": {
+    "role-d-aalan": {
       title: "دور جوتية",
       summary: "جوتية تستضيف إعلانات مستخدميها: ليست بائعًا ولا مشتريًا ولا طرفًا في البيوع.",
       blocks: [
@@ -238,7 +238,7 @@ export const HELP_AR: HelpLocaleContent = {
       ],
       keywords: ["نزاع", "استرجاع المال", "ضمان", "مستضيف", "مسؤولية", "وساطة", "خلاف", "بائع غشاش"],
     },
-    "assistant-joutiya": {
+    "assistant-aalan": {
       title: "مساعد جوتية",
       summary: "مساعد ذكاء اصطناعي يجيب عن أسئلتك انطلاقًا من مقالات مركز المساعدة هذا.",
       blocks: [

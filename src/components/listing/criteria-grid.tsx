@@ -1,13 +1,13 @@
 import { useTranslations } from "next-intl";
-import { criterionById, subcategoryById, type Condition, type Criterion, type CriterionGroup } from "@/config/categories";
+import type { Condition, CriterionGroup } from "@/config/categories";
 import type { ListingAttributes } from "@/lib/contracts/listings";
-import { groupDigits } from "@/lib/listings/client/format";
+import { criteriaRows, type CriteriaTranslators, type CriterionRow } from "@/lib/listings/criteria-rows";
 import { cn } from "@/lib/utils";
 
-// Criteria of a listing, from the declarative category config (design §2): the subcategory's
-// fields in config order, the core `condition` first, values that were not filled skipped. Labels
-// come from the Criteria namespace (`Criteria.<field>.label`, `.options.<option>`). The vehicle
+// Criteria of a listing (design §2), rows from src/lib/listings/criteria-rows.ts. The vehicle
 // dossier (`group: "dossier"`) has its own section (vehicle-dossier.tsx): `group` picks the rows.
+
+export type { CriterionRow };
 
 export interface CriteriaGridProps {
   subcategoryId: string;
@@ -20,49 +20,10 @@ export interface CriteriaGridProps {
   group?: CriterionGroup;
 }
 
-export interface CriterionRow {
-  id: string;
-  label: string;
-  value: string;
-  /** Free text typed by the seller (not a translated option): shown in its own direction. */
-  userText?: boolean;
-}
-
-/** "120000" km -> "120 000 km"; years and small counts are not grouped. */
-function formatNumber(value: number, criterion: Pick<Criterion, "unit">): string {
-  if (criterion.unit === "an") return String(value);
-  const digits = groupDigits(String(Math.abs(Math.trunc(value)))) || "0";
-  return value < 0 ? `-${digits}` : digits;
-}
-
-export function useCriteriaRows({ subcategoryId, attributes, condition, group, exclude = [] }: Omit<CriteriaGridProps, "className">): CriterionRow[] {
-  const t = useTranslations("Criteria");
+export function useCriteriaRows(props: Omit<CriteriaGridProps, "className">): CriterionRow[] {
+  const criteria = useTranslations("Criteria");
   const page = useTranslations("ListingPage.criteria");
-  type Key = Parameters<typeof t.has>[0];
-  const label = (id: string) => (t.has(`${id}.label` as Key) ? t(`${id}.label` as Key) : id);
-  const option = (id: string, value: string) => (t.has(`${id}.options.${value}` as Key) ? t(`${id}.options.${value}` as Key) : value);
-
-  const rows: CriterionRow[] = [];
-  const subcategory = subcategoryById(subcategoryId);
-  if (condition && subcategory?.condition && !group) rows.push({ id: "condition", label: label("condition"), value: option("condition", condition) });
-  for (const field of subcategory?.criteria ?? []) {
-    if (field.group !== group || exclude.includes(field.id)) continue;
-    const value = attributes[field.id];
-    if (value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) continue;
-    const def = criterionById(field.id) ?? field;
-    let text: string;
-    let userText = false;
-    if (Array.isArray(value)) text = value.map((item) => option(field.id, item)).join(", ");
-    else if (typeof value === "boolean") text = value ? page("yes") : page("no");
-    else if (typeof value === "number") text = def.unit && def.unit !== "an" ? `${formatNumber(value, def)} ${page(`units.${def.unit}`)}` : formatNumber(value, def);
-    else if (def.type === "select") text = option(field.id, value);
-    else {
-      text = value;
-      userText = true;
-    }
-    rows.push({ id: field.id, label: label(field.id), value: text, ...(userText ? { userText } : {}) });
-  }
-  return rows;
+  return criteriaRows(props, { criteria, page } as unknown as CriteriaTranslators);
 }
 
 function Rows({ rows, className }: { rows: CriterionRow[]; className?: string }) {

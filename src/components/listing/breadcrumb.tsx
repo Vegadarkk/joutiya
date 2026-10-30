@@ -49,10 +49,12 @@ export function Breadcrumb({ items, current, className }: { items: BreadcrumbIte
             ) : (
               <span>{item.label}</span>
             )}
-            <ChevronRight className="size-3.5 shrink-0 rtl:-scale-x-100" aria-hidden="true" />
+            {/* On a phone the trail ends with the last parent: the title stands right below, as the
+                heading, and would otherwise take a second line (UX audit). */}
+            <ChevronRight className={cn("size-3.5 shrink-0 rtl:-scale-x-100", index === items.length - 1 && "max-sm:hidden")} aria-hidden="true" />
           </li>
         ))}
-        <li className="min-w-0 max-w-full">
+        <li className="hidden min-w-0 max-w-full sm:block">
           <span aria-current="page" dir="auto" className="block truncate text-foreground sm:max-w-[22rem]">
             {current}
           </span>

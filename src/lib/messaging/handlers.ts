@@ -1,5 +1,6 @@
 import "server-only";
 import { requireUser } from "@/lib/auth/guards";
+import { getAbuseRules } from "@/lib/config/runtime";
 import {
   cidSchema,
   conversationStateSchema,
@@ -131,7 +132,7 @@ export async function handleStart(request: Request): Promise<Response> {
     const problem = rentalRequestProblem(rental, moroccoToday(now));
     if (problem) throw new HttpError(400, "invalid_body", undefined, { details: [{ path: "rentalRequest.from", code: problem }] });
     // Refused before the message is sent: the conversation never starts half way (A-02).
-    if (rental.pickup) screenPlace(rental.pickup);
+    if (rental.pickup) screenPlace(rental.pickup, (await getAbuseRules()).messaging);
     assertLimit("rental.request.uid", await consumeLimit("rental.request.uid", auth.user.uid));
   }
   if (offer) {

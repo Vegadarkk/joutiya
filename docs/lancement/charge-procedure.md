@@ -12,17 +12,25 @@ Outils : `load/k6.js` (k6 v2.3.0), `.github/workflows/load-test.yml` (lancement 
 
 ## Une fois
 
-1. **Jeton Access** `joutiya-scan` (Zero Trust > Access > Service Auth), en mode *single header*,
-   autorisé sur l'application `staging.joutiya.ma` (policy *Service Auth*, comme la sonde). Il sert
-   aussi au scan de sécurité.
-2. **GitHub** (variables et secrets du dépôt) :
-   - variable `ACCESS_TOKEN_HEADER` : le nom de l'en-tête choisi pour le mode single header ;
-   - secret `STAGING_SCAN_ACCESS_TOKEN` : `{"cf-access-client-id":"…","cf-access-client-secret":"…"}` ;
-   - secret `LOADTEST_BYPASS_SECRET` : 32 à 128 lettres et chiffres, tirés au hasard ;
-   - variable `LOAD_TEST_ENABLED=true` (le workflow ne fait rien sans elle).
-3. **Staging** : `LOADTEST_BYPASS_SECRET` (même valeur) dans l'app.env du staging (scellé, comme les
-   autres secrets), puis redémarrage. L'application refuse cette variable en production.
-4. **PC2** : `JOUTIYA_LOADTEST_BYPASS_SECRET` (même valeur) dans `.env.local`, pour la règle Cloudflare.
+Claude prépare tout depuis le cloud, Nav n'envoie que les secrets GitHub (le proxy du cloud refuse
+l'API Actions). Le jeton sert aussi au scan de sécurité.
+
+1. **Nav** (PC2) : `node scripts/github-ci.ts public-key` donne la clé publique Actions du dépôt
+   (publique).
+2. **Claude** : `NODE_USE_ENV_PROXY=1 node scripts/github-ci.ts seal-scan --public-key=<fichier>
+   --age-recipient=<age1…> --out=<fichier> --apply` crée (ou renouvelle) le jeton Access
+   `joutiya-scan`, tire un `LOADTEST_BYPASS_SECRET` et scelle pour GitHub les secrets
+   `STAGING_SCAN_ACCESS_TOKEN` (JSON `cf-access-client-id` / `cf-access-client-secret`) et
+   `LOADTEST_BYPASS_SECRET`, avec les variables `ACCESS_TOKEN_HEADER=Authorization`,
+   `SCAN_REPORT_AGE_RECIPIENT`, `SECURITY_SCAN_ENABLED=true` et `LOAD_TEST_ENABLED=true`. Il affiche
+   l'identifiant du jeton (`ACCESS_SCAN_TOKEN_ID`).
+3. **Claude** : `node scripts/cloudflare.ts access --apply` avec `ACCESS_SCAN_TOKEN_ID` : le staging
+   accepte ce jeton, y compris dans l'en-tête unique `Authorization`.
+4. **Claude** : `LOADTEST_BYPASS_SECRET` scellé pour la VM (`seal-env.ts app staging --only=…`),
+   posé par `oracle-vm.ts env staging --sealed=…`, puis web et worker redémarrés. L'application
+   refuse cette variable en production. La règle Cloudflare lit le même secret dans
+   `<fichier>.cloudflare.env` (`JOUTIYA_LOADTEST_BYPASS_SECRET`).
+5. **Nav** (PC2) : `node scripts/github-ci.ts apply <fichier> --apply`.
 
 ## Le jour du test
 
@@ -37,13 +45,17 @@ enregistrées 07:00 UTC). Au plus deux passages par jour (lectures Firestore des
 2. Limites de production sur le staging :
    `NODE_USE_ENV_PROXY=1 node scripts/oracle-vm.ts run load/staging-limits-prod.sh --apply`
 3. Règle Cloudflare (le secret n'est jamais affiché) :
-   `node --env-file=.env.local scripts/cloudflare.ts loadtest --on --apply`
-4. Mesure CPU, lancée juste avant le test (elle démarre quand l'agent Oracle prend la commande) :
-   `NODE_USE_ENV_PROXY=1 node scripts/oracle-vm.ts cpu --minutes=9`
+   `NODE_USE_ENV_PROXY=1 node --env-file=<fichier>.cloudflare.env scripts/cloudflare.ts loadtest --on --apply`
+4. Mesure CPU, lancée juste avant le test : un échantillonneur détaché relève toutes les 5 s, pendant
+   10 minutes, le CPU de la VM et celui de chaque conteneur du staging :
+   `NODE_USE_ENV_PROXY=1 node scripts/oracle-vm.ts run load/sampler-start.sh --apply`, puis, après
+   le test, `NODE_USE_ENV_PROXY=1 node scripts/oracle-vm.ts run load/sampler-read.sh --apply`.
+   `oracle-vm.ts cpu --minutes=9` ne sert plus ici : Run Command perd la sortie d'une commande de
+   plusieurs minutes (constaté le 30 octobre 2026, sortie vide).
 5. Lancer le workflow **Load test** (Actions > Load test > Run workflow). Sept minutes de charge.
 6. Défaire, même si le test a échoué :
    ```
-   node --env-file=.env.local scripts/cloudflare.ts loadtest --off --apply
+   NODE_USE_ENV_PROXY=1 node scripts/cloudflare.ts loadtest --off --apply
    NODE_USE_ENV_PROXY=1 node scripts/oracle-vm.ts run load/staging-limits-reset.sh --apply
    NODE_USE_ENV_PROXY=1 node scripts/oracle-vm.ts run load/seed-remove.sh --apply
    ```
@@ -55,8 +67,11 @@ enregistrées 07:00 UTC). Au plus deux passages par jour (lectures Firestore des
 - Artefact `k6-summary` du workflow : p95 et taux d'échec par scénario, seuils tenus ou non
   (code de sortie 99 si un seuil échoue), itérations perdues (`droppedIterations` : la charge
   demandée n'a pas pu partir, signe de saturation côté serveur ou runner).
-- Sortie de `cpu` : moyenne et pic de chaque CPU et de la VM.
-- Réussi si les quatre seuils tiennent et que le pic CPU reste sous 70 %.
+- Sortie de `sampler-read.sh` : par minute, la part occupée de la VM et les cœurs pris par chaque
+  conteneur, puis le pic de chacun. Le web est un seul processus Node : il plafonne vers 1 cœur (son
+  fil JavaScript), même quand sa limite est 1,5 et que la VM reste sous 70 %.
+- Réussi si les quatre seuils tiennent et que le pic CPU reste sous 70 %. Sinon, la marge mesurée
+  fixe le moment de la bascule vers un VPS (spec §10, critère de sortie de la phase 6).
 
 `docs/lancement/charge.md` reprend : date, commit du staging, chiffres k6 et CPU, verdict, et le
 seuil de trafic au-delà duquel passer à un VPS.
@@ -64,5 +79,5 @@ seuil de trafic au-delà duquel passer à un VPS.
 ## Écarts avec le design
 
 - Les limites de production sont posées par `docker update` sur les conteneurs du staging, sans
-  recréation : le tas Node du web reste celui du staging (576 Mo au lieu de 1 152 Mo).
+  recréation : le tas Node du web reste celui du staging (320 Mo par processus au lieu de 512 Mo).
 - Le scénario de recherche appelle `/api/search`, ce que fait la page de recherche à chaque filtre.

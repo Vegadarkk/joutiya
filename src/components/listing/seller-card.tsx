@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BadgeCheck, MailCheck, MapPin, ShieldCheck } from "lucide-react";
+import { BadgeCheck, MailCheck, MapPin, ShieldCheck, Store } from "lucide-react";
 import { RatingLink } from "@/components/reviews/rating-link";
 import { quietLinkClassName, textLinkClassName } from "@/components/ui/text-link";
 import { cityBySlug, cityName } from "@/config/regions";
@@ -72,10 +72,12 @@ export interface SellerCardProps {
   locale: Locale;
   /** Contact actions (the client island), under the identity. */
   children?: ReactNode;
+  /** The shop's /boutique segment: a Pro's name and listings lead to its storefront (UX journeys, 6). */
+  storefront?: string | null;
   className?: string;
 }
 
-export function SellerCard({ seller, fallbackName, fallbackType, locale, children, className }: SellerCardProps) {
+export function SellerCard({ seller, fallbackName, fallbackType, locale, children, storefront = null, className }: SellerCardProps) {
   const t = useNumbersTranslations("ListingPage.seller");
   const name = seller?.displayName ?? fallbackName;
   const type = seller?.sellerType ?? fallbackType;
@@ -89,7 +91,7 @@ export function SellerCard({ seller, fallbackName, fallbackType, locale, childre
           <p className="text-xs text-foreground-muted">{type === "pro" ? t("roleBusiness") : t("roleIndividual")}</p>
           <h2 id="seller-name" className="flex flex-wrap items-center gap-2 text-lg font-semibold leading-tight">
             {seller ? (
-              <Link href={`/profil/${seller.publicId}`} prefetch={false} dir="auto" className={cn("break-words rounded-sm", quietLinkClassName)}>
+              <Link href={storefront ? `/boutique/${storefront}` : `/profil/${seller.publicId}`} prefetch={false} dir="auto" className={cn("break-words rounded-sm", quietLinkClassName)}>
                 {name}
               </Link>
             ) : (
@@ -100,7 +102,7 @@ export function SellerCard({ seller, fallbackName, fallbackType, locale, childre
             {type === "pro" ? <span className="rounded-sm bg-structure px-2 py-0.5 text-xs font-medium text-structure-foreground">{t("pro")}</span> : null}
           </h2>
           {seller ? <p className="text-sm text-foreground-muted">{t("memberSince", { date: formatMemberSince(seller.memberSince, locale) })}</p> : null}
-          {seller ? <RatingLink rating={seller.rating} locale={locale} href={`/${locale}/profil/${seller.publicId}#avis`} /> : null}
+          {seller ? <RatingLink rating={seller.rating} locale={locale} href={storefront ? `/${locale}/boutique/${storefront}#avis` : `/${locale}/profil/${seller.publicId}#avis`} /> : null}
           {city ? (
             <p className="flex items-center gap-1 text-sm text-foreground-muted">
               <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
@@ -111,8 +113,10 @@ export function SellerCard({ seller, fallbackName, fallbackType, locale, childre
       </div>
       {seller ? <SellerBadges badges={seller.badges} sellerType={seller.sellerType} /> : null}
       {seller ? (
-        <Link href={`/profil/${seller.publicId}`} prefetch={false} className={cn("-my-3 inline-flex min-h-11 items-center self-start rounded-sm text-sm font-medium text-link", textLinkClassName)}>
-          {t("listingsOnline", { count: seller.publishedCount })}
+        <Link href={storefront ? `/boutique/${storefront}` : `/profil/${seller.publicId}`} prefetch={false} className={cn("-my-3 inline-flex min-h-11 flex-wrap items-center gap-x-1.5 self-start rounded-sm text-sm font-medium text-link", textLinkClassName)}>
+          {storefront ? <Store className="size-4 shrink-0" aria-hidden="true" /> : null}
+          {storefront ? t("storefront") : null}
+          {storefront ? <span className="font-normal text-foreground-muted">· {t("listingsOnline", { count: seller.publishedCount })}</span> : t("listingsOnline", { count: seller.publishedCount })}
         </Link>
       ) : null}
       {children}

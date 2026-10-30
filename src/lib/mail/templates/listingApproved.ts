@@ -8,23 +8,23 @@ const COPY: Record<MailLocale, { subject: (title: string) => string; title: stri
     subject: (title) => `Votre annonce « ${title} » a été vérifiée et publiée`,
     title: "Annonce vérifiée et publiée",
     body: (title, expires) => [
-      `Un modérateur a vérifié votre annonce « ${title} » : elle est maintenant visible sur Joutiya. Les acheteurs peuvent vous écrire depuis la messagerie.`,
+      `Un modérateur a vérifié votre annonce « ${title} » : elle est maintenant visible sur Aalan. Les acheteurs peuvent vous écrire depuis la messagerie.`,
       `Elle reste en ligne jusqu'au ${expires}. Vous pourrez la renouveler gratuitement dans les derniers jours, ou la marquer vendue dès qu'elle trouve preneur.`,
     ],
     button: "Voir mon annonce",
     manage: "Gérer mes annonces :",
-    closing: "Joutiya ne vous demandera jamais de paiement et n'envoie aucun lien de paiement.",
+    closing: "Aalan ne vous demandera jamais de paiement et n'envoie aucun lien de paiement.",
   },
   ar: {
     subject: (title) => `تمت مراجعة إعلانك «${title}» ونشره`,
     title: "تمت مراجعة الإعلان ونشره",
     body: (title, expires) => [
-      `راجع أحد المشرفين إعلانك «${title}»، وهو ظاهر الآن على Joutiya. يمكن للمشترين مراسلتك عبر الرسائل.`,
+      `راجع أحد المشرفين إعلانك «${title}»، وهو ظاهر الآن على Aalan. يمكن للمشترين مراسلتك عبر الرسائل.`,
       `يبقى الإعلان منشورًا حتى ${expires}. يمكنك تجديده مجانًا في الأيام الأخيرة، أو تعليمه كمُباع بمجرد بيعه.`,
     ],
     button: "عرض إعلاني",
     manage: "إدارة إعلاناتي:",
-    closing: "لن تطلب منك Joutiya أي دفع أبدًا ولا ترسل روابط دفع.",
+    closing: "لن تطلب منك Aalan أي دفع أبدًا ولا ترسل روابط دفع.",
   },
 };
 

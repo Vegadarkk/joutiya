@@ -44,7 +44,7 @@ describe("verifySignature", () => {
 
 describe("extractInbound", () => {
   it("returns the inbound text messages of our number with the 6-digit code", () => {
-    const items = extractInbound(payload([text("212612345678", "JOUTIYA 123456", "wamid.a"), text("212712345678", "123456", "wamid.b")]), PHONE_NUMBER_ID);
+    const items = extractInbound(payload([text("212612345678", "AALAN 123456", "wamid.a"), text("212712345678", "123456", "wamid.b")]), PHONE_NUMBER_ID);
     expect(items).toEqual([
       { wamid: "wamid.a", from: "212612345678", code: "123456" },
       { wamid: "wamid.b", from: "212712345678", code: "123456" },
@@ -61,7 +61,7 @@ describe("extractInbound", () => {
 
   it("ignores statuses, other phone number ids and non-text messages", () => {
     expect(extractInbound(payload([], { statuses: [{ id: "wamid.s", status: "delivered" }] }), PHONE_NUMBER_ID)).toEqual([]);
-    expect(extractInbound(payload([text("212612345678", "JOUTIYA 123456")], { phoneNumberId: "999" }), PHONE_NUMBER_ID)).toEqual([]);
+    expect(extractInbound(payload([text("212612345678", "AALAN 123456")], { phoneNumberId: "999" }), PHONE_NUMBER_ID)).toEqual([]);
     expect(extractInbound(payload([{ from: "212612345678", id: "wamid.i", type: "image", image: { id: "x" } }]), PHONE_NUMBER_ID)).toEqual([]);
     expect(extractInbound(payload([{ from: "212612345678", id: "wamid.r", type: "reaction", reaction: { emoji: "👍" } }]), PHONE_NUMBER_ID)).toEqual([]);
   });

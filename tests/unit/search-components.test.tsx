@@ -209,6 +209,8 @@ describe("SearchEmpty", () => {
 
   it("offers to remove a filter, widen the place or clear everything", () => {
     const html = render(<SearchEmpty params={url("q=velo&ville=rabat&prix-max=100")} locale="fr" action={<span data-slot="save" />} />);
+    // No w-full: the map panel gives the section side margins (UX audit, 2).
+    expect(html).toMatch(/<section[^>]*class="mx-auto flex max-w-xl flex-col/);
     expect(text(html)).toContain(fr.SearchPage.empty.title);
     expect(text(html)).toContain(fr.SearchPage.empty.bodyWords);
     expect(html).toContain('href="/fr/recherche?q=velo&amp;prix-max=100"');

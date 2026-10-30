@@ -10,10 +10,12 @@ import { SEARCH_PATH, SEARCH_Q_MAX, SEARCH_QUERY_KEYS } from "@/lib/search/url-k
 import { cn } from "@/lib/utils";
 import { useHeaderSearchBinding, type HeaderSearchBinding } from "./header-search-store";
 
-// The header's search pill (Carte vivante, lot 1): words, then the place from lg (the search page's
+// The header's search pill (Carte vivante, lot 1): words, then the place from xl (the search page's
 // own combobox in its "any city" variant), then the ochre submit. A GET form to /recherche that
 // works before hydration: `q`, and `ville` (slug) or `region`; empty fields leave the URL once
-// hydrated. Phones keep the words only: the place is set in the search page's filters.
+// hydrated. Below xl the pill keeps the words only (the place is set in the search page's filters):
+// beside "Louer", "Espace Pro" and "Vendre" (UX audit, choice B) the place segment left the words
+// 60 px at lg.
 // On /recherche (lot 2) the page binds the pill (header-search-store.ts): it starts from the current
 // words and place, carries the other filters and submits as the page's own navigation.
 
@@ -91,7 +93,7 @@ function HeaderSearchForm({ locale, binding, className }: { locale: string; bind
           {t("searchPlaceholderLong")}
         </span>
       </div>
-      <div className="relative hidden w-52 shrink-0 before:absolute before:start-0 before:top-1/2 before:h-6 before:w-px before:-translate-y-1/2 before:bg-border-strong lg:block xl:w-56">
+      <div className="relative hidden w-48 shrink-0 before:absolute before:start-0 before:top-1/2 before:h-6 before:w-px before:-translate-y-1/2 before:bg-border-strong xl:block">
         <SearchCityCombobox
           value={place}
           onChange={setPlace}

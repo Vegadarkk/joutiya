@@ -29,9 +29,12 @@ export { isWhatsappUrl, REVEAL_ERROR_KEYS, revealFailure, type RevealErrorKey } 
 // (message-dialog.tsx, then /messages/{cid}), and the phone reveal island
 // (POST /api/listings/{id}/phone with the phase 2 CSRF header; the number is never in the ISR HTML)
 // with WhatsApp once revealed, both shown only when the seller offers them (no phone check while
-// WhatsApp is parked, so messaging is then the only channel). Anonymous visitors get a sign-in link
-// that brings them back here; the seller sees a link to their listings instead. On phones the
-// actions sit in a bar fixed to the bottom of the screen; from lg they sit in the seller card. The
+// WhatsApp is parked, so messaging is then the only channel). The message is the main action
+// (ochre) and the phone the secondary one: messaging is the platform's channel, the number an
+// option of the seller (UX audit, 29 Oct 2026). Anonymous visitors get a sign-in link, shown
+// under the buttons, that brings them back here; the seller sees a link to their listings instead.
+// On phones the actions sit in a bar fixed to the bottom of the screen: the message and the listing's own
+// action (dates, visit, test drive or offer), the number as an icon beside them; from lg they sit in the seller card. The
 // dialog, the challenge and the refusal messages load on demand: most visitors never need them.
 // When their chunk cannot be downloaded (dropped connection, tab opened before a redeploy) the
 // download is tried again, then the visitor is asked to reload (chunk-retry.tsx).
@@ -183,6 +186,11 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
   const canReveal = showPhone || whatsapp;
   const own = status === "ready" && session !== null && session.publicId === sellerPublicId;
   const next = `/${locale}/annonce/${slugId}`;
+  /**
+   * The listing's own action beside "Message" in the phone bar (owner's choice, 30 Oct 2026, UX
+   * journeys 8): the dates of a rental, a visit, a test drive or an offer, the first that applies.
+   */
+  const barIntent: Exclude<ComposeIntent, "message"> | null = rental ? "rental" : visit ? "visit" : testDrive ? "test_drive" : offer ? "offer" : null;
 
   async function reveal(turnstileToken?: string) {
     if (state.kind === "loading") return;
@@ -239,11 +247,13 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
   const revealLabel = showPhone ? t("showPhone") : t("showWhatsapp");
   const revealed = state.kind === "revealed" ? state.phone : null;
 
-  const primary = (wide: boolean) =>
+  // The phone actions: secondary under the message button in the seller card; in the phone bar,
+  // where the message button leaves once the number shows, the first revealed action takes the lead.
+  const phoneActions = (wide: boolean, iconOnly = false) =>
     revealed ? (
       <>
         {showPhone ? (
-          <Button asChild className={cn(wide && "min-w-0 flex-1")}>
+          <Button asChild variant={wide ? "primary" : "outline"} className={cn(wide && "min-w-0 flex-1")}>
             <a href={`tel:${revealed.e164}`} aria-label={t("call", { number: isolateLtr(revealed.display) })}>
               <Phone aria-hidden="true" />
               <span dir="ltr" className="tabular-nums">
@@ -253,7 +263,7 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
           </Button>
         ) : null}
         {revealed.whatsappUrl && isWhatsappUrl(revealed.whatsappUrl) ? (
-          <Button asChild variant={showPhone ? "outline" : "primary"} className={cn(wide && "min-w-0 flex-1")}>
+          <Button asChild variant={wide && !showPhone ? "primary" : "outline"} className={cn(wide && "min-w-0 flex-1")}>
             <a href={revealed.whatsappUrl} target="_blank" rel="noopener noreferrer">
               <MessageCircle aria-hidden="true" />
               {t("whatsapp")}
@@ -261,19 +271,24 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
           </Button>
         ) : null}
       </>
+    ) : iconOnly ? (
+      // Three actions in the bar: the number's button keeps its icon and its name.
+      <Button type="button" variant="outline" size="icon" onClick={() => void reveal()} loading={state.kind === "loading"} aria-label={revealLabel} title={revealLabel} className="shrink-0">
+        <Phone aria-hidden="true" />
+      </Button>
     ) : (
-      <Button type="button" onClick={() => void reveal()} loading={state.kind === "loading"} className={cn(wide && "min-w-0 flex-1")}>
+      <Button type="button" variant="outline" onClick={() => void reveal()} loading={state.kind === "loading"} className={cn(wide && "min-w-0 flex-1")}>
         <Phone aria-hidden="true" />
         {revealLabel}
       </Button>
     );
 
   // `compact`: the narrow half of the phone bar ("Message" instead of "Envoyer un message"); `wide`:
-  // alone in the phone bar. The first action when it is the only one (no phone offered).
+  // alone in the phone bar.
   const messageButton = (compact: boolean, wide = false) => (
     <Button
       type="button"
-      variant={canReveal ? "outline" : "primary"}
+      variant="primary"
       onClick={() => void openComposer()}
       loading={compose === "checking" && intent === "message"}
       aria-describedby={hintId}
@@ -298,6 +313,26 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
       >
         <CalendarClock aria-hidden="true" />
         {compact ? t("visitShort") : t("visit")}
+      </Button>
+    ) : null;
+
+  // The phone bar's second button: the visit keeps its button, the others get a short label.
+  const barAction =
+    barIntent === "visit" ? (
+      visitButton(true)
+    ) : barIntent ? (
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => void openComposer(barIntent)}
+        loading={compose === "checking" && intent === barIntent}
+        aria-haspopup="dialog"
+        data-testid="contact-bar-action"
+        data-intent={barIntent}
+        className="min-w-0 flex-1 px-3"
+      >
+        {barIntent === "rental" ? stay ? <BedDouble aria-hidden="true" /> : <CalendarRange aria-hidden="true" /> : barIntent === "test_drive" ? <CarFront aria-hidden="true" /> : <HandCoins aria-hidden="true" />}
+        {barIntent === "rental" ? t(stay ? "home.rentalShort" : "rentalShort") : barIntent === "test_drive" ? t("testDriveShort") : offers("makeShort")}
       </Button>
     ) : null;
 
@@ -334,12 +369,13 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
 
   return (
     <div data-testid="contact-bar">
-      {/* lg and up: inside the seller card. */}
+      {/* lg and up: inside the seller card. The sign-in prompt, the challenge and the errors come
+          under the buttons, so the one just clicked stays in place. */}
       <div className="hidden flex-col gap-3 lg:flex">
-        {canReveal ? <div className="flex flex-col gap-2">{primary(false)}</div> : null}
-        {feedback(true)}
         {messageButton(false)}
+        {canReveal ? <div className="flex flex-col gap-2">{phoneActions(false)}</div> : null}
         {visitButton(false)}
+        {feedback(true)}
         {hint}
       </div>
       {rental ? (
@@ -392,9 +428,9 @@ export function ContactBar({ listingId, slugId, sellerPublicId, sellerName, list
         <div className="mx-auto flex max-w-xl flex-col gap-2">
           {feedback(false)}
           <div className="flex gap-2">
-            {revealed ? null : canReveal || visit ? messageButton(true) : messageButton(false, true)}
-            {revealed ? null : visitButton(true)}
-            {canReveal ? primary(true) : null}
+            {revealed ? null : canReveal || barIntent ? messageButton(true) : messageButton(false, true)}
+            {revealed ? null : barAction}
+            {canReveal ? phoneActions(true, barIntent !== null && !revealed) : null}
           </div>
         </div>
       </div>

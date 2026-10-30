@@ -6,11 +6,11 @@ Version {version} — en vigueur le {effectiveDate}
 
 Cette page est informative. {brand} ne propose pas de paiement en plusieurs fois et n'intervient dans aucun paiement entre utilisateurs.
 
-## 1. Ce que {brand} propose {#info}
+## 1. Ce qu'{brand} propose {#info}
 
 ### 1.1 Aucun paiement fractionné {#info-1}
 
-Aucun paiement en plusieurs fois n'est proposé sur {brand} : ni pour les achats entre utilisateurs, ni pour les services que {brand} vend elle-même.
+Aucun paiement en plusieurs fois n'est proposé sur {brand} : ni pour les achats entre utilisateurs, ni pour les services qu'{brand} vend elle-même.
 
 ### 1.2 Si cela change {#info-2}
 
@@ -24,23 +24,23 @@ Si un paiement en plusieurs fois est un jour proposé pour les options vendues p
 
 ### 2.2 Méfiez-vous des offres « en plusieurs fois » {#utilisateurs-2}
 
-Un message qui prétend que {brand} propose de payer en plusieurs fois, ou qui vous envoie un lien de paiement « {brand} », est une arnaque. {brand} ne vous demandera jamais de paiement par message, e-mail, WhatsApp, SMS ou appel. Ne cliquez pas, et signalez le message (voir [Confiance et sécurité](/legal/confiance-et-securite#arnaques)).
+Un message qui prétend qu'{brand} propose de payer en plusieurs fois, ou qui vous envoie un lien de paiement « {brand} », est une arnaque. {brand} ne vous demandera jamais de paiement par message, e-mail, WhatsApp, SMS ou appel. Ne cliquez pas, et signalez le message (voir [Confiance et sécurité](/legal/confiance-et-securite#arnaques)).
 
 ### 2.3 Si l'annonceur propose un paiement échelonné {#utilisateurs-3}
 
-Un paiement échelonné entre vous et un annonceur est un accord entre vous : {brand} ne le contrôle pas et ne le garantit pas. Ne versez pas d'acompte avant d'avoir vu le bien. Un professionnel qui vous propose un crédit ou un paiement échelonné doit vous donner les informations exigées par la loi applicable, notamment le coût total et vos droits de rétractation : cet engagement est le sien, pas celui de {brand}.
+Un paiement échelonné entre vous et un annonceur est un accord entre vous : {brand} ne le contrôle pas et ne le garantit pas. Ne versez pas d'acompte avant d'avoir vu le bien. Un professionnel qui vous propose un crédit ou un paiement échelonné doit vous donner les informations exigées par la loi applicable, notamment le coût total et vos droits de rétractation : cet engagement est le sien, pas celui d'{brand}.
 
 ## 3. Options vendues par {brand} {#options}
 
 ### 3.1 État des ventes {#options-1}
 
-Les options payantes de {brand} (« Remontée », « À la Une », abonnements Pro) ne sont pas encore en vente. L'offre de lancement des comptes Pro est gratuite : aucun paiement n'est demandé. Aucune facilité de paiement en plusieurs fois n'est prévue.
+Les options payantes d'{brand} (« Remontée », « À la Une », abonnements Pro) ne sont pas encore en vente. L'offre de lancement des comptes Pro est gratuite : aucun paiement n'est demandé. Aucune facilité de paiement en plusieurs fois n'est prévue.
 
 ### 3.2 Votre banque {#options-2}
 
 Votre banque ou l'émetteur de votre carte peut vous proposer de fractionner un paiement par carte. C'est un contrat entre vous et lui : {brand} n'en est pas partie.
 
-## 4. Rôle de {brand} {#role}
+## 4. Rôle d'{brand} {#role}
 
 ### 4.1 Ni vendeur, ni acheteur, ni intermédiaire de paiement {#role-1}
 
@@ -50,7 +50,7 @@ Votre banque ou l'émetteur de votre carte peut vous proposer de fractionner un 
 
 L'annonceur est seul responsable de son annonce et de la transaction qui s'ensuit. Les conditions de paiement, y compris un éventuel paiement échelonné, se règlent entre l'acheteur et le vendeur. {brand} répond de la bonne exécution des options et abonnements qu'elle vend elle-même, selon les conditions générales de vente applicables une fois les ventes ouvertes, et de ses propres obligations décrites dans les [CGU](/legal/cgu#responsabilite-3).
 
-Rien dans les présentes ne limite la responsabilité de {brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.
+Rien dans les présentes ne limite la responsabilité d'{brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.
 
 ### 4.3 Pour en savoir plus {#role-3}
 

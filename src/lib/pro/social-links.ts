@@ -1,6 +1,7 @@
 import "server-only";
 import { audit } from "@/lib/audit";
 import type { AuthContext, StaffContext } from "@/lib/auth/guards";
+import { getAbuseRules } from "@/lib/config/runtime";
 import type { ProSocialInput, ProSocialResponse, ProSocialView } from "@/lib/contracts/pro";
 import { getProProfile, proProfileRef, proProfileToFirestore, type ProProfileRecord } from "@/lib/db/repositories/pro-profiles";
 import { db } from "@/lib/firebase/admin";
@@ -35,11 +36,11 @@ function revalidateShop(profile: ProProfileRecord): void {
 
 /** PUT /api/pro/me/social: the owner's links, replaced whole (an empty list removes them). */
 export async function updateSocialLinks(auth: AuthContext, input: ProSocialInput, now = new Date()): Promise<ProSocialResponse> {
-  const owned = await ownedPublishingShop(auth);
+  const [owned, { prohibited }] = await Promise.all([ownedPublishingShop(auth), getAbuseRules()]);
   const links: SocialLinksDoc["links"] = [];
   for (const link of input.links) {
     if (link.value.trim() === "") continue;
-    const checked = checkSocialLink(link.network, link.value);
+    const checked = checkSocialLink(link.network, link.value, prohibited);
     if ("problem" in checked) throw new HttpError(422, "social_link_invalid", "social link refused", { details: { network: link.network, problem: checked.problem } });
     links.push({ network: link.network, handle: checked.handle });
   }

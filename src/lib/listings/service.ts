@@ -181,7 +181,7 @@ export async function createDraft(actor: Actor, input: CreateListingInput, now =
     attributes: {},
     price: null,
     priceNegotiable: false,
-    isDonation: false,
+    isDonation: input.isDonation === true && subcategory?.donationAllowed === true,
     photos: [],
     contact: { messaging: true, showPhone: false, whatsapp: false },
     boosts: {},

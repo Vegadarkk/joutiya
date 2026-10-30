@@ -102,7 +102,7 @@ async function verifyPhone(page: Page, request: APIRequestContext): Promise<void
   const started = page.waitForResponse((response) => response.url().endsWith("/api/auth/phone/start") && response.request().method() === "POST");
   await page.getByRole("button", { name: "Obtenir mon code" }).click();
   const { code } = (await (await started).json()) as { code: string };
-  const hit = signedInbound(`212${digits}`, `JOUTIYA ${code}`, `wamid.e2e.${Date.now()}.post`);
+  const hit = signedInbound(`212${digits}`, `AALAN ${code}`, `wamid.e2e.${Date.now()}.post`);
   const delivered = await request.post("/api/webhooks/whatsapp", { data: hit.raw, headers: { "content-type": "application/json", "x-hub-signature-256": hit.signature } });
   expect(delivered.status()).toBe(200);
   await expect(page.getByRole("heading", { name: "Numéro vérifié" })).toBeVisible({ timeout: 20_000 });
@@ -117,7 +117,7 @@ async function photoWithExif(): Promise<Buffer> {
   return sharp(grid, { raw: { width: 26, height: 19, channels: 3 } })
     .resize(2600, 1950, { kernel: "nearest" })
     .jpeg({ quality: 90 })
-    .withExif({ IFD0: { Make: "Joutiya E2E", Model: "Camera", Copyright: "Joutiya test fixture" } })
+    .withExif({ IFD0: { Make: "Aalan E2E", Model: "Camera", Copyright: "Aalan test fixture" } })
     .toBuffer();
 }
 
@@ -179,6 +179,9 @@ test.describe("posting wizard", () => {
     await page.getByRole("combobox", { name: /Ville/ }).fill("Casab");
     await page.getByRole("option", { name: "Casablanca", exact: true }).click();
     await expect(page.getByRole("textbox", { name: "Région" })).toHaveValue("Casablanca-Settat");
+    // The contact step ahead is prefilled from the account: shown as such, not as done.
+    const contactStep = page.locator('nav[aria-label="Étapes du dépôt"] li button', { hasText: "Contact" });
+    await expect(contactStep).toContainText("préremplie, à vérifier");
     await next(page);
 
     // 8. Contact: the verified badge unlocks the phone switch.
@@ -201,6 +204,8 @@ test.describe("posting wizard", () => {
     // Result screen, then the public page with its photo served as a WebP variant.
     await expect(page).toHaveURL(new RegExp(`/fr/deposer/${listingId}/termine$`));
     await expect(page.getByRole("heading", { level: 1, name: "Votre annonce est en ligne" })).toBeVisible();
+    // No share sheet in this browser: the button says what it does.
+    await expect(page.getByRole("button", { name: "Copier le lien" })).toBeVisible();
     const view = page.getByRole("link", { name: "Voir l'annonce" });
     await expect(view).toHaveAttribute("href", `/fr/annonce/${answer.slugId}`);
     await view.click();
@@ -248,7 +253,7 @@ test.describe("posting wizard", () => {
 
     // 8. Contact: messaging only here, even with the verified badge.
     await expect(page).toHaveURL(/\/contact$/);
-    await expect(page.getByText(/uniquement par la messagerie Joutiya/)).toBeVisible();
+    await expect(page.getByText(/uniquement par la messagerie Aalan/)).toBeVisible();
     await expect(page.getByRole("switch", { name: /Afficher mon numéro sur l'annonce/ })).toBeDisabled();
     await next(page);
 

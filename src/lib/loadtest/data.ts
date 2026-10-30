@@ -103,7 +103,7 @@ export function loadtestListing(series: "zz" | "zy", n: number, now: Date): List
     status: "published",
     slugId: buildSlugId({ id, title, city: city.nameFr, categoryId: sub.categoryId }),
     title,
-    description: `Annonce fictive du test de charge de Joutiya (${word}, ${city.nameFr}). Elle est supprimée après le test.`,
+    description: `Annonce fictive du test de charge d'Aalan (${word}, ${city.nameFr}). Elle est supprimée après le test.`,
     categoryId: sub.categoryId,
     subcategoryId: sub.id,
     attributes: attributesOf(sub, random),

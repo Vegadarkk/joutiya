@@ -131,7 +131,7 @@ function SignInForm({ accessEmail, nonce, turnstileSiteKey }: Omit<LoginFormProp
       <div>
         <h1 className="text-2xl font-semibold">Connexion</h1>
         <p className="mt-1 text-sm text-foreground-muted">
-          Back-office Joutiya. Votre identité Cloudflare Access est vérifiée ; saisissez le mot de passe de votre compte du personnel.
+          Back-office Aalan. Votre identité Cloudflare Access est vérifiée ; saisissez le mot de passe de votre compte du personnel.
         </p>
       </div>
       <Field label="E-mail" hint={accessEmail ? "Fourni par Cloudflare Access." : undefined} required>

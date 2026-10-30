@@ -8,7 +8,7 @@ import { Container } from "@/components/layout/container";
 import { RentalDatesBar } from "@/components/rental/rental-dates-bar";
 import { SaveSearchButton } from "@/components/saved-searches/save-search-button";
 import { ActiveFilterChips } from "@/components/search/active-filter-chips";
-import { FeaturedRow, withoutFeatured } from "@/components/search/featured-row";
+import { FeaturedHeading, FeaturedRow, withoutFeatured } from "@/components/search/featured-row";
 import { FiltersSheet } from "@/components/search/filters-sheet";
 import { DetailPanel } from "@/components/search/map/detail-panel";
 import { HeaderSearchBridge, PanelHandle, RowsArea, SheetHandle, ViewToggle } from "@/components/search/map/map-controls";
@@ -172,6 +172,7 @@ function Results({ response, locale, title, count, promos, map, publisher, trans
             <>
               <RowsArea className="search-rows">
                 <PendingRegion className="flex flex-col gap-3">
+                  {hits.length === 0 && featuredRows.length > 0 ? <FeaturedHeading id="featured-rows-title" empty className="px-2 pt-1" /> : null}
                   {featuredRows.length > 0 ? <ResultRows listings={featuredRows} cards={cards} renderAction={rowFavorite} priorityCount={2} label={own("featuredRows")} /> : null}
                   {organicRows.length > 0 ? <ResultRows listings={organicRows} cards={cards} renderAction={rowFavorite} priorityCount={4} label={t("results")} /> : null}
                 </PendingRegion>
@@ -214,7 +215,7 @@ function Results({ response, locale, title, count, promos, map, publisher, trans
                   </div>
                 </div>
               ) : (
-                <FeaturedRow cards={featured} locale={locale} renderAction={favoriteAction} />
+                <FeaturedRow cards={featured} locale={locale} renderAction={favoriteAction} empty />
               )}
             </PendingRegion>
           </ListViewOnly>

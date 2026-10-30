@@ -33,7 +33,7 @@ export const RATE_LIMITS = {
   // Sign-up attempt on an e-mail that already has an account: the warning mail to its owner is
   // sent 3 times per hour at most per normalized e-mail (mail bombing); the answer never changes.
   "signup.existing.email": { points: 3, duration: HOUR, policy: "closed", key: "email" },
-  // Google sign-in (/api/auth/google and /api/auth/session): 10 per hour per device, 60 per hour per IP.
+  // Google sign-in (/api/auth/google): 10 per hour per device, 60 per hour per IP.
   "google.device": { points: 10, duration: HOUR, policy: "closed", key: "device" },
   "google.ip": { points: 60, duration: HOUR, policy: "closed", key: "ip" },
   // /api/auth/login: 5 failures in 15 min then a 15 min lock for this account + IP /64;
@@ -193,6 +193,10 @@ export const RATE_LIMITS = {
   "search.ip48": { points: 1200, duration: MINUTE, policy: "open", key: "ip48" },
   // After a solved challenge (30 min pass): a bounded allowance, then 429.
   "search.passed.device": { points: 300, duration: 30 * MINUTE, policy: "open", key: "device" },
+  // Map detail panel cards (/api/listings/{id}/preview): one search-index query per pin opened (one
+  // more round trip on a « Prix repère » cache miss), no Firestore read. 240 per minute per IP, 2 400 per /48.
+  "preview.ip": { points: 240, duration: MINUTE, policy: "open", key: "ip" },
+  "preview.ip48": { points: 2400, duration: MINUTE, policy: "open", key: "ip48" },
   // Server-rendered pages /annonce, /c, /profil, /boutique (proxy.ts): visitor 120 per hour per
   // device, signed in 600 per hour, 1 200 per hour per IP /64; verified bots exempt.
   "pages.device": { points: 120, duration: HOUR, policy: "open", key: "device" },

@@ -19,7 +19,13 @@ export function RefineChips({ params, facets, className }: { params: SearchParam
   const subcategories = items[0]?.kind === "subcategory";
   return (
     <nav aria-label={subcategories ? t("subcategories") : t("categories")} className={cn("-mx-4 sm:mx-0", className)}>
-      <ul className="flex snap-x gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
+      <ul
+        className={cn(
+          "flex snap-x gap-2 overflow-x-auto ps-4 pe-14 pb-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden",
+          // Phones: the row fades at its end and the last chip scrolls clear of it (UX audit, 8); the map panel keeps its own row (globals.css).
+          "[mask-image:linear-gradient(to_right,#000_calc(100%-3rem),transparent)] rtl:[mask-image:linear-gradient(to_left,#000_calc(100%-3rem),transparent)] sm:[mask-image:none]",
+        )}
+      >
         {items.map((item) => (
           <li key={item.id} className="shrink-0 snap-start">
             <SearchLink

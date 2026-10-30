@@ -73,15 +73,27 @@ jobs:
           ZAP_AUTH_HEADER_SITE: staging.joutiya.ma
         run: |
           if [[ "$TARGET" == "staging" ]]; then url="https://staging.joutiya.ma/fr"; else url="https://joutiya.ma/fr"; unset ZAP_AUTH_HEADER ZAP_AUTH_HEADER_VALUE ZAP_AUTH_HEADER_SITE; fi
-          if [[ "$MODE" == "full" ]]; then script=zap-full-scan.py; minutes=10; else script=zap-baseline.py; minutes=3; fi
+          # The active scan has no time limit of its own (-m caps the spider, -T the start and passive
+          # wait): ZAP's scanner.* keys stop it within the job's 90 minutes, so the reports still get
+          # written (the run of 30 Oct 2026 was still scanning after 75 minutes).
+          zap_options=()
+          if [[ "$MODE" == "full" ]]; then
+            script=zap-full-scan.py; minutes=10
+            zap_options=(-z "-config scanner.maxScanDurationInMins=55 -config scanner.maxRuleDurationInMins=5")
+          else
+            script=zap-baseline.py; minutes=3
+          fi
           work="$RUNNER_TEMP/zap"
           install -d -m 0777 "$work"
           cp .zap/rules.tsv "$work/rules.tsv"
+          # Staging sends its CSP as Content-Security-Policy-Report-Only by design (§6), which 10038
+          # reads as no CSP: a warning there, a failure on production.
+          if [[ "$TARGET" == "staging" ]]; then sed -i 's/^10038\tFAIL\t/10038\tWARN\t/' "$work/rules.tsv"; fi
           docker pull --quiet "$ZAP_IMAGE"
           set +e
           # Console output to the encrypted report only: it lists URLs and findings.
           docker run --rm -v "$work:/zap/wrk:rw" -e ZAP_AUTH_HEADER -e ZAP_AUTH_HEADER_VALUE -e ZAP_AUTH_HEADER_SITE \
-            "$ZAP_IMAGE" "$script" -t "$url" -c rules.tsv -m "$minutes" -T 60 -J report.json -r report.html > "$work/console.txt" 2>&1
+            "$ZAP_IMAGE" "$script" -t "$url" -c rules.tsv -m "$minutes" -T 60 "${zap_options[@]}" -J report.json -r report.html > "$work/console.txt" 2>&1
           code=$?
           set -e
           echo "code=$code" >> "$GITHUB_OUTPUT"

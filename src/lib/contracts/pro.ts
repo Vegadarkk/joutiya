@@ -39,6 +39,10 @@ export const proApplySchema = z
     uploadIds: z.array(z.string().min(1).max(64)).min(KYBC_MIN_PIECES).max(KYBC_MAX_PIECES),
     /** Compliance commitment (§7 art. 30-inspired traceability): must be ticked. */
     complianceCommitment: z.literal(true),
+    /** The activity chosen with the application (journey review 2026-10-29): a general shop by default. */
+    sector: z.enum(PRO_SECTORS).default("general"),
+    /** The agency commitments of `sector` (src/lib/pro/commitments.ts), ticked: required for an agency sector. */
+    sectorCommitment: z.literal(true).optional(),
     turnstileToken: turnstileTokenSchema,
   })
   .strict();
@@ -176,6 +180,8 @@ export interface ProReview {
   description: string;
   regionCode: string;
   citySlug: string;
+  /** Business sector chosen with the application (a general shop when none). */
+  sector: ProSector;
   legal: Record<string, string>;
   kybc: {
     status: string;

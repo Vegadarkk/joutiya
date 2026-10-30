@@ -26,6 +26,14 @@ describe("proApplySchema", () => {
     expect(proApplySchema.safeParse({ ...base, uploadIds: Array.from({ length: 7 }, (_, i) => `u${i}`) }).success).toBe(false);
   });
 
+  it("takes the activity: a general shop by default, an agency with its commitments", () => {
+    expect(proApplySchema.parse(base).sector).toBe("general");
+    expect(proApplySchema.parse({ ...base, sector: "real_estate", sectorCommitment: true })).toMatchObject({ sector: "real_estate", sectorCommitment: true });
+    // The server refuses an agency without its commitments (src/lib/pro/service.ts); the schema only knows the sectors.
+    expect(proApplySchema.safeParse({ ...base, sector: "dealer" }).success).toBe(false);
+    expect(proApplySchema.safeParse({ ...base, sectorCommitment: false }).success).toBe(false);
+  });
+
   it("refuses unknown fields and a missing Turnstile token", () => {
     expect(proApplySchema.safeParse({ ...base, role: "pro" }).success).toBe(false);
     const { turnstileToken: _omit, ...withoutToken } = base;

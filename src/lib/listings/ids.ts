@@ -95,9 +95,13 @@ export interface ParsedSlugId {
   slug: string;
 }
 
-/** The `{slug}-{id}` segment of a URL, or a bare id; `null` when no listing id can be read. */
+/**
+ * The `{slug}-{id}` segment of a URL, or a bare id; `null` when no listing id can be read. A slug
+ * other than `slugify`'s alphabet is refused before any read: a dotted path skips proxy.ts and its
+ * page limits, so `x.<n>-{id}` would cost one Firestore read per URL.
+ */
 export function parseSlugId(segment: string): ParsedSlugId | null {
-  if (segment.length > SLUG_ID_MAX + 40 || segment.length < LISTING_ID_LENGTH) return null;
+  if (segment.length > SLUG_ID_MAX + 40 || segment.length < LISTING_ID_LENGTH || !/^[a-z0-9-]+$/.test(segment)) return null;
   const id = segment.slice(-LISTING_ID_LENGTH);
   if (!isListingId(id)) return null;
   if (segment.length === LISTING_ID_LENGTH) return { id, slug: "" };

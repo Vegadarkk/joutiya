@@ -1,15 +1,13 @@
 import { CarFront, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { RENTAL_SUBCATEGORY } from "@/config/categories";
 import { Link } from "@/i18n/navigation";
-import { canonicalSearchParams, searchPath } from "@/lib/search/params";
+import { RENT_CAR_SEARCH } from "@/lib/search/shortcuts";
 import { cn } from "@/lib/utils";
 
 // "Louer une voiture" in the home map's panel (Carte vivante, lot 3): the rental module's promise
 // as one card linking to the car rental search, where the city and the dates are chosen (the search
-// page's dates bar). The full form stays on the list view of the home page (RentCarModule).
-
-export const RENT_CAR_SEARCH = searchPath(canonicalSearchParams({ category: "vehicules", subcategory: RENTAL_SUBCATEGORY }));
+// page's dates bar; src/lib/search/shortcuts.ts). The full form stays on the list view of the home
+// page (RentCarModule).
 
 export function RentCarLink({ className }: { className?: string }) {
   const t = useTranslations("Rental.home");

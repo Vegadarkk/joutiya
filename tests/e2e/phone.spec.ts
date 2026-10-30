@@ -132,7 +132,7 @@ test.describe("phone verification", () => {
     // The page shows the code, the wa.me link and Joutiya's number, and waits. Both numbers are in
     // the national form, as after a reload.
     await expect(page.getByRole("heading", { name: "Envoyez ce code sur WhatsApp" })).toBeVisible();
-    await expect(page.getByText(`Depuis le WhatsApp du ${inSentence(number.national)}, envoyez le message ci-dessous au numéro de Joutiya.`)).toBeVisible();
+    await expect(page.getByText(`Depuis le WhatsApp du ${inSentence(number.national)}, envoyez le message ci-dessous au numéro d'Aalan.`)).toBeVisible();
     await expect(page.getByText("06 00 00 00 00", { exact: true })).toBeVisible();
     await expect(page.getByText(answer.code, { exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Ouvrir WhatsApp" })).toHaveAttribute("href", answer.waLink);
@@ -140,12 +140,12 @@ test.describe("phone verification", () => {
 
     // A wrong code from the right phone changes nothing.
     const wrong = String((Number(answer.code) + 1) % 1_000_000).padStart(6, "0");
-    const miss = signedInbound(number.from, `JOUTIYA ${wrong}`, `wamid.e2e.${Date.now()}.miss`);
+    const miss = signedInbound(number.from, `AALAN ${wrong}`, `wamid.e2e.${Date.now()}.miss`);
     expect((await request.post("/api/webhooks/whatsapp", { data: miss.raw, headers: { "content-type": "application/json", "x-hub-signature-256": miss.signature } })).status()).toBe(200);
     expect(((await (await request.get("/api/auth/phone/status", { headers: { cookie: await sessionCookie(page) } })).json()) as { status: string }).status).toBe("pending");
 
     // The user sends the code from their phone: Meta delivers it to the webhook.
-    const hit = signedInbound(number.from, `JOUTIYA ${answer.code}`, `wamid.e2e.${Date.now()}.hit`);
+    const hit = signedInbound(number.from, `AALAN ${answer.code}`, `wamid.e2e.${Date.now()}.hit`);
     const delivered = await request.post("/api/webhooks/whatsapp", { data: hit.raw, headers: { "content-type": "application/json", "x-hub-signature-256": hit.signature } });
     expect(delivered.status()).toBe(200);
     expect(await delivered.json()).toEqual({ received: true });
@@ -164,7 +164,7 @@ test.describe("phone verification", () => {
   });
 
   test("the webhook refuses an unsigned payload and answers the subscription handshake", async ({ request }) => {
-    const { raw } = signedInbound("212600000001", "JOUTIYA 123456", `wamid.e2e.${Date.now()}.unsigned`);
+    const { raw } = signedInbound("212600000001", "AALAN 123456", `wamid.e2e.${Date.now()}.unsigned`);
     expect((await request.post("/api/webhooks/whatsapp", { data: raw, headers: { "content-type": "application/json" } })).status()).toBe(403);
     expect((await request.post("/api/webhooks/whatsapp", { data: raw, headers: { "content-type": "application/json", "x-hub-signature-256": `sha256=${"0".repeat(64)}` } })).status()).toBe(403);
     const handshake = await request.get("/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=e2e-whatsapp-verify-token&hub.challenge=424242");

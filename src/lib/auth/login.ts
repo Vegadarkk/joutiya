@@ -1,5 +1,4 @@
 import "server-only";
-import { RATE_LIMITS } from "@/config/rate-limits";
 import { loginSchema, type LoginResponse } from "@/lib/contracts/auth";
 import { emailNormHash } from "@/lib/db/repositories/users";
 import { auth } from "@/lib/firebase/admin";
@@ -9,7 +8,7 @@ import { createSessionForUid, createSessionFromServerSignIn, type MintedSession 
 import { HttpError, forbidden, unavailable } from "@/lib/http/errors";
 import { readJson } from "@/lib/http/json";
 import { logConnection } from "@/lib/logging/connection-logs";
-import { assertLimit, blockLimit, consumeLimit, consumedPoints, limitState, resetLimit } from "@/lib/rate-limit/limiter";
+import { assertLimit, blockLimit, consumeLimit, consumedPoints, limitState, rateLimitDefinition, resetLimit } from "@/lib/rate-limit/limiter";
 import { classifySignInError } from "./accounts";
 import { activateMember } from "./activation";
 import { anonymous, beginAnonymous, checkTurnstile, finish, hasPass, respond } from "./anonymous";
@@ -20,9 +19,7 @@ import { sessionSummary } from "./summary";
 // Toolkit REST API, applies the account + IP lockout (5 failures / 15 min), Turnstile from the 3rd
 // failure (20 per hour on the account: mandatory), then mints the session cookie.
 
-export const LOCK_SECONDS = RATE_LIMITS["login.fail.accountIp"].blockDuration;
 export const TURNSTILE_AFTER_FAILURES = 3;
-export const ACCOUNT_FAILURE_LIMIT = RATE_LIMITS["login.fail.account"].points;
 
 export interface LoginKeys {
   account: string;
@@ -40,14 +37,20 @@ export function loginKeys(email: string, ipBucket: string): LoginKeys {
 }
 
 /** 429 `account_locked` once this account + IP exhausted its failures; Retry-After is the real time left on the lock. */
-export async function assertNotLocked(keys: LoginKeys): Promise<{ failures: number; accountFailures: number }> {
-  const [state, accountFailures] = await Promise.all([limitState("login.fail.accountIp", keys.accountIp), consumedPoints("login.fail.account", keys.account)]);
+export async function assertNotLocked(keys: LoginKeys): Promise<{ failures: number; accountFailures: number; accountFailureLimit: number }> {
+  // Thresholds of the limiters as applied (config/abuse overrides included).
+  const [state, accountFailures, pair, account] = await Promise.all([
+    limitState("login.fail.accountIp", keys.accountIp),
+    consumedPoints("login.fail.account", keys.account),
+    rateLimitDefinition("login.fail.accountIp"),
+    rateLimitDefinition("login.fail.account"),
+  ]);
   // Both limits are policy "closed": an unreadable counter never reads as "no failures" (a lock or
   // a mandatory Turnstile would silently lift), the same answer as the staff login.
   if (!state || accountFailures === null) throw unavailable("rate limiter unavailable");
-  const result = { failures: state.consumedPoints, accountFailures };
-  if (result.failures >= RATE_LIMITS["login.fail.accountIp"].points) {
-    const retryAfter = state.msBeforeNext > 0 ? Math.ceil(state.msBeforeNext / 1000) : LOCK_SECONDS;
+  const result = { failures: state.consumedPoints, accountFailures, accountFailureLimit: account.points };
+  if (result.failures >= pair.points) {
+    const retryAfter = state.msBeforeNext > 0 ? Math.ceil(state.msBeforeNext / 1000) : (pair.blockDuration ?? pair.duration);
     throw new HttpError(429, "account_locked", undefined, { headers: { "Retry-After": String(retryAfter) } });
   }
   return result;
@@ -105,12 +108,12 @@ async function login(request: Request): Promise<Response> {
   if (networkOutcome && !networkOutcome.ok && networkOutcome.reason === "unavailable") assertLimit("login.ip48", networkOutcome);
   const ipEscalated = !ipOutcome.ok || (networkOutcome !== null && !networkOutcome.ok);
   const keys = loginKeys(input.email, flow.identity.ipBucket);
-  const { failures, accountFailures } = await assertNotLocked(keys);
+  const { failures, accountFailures, accountFailureLimit } = await assertNotLocked(keys);
 
   // The 30-minute pass lifts the IP and account + IP escalations only: 20 failures per hour on
   // the account (an attack spread over many IPs) make Turnstile mandatory on every attempt.
   const pass = hasPass(flow, request);
-  const turnstileNeeded = ((failures >= TURNSTILE_AFTER_FAILURES || ipEscalated) && !pass) || accountFailures >= ACCOUNT_FAILURE_LIMIT;
+  const turnstileNeeded = ((failures >= TURNSTILE_AFTER_FAILURES || ipEscalated) && !pass) || accountFailures >= accountFailureLimit;
   if (turnstileNeeded) {
     if (!input.turnstileToken) return respond<LoginResponse>(flow, { status: "turnstile_required" });
     await checkTurnstile(flow, input.turnstileToken, "login");

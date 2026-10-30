@@ -10,6 +10,8 @@ import { MessagesProvider } from "./messages-provider";
 // The messaging panel (design phase-5 D2): the conversation list and the open thread side by side
 // from lg, one at a time below (the list at /messages, the thread at /messages/{cid}). The panel
 // fills the viewport under the sticky header so the thread scrolls inside it, composer at the bottom.
+// `data-shell="app"`: below lg the site footer steps aside (footer.tsx), an application screen has
+// no 25 links under its composer (UX audit, finding 9).
 
 /** The open conversation id from the child segment, null on /messages itself. */
 export function selectedConversation(segment: string | null): string | null {
@@ -22,6 +24,7 @@ export function MessagesShell({ children }: { children: ReactNode }) {
   return (
     <MessagesProvider>
       <div
+        data-shell="app"
         className={cn(
           "flex h-[calc(100dvh-4rem)] min-h-[26rem] w-full overflow-hidden bg-surface md:h-[calc(100dvh-5rem)]",
           "lg:h-[calc(100dvh-8rem)] lg:rounded-lg lg:border lg:border-border lg:shadow-sm",

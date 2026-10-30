@@ -27,8 +27,7 @@ import { sessionSummary } from "./summary";
 // Google sign-in through Google Identity Services (PLAN "Research corrections"): the browser sends
 // the Google ID token, the server verifies it (signature, issuer, audience, verified e-mail, the
 // nonce of this page), then signs the account in or, with the consents and Turnstile, creates it.
-// The provider is linked on the Auth record (sub) so the SDK popup flow (/api/auth/session)
-// resolves to the same account.
+// The provider is linked on the Auth record (sub).
 
 const GOOGLE_JWKS = "https://www.googleapis.com/oauth2/v3/certs";
 export const GOOGLE_ISSUERS = ["accounts.google.com", "https://accounts.google.com"];

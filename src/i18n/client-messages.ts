@@ -24,6 +24,9 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   "ListingPage.contact",
   "ListingPage.catalogue",
   "ListingPage.promo",
+  // "Partager" beside the favourite button (UX journeys counter-review, 8).
+  "ListingPage.share",
+  "Guide.search",
   "Map",
   "Auth.common",
   "Auth.errors",
@@ -83,9 +86,10 @@ export const HOME_PAGE_CLIENT_NAMESPACES = ["SearchMap"] as const;
 
 /**
  * Added on the help centre pages only (src/app/[locale]/(public)/aide/layout.tsx): the article
- * search box and the Assistant Joutiya widget (design phase-5 D25).
+ * search box and the Assistant Joutiya widget (design phase-5 D25), and the contact page's "Signaler
+ * un contenu illicite" form (DSA art. 16).
  */
-export const HELP_PAGE_CLIENT_NAMESPACES = ["Help.search", "Help.assistant"] as const;
+export const HELP_PAGE_CLIENT_NAMESPACES = ["Help.search", "Help.assistant", "Contact.report"] as const;
 
 /** The subtrees of `messages` named by `paths` ("Auth.menu" keeps `{ Auth: { menu } }`); unknown paths are skipped. */
 export function pickMessages(messages: AbstractIntlMessages, paths: readonly string[]): AbstractIntlMessages {

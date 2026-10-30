@@ -11,6 +11,8 @@ import { HeaderSearch } from "./header-search";
 import { IntentLink } from "./intent-link";
 import { LocaleSwitcher } from "./locale-switcher";
 import { Logo } from "./logo";
+import { ProEntry } from "./pro-entry";
+import { RentEntry } from "./rent-entry";
 import { SellFab } from "./sell-fab";
 
 // Header of the Carte vivante (lot 1): separate floating pieces on the page ground, never one solid
@@ -21,6 +23,10 @@ import { SellFab } from "./sell-fab";
 // The search pill hides on pages whose main content has its own search form (the help centre):
 // never two search fields at once. On /recherche the pill is the page's search (lot 2), filled
 // from the URL, and over the map view the band turns clear so that its pieces float on the map.
+// Owner's choice B (29 Oct 2026): "Louer" (menu of the two rental searches) and "Espace Pro" stand
+// between the account pill and "Vendre" from lg, compact until xl; below lg they live in the account
+// menus. The header and its category row run to max-w-7xl, 88rem from xl, wider than the page's
+// max-w-6xl, so the search pill keeps its room beside the six pieces (its place segment waits for xl).
 
 export function SiteHeader({ locale }: { locale: string }) {
   const t = useTranslations("Nav");
@@ -31,7 +37,7 @@ export function SiteHeader({ locale }: { locale: string }) {
     <>
       {/* Over the search map (lot 2) the band goes clear: only its pieces float, the map takes the rest. */}
       <header className="header-lift sticky top-0 z-40 bg-background/85 backdrop-blur-md search-map:pointer-events-none search-map:bg-transparent search-map:backdrop-blur-none search-map:[animation:none]">
-        <Container className="flex h-16 items-center gap-2 md:h-20 md:gap-3 lg:gap-4 search-map:*:pointer-events-auto search-map:lg:max-w-none">
+        <Container className="flex h-16 max-w-7xl items-center gap-2 md:h-20 md:gap-3 lg:gap-4 xl:max-w-[88rem] search-map:*:pointer-events-auto search-map:lg:max-w-none">
           {/* On every page: the home payload is prefetched when the visitor reaches for the logo, not during load. */}
           <IntentLink
             href="/"
@@ -51,6 +57,8 @@ export function SiteHeader({ locale }: { locale: string }) {
               {/* Phones reach the languages from the footer. */}
               <LocaleSwitcher className="hidden rounded-full px-3 md:inline-flex" />
             </div>
+            <RentEntry />
+            <ProEntry />
             <Link href="/deposer" className="sell-arch hidden h-13 items-center gap-1.5 ps-4 pe-5 font-semibold transition-[background-color,scale] duration-150 ease-door hover:bg-ochre-700 active:scale-[0.98] md:inline-flex">
               <Plus className="size-5" strokeWidth={2.25} aria-hidden="true" />
               {t("sell")}
@@ -60,7 +68,7 @@ export function SiteHeader({ locale }: { locale: string }) {
         </Container>
       </header>
       <CategoryChips items={chips} label={t("categories")} guide={t("guide")} />
-      <SellFab label={t("post")} />
+      <SellFab label={t("post")} text={t("sell")} />
     </>
   );
 }

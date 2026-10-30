@@ -126,8 +126,8 @@ describe("header search pill", () => {
     expect(html).toContain(`<label for="${/<label for="([^"]+-input)"/.exec(html)?.[1]}" class="sr-only">${ar.Nav.searchPlace}</label>`);
     expect(fr.Nav.searchPlace).not.toMatch(/ville/i);
     expect(html).toContain(`aria-label="${ar.Nav.searchSubmit}"`);
-    // The place segment from lg only: phones and tablets search by words.
-    expect(html).toMatch(/<div class="relative hidden w-52 [^"]*lg:block[^"]*"><div class="relative flex flex-col/);
+    // The place segment from xl only: phones, tablets and lg laptops search by words.
+    expect(html).toMatch(/<div class="relative hidden w-48 [^"]*xl:block[^"]*"><div class="relative flex flex-col/);
   });
 });
 

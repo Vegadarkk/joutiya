@@ -12,7 +12,7 @@ import { CityLinks, LandingBreadcrumb, SubcategoryChips, type LandingChip, type 
 import { Button } from "@/components/ui/button";
 import { categoryById } from "@/config/categories";
 import { cityBySlug, cityName } from "@/config/regions";
-import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
+import { CANONICAL_ORIGIN, SITE_NAME, LOCALE_TAGS, type Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
 import { numbersLocale, pageLocale } from "@/i18n/params";
 import { alternates } from "@/lib/i18n/metadata";
@@ -89,7 +89,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     title,
     description,
     alternates: alternates(locale, path),
-    openGraph: { type: "website", siteName: "Joutiya", locale: LOCALE_TAGS[locale].replace("-", "_"), url: `/${locale}${path}`, title, description },
+    openGraph: { type: "website", siteName: SITE_NAME, locale: LOCALE_TAGS[locale].replace("-", "_"), url: `/${locale}${path}`, title, description },
     twitter: { card: "summary", title, description },
     // Thin pages stay reachable and pass their links on, out of the index (D15).
     ...(data.verdict === "noindex" ? { robots: { index: false, follow: true } } : {}),

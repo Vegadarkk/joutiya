@@ -37,21 +37,23 @@ const LIGHT_TINT: Partial<Flavor> = {
   highway: "#fbf7ef",
 };
 
+// Dark: the sea a shade darker than the land and the roads lighter than both, so the coast and the
+// main roads stay readable under the pins (UX audit, 29 Oct 2026).
 const DARK_TINT: Partial<Flavor> = {
-  background: "#081e20",
-  earth: "#0e2c2e",
-  water: "#081e20",
-  park_a: "#123a33",
-  park_b: "#11372f",
-  wood_a: "#123a33",
-  wood_b: "#11372f",
-  sand: "#183531",
-  beach: "#183531",
-  buildings: "#143a3c",
-  minor_a: "#1a4547",
-  minor_b: "#1a4547",
-  major: "#215051",
-  highway: "#2a5a58",
+  background: "#05171a",
+  earth: "#143739",
+  water: "#05171a",
+  park_a: "#18443c",
+  park_b: "#173f38",
+  wood_a: "#18443c",
+  wood_b: "#173f38",
+  sand: "#1f403b",
+  beach: "#1f403b",
+  buildings: "#1c4547",
+  minor_a: "#265254",
+  minor_b: "#265254",
+  major: "#33696a",
+  highway: "#437c78",
 };
 
 export function searchFlavor(theme: MapTheme): Flavor {

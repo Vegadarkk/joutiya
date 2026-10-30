@@ -193,6 +193,15 @@ describe("SellerCard", () => {
     expect(html).toMatch(/<a [^>]*dir="auto"[^>]*>Salma<\/a>/);
   });
 
+  it("sends a Pro with a storefront to /boutique: name and 'Voir la boutique' with the count", () => {
+    const html = render(<SellerCard seller={{ ...seller, sellerType: "pro" }} fallbackName="" fallbackType="pro" locale="fr" storefront="maison-lalla-abcd1234" />);
+    expect(html).not.toContain("/profil/");
+    expect(html.match(/href="\/fr\/boutique\/maison-lalla-abcd1234"/g)).toHaveLength(2);
+    const content = text(html);
+    expect(content).toContain("Voir la boutique");
+    expect(content).toContain("2 annonces en ligne");
+  });
+
   it("falls back to the denormalized name, without profile link, when the account has no public face", () => {
     const html = render(<SellerCard seller={null} fallbackName="Garage Atlas" fallbackType="pro" locale="fr" />);
     expect(html).not.toContain("/profil/");
@@ -303,7 +312,7 @@ describe("PropertyTerms", () => {
     expect(html).toMatch(/<dd dir="auto"[^>]*>CASA-118<\/dd>/);
     // Declared data, never shown as verified: the advertiser alone answers for them.
     expect(html).toContain('data-testid="property-terms-declared"');
-    expect(shown).toContain("sous sa seule responsabilité. Joutiya ne les vérifie pas");
+    expect(shown).toContain("sous sa seule responsabilité. Aalan ne les vérifie pas");
   });
 
   it("states included or no fees, an off-plan delivery and a declared tourist authorisation", () => {

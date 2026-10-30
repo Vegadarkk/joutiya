@@ -38,6 +38,21 @@ export function SafetyTips({ variant = "goods", className }: { variant?: keyof t
           </li>
         ))}
       </ul>
+      {/* The notice and the users' contact one step away (DSA art. 12 and 16, Phase 6 review). */}
+      <p className="text-sm text-pretty">
+        {t.rich("report", {
+          report: (chunks) => (
+            <a href="#signaler" className={cn("font-medium text-link", textLinkClassName)}>
+              {chunks}
+            </a>
+          ),
+          contact: (chunks) => (
+            <Link href="/aide/contact" className={cn("font-medium text-link", textLinkClassName)}>
+              {chunks}
+            </Link>
+          ),
+        })}
+      </p>
       <p className="text-xs text-foreground-muted text-pretty">{t("host")}</p>
       <Link href="/legal/confiance-et-securite" className={cn("-my-2 inline-flex min-h-11 items-center self-start rounded-sm text-sm font-medium text-link", textLinkClassName)}>
         {t("more")}

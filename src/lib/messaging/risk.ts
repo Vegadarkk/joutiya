@@ -5,9 +5,10 @@ import { containsPhoneNumber } from "@/lib/moderation/phones";
 import { detectSensitiveDetailed } from "@/lib/moderation/sensitive";
 
 // Message risk (architecture §7 step 7, design D5): local rules, never AI. Every URL or bare domain
-// except joutiya.ma is replaced by URL_MARKER in the stored text (the original goes to the
+// except aalan.ma, a3lan.ma and joutiya.ma are replaced by URL_MARKER in the stored text (the original goes to the
 // server-only evidence document); flags warn the recipient. A phone number or a WhatsApp mention
-// alone is NOT flagged (normal in Morocco): only together with a payment keyword. Pure.
+// alone is NOT flagged (normal in Morocco): only together with a payment keyword. Pure. The server
+// passes the keywords with the private extras of Firestore `config/abuse` (getAbuseRules).
 //
 // URL shapes follow src/lib/moderation/contacts.ts (scheme or www., known messaging and social
 // hosts such as wa.me and t.me, bare domains on a short TLD list), with spans so they can be
@@ -22,7 +23,7 @@ const BARE_DOMAIN = /(?<![a-z0-9@.-])[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|ma|net|
 const TRAILING_PUNCTUATION = /[.,;:!?)\]}»"']+$/;
 
 /** Links to the platform itself stay readable. */
-const OWN_HOST = /^(?:[a-z0-9-]+\.)*joutiya\.ma$/;
+const OWN_HOST = /^(?:[a-z0-9-]+\.)*(?:aalan|a3lan|joutiya)\.ma$/;
 
 interface Span {
   start: number;
@@ -73,8 +74,17 @@ export function maskLinks(text: string): { text: string; count: number } {
   return { text: out + text.slice(cursor), count: links.length };
 }
 
-let paymentKeywords: CompiledKeyword[] | undefined;
-let contactKeywords: CompiledKeyword[] | undefined;
+/** Payment and contact-app keywords, compiled: the committed lists plus the server's `config/abuse` extras. */
+export interface MessageKeywords {
+  readonly payment: readonly CompiledKeyword[];
+  readonly contactApps: readonly CompiledKeyword[];
+}
+
+export function compileMessageKeywords(extra: { paymentKeywords: readonly string[]; contactAppKeywords: readonly string[] } = { paymentKeywords: [], contactAppKeywords: [] }): MessageKeywords {
+  return { payment: compileKeywords([...PAYMENT_KEYWORDS, ...extra.paymentKeywords]), contactApps: compileKeywords([...CONTACT_APP_KEYWORDS, ...extra.contactAppKeywords]) };
+}
+
+let committedKeywords: MessageKeywords | undefined;
 
 function bankDetails(text: string): boolean {
   return detectSensitiveDetailed(text).some((hit) => hit.id === "bank_account" || hit.id === "card_number");
@@ -89,19 +99,17 @@ export interface MessageAnalysis {
   masked: boolean;
 }
 
-/** Risk flags and masked text of a message (D5). */
-export function analyzeMessage(text: string): MessageAnalysis {
+/** Risk flags and masked text of a message (D5); `keywords`: the server's compiled config/abuse lists (default: the committed ones). */
+export function analyzeMessage(text: string, keywords: MessageKeywords = (committedKeywords ??= compileMessageKeywords())): MessageAnalysis {
   const masked = maskLinks(text);
   const tokens = new TokenizedText(text);
-  paymentKeywords ??= compileKeywords(PAYMENT_KEYWORDS);
-  contactKeywords ??= compileKeywords(CONTACT_APP_KEYWORDS);
-  const payment = tokens.find(paymentKeywords).length > 0;
+  const payment = tokens.find(keywords.payment).length > 0;
   const raised = new Set<MessageRiskFlag>();
   if (masked.count > 0) raised.add("external_url");
   if (bankDetails(text)) raised.add("iban");
   if (payment) {
     raised.add("payment_kw");
-    if (containsPhoneNumber(text) || tokens.find(contactKeywords).length > 0) raised.add("contact_with_payment_kw");
+    if (containsPhoneNumber(text) || tokens.find(keywords.contactApps).length > 0) raised.add("contact_with_payment_kw");
   }
   return { text: masked.text, flags: MESSAGE_RISK_FLAGS.filter((flag) => raised.has(flag)), masked: masked.count > 0 };
 }

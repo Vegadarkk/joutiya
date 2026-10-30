@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /**
- * The door of the logo (public/brand/joutiya-icon.svg geometry): horseshoe pointed arch, khoukha,
+ * The door of the logo (public/brand/aalan-icon.svg geometry): horseshoe pointed arch, khoukha,
  * eight-point door star and gold threshold. Used for empty states and brand moments instead of
  * stock illustrations.
  */

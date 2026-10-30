@@ -2,7 +2,7 @@ import "server-only";
 import { randomInt } from "node:crypto";
 import { launchOfferOpen, listingQuotas } from "@/config/pricing";
 import type { AuthContext } from "@/lib/auth/guards";
-import { getFlags, getPricing } from "@/lib/config/runtime";
+import { getAbuseRules, getFlags, getPricing } from "@/lib/config/runtime";
 import type { SectionsInput, SectionsResponse, ShopSection } from "@/lib/contracts/catalog";
 import type { ProAgencyInput, ProAgencyResponse, ProApplyInput, ProMeResponse, ProRentalInput, ProRentalResponse } from "@/lib/contracts/pro";
 import { db } from "@/lib/firebase/admin";
@@ -70,6 +70,9 @@ export async function assertCanApply(auth: AuthContext): Promise<{ user: UserDoc
 export async function submitApplication(actor: ProActor, input: ProApplyInput, now = new Date()): Promise<{ proId: string }> {
   const uid = actor.auth.user.uid;
   const { user, existing } = await assertCanApply(actor.auth);
+  // An agency applies as such (journey review 2026-10-29): its trade's commitments come with the shop's.
+  const agencyScope = sectorCommitmentScope(input.sector);
+  if (agencyScope && !input.sectorCommitment) throw new HttpError(400, "commitments_required", "the agency commitments must be accepted");
   // The badge may be false only while the WhatsApp check is unavailable: the number to call is then part of the application.
   let phoneToCheck: string | undefined;
   if (!user.badges.phoneVerified) {
@@ -109,6 +112,7 @@ export async function submitApplication(actor: ProActor, input: ProApplyInput, n
     plan: "none",
     planSource: "none",
     quotas: listingQuotas({ type: "pro", plan: "none" }, pricing),
+    ...(agencyScope ? { sector: input.sector, sectorCommitment: { sector: input.sector, version: COMMITMENTS_VERSION, at: now } } : {}),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -180,13 +184,13 @@ export async function proSelf(auth: AuthContext): Promise<ProMeResponse> {
  * suspended), from the session claims; the storefront is revalidated when shown.
  */
 export async function updateAgency(auth: AuthContext, input: ProAgencyInput, now = new Date()): Promise<ProAgencyResponse> {
-  const profile = await ownedPublishingShop(auth);
+  const [profile, { prohibited }] = await Promise.all([ownedPublishingShop(auth), getAbuseRules()]);
   // Becoming an agency takes the trade's legal commitments, ticked by the owner (owner ask 2026-10-29).
   const becomesAgency = sectorCommitmentScope(input.sector) !== null && input.sector !== (profile.sector ?? "general");
   if (becomesAgency && !input.acceptCommitments) throw new HttpError(400, "commitments_required", "the agency commitments must be accepted");
   const feeSchedule = input.sector === "real_estate" ? input.feeSchedule : "";
   // The listing text rules, sensitive data refused outright (as a member's storefront bio).
-  const issue = feeSchedule ? firstStrictIssue(feeSchedule) : null;
+  const issue = feeSchedule ? firstStrictIssue(feeSchedule, prohibited) : null;
   if (issue) throw new HttpError(422, "invalid_text", "fee schedule refused by the text screen", { details: { field: "feeSchedule", issue } });
   await proProfileRef(profile.proId).update({
     sector: input.sector,
@@ -210,11 +214,11 @@ const newSectionId = () => Array.from({ length: 6 }, () => SECTION_ID_ALPHABET[r
  * storefront text screen.
  */
 export async function updateSections(auth: AuthContext, input: SectionsInput, now = new Date()): Promise<SectionsResponse> {
-  const profile = await ownedPublishingShop(auth);
+  const [profile, { prohibited }] = await Promise.all([ownedPublishingShop(auth), getAbuseRules()]);
   const known = new Set((profile.sections ?? []).map((section) => section.id));
   const used = new Set<string>();
   const sections: ShopSection[] = input.sections.map((section, index) => {
-    const issue = firstStrictIssue(section.name);
+    const issue = firstStrictIssue(section.name, prohibited);
     if (issue) throw new HttpError(422, "invalid_text", "section name refused by the text screen", { details: { field: `sections.${index}.name`, issue } });
     let id = section.id && known.has(section.id) && !used.has(section.id) ? section.id : newSectionId();
     while (used.has(id) || (id !== section.id && known.has(id))) id = newSectionId();
@@ -245,10 +249,10 @@ export async function ownedPublishingShop(auth: AuthContext): Promise<ProProfile
  * the document check made against the previous one (decision 5).
  */
 export async function updateRentalAgency(auth: AuthContext, input: ProRentalInput, now = new Date()): Promise<ProRentalResponse> {
-  const profile = await ownedPublishingShop(auth);
+  const [profile, { prohibited }] = await Promise.all([ownedPublishingShop(auth), getAbuseRules()]);
   const texts: [string, string][] = [["hours", input.hours], ...input.branches.map((branch, index): [string, string] => [`branches.${index}.address`, branch.address])];
   for (const [field, text] of texts) {
-    const issue = text ? firstStrictIssue(text) : null;
+    const issue = text ? firstStrictIssue(text, prohibited) : null;
     if (issue) throw new HttpError(422, "invalid_text", "rental settings refused by the text screen", { details: { field, issue } });
   }
   // The licence check was made against the previous reference: a new one needs a new document.

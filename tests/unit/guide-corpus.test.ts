@@ -55,7 +55,7 @@ describe("guide corpus", () => {
   it("fills the brand, dates a rubric by its latest reviewed source, maps categories", () => {
     const page = guideRubricPage("fr", "auto-entrepreneur");
     expect(page.intro).not.toContain("{brand}");
-    expect(page.intro).toContain("Joutiya");
+    expect(page.intro).toContain("Aalan");
     expect(page.reviewedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     for (const rubric of GUIDE_RUBRICS) expect(guideRubricPage("ar", rubric).procedures.length).toBeGreaterThan(0);
     expect(rubricForCategory("vehicules")).toBe("vehicule");

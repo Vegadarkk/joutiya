@@ -10,7 +10,7 @@ Dans cette politique, « {brand} » et « nous » désignent l'éditeur du site 
 
 ### 1.1 Le responsable du traitement {#responsable-1}
 
-Le responsable du traitement est {publisherIdentity}, éditeur de {brand}, {address}. Les informations complètes sur l'éditeur figurent dans les Mentions légales.
+Le responsable du traitement est {publisherIdentity}, éditeur d'{brand}, {address}. Les informations complètes sur l'éditeur figurent dans les Mentions légales.
 
 {brand} est un service de petites annonces : elle héberge les annonces publiées par ses utilisateurs. Elle n'est ni vendeur, ni acheteur, ni mandataire, et n'est pas partie aux contrats conclus entre utilisateurs.
 
@@ -40,9 +40,9 @@ L'annonceur :
 - ne publie aucune donnée sensible (santé, vie ou orientation sexuelle, religion, opinions, origine) ni aucune donnée d'un tiers sans son accord explicite ;
 - corrige ou retire son annonce quand une personne concernée ou {brand} le lui demande.
 
-Quelle que soit cette répartition, vous pouvez exercer vos droits auprès de {brand} (§8), y compris si vous n'avez pas de compte et qu'une annonce vous concerne.
+Quelle que soit cette répartition, vous pouvez exercer vos droits auprès d'{brand} (§8), y compris si vous n'avez pas de compte et qu'une annonce vous concerne.
 
-Rien dans les présentes ne limite la responsabilité de {brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.
+Rien dans les présentes ne limite la responsabilité d'{brand} en cas de faute lourde, de dol ou de dommage corporel, ni les droits que la loi accorde au consommateur.
 
 ### 1.3 Nous contacter {#responsable-3}
 
@@ -129,7 +129,7 @@ Quand un traitement repose sur notre intérêt légitime, vous pouvez vous y opp
 
 ### 3.1 Votre compte {#finalites-1}
 
-Nous utilisons les données de votre compte pour l'ouvrir, vérifier votre adresse e-mail, vous connecter, afficher votre profil public et le gérer jusqu'à sa clôture. Votre profil public (votre vitrine) montre votre pseudonyme, votre ville ou région si vous l'indiquez, votre texte de présentation (500 caractères au plus, contrôlé par des règles automatiques comme une annonce) et la bannière choisie parmi celles de {brand}, vos badges (téléphone vérifié et, pour un professionnel, « Pro » et, lorsqu'il est proposé, « Certifié »), vos annonces en ligne et vos statistiques de réponse.
+Nous utilisons les données de votre compte pour l'ouvrir, vérifier votre adresse e-mail, vous connecter, afficher votre profil public et le gérer jusqu'à sa clôture. Votre profil public (votre vitrine) montre votre pseudonyme, votre ville ou région si vous l'indiquez, votre texte de présentation (500 caractères au plus, contrôlé par des règles automatiques comme une annonce) et la bannière choisie parmi celles d'{brand}, vos badges (téléphone vérifié et, pour un professionnel, « Pro » et, lorsqu'il est proposé, « Certifié »), vos annonces en ligne et vos statistiques de réponse.
 
 Un compte dont l'adresse e-mail n'est pas confirmée sous 24 heures est supprimé.
 
@@ -184,10 +184,10 @@ Après un échange par la messagerie, l'acheteur peut noter le vendeur (voir [Av
 
 ### 3.8 Les comptes Pro et leur vérification {#finalites-8}
 
-Les comptes Pro sont ouverts dès le lancement de {brand}. Avant sa première publication en tant que Pro, chaque compte est vérifié : identifiants légaux selon la forme de l'entreprise, contrôle du format de l'ICE et, si besoin, consultation d'un registre public, téléphone vérifié, engagement de conformité.
+Les comptes Pro sont ouverts dès le lancement d'{brand}. Avant sa première publication en tant que Pro, chaque compte est vérifié : identifiants légaux selon la forme de l'entreprise, contrôle du format de l'ICE et, si besoin, consultation d'un registre public, téléphone vérifié, engagement de conformité.
 
 **Les pièces justificatives (documents de vérification).** Selon la forme de l'entreprise, nous demandons par exemple un extrait du registre du commerce, la carte d'auto-entrepreneur ou l'attestation de taxe professionnelle.
-- **Pourquoi :** vérifier qu'un compte Pro correspond à une entreprise réelle avant sa première publication. C'est une diligence que {brand} applique volontairement, inspirée de l'article 30 du règlement sur les services numériques. Les pièces ne servent à aucune autre fin.
+- **Pourquoi :** vérifier qu'un compte Pro correspond à une entreprise réelle avant sa première publication. C'est une diligence qu'{brand} applique volontairement, inspirée de l'article 30 du règlement sur les services numériques. Les pièces ne servent à aucune autre fin.
 - **Qui les voit :** elles sont accessibles aux seuls modérateurs et administrateurs depuis l'espace d'administration (et, pour la décision d'agrément d'un loueur de voitures, à l'IA décrite ci-dessous), chaque consultation étant journalisée. Vous pouvez aussi consulter vos propres pièces. Elles ne sont jamais publiques et ne sont pas communiquées aux autres utilisateurs.
 - **Où elles sont gardées :** dans un espace de stockage privé de notre prestataire Cloudflare, dans l'Union européenne, donc hors du Maroc (§6.2 et §7).
 - **Combien de temps :** 6 mois après la fin de la relation avec le compte Pro (§5.1), puis suppression. Le gel du §5.3 reste possible.
@@ -217,7 +217,7 @@ Tant que les ventes d'options payantes ne sont pas ouvertes, {brand} ne traite a
 
 {brand} peut afficher des publicités fournies par Google (AdSense) sur certaines pages publiques. Il n'y en a jamais sur la messagerie, votre compte, le dépôt d'annonce, le paiement, les pages légales ni les pages en tarifit.
 
-Ces publicités et leurs traceurs ne fonctionnent qu'avec votre accord, donné ou refusé dans la bannière de cookies aussi simplement l'un que l'autre. Vous pouvez accepter la publicité sans accepter sa personnalisation. Si vous refusez, aucune demande publicitaire n'est envoyée à Google et vous voyez à la place des messages de {brand}. Tant que la publicité n'est pas activée sur {brand}, aucune donnée n'est transmise à Google à cette fin.
+Ces publicités et leurs traceurs ne fonctionnent qu'avec votre accord, donné ou refusé dans la bannière de cookies aussi simplement l'un que l'autre. Vous pouvez accepter la publicité sans accepter sa personnalisation. Si vous refusez, aucune demande publicitaire n'est envoyée à Google et vous voyez à la place des messages d'{brand}. Tant que la publicité n'est pas activée sur {brand}, aucune donnée n'est transmise à Google à cette fin.
 
 Avec votre accord, Google collecte sur nos pages des données techniques : identifiants de cookies, adresse IP, navigateur, page consultée. {brand} ne transmet à Google ni votre e-mail, ni votre téléphone, ni vos messages, ni les données de votre compte.
 
@@ -334,7 +334,7 @@ Un contenu ou un compte visé par un signalement en cours, un recours ou une dem
 
 {brand} ne vend pas vos données et ne les loue pas.
 
-### 6.1 Au sein de {brand} {#destinataires-1}
+### 6.1 Au sein d'{brand} {#destinataires-1}
 
 Seules les personnes chargées de faire fonctionner et de modérer {brand} accèdent à vos données, chacune pour ce dont elle a besoin. Le personnel utilise des comptes séparés, protégés par une double authentification, avec des sessions de 8 heures au plus. Ses accès aux conversations et aux données de connexion sont limités et enregistrés.
 
@@ -354,7 +354,7 @@ Nos prestataires (sous-traitants) traitent vos données uniquement selon nos ins
 | Meta (WhatsApp) | Réception des messages de vérification du téléphone | États-Unis |
 <!--endif-->
 | Resend | Envoi des e-mails | États-Unis |
-| Hostinger | Nom de domaine et boîtes de messagerie de {brand} (contact, signalements, données personnelles, abus) | Union européenne |
+| Hostinger | Nom de domaine et boîtes de messagerie d'{brand} (contact, signalements, données personnelles, abus) | Union européenne |
 | Brevo | Envoi de secours des e-mails de sécurité, si Resend est indisponible | Union européenne |
 | Sentry | Suivi des erreurs techniques | Rapports stockés dans l'Union européenne ; accès possible depuis les États-Unis |
 | Stripe | Paiements, à l'ouverture des ventes | États-Unis |
@@ -491,7 +491,7 @@ Aucune mesure ne supprime tout risque. Protégez aussi votre compte : un mot de 
 
 ## 11. Cookies et traceurs {#cookies}
 
-Les cookies et traceurs utilisés par {brand}, leurs finalités et leurs durées sont décrits sur la page « Gestion des cookies ». Tant que {brand} n'utilise que des cookies nécessaires, aucun accord n'est demandé. Dès que des traceurs soumis à votre accord sont utilisés, une bannière vous le demande, et vous pouvez modifier vos choix à tout moment par le lien « Gérer mes cookies », en bas de chaque page.
+Les cookies et traceurs utilisés par {brand}, leurs finalités et leurs durées sont décrits sur la page « Gestion des cookies ». Tant qu'{brand} n'utilise que des cookies nécessaires, aucun accord n'est demandé. Dès que des traceurs soumis à votre accord sont utilisés, une bannière vous le demande, et vous pouvez modifier vos choix à tout moment par le lien « Gérer mes cookies », en bas de chaque page.
 
 ## 12. Modifications de cette politique {#modifications}
 

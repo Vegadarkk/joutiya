@@ -5,22 +5,22 @@ type Role = TemplateData["staffInvite"]["role"];
 
 const COPY: Record<MailLocale, { subject: string; title: string; roles: Record<Role, string>; body: (role: string) => string[]; button: string; notYou: string }> = {
   fr: {
-    subject: "Invitation à rejoindre l'équipe Joutiya",
-    title: "Invitation à l'équipe Joutiya",
+    subject: "Invitation à rejoindre l'équipe Aalan",
+    title: "Invitation à l'équipe Aalan",
     roles: { moderator: "modérateur·rice", admin: "administrateur·rice" },
     body: (role) => [
-      `Tu es invité·e à rejoindre l'équipe Joutiya en tant que ${role}. Accepte l'invitation pour activer ton accès au back-office.`,
+      `Tu es invité·e à rejoindre l'équipe Aalan en tant que ${role}. Accepte l'invitation pour activer ton accès au back-office.`,
       "L'accès passe par Cloudflare Access avec ton compte Google : la validation en deux étapes doit y être activée.",
     ],
     button: "Accepter l'invitation",
     notYou: "Si tu n'attendais pas cette invitation, ignore cet e-mail.",
   },
   ar: {
-    subject: "دعوة للانضمام إلى فريق Joutiya",
-    title: "دعوة إلى فريق Joutiya",
+    subject: "دعوة للانضمام إلى فريق Aalan",
+    title: "دعوة إلى فريق Aalan",
     roles: { moderator: "مشرف", admin: "مدير" },
     body: (role) => [
-      `أنت مدعو للانضمام إلى فريق Joutiya بصفة ${role}. اقبل الدعوة لتفعيل وصولك إلى لوحة الإدارة.`,
+      `أنت مدعو للانضمام إلى فريق Aalan بصفة ${role}. اقبل الدعوة لتفعيل وصولك إلى لوحة الإدارة.`,
       "يتم الوصول عبر Cloudflare Access بحساب Google الخاص بك، ويجب تفعيل التحقق بخطوتين عليه.",
     ],
     button: "قبول الدعوة",

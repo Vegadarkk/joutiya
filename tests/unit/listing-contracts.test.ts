@@ -83,6 +83,7 @@ describe("listingPatchSchema", () => {
     expect(createListingSchema.safeParse({ categoryId: "vehicules", subcategoryId: "voitures" }).success).toBe(true);
     expect(createListingSchema.safeParse({ categoryId: "vehicules", subcategoryId: "vente" }).success).toBe(false);
     expect(createListingSchema.safeParse({ title: "x" }).success).toBe(false);
+    expect(createListingSchema.safeParse({ categoryId: "loisirs", subcategoryId: "livres", isDonation: true }).success).toBe(true);
   });
 });
 

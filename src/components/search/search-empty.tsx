@@ -15,7 +15,8 @@ import { SearchLink } from "./search-navigation";
 
 // No result (design §2 L3b): say so plainly, then offer the next step: remove one filter, widen
 // the place, check the words, or start over. A search with no filter at all means the site has no
-// listing yet: invite to post one. `action` takes L5's "save this search" (alerts).
+// listing yet: invite to post one. `action` takes L5's "save this search" (alerts). No `w-full` on the
+// section: the map panel gives it side margins (globals.css) and a full width overflowed it (UX audit, 2).
 
 interface SearchEmptyProps {
   params: SearchParams;
@@ -62,7 +63,7 @@ export function SearchEmpty({ params, locale, outOfRange = false, action, classN
   const filters = describeFilters(params, locale, labels);
   const wider = widenings(params);
   return (
-    <section data-testid="search-empty" aria-labelledby="search-empty-title" className={cn("mx-auto flex w-full max-w-xl flex-col items-center gap-5 py-12 text-center", className)}>
+    <section data-testid="search-empty" aria-labelledby="search-empty-title" className={cn("mx-auto flex max-w-xl flex-col items-center gap-5 py-12 text-center", className)}>
       <DoorMark className="w-16" />
       <div className="flex flex-col gap-2">
         <h2 id="search-empty-title" className="text-xl font-semibold text-balance">

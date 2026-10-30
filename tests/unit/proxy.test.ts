@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { proxy } from "@/proxy";
+import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
+import { config, proxy } from "@/proxy";
 import { resetServerEnv } from "@/lib/env";
 import { INLINE_HASH_MARKER } from "@/lib/security/csp";
 import { PINNED_SCRIPT_HASHES } from "@/lib/security/inline-hashes";
@@ -30,6 +31,14 @@ afterEach(() => {
 
 /** One directive of a policy, e.g. "img-src 'self' data: ...". */
 const directive = (policy: string, name: string) => policy.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name} `)) ?? "";
+
+describe("proxy matcher", () => {
+  it("skips build assets and asset files, never a dotted page path", () => {
+    const matches = (url: string) => unstable_doesMiddlewareMatch({ config, url });
+    for (const url of ["/_next/static/chunks/a.js", "/_next/image", "/robots.txt", "/ads.txt", "/sitemap.xml", "/sitemaps/index.xml", "/brand/joutiya-icon.svg", "/vendor/maplibre-gl-5.0.0-worker.mjs"]) expect(matches(url), url).toBe(false);
+    for (const url of ["/", "/fr", "/fr/annonce/velo-abcdefgh", "/fr/annonce/x.1-abcdefgh", "/fr/messages/a.b", "/comptes/a.b", "/fr/x.svg.html", "/api/health"]) expect(matches(url), url).toBe(true);
+  });
+});
 
 describe("proxy", () => {
   it("hides the back office on the public host", async () => {

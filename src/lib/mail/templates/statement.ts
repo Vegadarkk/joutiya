@@ -9,7 +9,7 @@ import type { MailLocale } from "./layout";
 
 const FLAGS: Record<MailLocale, Record<string, string>> = {
   fr: {
-    prohibited_kw: "mention d'un objet ou d'un service interdit sur Joutiya",
+    prohibited_kw: "mention d'un objet ou d'un service interdit sur Aalan",
     prohibited_soft: "vocabulaire proche d'un objet ou d'un service interdit",
     sensitive_text: "données personnelles sensibles dans le texte (santé, religion, opinions, origine, vie privée)",
     third_party_phone: "coordonnées d'un tiers dans le texte",
@@ -27,7 +27,7 @@ const FLAGS: Record<MailLocale, Record<string, string>> = {
     promo_check: "promotion de plus de 70 % : un modérateur vérifie le prix de départ avant la remise en ligne",
   },
   ar: {
-    prohibited_kw: "ذكر غرض أو خدمة ممنوعة على Joutiya",
+    prohibited_kw: "ذكر غرض أو خدمة ممنوعة على Aalan",
     prohibited_soft: "مفردات قريبة من غرض أو خدمة ممنوعة",
     sensitive_text: "بيانات شخصية حساسة في النص (الصحة، الدين، الآراء، الأصل، الحياة الخاصة)",
     third_party_phone: "بيانات اتصال لشخص آخر في النص",
@@ -63,7 +63,7 @@ const COPY: Record<MailLocale, StatementCopy> = {
     noFacts: "Faits constatés : signaux de risque relevés par le contrôle automatique.",
     ground: "Fondement : ",
     automated: "Cette mesure a été prise par un traitement automatisé, sans intervention humaine à ce stade.",
-    human: "Cette décision a été prise par un modérateur de Joutiya, après examen de l'annonce.",
+    human: "Cette décision a été prise par un modérateur d'Aalan, après examen de l'annonce.",
     redress: (email, ref, human) =>
       `Pour la contester, écrivez à ${email}${ref ? ` en indiquant la référence ${ref}` : ""} : ${human ? "une autre personne" : "un modérateur"} réexaminera votre annonce.`,
   },
@@ -73,7 +73,7 @@ const COPY: Record<MailLocale, StatementCopy> = {
     noFacts: "الوقائع المسجّلة: مؤشرات خطر رصدها الفحص الآلي.",
     ground: "الأساس: ",
     automated: "اتُّخذ هذا الإجراء بمعالجة آلية دون تدخل بشري في هذه المرحلة.",
-    human: "اتخذ هذا القرار مشرف لدى Joutiya بعد فحص الإعلان.",
+    human: "اتخذ هذا القرار مشرف لدى Aalan بعد فحص الإعلان.",
     redress: (email, ref, human) => `للاعتراض عليه، اكتب إلى ${email}${ref ? ` مع ذكر المرجع ${ref}` : ""}: ${human ? "سيعيد شخص آخر" : "سيعيد مشرف"} فحص إعلانك.`,
   },
 };

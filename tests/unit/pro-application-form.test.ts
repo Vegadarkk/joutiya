@@ -11,6 +11,7 @@ const ready: PieceState = { key: "p1", name: "rc.pdf", phase: "ready", uploadId:
 
 function draft(overrides: Partial<Draft> = {}): Draft {
   return {
+    activity: "shop",
     name: "Atelier Salma",
     description: "",
     city: cityBySlug("casablanca") ?? null,
@@ -18,6 +19,7 @@ function draft(overrides: Partial<Draft> = {}): Draft {
     ids: { ice: "001 234 567 000 089", rc: "12345", if: "4567890", aeNumber: "", tp: "", coopNumber: "" },
     phone: "",
     commitment: true,
+    sectorCommitment: false,
     ...overrides,
   };
 }
@@ -29,8 +31,8 @@ describe("draftProblems", () => {
   });
 
   it("flags each missing or malformed field", () => {
-    const empty = draft({ name: " ", city: null, form: null, commitment: false });
-    expect(draftProblems(empty, [], false, null)).toEqual({ name: "required", city: "cityRequired", form: "required", pieces: "piecesRequired", commitment: "commitmentRequired", challenge: "challenge" });
+    const empty = draft({ activity: null, name: " ", city: null, form: null, commitment: false });
+    expect(draftProblems(empty, [], false, null)).toEqual({ activity: "activityRequired", name: "required", city: "cityRequired", form: "required", pieces: "piecesRequired", commitment: "commitmentRequired", challenge: "challenge" });
     expect(draftProblems(draft({ name: "A" }), [ready], false, "t").name).toBe("nameLength");
     expect(draftProblems(draft({ ids: { ice: "12345", rc: "", if: "IF#1", aeNumber: "", tp: "", coopNumber: "" } }), [ready], false, "t")).toEqual({ ice: "iceFormat", rc: "required", if: "identifierFormat" });
   });
@@ -52,6 +54,14 @@ describe("draftProblems", () => {
     for (const phone of ["06 12 34 56 78", "+212 712-345-678", "00212612345678"]) expect(draftProblems(draft({ phone }), [ready], true, "t"), phone).toEqual({});
   });
 
+  it("asks an agency for its trade's commitments too, a dealership for the shop's only", () => {
+    for (const activity of ["real_estate", "car_rental", "holiday_rental"] as const) {
+      expect(draftProblems(draft({ activity }), [ready], false, "t"), activity).toEqual({ sectorCommitment: "sectorCommitmentRequired" });
+      expect(draftProblems(draft({ activity, sectorCommitment: true }), [ready], false, "t"), activity).toEqual({});
+    }
+    expect(draftProblems(draft({ activity: "dealer" }), [ready], false, "t")).toEqual({});
+  });
+
   it("waits for pieces still uploading and ignores refused ones", () => {
     const uploading: PieceState = { key: "p2", name: "tp.jpg", phase: "uploading", progress: 0.4 };
     const refused: PieceState = { key: "p3", name: "x.gif", phase: "rejected", reason: "bad_type" };
@@ -62,11 +72,13 @@ describe("draftProblems", () => {
 
 describe("initialDraft", () => {
   it("prefills a rejected application with what the server sends back", () => {
-    const previous = { name: "Atelier Salma", description: "Céramique", citySlug: "casablanca", legalForm: "commercant", ice: "001234567000089" } as ProSelfView;
+    const previous = { name: "Atelier Salma", description: "Céramique", citySlug: "casablanca", legalForm: "commercant", ice: "001234567000089", sector: "general" } as ProSelfView;
     const filled = initialDraft(previous);
-    expect(filled).toMatchObject({ name: "Atelier Salma", description: "Céramique", form: "commercant", commitment: false });
+    expect(filled).toMatchObject({ activity: "shop", name: "Atelier Salma", description: "Céramique", form: "commercant", commitment: false, sectorCommitment: false });
     expect(filled.city?.slug).toBe("casablanca");
     expect(filled.ids).toEqual({ ice: "001234567000089", rc: "", if: "", aeNumber: "", tp: "", coopNumber: "" });
-    expect(initialDraft(null).form).toBeNull();
+    // An agency's sector comes back as its activity; the commitments are ticked again.
+    expect(initialDraft({ ...previous, sector: "real_estate" }).activity).toBe("real_estate");
+    expect(initialDraft(null)).toMatchObject({ activity: null, form: null });
   });
 });

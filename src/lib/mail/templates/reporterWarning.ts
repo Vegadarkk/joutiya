@@ -23,7 +23,7 @@ const COPY: Record<MailLocale, Copy> = {
         ? [
             `Plusieurs de vos signalements récents (${data.count} en ${data.windowDays} jours) ont été jugés manifestement infondés.`,
             "Un signalement doit être fait de bonne foi, pour un contenu que vous estimez illicite ou contraire à nos règles. Si un nouveau signalement manifestement infondé est constaté dans les 30 prochains jours, nous cesserons de traiter vos signalements pendant 30 jours.",
-            "Vous pouvez continuer à utiliser Joutiya normalement.",
+            "Vous pouvez continuer à utiliser Aalan normalement.",
           ]
         : [
             "Malgré notre avertissement, un nouveau signalement manifestement infondé a été constaté.",
@@ -40,7 +40,7 @@ const COPY: Record<MailLocale, Copy> = {
         ? [
             `اعتُبر عدد من تبليغاتك الأخيرة (${data.count} خلال ${data.windowDays} يومًا) غير مؤسَّس بشكل واضح.`,
             "يجب أن يكون التبليغ بحسن نية، بخصوص محتوى تعتبره غير قانوني أو مخالفًا لقواعدنا. إذا لوحظ تبليغ جديد غير مؤسَّس بشكل واضح خلال الثلاثين يومًا القادمة، سنتوقف عن معالجة تبليغاتك لمدة 30 يومًا.",
-            "يمكنك مواصلة استعمال Joutiya بشكل عادي.",
+            "يمكنك مواصلة استعمال Aalan بشكل عادي.",
           ]
         : [
             "رغم إنذارنا، لوحظ تبليغ جديد غير مؤسَّس بشكل واضح.",

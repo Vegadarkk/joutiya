@@ -46,7 +46,8 @@ export function StatusPanel({ icon: Icon, title, children, actions, extra, headi
             <Icon className="size-7" aria-hidden="true" />
           </span>
         )}
-        <Heading ref={heading} tabIndex={-1} className="rounded-sm text-xl font-semibold text-balance outline-none focus-visible:ring-3 focus-visible:ring-ring/25">
+        {/* Focus moves here for screen readers (autoFocus); no ring, nobody clicked or tabbed to a title (UX audit, 15). */}
+        <Heading ref={heading} tabIndex={-1} className="text-xl font-semibold text-balance outline-none">
           {title}
         </Heading>
         {children ? <div className="max-w-sm text-foreground-muted text-pretty">{children}</div> : null}

@@ -198,13 +198,16 @@ export function interpretQuery(input: string): Interpretation {
       target = { category: [...categories][0] ?? "", ...(subcategories.size ? { subcategory: [...subcategories][0] } : {}), criteria };
     }
   }
+  // "location saisonnière", "location vacances" with nothing named: a holiday rental (journey review 2026-10-29).
+  const holidayAlone = !target && things.length === 0 && flags.holiday;
+  if (holidayAlone) target = { category: "immobilier", subcategory: "location-vacances", criteria: {} };
   if (target) {
     const families = new Set(things.map((match) => match.entry.family));
     const used = [
       ...things,
       ...of("sale"),
       ...(families.has("car") || families.has("property") ? of("rent") : []),
-      ...(families.has("property") ? of("holiday") : []),
+      ...(families.has("property") || holidayAlone ? of("holiday") : []),
     ];
     const tokensOf = used.flatMap(span);
     understood.push({ key: "category", label: labelOf(tokens, tokensOf), patch: { category: target.category, ...(target.subcategory ? { subcategory: target.subcategory } : {}) }, tokens: tokensOf, content: true });

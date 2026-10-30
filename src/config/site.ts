@@ -2,6 +2,12 @@
 
 export const LOCALES = ["fr", "ar", "rif"] as const;
 export type Locale = (typeof LOCALES)[number];
+/**
+ * Locales offered by the language menu and the account setting. Tarifit stays out until its native
+ * review (owner, decision card of 29 Oct 2026; 2 of its 4 089 strings were translated): the /rif
+ * pages stay reachable by URL, with their French fallback.
+ */
+export const SWITCHABLE_LOCALES: readonly Locale[] = ["fr", "ar"];
 export const DEFAULT_LOCALE: Locale = "fr";
 
 /** Right-to-left locales: `dir="rtl"` on <html>. */
@@ -21,7 +27,14 @@ export function isRtl(locale: Locale): boolean {
   return RTL_LOCALES.includes(locale);
 }
 
-export const SITE_NAME = "Joutiya";
+/**
+ * Public brand (owner, 2026-10-29: Joutiya renamed Aalan; OMPIC word mark AALAN). Arabic and
+ * Tifinagh spellings chosen by the owner the same day. "Joutiya" stays the internal project name
+ * (repository, cloud resources, JOUTIYA_* variables) and joutiya.ma stays ours as a redirect.
+ */
+export const BRAND = { latin: "Aalan", arabic: "أعلان", tifinagh: "ⴰⵄⵍⴰⵏ" } as const;
+
+export const SITE_NAME = BRAND.latin;
 
 /** Production origin, used for canonical URLs of prerendered pages (src/lib/i18n/metadata.ts). */
 export const CANONICAL_ORIGIN = "https://joutiya.ma";

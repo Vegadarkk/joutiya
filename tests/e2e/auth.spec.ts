@@ -300,14 +300,14 @@ test.describe("account", () => {
     const downloading = page.waitForEvent("download");
     await page.getByRole("button", { name: "Télécharger mes données" }).click();
     const file = await downloading;
-    expect(file.suggestedFilename()).toMatch(/^joutiya-mes-donnees-\d{4}-\d{2}-\d{2}\.json$/);
+    expect(file.suggestedFilename()).toMatch(/^aalan-mes-donnees-\d{4}-\d{2}-\d{2}\.json$/);
     const data = JSON.parse(await readFile(await file.path(), "utf8")) as { format: string; account: { email: string } };
     expect(data.format).toBe("joutiya.account-export");
     expect(data.account.email).toBe(email);
 
     // The closure: the time line, then an explicit acknowledgement before the button works.
     await page.getByRole("button", { name: "Fermer mon compte" }).click();
-    const dialog = page.getByRole("dialog", { name: "Fermer votre compte Joutiya ?" });
+    const dialog = page.getByRole("dialog", { name: "Fermer votre compte Aalan ?" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText("Aujourd'hui")).toBeVisible();
     const submit = dialog.getByRole("button", { name: "Fermer définitivement" });

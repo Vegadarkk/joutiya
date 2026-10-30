@@ -6,7 +6,7 @@ const COPY: Record<MailLocale, { subject: string; title: string; body: (phone: s
     subject: "Ton numéro de téléphone est vérifié",
     title: "Numéro vérifié",
     body: (phone) => [
-      `Ton numéro ${phone} est maintenant vérifié sur Joutiya. Tes annonces affichent le badge « Téléphone vérifié » et les acheteurs peuvent te contacter en confiance.`,
+      `Ton numéro ${phone} est maintenant vérifié sur Aalan. Tes annonces affichent le badge « Téléphone vérifié » et les acheteurs peuvent te contacter en confiance.`,
     ],
     button: "Voir mes paramètres",
     notYou: "Si tu n'es pas à l'origine de cette vérification, change ton mot de passe sans attendre.",
@@ -14,7 +14,7 @@ const COPY: Record<MailLocale, { subject: string; title: string; body: (phone: s
   ar: {
     subject: "تم التحقق من رقم هاتفك",
     title: "تم التحقق من الرقم",
-    body: (phone) => [`تم الآن التحقق من رقمك ${phone} على Joutiya. تعرض إعلاناتك شارة «هاتف موثّق» ويمكن للمشترين التواصل معك بثقة.`],
+    body: (phone) => [`تم الآن التحقق من رقمك ${phone} على Aalan. تعرض إعلاناتك شارة «هاتف موثّق» ويمكن للمشترين التواصل معك بثقة.`],
     button: "عرض إعداداتي",
     notYou: "إذا لم تكن أنت من قام بهذا التحقق، فغيّر كلمة المرور الخاصة بك فورًا.",
   },

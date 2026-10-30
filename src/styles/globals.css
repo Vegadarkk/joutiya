@@ -750,8 +750,12 @@ html[data-welcome]:has(#main:target) .welcome {
   & .search-panel-tools .search-refine > ul {
     flex-wrap: nowrap;
     overflow-x: auto;
-    padding-inline: 1rem;
+    padding-inline: 1rem 3.5rem;
     scroll-padding-inline: 1rem;
+    mask-image: linear-gradient(to right, #000 calc(100% - 3rem), transparent);
+  }
+  &:is([dir="rtl"] *) .search-panel-tools .search-refine > ul {
+    mask-image: linear-gradient(to left, #000 calc(100% - 3rem), transparent);
   }
   /* Narrow panel: "Sauvegarder" as a 44 px icon button, the sort without its visible label (both
      keep their accessible names). */
@@ -779,6 +783,19 @@ html[data-welcome]:has(#main:target) .welcome {
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: 0.5rem;
+  }
+  /* The rows do not end on a hard cut: a fade in the panel's colour rides the bottom of the scroll
+     and lands after the last row (UX audit, 8). */
+  & .search-rows::after {
+    content: "";
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    display: block;
+    flex: none;
+    height: 2.5rem;
+    background: linear-gradient(to top, var(--surface), transparent);
+    pointer-events: none;
   }
   & .search-map-pagination {
     padding: 0.25rem 0.5rem;
@@ -931,7 +948,7 @@ html[data-welcome]:has(#main:target) .welcome {
   background: #cfe3e6; /* The search map's water (search-style.ts): an unloaded tile reads as sea. */
 }
 [data-theme="dark"] .search-stage {
-  background: #081e20;
+  background: #05171a;
 }
 .search-stage .maplibregl-canvas:focus-visible {
   outline: 2px solid var(--ring);

@@ -185,10 +185,10 @@ describe("step machine", () => {
 
 describe(".ics", () => {
   it("is one event in UTC with an alarm two hours before", () => {
-    const ics = appointmentIcs({ id: "abcdefghijkl", slot: { start: Date.UTC(2026, 10, 5, 13, 30), minutes: 30 }, title: "Visite avec Salma, Joutiya", description: "Appartement; Maârif", place: "Agence", url: "https://joutiya.ma/fr/messages/x", now: NOW });
+    const ics = appointmentIcs({ id: "abcdefghijkl", slot: { start: Date.UTC(2026, 10, 5, 13, 30), minutes: 30 }, title: "Visite avec Salma, Aalan", description: "Appartement; Maârif", place: "Agence", url: "https://joutiya.ma/fr/messages/x", now: NOW });
     expect(ics).toContain("DTSTART:20261105T133000Z\r\n");
     expect(ics).toContain("DTEND:20261105T140000Z\r\n");
-    expect(ics).toContain("SUMMARY:Visite avec Salma\\, Joutiya\r\n");
+    expect(ics).toContain("SUMMARY:Visite avec Salma\\, Aalan\r\n");
     expect(ics).toContain("DESCRIPTION:Appartement\\; Maârif\r\n");
     expect(ics).toContain("TRIGGER:-PT2H");
     expect(ics.startsWith("BEGIN:VCALENDAR\r\n")).toBe(true);

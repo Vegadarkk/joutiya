@@ -1,7 +1,7 @@
 import { Fragment, cache } from "react";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
-import { BadgeCheck, CalendarDays, MapPin } from "lucide-react";
+import { BadgeCheck, CalendarDays, Flag, MapPin } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { EmptyState } from "@/components/feedback/empty-state";
@@ -17,15 +17,17 @@ import { RentalAgencyCard, RentalBranches, RentalConditions } from "@/components
 import { SellerInfo } from "@/components/pro/seller-info";
 import { SocialLinks } from "@/components/pro/social-links";
 import { StorefrontTabs } from "@/components/storefront/storefront-tabs";
+import { LandingBreadcrumb } from "@/components/seo/landing";
 import { ReportButton } from "@/components/report/report-button";
 import { RatingLink } from "@/components/reviews/rating-link";
 import { SellerReviews } from "@/components/reviews/seller-reviews";
 import { Button } from "@/components/ui/button";
+import { quietLinkClassName } from "@/components/ui/text-link";
 import { ExampleBanner } from "@/components/listing/example-banner";
 import { RENTAL_SUBCATEGORY, criterionById } from "@/config/categories";
 import { availablePromos } from "@/config/house-promos";
 import { cityBySlug, cityName } from "@/config/regions";
-import { CANONICAL_ORIGIN, LOCALE_TAGS, type Locale } from "@/config/site";
+import { CANONICAL_ORIGIN, SITE_NAME, LOCALE_TAGS, type Locale } from "@/config/site";
 import { Link } from "@/i18n/navigation";
 import { numbersLocale, pageLocale } from "@/i18n/params";
 import { getFlags } from "@/lib/config/runtime";
@@ -37,6 +39,7 @@ import { dealerStock } from "@/lib/search/dealer";
 import { rentalFleet } from "@/lib/search/rental-fleet";
 import type { RentalFleetView } from "@/lib/search/rental-fleet-view";
 import { searchPath } from "@/lib/search/params";
+import { DIRECTORY_PATH } from "@/lib/search/shortcuts";
 import { shopShelves, shopSubcategoryCounts } from "@/lib/search/storefront";
 import { mediaBaseUrl } from "@/lib/storage/keys";
 
@@ -97,7 +100,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     title,
     description,
     alternates: alternates(locale, path),
-    openGraph: { type: "website", siteName: "Joutiya", locale: LOCALE_TAGS[locale].replace("-", "_"), url: `/${locale}${path}`, title, description },
+    openGraph: { type: "website", siteName: SITE_NAME, locale: LOCALE_TAGS[locale].replace("-", "_"), url: `/${locale}${path}`, title, description },
     // An empty shop has nothing to show search engines yet; an example shop is not a business.
     ...(store.seller.publishedCount > 0 && !store.example ? {} : { robots: { index: false, follow: true } }),
   };
@@ -112,9 +115,10 @@ export default async function StorefrontPage({ params }: { params: Params }) {
   if (store.segment !== shop) permanentRedirect(storefrontPath(locale, store.segment));
 
   const rentalAgency = store.sector === "car_rental";
-  const [t, profile, criteria, legal, flags, vehicles, fleet, shelves] = await Promise.all([
+  const [t, profile, seo, criteria, legal, flags, vehicles, fleet, shelves] = await Promise.all([
     getTranslations({ locale: numbersLocale(locale), namespace: "Storefront" }),
     getTranslations({ locale: numbersLocale(locale), namespace: "Profile" }),
+    getTranslations({ locale, namespace: "Seo" }),
     getTranslations({ locale, namespace: "Criteria" }),
     getLegalConfig(),
     getFlags(),
@@ -171,6 +175,8 @@ export default async function StorefrontPage({ params }: { params: Params }) {
 
   return (
     <Container className="flex flex-col gap-10 py-8 lg:gap-12 lg:py-12">
+      {/* Back to the directory of shops (owner's choice of 30 Oct 2026), the way the category landings lead home. */}
+      <LandingBreadcrumb steps={[{ label: seo("home"), href: "/" }, { label: t("directory"), href: DIRECTORY_PATH }, { label: store.name }]} className="-mb-4 lg:-mb-6" />
       {/* The shop's door: the Pro green under the arch, its gold threshold, the monogram where a logo will go. */}
       <header data-testid="storefront-header" className="arch threshold flex flex-col items-center gap-5 rounded-b-lg bg-structure px-6 pt-12 pb-9 text-center text-structure-foreground sm:flex-row sm:items-end sm:gap-7 sm:px-10 sm:text-start">
         <span aria-hidden="true" className="flex size-20 shrink-0 items-center justify-center rounded-full bg-featured text-3xl font-semibold text-featured-foreground shadow-sm">
@@ -193,6 +199,11 @@ export default async function StorefrontPage({ params }: { params: Params }) {
               {profile("memberSince", { date: formatMemberSince(seller.memberSince, locale) })}
             </span>
             <RatingLink rating={seller.rating} locale={locale} />
+            {/* "Signaler" within reach of the header (DSA art. 16(1), Phase 6 review); the dialog itself stays below. */}
+            <a href="#signaler" className={`inline-flex min-h-11 items-center gap-1.5 ${quietLinkClassName}`}>
+              <Flag className="size-4 shrink-0" aria-hidden="true" />
+              {t("reportLink")}
+            </a>
           </div>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-sm bg-featured px-3 py-1 text-sm font-medium text-featured-foreground sm:ms-auto sm:self-start">
@@ -214,6 +225,9 @@ export default async function StorefrontPage({ params }: { params: Params }) {
             <p dir="auto" className="max-w-prose leading-relaxed whitespace-pre-line text-pretty">
               {store.description}
             </p>
+            {/* Under the presentation, not in the cards column: a two-line presentation beside a tall
+                column left a void under it (UX audit, finding 22). */}
+            {aside}
           </section>
         ) : null}
         <div className={store.description ? "flex flex-col gap-4 self-start" : "flex max-w-prose flex-col gap-4 lg:col-span-2"}>
@@ -221,7 +235,7 @@ export default async function StorefrontPage({ params }: { params: Params }) {
           <FeeSchedule text={store.feeSchedule} />
           <SocialLinks links={store.social} />
           {store.payment ? <PayAtSeller payment={store.payment} className="rounded-lg border border-border bg-surface p-4" /> : null}
-          {aside}
+          {store.description ? null : aside}
         </div>
       </div>
 
@@ -281,13 +295,16 @@ export default async function StorefrontPage({ params }: { params: Params }) {
 
       {/* Profiles stay out of the ad inventory (AF §8 table): house promotion only. */}
       <AdSlot placement="profile-bottom" eligible={false} promos={availablePromos(flags)} seed={store.segment} />
-      <ReportButton
-        target={{ type: "user", id: seller.publicId }}
-        subject={store.name}
-        ownerPublicId={seller.publicId}
-        email={legal.dsaContactEmail}
-        url={`${CANONICAL_ORIGIN}${storefrontPath(locale, store.segment)}`}
-      />
+      {/* The report buttons' link from the header lands here (DSA art. 16, Phase 6 review). */}
+      <div id="signaler" className="scroll-mt-24">
+        <ReportButton
+          target={{ type: "user", id: seller.publicId }}
+          subject={store.name}
+          ownerPublicId={seller.publicId}
+          email={legal.dsaContactEmail}
+          url={`${CANONICAL_ORIGIN}${storefrontPath(locale, store.segment)}`}
+        />
+      </div>
     </Container>
   );
 }

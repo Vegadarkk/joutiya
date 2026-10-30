@@ -97,6 +97,13 @@ describe("À la Une band", () => {
     expect(html).toContain('<li class="min-w-0 md:col-span-2">');
   });
 
+  it("reads \"Vous aimerez peut-être\" under an empty result, still marked sponsored", () => {
+    const html = render(<FeaturedRow cards={[card("aaaa2345", { featured: true })]} locale="fr" empty />);
+    expect(html).toContain(">Vous aimerez peut-être<");
+    expect(html).toContain(">Sponsorisé<");
+    expect(html).not.toContain(">À la Une<");
+  });
+
   it("keeps the grid cards stacked", () => {
     const html = render(<ListingCard listing={card("abcd2345")} mediaBaseUrl={MEDIA} locale="fr" />);
     expect(html).not.toContain("md:flex-row");

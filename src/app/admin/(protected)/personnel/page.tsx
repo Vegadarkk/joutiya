@@ -16,7 +16,7 @@ export default async function PersonnelPage() {
       <div>
         <h1 className="text-2xl font-semibold">Personnel</h1>
         <p className="mt-1 max-w-prose text-sm text-foreground-muted">
-          Modérateurs et admins du back-office. Ces comptes sont séparés des comptes acheteurs et vendeurs : un compte Joutiya existant ne peut pas
+          Modérateurs et admins du back-office. Ces comptes sont séparés des comptes acheteurs et vendeurs : un compte Aalan existant ne peut pas
           devenir membre du personnel, et personne ne modifie son propre rôle. Révoquer un accès ne retire pas la personne de Cloudflare Access :
           faites-le aussi dans Zero Trust.
         </p>

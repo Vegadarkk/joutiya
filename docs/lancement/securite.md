@@ -10,7 +10,8 @@ le cherche).
   et lit les réponses sans rien attaquer (3 minutes d'exploration).
 - **Full scan (actif)** du staging, une fois avant v1.0.0, à la demande (mode `full`) : ZAP envoie de
   vraies charges d'attaque (injections, XSS…). Le staging peut recevoir des formulaires remplis de
-  charges : à lancer hors des recettes en cours.
+  charges : à lancer hors des recettes en cours. 10 minutes d'exploration, puis 55 minutes d'attaque
+  au plus (5 par règle) : au-delà, le travail de 90 minutes serait coupé sans rapport.
 - **Baseline de la production** après le lancement (cible `prod`, passif seulement).
 
 Règles : `.zap/rules.tsv`. Une alerte `FAIL` fait échouer le workflow (en-têtes de sécurité, CSP,
@@ -18,18 +19,17 @@ cookies, injections SQL, XSS, injection de commande, traversée de répertoire).
 avertissement (`jt_consent` est lisible par le script de la page, voulu) et `10202` est ignorée
 (la protection CSRF passe par un en-tête, pas par un champ de formulaire).
 
-Réglages (une fois) :
-- jeton Access `joutiya-scan` en mode single header (le même que le test de charge,
-  `docs/lancement/charge-procedure.md`), variable `ACCESS_TOKEN_HEADER`, secret
-  `STAGING_SCAN_ACCESS_TOKEN` ;
-- variable `SCAN_REPORT_AGE_RECIPIENT` : ta clé publique [age](https://age-encryption.org)
-  (`age-keygen -o cle-zap.txt` sur PC2 ; la ligne `# public key: age1…` donne la valeur) ;
-- variable `SECURITY_SCAN_ENABLED=true`.
+Réglages (une fois) : `scripts/github-ci.ts seal-scan`, avec le test de charge
+(`docs/lancement/charge-procedure.md`, « Une fois ») : jeton Access `joutiya-scan` en en-tête unique
+`Authorization` (seul nom accepté par Access), variable `ACCESS_TOKEN_HEADER`, secret `STAGING_SCAN_ACCESS_TOKEN`,
+`SECURITY_SCAN_ENABLED=true` et `SCAN_REPORT_AGE_RECIPIENT`, la clé publique [age](https://age-encryption.org)
+des sauvegardes (`BACKUP_AGE_RECIPIENT`, docs/backups.md) : la clé privée, sur le PC2, ouvre aussi
+les rapports.
 
 Le dépôt, ses journaux et ses artefacts sont publics jusqu'au lancement : le journal ne montre que
 le nombre d'alertes par niveau ; les rapports (JSON, HTML, sortie console) sont chiffrés pour ta
 clé avant l'envoi. Lecture : télécharger l'artefact `zap-…`, puis
-`age -d -i cle-zap.txt zap-reports.tar.age | tar -x`.
+`age -d -i <clé privée des sauvegardes> zap-reports.tar.age | tar -x`.
 
 ## 2. Revue manuelle
 

@@ -120,7 +120,7 @@ async function seedDecision(listingId: string, seller: Member): Promise<{ decisi
     target: { type: "listing", id: listingId },
     affectedUid: seller.uid,
     action: "remove",
-    facts: "l'annonce présente des signes d'arnaque (paiement demandé d'avance, objet inexistant, prix irréaliste ou contact hors de Joutiya)",
+    facts: "l'annonce présente des signes d'arnaque (paiement demandé d'avance, objet inexistant, prix irréaliste ou contact hors d'Aalan)",
     origin: "notice",
     automation: { detection: false, decision: false },
     ground: { type: "terms", ref: "CGU, modération (arnaques)", explanation: "nos conditions générales interdisent les annonces trompeuses destinées à obtenir un paiement ou des données" },

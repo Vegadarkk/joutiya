@@ -1,13 +1,15 @@
 import "server-only";
+import { DEFAULT_ABUSE, resolveAbuseConfig, type AbuseConfig } from "@/config/abuse";
 import { DEFAULT_FLAGS, resolveFlagsConfig, type FlagsConfig } from "@/config/flags";
 import { DEFAULT_PRICING, resolvePricingConfig, type PricingConfig } from "@/config/pricing";
 import { DEFAULT_SELLER_PAYMENTS, resolveSellerPaymentsConfig, type SellerPaymentsConfig } from "@/config/seller-payments";
 import { alert } from "@/lib/alert";
 import { db, isFirestoreConfigured } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logging/logger";
+import { abuseRules, type AbuseRules } from "@/lib/moderation/abuse";
 import { consume } from "@/lib/quota";
 
-// Firestore `config/flags`, `config/pricing` and `config/sellerPayments` over their defaults, cached 5 minutes in memory
+// Firestore `config/flags`, `config/pricing`, `config/sellerPayments` and `config/abuse` over their defaults, cached 5 minutes in memory
 // (§5), same pattern as src/lib/legal/config.ts. Never throws: on an invalid document the
 // resolver's fallback applies (flag by flag for the flags, the whole default pricing for the
 // pricing) and a P1 alert goes out (once an hour: an invalid document silently reopening the Pro
@@ -52,3 +54,10 @@ function cachedConfig<T>(docId: string, fallback: T, resolve: (stored: unknown) 
 export const getFlags: CachedConfig<FlagsConfig> = cachedConfig("flags", DEFAULT_FLAGS, resolveFlagsConfig);
 export const getPricing: CachedConfig<PricingConfig> = cachedConfig("pricing", DEFAULT_PRICING, resolvePricingConfig);
 export const getSellerPayments: CachedConfig<SellerPaymentsConfig> = cachedConfig("sellerPayments", DEFAULT_SELLER_PAYMENTS, resolveSellerPaymentsConfig);
+/** Private anti-abuse values (spec §10): never sent to the browser, never committed. */
+export const getAbuse: CachedConfig<AbuseConfig> = cachedConfig("abuse", DEFAULT_ABUSE, resolveAbuseConfig);
+
+/** config/abuse compiled for the detectors (listing screen, prohibited lists, message keywords), once per cached value. */
+export async function getAbuseRules(): Promise<AbuseRules> {
+  return abuseRules(await getAbuse());
+}

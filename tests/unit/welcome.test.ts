@@ -261,7 +261,7 @@ describe("door timeline", () => {
       const code = readFileSync(file, "utf8")
         .replace(/\/\*[\s\S]*?\*\//g, "")
         .replace(/^\s*\/\/.*$/gm, "");
-      expect(code, file).not.toMatch(/joutiya|جوطية/i);
+      expect(code, file).not.toMatch(/joutiya|أعلان/i);
     }
   });
 

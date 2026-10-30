@@ -13,9 +13,9 @@ const COPY: Record<MailLocale, { subject: (title: string) => string; title: stri
     title: "Modifications validées",
     approved: (title) => `Un modérateur a vérifié les modifications de votre annonce « ${title} » : elles sont validées.`,
     next: {
-      paused: (until) => `Votre annonce reste en pause, comme vous l'aviez choisi : elle n'est pas visible sur Joutiya. Vous pouvez la remettre en ligne depuis « Mes annonces » jusqu'au ${until}.`,
+      paused: (until) => `Votre annonce reste en pause, comme vous l'aviez choisi : elle n'est pas visible sur Aalan. Vous pouvez la remettre en ligne depuis « Mes annonces » jusqu'au ${until}.`,
       expired: (until) =>
-        `Votre annonce a expiré : elle n'est pas visible sur Joutiya. Vous pouvez la renouveler gratuitement depuis « Mes annonces » jusqu'au ${until}. Après cette date, elle sera supprimée définitivement, avec ses photos.`,
+        `Votre annonce a expiré : elle n'est pas visible sur Aalan. Vous pouvez la renouveler gratuitement depuis « Mes annonces » jusqu'au ${until}. Après cette date, elle sera supprimée définitivement, avec ses photos.`,
     },
     button: { paused: "Remettre mon annonce en ligne", expired: "Renouveler mon annonce" },
   },
@@ -24,8 +24,8 @@ const COPY: Record<MailLocale, { subject: (title: string) => string; title: stri
     title: "تمت الموافقة على التعديلات",
     approved: (title) => `راجع أحد المشرفين تعديلات إعلانك «${title}» ووافق عليها.`,
     next: {
-      paused: (until) => `يبقى إعلانك موقوفًا مؤقتًا كما اخترت، ولا يظهر على Joutiya. يمكنك إعادة نشره من «إعلاناتي» حتى ${until}.`,
-      expired: (until) => `انتهت مدة إعلانك، ولا يظهر على Joutiya. يمكنك تجديده مجانًا من «إعلاناتي» حتى ${until}. بعد هذا التاريخ سيُحذف نهائيًا مع صوره.`,
+      paused: (until) => `يبقى إعلانك موقوفًا مؤقتًا كما اخترت، ولا يظهر على Aalan. يمكنك إعادة نشره من «إعلاناتي» حتى ${until}.`,
+      expired: (until) => `انتهت مدة إعلانك، ولا يظهر على Aalan. يمكنك تجديده مجانًا من «إعلاناتي» حتى ${until}. بعد هذا التاريخ سيُحذف نهائيًا مع صوره.`,
     },
     button: { paused: "إعادة نشر إعلاني", expired: "تجديد إعلاني" },
   },
