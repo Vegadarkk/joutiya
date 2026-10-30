@@ -4,7 +4,7 @@ import { Suspense, useId, useState } from "react";
 import { Globe } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { LOCALES, type Locale } from "@/config/site";
+import { SWITCHABLE_LOCALES, type Locale } from "@/config/site";
 import { cn } from "@/lib/utils";
 import type { LocaleMenuProps } from "./locale-menu";
 import { lazyIsland } from "./lazy-island";
@@ -84,7 +84,7 @@ export function LocaleLinks({ triggerClassName, label, children }: LocaleMenuPro
       </button>
       {open ? (
         <ul id={listId} className="absolute end-0 top-full z-50 mt-1.5 min-w-44 rounded-md border border-border bg-surface p-1 shadow-lg shadow-bab-950/10">
-          {LOCALES.map((locale) => (
+          {SWITCHABLE_LOCALES.map((locale) => (
             <li key={locale}>
               <Link
                 href={href}
