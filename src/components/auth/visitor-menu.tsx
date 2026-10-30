@@ -1,18 +1,18 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { CarFront, CircleHelp, House, LogIn, Mail, ScrollText, Store, UserPlus } from "lucide-react";
+import { CarFront, CircleHelp, House, LogIn, Mail, ScrollText, ShoppingBag, Store, UserPlus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { LocaleMenuItems } from "@/components/layout/locale-menu-items";
 import { Link } from "@/i18n/navigation";
-import { HOLIDAY_RENTAL_SEARCH, PRO_LANDING_PATH, RENT_CAR_SEARCH } from "@/lib/search/shortcuts";
+import { DIRECTORY_PATH, HOLIDAY_RENTAL_SEARCH, PRO_LANDING_PATH, RENT_CAR_SEARCH } from "@/lib/search/shortcuts";
 import { cn } from "@/lib/utils";
 
 // The visitor menu of the header on phones and tablets (below lg), its own chunk (visitor-entry.tsx
 // loads it when the pointer reaches the trigger): sign in, create an account, then what the wide
 // header shows as buttons (owner's choice B, 29 Oct 2026), the two rental searches and the Pro
-// space, then the help centre, the users' contact (DSA art. 12) and, below md, the other languages
+// space, the directory of verified shops (owner, 30 Oct 2026), then the help centre, the users' contact (DSA art. 12) and, below md, the other languages
 // (UX journeys counter-review, 10).
 // Open at once: the click that asked for it already happened.
 
@@ -77,6 +77,15 @@ export default function VisitorMenu({ signInHref, triggerClassName, label, child
               <span className="flex flex-col">
                 <span>{t("proSpace")}</span>
                 <span className="text-xs text-foreground-muted">{t("proHint")}</span>
+              </span>
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild>
+            <Link href={DIRECTORY_PATH} prefetch={false} className={item}>
+              <ShoppingBag aria-hidden="true" />
+              <span className="flex flex-col">
+                <span>{t("shops")}</span>
+                <span className="text-xs text-foreground-muted">{t("shopsHint")}</span>
               </span>
             </Link>
           </DropdownMenu.Item>

@@ -76,7 +76,13 @@ test("lists the verified shops by city and activity", async ({ browser, page, re
   await firestore.collection("users").doc(suspendedUid).update({ proId: suspendedId, type: "pro", "badges.phoneVerified": true, status: "suspended", updatedAt: now });
 
   // The whole directory: the two shops with their activity, city, badge and listings; the others never.
-  await page.goto("/fr/boutiques");
+  // The way in from every page: the « Boutiques » chip closing the header's category row (owner's choice, 30 Oct 2026).
+  await page.goto("/fr/c/vehicules");
+  // The row carries the door twice (the scrolling line below lg, the fixed end group from lg): the one on screen.
+  const door = page.getByTestId("category-chips").getByRole("link", { name: "Boutiques" }).filter({ visible: true });
+  await door.click();
+  await expect(page).toHaveURL(/\/fr\/boutiques$/);
+  await expect(door).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("heading", { level: 1, name: "Boutiques et agences vérifiées" })).toBeVisible();
   await expect(page).toHaveTitle(/Annuaire des professionnels/);
   const list = page.getByTestId("directory-list");

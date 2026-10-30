@@ -6,7 +6,7 @@ import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { CategoryGrid } from "@/components/home/category-grid";
 import { FeaturedCarousel } from "@/components/home/featured-carousel";
 import { HomePillars } from "@/components/home/home-pillars";
-import { RentShortcuts } from "@/components/home/rent-shortcuts";
+import { HomeShortcuts } from "@/components/home/home-shortcuts";
 import { Container } from "@/components/layout/container";
 import { RentCarLink } from "@/components/rental/rent-car-link";
 import { RentCarModule } from "@/components/rental/rent-car-module";
@@ -134,8 +134,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 {/* Map view (and its no-script page): the panel's content. */}
                 {map ? (
                   <RowsArea className="search-rows home-rows flex flex-col gap-6">
-                    <RentShortcuts />
                     <CategoryGrid variant="rail" />
+                    <HomeShortcuts compact />
                     {featuredRows.length > 0 ? (
                       <section aria-labelledby="home-featured-rows" data-testid="home-featured-rows" className="flex flex-col gap-1">
                         <FeaturedHeading id="home-featured-rows" className="px-2" />
@@ -164,6 +164,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                     {/* Desktop only (AF §8 table): no ad on the phone home page. */}
                     <AdSlot placement="home-leaderboard" eligible promos={availablePromos(flags)} seed="home" />
                     <CategoryGrid />
+                    <HomeShortcuts />
                     <RentCarModule locale={locale} />
                     {featured && featured.length > 0 ? <FeaturedCarousel cards={featured} locale={locale} renderAction={favoriteAction} /> : null}
                     {recent && recent.length > 0 ? (

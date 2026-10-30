@@ -5,7 +5,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 // Drag, wheel and arrows for a scrolling row on mouse and trackpad screens (the home map's category
-// rail): a pointer cannot swipe, and the row hides its scrollbar. Touch screens keep the swipe alone.
+// rail, the header's category row): a pointer cannot swipe, and the row hides its scrollbar. Touch
+// screens keep the swipe alone. The arrows float over the ends of the row (the rail) or stand after
+// it at the end of the line, with the row's fixed end group (the category row: owner's report of
+// 30 Oct 2026, the categories past the fade were out of reach on a desktop).
 
 export interface RailScrollerProps {
   children: ReactNode;
@@ -13,14 +16,32 @@ export interface RailScrollerProps {
   previous: string;
   next: string;
   className?: string;
+  /**
+   * "overlay" (default): an arrow floats over each end of the row that has more to show. "trailing":
+   * the two arrows stand after the row, each disabled at its edge, gone when the whole row fits,
+   * and `trailing` renders after them.
+   */
+  arrows?: "overlay" | "trailing";
+  /** The trailing layout's fixed end group, after the arrows. */
+  trailing?: ReactNode;
+  /** Display classes of the trailing arrows' box: which screens show it. */
+  arrowsClassName?: string;
+  /**
+   * A vertical wheel over the row scrolls it sideways (default). Off for a row of a page that scrolls
+   * under the pointer: the wheel keeps scrolling the page.
+   */
+  wheel?: boolean;
 }
 
-const ARROW =
-  "absolute top-[1.125rem] z-10 inline-flex size-8 items-center justify-center rounded-full border border-border-strong bg-surface text-foreground shadow-sm transition-colors duration-150 ease-door hover:bg-surface-muted pointer-coarse:hidden";
+const ARROW = "inline-flex items-center justify-center rounded-full border border-border-strong bg-surface text-foreground shadow-sm transition-colors duration-150 ease-door hover:bg-surface-muted";
+const OVERLAY_ARROW = cn(ARROW, "absolute top-[1.125rem] z-10 size-8 pointer-coarse:hidden");
+const TRAILING_ARROW = cn(ARROW, "size-9 disabled:opacity-40 disabled:hover:bg-surface");
 
-export function RailScroller({ children, previous, next, className }: RailScrollerProps) {
+export function RailScroller({ children, previous, next, className, arrows = "overlay", trailing, arrowsClassName, wheel = true }: RailScrollerProps) {
   const root = useRef<HTMLDivElement>(null);
-  const [edges, setEdges] = useState({ start: true, end: true });
+  // Until the first measure, the trailing layout takes the row for longer than its line (the usual
+  // case): its arrows are in the server markup and the end group does not shift when they appear.
+  const [edges, setEdges] = useState({ start: true, end: arrows !== "trailing" });
 
   useEffect(() => {
     const row = root.current?.querySelector("ul");
@@ -33,7 +54,7 @@ export function RailScroller({ children, previous, next, className }: RailScroll
     };
     // A mouse wheel turns vertically: over the row it scrolls the row sideways, and once the row is at
     // its end the wheel scrolls the panel again. Trackpads already send sideways deltas.
-    const wheel = (event: WheelEvent) => {
+    const onWheel = (event: WheelEvent) => {
       if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
       const room = row.scrollWidth - row.clientWidth;
       const travelled = Math.abs(row.scrollLeft);
@@ -85,7 +106,7 @@ export function RailScroller({ children, previous, next, className }: RailScroll
     };
     update();
     row.addEventListener("scroll", update, { passive: true });
-    row.addEventListener("wheel", wheel, { passive: false });
+    if (wheel) row.addEventListener("wheel", onWheel, { passive: false });
     row.addEventListener("pointerdown", down);
     row.addEventListener("pointermove", move);
     row.addEventListener("pointerup", up);
@@ -96,7 +117,7 @@ export function RailScroller({ children, previous, next, className }: RailScroll
     observer.observe(row);
     return () => {
       row.removeEventListener("scroll", update);
-      row.removeEventListener("wheel", wheel);
+      row.removeEventListener("wheel", onWheel);
       row.removeEventListener("pointerdown", down);
       row.removeEventListener("pointermove", move);
       row.removeEventListener("pointerup", up);
@@ -105,7 +126,7 @@ export function RailScroller({ children, previous, next, className }: RailScroll
       row.removeEventListener("mousedown", press);
       observer.disconnect();
     };
-  }, []);
+  }, [wheel]);
 
   function scroll(direction: 1 | -1) {
     const row = root.current?.querySelector("ul");
@@ -115,16 +136,34 @@ export function RailScroller({ children, previous, next, className }: RailScroll
     row.scrollBy({ left: direction * (rtl ? -1 : 1) * row.clientWidth * 0.75, behavior: smooth ? "smooth" : "auto" });
   }
 
+  if (arrows === "trailing") {
+    return (
+      <div ref={root} data-testid="rail-scroller" className={cn("flex items-start pointer-fine:[&>ul]:cursor-grab", className)}>
+        {children}
+        {edges.start && edges.end ? null : (
+          <div data-testid="rail-arrows" className={cn("h-11 shrink-0 items-center gap-1", arrowsClassName)}>
+            <button type="button" onClick={() => scroll(-1)} aria-label={previous} disabled={edges.start} data-testid="rail-previous" className={TRAILING_ARROW}>
+              <ChevronLeft className="size-4 rtl:-scale-x-100" aria-hidden="true" />
+            </button>
+            <button type="button" onClick={() => scroll(1)} aria-label={next} disabled={edges.end} data-testid="rail-next" className={TRAILING_ARROW}>
+              <ChevronRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
+            </button>
+          </div>
+        )}
+        {trailing}
+      </div>
+    );
+  }
   return (
     <div ref={root} data-testid="rail-scroller" className={cn("relative pointer-fine:[&>ul]:cursor-grab", className)}>
       {children}
       {edges.start ? null : (
-        <button type="button" onClick={() => scroll(-1)} aria-label={previous} data-testid="rail-previous" className={cn(ARROW, "start-0")}>
+        <button type="button" onClick={() => scroll(-1)} aria-label={previous} data-testid="rail-previous" className={cn(OVERLAY_ARROW, "start-0")}>
           <ChevronLeft className="size-4 rtl:-scale-x-100" aria-hidden="true" />
         </button>
       )}
       {edges.end ? null : (
-        <button type="button" onClick={() => scroll(1)} aria-label={next} data-testid="rail-next" className={cn(ARROW, "end-0")}>
+        <button type="button" onClick={() => scroll(1)} aria-label={next} data-testid="rail-next" className={cn(OVERLAY_ARROW, "end-0")}>
           <ChevronRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
         </button>
       )}

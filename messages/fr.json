@@ -16,6 +16,10 @@
     "searchSubmit": "Rechercher",
     "signIn": "Se connecter",
     "guide": "Démarches",
+    "shops": "Boutiques",
+    "shopsHint": "Les boutiques et agences vérifiées",
+    "previousCategories": "Catégories précédentes",
+    "nextCategories": "Catégories suivantes",
     "categories": "Catégories",
     "rent": "Louer",
     "rentCar": "Louer une voiture",
@@ -83,6 +87,13 @@
     },
     "rent": {
       "label": "Louer"
+    },
+    "shortcuts": {
+      "label": "Accès directs",
+      "shops": "Boutiques des Pros",
+      "shopsHint": "Le neuf, les agences et les loueurs vérifiés",
+      "guide": "Démarches",
+      "guideHint": "Véhicule, logement, auto-entrepreneur, MRE : les étapes et les papiers"
     }
   },
   "Welcome": {
@@ -117,6 +128,7 @@
     "trustTitle": "Mentions et autorités",
     "contact": "Nous contacter",
     "help": "Centre d'aide",
+    "shops": "Boutiques",
     "disclaimer": "Aalan héberge les annonces de ses utilisateurs : elle n'est ni vendeur, ni acheteur, ni partie aux ventes conclues entre eux.",
     "copyright": "© {year} {publisher}",
     "links": {
