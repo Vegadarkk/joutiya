@@ -64,7 +64,8 @@ export function Footer({ publisher }: { publisher: string }) {
               </Link>
             </li>
             <li>
-              <Link href={DIRECTORY_PATH} className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>
+              {/* The directory is rendered from live data (ISR): no prefetch from every page, like its other doors. */}
+              <Link href={DIRECTORY_PATH} prefetch={false} className={cn("text-foreground-muted hover:text-foreground", quietLinkClassName)}>
                 {t("shops")}
               </Link>
             </li>

@@ -430,9 +430,13 @@ test.describe("home and crawler files", () => {
     // Owner's report of 30 Oct 2026: past the fade, the last categories were out of reach (hidden scrollbar).
     await expect(row.getByTestId("rail-previous")).toBeDisabled();
     await expect(last).not.toBeInViewport();
-    await row.getByTestId("rail-next").click();
+    // A step is three quarters of the line: the end takes one or more, by the width of the glyphs.
+    const next = row.getByTestId("rail-next");
+    await expect(async () => {
+      if (await next.isEnabled()) await next.click();
+      await expect(next).toBeDisabled({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
     await expect(last).toBeInViewport();
-    await expect(row.getByTestId("rail-next")).toBeDisabled();
     await expect(row.getByTestId("rail-previous")).toBeEnabled();
     // The doors to the directory and the guide stand after the line, in view without scrolling.
     const doors = row.getByTestId("category-doors").filter({ visible: true });
