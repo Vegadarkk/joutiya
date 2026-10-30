@@ -158,7 +158,7 @@ describe("buildSitemapFile", () => {
     ]);
     const xml = (await buildSitemapFile("pages.xml", PROD)) ?? "";
     const paths = [...xml.matchAll(/<loc>https:\/\/joutiya\.ma\/fr([^<]*)<\/loc>/g)].map((match) => match[1]);
-    expect(paths.sort()).toEqual(["", "/c/vehicules", "/c/vehicules/casablanca", "/c/vehicules/voitures", "/c/vehicules/voitures/casablanca", "/demarches", ...GUIDE_RUBRICS.map((rubric) => `/demarches/${rubric}`), "/professionnels"].sort());
+    expect(paths.sort()).toEqual(["", "/c/vehicules", "/c/vehicules/casablanca", "/c/vehicules/voitures", "/c/vehicules/voitures/casablanca", "/boutiques", "/boutiques/activite/boutiques", "/boutiques/activite/agences-immobilieres", "/boutiques/activite/location-voitures", "/boutiques/activite/location-saisonniere", "/demarches", ...GUIDE_RUBRICS.map((rubric) => `/demarches/${rubric}`), "/professionnels"].sort());
     expect(xml.match(/<url>/g)).toHaveLength(paths.length * 2);
   });
 });
