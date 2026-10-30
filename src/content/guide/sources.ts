@@ -31,8 +31,31 @@ export const OFFICIAL_HOSTS = {
   "www.cnie.ma": "DGSN",
   "www.passeport.ma": "DGSN",
   "mtaess.gov.ma": "Ministère du Tourisme",
+  "www.cursussup.gov.ma": "Enseignement supérieur",
+  "www.cpge.ac.ma": "Classes préparatoires",
+  "www.cnops.org.ma": "CNOPS",
+  "www.rsu.ma": "Registre social unifié",
+  "www.rnp.ma": "Registre national de la population",
+  "www.asd.ma": "Aide sociale directe",
+  "www.daamsakane.ma": "Aide au logement",
+  "www.cmr.gov.ma": "CMR",
+  "www.rcar.ma": "RCAR",
+  "www.cimr.ma": "CIMR",
+  "www.srm-cs.ma": "SRM Casablanca-Settat",
+  "www.redal.ma": "Redal",
+  "www.amendis.ma": "Amendis",
+  "www.one.org.ma": "ONEE",
+  "www.acaps.ma": "ACAPS",
+  "reclamation-assurance.acaps.ma": "ACAPS",
+  "www.tajnid.ma": "Service militaire",
+  // Foreign official hosts (FOREIGN_OFFICIAL_HOSTS): studies in France, asked for by the owner.
+  "www.maroc.campusfrance.org": "Campus France (État français)",
+  "www.parcoursup.gouv.fr": "Parcoursup (État français)",
 } as const;
 export type OfficialHost = keyof typeof OFFICIAL_HOSTS;
+
+/** The only hosts outside .ma the guide may link to (owner, 2026-10-30: studies in France). */
+export const FOREIGN_OFFICIAL_HOSTS: ReadonlySet<string> = new Set(["www.maroc.campusfrance.org", "www.parcoursup.gouv.fr"]);
 
 /** Languages a page is offered in (badges next to the link). */
 export const PAGE_LANGS = ["fr", "ar", "en", "es"] as const;
@@ -104,6 +127,31 @@ export const GUIDE_SOURCES = {
   "ompic-creation": source("https://www.ompic.ma/fr/creation-et-vie-de-lentreprise", ["fr", "ar"]),
   "ompic-rcc": source("https://www.ompic.ma/fr/services-rcc", ["fr", "ar"]),
   "ompic-ice": source("https://www.ompic.ma/fr/identifiant-commun-de-lentreprise", ["fr", "ar"]),
+  // Students: admissions after the baccalaureate, studies in France
+  cursussup: source("https://www.cursussup.gov.ma/", ["fr", "ar"], false, "2026-10-30"),
+  cpge: source("https://www.cpge.ac.ma/", ["fr"], true, "2026-10-30"),
+  "campusfrance-procedures": source("https://www.maroc.campusfrance.org/les-procedures-de-campus-france-maroc", ["fr"], true, "2026-10-30"),
+  parcoursup: source("https://www.parcoursup.gouv.fr/", ["fr"], false, "2026-10-30"),
+  // Health cover, retirement, social aid
+  cnops: source("https://www.cnops.org.ma/", ["fr", "ar"], false, "2026-10-30"),
+  rsu: source("https://www.rsu.ma/", ["fr", "ar"], false, "2026-10-30"),
+  rnp: source("https://www.rnp.ma/", ["fr", "ar"], false, "2026-10-30"),
+  asd: source("https://www.asd.ma/", ["fr", "ar"], false, "2026-10-30"),
+  "daam-sakane": source("https://www.daamsakane.ma/", ["fr", "ar"], false, "2026-10-30"),
+  cmr: source("https://www.cmr.gov.ma/", ["fr", "ar"], false, "2026-10-30"),
+  "rcar-affiliation": source("https://www.rcar.ma/fr/affiliation", ["fr", "ar"], true, "2026-10-30"),
+  "cimr-pension": source("https://www.cimr.ma/prestations/pension-principale/", ["fr"], true, "2026-10-30"),
+  // Water and electricity (regional multiservice companies, former delegated operators, ONEE)
+  "srm-casablanca": source("https://www.srm-cs.ma/", ["fr", "ar"], false, "2026-10-30"),
+  "redal-particuliers": source("https://www.redal.ma/fr/client-redal/client-particulier", ["fr"], true, "2026-10-30"),
+  "amendis-abonnement": source("https://www.amendis.ma/fr/nos-activites/relation-client/client-particulier/branchement-abonnement-particulier", ["fr"], true, "2026-10-30"),
+  "amendis-gestion": source("https://www.amendis.ma/fr/nos-activites/relation-client/client-particulier/gestion-abonnements", ["fr"], true, "2026-10-30"),
+  onee: source("https://www.one.org.ma/", ["fr", "ar"], false, "2026-10-30"),
+  // Insurance
+  acaps: source("https://www.acaps.ma/fr", ["fr", "ar"], true, "2026-10-30"),
+  "acaps-reclamation": source("https://reclamation-assurance.acaps.ma/", ["fr", "ar"], false, "2026-10-30"),
+  // Military service
+  tajnid: source("https://www.tajnid.ma/", ["fr", "ar"], false, "2026-10-30"),
 } as const satisfies Record<string, GuideSource>;
 export type GuideSourceId = keyof typeof GUIDE_SOURCES;
 export const GUIDE_SOURCE_IDS = Object.keys(GUIDE_SOURCES) as GuideSourceId[];

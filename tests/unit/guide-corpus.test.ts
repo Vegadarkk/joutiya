@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LOCALES } from "@/config/site";
 import {
+  FOREIGN_OFFICIAL_HOSTS,
   GUIDE_PROCEDURE_IDS,
   GUIDE_RUBRICS,
   GUIDE_SOURCE_IDS,
@@ -27,7 +28,8 @@ describe("guide corpus", () => {
       expect(Object.keys(CONTENT[locale].procedures).sort()).toEqual([...GUIDE_PROCEDURE_IDS].sort());
       expect(Object.keys(CONTENT[locale].sources).sort()).toEqual([...GUIDE_SOURCE_IDS].sort());
     }
-    for (const host of Object.keys(OFFICIAL_HOSTS)) expect(host).toMatch(/(?:^|\.)(?:gov\.)?ma$/);
+    for (const host of Object.keys(OFFICIAL_HOSTS)) if (!FOREIGN_OFFICIAL_HOSTS.has(host)) expect(host).toMatch(/(?:^|\.)(?:gov\.)?ma$/);
+    expect([...FOREIGN_OFFICIAL_HOSTS].every((host) => Object.hasOwn(OFFICIAL_HOSTS, host))).toBe(true);
   });
 
   it("refuses an http link, a foreign host, a file, an address in a text and an unused source", () => {
