@@ -403,7 +403,7 @@ test.describe("home and crawler files", () => {
   test("shows the category grid and the recent listings", async ({ page }) => {
     await page.goto("/fr");
     // Every category of the tree, Emploi included (src/config/categories.ts).
-    await expect(page.getByTestId("home-categories").getByRole("link")).toHaveCount(13);
+    await expect(page.getByTestId("home-categories").getByRole("link")).toHaveCount(15);
     await expect(page.getByTestId("home-categories").getByRole("link").first()).toHaveAttribute("href", /\/fr\/c\//);
   });
 
