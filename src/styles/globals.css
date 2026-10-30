@@ -1281,6 +1281,11 @@ html[data-welcome]:has(#main:target) .welcome {
 .search-cluster:hover {
   scale: 1.06;
 }
+/* Opened at the last zoom: its listings fan out around it, the bubble steps back. */
+.search-cluster[data-open] {
+  opacity: 0.6;
+  scale: 0.85;
+}
 [data-theme="dark"] .search-cluster {
   background: var(--color-bab-500);
   color: var(--color-cream-50);

@@ -27,6 +27,8 @@ import { useSearchMap } from "./search-map-root";
 // Positions are approximate only.
 
 let protocolRegistered = false;
+/** Listings a bubble fans out at the last zoom; past that many, the list panel is the way. */
+const FAN_MAX = 12;
 
 const themeOf = (): MapTheme => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -104,6 +106,8 @@ export default function SearchMap({ onReady }: SearchMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markers = useRef(new Map<string, { marker: Marker; element: HTMLButtonElement }>());
+  // A count bubble opened at the last zoom: its listings fanned out around it.
+  const fan = useRef<{ key: string; ids: string[] } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [moved, setMoved] = useState(false);
 
@@ -211,6 +215,40 @@ export default function SearchMap({ onReady }: SearchMapProps) {
           .filter((listing) => listing.featured)
           .map((listing) => ({ geometry: { type: "Point" as const, coordinates: [listing.position.lng, listing.position.lat] }, properties: { id: listing.id } })),
       ];
+      // A marker: the button in a holder, at a spot, moved by a pixel offset when fanned out of a bubble.
+      // MapLibre places the marker with `transform`: a `scale` on that same element would scale its
+      // offset too (the pin leaps away from the pointer, then back). The pin grows inside a holder.
+      const place = (key: string, element: HTMLButtonElement, at: [number, number], anchor: "center" | "bottom", offset: [number, number] = [0, 0]) => {
+        const holder = document.createElement("div");
+        holder.className = "search-marker";
+        holder.append(element);
+        const marker = new Marker({ element: holder, anchor, offset }).setLngLat(at).addTo(instance);
+        markers.current.set(key, { marker, element });
+      };
+      const pinFor = (listing: MapListing): HTMLButtonElement => {
+        const key = listing.id;
+        const element = pinElement(listing, latest.current.labels?.pin(listing) ?? listing.title);
+        element.addEventListener("pointerenter", () => latest.current.state?.highlight(key));
+        element.addEventListener("pointerleave", () => latest.current.state?.highlight(null));
+        element.addEventListener("focus", () => latest.current.state?.highlight(key));
+        element.addEventListener("blur", () => latest.current.state?.highlight(null));
+        element.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const current = latest.current.state;
+          if (!current) return;
+          if (current.desktop) {
+            current.select(key, element);
+            return;
+          }
+          // Phones: the sheet comes up to the row.
+          current.highlight(key);
+          if (current.snap === "peek") current.setSnap("half");
+          window.setTimeout(() => {
+            document.querySelector(`[data-map-row][data-listing-id="${CSS.escape(key)}"]`)?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+          }, 320);
+        });
+        return element;
+      };
       for (const feature of features) {
         if (feature.geometry.type !== "Point") continue;
         const [lng, lat] = feature.geometry.coordinates as [number, number];
@@ -218,55 +256,63 @@ export default function SearchMap({ onReady }: SearchMapProps) {
         const key = props.cluster ? `cluster:${props.cluster_id}` : (props.id ?? "");
         if (!key || seen.has(key)) continue;
         seen.add(key);
-        if (markers.current.has(key)) continue;
-        let element: HTMLButtonElement;
-        let anchor: "center" | "bottom" = "center";
-        if (props.cluster) {
-          const count = props.point_count ?? 0;
-          const clusterId = props.cluster_id ?? 0;
-          element = clusterElement(count, latest.current.labels?.cluster(count) ?? String(count));
-          element.addEventListener("click", (event) => {
-            event.stopPropagation();
-            const source = instance.getSource(PINS_SOURCE) as GeoJSONSource | undefined;
-            source?.getClusterExpansionZoom(clusterId).then(
-              (zoom) => instance.easeTo({ center: [lng, lat], zoom: Math.min(zoom + 0.2, SEARCH_ZOOM.max), duration: reducedMotion() ? 0 : 500 }),
-              () => undefined,
-            );
-            setMoved(true);
-          });
-        } else {
+        if (!props.cluster) {
+          if (markers.current.has(key)) continue;
           const listing = byId.get(key);
           if (!listing) continue;
-          element = pinElement(listing, latest.current.labels?.pin(listing) ?? listing.title);
-          if (listing.featured) anchor = "bottom";
-          element.addEventListener("pointerenter", () => latest.current.state?.highlight(key));
-          element.addEventListener("pointerleave", () => latest.current.state?.highlight(null));
-          element.addEventListener("focus", () => latest.current.state?.highlight(key));
-          element.addEventListener("blur", () => latest.current.state?.highlight(null));
-          element.addEventListener("click", (event) => {
-            event.stopPropagation();
-            const current = latest.current.state;
-            if (!current) return;
-            if (current.desktop) {
-              current.select(key, element);
-              return;
-            }
-            // Phones: the sheet comes up to the row.
-            current.highlight(key);
-            if (current.snap === "peek") current.setSnap("half");
-            window.setTimeout(() => {
-              document.querySelector(`[data-map-row][data-listing-id="${CSS.escape(key)}"]`)?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
-            }, 320);
+          place(key, pinFor(listing), [lng, lat], listing.featured ? "bottom" : "center");
+          continue;
+        }
+        const count = props.point_count ?? 0;
+        const clusterId = props.cluster_id ?? 0;
+        const open = fan.current?.key === key;
+        if (open) {
+          // The bubble's listings on a ring around it, each its usual pin.
+          const leaves = fan.current!.ids.map((id) => byId.get(id)).filter((listing): listing is MapListing => Boolean(listing));
+          const radius = Math.max(48, (leaves.length * 72) / (2 * Math.PI));
+          leaves.forEach((listing, index) => {
+            const leafKey = `fan:${listing.id}`;
+            seen.add(leafKey);
+            if (markers.current.has(leafKey)) return;
+            const angle = -Math.PI / 2 + (2 * Math.PI * index) / leaves.length;
+            place(leafKey, pinFor(listing), [lng, lat], "center", [Math.round(radius * Math.cos(angle)), Math.round(radius * Math.sin(angle))]);
           });
         }
-        // MapLibre places the marker with `transform`: a `scale` on that same element would scale its
-        // offset too (the pin leaps away from the pointer, then back). The pin grows inside a holder.
-        const holder = document.createElement("div");
-        holder.className = "search-marker";
-        holder.append(element);
-        const marker = new Marker({ element: holder, anchor }).setLngLat([lng, lat]).addTo(instance);
-        markers.current.set(key, { marker, element });
+        const existing = markers.current.get(key);
+        if (existing) {
+          existing.element.toggleAttribute("data-open", open);
+          continue;
+        }
+        const element = clusterElement(count, latest.current.labels?.cluster(count) ?? String(count));
+        element.toggleAttribute("data-open", open);
+        element.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const source = instance.getSource(PINS_SOURCE) as GeoJSONSource | undefined;
+          if (!source) return;
+          source.getClusterExpansionZoom(clusterId).then(
+            async (zoom) => {
+              // The bubble splits at a zoom the map reaches: go there.
+              if (zoom <= SEARCH_ZOOM.clusterMax || instance.getZoom() < SEARCH_ZOOM.max - 0.05) {
+                instance.easeTo({ center: [lng, lat], zoom: Math.min(zoom + 0.2, SEARCH_ZOOM.max), duration: reducedMotion() ? 0 : 500 });
+                setMoved(true);
+                return;
+              }
+              // At the last zoom it never splits (neighbours a few hundred metres apart, positions
+              // approximate): its listings fan out around it; a second click folds them back.
+              if (fan.current?.key === key) fan.current = null;
+              else {
+                const leaves = await source.getClusterLeaves(clusterId, FAN_MAX, 0);
+                fan.current = { key, ids: leaves.map((leaf) => String(leaf.properties?.id ?? "")).filter(Boolean) };
+              }
+              sync();
+            },
+            () => undefined,
+          );
+        });
+        place(key, element, [lng, lat], "center");
       }
+      // The bubble a fan belonged to is gone (zoom, new results): so is the fan.
+      if (fan.current && !seen.has(fan.current.key)) fan.current = null;
       for (const [key, { marker }] of markers.current) {
         if (seen.has(key)) continue;
         marker.remove();
@@ -286,7 +332,7 @@ export default function SearchMap({ onReady }: SearchMapProps) {
       const obstacles: Box[] = [...markers.current.values()]
         .filter(({ element }) => !element.classList.contains("search-pin-featured"))
         .map(({ marker, element }) => {
-          const at = instance.project(marker.getLngLat());
+          const at = instance.project(marker.getLngLat()).add(marker.getOffset());
           const halfWidth = element.offsetWidth / 2;
           const halfHeight = element.offsetHeight / 2;
           return { left: at.x - halfWidth, right: at.x + halfWidth, top: at.y - halfHeight, bottom: at.y + halfHeight };
@@ -317,14 +363,22 @@ export default function SearchMap({ onReady }: SearchMapProps) {
     const onData = (event: { sourceId?: string; isSourceLoaded?: boolean }) => {
       if (event.sourceId === PINS_SOURCE && event.isSourceLoaded) sync();
     };
+    // A click on the map itself folds an open fan (the markers stop their own clicks).
+    const onMapClick = () => {
+      if (!fan.current) return;
+      fan.current = null;
+      sync();
+    };
     instance.on("move", sync);
     instance.on("moveend", sync);
     instance.on("sourcedata", onData);
+    instance.on("click", onMapClick);
     sync();
     return () => {
       instance.off("move", sync);
       instance.off("moveend", sync);
       instance.off("sourcedata", onData);
+      instance.off("click", onMapClick);
     };
   }, [loaded, state?.listings]);
 
@@ -342,6 +396,7 @@ export default function SearchMap({ onReady }: SearchMapProps) {
     const source = instance.getSource(PINS_SOURCE) as GeoJSONSource | undefined;
     for (const { marker } of markers.current.values()) marker.remove();
     markers.current.clear();
+    fan.current = null;
     source?.setData(clustered(listings));
     setMoved(false);
     const animate = !first.current && !reducedMotion();
