@@ -80,6 +80,9 @@ const PROHIBITED_GROUP_LABEL: Record<ProhibitedGroupId, string> = {
   hacking_piracy: "piratage",
   gambling: "jeux d'argent",
   inalienable_land: "terres collectives ou habous",
+  job_scam: "paiement demandé à un candidat",
+  job_discrimination: "offre d'emploi discriminatoire",
+  job_minors: "emploi d'un mineur",
 };
 
 const SENSITIVE_LABEL: Record<SensitiveCategoryId, string> = {

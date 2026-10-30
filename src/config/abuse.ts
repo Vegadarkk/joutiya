@@ -28,6 +28,7 @@ export const RISK_FLAG_IDS = [
   "sanitary_check",
   "rental_review",
   "promo_check",
+  "work_abroad",
 ] as const;
 export type RiskFlagId = (typeof RISK_FLAG_IDS)[number];
 

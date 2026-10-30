@@ -48,7 +48,8 @@ export const loadReportDialog = loadWithRetry<ReportDialogProps & { pageUrl?: st
 const ReportDialog = dynamic(() => loadReportDialog(), { ssr: false });
 
 export interface ReportButtonProps {
-  target: { type: "listing" | "user" | "review"; id: string };
+  /** `categoryId` of a listing opens the reasons of its category (the job ad ones). */
+  target: { type: "listing" | "user" | "review"; id: string; categoryId?: string };
   /** Listing title or display name (a review: its author's), recalled in the dialog. */
   subject: string;
   /** publicId of the owner: the button hides from them. */

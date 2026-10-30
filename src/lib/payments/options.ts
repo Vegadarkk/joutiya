@@ -1,4 +1,5 @@
 import "server-only";
+import { paidOptionsAllowed } from "@/config/categories";
 import { FEATURED_DAYS, OPTION_IDS, optionPrice, type OptionId, type PricingConfig } from "@/config/pricing";
 import { requireOwner, type AuthContext } from "@/lib/auth/guards";
 import { OPTION_CONSENT_VERSION, type BuyOptionInput, type BuyOptionResponse, type ListingOptionsResponse, type OptionOffer, type WalletSummary } from "@/lib/contracts/payments";
@@ -101,6 +102,7 @@ export async function listingOptions(auth: AuthContext, listingId: string, now =
   return {
     salesOpen: flags.salesEnabled,
     promotable: promotable(listing, now),
+    allowed: paidOptionsAllowed(listing.subcategoryId),
     options: offers(listing, walletStateAt(wallet, now), pricing, now),
     wallet: walletSummary(wallet, now),
     boosts: boostsView(listing, now),
@@ -137,7 +139,8 @@ const creditsTaken = (ledger: Pick<LedgerRecord, "delta" | "planCreditsDelta">) 
  * POST: buys `input.optionId` for the listing. A retry of a committed purchase (same request id)
  * is answered from the ledger first, whatever the sales gate and the limits say now. Then: 403
  * `sales_closed` while `salesEnabled` is off, 404 for someone else's listing, 409
- * `listing_not_promotable` / `bump_too_soon` / `wallet_frozen`, 402 `insufficient_credits`, 409
+ * `boost_not_allowed` (a job seeker's ad has no paid options) / `listing_not_promotable` /
+ * `bump_too_soon` / `wallet_frozen`, 402 `insufficient_credits`, 409
  * `price_changed` when the cost is not the `expectedCost` the buyer agreed to, 409 `conflict` when
  * the request id was used for another option. `beforePurchase` runs the per-attempt limits of a new
  * purchase only.
@@ -173,6 +176,7 @@ export async function buyOption(auth: AuthContext, listingId: string, input: Buy
         if (!sameOrder(previous, listingId, option)) throw new ReplayConflictError();
         return { replayed: true, entry: previous, wallet, boosts: current.boosts };
       }
+      if (!paidOptionsAllowed(current.subcategoryId)) throw new HttpError(409, "boost_not_allowed");
       if (!promotable(current, now)) throw new HttpError(409, "listing_not_promotable");
       if (option === "bump" && bumpAvailableAt(current.sortAt, now)) throw new HttpError(409, "bump_too_soon");
       // Price at the listing's category as read in the transaction (a category edit meanwhile counts).

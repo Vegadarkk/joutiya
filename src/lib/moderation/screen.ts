@@ -1,4 +1,4 @@
-import { contactMessagingOnly, criteriaSchema, sanitaryNumber, subcategoryById } from "@/config/categories";
+import { contactMessagingOnly, criteriaSchema, jobOfferAbroad, sanitaryNumber, subcategoryById } from "@/config/categories";
 import { isPriceOutlier, priceRange } from "@/config/price-ranges";
 import type { ModerationFlag } from "@/lib/contracts/listings";
 import { findContacts } from "@/lib/moderation/contacts";
@@ -119,6 +119,13 @@ export function screenListing(input: ScreenInput, ctx: ScreenContext): ScreenRes
     note(`ONSSA number ${sanitary} not yet checked for this shop`);
   }
 
+  // A job offer abroad (Code du travail arts. 489, 512-515): a moderator checks the visa and agency
+  // mentions before the offer goes public.
+  if (jobOfferAbroad(input.subcategoryId, input.attributes ?? {})) {
+    flags.add("work_abroad");
+    note("job offer located abroad");
+  }
+
   // Steps 2-3 on every free text: phones, e-mails / links, prohibited keywords, sensitive data.
   const phoneKeys = new Set<string>();
   for (const field of textFields(input)) {
@@ -132,7 +139,7 @@ export function screenListing(input: ScreenInput, ctx: ScreenContext): ScreenRes
       pushIssue(blockers, issue(field.path, contact.kind === "email" ? "email_in_text" : "url_in_text"));
       note(`${contact.kind} in ${field.path}`);
     }
-    const prohibited = containsProhibited(field.text, ctx.abuse?.prohibited);
+    const prohibited = containsProhibited(field.text, ctx.abuse?.prohibited, { categoryId: input.categoryId });
     if (prohibited.hard.length > 0) {
       pushIssue(blockers, issue(field.path, "prohibited"));
       flags.add("prohibited_kw");

@@ -30,6 +30,7 @@ import { getReport } from "@/lib/reports";
 import { csrfToken } from "@/lib/security/csrf";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 import { capturedMails } from "../auth/helpers";
+import { seekerAdPatch } from "../listings/helpers";
 import { EXPLANATION, Jar, listingNotice, member, publicIdOf, publishedListing, report, seedConversation, visitor, type Member } from "./helpers";
 
 const sendMailMock = vi.mocked(sendMail);
@@ -318,6 +319,15 @@ describe("reasons and SLA", () => {
   it("refuses a reason that does not apply to the target type", async () => {
     const result = await report(listingNotice(listingId, "harassment"), { as: reporter });
     expect(result.status).toBe(400);
+  });
+
+  it("keeps the job ad reasons to job ads: 400 on another category, 201 on a seeker's ad (PR 14b)", async () => {
+    const wrong = await report(listingNotice(listingId, "job_scam"), { as: reporter });
+    expect(wrong.status).toBe(400);
+    const { id } = await publishedListing({ patch: seekerAdPatch() });
+    const right = await report(listingNotice(id, "job_discrimination"), { as: reporter });
+    expect(right.status).toBe(201);
+    expect(right.body).toMatchObject({ priority: "P1", slaHours: 24 });
   });
 
   it("dates the SLA from the reason's priority", () => {

@@ -4,7 +4,7 @@ import { POST as createListing } from "@/app/api/listings/route";
 import { PATCH as patchListing } from "@/app/api/listings/[id]/route";
 import { POST as publishListing } from "@/app/api/listings/[id]/publish/route";
 import { POST as postReport } from "@/app/api/reports/route";
-import type { CreateListingResponse } from "@/lib/contracts/listings";
+import type { CreateListingResponse, ListingPatch } from "@/lib/contracts/listings";
 import type { CreateReportResponse } from "@/lib/contracts/reports";
 import { COLLECTIONS, type UploadDoc } from "@/lib/db/schemas";
 import { db } from "@/lib/firebase/admin";
@@ -61,15 +61,18 @@ export function listingNotice(id: string, reasonId: string, extra: Record<string
 
 let sellerCounter = 0;
 
-/** A published listing of a fresh seller with one ready photo; `checks` overrides the photo's local model scores. */
-export async function publishedListing(options: { seller?: Member; checks?: UploadDoc["checks"] } = {}): Promise<{ id: string; seller: Member; uploadId: string }> {
+/**
+ * A published listing of a fresh seller with one ready photo; `checks` overrides the photo's local
+ * model scores; `patch` overrides the listing (a job seeker's ad: `seekerAdPatch()`, no photo).
+ */
+export async function publishedListing(options: { seller?: Member; checks?: UploadDoc["checks"]; patch?: Partial<ListingPatch> } = {}): Promise<{ id: string; seller: Member; uploadId: string }> {
   sellerCounter += 1;
   const seller = options.seller ?? (await member({ displayName: `Vendeur ${String.fromCharCode(65 + (sellerCounter % 26))}` }));
   const created = await api<CreateListingResponse>(createListing, "POST", "/api/listings", { member: seller, body: {} });
   expect(created.status).toBe(201);
   const id = created.body.id;
   const uploadId = await seedReadyUpload(seller, id, options.checks ? { checks: options.checks } : {});
-  const saved = await api<ListingBody>(patchListing, "PATCH", `/api/listings/${id}`, { member: seller, body: { ...readyPatch(), photos: [uploadId] } });
+  const saved = await api<ListingBody>(patchListing, "PATCH", `/api/listings/${id}`, { member: seller, body: { ...readyPatch(), photos: [uploadId], ...options.patch } });
   expect(saved.status).toBe(200);
   const published = await api<PublishBody>(publishListing, "POST", `/api/listings/${id}/publish`, { member: seller, body: { acceptRules: true } });
   expect(published.body.status).toBe("published");

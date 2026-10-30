@@ -1,6 +1,6 @@
 import "server-only";
 import type { AiConfig } from "@/config/ai";
-import { reportReason, slaDueAt, type ReportPriority, type ReportReasonId, type ReportTargetType } from "@/config/report-reasons";
+import { reasonApplies, reportReason, slaDueAt, type ReportPriority, type ReportReasonId, type ReportTargetType } from "@/config/report-reasons";
 import type { Locale } from "@/config/site";
 import { aiConfig } from "@/lib/ai/config";
 import { alert } from "@/lib/alert";
@@ -269,6 +269,9 @@ export async function createReport(input: CreateReportRequest, requester: Report
   const reporter = await reporterFacts(input, requester, ai, now);
   const resolved = await resolveReportTarget(input.target, requester.uid);
   const { target } = resolved;
+  // A reason of some categories (the job ad reasons) needs a listing of one of them: known once the target is read.
+  const reason = reportReason(input.reasonId);
+  if (reason?.categories && !reasonApplies(reason, target.type, resolved.listing?.categoryId)) throw invalidField("reasonId", "invalid_for_target");
 
   const device = deviceHash(requester.deviceKey);
   const ipPrefix = ipPrefixHash(requester.ip);

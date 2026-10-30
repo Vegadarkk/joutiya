@@ -713,7 +713,9 @@
       "dossierTitle": "Historique, garantie et équipements",
       "dossierHint": "Facultatif : une fiche complète inspire confiance et ressort mieux dans la recherche.",
       "rentalTitle": "Conditions de location",
-      "rentalHint": "Assurance, caution, conducteur, remise du véhicule : des conditions claires évitent les mauvaises surprises et ressortent dans la recherche."
+      "rentalHint": "Assurance, caution, conducteur, remise du véhicule : des conditions claires évitent les mauvaises surprises et ressortent dans la recherche.",
+      "jobAbroadTitle": "Emploi à l'étranger : un modérateur vérifie l'offre avant sa mise en ligne.",
+      "jobAbroadBody": "Le contrat de travail doit porter le visa du ministère chargé du Travail avant le départ, et les services de l'ANAPEC sont gratuits. L'offre ne doit demander aucun paiement au candidat : ni frais de dossier, ni caution, ni visa."
     },
     "start": {
       "title": "Déposer une annonce",
@@ -4770,6 +4772,7 @@
     "retry": "Réessayer",
     "closed": "Les options payantes ne sont pas encore ouvertes sur Aalan.",
     "notPromotable": "Cette annonce ne peut pas être mise en avant : elle doit être en ligne et visible.",
+    "notAllowed": "Une demande d'emploi ne se met pas en avant : elle reste gratuite, et les recruteurs vous écrivent par la messagerie.",
     "choose": "Choisissez une option.",
     "legend": "Option",
     "options": {
@@ -4812,6 +4815,7 @@
     "errors": {
       "sales_closed": "Les options payantes ne sont pas encore ouvertes.",
       "billing_owner_only": "Seul le titulaire de la boutique peut dépenser ses crédits.",
+      "boost_not_allowed": "Les annonces de demande d'emploi n'ont pas d'options payantes.",
       "listing_not_promotable": "Cette annonce n'est plus en ligne : elle ne peut pas être mise en avant.",
       "bump_too_soon": "Votre annonce est déjà en tête des résultats. Réessayez dans une heure.",
       "wallet_frozen": "Votre porte-monnaie est bloqué après un remboursement.",

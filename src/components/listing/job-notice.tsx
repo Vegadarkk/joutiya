@@ -1,7 +1,7 @@
 import { BriefcaseBusiness, Plane } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { textLinkClassName } from "@/components/ui/text-link";
-import { subcategoryById } from "@/config/categories";
+import { jobOfferAbroad, subcategoryById } from "@/config/categories";
 import { Link } from "@/i18n/navigation";
 import type { ListingAttributes } from "@/lib/contracts/listings";
 import { cn } from "@/lib/utils";
@@ -11,9 +11,6 @@ import { cn } from "@/lib/utils";
 // checks nothing beyond the moderation and is no party to the hiring; a candidate never pays
 // (arts. 480, 485). An offer abroad adds the ministry's visa and ANAPEC (arts. 489, 512-515).
 // Links: the CGU rules (§7.11 once Phase 6 ships it, the page until then) and the report control.
-
-/** `job-location` value of an offer outside Morocco. */
-export const JOB_ABROAD = "etranger";
 
 const OFFER_POINTS = ["publisher", "moderation", "noFees"] as const;
 const SEEKER_POINTS = ["publisher", "contact"] as const;
@@ -27,7 +24,7 @@ export interface JobNoticeProps {
 export function JobNotice({ subcategoryId, attributes, className }: JobNoticeProps) {
   const t = useTranslations("ListingPage.jobs");
   const seeker = subcategoryById(subcategoryId)?.individualOnly === true;
-  const abroad = !seeker && attributes["job-location"] === JOB_ABROAD;
+  const abroad = jobOfferAbroad(subcategoryId, attributes);
   return (
     <section data-testid="job-notice" data-kind={seeker ? "seeker" : "offer"} aria-labelledby="job-notice-title" className={cn("flex flex-col gap-3 rounded-lg border border-border bg-surface p-5", className)}>
       <h2 id="job-notice-title" className="flex items-center gap-2 text-lg font-semibold">

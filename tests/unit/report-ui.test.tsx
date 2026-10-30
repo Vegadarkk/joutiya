@@ -49,6 +49,18 @@ describe("report state", () => {
     const message = reasonGroups("message").flatMap((group) => group.reasons.map((reason) => reason.id));
     expect(message).toContain("harassment");
     expect(message).not.toContain("wrong_category");
+    // The job ad reasons: listings of the Emploi category only (PR 14b).
+    const ids = (target: Parameters<typeof reasonGroups>[0], categoryId?: string) => reasonGroups(target, categoryId).flatMap((group) => group.reasons.map((reason) => reason.id));
+    expect(ids("listing")).not.toContain("job_scam");
+    expect(ids("listing", "vehicules")).not.toContain("job_discrimination");
+    expect(ids("listing", "emploi")).toEqual(expect.arrayContaining(["job_scam", "job_discrimination", "scam", "other"]));
+    expect(ids("user", "emploi")).not.toContain("job_scam");
+    expect(reportReason("job_scam")).toMatchObject({ priority: "P1", targets: ["listing"], categories: ["emploi"], ground: { type: "illegal" } });
+  });
+
+  it("sends the target without its category: the server reads it from the listing", () => {
+    const request = reportRequest({ type: "listing", id: "abcd1234", categoryId: "emploi" }, VALID, true);
+    expect(request.target).toEqual({ type: "listing", id: "abcd1234" });
   });
 
   it("asks a visitor's name and e-mail, optional for an urgent reason, never a member's", () => {

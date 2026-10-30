@@ -95,6 +95,8 @@ export type ErrorCode =
   | "billing_owner_only"
   /** The listing is not published or is hidden by moderation (409). */
   | "listing_not_promotable"
+  /** The subcategory has no paid options: a job seeker's ad (409). */
+  | "boost_not_allowed"
   /** The listing sorted from a publication, renewal or bump within the last hour (409). */
   | "bump_too_soon"
   /** Negative balance after a refund: no purchase until it is covered (409). */
