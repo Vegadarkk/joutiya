@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { assertTargets, credentialProject, STRICT_REQUIRED, validateTargets } from "./assert-target.ts";
+import { assertTargets, credentialProject, recordedZoneId, STRICT_REQUIRED, validateTargets, zoneOf } from "./assert-target.ts";
 import type { EnvTargets, Targets } from "./assert-target.ts";
 
 const ACCOUNT = "0123456789abcdef0123456789abcdef";
@@ -26,13 +26,14 @@ function envTargets(name: keyof typeof TUNNELS, phoneNumberId: string): EnvTarge
     r2: { quarantine: `joutiya-${name}-quarantine`, media: `joutiya-${name}-media`, private: `joutiya-${name}-private` },
     whatsapp: { wabaId: "102030405060708", phoneNumberId },
     cloudflare: { tunnelId: TUNNELS[name], accessAud: "a".repeat(63) + String(index) },
+    hosts: { site: `${name}.joutiya.ma`, www: null, admin: `admin-${name}.joutiya.ma`, media: `media-${name}.joutiya.ma` },
   };
 }
 
 function recorded(): Targets {
   return {
     shared: {
-      cloudflare: { accountId: ACCOUNT, zoneId: "fedcba9876543210fedcba9876543210", accessTeamDomain: "joutiya.cloudflareaccess.com", sshTunnelId: null, accessOauthClientId: `100000000001-${"b".repeat(32)}.apps.googleusercontent.com` },
+      cloudflare: { accountId: ACCOUNT, zoneId: "fedcba9876543210fedcba9876543210", aalanZoneId: null, a3lanZoneId: null, accessTeamDomain: "joutiya.cloudflareaccess.com", sshTunnelId: null, accessOauthClientId: `100000000001-${"b".repeat(32)}.apps.googleusercontent.com` },
       oracle: { homeRegion: "eu-paris-1", tenancyId: `ocid1.tenancy.oc1..${"a".repeat(60)}`, compartmentId: `ocid1.compartment.oc1..${"b".repeat(60)}`, userId: `ocid1.user.oc1..${"d".repeat(60)}`, vmDynamicGroupId: null, runCommandPolicyId: null, launcherUserId: null, launcherGroupId: null },
       anthropic: { organizationId: "123e4567-e89b-12d3-a456-426614174000" },
       github: { repository: "octo-org/joutiya", repositoryId: "123456789" },
@@ -94,6 +95,29 @@ describe("validateTargets", () => {
       "environments.staging.r2.media: joutiya-dev-media is already recorded at environments.dev.r2.media",
       "environments.prod.firebase.projectId: joutiya-prod-4821 is already recorded at environments.staging.firebase.projectId",
     ]);
+  });
+
+  it("keeps hosts inside the project zones, first-level and distinct, and each zone id once", () => {
+    const targets = recorded();
+    targets.environments.prod.hosts.site = "joutiya.example.org";
+    targets.environments.prod.hosts.admin = "admin.staging.aalan.ma";
+    targets.environments.prod.hosts.media = targets.environments.staging.hosts.media;
+    targets.shared.cloudflare.a3lanZoneId = targets.shared.cloudflare.zoneId;
+    assert.deepEqual(validateTargets(targets), [
+      "environments.prod.hosts.site: joutiya.example.org is outside joutiya.ma, aalan.ma, a3lan.ma",
+      "environments.prod.hosts.admin: admin.staging.aalan.ma is not covered by Universal SSL",
+      "environments.prod.hosts.media: media-staging.joutiya.ma is already recorded at environments.staging.hosts.media",
+      "shared.cloudflare.a3lanZoneId: fedcba9876543210fedcba9876543210 is already recorded at shared.cloudflare.zoneId",
+    ]);
+  });
+
+  it("finds the zone of a hostname and its recorded id", () => {
+    const targets = recorded();
+    assert.equal(zoneOf("admin.aalan.ma"), "aalan.ma");
+    assert.equal(zoneOf("a3lan.ma"), "a3lan.ma");
+    assert.equal(zoneOf("notjoutiya.ma"), null);
+    assert.equal(recordedZoneId(targets, "joutiya.ma"), "fedcba9876543210fedcba9876543210");
+    assert.equal(recordedZoneId(targets, "aalan.ma"), null);
   });
 
   it("rejects Meta's test number in production", () => {

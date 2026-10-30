@@ -20,12 +20,40 @@ const META_ID = /^[0-9]{5,25}$/;
 const R2_BUCKET = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/;
 // <project number>-<hash>.apps.googleusercontent.com
 const OAUTH_CLIENT = /^[0-9]{6,20}-[0-9a-z]{32}\.apps\.googleusercontent\.com$/;
+// A public hostname: lowercase labels, at least one dot.
+const HOSTNAME = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+/**
+ * The Cloudflare zones of the project and the field holding each id (null until Nav adds the zone).
+ * joutiya.ma serves the site until the switch to aalan.ma, then redirects (with a3lan.ma) to it,
+ * except ssh.joutiya.ma, the CI's deploy path.
+ */
+export const CLOUDFLARE_ZONES = [
+  { name: "joutiya.ma", field: "zoneId" },
+  { name: "aalan.ma", field: "aalanZoneId" },
+  { name: "a3lan.ma", field: "a3lanZoneId" },
+] as const;
+export type ZoneName = (typeof CLOUDFLARE_ZONES)[number]["name"];
+
+/** The project zone a hostname belongs to, or null when it is outside all of them. */
+export function zoneOf(hostname: string): ZoneName | null {
+  return CLOUDFLARE_ZONES.find(({ name }) => hostname === name || hostname.endsWith(`.${name}`))?.name ?? null;
+}
+
+/** The recorded id of a zone (null: not added yet). */
+export function recordedZoneId(targets: Targets, zone: ZoneName): Id {
+  const field = CLOUDFLARE_ZONES.find(({ name }) => name === zone)?.field;
+  return field === undefined ? null : targets.shared.cloudflare[field];
+}
 
 // Format of each recorded identifier; null means "not created yet".
 const SHARED_SHAPE = {
   cloudflare: {
     accountId: HEX32,
+    // One per CLOUDFLARE_ZONES entry: joutiya.ma, aalan.ma, a3lan.ma.
     zoneId: HEX32,
+    aalanZoneId: HEX32,
+    a3lanZoneId: HEX32,
     accessTeamDomain: /^[a-z0-9][a-z0-9-]*\.cloudflareaccess\.com$/,
     // Tunnel of the host's cloudflared (SSH only), independent of Docker.
     sshTunnelId: UUID,
@@ -76,6 +104,9 @@ const ENV_SHAPE = {
   whatsapp: { wabaId: META_ID, phoneNumberId: META_ID },
   // Tunnel of this environment and AUD tag of the Access application protecting its back office.
   cloudflare: { tunnelId: UUID, accessAud: /^[0-9a-f]{64}$/ },
+  // Public hosts of this environment (SITE_URL, ADMIN_HOST, MEDIA_BASE_URL, CORS origins, Access):
+  // the switch to aalan.ma changes them here, and the edge files are checked against them.
+  hosts: { site: HOSTNAME, www: HOSTNAME, admin: HOSTNAME, media: HOSTNAME },
 } satisfies Shape;
 
 type Recorded<S extends Shape> = { [K in keyof S]: { [F in keyof S[K]]: Id } };
@@ -273,6 +304,15 @@ function checkDistinct(targets: Targets): string[] {
     for (const role of ["quarantine", "media", "private"] as const) {
       claim("r2", `environments.${env}.r2.${role}`, t.r2[role]);
     }
+    for (const role of ["site", "www", "admin", "media"] as const) {
+      const host = t.hosts[role];
+      claim("host", `environments.${env}.hosts.${role}`, host);
+      if (host === null) continue;
+      const zone = zoneOf(host);
+      if (zone === null) errors.push(`environments.${env}.hosts.${role}: ${host} is outside ${CLOUDFLARE_ZONES.map(({ name }) => name).join(", ")}`);
+      // Universal SSL covers the apex and first-level subdomains only.
+      else if (host.split(".").length > zone.split(".").length + 1) errors.push(`environments.${env}.hosts.${role}: ${host} is not covered by Universal SSL`);
+    }
     // The web app and the OAuth client carry the number of the project they belong to.
     const number = t.firebase.projectNumber;
     const appNumber = t.firebase.appId?.split(":")[1];
@@ -284,6 +324,7 @@ function checkDistinct(targets: Targets): string[] {
       errors.push(`environments.${env}.google.oauthClientId: project number ${clientNumber} is not environments.${env}.firebase.projectNumber`);
     }
   }
+  for (const { field } of CLOUDFLARE_ZONES) claim("zone", `shared.cloudflare.${field}`, targets.shared.cloudflare[field]);
   const accessClient = targets.shared.cloudflare.accessOauthClientId;
   claim("oauth", "shared.cloudflare.accessOauthClientId", accessClient);
   const prodProject = targets.environments.prod.firebase.projectNumber;

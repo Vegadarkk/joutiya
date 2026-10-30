@@ -3,7 +3,7 @@
 // this module. No value is ever printed: names, sources and line numbers only.
 //
 // Where each value comes from:
-// - infra/targets.json and the hosts of §1 (derivedValues), never a file;
+// - infra/targets.json, hosts included (derivedValues), never a file;
 // - the VM itself for CSRF_SECRET, the Valkey passwords (with the two Redis URLs) and Meilisearch's
 //   master key (meilisearch.env, phase 4): generated there once, they never leave it, and a rebuilt
 //   VM simply gets new ones. The app's two Meilisearch keys come from that master key
@@ -30,11 +30,6 @@ import { assertTargets, type Targets } from "./assert-target.ts";
 
 export const DEPLOYED_ENVS = ["staging", "prod"] as const;
 export type DeployedEnv = (typeof DEPLOYED_ENVS)[number];
-
-const HOSTS: Record<DeployedEnv, { site: string; admin: string; media: string }> = {
-  staging: { site: "staging.joutiya.ma", admin: "admin-staging.joutiya.ma", media: "media-staging.joutiya.ma" },
-  prod: { site: "joutiya.ma", admin: "admin.joutiya.ma", media: "media.joutiya.ma" },
-};
 
 /** Set by Compose or the image, development only, or the owner's own tooling: never in app.env. */
 const NOT_IN_APP_ENV = new Set([
@@ -96,19 +91,20 @@ export function appEnvNames(example: string): string[] {
   return [...new Set(names)].filter((name) => name !== "" && !name.startsWith("JOUTIYA_") && !NOT_IN_APP_ENV.has(name));
 }
 
-/** Values that follow from infra/targets.json and the hosts of §1 (R2's join only with its keys). */
 /** The S3 endpoint of the account's R2 buckets (EU jurisdiction). */
 export function r2Endpoint(accountId: string): string {
   return `https://${accountId}.eu.r2.cloudflarestorage.com`;
 }
 
+/** Values that follow from infra/targets.json (R2's join only with its keys). */
 export function derivedValues(env: DeployedEnv, targets: Targets): Record<string, string> {
   const recorded = targets.environments[env];
   const { accountId, accessTeamDomain } = targets.shared.cloudflare;
   const project = recorded.firebase.projectId;
+  const { site, admin, media } = recorded.hosts;
   const values: Record<string, string | null> = {
-    SITE_URL: `https://${HOSTS[env].site}`,
-    ADMIN_HOST: HOSTS[env].admin,
+    SITE_URL: site === null ? null : `https://${site}`,
+    ADMIN_HOST: admin,
     LOG_LEVEL: "info",
     // §6: staging starts with its CSP in report-only mode; production enforces it.
     CSP_REPORT_ONLY: env === "staging" ? "true" : null,
@@ -126,12 +122,12 @@ export function derivedValues(env: DeployedEnv, targets: Targets): Record<string
     CF_ACCESS_AUD: recorded.cloudflare.accessAud,
     WHATSAPP_PHONE_NUMBER_ID: recorded.whatsapp.phoneNumberId,
     MAIL_PROVIDER: "resend",
-    MAIL_FROM: "Joutiya <no-reply@notif.joutiya.ma>",
+    MAIL_FROM: "Aalan <no-reply@notif.joutiya.ma>",
     R2_S3_ENDPOINT: accountId === null ? null : r2Endpoint(accountId),
     R2_BUCKET_QUARANTINE: recorded.r2.quarantine,
     R2_BUCKET_MEDIA: recorded.r2.media,
     R2_BUCKET_PRIVATE: recorded.r2.private,
-    MEDIA_BASE_URL: `https://${HOSTS[env].media}`,
+    MEDIA_BASE_URL: media === null ? null : `https://${media}`,
     // No MEILI_URL (phase 4): infra/vm/search-setup.sh writes it with the two search keys. Alone, it
     // stops web and worker at startup (src/lib/env.ts), and a first start comes before the keys.
   };

@@ -1,6 +1,7 @@
-// Applies the Cloudflare edge configuration of infra/cloudflare/ (§2, §6) to the account and zone
-// recorded in infra/targets.json, and nowhere else: the zone must be joutiya.ma in that account,
-// each tunnel must be joutiya-<name>-tunnel. Dry run by default (prints the requests); --apply sends.
+// Applies the Cloudflare edge configuration of infra/cloudflare/ (§2, §6) to the account and zones
+// recorded in infra/targets.json, and nowhere else: each zone id must be that zone (joutiya.ma,
+// aalan.ma, a3lan.ma) in that account, each tunnel must be joutiya-<name>-tunnel. A zone not
+// recorded yet is skipped. Dry run by default (prints the requests); --apply sends.
 //
 //   node --env-file=<owner env file> scripts/cloudflare.ts <part>... [--apply] [--replace-dns]
 //   node --env-file=<owner env file> scripts/cloudflare.ts zone --check
@@ -8,10 +9,12 @@
 //   parts: zone (settings and rules), tunnel:staging, tunnel:prod, tunnel:ssh, access, r2, loadtest
 // zone --check reads the live settings and rules, compares them with the files and exits 1 on any
 // drift (a missing transform rule lets a client forge X-Verified-Bot); zone --apply runs it after
-// its writes.
+// its writes. Every recorded zone gets the same settings and rulesets: their rules name hosts, so
+// a rule only fires in its own zone. Hostnames that only redirect (redirect-hosts.json) get a
+// proxied AAAA 100:: record in their zone, so the redirect rules see their requests.
 //
 // Environment (never printed): JOUTIYA_CLOUDFLARE_API_TOKEN, a custom token limited to the Joutiya
-// account and the joutiya.ma zone (a prefixed name: a shared shell may hold other projects' tokens);
+// account and its zones (a prefixed name: a shared shell may hold other projects' tokens);
 // for access: ACCESS_OWNER_EMAIL, ACCESS_CI_TOKEN_ID, ACCESS_PROBE_TOKEN_ID, ACCESS_SCAN_TOKEN_ID.
 // r2 only checks: Nav applies r2-buckets.json in the dashboard (bucket settings need account-wide
 // R2 rights), and this part sends its CORS preflights, which need no token.
@@ -24,12 +27,12 @@
 
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { validateTargets, type AppEnv, type EnvTargets, type Targets } from "./assert-target.ts";
+import { CLOUDFLARE_ZONES, recordedZoneId, validateTargets, zoneOf, type AppEnv, type EnvTargets, type Targets, type ZoneName } from "./assert-target.ts";
 import { requireEnvProxy } from "./env-proxy.ts";
 
-export const ZONE_NAME = "joutiya.ma";
 const API = "https://api.cloudflare.com/client/v4";
 const DIR = new URL("../infra/cloudflare/", import.meta.url);
+const TARGETS = new URL("../infra/targets.json", import.meta.url);
 
 /** Rule counts of Cloudflare Free per phase. */
 export const FREE_LIMITS: Record<string, number> = {
@@ -81,33 +84,46 @@ export interface AccessApp {
 
 /** Staff sign in with Google only (§6); the identity provider is looked up in the account. */
 export const GOOGLE_IDP = "${ACCESS_GOOGLE_IDP_ID}";
+/** infra/targets.json, unchecked: callers validate it with validateTargets. */
+export function readTargets(): Targets {
+  return JSON.parse(readFileSync(TARGETS, "utf8")) as Targets;
+}
+
+/** The site host of an environment (hosts.site of infra/targets.json). */
+export function siteHost(targets: Targets, env: AppEnv): string {
+  const host = targets.environments[env].hosts.site;
+  if (host === null) throw new Error(`environments.${env}.hosts.site must be recorded in infra/targets.json first`);
+  return host;
+}
+
 /**
  * Resend and Meta cannot sign in, so their webhooks reach the staging site through this path
  * without Access; the routes check each sender's signature and the WAF skips the path. The
  * production site is public: it needs no such path.
  */
-export const WEBHOOK_BYPASS = "staging.joutiya.ma/api/webhooks/*";
+export function webhookBypass(targets: Targets): string {
+  return `${siteHost(targets, "staging")}/api/webhooks/*`;
+}
 export const LOADTEST_RULE_REF = "loadtest_skip";
-export const LOADTEST_HOST = "staging.joutiya.ma";
 export const LOADTEST_HEADER = "x-joutiya-loadtest";
 
-/** The temporary skip rule of the load test. The secret is checked first: it goes into an expression. */
-export function loadtestRule(secret: string): Rule {
+/** The temporary skip rule of the load test of `host` (staging). The secret is checked first: it goes into an expression. */
+export function loadtestRule(secret: string, host: string): Rule {
   if (!/^[A-Za-z0-9]{32,128}$/.test(secret)) throw new Error("JOUTIYA_LOADTEST_BYPASS_SECRET must be 32 to 128 letters and digits");
   return {
     ref: LOADTEST_RULE_REF,
     description: "Load test of staging (temporary, D17): no edge rate limit, managed rules, Browser Integrity Check or Security Level",
-    expression: `http.host eq "${LOADTEST_HOST}" and any(http.request.headers["${LOADTEST_HEADER}"][*] eq "${secret}")`,
+    expression: `http.host eq "${host}" and any(http.request.headers["${LOADTEST_HEADER}"][*] eq "${secret}")`,
     action: "skip",
     action_parameters: { phases: ["http_ratelimit", "http_request_firewall_managed"], products: ["bic", "securityLevel"] },
     logging: { enabled: true },
   };
 }
 
-/** waf-rules.json with the load test rule first (secret set) or as committed (null). */
-export function loadtestRuleset(base: Ruleset, secret: string | null): Ruleset {
+/** waf-rules.json with the load test rule of `host` first (secret set) or as committed (null). */
+export function loadtestRuleset(base: Ruleset, secret: string | null, host: string): Ruleset {
   if (secret === null) return base;
-  const rules = [loadtestRule(secret), ...base.rules.filter((rule) => rule.ref !== LOADTEST_RULE_REF)];
+  const rules = [loadtestRule(secret, host), ...base.rules.filter((rule) => rule.ref !== LOADTEST_RULE_REF)];
   const limit = FREE_LIMITS[base.phase] ?? 0;
   if (rules.length > limit) throw new Error(`${base.phase}: ${rules.length} rules with the load test rule, Free allows ${limit}`);
   return { ...base, rules };
@@ -136,9 +152,25 @@ export function readEdgeFile<T>(name: string): T {
   return JSON.parse(readFileSync(new URL(name, DIR), "utf8")) as T;
 }
 
-/** Structure and Free-plan limits of the committed files. Returns the errors found. */
-export function validateEdge(read: <T>(name: string) => T = readEdgeFile): string[] {
+/** Hostnames that only redirect: no tunnel, a proxied AAAA 100:: record so the redirect rules apply. */
+export interface RedirectHosts {
+  hostnames: string[];
+}
+export const PARKED_RECORD = { type: "AAAA", content: "100::" } as const;
+
+/** Where a hostname may live: a project zone, at most one level below it (Universal SSL). */
+function hostnameErrors(file: string, hostname: string): string[] {
+  const zone = zoneOf(hostname);
+  if (zone === null) return [`${file}: ${hostname} is outside ${CLOUDFLARE_ZONES.map(({ name }) => name).join(", ")}`];
+  // Universal SSL covers the apex and first-level subdomains only.
+  if (hostname.split(".").length > zone.split(".").length + 1) return [`${file}: ${hostname} is not covered by Universal SSL`];
+  return [];
+}
+
+/** Structure and Free-plan limits of the committed files, and their hosts against infra/targets.json. Returns the errors found. */
+export function validateEdge(read: <T>(name: string) => T = readEdgeFile, targets: Targets = readTargets()): string[] {
   const errors: string[] = [];
+  const bypassPath = webhookBypass(targets);
   for (const file of RULESET_FILES) {
     const ruleset = read<Ruleset>(file);
     const limit = FREE_LIMITS[ruleset.phase];
@@ -156,14 +188,16 @@ export function validateEdge(read: <T>(name: string) => T = readEdgeFile): strin
   const guarded = new Set(access.map((app) => app.domain));
   for (const app of access) {
     const bypass = app.policies.some((policy) => policy.decision === "bypass");
-    if (app.domain === WEBHOOK_BYPASS) {
+    if (app.domain === bypassPath) {
       if (app.policies.length !== 1 || !bypass) errors.push(`access-apps.json: ${app.domain} must have a single bypass policy`);
     } else if (bypass || app.domain.includes("/")) {
-      errors.push(`access-apps.json: ${app.domain}: only ${WEBHOOK_BYPASS} may bypass Access`);
+      errors.push(`access-apps.json: ${app.domain}: only ${bypassPath} may bypass Access`);
     } else if (app.allowed_idps?.length !== 1 || app.allowed_idps[0] !== GOOGLE_IDP || app.auto_redirect_to_identity !== true) {
       errors.push(`access-apps.json: ${app.domain} must allow the Google login method only (§6)`);
     }
   }
+  if (!guarded.has(bypassPath)) errors.push(`access-apps.json: no application for ${bypassPath}`);
+  const tunneled = new Set<string>();
   for (const name of TUNNELS) {
     const file = `tunnel.${name}.json`;
     const ingress = read<TunnelConfig>(file).config.ingress;
@@ -171,14 +205,25 @@ export function validateEdge(read: <T>(name: string) => T = readEdgeFile): strin
     if (!last || last.hostname !== undefined || !last.service.startsWith("http_status:")) errors.push(`${file}: the last ingress rule must be a catch-all http_status`);
     for (const { hostname, service } of ingress) {
       if (hostname === undefined) continue;
-      if (hostname !== ZONE_NAME && !hostname.endsWith(`.${ZONE_NAME}`)) errors.push(`${file}: ${hostname} is outside ${ZONE_NAME}`);
-      // Universal SSL covers the apex and first-level subdomains only.
-      if (hostname.split(".").length > ZONE_NAME.split(".").length + 1) errors.push(`${file}: ${hostname} is not covered by Universal SSL`);
+      tunneled.add(hostname);
+      errors.push(...hostnameErrors(file, hostname));
       if (service.startsWith("ssh://") !== (name === "ssh")) errors.push(`${file}: ${hostname}: SSH goes through tunnel.ssh.json only`);
       const guardedHost = needsAccess(name, hostname);
       if (guardedHost && !guarded.has(hostname)) errors.push(`${file}: ${hostname} has no Access application`);
       if (!guardedHost && guarded.has(hostname)) errors.push(`${file}: ${hostname} is public but has an Access application`);
     }
+    // The hosts the app is configured with (SITE_URL, ADMIN_HOST) must reach this environment's tunnel.
+    if (name !== "ssh") {
+      const hosts = tunnelHostnames(read<TunnelConfig>(file));
+      for (const role of ["site", "www", "admin"] as const) {
+        const host = targets.environments[name].hosts[role];
+        if (host !== null && !hosts.includes(host)) errors.push(`${file}: environments.${name}.hosts.${role} ${host} has no ingress rule`);
+      }
+    }
+  }
+  for (const hostname of read<RedirectHosts>("redirect-hosts.json").hostnames) {
+    errors.push(...hostnameErrors("redirect-hosts.json", hostname));
+    if (tunneled.has(hostname)) errors.push(`redirect-hosts.json: ${hostname} is a tunnel hostname`);
   }
   return errors;
 }
@@ -220,11 +265,11 @@ export interface DnsChange {
   conflicts: DnsRecord[];
 }
 
-/** What to do so that `hostname` is a proxied CNAME to `target`. MX, TXT and others are kept. */
-export function dnsChange(existing: DnsRecord[], target: string, replace: boolean): DnsChange {
+/** What to do so that `hostname` is a proxied `type` record to `target` (a tunnel CNAME by default). MX, TXT and others are kept. */
+export function dnsChange(existing: DnsRecord[], target: string, replace: boolean, type: "CNAME" | "AAAA" = "CNAME"): DnsChange {
   const blocking = existing.filter((record) => ["A", "AAAA", "CNAME"].includes(record.type));
   const [only] = blocking;
-  const done = blocking.length === 1 && only?.type === "CNAME" && only.content === target && only.proxied === true;
+  const done = blocking.length === 1 && only?.type === type && only.content === target && only.proxied === true;
   if (done) return { create: false, deletes: [], conflicts: [] };
   if (blocking.length === 0) return { create: true, deletes: [], conflicts: [] };
   return replace ? { create: true, deletes: blocking, conflicts: [] } : { create: false, deletes: [], conflicts: blocking };
@@ -287,62 +332,111 @@ class CloudflareApi {
   }
 }
 
-function recorded(targets: Targets): { accountId: string; zoneId: string } {
-  const { accountId, zoneId } = targets.shared.cloudflare;
-  if (!accountId || !zoneId) throw new Error("shared.cloudflare.accountId and zoneId must be recorded in infra/targets.json first");
-  return { accountId, zoneId };
+interface Zone {
+  name: ZoneName;
+  id: string;
 }
 
-async function checkZone(api: CloudflareApi, targets: Targets): Promise<{ accountId: string; zoneId: string }> {
-  const ids = recorded(targets);
-  const zone = await api.call<{ name: string; account: { id: string } }>({ method: "GET", path: `/zones/${ids.zoneId}` });
-  if (zone.name !== ZONE_NAME || zone.account.id !== ids.accountId) {
-    throw new Error(`zone ${ids.zoneId} is not ${ZONE_NAME} in account ${ids.accountId}: nothing written`);
+/** The zones recorded in infra/targets.json; the others are printed as not added yet. */
+function recordedZones(targets: Targets): Zone[] {
+  if (!targets.shared.cloudflare.accountId) throw new Error("shared.cloudflare.accountId must be recorded in infra/targets.json first");
+  const zones: Zone[] = [];
+  for (const { name, field } of CLOUDFLARE_ZONES) {
+    const id = recordedZoneId(targets, name);
+    if (id) zones.push({ name, id });
+    else console.log(`skip  ${name}: not added yet (shared.cloudflare.${field})`);
   }
-  return ids;
+  if (zones.length === 0) throw new Error("no zone is recorded in infra/targets.json");
+  return zones;
 }
 
-async function applyZone(api: CloudflareApi, targets: Targets): Promise<void> {
-  const { zoneId } = await checkZone(api, targets);
-  for (const setting of readEdgeFile<ZoneSettings>("zone-settings.json").settings) {
-    await api.write({ method: "PATCH", path: `/zones/${zoneId}/settings/${setting.id}`, body: { value: setting.value } });
-  }
-  for (const file of RULESET_FILES) {
-    const { phase, description, rules } = readEdgeFile<Ruleset>(file);
-    // PUT replaces every rule of the phase: the file is the whole truth.
-    await api.write({ method: "PUT", path: `/zones/${zoneId}/rulesets/phases/${phase}/entrypoint`, body: { description, rules } });
-  }
+/** The recorded zone of a hostname, or null when that zone is not added yet. */
+function hostZone(targets: Targets, hostname: string): Zone | null {
+  const name = zoneOf(hostname);
+  if (name === null) throw new Error(`${hostname} is outside the project zones`);
+  const id = recordedZoneId(targets, name);
+  return id ? { name, id } : null;
 }
 
-/** Reads the live zone settings and rulesets back and throws on any difference with the files. */
+async function checkZone(api: CloudflareApi, targets: Targets, zone: Zone): Promise<{ accountId: string; zoneId: string }> {
+  const accountId = targets.shared.cloudflare.accountId;
+  if (!accountId) throw new Error("shared.cloudflare.accountId must be recorded in infra/targets.json first");
+  const live = await api.call<{ name: string; account: { id: string } }>({ method: "GET", path: `/zones/${zone.id}` });
+  if (live.name !== zone.name || live.account.id !== accountId) {
+    throw new Error(`zone ${zone.id} is not ${zone.name} in account ${accountId}: nothing written`);
+  }
+  return { accountId, zoneId: zone.id };
+}
+
+/** Proxied AAAA 100:: records of the redirect-only hostnames of a zone, so its redirect rules see them. */
+async function applyParked(api: CloudflareApi, zone: Zone, replaceDns: boolean): Promise<string[]> {
+  const blocked: string[] = [];
+  for (const hostname of readEdgeFile<RedirectHosts>("redirect-hosts.json").hostnames.filter((host) => zoneOf(host) === zone.name)) {
+    const existing = await api.call<DnsRecord[]>({ method: "GET", path: `/zones/${zone.id}/dns_records?name=${encodeURIComponent(hostname)}` });
+    const change = dnsChange(existing, PARKED_RECORD.content, replaceDns, PARKED_RECORD.type);
+    for (const record of change.conflicts) blocked.push(`${hostname}: existing ${record.type} ${record.content}`);
+    for (const record of change.deletes) await api.write({ method: "DELETE", path: `/zones/${zone.id}/dns_records/${record.id}` }, { type: record.type, name: record.name, content: record.content });
+    if (change.create) {
+      await api.write({ method: "POST", path: `/zones/${zone.id}/dns_records`, body: { ...PARKED_RECORD, name: hostname, proxied: true, comment: "joutiya-redirect" } });
+    }
+  }
+  return blocked;
+}
+
+async function applyZone(api: CloudflareApi, targets: Targets, replaceDns: boolean): Promise<void> {
+  const blocked: string[] = [];
+  for (const zone of recordedZones(targets)) {
+    console.log(`-- ${zone.name}`);
+    const { zoneId } = await checkZone(api, targets, zone);
+    for (const setting of readEdgeFile<ZoneSettings>("zone-settings.json").settings) {
+      await api.write({ method: "PATCH", path: `/zones/${zoneId}/settings/${setting.id}`, body: { value: setting.value } });
+    }
+    for (const file of RULESET_FILES) {
+      const { phase, description, rules } = readEdgeFile<Ruleset>(file);
+      // PUT replaces every rule of the phase: the file is the whole truth.
+      await api.write({ method: "PUT", path: `/zones/${zoneId}/rulesets/phases/${phase}/entrypoint`, body: { description, rules } });
+    }
+    blocked.push(...(await applyParked(api, zone, replaceDns)));
+  }
+  if (blocked.length > 0) throw new Error(`DNS records in the way (rerun with --replace-dns to replace them):\n  ${blocked.join("\n  ")}`);
+}
+
+/** Reads the live settings and rulesets of every recorded zone back and throws on any difference with the files. */
 async function verifyZone(api: CloudflareApi, targets: Targets): Promise<void> {
-  const { zoneId } = await checkZone(api, targets);
   const expected = readEdgeFile<ZoneSettings>("zone-settings.json");
-  const live: Record<string, unknown> = {};
-  for (const setting of expected.settings) {
-    live[setting.id] = (await api.call<{ value: unknown }>({ method: "GET", path: `/zones/${zoneId}/settings/${setting.id}` })).value;
+  const drift: string[] = [];
+  for (const zone of recordedZones(targets)) {
+    const { zoneId } = await checkZone(api, targets, zone);
+    const live: Record<string, unknown> = {};
+    for (const setting of expected.settings) {
+      live[setting.id] = (await api.call<{ value: unknown }>({ method: "GET", path: `/zones/${zoneId}/settings/${setting.id}` })).value;
+    }
+    const found = settingsDrift(expected, live);
+    for (const file of RULESET_FILES) {
+      const ruleset = readEdgeFile<Ruleset>(file);
+      const rules = await api
+        .call<{ rules?: Rule[] }>({ method: "GET", path: `/zones/${zoneId}/rulesets/phases/${ruleset.phase}/entrypoint` })
+        .then((result) => result.rules ?? [])
+        .catch((error: unknown) => {
+          if (/HTTP 404/.test((error as Error).message)) return null;
+          throw error;
+        });
+      found.push(...rulesetDrift(ruleset, rules));
+    }
+    drift.push(...found.map((line) => `${zone.name}: ${line}`));
   }
-  const drift = settingsDrift(expected, live);
-  for (const file of RULESET_FILES) {
-    const ruleset = readEdgeFile<Ruleset>(file);
-    const rules = await api
-      .call<{ rules?: Rule[] }>({ method: "GET", path: `/zones/${zoneId}/rulesets/phases/${ruleset.phase}/entrypoint` })
-      .then((result) => result.rules ?? [])
-      .catch((error: unknown) => {
-        if (/HTTP 404/.test((error as Error).message)) return null;
-        throw error;
-      });
-    drift.push(...rulesetDrift(ruleset, rules));
-  }
-  if (drift.length > 0) throw new Error(`the zone differs from infra/cloudflare:\n${drift.join("\n")}\nRe-apply with: scripts/cloudflare.ts zone --apply`);
+  if (drift.length > 0) throw new Error(`the zones differ from infra/cloudflare:\n${drift.join("\n")}\nRe-apply with: scripts/cloudflare.ts zone --apply`);
   console.log("zone settings and rules match infra/cloudflare");
 }
 
 async function applyLoadtest(api: CloudflareApi, targets: Targets, on: boolean): Promise<void> {
-  const { zoneId } = await checkZone(api, targets);
+  const host = siteHost(targets, "staging");
+  const zone = hostZone(targets, host);
+  if (zone === null) throw new Error(`the zone of ${host} is not recorded in infra/targets.json`);
+  const { zoneId } = await checkZone(api, targets, zone);
   const secret = on ? (process.env.JOUTIYA_LOADTEST_BYPASS_SECRET?.trim() ?? "") : null;
   if (secret === "") throw new Error("JOUTIYA_LOADTEST_BYPASS_SECRET is not set");
-  const { phase, description, rules } = loadtestRuleset(readEdgeFile<Ruleset>("waf-rules.json"), secret);
+  const { phase, description, rules } = loadtestRuleset(readEdgeFile<Ruleset>("waf-rules.json"), secret, host);
   const request: ApiRequest = { method: "PUT", path: `/zones/${zoneId}/rulesets/phases/${phase}/entrypoint`, body: { description, rules } };
   await api.write(request, secret === null ? request.body : redact(request.body, secret));
   if (!api.apply) return;
@@ -353,7 +447,8 @@ async function applyLoadtest(api: CloudflareApi, targets: Targets, on: boolean):
 }
 
 async function applyTunnel(api: CloudflareApi, targets: Targets, name: TunnelName, replaceDns: boolean): Promise<void> {
-  const { accountId, zoneId } = await checkZone(api, targets);
+  const accountId = targets.shared.cloudflare.accountId;
+  if (!accountId) throw new Error("shared.cloudflare.accountId must be recorded in infra/targets.json first");
   const tunnelId = name === "ssh" ? targets.shared.cloudflare.sshTunnelId : targets.environments[name].cloudflare.tunnelId;
   const field = name === "ssh" ? "shared.cloudflare.sshTunnelId" : `environments.${name}.cloudflare.tunnelId`;
   if (!tunnelId) throw new Error(`${field} must be recorded in infra/targets.json first`);
@@ -365,7 +460,15 @@ async function applyTunnel(api: CloudflareApi, targets: Targets, name: TunnelNam
 
   const target = `${tunnelId}.cfargotunnel.com`;
   const blocked: string[] = [];
+  const checked = new Map<ZoneName, string>();
   for (const hostname of tunnelHostnames(config)) {
+    const zone = hostZone(targets, hostname);
+    if (zone === null) {
+      console.log(`held  ${hostname}: its zone is not recorded in infra/targets.json yet, DNS record not created`);
+      continue;
+    }
+    if (!checked.has(zone.name)) checked.set(zone.name, (await checkZone(api, targets, zone)).zoneId);
+    const zoneId = checked.get(zone.name) as string;
     // A guarded hostname gets its DNS record only once its Access application exists: otherwise
     // the record would publish the service unguarded as soon as the zone is active.
     if (needsAccess(name, hostname) && !(await accessApp(api, accountId, hostname))) {
@@ -403,7 +506,8 @@ async function accessApp(api: CloudflareApi, accountId: string, domain: string):
 }
 
 async function applyAccess(api: CloudflareApi, targets: Targets): Promise<void> {
-  const { accountId } = await checkZone(api, targets);
+  const accountId = targets.shared.cloudflare.accountId;
+  if (!accountId) throw new Error("shared.cloudflare.accountId must be recorded in infra/targets.json first");
   const template = readEdgeFile<{ apps: AccessApp[] }>("access-apps.json").apps;
   const providers = await api.call<{ id: string; type: string }[]>({ method: "GET", path: `/accounts/${accountId}/access/identity_providers` });
   const { value: apps, missing } = substitute(template, { ...process.env, ACCESS_GOOGLE_IDP_ID: googleIdp(providers) });
@@ -437,12 +541,23 @@ export interface R2Settings {
 }
 type BucketRole = keyof EnvTargets["r2"];
 
-/** The site origins of each environment: a bucket never admits another environment's pages. */
-export const SITE_ORIGINS: Record<AppEnv, string[]> = {
-  dev: ["http://localhost:3000"],
-  staging: ["https://staging.joutiya.ma"],
-  prod: ["https://joutiya.ma", "https://www.joutiya.ma"],
-};
+/** The two zones that serve the site in turn: their origins are both admitted until joutiya.ma only redirects. */
+const SITE_ZONES: readonly ZoneName[] = ["joutiya.ma", "aalan.ma"];
+
+/**
+ * The site origins of each environment (hosts.site and hosts.www), each with its twin in the other
+ * site zone: a bucket never admits another environment's pages.
+ */
+export function siteOrigins(targets: Targets, env: AppEnv): string[] {
+  if (env === "dev") return ["http://localhost:3000"];
+  const { site, www } = targets.environments[env].hosts;
+  return [site, www].flatMap((host) => {
+    if (host === null) return [];
+    const zone = zoneOf(host);
+    const twins = zone !== null && SITE_ZONES.includes(zone) ? SITE_ZONES.map((other) => `${host.slice(0, -zone.length)}${other}`) : [host];
+    return twins.map((name) => `https://${name}`);
+  });
+}
 const CORS_METHODS: Record<BucketRole, string[]> = { quarantine: ["PUT"], media: ["GET", "HEAD"], private: [] };
 
 /** r2-buckets.json against the registry: its buckets, each role's methods, each environment's origins. */
@@ -461,7 +576,7 @@ export function validateR2(settings: R2Settings, targets: Targets): string[] {
     }
     for (const rule of cors) {
       for (const method of rule.AllowedMethods) if (!CORS_METHODS[owner.role].includes(method)) errors.push(`r2-buckets.json: ${bucket} must not allow ${method}`);
-      for (const origin of rule.AllowedOrigins) if (!SITE_ORIGINS[owner.env].includes(origin)) errors.push(`r2-buckets.json: ${bucket} must not admit ${origin}`);
+      for (const origin of rule.AllowedOrigins) if (!siteOrigins(targets, owner.env).includes(origin)) errors.push(`r2-buckets.json: ${bucket} must not admit ${origin}`);
     }
     for (const rule of lifecycle) {
       if (!Number.isInteger(rule.deleteAfterDays) || rule.deleteAfterDays < 1) errors.push(`r2-buckets.json: ${bucket}: ${rule.name} needs a whole number of days`);
@@ -542,12 +657,11 @@ async function main(): Promise<void> {
   const on = args.includes("--on");
   if (parts.includes("loadtest") && (parts.length !== 1 || on === args.includes("--off"))) throw new Error("usage: scripts/cloudflare.ts loadtest --on|--off [--apply]");
 
-  const edgeErrors = validateEdge();
-  if (edgeErrors.length > 0) throw new Error(edgeErrors.join("\n"));
-  const raw: unknown = JSON.parse(readFileSync(new URL("../infra/targets.json", import.meta.url), "utf8"));
-  const targetErrors = validateTargets(raw);
+  const targets = readTargets();
+  const targetErrors = validateTargets(targets);
   if (targetErrors.length > 0) throw new Error(targetErrors.join("\n"));
-  const targets = raw as Targets;
+  const edgeErrors = validateEdge(readEdgeFile, targets);
+  if (edgeErrors.length > 0) throw new Error(edgeErrors.join("\n"));
 
   const token = process.env.JOUTIYA_CLOUDFLARE_API_TOKEN?.trim() ?? "";
   if (!token && parts.some((part) => part !== "r2")) throw new Error("JOUTIYA_CLOUDFLARE_API_TOKEN is not set");
@@ -556,7 +670,7 @@ async function main(): Promise<void> {
     console.log(`\n== ${part}`);
     if (part === "zone" && check) await verifyZone(api, targets);
     else if (part === "zone") {
-      await applyZone(api, targets);
+      await applyZone(api, targets, replaceDns);
       if (apply) await verifyZone(api, targets);
     }
     else if (part === "access") await applyAccess(api, targets);

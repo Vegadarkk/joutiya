@@ -18,7 +18,8 @@ import {
   tunnelHostnames,
   validateEdge,
   validateR2,
-  WEBHOOK_BYPASS,
+  siteOrigins,
+  webhookBypass,
   type AccessApp,
   type DnsRecord,
   type R2CorsRule,
@@ -28,6 +29,8 @@ import {
   type ZoneSettings,
 } from "../../scripts/cloudflare";
 
+const targets = registry as unknown as Targets;
+const WEBHOOK_BYPASS = webhookBypass(targets);
 const record = (type: string, content: string, proxied = true): DnsRecord => ({ id: `${type}-${content}`, type, name: "joutiya.ma", content, proxied });
 const TARGET = "0f0e0d0c-0b0a-4908-8706-050403020100.cfargotunnel.com";
 
@@ -47,18 +50,50 @@ describe("infra/cloudflare", () => {
       },
     };
     const read = <T,>(name: string): T => (name.startsWith("tunnel.staging") ? tunnel : readEdgeFile(name)) as T;
-    const errors = validateEdge(read);
+    const errors = validateEdge(read, targets);
     expect(errors).toContain("tunnel.staging.json: the last ingress rule must be a catch-all http_status");
     expect(errors).toContain("tunnel.staging.json: preview.staging.joutiya.ma is not covered by Universal SSL");
     expect(errors).toContain("tunnel.staging.json: beta.joutiya.ma has no Access application");
     expect(errors).toContain("tunnel.staging.json: ssh.joutiya.ma: SSH goes through tunnel.ssh.json only");
+    expect(errors).toContain("tunnel.staging.json: environments.staging.hosts.site staging.joutiya.ma has no ingress rule");
+  });
+
+  it("accepts tunnel hostnames in every project zone and refuses others", () => {
+    const tunnel: TunnelConfig = {
+      config: {
+        ingress: [
+          { hostname: "joutiya.ma", service: "http://web:3000" },
+          { hostname: "www.joutiya.ma", service: "http://web:3000" },
+          { hostname: "admin.joutiya.ma", service: "http://web:3000" },
+          { hostname: "aalan.ma", service: "http://web:3000" },
+          { hostname: "admin.aalan.ma", service: "http://web:3000" },
+          { hostname: "example.org", service: "http://web:3000" },
+          { service: "http_status:404" },
+        ],
+      },
+    };
+    const read = <T,>(name: string): T => (name.startsWith("tunnel.prod") ? tunnel : readEdgeFile(name)) as T;
+    expect(validateEdge(read, targets)).toEqual([
+      "tunnel.prod.json: admin.aalan.ma has no Access application",
+      "tunnel.prod.json: example.org is outside joutiya.ma, aalan.ma, a3lan.ma",
+    ]);
+  });
+
+  it("checks the redirect-only hostnames", () => {
+    const parked = { hostnames: ["a3lan.ma", "www.a3lan.ma", "joutiya.ma", "a.b.a3lan.ma", "example.org"] };
+    const read = <T,>(name: string): T => (name === "redirect-hosts.json" ? parked : readEdgeFile(name)) as T;
+    expect(validateEdge(read, targets)).toEqual([
+      "redirect-hosts.json: joutiya.ma is a tunnel hostname",
+      "redirect-hosts.json: a.b.a3lan.ma is not covered by Universal SSL",
+      "redirect-hosts.json: example.org is outside joutiya.ma, aalan.ma, a3lan.ma",
+    ]);
   });
 
   it("lets staff in with the Google login method only", () => {
     const { apps } = readEdgeFile<{ apps: AccessApp[] }>("access-apps.json");
     const withOtp = { apps: apps.map((app, index) => (index === 0 ? { ...app, allowed_idps: [] } : app)) };
     const read = <T,>(name: string): T => (name === "access-apps.json" ? withOtp : readEdgeFile(name)) as T;
-    expect(validateEdge(read)).toEqual(["access-apps.json: admin.joutiya.ma must allow the Google login method only (§6)"]);
+    expect(validateEdge(read, targets)).toEqual(["access-apps.json: admin.joutiya.ma must allow the Google login method only (§6)"]);
   });
 
   it("lets only the staging webhook path bypass Access", () => {
@@ -71,7 +106,7 @@ describe("infra/cloudflare", () => {
       ],
     };
     const read = <T,>(name: string): T => (name === "access-apps.json" ? changed : readEdgeFile(name)) as T;
-    expect(validateEdge(read)).toEqual([
+    expect(validateEdge(read, targets)).toEqual([
       `access-apps.json: ${WEBHOOK_BYPASS} must have a single bypass policy`,
       `access-apps.json: admin-staging.joutiya.ma: only ${WEBHOOK_BYPASS} may bypass Access`,
       `access-apps.json: staging.joutiya.ma/api: only ${WEBHOOK_BYPASS} may bypass Access`,
@@ -126,10 +161,14 @@ describe("dnsChange", () => {
 });
 
 describe("r2-buckets.json", () => {
-  const targets = registry as unknown as Targets;
-
   it("names registry buckets only, with each role's methods and each environment's origins", () => {
     expect(validateR2(readEdgeFile<R2Settings>("r2-buckets.json"), targets)).toEqual([]);
+  });
+
+  it("admits each environment's site origins and their twins on the other site zone", () => {
+    expect(siteOrigins(targets, "prod")).toEqual(["https://joutiya.ma", "https://aalan.ma", "https://www.joutiya.ma", "https://www.aalan.ma"]);
+    expect(siteOrigins(targets, "staging")).toEqual(["https://staging.joutiya.ma", "https://staging.aalan.ma"]);
+    expect(siteOrigins(targets, "dev")).toEqual(["http://localhost:3000"]);
   });
 
   it("flags another environment's origin, a write on media and a rule that would empty a private bucket", () => {
@@ -206,25 +245,25 @@ describe("load test rule", () => {
   const waf = readEdgeFile<Ruleset>("waf-rules.json");
 
   it("skips the edge limits for staging requests carrying the secret header only", () => {
-    const rule = loadtestRule(secret);
+    const rule = loadtestRule(secret, "staging.joutiya.ma");
     expect(rule.expression).toBe(`http.host eq "staging.joutiya.ma" and any(http.request.headers["x-joutiya-loadtest"][*] eq "${secret}")`);
     expect(rule.action_parameters).toEqual({ phases: ["http_ratelimit", "http_request_firewall_managed"], products: ["bic", "securityLevel"] });
   });
 
   it("refuses a secret that could change the expression", () => {
-    for (const bad of ["short", `${"a".repeat(32)}" or true or "`, `${"a".repeat(31)} `]) expect(() => loadtestRule(bad)).toThrow(/32 to 128/);
+    for (const bad of ["short", `${"a".repeat(32)}" or true or "`, `${"a".repeat(31)} `]) expect(() => loadtestRule(bad, "staging.joutiya.ma")).toThrow(/32 to 128/);
   });
 
   it("goes first, within the Free limit, and goes away with the committed rules", () => {
-    const on = loadtestRuleset(waf, secret);
+    const on = loadtestRuleset(waf, secret, "staging.joutiya.ma");
     expect(on.rules.map((rule) => rule.ref)).toEqual([LOADTEST_RULE_REF, ...waf.rules.map((rule) => rule.ref)]);
-    expect(loadtestRuleset(on, secret).rules).toHaveLength(on.rules.length);
-    expect(loadtestRuleset(waf, null)).toBe(waf);
-    expect(() => loadtestRuleset({ ...waf, rules: [...waf.rules, { ...waf.rules[0]!, ref: "extra" }] }, secret)).toThrow(/Free allows 5/);
+    expect(loadtestRuleset(on, secret, "staging.joutiya.ma").rules).toHaveLength(on.rules.length);
+    expect(loadtestRuleset(waf, null, "staging.joutiya.ma")).toBe(waf);
+    expect(() => loadtestRuleset({ ...waf, rules: [...waf.rules, { ...waf.rules[0]!, ref: "extra" }] }, secret, "staging.joutiya.ma")).toThrow(/Free allows 5/);
   });
 
   it("never prints the secret", () => {
-    const shown = JSON.stringify(redact({ rules: loadtestRuleset(waf, secret).rules }, secret));
+    const shown = JSON.stringify(redact({ rules: loadtestRuleset(waf, secret, "staging.joutiya.ma").rules }, secret));
     expect(shown).not.toContain(secret);
     expect(shown).toContain('eq \\"***\\"');
   });
