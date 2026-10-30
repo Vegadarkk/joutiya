@@ -3368,6 +3368,7 @@
     },
     "featured": {
       "title": "À la Une",
+      "emptyTitle": "Vous aimerez peut-être",
       "sponsored": "Sponsorisé",
       "infoLabel": "À propos des annonces À la Une",
       "info": "Emplacement payé par l'annonceur. Il ne modifie pas le classement des autres résultats."
