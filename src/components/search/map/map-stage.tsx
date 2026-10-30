@@ -32,6 +32,12 @@ export function MapStage() {
         </div>
       )}
       <div className="search-mapfoot">
+        {state.jobSeekers.count > 0 ? (
+          <label className="search-jobfilter float-card" data-testid="search-jobseekers">
+            <input type="checkbox" checked={!state.jobSeekers.shown} onChange={(event) => state.jobSeekers.setShown(!event.target.checked)} className="size-4 accent-primary" />
+            {t("jobSeekers", { count: state.jobSeekers.count })}
+          </label>
+        ) : null}
         <p className="search-attribution">
           {tMap.rich("attribution", {
             osm: (chunks) => (
