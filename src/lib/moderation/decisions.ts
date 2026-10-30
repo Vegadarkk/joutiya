@@ -150,6 +150,7 @@ export const FLAG_LABELS: Record<ModerationFlag, string> = {
   sanitary_check: "N° ONSSA à vérifier",
   rental_review: "Location à vérifier",
   promo_check: "Promotion de plus de 70 %",
+  work_abroad: "Emploi à l'étranger",
 };
 
 export const DECISION_TEXT_MAX = 500;

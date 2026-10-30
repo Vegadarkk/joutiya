@@ -22,6 +22,8 @@ import {
   criteriaFor,
   criteriaSchema,
   criterionById,
+  jobOfferAbroad,
+  paidOptionsAllowed,
   searchCriteria,
   subcategoryById,
 } from "@/config/categories";
@@ -119,6 +121,21 @@ describe("category tree", () => {
     expect(contactMessagingOnly(subcategoryById("koumiyas-decoratives"))).toBe(true);
     expect(contactMessagingOnly(offers)).toBe(false);
     expect(contactMessagingOnly(undefined)).toBe(false);
+  });
+
+  it("knows a job offer abroad and keeps paid options off a job seeker's ad (PR 14b)", () => {
+    expect(jobOfferAbroad("offres-emploi", { "job-location": "etranger" })).toBe(true);
+    expect(jobOfferAbroad("offres-emploi", { "job-location": "maroc" })).toBe(false);
+    expect(jobOfferAbroad("offres-emploi", {})).toBe(false);
+    // A seeker's ad has no location criterion; a stray value never holds it.
+    expect(jobOfferAbroad("demandes-emploi", { "job-location": "etranger" })).toBe(false);
+    expect(jobOfferAbroad("voitures", { "job-location": "etranger" })).toBe(false);
+    expect(jobOfferAbroad(undefined, { "job-location": "etranger" })).toBe(false);
+    expect(subcategoryById("demandes-emploi")?.noPaidOptions).toBe(true);
+    expect(paidOptionsAllowed("demandes-emploi")).toBe(false);
+    expect(paidOptionsAllowed("offres-emploi")).toBe(true);
+    expect(paidOptionsAllowed("voitures")).toBe(true);
+    expect(paidOptionsAllowed(null)).toBe(true);
   });
 
   it("lists about 60 car brands plus `autre`, used by the car fields", () => {

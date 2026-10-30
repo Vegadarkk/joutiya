@@ -32,7 +32,7 @@ import { createSessionForUid } from "@/lib/firebase/session";
 import { resetRateLimiters } from "@/lib/rate-limit/limiter";
 import { scheduleBoostExpiry } from "@/lib/search/boosts";
 import { csrfToken } from "@/lib/security/csrf";
-import { DAY_MS, api, member, readyPatch, seedReadyUpload, type ErrorBody, type Member } from "../listings/helpers";
+import { DAY_MS, api, member, readyPatch, seedReadyUpload, seekerAdPatch, type ErrorBody, type Member } from "../listings/helpers";
 
 beforeAll(() => resetServerEnv());
 beforeEach(() => {
@@ -145,6 +145,23 @@ describe("buying an option", () => {
     expect(result.status).toBe(409);
     expect(code(result.body)).toBe("listing_not_promotable");
     expect((await getWallet(owner.uid))?.balance).toBe(100);
+  });
+
+  it("refuses a job seeker's ad, which has no paid options (409 boost_not_allowed), and says so in the offer (PR 14b)", async () => {
+    const owner = await member();
+    const created = await api<CreateListingResponse>(create, "POST", "/api/listings", { member: owner, body: {} });
+    const id = created.body.id;
+    expect((await api(patch, "PATCH", `/api/listings/${id}`, { member: owner, body: seekerAdPatch() })).status).toBe(200);
+    expect((await api(publish, "POST", `/api/listings/${id}/publish`, { member: owner, body: { acceptRules: true } })).body).toMatchObject({ status: "published" });
+    await fund(owner.uid, { balance: 100 });
+    const offer = await api<ListingOptionsResponse>(options, "GET", `/api/listings/${id}/options`, { member: owner });
+    expect(offer.body).toMatchObject({ allowed: false, promotable: true });
+    const result = await purchase(owner, id, order("bump", randomUUID(), 10));
+    expect(result.status).toBe(409);
+    expect(code(result.body)).toBe("boost_not_allowed");
+    expect((await getWallet(owner.uid))?.balance).toBe(100);
+    // Every other listing keeps its options.
+    expect((await api<ListingOptionsResponse>(options, "GET", `/api/listings/${await published(owner)}/options`, { member: owner })).body.allowed).toBe(true);
   });
 
   it("refuses a bump while the listing is at the top already", async () => {

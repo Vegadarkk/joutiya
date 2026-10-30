@@ -19,6 +19,8 @@ export interface ReportReason {
   id: string;
   priority: ReportPriority;
   targets: readonly ReportTargetType[];
+  /** Listings of these categories only (the job ad reasons); absent: every listing. */
+  categories?: readonly string[];
   label: { fr: string; ar: string };
   /** One line under the label in the dialog. */
   hint: { fr: string; ar: string };
@@ -57,6 +59,25 @@ export const REPORT_REASONS = [
     ground: { type: "illegal", ref: "C. pén. art. 222-17" },
   },
   // P1: 24 hours.
+  {
+    // Job ads (Emploi frame of 2026-10-30): a candidate never pays (Code du travail arts. 480, 485).
+    id: "job_scam",
+    priority: "P1",
+    targets: ["listing"],
+    categories: ["emploi"],
+    label: { fr: "Offre frauduleuse : paiement demandé au candidat", ar: "عرض احتيالي: مطلوب من المرشح أن يدفع" },
+    hint: { fr: "Frais de dossier, formation payante, caution, visa ou recharge demandés pour obtenir le poste.", ar: "رسوم ملف، تكوين مؤدى عنه، ضمانة، فيزا أو تعبئة مطلوبة للحصول على المنصب." },
+    ground: { type: "illegal", ref: "Code du travail (Maroc) art. 480 et 485" },
+  },
+  {
+    id: "job_discrimination",
+    priority: "P1",
+    targets: ["listing"],
+    categories: ["emploi"],
+    label: { fr: "Offre discriminatoire", ar: "عرض تمييزي" },
+    hint: { fr: "Condition de sexe, d'âge, d'apparence, de situation familiale, de religion ou d'origine pour postuler.", ar: "شرط الجنس أو السن أو المظهر أو الحالة العائلية أو الدين أو الأصل للترشح." },
+    ground: { type: "illegal", ref: "Code du travail (Maroc) art. 9" },
+  },
   {
     id: "scam",
     priority: "P1",
@@ -200,9 +221,15 @@ export function reportReason(id: string): ReportReason | undefined {
   return BY_ID.get(id);
 }
 
-/** The reasons the dialog offers for a target type, in priority order. */
-export function reasonsFor(target: ReportTargetType): ReportReason[] {
-  return REPORT_REASONS.filter((reason) => (reason.targets as readonly ReportTargetType[]).includes(target));
+/** The reason fits the target type and, for a reason of some categories, the listing's category. */
+export function reasonApplies(reason: ReportReason, target: ReportTargetType, categoryId?: string | null): boolean {
+  if (!(reason.targets as readonly ReportTargetType[]).includes(target)) return false;
+  return reason.categories === undefined || (categoryId !== undefined && categoryId !== null && reason.categories.includes(categoryId));
+}
+
+/** The reasons the dialog offers for a target type (and a listing's category), in priority order. */
+export function reasonsFor(target: ReportTargetType, categoryId?: string | null): ReportReason[] {
+  return REPORT_REASONS.filter((reason) => reasonApplies(reason, target, categoryId));
 }
 
 export function slaDueAt(priority: ReportPriority, createdAt: Date): Date {

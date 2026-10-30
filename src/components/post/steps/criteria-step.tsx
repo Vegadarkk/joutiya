@@ -3,7 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { ErrorBanner } from "@/components/feedback/error-banner";
-import { criterionApplies, criterionById, subcategoryById, type Condition } from "@/config/categories";
+import { criterionApplies, criterionById, jobOfferAbroad, subcategoryById, type Condition } from "@/config/categories";
 import type { FieldIssue } from "@/lib/contracts/listings";
 import { useWizard } from "@/lib/listings/client/store";
 import { criterionBounds, stepIssues } from "@/lib/listings/client/validation";
@@ -76,6 +76,12 @@ export function CriteriaStep({ onNext }: { onNext: () => void }) {
           <p className="text-sm text-foreground-muted">{t("wizard.requiredHint")}</p>
           {covered.length > 0 ? <p className="text-sm text-foreground-muted">{t("catalogue.fromVariants", { criteria: covered.map((criterion) => labels.label(criterion.id)).join(", ") })}</p> : null}
           <CriteriaFields subcategory={shown} attributes={listing.attributes} condition={listing.condition} errors={errors} onAttribute={onAttribute} onCondition={onCondition} onBlur={() => void flush()} pro={listing.sellerType === "pro"} />
+          {/* A job offer abroad: the visa and ANAPEC rule, and the moderator's check before publication (Emploi frame, rule 10). */}
+          {jobOfferAbroad(subcategory.id, listing.attributes) ? (
+            <ErrorBanner tone="info" title={t("wizard.jobAbroadTitle")} className="text-sm">
+              {t("wizard.jobAbroadBody")}
+            </ErrorBanner>
+          ) : null}
         </>
       )}
     </form>

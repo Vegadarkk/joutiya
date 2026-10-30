@@ -140,6 +140,24 @@ export function readyPatch(overrides: Partial<ListingPatch> = {}): ListingPatch 
   };
 }
 
+/** A job seeker's ad (Emploi, PR 14): no amount, no photo, no condition, messaging only. */
+export function seekerAdPatch(overrides: Partial<ListingPatch> = {}): ListingPatch {
+  return {
+    subcategoryId: "demandes-emploi",
+    title: "Réceptionniste trilingue cherche poste en hôtellerie",
+    description: "Trois ans d'expérience en hôtel quatre étoiles, accueil, réservations et caisse, français, arabe et anglais. Disponible immédiatement, Casablanca ou Rabat.",
+    attributes: { "job-sector": "restauration-hotellerie", "job-experience": "3-5-ans", "job-mobility": "region" },
+    condition: null,
+    price: null,
+    priceNegotiable: false,
+    isDonation: false,
+    location: { regionCode: casablanca.regionCode, citySlug: casablanca.slug },
+    contact: { showPhone: false, whatsapp: false },
+    photos: [],
+    ...overrides,
+  };
+}
+
 /** A `ready` upload document of `owner` for `listingId`, as the media pipeline leaves it. */
 export async function seedReadyUpload(owner: Member, listingId: string, overrides: Partial<UploadDoc> = {}): Promise<string> {
   const id = newUploadId();

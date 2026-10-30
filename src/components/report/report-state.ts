@@ -12,6 +12,8 @@ import type { CreateReportRequest, CreateReportResponse } from "@/lib/contracts/
 export interface ReportTarget {
   type: "listing" | "user" | "message" | "review";
   id: string;
+  /** A listing's category: opens the reasons of that category (the job ad ones). Never sent. */
+  categoryId?: string;
 }
 
 /** Where the notice is sent from: titles and wording follow it (a conversation reports its other participant). */
@@ -22,9 +24,9 @@ export interface ReasonGroup {
   reasons: ReportReason[];
 }
 
-/** The reasons of a target, illegal content first then the terms of use, each group in priority order. */
-export function reasonGroups(target: ReportTarget["type"]): ReasonGroup[] {
-  const reasons = reasonsFor(target);
+/** The reasons of a target (and a listing's category), illegal content first then the terms of use, each group in priority order. */
+export function reasonGroups(target: ReportTarget["type"], categoryId?: string): ReasonGroup[] {
+  const reasons = reasonsFor(target, categoryId);
   return (["illegal", "terms"] as const).map((ground) => ({ ground, reasons: reasons.filter((reason) => reason.ground.type === ground) })).filter((group) => group.reasons.length > 0);
 }
 
@@ -81,7 +83,7 @@ export function reportRequest(target: ReportTarget, draft: ReportDraft, signedIn
   const name = draft.name.trim();
   const email = draft.email.trim();
   return {
-    target,
+    target: { type: target.type, id: target.id },
     reasonId: draft.reasonId as CreateReportRequest["reasonId"],
     explanation: draft.explanation.trim(),
     goodFaith: true,

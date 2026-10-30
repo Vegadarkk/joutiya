@@ -55,7 +55,7 @@ export function ReportDialog({ open, onOpenChange, target, context, subject, quo
   const pathname = usePathname();
   const { session } = useSession();
   const signedIn = session !== null;
-  const groups = useMemo(() => reasonGroups(target.type), [target.type]);
+  const groups = useMemo(() => reasonGroups(target.type, target.categoryId), [target.type, target.categoryId]);
   const turnstile = useRef<TurnstileHandle>(null);
   const stepHeading = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState<Step>("reason");

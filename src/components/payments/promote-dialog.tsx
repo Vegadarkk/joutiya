@@ -35,7 +35,7 @@ type Note = { text: string; tone?: "warning" };
 type State = { kind: "loading" } | { kind: "failed"; error: unknown } | { kind: "ready"; data: ListingOptionsResponse; at: number };
 
 /** Codes the dialog explains in its own words (Options.errors). */
-const OPTION_ERRORS = ["sales_closed", "billing_owner_only", "listing_not_promotable", "bump_too_soon", "wallet_frozen", "insufficient_credits", "price_changed"] as const;
+const OPTION_ERRORS = ["sales_closed", "billing_owner_only", "boost_not_allowed", "listing_not_promotable", "bump_too_soon", "wallet_frozen", "insufficient_credits", "price_changed"] as const;
 type OptionError = (typeof OPTION_ERRORS)[number];
 
 interface PromoteDialogProps {
@@ -135,7 +135,7 @@ export function PromoteDialog({ listingId, title, onClose }: PromoteDialogProps)
   }
 
   const data = state.kind === "ready" ? state.data : null;
-  const buyable = data !== null && data.salesOpen && data.promotable;
+  const buyable = data !== null && data.salesOpen && data.allowed && data.promotable;
 
   return (
     <Dialog.Root open onOpenChange={(value) => !value && !submitting && onClose()}>
@@ -178,7 +178,8 @@ export function PromoteDialog({ listingId, title, onClose }: PromoteDialogProps)
               </ErrorBanner>
             ) : null}
             {data && !data.salesOpen ? <ErrorBanner tone="info" title={t("closed")} /> : null}
-            {data && data.salesOpen && !data.promotable ? <ErrorBanner tone="warning" title={t("notPromotable")} /> : null}
+            {data && data.salesOpen && !data.allowed ? <ErrorBanner tone="info" title={t("notAllowed")} /> : null}
+            {data && data.salesOpen && data.allowed && !data.promotable ? <ErrorBanner tone="warning" title={t("notPromotable")} /> : null}
 
             {data && buyable ? (
               <>

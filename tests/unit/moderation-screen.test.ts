@@ -145,6 +145,38 @@ describe("screenListing: job ads (Phase 6 frame)", () => {
     expect(codes(offer)).toEqual([]);
     expect(codes({ ...offer, price: 4000 })).toEqual([]);
   });
+
+  const offer = (overrides: Partial<ScreenInput> = {}) =>
+    seeker({
+      title: "Commis de cuisine, saison d'été",
+      description: "Hôtel-restaurant recrute un commis de cuisine de juin à septembre, logement fourni, aucun frais demandé au candidat.",
+      attributes: { "job-contract": "saisonnier", "job-sector": "restauration-hotellerie", "job-experience": "1-3-ans", "job-mode": "sur-place", "job-location": "maroc" },
+      subcategoryId: "offres-emploi",
+      ...overrides,
+    });
+
+  it("holds a job offer abroad for a moderator (work_abroad), whatever the score", () => {
+    const abroad = offer({ attributes: { ...offer().attributes, "job-location": "etranger" } });
+    const result = screenListing(abroad, ctx);
+    expect(result).toMatchObject({ state: "needs_review", score: 0, flags: ["work_abroad"], blockers: [] });
+    expect(result.evidence).toContain("job offer located abroad");
+    expect(screenListing(offer(), ctx)).toMatchObject({ state: "auto_ok", flags: [] });
+  });
+
+  it("reviews fees asked from a candidate or a discriminatory requirement, on job ads only", () => {
+    const fees = screenListing(offer({ description: "Commis de cuisine pour la saison. Frais de dossier de 300 DH à régler avant l'entretien." }), ctx);
+    expect(fees.state).toBe("needs_review");
+    expect(fees.flags).toEqual(["prohibited_soft"]);
+    expect(fees.blockers).toEqual([]);
+    expect(fees.evidence).toContain("prohibited soft:job_scam in description");
+    const wording = screenListing(seeker({ title: "Jeune fille de bonne présentation cherche poste d'hôtesse" }), ctx);
+    expect(wording.flags).toEqual(["prohibited_soft"]);
+    expect(wording.evidence).toContain("prohibited soft:job_discrimination in title");
+    // The same words on a rental: a deposit, nothing to review.
+    const rental = screenListing(cleanListing({ description: "Logan 2019 propre, caution de 2 000 DH et acompte à la réservation, frais de dossier offerts." }), ctx);
+    expect(rental.flags).toEqual([]);
+    expect(rental.state).toBe("auto_ok");
+  });
 });
 
 describe("screenListing: adults-only subcategory (decorative koumiyas)", () => {

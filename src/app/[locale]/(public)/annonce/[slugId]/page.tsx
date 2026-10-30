@@ -397,7 +397,7 @@ export default async function ListingPage({ params }: { params: Params }) {
                 and the contact or report controls (D6). */}
             {/* The search map links here ("Signaler", lot 2). */}
             <div id="signaler" className="scroll-mt-24">
-              <ReportButton target={{ type: "listing", id: listing.id }} subject={listing.title} ownerPublicId={listing.seller.publicId} email={legal.dsaContactEmail} url={canonicalUrl} />
+              <ReportButton target={{ type: "listing", id: listing.id, categoryId: listing.categoryId }} subject={listing.title} ownerPublicId={listing.seller.publicId} email={legal.dsaContactEmail} url={canonicalUrl} />
             </div>
             <SafetyTips variant={jobs ? "jobs" : realEstate ? "realEstate" : "goods"} />
             <AdSlot placement="listing-bottom" eligible={found.adsEligible} promos={availablePromos(flags)} seed={listing.id} />
