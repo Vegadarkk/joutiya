@@ -4,7 +4,7 @@
 # no NEXT_PUBLIC_* build argument, every setting is read at runtime.
 
 # The pin sits on one literal FROM line: Dependabot cannot read an image named through an ARG.
-FROM node:24.22.0-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS base
+FROM node:26.12.0-bookworm-slim@sha256:742a0fe7320e09e0321222b68165e6ac731d30470e7ea7f98f9bfc3a6e1034fe AS base
 
 FROM base AS deps
 WORKDIR /src
