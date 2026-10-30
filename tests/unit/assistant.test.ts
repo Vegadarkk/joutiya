@@ -98,10 +98,10 @@ describe("assistant prompt", () => {
   });
 
   it("bounds the answer and keeps known, distinct citations (3 at most)", () => {
-    const { answer, cited } = clampAnswer({ answer: `  ${"a".repeat(2000)}\u0007 `, articles: ["eviter-les-arnaques", "eviter-les-arnaques", "role-de-joutiya", "signaler-un-contenu", "creer-un-compte"] as never });
+    const { answer, cited } = clampAnswer({ answer: `  ${"a".repeat(2000)}\u0007 `, articles: ["eviter-les-arnaques", "eviter-les-arnaques", "role-d-aalan", "signaler-un-contenu", "creer-un-compte"] as never });
     expect(answer).toHaveLength(1500);
     expect(answer.endsWith("…")).toBe(true);
-    expect(cited).toEqual(["eviter-les-arnaques", "role-de-joutiya", "signaler-un-contenu"]);
+    expect(cited).toEqual(["eviter-les-arnaques", "role-d-aalan", "signaler-un-contenu"]);
   });
 });
 

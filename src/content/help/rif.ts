@@ -215,7 +215,7 @@ export const HELP_RIF: HelpLocaleContent = {
       ],
       keywords: ["isefka", "données", "confidentialité", "cookies"],
     },
-    "role-de-joutiya": {
+    "role-d-aalan": {
       title: "Tawuri n Aalan",
       summary: "Aalan teṭṭef annonces n medden: war d amzenzu, war d amsaɣ.",
       blocks: [
@@ -225,7 +225,7 @@ export const HELP_RIF: HelpLocaleContent = {
       ],
       keywords: ["litige", "amennuɣ", "remboursement", "garantie"],
     },
-    "assistant-joutiya": {
+    "assistant-aalan": {
       title: "Amallal n Aalan",
       summary: "Amallal n tmusni tamsnalit (IA) i d-yerran x isteqsiyen nnec zi imagraden n tasna n tallalt.",
       blocks: [

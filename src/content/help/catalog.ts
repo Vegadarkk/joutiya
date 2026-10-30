@@ -45,8 +45,8 @@ export const HELP_SLUGS = [
   "decisions-et-recours",
   "suspension-de-compte",
   "donnees-personnelles",
-  "role-de-joutiya",
-  "assistant-joutiya",
+  "role-d-aalan",
+  "assistant-aalan",
 ] as const;
 export type HelpSlug = (typeof HELP_SLUGS)[number];
 
@@ -74,8 +74,8 @@ export const HELP_META: Readonly<Record<HelpSlug, HelpArticleMeta>> = {
   "decisions-et-recours": { category: "moderation", links: [page("recours"), help("suspension-de-compte"), legal("cgu")] },
   "suspension-de-compte": { category: "moderation", links: [page("recours"), help("decisions-et-recours"), legal("cgu")] },
   "donnees-personnelles": { category: "donnees", links: [legal("confidentialite"), legal("cookies"), legal("mentions-legales")] },
-  "role-de-joutiya": { category: "donnees", links: [legal("cgu"), legal("droits-et-obligations"), help("eviter-les-arnaques")] },
-  "assistant-joutiya": { category: "donnees", links: [help("donnees-personnelles"), legal("confidentialite")] },
+  "role-d-aalan": { category: "donnees", links: [legal("cgu"), legal("droits-et-obligations"), help("eviter-les-arnaques")] },
+  "assistant-aalan": { category: "donnees", links: [help("donnees-personnelles"), legal("confidentialite")] },
 };
 
 /** A paragraph, a bullet list, numbered steps (a real sequence) or a caution note. */

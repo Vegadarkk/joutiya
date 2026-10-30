@@ -5,6 +5,7 @@ import { Check, CircleCheck, CircleX, Clock, Link2, Share2 } from "lucide-react"
 import { useLocale, useTranslations } from "next-intl";
 import { StatusPanel } from "@/components/auth/status-panel";
 import { Button } from "@/components/ui/button";
+import { CANONICAL_ORIGIN } from "@/config/site";
 import { Link } from "@/i18n/navigation";
 import type { ListingStatus } from "@/lib/contracts/listings";
 import { usePublicConfig } from "@/lib/config/client";
@@ -33,7 +34,7 @@ export function DoneScreen({ status, slugId, url, listingId }: DoneScreenProps) 
   const canShare = useSyncExternalStore(noSubscription, shareSheetExists, () => false);
   // The page in the language on screen (the API answers with the seller's stored locale).
   const path = slugId ? `/${locale}/annonce/${slugId}` : (url ?? null);
-  const absolute = path ? new URL(path, config?.siteUrl ?? (typeof window !== "undefined" ? window.location.origin : "https://joutiya.ma")).toString() : null;
+  const absolute = path ? new URL(path, config?.siteUrl ?? (typeof window !== "undefined" ? window.location.origin : CANONICAL_ORIGIN)).toString() : null;
 
   async function share() {
     if (!absolute) return;

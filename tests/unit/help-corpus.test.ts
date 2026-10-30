@@ -30,8 +30,8 @@ describe("help corpus", () => {
     const problems = validateHelpCorpus({ fr: HELP_FR, ar: broken, rif: HELP_RIF });
     expect(problems).toContain("ar: missing article signaler-un-contenu");
     expect(problems).toContain("ar: unknown article faq-inconnue");
-    const placeholder: HelpLocaleContent = { ...HELP_FR, articles: { ...HELP_FR.articles, "role-de-joutiya": { title: "T", summary: "S {inconnu}", blocks: ["B"] } } };
-    expect(validateHelpCorpus({ fr: placeholder, ar: HELP_AR, rif: HELP_RIF })).toEqual(["fr/role-de-joutiya: unknown placeholder {inconnu}"]);
+    const placeholder: HelpLocaleContent = { ...HELP_FR, articles: { ...HELP_FR.articles, "role-d-aalan": { title: "T", summary: "S {inconnu}", blocks: ["B"] } } };
+    expect(validateHelpCorpus({ fr: placeholder, ar: HELP_AR, rif: HELP_RIF })).toEqual(["fr/role-d-aalan: unknown placeholder {inconnu}"]);
   });
 
   it("fills placeholders from the code's limits and config/legal", () => {
