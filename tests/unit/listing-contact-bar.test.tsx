@@ -110,9 +110,30 @@ describe("ContactBar", () => {
     const html = render({ testDrive: true });
     expect(html).toContain(fr.ListingPage.contact.testDrive);
     expect(html).toContain(escape(fr.ListingPage.contact.testDriveHint));
-    expect(html.match(/aria-haspopup="dialog"/g)).toHaveLength(3);
+    // Two message buttons, the block's button and the phone bar's.
+    expect(html.match(/aria-haspopup="dialog"/g)).toHaveLength(4);
     const own = { uid: "u1", publicId: "abcdefghjk", role: "pro" } as unknown as SessionSummary;
     expect(render({ testDrive: true }, own)).not.toContain(fr.ListingPage.contact.testDrive);
+  });
+
+  it("puts the listing's own action beside the message in the phone bar, the number as an icon", () => {
+    expect(render()).not.toContain('data-testid="contact-bar-action"');
+    expect(render()).not.toContain(`aria-label="${fr.ListingPage.contact.showPhone}"`);
+    const drive = render({ testDrive: true });
+    expect(drive).toContain('data-testid="contact-bar-action" data-intent="test_drive"');
+    expect(drive).toContain(fr.ListingPage.contact.testDriveShort);
+    expect(drive).toContain(`aria-label="${fr.ListingPage.contact.showPhone}"`);
+    const offer = render({ offer: { price: 1500 }, showPhone: false, whatsapp: false });
+    expect(offer).toContain('data-intent="offer"');
+    expect(offer).toContain(fr.Offers.listing.makeShort);
+    expect(offer).not.toContain("aria-label=");
+    expect(render({ rental: "day" })).toContain(fr.ListingPage.contact.rentalShort);
+    expect(render({ rental: "night" })).toContain(fr.ListingPage.contact.home.rentalShort);
+    // One action only, the dates before a visit, the visit before an offer.
+    const both = render({ visit: true, offer: { price: 1500 } });
+    expect(both.match(/data-testid="visit-button"/g)).toHaveLength(2);
+    expect(both).not.toContain('data-testid="contact-bar-action"');
+    expect(render({ rental: "day", visit: true })).toContain('data-intent="rental"');
   });
 
   it("shows the seller their own listing's management link instead of the actions", () => {
