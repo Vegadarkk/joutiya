@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   enforceSearchLimit: vi.fn<(request: Request) => Promise<{ passGranted: boolean }>>(),
   requestHeaders: { "user-agent": "vitest", "cf-connecting-ip": "203.0.113.7" },
 }));
-vi.mock("@/lib/search/service", () => ({ runSearch: mocks.runSearch }));
+vi.mock("@/lib/search/service", () => ({ runSearch: mocks.runSearch, NOT_EXAMPLE: { not: { field: "isExample", op: "eq", value: true } } }));
 vi.mock("@/lib/search/limits", () => ({ enforceSearchLimit: mocks.enforceSearchLimit }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers(mocks.requestHeaders) }));
 vi.mock("@/lib/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() } }));
@@ -345,5 +345,16 @@ describe("loadSearch", () => {
     const built = await pageRequest();
     expect(new URL(built.url).pathname).toBe("/recherche");
     expect(built.headers.get("user-agent")).toBe("vitest");
+  });
+
+  it("leaves the example listings out when this device hides them, so the count and pages stay right", async () => {
+    const ok = response({}, { total: 3, totalPages: 1 });
+    mocks.runSearch.mockResolvedValue(ok);
+    await loadSearch({ q: "velo" }, new Request("https://joutiya.ma/recherche", { headers: { cookie: "theme=dark; examples=hidden" } }));
+    expect(mocks.runSearch).toHaveBeenLastCalledWith({ q: "velo" }, { extraFilter: { not: { field: "isExample", op: "eq", value: true } } });
+    for (const cookie of ["examples=shown", "myexamples=hidden", "examples=hiddenx"]) {
+      await loadSearch({ q: "velo" }, new Request("https://joutiya.ma/recherche", { headers: { cookie } }));
+      expect(mocks.runSearch, cookie).toHaveBeenLastCalledWith({ q: "velo" });
+    }
   });
 });

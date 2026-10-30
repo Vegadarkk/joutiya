@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, u
 import type { PublicMapConfig } from "@/lib/config/public-types";
 import { supportsWebGL2 } from "@/lib/map/webgl";
 import { canonicalSearchParams, type SearchParams, type SearchZone } from "@/lib/search/params";
+import { useExamplesHidden } from "@/components/examples/use-examples";
 import { useSearchNavigation } from "../search-navigation";
 import type { MapListing } from "./map-listings";
 import { SHEET_SNAPS, type SheetSnap } from "./sheet";
@@ -103,8 +104,11 @@ export interface SearchMapRootProps {
   children: ReactNode;
 }
 
-export function SearchMapRoot({ serverView, variant = "search", startSnap = "peek", map, listings, params, className, children }: SearchMapRootProps) {
+export function SearchMapRoot({ serverView, variant = "search", startSnap = "peek", map, listings: given, params, className, children }: SearchMapRootProps) {
   const navigation = useSearchNavigation();
+  // « Masquer les annonces exemples »: the home page is rendered once for everyone, its pins are not.
+  const examplesHidden = useExamplesHidden();
+  const listings = useMemo(() => (examplesHidden ? given.filter((listing) => !listing.example) : given), [examplesHidden, given]);
   const webgl2 = useSyncExternalStore(subscribeNever, supportsWebGL2, () => false);
   const desktop = useDesktop();
   const [failed, setFailed] = useState(false);

@@ -25,6 +25,7 @@ Ces cookies servent uniquement au fonctionnement du site, à sa sécurité ou à
 | `NEXT_LOCALE` | Mémoriser la langue que vous avez choisie | 1 an |
 | `jt_consent` | Mémoriser vos choix en matière de cookies (section 6). Il n'est déposé que si {brand} utilise des traceurs soumis à votre accord et que vous faites un choix | 6 mois |
 | `theme` (stockage local) | Mémoriser l'apparence choisie, claire ou sombre | Jusqu'à ce que vous changiez de réglage ou effaciez les données du site |
+| `examples` | Mémoriser votre choix de masquer les annonces exemples (réglage « Masquer les annonces exemples »). Il n'est déposé que si vous faites ce choix | 400 jours (environ 13 mois) |
 | Stockage de session (dépôt d'annonce) | Garder, pendant le dépôt d'une annonce, la liste des points à corriger | Jusqu'à la fermeture de l'onglet |
 
 Le cookie `jt_consent` contient seulement le numéro de version de la bannière, la date de votre choix et votre réponse pour chaque finalité. Il ne contient aucun identifiant.

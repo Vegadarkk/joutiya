@@ -5798,5 +5798,16 @@
       "title": "Les premières boutiques arrivent",
       "body": "L'annuaire s'ouvre avec les premiers professionnels vérifiés. Commerce, concession, agence : ouvrez votre boutique dès maintenant."
     }
+  },
+  "Examples": {
+    "settingsTitle": "Annonces exemples",
+    "settingsBody": "Aalan publie des annonces exemples, marquées « Exemple », pour montrer à quoi ressemble une bonne annonce dans chaque catégorie. Leurs vendeurs et leurs articles sont fictifs.",
+    "label": "Masquer les annonces exemples",
+    "hint": "Elles disparaissent des résultats, de la page d'accueil et de la carte, sur cet appareil.",
+    "hide": "Masquer les annonces exemples",
+    "show": "Les afficher",
+    "hiddenNotice": "Les annonces exemples sont masquées sur cet appareil.",
+    "hiddenToast": "Annonces exemples masquées",
+    "shownToast": "Annonces exemples affichées"
   }
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { AdSlot } from "@/components/ads/ad-slot";
+import { ExamplesHiddenNotice } from "@/components/examples/examples-controls";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Container } from "@/components/layout/container";
@@ -164,6 +165,7 @@ function Results({ response, locale, title, count, promos, map, publisher, trans
             </ErrorBanner>
           ) : null}
           <MapFailedNotice />
+          <ExamplesHiddenNotice className="search-examples" />
 
           {hits.length === 0 ? <SearchEmpty params={params} locale={locale} outOfRange={response.total > 0} className="search-empty" /> : null}
 

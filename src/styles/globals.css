@@ -316,6 +316,17 @@
   transition: none !important;
 }
 
+/* ── example listings ─────────────────────────────────────────────────────────────────────────
+ * « Masquer les annonces exemples » (owner, 30 Oct 2026). The pre-paint script
+ * (src/lib/examples/script.ts) sets html[data-examples="hidden"] from the device's cookie. The
+ * search page already leaves them out on the server; the pages rendered once for everyone (home,
+ * categories, profiles, shops, a listing's suggestions) drop their cards and map rows here, except
+ * on an example shop, whose own listings the visitor asked for.
+ */
+html[data-examples="hidden"] body:not(:has([data-example-page])) :is([data-example], li:has(> [data-example])) {
+  display: none !important;
+}
+
 /* ── welcome ──────────────────────────────────────────────────────────────────────────────────
  * Welcome threshold of the home page (design C7). The pre-paint script (src/lib/welcome/script.ts)
  * sets html[data-welcome] on a first visit: "screen" (the welcome screen) or "door" (a sign-in just

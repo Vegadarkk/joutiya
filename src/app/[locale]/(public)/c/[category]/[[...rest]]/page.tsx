@@ -2,6 +2,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { ExamplesHiddenNotice } from "@/components/examples/examples-controls";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { Container } from "@/components/layout/container";
@@ -171,6 +172,7 @@ export default async function CategoryLandingPage({ params }: { params: Params }
             <h2 id="landing-recent" className="text-xl font-semibold">
               {t("recentTitle")}
             </h2>
+            <ExamplesHiddenNotice />
             <ResultsGrid cards={recent} locale={locale} priorityCount={4} renderAction={favoriteAction} />
             {total > response.hits.length ? (
               <div className="flex justify-center pt-2">
