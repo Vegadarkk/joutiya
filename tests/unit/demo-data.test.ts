@@ -58,6 +58,15 @@ describe("demo catalog", () => {
     }
   });
 
+  it("never shows the same photo on two listings (owner, 2026-10-30: each photo matches its own listing)", () => {
+    const seen = new Map<string, string>();
+    for (const entry of DEMO_ENTRIES)
+      for (const photo of entry.photos) {
+        expect(seen.get(photo), `${entry.key} reuses photo ${photo}`).toBeUndefined();
+        seen.set(photo, entry.key);
+      }
+  });
+
   it("reads as a listing a member could publish: no prohibited or flagged term in its category", () => {
     for (const entry of DEMO_ENTRIES) {
       const sub = subcategoryById(entry.sub);
