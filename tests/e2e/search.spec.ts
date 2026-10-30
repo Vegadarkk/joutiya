@@ -422,6 +422,28 @@ test.describe("home and crawler files", () => {
     await expect(page.getByTestId("category-chips")).toBeVisible();
   });
 
+  test("reaches the last categories of the header row with its arrows on a mouse screen, the two doors after the line", async ({ page, isMobile }) => {
+    test.skip(isMobile, "a touch screen swipes the row, no arrows");
+    await page.goto("/fr/c/vehicules");
+    const row = page.getByTestId("category-chips");
+    const last = row.getByRole("link", { name: "Divers" });
+    // Owner's report of 30 Oct 2026: past the fade, the last categories were out of reach (hidden scrollbar).
+    await expect(row.getByTestId("rail-previous")).toBeDisabled();
+    await expect(last).not.toBeInViewport();
+    // A step is three quarters of the line: the end takes one or more, by the width of the glyphs.
+    const next = row.getByTestId("rail-next");
+    await expect(async () => {
+      if (await next.isEnabled()) await next.click();
+      await expect(next).toBeDisabled({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+    await expect(last).toBeInViewport();
+    await expect(row.getByTestId("rail-previous")).toBeEnabled();
+    // The doors to the directory and the guide stand after the line, in view without scrolling.
+    const doors = row.getByTestId("category-doors").filter({ visible: true });
+    await expect(doors.getByRole("link", { name: "Boutiques" })).toBeInViewport();
+    await expect(doors.getByRole("link", { name: "Démarches" })).toHaveAttribute("href", "/fr/demarches");
+  });
+
   test("keeps sitemaps out of development and disallows everything in robots.txt", async ({ request }) => {
     expect((await request.get("/sitemap.xml")).status()).toBe(404);
     expect(await (await request.get("/robots.txt")).text()).toContain("Disallow: /");

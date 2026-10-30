@@ -108,14 +108,32 @@ describe("SiteHeader", () => {
     expect(sell?.[1]).toContain(`${fr.Nav.sell}<span class="sr-only">, ${fr.Nav.post}</span>`);
   });
 
-  it("lists the category pages and the procedures guide in a named row", () => {
+  it("lists the category pages in a named row, with the doors to the shop directory and the procedures guide and the arrows of a mouse screen", () => {
     const html = render(<SiteHeader locale="fr" />);
     const row = /<nav aria-label="([^"]+)" data-testid="category-chips">([\s\S]*?)<\/nav>/.exec(html);
     expect(row?.[1]).toBe(fr.Nav.categories);
-    for (const category of CATEGORIES) expect(row?.[2]).toContain(`href="/fr/c/${category.id}"`);
-    expect(row?.[2]).toContain('href="/fr/demarches"');
-    expect(row?.[2]).toContain(fr.Nav.guide);
-    expect(row?.[2]?.match(/class="group flex h-11 /g)).toHaveLength(CATEGORIES.length + 1);
+    const body = row?.[2] ?? "";
+    for (const category of CATEGORIES) expect(body).toContain(`href="/fr/c/${category.id}"`);
+    // The two doors close the scrolling line below lg and stand after it, fixed, from lg (owner, 30 Oct 2026).
+    const doors = body.match(/data-testid="category-doors" class="([^"]*)"/g) ?? [];
+    expect(doors).toHaveLength(2);
+    expect(doors[0]).toContain("lg:hidden");
+    expect(doors[1]).toContain("hidden h-11 shrink-0 items-center gap-1.5 lg:flex");
+    expect(body.match(/href="\/fr\/boutiques"/g)).toHaveLength(2);
+    expect(body.match(/href="\/fr\/demarches"/g)).toHaveLength(2);
+    expect(body).toContain("lucide-shopping-bag");
+    expect(body).toContain("lucide-scroll-text");
+    expect(body).toContain(fr.Nav.shops);
+    expect(body).toContain(fr.Nav.guide);
+    expect(body.indexOf('href="/fr/boutiques"')).toBeLessThan(body.indexOf('href="/fr/demarches"'));
+    expect(body.match(/class="group flex h-11 /g)).toHaveLength(CATEGORIES.length + 4);
+    // The arrows, in the server markup (the line is taken for longer than its room), the first one at its edge;
+    // mouse screens from lg only (a touch screen swipes), between the line and the doors.
+    expect(body).toContain('data-testid="rail-arrows" class="h-11 shrink-0 items-center gap-1 hidden lg:pointer-fine:flex"');
+    expect(body).toContain(`<button type="button" aria-label="${fr.Nav.previousCategories}" disabled="" data-testid="rail-previous"`);
+    expect(body).toContain(`<button type="button" aria-label="${fr.Nav.nextCategories}" data-testid="rail-next"`);
+    expect(body.indexOf('data-testid="rail-arrows"')).toBeLessThan(body.lastIndexOf('data-testid="category-doors"'));
+    expect(body.indexOf("</ul>")).toBeLessThan(body.indexOf('data-testid="rail-arrows"'));
   });
 
   it("stands 'Louer' (the car and the house, a menu) and 'Espace Pro' beside 'Vendre' from lg, compact until xl", () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { BadgeCheck, BellRing, CarFront, CircleHelp, Heart, House, LogOut, Mail, MessageSquare, Scale, ScrollText, Settings, Star, Store, Tag, Wallet } from "lucide-react";
+import { BadgeCheck, BellRing, CarFront, CircleHelp, Heart, House, LogOut, Mail, MessageSquare, Scale, ScrollText, Settings, ShoppingBag, Star, Store, Tag, Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DropdownMenu } from "radix-ui";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import { canMessage } from "@/components/messages/can-message";
 import { useLiveSnapshot } from "@/components/messages/use-live";
 import { Link, useRouter } from "@/i18n/navigation";
 import { signOut } from "@/lib/auth/client";
-import { HOLIDAY_RENTAL_SEARCH, RENT_CAR_SEARCH } from "@/lib/search/shortcuts";
+import { DIRECTORY_PATH, HOLIDAY_RENTAL_SEARCH, RENT_CAR_SEARCH } from "@/lib/search/shortcuts";
 import type { SessionSummary } from "@/lib/contracts/auth";
 import { cn } from "@/lib/utils";
 
@@ -149,6 +149,13 @@ export default function AccountDropdown({ session, name, triggerClassName, child
             <Link href="/recours" className={item}>
               <Scale aria-hidden="true" />
               {t("decisions")}
+            </Link>
+          </DropdownMenu.Item>
+          {/* The directory of verified shops (owner, 30 Oct 2026), with the help centre and the guide. */}
+          <DropdownMenu.Item asChild>
+            <Link href={DIRECTORY_PATH} prefetch={false} className={item}>
+              <ShoppingBag aria-hidden="true" />
+              {nav("shops")}
             </Link>
           </DropdownMenu.Item>
           {/* Help centre with the Assistant Aalan open (phase 5 D25); the event opens it when already there. */}
