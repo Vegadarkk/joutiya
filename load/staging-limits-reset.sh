@@ -12,7 +12,7 @@ limit() {
   docker update --cpus "$cpus" --memory "$memory" --memory-swap "$memory" "$id" > /dev/null
   echo "$service: cpus $cpus, memory $memory"
 }
-limit web 0.75 768M
+limit web 0.75 1024M
 limit worker 0.25 1024M
 limit valkey-queue 0.25 256M
 limit valkey-ratelimit 0.25 96M

@@ -3,8 +3,11 @@
 services:
   web:
     user: "1000:2001"
+    # Two Next.js servers (src/server/web-cluster.ts): one alone saturates near one core. The heap
+    # limit applies to each; about 200 MB each stays native.
     environment:
-      NODE_OPTIONS: --max-old-space-size=1152
+      WEB_PROCESSES: "2"
+      NODE_OPTIONS: --max-old-space-size=512
     deploy:
       resources:
         limits: { cpus: "1.5", memory: 1536M }

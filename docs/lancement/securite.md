@@ -10,7 +10,8 @@ le cherche).
   et lit les réponses sans rien attaquer (3 minutes d'exploration).
 - **Full scan (actif)** du staging, une fois avant v1.0.0, à la demande (mode `full`) : ZAP envoie de
   vraies charges d'attaque (injections, XSS…). Le staging peut recevoir des formulaires remplis de
-  charges : à lancer hors des recettes en cours.
+  charges : à lancer hors des recettes en cours. 10 minutes d'exploration, puis 55 minutes d'attaque
+  au plus (5 par règle) : au-delà, le travail de 90 minutes serait coupé sans rapport.
 - **Baseline de la production** après le lancement (cible `prod`, passif seulement).
 
 Règles : `.zap/rules.tsv`. Une alerte `FAIL` fait échouer le workflow (en-têtes de sécurité, CSP,

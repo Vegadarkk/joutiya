@@ -20,8 +20,10 @@ cpSync(`${root}infra/targets.json`, `${app}/infra/targets.json`);
 
 // Next resolves proxy rewrites against its own host: with HOSTNAME=127.0.0.1 the admin-host
 // rewrite is treated as external. "localhost" (here) and "0.0.0.0" (Docker) keep it internal.
-// The shell's HOSTNAME (machine name) is ignored on purpose.
-const child = spawn(process.execPath, ["--import", "./dist/server/csp-hash-hook.mjs", "server.js"], {
+// The shell's HOSTNAME (machine name) is ignored on purpose. Same entry point as the image
+// (src/server/web-cluster.ts); one process unless WEB_PROCESSES says otherwise: the end-to-end
+// tests read the dev mailbox from the memory of the process that sent the mail.
+const child = spawn(process.execPath, ["--import", "./dist/server/csp-hash-hook.mjs", "dist/server/web-cluster.mjs"], {
   cwd: app,
   stdio: "inherit",
   env: { ...process.env, PORT: process.env.PORT ?? "3000", HOSTNAME: process.env.STANDALONE_HOST ?? "localhost" },
