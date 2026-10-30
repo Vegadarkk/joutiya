@@ -342,7 +342,7 @@ describe("JobNotice", () => {
     expect(text(html)).toContain(fr.ListingPage.jobs.offer.publisher);
     expect(text(html)).toContain(fr.ListingPage.jobs.offer.noFees);
     expect(text(html)).not.toContain(fr.ListingPage.jobs.seeker.publisher);
-    expect(html).toContain('href="/fr/legal/cgu"');
+    expect(html).toContain('href="/fr/legal/cgu#annonces-12"');
     expect(html).toContain('href="#signaler"');
     expect(html).not.toContain("job-abroad-notice");
     expect(text(render(<JobNotice subcategoryId="offres-emploi" attributes={offer} />, "ar"))).toContain(ar.ListingPage.jobs.title);

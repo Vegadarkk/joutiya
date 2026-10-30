@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 // and job-seeker ads like a publication (Code du travail art. 491), is no recruitment agency,
 // checks nothing beyond the moderation and is no party to the hiring; a candidate never pays
 // (arts. 480, 485). An offer abroad adds the ministry's visa and ANAPEC (arts. 489, 512-515).
-// Links: the CGU rules (§7.11 once Phase 6 ships it, the page until then) and the report control.
+// Links: the CGU rules (§7.12 `#annonces-12`, written by Phase 6; the page top until its PR lands) and
+// the report control.
 
 const OFFER_POINTS = ["publisher", "moderation", "noFees"] as const;
 const SEEKER_POINTS = ["publisher", "contact"] as const;
@@ -45,7 +46,7 @@ export function JobNotice({ subcategoryId, attributes, className }: JobNoticePro
       <p className="text-sm">
         {t.rich("links", {
           rules: (chunks) => (
-            <Link href="/legal/cgu" className={cn("font-medium text-link", textLinkClassName)}>
+            <Link href="/legal/cgu#annonces-12" className={cn("font-medium text-link", textLinkClassName)}>
               {chunks}
             </Link>
           ),
