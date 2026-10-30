@@ -17,6 +17,10 @@ const nextConfig: NextConfig = {
   // Cloudflare compresses at the edge; an uncompressed origin body lets the CSP hook hash
   // inline scripts (src/server/csp-hash-hook.ts).
   compress: false,
+  // No ETag on rendered pages: hashing each HTML body took about 6 % of the web CPU in the profile
+  // of 30 Oct 2026 (docs/lancement/charge.md); an ETag would only spare Cloudflare a body download
+  // once its TTL ends, after the render is already paid.
+  generateEtags: false,
   reactStrictMode: true,
   typedRoutes: false,
   // Typecheck and lint run as separate CI steps.

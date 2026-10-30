@@ -79,5 +79,5 @@ seuil de trafic au-delà duquel passer à un VPS.
 ## Écarts avec le design
 
 - Les limites de production sont posées par `docker update` sur les conteneurs du staging, sans
-  recréation : le tas Node du web reste celui du staging (576 Mo au lieu de 1 152 Mo).
+  recréation : le tas Node du web reste celui du staging (320 Mo par processus au lieu de 512 Mo).
 - Le scénario de recherche appelle `/api/search`, ce que fait la page de recherche à chaque filtre.

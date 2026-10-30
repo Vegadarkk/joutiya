@@ -56,7 +56,8 @@ ENV PORT=3000 \
 USER node
 EXPOSE 3000
 STOPSIGNAL SIGTERM
-CMD ["node", "--import", "./dist/server/csp-hash-hook.mjs", "server.js"]
+# WEB_PROCESSES servers on port 3000 (src/server/web-cluster.ts), each with the CSP hash hook.
+CMD ["node", "--import", "./dist/server/csp-hash-hook.mjs", "dist/server/web-cluster.mjs"]
 
 FROM runtime AS worker
 # Bundle plus its traced npm packages (scripts/build-node.ts), owned by root, read-only at runtime.
