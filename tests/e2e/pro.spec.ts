@@ -146,9 +146,18 @@ test.describe("Pro accounts", () => {
 
     // Nothing filled: each field says what it needs, nothing is sent.
     await page.getByRole("button", { name: "Envoyer ma demande" }).click();
+    await expect(page.getByText("Choisissez votre activité.")).toBeVisible();
     await expect(page.getByText("Choisissez la ville de la boutique.")).toBeVisible();
     await expect(page.getByText("Ajoutez au moins un justificatif.")).toBeVisible();
     await page.screenshot({ path: "test-results/pro-form-errors.png", fullPage: true });
+
+    // An agency applies as such: its trade's commitments come under the shop's (journey review).
+    await page.getByRole("radio", { name: /Agence immobilière/ }).check();
+    await expect(page.getByRole("heading", { name: "Votre agence" })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: /engagements d'agence immobilière/ })).toBeVisible();
+    await page.getByRole("radio", { name: /^Boutique/ }).check();
+    await expect(page.getByRole("heading", { name: "Votre boutique" })).toBeVisible();
+    await expect(page.getByRole("checkbox")).toHaveCount(1);
 
     await page.getByLabel("Nom de la boutique").fill(shopName);
     await page.getByLabel("Présentation").fill("Céramique et zellige faits main.");

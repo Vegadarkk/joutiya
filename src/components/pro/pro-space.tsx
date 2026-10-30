@@ -277,6 +277,52 @@ function Dashboard({ me, shop, lifecycle }: { me: ProMeResponse; shop: ProSelfVi
         </ErrorBanner>
       ) : null}
 
+      {/* The actions first (journey review 2026-10-29): they sat under the plan, the quotas and the settings. */}
+      <section className="flex flex-col gap-3" aria-labelledby="pro-shortcuts">
+        <h2 id="pro-shortcuts" className="text-lg font-semibold">
+          {t("shortcuts")}
+        </h2>
+        <div className="flex flex-wrap gap-3">
+          {canPublish ? (
+            <Button asChild>
+              <Link href="/deposer">{t("newListing")}</Link>
+            </Button>
+          ) : null}
+          {canPublish ? (
+            <Button asChild variant="outline">
+              <Link href="/pro/stock">{t("stockImport")}</Link>
+            </Button>
+          ) : null}
+          {canPublish && shop.sector === "car_rental" ? (
+            <>
+              <Button asChild variant="outline">
+                <Link href="/pro/flotte">{t("fleet")}</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/pro/location">{t("rentalAgency")}</Link>
+              </Button>
+            </>
+          ) : null}
+          <Button asChild variant="outline">
+            <Link href="/mes-annonces">{t("myListings")}</Link>
+          </Button>
+          {shop.storefront && !suspended ? (
+            <Button asChild variant="outline">
+              {/* No prefetch: a storefront render started here could finish after a save on this
+                  page revalidated it, and the owner would see the old storefront for 5 minutes. */}
+              <Link href={`/boutique/${shop.storefront}`} prefetch={false}>
+                {t("storefront")}
+              </Link>
+            </Button>
+          ) : null}
+          {paymentEligible(lifecycle, plan) ? (
+            <Button asChild variant="outline">
+              <Link href="/pro/paiement">{t("sellerPayment")}</Link>
+            </Button>
+          ) : null}
+        </div>
+      </section>
+
       {suspended ? null : (
         <div className="grid gap-6 md:grid-cols-2">
           <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5" aria-labelledby="pro-plan">
@@ -307,50 +353,6 @@ function Dashboard({ me, shop, lifecycle }: { me: ProMeResponse; shop: ProSelfVi
       {canPublish ? <SocialLinksSettings shop={shop} /> : null}
       {canPublish && shop.sector !== "car_rental" ? <SectionsSettings shop={shop} /> : null}
 
-      <section className="flex flex-col gap-3" aria-labelledby="pro-shortcuts">
-        <h2 id="pro-shortcuts" className="text-lg font-semibold">
-          {t("shortcuts")}
-        </h2>
-        <div className="flex flex-wrap gap-3">
-          {canPublish ? (
-            <Button asChild>
-              <Link href="/deposer">{t("newListing")}</Link>
-            </Button>
-          ) : null}
-          {canPublish ? (
-            <Button asChild variant="outline">
-              <Link href="/pro/stock">{t("stockImport")}</Link>
-            </Button>
-          ) : null}
-          {canPublish && shop.sector !== "real_estate" && shop.sector !== "holiday_rental" ? (
-            <Button asChild variant="outline">
-              <Link href="/pro/flotte">{t("fleet")}</Link>
-            </Button>
-          ) : null}
-          {canPublish && shop.sector === "car_rental" ? (
-            <Button asChild variant="outline">
-              <Link href="/pro/location">{t("rentalAgency")}</Link>
-            </Button>
-          ) : null}
-          <Button asChild variant="outline">
-            <Link href="/mes-annonces">{t("myListings")}</Link>
-          </Button>
-          {shop.storefront && !suspended ? (
-            <Button asChild variant="outline">
-              {/* No prefetch: a storefront render started here could finish after a save on this
-                  page revalidated it, and the owner would see the old storefront for 5 minutes. */}
-              <Link href={`/boutique/${shop.storefront}`} prefetch={false}>
-                {t("storefront")}
-              </Link>
-            </Button>
-          ) : null}
-          {paymentEligible(lifecycle, plan) ? (
-            <Button asChild variant="outline">
-              <Link href="/pro/paiement">{t("sellerPayment")}</Link>
-            </Button>
-          ) : null}
-        </div>
-      </section>
     </div>
   );
 }

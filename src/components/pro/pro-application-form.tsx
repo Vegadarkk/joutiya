@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { Building2, CarFront, KeyRound, Palmtree, Store, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { TurnstileWidget, type TurnstileHandle } from "@/components/auth/turnstile-widget";
@@ -15,20 +16,38 @@ import { cityBySlug, type City } from "@/config/regions";
 import type { Locale } from "@/config/site";
 import { ApiError } from "@/lib/auth/client";
 import type { ProApplyInput, ProSelfView } from "@/lib/contracts/pro";
+import { sectorCommitmentScope, type CommitmentScope } from "@/lib/pro/commitments";
 import { LEGAL_FORMS, normalizeIdentifier, type LegalForm } from "@/lib/pro/kybc";
 import { submitProApplication } from "@/lib/pro/client";
-import { PRO_DESCRIPTION_MAX, PRO_NAME_MAX } from "@/lib/pro/profile-schema";
+import { PRO_DESCRIPTION_MAX, PRO_NAME_MAX, type ProSector } from "@/lib/pro/profile-schema";
 import { cn } from "@/lib/utils";
 import { KybcPieces, type PieceState } from "./kybc-pieces";
 import { ProCommitments } from "./pro-commitments";
 
-// Pro application form (phase 7 design §4): shop, legal form and its identifiers, the number a
-// moderator calls while the WhatsApp check is parked, the KYBC pieces, the legal commitments (with
-// the admin guide's procedures) and a Turnstile check. Checked here as the server checks it (src/lib/pro/kybc.ts), so a refusal is
-// shown on its field before anything is sent; the server stays the judge.
+// Pro application form (phase 7 design §4): the activity (journey review 2026-10-29: an agency
+// applies as such, with its trade's commitments), shop, legal form and its identifiers, the number
+// a moderator calls while the WhatsApp check is parked, the KYBC pieces, the legal commitments
+// (with the admin guide's procedures) and a Turnstile check. Checked here as the server checks it
+// (src/lib/pro/kybc.ts), so a refusal is shown on its field before anything is sent; the server
+// stays the judge.
+
+/** What the applicant does; a dealership is a general shop whose storefront shows its vehicle stock. */
+export const ACTIVITIES = ["shop", "dealer", "real_estate", "car_rental", "holiday_rental"] as const;
+export type Activity = (typeof ACTIVITIES)[number];
+const ACTIVITY_ICONS: Record<Activity, LucideIcon> = { shop: Store, dealer: CarFront, real_estate: Building2, car_rental: KeyRound, holiday_rental: Palmtree };
+
+/** The sector sent for an activity (src/lib/pro/profile-schema.ts). */
+export function sectorOf(activity: Activity): ProSector {
+  return activity === "shop" || activity === "dealer" ? "general" : activity;
+}
+
+/** The agency commitments an activity adds to the shop's own, or null. */
+export function agencyScopeOf(activity: Activity | null): CommitmentScope | null {
+  return activity ? sectorCommitmentScope(sectorOf(activity)) : null;
+}
 
 type Identifier = "ice" | "rc" | "if" | "aeNumber" | "tp" | "coopNumber";
-type FieldKey = "name" | "city" | "form" | Identifier | "phone" | "pieces" | "commitment" | "challenge";
+type FieldKey = "activity" | "name" | "city" | "form" | Identifier | "phone" | "pieces" | "commitment" | "sectorCommitment" | "challenge";
 
 /** Identifier inputs per legal form, in reading order; `commercant` needs rc or tp. */
 const IDENTIFIERS: Record<LegalForm, readonly Identifier[]> = {
@@ -43,6 +62,7 @@ const REGISTRY = /^[A-Z0-9/]{1,30}$/;
 const MOBILE = /^(?:0|\+212|00212)[67]\d{8}$/;
 
 export interface Draft {
+  activity: Activity | null;
   name: string;
   description: string;
   city: City | null;
@@ -50,13 +70,17 @@ export interface Draft {
   ids: Record<Identifier, string>;
   phone: string;
   commitment: boolean;
+  /** The agency commitments of the activity, ticked (agencies only). */
+  sectorCommitment: boolean;
 }
 
-type MessageKey = "required" | "nameLength" | "cityRequired" | "iceFormat" | "identifierFormat" | "rcOrTp" | "phoneRequired" | "phoneFormat" | "piecesRequired" | "piecesPending" | "commitmentRequired" | "challenge";
+type MessageKey = "required" | "activityRequired" | "nameLength" | "cityRequired" | "iceFormat" | "identifierFormat" | "rcOrTp" | "phoneRequired" | "phoneFormat" | "piecesRequired" | "piecesPending" | "commitmentRequired" | "sectorCommitmentRequired" | "challenge";
 
 export function initialDraft(previous: ProSelfView | null): Draft {
   const form = previous && (LEGAL_FORMS as readonly string[]).includes(previous.legalForm) ? (previous.legalForm as LegalForm) : null;
   return {
+    // A rejected application keeps its sector; a dealership was stored as a general shop.
+    activity: previous ? (previous.sector === "general" ? "shop" : previous.sector) : null,
     name: previous?.name ?? "",
     description: previous?.description ?? "",
     city: previous ? (cityBySlug(previous.citySlug) ?? null) : null,
@@ -65,11 +89,13 @@ export function initialDraft(previous: ProSelfView | null): Draft {
     ids: { ice: previous?.ice ?? "", rc: "", if: "", aeNumber: "", tp: "", coopNumber: "" },
     phone: "",
     commitment: false,
+    sectorCommitment: false,
   };
 }
 
 export function draftProblems(draft: Draft, pieces: readonly PieceState[], needsPhone: boolean, token: string | null): Partial<Record<FieldKey, MessageKey>> {
   const out: Partial<Record<FieldKey, MessageKey>> = {};
+  if (!draft.activity) out.activity = "activityRequired";
   const name = draft.name.trim();
   if (name === "") out.name = "required";
   else if (name.length < 2 || name.length > PRO_NAME_MAX) out.name = "nameLength";
@@ -96,6 +122,7 @@ export function draftProblems(draft: Draft, pieces: readonly PieceState[], needs
   if (pieces.some((piece) => piece.phase === "uploading")) out.pieces = "piecesPending";
   else if (!pieces.some((piece) => piece.phase === "ready")) out.pieces = "piecesRequired";
   if (!draft.commitment) out.commitment = "commitmentRequired";
+  if (agencyScopeOf(draft.activity) && !draft.sectorCommitment) out.sectorCommitment = "sectorCommitmentRequired";
   if (!token) out.challenge = "challenge";
   return out;
 }
@@ -150,7 +177,7 @@ export function ProApplicationForm({ previous, needsPhone, onDone }: ProApplicat
     if (pending) return;
     setAttempted(true);
     const found = draftProblems(draft, pieces, needsPhone, token);
-    if (Object.keys(found).length > 0 || !draft.form || !draft.city || !token) {
+    if (Object.keys(found).length > 0 || !draft.activity || !draft.form || !draft.city || !token) {
       // The first invalid control takes the focus, once the messages are rendered.
       requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
       return;
@@ -167,6 +194,8 @@ export function ProApplicationForm({ previous, needsPhone, onDone }: ProApplicat
         ...(needsPhone ? { phone: draft.phone.trim() } : {}),
         uploadIds: pieces.flatMap((piece) => (piece.phase === "ready" ? [piece.uploadId] : [])),
         complianceCommitment: true,
+        sector: sectorOf(draft.activity),
+        ...(agencyScopeOf(draft.activity) ? { sectorCommitment: true as const } : {}),
         turnstileToken: token,
       });
       toast.success(t("submitted"), { description: t("submittedBody") });
@@ -185,10 +214,40 @@ export function ProApplicationForm({ previous, needsPhone, onDone }: ProApplicat
     }
   }
 
+  const agencyScope = agencyScopeOf(draft.activity);
+
   return (
     <form ref={formRef} onSubmit={(event) => void onSubmit(event)} noValidate className="flex flex-col gap-10">
-      <Section title={t("shopTitle")}>
-        <Field label={t("name")} hint={t("nameHint", { max: PRO_NAME_MAX })} error={message("name")} required>
+      <Section title={t("activityTitle")}>
+        <fieldset className="flex flex-col gap-3" aria-invalid={problems.activity ? true : undefined}>
+          <legend className="sr-only">{t("activityTitle")}</legend>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {ACTIVITIES.map((activity) => {
+              const Icon = ACTIVITY_ICONS[activity];
+              return (
+                <label
+                  key={activity}
+                  className={cn(
+                    "flex cursor-pointer items-start gap-3 rounded-md border bg-surface p-3.5 transition-colors duration-150",
+                    draft.activity === activity ? "border-structure bg-structure/5 dark:border-gold-300" : "border-border hover:border-border-strong",
+                  )}
+                >
+                  <input type="radio" name="activity" value={activity} checked={draft.activity === activity} onChange={() => set({ activity, sectorCommitment: false })} className="mt-1 size-4 shrink-0 accent-structure" />
+                  <Icon className="mt-0.5 size-5 shrink-0 text-structure dark:text-gold-300" aria-hidden="true" />
+                  <span className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium">{t(`activities.${activity}`)}</span>
+                    <span className="text-xs text-foreground-muted text-pretty">{t(`activityHints.${activity}`)}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          {problems.activity ? <InlineError>{t(problems.activity)}</InlineError> : null}
+        </fieldset>
+      </Section>
+
+      <Section title={t(agencyScope ? "agencyTitle" : "shopTitle")}>
+        <Field label={t(agencyScope ? "agencyName" : "name")} hint={t("nameHint", { max: PRO_NAME_MAX })} error={message("name")} required>
           <Input value={draft.name} maxLength={PRO_NAME_MAX} dir="auto" autoComplete="organization" onChange={(event) => set({ name: event.target.value })} />
         </Field>
         <Field label={t("description")} hint={t("descriptionHint")}>
@@ -265,6 +324,9 @@ export function ProApplicationForm({ previous, needsPhone, onDone }: ProApplicat
 
       <Section title={t("commitTitle")}>
         <ProCommitments scope="shop" checked={draft.commitment} onCheckedChange={(commitment) => set({ commitment })} error={message("commitment")} />
+        {agencyScope ? (
+          <ProCommitments scope={agencyScope} checked={draft.sectorCommitment} onCheckedChange={(sectorCommitment) => set({ sectorCommitment })} error={message("sectorCommitment")} />
+        ) : null}
         <TurnstileWidget ref={turnstile} action="pro-apply" cData="pro-apply" onToken={setToken} error={message("challenge")} />
       </Section>
 

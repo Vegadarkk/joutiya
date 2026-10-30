@@ -70,6 +70,9 @@ export async function assertCanApply(auth: AuthContext): Promise<{ user: UserDoc
 export async function submitApplication(actor: ProActor, input: ProApplyInput, now = new Date()): Promise<{ proId: string }> {
   const uid = actor.auth.user.uid;
   const { user, existing } = await assertCanApply(actor.auth);
+  // An agency applies as such (journey review 2026-10-29): its trade's commitments come with the shop's.
+  const agencyScope = sectorCommitmentScope(input.sector);
+  if (agencyScope && !input.sectorCommitment) throw new HttpError(400, "commitments_required", "the agency commitments must be accepted");
   // The badge may be false only while the WhatsApp check is unavailable: the number to call is then part of the application.
   let phoneToCheck: string | undefined;
   if (!user.badges.phoneVerified) {
@@ -109,6 +112,7 @@ export async function submitApplication(actor: ProActor, input: ProApplyInput, n
     plan: "none",
     planSource: "none",
     quotas: listingQuotas({ type: "pro", plan: "none" }, pricing),
+    ...(agencyScope ? { sector: input.sector, sectorCommitment: { sector: input.sector, version: COMMITMENTS_VERSION, at: now } } : {}),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
