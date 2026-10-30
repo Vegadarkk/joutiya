@@ -11,7 +11,8 @@
 // drift (a missing transform rule lets a client forge X-Verified-Bot); zone --apply runs it after
 // its writes. Every recorded zone gets the same settings and rulesets: their rules name hosts, so
 // a rule only fires in its own zone. Hostnames that only redirect (redirect-hosts.json) get a
-// proxied AAAA 100:: record in their zone, so the redirect rules see their requests.
+// proxied AAAA 100:: record in their zone, so the redirect rules see their requests; a wildcard
+// address record is only deleted with --replace-dns.
 //
 // Environment (never printed): JOUTIYA_CLOUDFLARE_API_TOKEN, a custom token limited to the Joutiya
 // account and its zones (a prefixed name: a shared shell may hold other projects' tokens);
@@ -79,6 +80,8 @@ export interface AccessApp {
   auto_redirect_to_identity?: boolean;
   /** Single-header service token authentication (the security scan and the load test). */
   read_service_tokens_from_header?: string;
+  /** Every hostname or path the application guards, `domain` first (multi-domain application: one AUD tag). */
+  destinations?: { type: "public"; uri: string }[];
   policies: { name: string; decision: string; include: unknown[] }[];
 }
 
@@ -185,12 +188,17 @@ export function validateEdge(read: <T>(name: string) => T = readEdgeFile, target
     }
   }
   const access = read<{ apps: AccessApp[] }>("access-apps.json").apps;
-  const guarded = new Set(access.map((app) => app.domain));
+  const guarded = new Set(access.flatMap(appUris));
+  // The staging webhook path on the staging host and on its twin in the other site zone.
+  const bypassPaths = siteOrigins(targets, "staging").map((origin) => `${origin.replace("https://", "")}/api/webhooks/*`);
   for (const app of access) {
     const bypass = app.policies.some((policy) => policy.decision === "bypass");
-    if (app.domain === bypassPath) {
+    const uris = appUris(app);
+    if (app.destinations !== undefined && app.destinations[0]?.uri !== app.domain) errors.push(`access-apps.json: ${app.domain}: the first destination must be the domain`);
+    if (uris.includes(bypassPath)) {
       if (app.policies.length !== 1 || !bypass) errors.push(`access-apps.json: ${app.domain} must have a single bypass policy`);
-    } else if (bypass || app.domain.includes("/")) {
+      for (const uri of uris) if (!bypassPaths.includes(uri)) errors.push(`access-apps.json: ${uri}: only ${bypassPaths.join(" and ")} may bypass Access`);
+    } else if (bypass || uris.some((uri) => uri.includes("/"))) {
       errors.push(`access-apps.json: ${app.domain}: only ${bypassPath} may bypass Access`);
     } else if (app.allowed_idps?.length !== 1 || app.allowed_idps[0] !== GOOGLE_IDP || app.auto_redirect_to_identity !== true) {
       errors.push(`access-apps.json: ${app.domain} must allow the Google login method only (§6)`);
@@ -247,6 +255,11 @@ export function substitute<T>(value: T, env: Record<string, string | undefined>)
     return node;
   };
   return { value: walk(value) as T, missing: [...missing] };
+}
+
+/** The hostnames and paths an Access application guards. */
+export function appUris(app: AccessApp): string[] {
+  return [...new Set([app.domain, ...(app.destinations ?? []).map((destination) => destination.uri)])];
 }
 
 /** Every tunnel hostname is behind Access, except the public production site (§6). */
@@ -368,9 +381,20 @@ async function checkZone(api: CloudflareApi, targets: Targets, zone: Zone): Prom
   return { accountId, zoneId: zone.id };
 }
 
-/** Proxied AAAA 100:: records of the redirect-only hostnames of a zone, so its redirect rules see them. */
+/**
+ * Proxied AAAA 100:: records of the redirect-only hostnames of a zone, so its redirect rules see
+ * them. A wildcard address record (the registrar's parking import) would publish every other
+ * subdomain: it is reported, and deleted with --replace-dns.
+ */
 async function applyParked(api: CloudflareApi, zone: Zone, replaceDns: boolean): Promise<string[]> {
   const blocked: string[] = [];
+  const wildcard = (await api.call<DnsRecord[]>({ method: "GET", path: `/zones/${zone.id}/dns_records?name=${encodeURIComponent(`*.${zone.name}`)}` })).filter((record) =>
+    ["A", "AAAA", "CNAME"].includes(record.type),
+  );
+  for (const record of wildcard) {
+    if (replaceDns) await api.write({ method: "DELETE", path: `/zones/${zone.id}/dns_records/${record.id}` }, { type: record.type, name: record.name, content: record.content });
+    else blocked.push(`${record.name}: wildcard ${record.type} ${record.content}`);
+  }
   for (const hostname of readEdgeFile<RedirectHosts>("redirect-hosts.json").hostnames.filter((host) => zoneOf(host) === zone.name)) {
     const existing = await api.call<DnsRecord[]>({ method: "GET", path: `/zones/${zone.id}/dns_records?name=${encodeURIComponent(hostname)}` });
     const change = dnsChange(existing, PARKED_RECORD.content, replaceDns, PARKED_RECORD.type);
@@ -471,7 +495,7 @@ async function applyTunnel(api: CloudflareApi, targets: Targets, name: TunnelNam
     const zoneId = checked.get(zone.name) as string;
     // A guarded hostname gets its DNS record only once its Access application exists: otherwise
     // the record would publish the service unguarded as soon as the zone is active.
-    if (needsAccess(name, hostname) && !(await accessApp(api, accountId, hostname))) {
+    if (needsAccess(name, hostname) && !(await guardedLive(api, accountId, hostname))) {
       console.log(`held  ${hostname}: no Access application yet, DNS record not created (run the access part first)`);
       continue;
     }
@@ -494,11 +518,26 @@ export function googleIdp(providers: { id: string; type: string }[]): string {
   return only.id;
 }
 
-async function accessApp(api: CloudflareApi, accountId: string, domain: string): Promise<{ id: string; domain: string; aud: string } | undefined> {
+/** True when the live Access application of access-apps.json that lists `hostname` guards it. */
+async function guardedLive(api: CloudflareApi, accountId: string, hostname: string): Promise<boolean> {
+  const app = readEdgeFile<{ apps: AccessApp[] }>("access-apps.json").apps.find((item) => appUris(item).includes(hostname));
+  if (!app) return false;
+  const live = await accessApp(api, accountId, app.domain);
+  return live !== undefined && (live.domain === hostname || (live.destinations ?? []).some((destination) => destination.uri === hostname));
+}
+
+interface LiveAccessApp {
+  id: string;
+  domain: string;
+  aud: string;
+  destinations?: { type: string; uri?: string }[];
+}
+
+async function accessApp(api: CloudflareApi, accountId: string, domain: string): Promise<LiveAccessApp | undefined> {
   // The API documents exact matching of the domain filter, not whether a path takes part in it:
   // the partial filter on the hostname also returns its path applications, compared exactly here.
   const hostname = domain.split("/")[0] ?? domain;
-  const found = await api.call<{ id: string; domain: string; aud: string }[]>({
+  const found = await api.call<LiveAccessApp[]>({
     method: "GET",
     path: `/accounts/${accountId}/access/apps?domain=${encodeURIComponent(hostname)}`,
   });

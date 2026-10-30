@@ -18,6 +18,7 @@ import {
   tunnelHostnames,
   validateEdge,
   validateR2,
+  appUris,
   siteOrigins,
   webhookBypass,
   type AccessApp,
@@ -67,6 +68,7 @@ describe("infra/cloudflare", () => {
           { hostname: "admin.joutiya.ma", service: "http://web:3000" },
           { hostname: "aalan.ma", service: "http://web:3000" },
           { hostname: "admin.aalan.ma", service: "http://web:3000" },
+          { hostname: "admin.a3lan.ma", service: "http://web:3000" },
           { hostname: "example.org", service: "http://web:3000" },
           { service: "http_status:404" },
         ],
@@ -74,7 +76,7 @@ describe("infra/cloudflare", () => {
     };
     const read = <T,>(name: string): T => (name.startsWith("tunnel.prod") ? tunnel : readEdgeFile(name)) as T;
     expect(validateEdge(read, targets)).toEqual([
-      "tunnel.prod.json: admin.aalan.ma has no Access application",
+      "tunnel.prod.json: admin.a3lan.ma has no Access application",
       "tunnel.prod.json: example.org is outside joutiya.ma, aalan.ma, a3lan.ma",
     ]);
   });
@@ -113,6 +115,23 @@ describe("infra/cloudflare", () => {
     ]);
   });
 
+  it("guards each aalan.ma twin in the same application, and keeps the webhook bypass to the staging hosts", () => {
+    const { apps } = readEdgeFile<{ apps: AccessApp[] }>("access-apps.json");
+    expect(appUris(apps.find((app) => app.domain === "admin.joutiya.ma")!)).toEqual(["admin.joutiya.ma", "admin.aalan.ma"]);
+    const widened = {
+      apps: apps.map((app) => {
+        if (app.domain === WEBHOOK_BYPASS) return { ...app, destinations: [...(app.destinations ?? []), { type: "public" as const, uri: "aalan.ma/api/webhooks/*" }] };
+        if (app.domain === "admin-staging.joutiya.ma") return { ...app, destinations: [{ type: "public" as const, uri: "admin-staging.aalan.ma" }] };
+        return app;
+      }),
+    };
+    const read = <T,>(name: string): T => (name === "access-apps.json" ? widened : readEdgeFile(name)) as T;
+    expect(validateEdge(read, targets)).toEqual([
+      "access-apps.json: aalan.ma/api/webhooks/*: only staging.joutiya.ma/api/webhooks/* and staging.aalan.ma/api/webhooks/* may bypass Access",
+      "access-apps.json: admin-staging.joutiya.ma: the first destination must be the domain",
+    ]);
+  });
+
   it("picks the account's only Google login method", () => {
     expect(googleIdp([{ id: "otp", type: "onetimepin" }, { id: "g1", type: "google" }])).toBe("g1");
     expect(() => googleIdp([{ id: "otp", type: "onetimepin" }])).toThrow("found 0");
@@ -128,7 +147,7 @@ describe("infra/cloudflare", () => {
   });
 
   it("lists the tunnel hostnames", () => {
-    expect(tunnelHostnames(readEdgeFile<TunnelConfig>("tunnel.prod.json"))).toEqual(["joutiya.ma", "www.joutiya.ma", "admin.joutiya.ma"]);
+    expect(tunnelHostnames(readEdgeFile<TunnelConfig>("tunnel.prod.json"))).toEqual(["joutiya.ma", "www.joutiya.ma", "admin.joutiya.ma", "aalan.ma", "www.aalan.ma", "admin.aalan.ma"]);
     expect(tunnelHostnames(readEdgeFile<TunnelConfig>("tunnel.ssh.json"))).toEqual(["ssh.joutiya.ma"]);
   });
 });

@@ -1,11 +1,11 @@
 {
   "phase": "http_request_cache_settings",
-  "description": "Cache Rules (§1): anonymous public pages on joutiya.ma are cached for the TTL the origin sends (ISR s-maxage); a production deploy purges the cache. Only locale-prefixed paths: '/' and unprefixed paths redirect per visitor. Bypassed as soon as the __Host-session cookie is present. Private pages send no-store. Build assets (/_next/static) are cached by default.",
+  "description": "Cache Rules (§1): anonymous public pages on joutiya.ma and aalan.ma are cached for the TTL the origin sends (ISR s-maxage); a production deploy purges the cache. Only locale-prefixed paths: '/' and unprefixed paths redirect per visitor. Bypassed as soon as the __Host-session cookie is present. Private pages send no-store. Build assets (/_next/static) are cached by default.",
   "rules": [
     {
       "ref": "public_pages",
       "description": "Anonymous public pages: cache, TTLs from the origin",
-      "expression": "http.host eq \"joutiya.ma\" and (http.request.uri.path in {\"/fr\" \"/ar\" \"/rif\"} or starts_with(http.request.uri.path, \"/fr/\") or starts_with(http.request.uri.path, \"/ar/\") or starts_with(http.request.uri.path, \"/rif/\")) and not http.cookie contains \"__Host-session\"",
+      "expression": "http.host in {\"joutiya.ma\" \"aalan.ma\"} and (http.request.uri.path in {\"/fr\" \"/ar\" \"/rif\"} or starts_with(http.request.uri.path, \"/fr/\") or starts_with(http.request.uri.path, \"/ar/\") or starts_with(http.request.uri.path, \"/rif/\")) and not http.cookie contains \"__Host-session\"",
       "action": "set_cache_settings",
       "action_parameters": {
         "cache": true,
@@ -16,7 +16,7 @@
     {
       "ref": "media_edge_ttl",
       "description": "R2 media hosts (photos, PMTiles map): the origin sends max-age=31536000, immutable, which browsers keep, but the edge keeps a copy one day at most, so the photos of a removed listing leave the CDN within a day of their move to the private bucket; an urgent removal is purged by URL.",
-      "expression": "http.host in {\"media.joutiya.ma\" \"media-staging.joutiya.ma\"}",
+      "expression": "http.host in {\"media.joutiya.ma\" \"media-staging.joutiya.ma\" \"media.aalan.ma\" \"media-staging.aalan.ma\"}",
       "action": "set_cache_settings",
       "action_parameters": {
         "cache": true,

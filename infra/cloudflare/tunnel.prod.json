@@ -1,10 +1,13 @@
 {
-  "description": "Ingress of the production Tunnel joutiya-prod-tunnel (remotely managed, connector in the joutiya-prod Compose project, token in /etc/joutiya/prod/tunnel.env). Each hostname gets a proxied CNAME to <tunnelId>.cfargotunnel.com.",
+  "description": "Ingress of the production Tunnel joutiya-prod-tunnel (remotely managed, connector in the joutiya-prod Compose project, token in /etc/joutiya/prod/tunnel.env). The aalan.ma twins serve the same site while joutiya.ma still answers (until its 301, at the ANRT validation of aalan.ma). Each hostname gets a proxied CNAME to <tunnelId>.cfargotunnel.com.",
   "config": {
     "ingress": [
       { "hostname": "joutiya.ma", "service": "http://web:3000" },
       { "hostname": "www.joutiya.ma", "service": "http://web:3000" },
       { "hostname": "admin.joutiya.ma", "service": "http://web:3000" },
+      { "hostname": "aalan.ma", "service": "http://web:3000" },
+      { "hostname": "www.aalan.ma", "service": "http://web:3000" },
+      { "hostname": "admin.aalan.ma", "service": "http://web:3000" },
       { "service": "http_status:404" }
     ]
   }
