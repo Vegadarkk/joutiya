@@ -301,8 +301,11 @@ test.describe("search page", () => {
     await page.setViewportSize({ width: 1366, height: 800 });
     await page.goto(`/fr/recherche?q=${WORD}`);
     const place = page.getByRole("banner").getByRole("combobox");
-    await place.focus();
-    await expect(place).toBeFocused();
+    // Under load a focus given before hydration is lost when the pill re-renders: retry until it holds.
+    await expect(async () => {
+      await place.focus();
+      await expect(place).toBeFocused({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
     await expect(place).toHaveAttribute("aria-expanded", "false");
     await place.press("ArrowDown");
     await expect(place).toHaveAttribute("aria-expanded", "true");
