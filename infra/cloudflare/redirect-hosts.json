@@ -1,0 +1,4 @@
+{
+  "description": "Hostnames that only redirect, with no tunnel behind them: scripts/cloudflare.ts zone gives each a proxied AAAA 100:: record in its zone (once the zone is recorded in infra/targets.json), so the redirect rules of redirect-rules.json see their requests. Empty until the switch to aalan.ma, which adds a3lan.ma and www.a3lan.ma (their 301 to aalan.ma lives in redirect-rules.json).",
+  "hostnames": []
+}

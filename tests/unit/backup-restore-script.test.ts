@@ -23,6 +23,7 @@ function targets(projects: { dev?: string | null; staging?: string | null; prod?
     r2: { quarantine: `joutiya-${name}-quarantine`, media: `joutiya-${name}-media`, private: `joutiya-${name}-private` },
     whatsapp: { wabaId: null, phoneNumberId: null },
     cloudflare: { tunnelId: null, accessAud: null },
+    hosts: { site: null, www: null, admin: null, media: null },
   });
   return { shared: {} as Targets["shared"], environments: { dev: env("dev"), staging: env("staging"), prod: env("prod") } };
 }

@@ -75,7 +75,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
-import { tunnelTokenErrors, validateTargets, type Targets } from "./assert-target.ts";
+import { recordedZoneId, tunnelTokenErrors, validateTargets, zoneOf, type Targets } from "./assert-target.ts";
 import { LEAF_DAYS, WIF_SERVICES, certificateConfig, credentialConfig, csrFromOutput, derBase64, pemBlock, subjectName, wifLines, type WifService } from "./google-wif.ts";
 import { type Sealed, openSealedLines, parseSealed } from "./seal-env.ts";
 import { DEPLOYED_ENVS, REQUIRED, VM_DIRS, envPayload, envScripts, mergeLines, namesScript, parseMissing, parseNames, planEnv, type DeployedEnv, type EnvDirs, type Source } from "./vm-env.ts";
@@ -1233,11 +1233,13 @@ function isOnMain(release: string): boolean {
   return spawnSync("git", ["merge-base", "--is-ancestor", release, "origin/main"], { cwd: root, stdio: "ignore" }).status === 0;
 }
 
-/** Purges the zone's cache after a production change. Warns only: the release itself is done. */
+/** Purges the cache of the production site's zone after a production change. Warns only: the release itself is done. */
 async function purgeCache(targets: Targets): Promise<void> {
-  const zone = targets.shared.cloudflare.zoneId;
+  const site = targets.environments.prod.hosts.site;
+  const name = site === null ? null : zoneOf(site);
+  const zone = name === null ? null : recordedZoneId(targets, name);
   try {
-    if (!zone) throw new Error("shared.cloudflare.zoneId is not recorded");
+    if (!zone) throw new Error(`the zone of environments.prod.hosts.site (${name ?? "none"}) is not recorded`);
     await cloudflare(`/zones/${zone}/purge_cache`, { purge_everything: true });
     console.log("Cloudflare cache purged");
   } catch (error) {
