@@ -10,13 +10,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link, getPathname, usePathname, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/config/site";
 import { isApiError } from "@/lib/auth/client";
+import { subcategoryById } from "@/config/categories";
 import { usePublicConfig } from "@/lib/config/client";
 import { WIZARD_DONE, WIZARD_STEPS, type ListingPatch, type ListingStatus, type OwnerListing, type PublishListingResponse, type WizardStep } from "@/lib/contracts/listings";
 import { MAX_PHOTOS_INDIVIDUAL } from "@/lib/contracts/media";
 import { getListing, patchListing } from "@/lib/listings/client/api";
 import { parseWizardPath, wizardPath, type WizardScreen } from "@/lib/listings/client/routes";
 import { WizardProvider, useWizard } from "@/lib/listings/client/store";
-import { firstIncompleteStep, nextStep, previousStep, stepState, type StepState } from "@/lib/listings/client/validation";
+import { firstIncompleteStep, nextStep, previousStep, stepState, wizardSteps, type StepState } from "@/lib/listings/client/validation";
 import { DoneScreen } from "./done-screen";
 import { useSaveErrorMessage, useStepLabel } from "./field-messages";
 import { CategoryStep } from "./steps/category-step";
@@ -182,9 +183,13 @@ function WizardScreens({ nonce }: { nonce?: string }) {
     [listingId, locale, router],
   );
 
+  // The draft's steps (no price step on a job-seeker ad); a job offer's price step is its salary.
+  const steps = wizardSteps(listing);
+  const salary = Boolean(listing.subcategoryId && subcategoryById(listing.subcategoryId)?.priceMode === "salary");
   // `/deposer/{id}`: resume where the draft stopped (a live listing opens on its review). The
-  // result screen without a result (reload of a draft) goes back to the steps.
-  const needsRedirect = screen === null || (screen === WIZARD_DONE && !publishResult && listing.status === "draft");
+  // result screen without a result (reload of a draft) goes back to the steps, and so does a step
+  // the draft does not have.
+  const needsRedirect = screen === null || (screen === WIZARD_DONE && !publishResult && listing.status === "draft") || (screen !== WIZARD_DONE && !steps.includes(screen));
   useEffect(() => {
     if (!needsRedirect) return;
     navigate(listing.status === "draft" ? firstIncompleteStep(listing, issueOptions) : "apercu", true);
@@ -214,13 +219,13 @@ function WizardScreens({ nonce }: { nonce?: string }) {
 
   const step = screen;
   const onNext = () => {
-    const next = nextStep(step);
+    const next = nextStep(step, listing);
     if (next) {
       void flush();
       navigate(next);
     }
   };
-  const previous = previousStep(step);
+  const previous = previousStep(step, listing);
   const onBack = previous ? () => goTo(previous) : undefined;
 
   function onPublished(result: PublishListingResponse) {
@@ -238,8 +243,10 @@ function WizardScreens({ nonce }: { nonce?: string }) {
   return (
     <WizardShell
       step={step}
-      title={step === "categorie" && !listing.subcategoryId ? t("wizard.title") : stepLabel(step)}
-      lead={t(`stepLead.${step}`)}
+      title={step === "categorie" && !listing.subcategoryId ? t("wizard.title") : step === "prix" && salary ? t("steps.salaire") : stepLabel(step)}
+      lead={step === "prix" && salary ? t("stepLead.salaire") : t(`stepLead.${step}`)}
+      steps={steps}
+      stepLabels={salary ? { prix: t("steps.salaire") } : undefined}
       states={states}
       reachable={reachable}
       onSelect={goTo}

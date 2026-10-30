@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { OwnerListing } from "@/lib/contracts/listings";
 import { parseWizardPath, wizardPath } from "@/lib/listings/client/routes";
-import { allIssues, firstIncompleteStep, nextStep, previousStep, sanitizePatch, stepIssues, stepOfPath, stepState, withoutRejectedFields } from "@/lib/listings/client/validation";
+import { allIssues, firstIncompleteStep, nextStep, previousStep, sanitizePatch, stepIssues, stepOfPath, stepState, withoutRejectedFields, wizardSteps } from "@/lib/listings/client/validation";
 
 // Per-step readiness of the wizard (design D3/D4), derived from the shared contracts.
 
@@ -105,6 +105,40 @@ describe("stepIssues", () => {
     expect(stepIssues("lieu", { ...car, location: null }).map((i) => i.code)).toEqual(["city_required"]);
     expect(stepIssues("lieu", { ...car, location: { regionCode: "01", citySlug: "casablanca" } }).map((i) => i.code)).toEqual(["city_required"]);
     expect(stepIssues("lieu", { ...car, location: { regionCode: "06", citySlug: "casablanca", district: "x".repeat(65) } }).map((i) => i.code)).toEqual(["district_max"]);
+  });
+
+  it("lets a job ad go without a photo, a job offer without a salary, and refuses an amount on a job-seeker ad", () => {
+    const offer = draft({
+      sellerType: "pro",
+      categoryId: "emploi",
+      subcategoryId: "offres-emploi",
+      title: "Vendeuse en boutique, Casablanca",
+      description: "Boutique de prêt-à-porter recrute une vendeuse en CDI, caisse et conseil clientèle.",
+      attributes: { "job-contract": "cdi", "job-sector": "commerce-vente", "job-experience": "1-3-ans", "job-mode": "sur-place", "job-location": "maroc" },
+      location: { regionCode: "06", citySlug: "casablanca" },
+    });
+    expect(allIssues(offer)).toEqual([]);
+    expect(stepState("photos", offer)).toBe("complete");
+    expect(stepIssues("prix", { ...offer, price: 4500 })).toEqual([]);
+    const seeker = draft({
+      categoryId: "emploi",
+      subcategoryId: "demandes-emploi",
+      title: "Vendeuse expérimentée cherche poste",
+      description: "Cinq ans en boutique de prêt-à-porter, caisse et réassort, disponible immédiatement.",
+      attributes: { "job-sector": "commerce-vente", "job-experience": "3-5-ans", "job-mobility": "ville" },
+      location: { regionCode: "06", citySlug: "casablanca" },
+    });
+    expect(allIssues(seeker)).toEqual([]);
+    expect(stepIssues("prix", { ...seeker, price: 4000 })).toEqual([{ path: "price", code: "price_not_allowed" }]);
+    expect(stepIssues("contact", { ...seeker, contact: { showPhone: true, whatsapp: false } }, { phoneVerified: true })).toEqual([{ path: "contact.showPhone", code: "messaging_only" }]);
+    // The price step is not one of a job-seeker ad's steps: the photos lead to the place.
+    expect(wizardSteps(seeker)).toEqual(["categorie", "criteres", "titre", "description", "photos", "lieu", "contact", "apercu"]);
+    expect(wizardSteps(offer)).toHaveLength(9);
+    expect(wizardSteps()).toHaveLength(9);
+    expect(nextStep("photos", seeker)).toBe("lieu");
+    expect(previousStep("lieu", seeker)).toBe("photos");
+    expect(nextStep("photos", offer)).toBe("prix");
+    expect(firstIncompleteStep({ ...seeker, location: null })).toBe("lieu");
   });
 
   it("needs at least one ready photo (photos_required at publish) and caps them", () => {

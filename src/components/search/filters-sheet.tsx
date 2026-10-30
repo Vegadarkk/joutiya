@@ -114,6 +114,8 @@ export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
   districts.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   const criteria = filterableCriteria(draft.category, draft.subcategory);
   const rentalUnit = datedRental(draft.subcategory)?.unit;
+  // Job offers filter on a salary; job-seeker ads carry no amount at all.
+  const priceMode = draft.subcategory ? subcategoryById(draft.subcategory)?.priceMode : undefined;
 
   function apply(event: FormEvent) {
     event.preventDefault();
@@ -243,22 +245,24 @@ export function FiltersSheet({ params, facets, className }: FiltersSheetProps) {
                 )}
               </Section>
 
-              <Section title={t("sections.price")}>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor={`${ids}-price-min`} className="text-xs text-foreground-muted">
-                      {t("priceMin")}
-                    </label>
-                    <NumberInput id={`${ids}-price-min`} value={draft.priceMin} min={0} unit={currencyLabel(locale)} onChange={(value) => update({ priceMin: value })} />
+              {priceMode === "none" ? null : (
+                <Section title={t(priceMode === "salary" ? "sections.salary" : "sections.price")}>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor={`${ids}-price-min`} className="text-xs text-foreground-muted">
+                        {t(priceMode === "salary" ? "salaryMin" : "priceMin")}
+                      </label>
+                      <NumberInput id={`${ids}-price-min`} value={draft.priceMin} min={0} unit={currencyLabel(locale)} onChange={(value) => update({ priceMin: value })} />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor={`${ids}-price-max`} className="text-xs text-foreground-muted">
+                        {t(priceMode === "salary" ? "salaryMax" : "priceMax")}
+                      </label>
+                      <NumberInput id={`${ids}-price-max`} value={draft.priceMax} min={0} unit={currencyLabel(locale)} onChange={(value) => update({ priceMax: value })} />
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor={`${ids}-price-max`} className="text-xs text-foreground-muted">
-                      {t("priceMax")}
-                    </label>
-                    <NumberInput id={`${ids}-price-max`} value={draft.priceMax} min={0} unit={currencyLabel(locale)} onChange={(value) => update({ priceMax: value })} />
-                  </div>
-                </div>
-              </Section>
+                </Section>
+              )}
 
               {draft.shop ? null : (
                 <Section title={t("sections.seller")}>

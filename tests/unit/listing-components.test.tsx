@@ -6,7 +6,9 @@ import ar from "../../messages/ar.json";
 import fr from "../../messages/fr.json";
 import { Breadcrumb, SEARCH_QUERY, searchHref } from "@/components/listing/breadcrumb";
 import { CriteriaGrid, CriteriaSection } from "@/components/listing/criteria-grid";
+import { JOB_ABROAD, JobNotice } from "@/components/listing/job-notice";
 import { ListingCard } from "@/components/listing/listing-card";
+import { ListingPrice } from "@/components/listing/listing-price";
 import { ListingStatusBanner } from "@/components/listing/listing-status-banner";
 import { PriceTag } from "@/components/listing/price-tag";
 import { PROPERTY_TERM_FIELDS, PropertyTerms } from "@/components/listing/property-terms";
@@ -58,6 +60,14 @@ describe("PriceTag", () => {
     const toDiscuss = render(<PriceTag price={null} isDonation={false} negotiable unit="month" locale="fr" />);
     expect(text(toDiscuss)).toBe(fr.ListingCard.toDiscuss);
     expect(text(render(<PriceTag price={null} isDonation={false} locale="ar" />, "ar"))).toBe(ar.ListingCard.toDiscuss);
+  });
+
+  it("says a job offer's salary is to agree on when it has none, and shows it per month otherwise", () => {
+    expect(text(render(<PriceTag price={null} isDonation={false} mode="salary" unit="month" locale="fr" />))).toBe(fr.ListingCard.salaryToDiscuss);
+    expect(text(render(<PriceTag price={null} isDonation={false} mode="salary" locale="ar" />, "ar"))).toBe(ar.ListingCard.salaryToDiscuss);
+    const paid = render(<PriceTag price={4000} isDonation={false} mode="salary" unit="month" locale="fr" />);
+    expect(paid).toContain(`4${NNBSP}000${NBSP}DH`);
+    expect(paid).toContain(fr.ListingCard.per.month);
   });
 });
 
@@ -152,6 +162,17 @@ describe("ListingCard", () => {
     expect(text(html)).toContain(fr.ListingCard.noPhoto);
     expect(text(html)).toContain(fr.ListingCard.pro);
     expect(render(<ListingCard listing={card} mediaBaseUrl={null} locale="fr" />)).not.toContain("<img");
+  });
+
+  it("shows no amount and a briefcase on a job-seeker ad, the salary wording on an offer", () => {
+    const seeker = render(<ListingCard listing={{ ...card, subcategoryId: "demandes-emploi", price: null, priceNegotiable: false, photo: null, photoCount: 0 }} mediaBaseUrl={MEDIA} locale="fr" />);
+    expect(seeker).not.toContain('data-testid="price-tag"');
+    expect(seeker).not.toContain(fr.ListingCard.toDiscuss);
+    expect(seeker).not.toContain(fr.ListingCard.noPhoto);
+    expect(seeker).toContain("lucide-briefcase-business");
+    const offer = render(<ListingCard listing={{ ...card, subcategoryId: "offres-emploi", price: null, priceNegotiable: false, sellerType: "pro" }} mediaBaseUrl={MEDIA} locale="fr" />);
+    expect(text(offer)).toContain(fr.ListingCard.salaryToDiscuss);
+    expect(offer).not.toContain(fr.ListingCard.toDiscuss);
   });
 
   it("uses Arabic city names and the Arabic currency in Arabic", () => {
@@ -300,6 +321,44 @@ describe("SafetyTips", () => {
     expect(html).toContain(fr.ListingPage.safety.tips.checkTitle);
     expect(html).not.toContain(fr.ListingPage.safety.tips.meetPublic);
   });
+
+  it("warns a candidate against fees, unchecked employers and identity papers on a job ad", () => {
+    const html = text(render(<SafetyTips variant="jobs" />));
+    expect(html).toContain(fr.ListingPage.safety.tips.noFees);
+    expect(html).toContain(fr.ListingPage.safety.tips.abroad);
+    expect(html).toContain(fr.ListingPage.safety.tips.noDocuments);
+    expect(html).not.toContain(fr.ListingPage.safety.tips.noAdvance);
+    expect(text(render(<SafetyTips variant="jobs" />, "ar"))).toContain(ar.ListingPage.safety.tips.noFees);
+  });
+});
+
+describe("JobNotice", () => {
+  const offer = { "job-contract": "cdi", "job-sector": "commerce-vente", "job-experience": "1-3-ans", "job-mode": "sur-place", "job-location": "maroc" };
+
+  it("states on an offer that Aalan publishes, is no agency and that a candidate never pays, with the rules and report links", () => {
+    const html = render(<JobNotice subcategoryId="offres-emploi" attributes={offer} />);
+    expect(html).toContain('data-kind="offer"');
+    expect(text(html)).toContain(fr.ListingPage.jobs.offer.publisher);
+    expect(text(html)).toContain(fr.ListingPage.jobs.offer.noFees);
+    expect(text(html)).not.toContain(fr.ListingPage.jobs.seeker.publisher);
+    expect(html).toContain('href="/fr/legal/cgu"');
+    expect(html).toContain('href="#signaler"');
+    expect(html).not.toContain("job-abroad-notice");
+    expect(text(render(<JobNotice subcategoryId="offres-emploi" attributes={offer} />, "ar"))).toContain(ar.ListingPage.jobs.title);
+  });
+
+  it("adds the ministry's visa and ANAPEC on an offer abroad", () => {
+    const html = render(<JobNotice subcategoryId="offres-emploi" attributes={{ ...offer, "job-location": JOB_ABROAD }} />);
+    expect(html).toContain('data-testid="job-abroad-notice"');
+    expect(text(html)).toContain(fr.ListingPage.jobs.abroad.body);
+  });
+
+  it("tells an employer on a job-seeker ad to use the messaging and ask for no money or papers", () => {
+    const html = render(<JobNotice subcategoryId="demandes-emploi" attributes={{ "job-sector": "commerce-vente", "job-experience": "debutant", "job-mobility": "ville" }} />);
+    expect(html).toContain('data-kind="seeker"');
+    expect(text(html)).toContain(fr.ListingPage.jobs.seeker.contact);
+    expect(text(html)).not.toContain(fr.ListingPage.jobs.offer.moderation);
+  });
 });
 
 describe("PropertyTerms", () => {
@@ -330,5 +389,20 @@ describe("PropertyTerms", () => {
     const grid = text(render(<CriteriaGrid subcategoryId="vente" attributes={attributes} condition={null} exclude={PROPERTY_TERM_FIELDS} />));
     expect(grid).not.toContain(fr.Criteria.mandate.label);
     expect(grid).toContain(fr.Criteria.surface.label);
+  });
+});
+
+describe("ListingPrice", () => {
+  const base = { from: false, isDonation: false, negotiable: false, locale: "fr" as const, promo: null, renderedAt: 0 };
+
+  it("puts the salary label above an amount only; « Salaire à convenir » stands alone; nothing on a job-seeker ad", () => {
+    const paid = render(<ListingPrice {...base} price={6500} unit="month" mode="salary" />);
+    expect(paid).toContain('data-testid="listing-price"');
+    expect(text(paid)).toContain(fr.ListingPage.salary.label);
+    expect(text(paid)).toMatch(/6\s500/);
+    const open = render(<ListingPrice {...base} price={null} unit="month" mode="salary" />);
+    expect(text(open)).toContain(fr.ListingCard.salaryToDiscuss);
+    expect(text(open)).not.toContain(fr.ListingPage.salary.label);
+    expect(render(<ListingPrice {...base} price={null} mode="none" />)).toBe("");
   });
 });

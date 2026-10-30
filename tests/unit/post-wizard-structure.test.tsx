@@ -66,6 +66,24 @@ describe("StepProgress", () => {
   });
 });
 
+describe("StepProgress on a job ad", () => {
+  const states = Object.fromEntries(WIZARD_STEPS.map((step) => [step, "empty"])) as Record<WizardStep, StepState>;
+
+  it("counts and lists only the draft's steps: eight without the price step of a job-seeker ad", () => {
+    const steps = WIZARD_STEPS.filter((step) => step !== "prix");
+    const html = render(<StepProgress current="lieu" steps={steps} states={states} onSelect={noop} reachable={() => true} />);
+    expect(openingTags(html, "button").length).toBe(1 + steps.length);
+    expect(html).toContain(fr.Listing.wizard.stepOf.replace("{current}", "6").replace("{total}", "8"));
+    expect(html).not.toContain(`>${fr.Listing.steps.prix}<`);
+  });
+
+  it("names the price step of a job offer after its salary", () => {
+    const html = render(<StepProgress current="prix" labels={{ prix: fr.Listing.steps.salaire }} states={states} onSelect={noop} reachable={() => true} />);
+    expect(html).toContain(`>${fr.Listing.steps.salaire}<`);
+    expect(html).not.toContain(`>${fr.Listing.steps.prix}<`);
+  });
+});
+
 describe("DoneScreen", () => {
   it("titles the result page with its h1", () => {
     const html = render(<DoneScreen status="published" slugId="velo-de-ville-abc123" listingId="abc123" />);

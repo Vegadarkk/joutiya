@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Baby, Building2, Car, Check, ChevronRight, Dumbbell, Handshake, Package, PawPrint, Shirt, Smartphone, Sofa, Wheat, Wrench, type LucideIcon } from "lucide-react";
+import { ArrowRight, Baby, BriefcaseBusiness, Building2, Car, Check, ChevronRight, Dumbbell, Handshake, Package, PawPrint, Shirt, Smartphone, Sofa, Wheat, Wrench, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { ErrorBanner } from "@/components/feedback/error-banner";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   animaux: PawPrint,
   "materiel-pro": Wrench,
   services: Handshake,
+  emploi: BriefcaseBusiness,
   divers: Package,
 };
 
@@ -87,7 +88,8 @@ export function CategoryPicker({ categoryId, subcategoryId, onCategory, onSubcat
       <div role="radiogroup" aria-label={t("subcategories", { category: names.category(category.id) })} className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface">
         {category.subcategories.map((subcategory) => {
           const checked = subcategory.id === subcategoryId;
-          const locked = Boolean(subcategory.proOnly) && !isPro;
+          // Pro-only subcategories lock for individuals; a job-seeker ad (individuals only) for Pros.
+          const locked = (Boolean(subcategory.proOnly) && !isPro) || (Boolean(subcategory.individualOnly) && isPro);
           return (
             <button
               key={subcategory.id}
@@ -105,7 +107,7 @@ export function CategoryPicker({ categoryId, subcategoryId, onCategory, onSubcat
             >
               <span className="flex min-w-0 flex-col">
                 <span className="truncate font-medium">{names.subcategory(category.id, subcategory.id)}</span>
-                {locked ? <span className="text-xs">{t("proOnly")}</span> : null}
+                {locked ? <span className="text-xs">{t(subcategory.individualOnly ? "individualOnly" : "proOnly")}</span> : null}
               </span>
               {checked ? <Check className="size-5 shrink-0" aria-hidden="true" /> : <ChevronRight className="size-5 shrink-0 text-foreground-muted rtl:-scale-x-100" aria-hidden="true" />}
             </button>
@@ -125,6 +127,11 @@ export function CategoryPicker({ categoryId, subcategoryId, onCategory, onSubcat
           }
         >
           {t("proOnlyBody")}
+        </ErrorBanner>
+      ) : null}
+      {category.subcategories.some((s) => s.individualOnly) && isPro ? (
+        <ErrorBanner tone="info" title={t("individualOnly")}>
+          {t("individualOnlyBody")}
         </ErrorBanner>
       ) : null}
     </div>

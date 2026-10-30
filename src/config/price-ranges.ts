@@ -85,6 +85,9 @@ export const PRICE_RANGES: Readonly<Record<string, PriceRange>> = {
   menage: { min: 50, max: 10_000 },
   evenements: { min: 200, max: 500_000 },
   beaute: { min: 30, max: 10_000 },
+  // emploi: a monthly gross salary (SMIG about 3 200 MAD in 2026; a seeker ad carries no amount).
+  "offres-emploi": { min: 1_500, max: 150_000 },
+  "demandes-emploi": { min: 1_500, max: 150_000 },
 };
 
 export function priceRange(subcategoryId: string): PriceRange | undefined {

@@ -5,7 +5,7 @@ import { BadgeCheck, MessageSquare, ShieldCheck } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { subcategoryById } from "@/config/categories";
+import { contactMessagingOnly, subcategoryById } from "@/config/categories";
 import { Link } from "@/i18n/navigation";
 import { useSession } from "@/lib/auth/client";
 import { usePublicConfig } from "@/lib/config/client";
@@ -15,7 +15,8 @@ import { STEP_FORM_ID } from "../wizard-shell";
 
 /**
  * Step 8: messaging is always on; the phone and WhatsApp switches need the verified badge (phase 2,
- * /verifications). Adults-only subcategories are messaging only: the switches can be turned off, never on.
+ * /verifications). Adults-only subcategories and job-seeker ads are messaging only: the switches
+ * can be turned off, never on.
  */
 export function ContactStep({ onNext }: { onNext: () => void }) {
   const { listing, update, blockers } = useWizard();
@@ -25,7 +26,8 @@ export function ContactStep({ onNext }: { onNext: () => void }) {
   const verified = Boolean(session?.phoneVerified);
   // While the WhatsApp check is closed, explain why the switches stay off instead of linking to a 503.
   const phoneOpen = usePublicConfig()?.phoneVerification !== false;
-  const messagingOnly = Boolean(listing.subcategoryId && subcategoryById(listing.subcategoryId)?.adultsOnly);
+  const subcategory = listing.subcategoryId ? subcategoryById(listing.subcategoryId) : undefined;
+  const messagingOnly = contactMessagingOnly(subcategory);
   // Without the badge the switches can be turned off, never on (the API refuses: phone_required).
   const blocked = !messagingOnly && known && !verified && (listing.contact.showPhone || listing.contact.whatsapp);
   const canEnable = verified && !messagingOnly;
@@ -40,7 +42,7 @@ export function ContactStep({ onNext }: { onNext: () => void }) {
     <form id={STEP_FORM_ID} onSubmit={onSubmit} noValidate className="flex flex-col gap-6">
       <div className="flex gap-3 rounded-lg bg-surface-brand px-4 py-3">
         <MessageSquare className="mt-0.5 size-5 shrink-0 text-structure" aria-hidden="true" />
-        <p className="text-sm text-pretty">{t(messagingOnly ? "contact.messagingOnly" : "contact.messagesAlways")}</p>
+        <p className="text-sm text-pretty">{t(subcategory?.adultsOnly ? "contact.messagingOnly" : messagingOnly ? "contact.messagingOnlyPrivate" : "contact.messagesAlways")}</p>
       </div>
 
       <section aria-labelledby="contact-phone-title" className="flex flex-col gap-3 rounded-lg border border-border p-4">

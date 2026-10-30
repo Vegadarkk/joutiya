@@ -20,6 +20,10 @@ interface WizardShellProps {
   step: WizardStep;
   title: string;
   lead?: string;
+  /** The draft's steps, in order (the price step is absent from a job-seeker ad). */
+  steps?: readonly WizardStep[];
+  /** Step names that differ for this draft (the price step of a job offer reads "Salaire"). */
+  stepLabels?: Partial<Record<WizardStep, string>>;
   states: Record<WizardStep, StepState>;
   reachable: (step: WizardStep) => boolean;
   onSelect: (step: WizardStep) => void;
@@ -44,7 +48,7 @@ interface WizardShellProps {
  * bottom on a phone). The Next button submits the step's form (`form` attribute), so each step
  * validates itself before the wizard moves on.
  */
-export function WizardShell({ step, title, lead, states, reachable, onSelect, onBack, nextLabel, nextDisabled, nextLoading, saveState, saveError, saveMode = "auto", onRetrySave, onSaveNow, held = false, children }: WizardShellProps) {
+export function WizardShell({ step, title, lead, steps, stepLabels, states, reachable, onSelect, onBack, nextLabel, nextDisabled, nextLoading, saveState, saveError, saveMode = "auto", onRetrySave, onSaveNow, held = false, children }: WizardShellProps) {
   const t = useTranslations("Listing.wizard");
   const heading = useRef<HTMLHeadingElement>(null);
   const first = useRef(true);
@@ -62,7 +66,7 @@ export function WizardShell({ step, title, lead, states, reachable, onSelect, on
   return (
     <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start lg:gap-12">
       <div className="lg:sticky lg:top-24">
-        <StepProgress current={step} states={states} onSelect={onSelect} reachable={reachable} />
+        <StepProgress current={step} steps={steps} labels={stepLabels} states={states} onSelect={onSelect} reachable={reachable} />
       </div>
 
       <div className="flex min-w-0 flex-col gap-6">

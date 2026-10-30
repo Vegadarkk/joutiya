@@ -38,7 +38,8 @@ export function FavoriteCard({ favorite, mediaBaseUrl, locale, busy = false, onR
   const card = favorite.card;
   const available = favorite.available;
   const city = card.citySlug ? cityBySlug(card.citySlug) : undefined;
-  const unit = card.subcategoryId ? subcategoryById(card.subcategoryId)?.priceUnit : undefined;
+  const subcategory = card.subcategoryId ? subcategoryById(card.subcategoryId) : undefined;
+  const unit = subcategory?.priceUnit;
   const sources = card.photo ? photoSources(mediaBaseUrl, card.id, card.photo, "s") : null;
   const placeholder = blurhashPlaceholder(card.photo?.blurhash);
 
@@ -110,7 +111,7 @@ export function FavoriteCard({ favorite, mediaBaseUrl, locale, busy = false, onR
           <span className="line-clamp-2 break-words">{card.title}</span>
         )}
       </h2>
-      <PriceTag price={card.price} isDonation={card.isDonation} negotiable={card.priceNegotiable} unit={unit} locale={locale} className={cn(!available && "opacity-70")} />
+      {subcategory?.priceMode === "none" ? null : <PriceTag price={card.price} isDonation={card.isDonation} negotiable={card.priceNegotiable} unit={unit} mode={subcategory?.priceMode} locale={locale} className={cn(!available && "opacity-70")} />}
       <p className="flex min-w-0 flex-wrap gap-x-2 text-xs text-foreground-muted">
         {city ? <span className="truncate">{cityName(city, locale)}</span> : null}
         <span>{t("savedOn", { date: formatSavedDate(favorite.createdAt, locale) })}</span>

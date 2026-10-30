@@ -213,15 +213,18 @@ export function ReviewStep({ onEdit, onPublished, onSaved, onBusy, nonce }: Revi
           <Section onEdit={() => onEdit("titre")} label={t("review.editStep", { step: stepLabel("titre") })}>
             <h2 className={cn("text-xl font-semibold text-balance", !listing.title && "text-foreground-muted")}>{listing.title || t("review.untitled")}</h2>
           </Section>
-          <Section onEdit={() => onEdit("prix")} label={t("review.editStep", { step: stepLabel("prix") })}>
-            <p className="flex flex-wrap items-baseline gap-2">
-              <span className="text-2xl font-semibold tabular-nums">
-                {listing.isDonation ? t("review.donation") : listing.price !== null ? formatPrice(listing.price, locale) : subcategory?.priceOptional ? t("review.toDiscuss") : <span className="text-base font-normal text-foreground-muted">{t("review.noPrice")}</span>}
-              </span>
-              {subcategory?.priceUnit && listing.price !== null && !listing.isDonation ? <span className="text-sm text-foreground-muted">{t(`fields.per.${subcategory.priceUnit}`)}</span> : null}
-              {listing.priceNegotiable && !listing.isDonation ? <Badge variant="neutral">{t("review.negotiable")}</Badge> : null}
-            </p>
-          </Section>
+          {/* No amount on a job-seeker ad (priceMode "none"): nothing to review. */}
+          {subcategory?.priceMode === "none" ? null : (
+            <Section onEdit={() => onEdit("prix")} label={t("review.editStep", { step: subcategory?.priceMode === "salary" ? t("steps.salaire") : stepLabel("prix") })}>
+              <p className="flex flex-wrap items-baseline gap-2">
+                <span className="text-2xl font-semibold tabular-nums">
+                  {listing.isDonation ? t("review.donation") : listing.price !== null ? formatPrice(listing.price, locale) : subcategory?.priceOptional ? t(subcategory.priceMode === "salary" ? "review.salaryToDiscuss" : "review.toDiscuss") : <span className="text-base font-normal text-foreground-muted">{t("review.noPrice")}</span>}
+                </span>
+                {subcategory?.priceUnit && listing.price !== null && !listing.isDonation ? <span className="text-sm text-foreground-muted">{t(`fields.per.${subcategory.priceUnit}`)}</span> : null}
+                {listing.priceNegotiable && !listing.isDonation ? <Badge variant="neutral">{t("review.negotiable")}</Badge> : null}
+              </p>
+            </Section>
+          )}
           <Section onEdit={() => onEdit("lieu")} label={t("review.editStep", { step: stepLabel("lieu") })}>
             <p className="flex items-center gap-2 text-foreground-muted">
               <MapPin className="size-4 shrink-0" aria-hidden="true" />

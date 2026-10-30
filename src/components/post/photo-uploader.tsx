@@ -30,6 +30,8 @@ interface PhotoUploaderProps {
   onMove: (key: string, to: number) => void;
   /** A live listing keeps at least one photo (the API refuses to remove the last one). */
   keepOne?: boolean;
+  /** Photos optional (job ads): an invitation instead of the "at least one" warning. */
+  optional?: boolean;
   /** Uploads a cropped copy in place of the photo (faces found); absent: no crop offered. */
   onCrop?: (key: string, file: File) => void;
   /** Published large variant of a ready photo: the crop source once the local file is gone. */
@@ -42,7 +44,7 @@ function hasFiles(event: DragEvent): boolean {
   return Array.from(event.dataTransfer?.types ?? []).includes("Files");
 }
 
-export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onRefresh, onMove, keepOne = false, onCrop, largeUrlOf }: PhotoUploaderProps) {
+export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onRefresh, onMove, keepOne = false, optional = false, onCrop, largeUrlOf }: PhotoUploaderProps) {
   const t = useNumbersTranslations("Listing.photos");
   const errors = useTranslations("Listing.errors");
   const picker = useRef<HTMLInputElement>(null);
@@ -214,7 +216,7 @@ export function PhotoUploader({ photos, maxPhotos, onAdd, onRemove, onRetry, onR
         />
       ) : null}
 
-      {photos.length === 0 ? <ErrorBanner tone="info" title={t("noPhotoWarning")} /> : <p className="text-sm text-foreground-muted">{t("reorderHelp")}</p>}
+      {photos.length === 0 ? <ErrorBanner tone="info" title={t(optional ? "optionalHint" : "noPhotoWarning")} /> : <p className="text-sm text-foreground-muted">{t("reorderHelp")}</p>}
     </div>
   );
 }

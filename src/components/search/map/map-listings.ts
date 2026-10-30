@@ -43,6 +43,8 @@ export interface MapListing {
 export interface MapListingLabels {
   donation: string;
   toDiscuss: string;
+  /** A job offer without an amount (« Salaire à convenir »); `toDiscuss` when absent. */
+  salaryToDiscuss?: string;
   today: string;
   per: (unit: "night" | "month" | "day") => string;
   pinPer: (unit: "night" | "month" | "day") => string;
@@ -61,13 +63,17 @@ export function buildMapListings(input: { featured: readonly SearchCard[]; hits:
   return pinSources(featured, hits).flatMap(({ id, position, featured: isFeatured }) => {
     const card = cards.get(id);
     if (!card) return [];
-    const unit = card.subcategoryId ? subcategoryById(card.subcategoryId)?.priceUnit : undefined;
+    const subcategory = card.subcategoryId ? subcategoryById(card.subcategoryId) : undefined;
+    const unit = subcategory?.priceUnit;
     const priced = !card.isDonation && card.price !== null;
     const city = card.citySlug ? cityBySlug(card.citySlug) : undefined;
     const sources = card.photo ? photoSources(media, card.id, card.photo, "s") : null;
     const today = isPublishedToday(card, now);
-    const amount = card.isDonation ? labels.donation : card.price === null ? labels.toDiscuss : formatPrice(card.price, locale);
-    const pin = card.isDonation ? labels.donation : card.price === null ? labels.toDiscuss : `${pinAmount(card.price, locale)}${unit ? labels.pinPer(unit) : ""}`;
+    // A job-seeker ad carries no amount: a dash on the pin and the row. A job offer without one
+    // says « Salaire à convenir ».
+    const unpriced = subcategory?.priceMode === "none" ? "—" : subcategory?.priceMode === "salary" ? (labels.salaryToDiscuss ?? labels.toDiscuss) : labels.toDiscuss;
+    const amount = card.isDonation ? labels.donation : card.price === null ? unpriced : formatPrice(card.price, locale);
+    const pin = card.isDonation ? labels.donation : card.price === null ? unpriced : `${pinAmount(card.price, locale)}${unit ? labels.pinPer(unit) : ""}`;
     const listing: MapListing = {
       id: card.id,
       slugId: card.slugId,

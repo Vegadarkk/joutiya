@@ -24,6 +24,8 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   "ListingPage.contact",
   "ListingPage.catalogue",
   "ListingPage.promo",
+  // "Salaire mensuel brut" above a job offer's amount (ListingPrice is a client island).
+  "ListingPage.salary",
   // "Partager" beside the favourite button (UX journeys counter-review, 8).
   "ListingPage.share",
   "Guide.search",

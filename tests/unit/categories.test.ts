@@ -18,6 +18,7 @@ import {
   PRICE_UNITS,
   SUBCATEGORY_IDS,
   categoryById,
+  contactMessagingOnly,
   criteriaFor,
   criteriaSchema,
   criterionById,
@@ -30,8 +31,8 @@ type Labels = { Categories: Record<string, { name: string; sub: Record<string, s
 const messages: Record<"fr" | "ar", Labels> = { fr: fr as unknown as Labels, ar: ar as unknown as Labels };
 
 describe("category tree", () => {
-  it("has the 11 categories of the product research plus the Pros' terroir, each with subcategories", () => {
-    expect(CATEGORY_IDS).toEqual(["vehicules", "immobilier", "electronique", "maison-jardin", "mode", "terroir", "famille", "loisirs", "animaux", "materiel-pro", "services", "divers"]);
+  it("has the 11 categories of the product research plus the Pros' terroir and the jobs, each with subcategories", () => {
+    expect(CATEGORY_IDS).toEqual(["vehicules", "immobilier", "electronique", "maison-jardin", "mode", "terroir", "famille", "loisirs", "animaux", "materiel-pro", "services", "emploi", "divers"]);
     for (const category of CATEGORIES) expect(category.subcategories.length, category.id).toBeGreaterThan(0);
     expect(SUBCATEGORY_IDS.length).toBeGreaterThanOrEqual(50);
   });
@@ -96,6 +97,28 @@ describe("category tree", () => {
     expect(criterionById("year")?.unit).toBe("an");
     expect(criterionById("__proto__")).toBeUndefined();
     expect(criterionById("toString")).toBeUndefined();
+  });
+
+  it("keeps the job ads to their frame: offers by Pros with a salary, seeker ads by individuals without amount, photos optional", () => {
+    const offers = subcategoryById("offres-emploi")!;
+    const seekers = subcategoryById("demandes-emploi")!;
+    expect(offers).toMatchObject({ categoryId: "emploi", proOnly: true, priceOptional: true, priceMode: "salary", priceUnit: "month", photosOptional: true });
+    expect(offers.individualOnly).toBeUndefined();
+    expect(offers.donationAllowed).toBeUndefined();
+    expect(offers.condition).toBeUndefined();
+    expect(seekers).toMatchObject({ categoryId: "emploi", individualOnly: true, messagingOnly: true, priceOptional: true, priceMode: "none", photosOptional: true });
+    expect(seekers.proOnly).toBeUndefined();
+    expect(seekers.donationAllowed).toBeUndefined();
+    // Fields stay skills and terms (art. 479 spirit): no age, sex, origin or health criterion.
+    for (const subcategory of [offers, seekers]) for (const criterion of subcategory.criteria) expect(criterion.id).toMatch(/^(job-|availability$)/);
+    expect(offers.criteria.map((criterion) => criterion.id)).toContain("job-location");
+    expect(seekers.criteria.some((criterion) => criterion.id === "job-location")).toBe(false);
+    expect(categoryById("emploi")?.sharedFilters).toEqual(["job-contract", "job-sector", "job-experience", "job-mode"]);
+    // Messaging only: adults-only goods and job-seeker ads, nothing else by default.
+    expect(contactMessagingOnly(seekers)).toBe(true);
+    expect(contactMessagingOnly(subcategoryById("koumiyas-decoratives"))).toBe(true);
+    expect(contactMessagingOnly(offers)).toBe(false);
+    expect(contactMessagingOnly(undefined)).toBe(false);
   });
 
   it("lists about 60 car brands plus `autre`, used by the car fields", () => {

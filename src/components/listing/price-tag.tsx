@@ -1,12 +1,13 @@
 import { useTranslations } from "next-intl";
-import type { PriceUnit } from "@/config/categories";
+import type { PriceUnit, Subcategory } from "@/config/categories";
 import type { Locale } from "@/config/site";
 import { formatPrice } from "@/lib/listings/client/format";
 import { cn } from "@/lib/utils";
 
 // The price of a listing (D4): an integer MAD as "1 500 DH" / "1 500 درهم", "Don" for a donation,
-// "Prix à discuter" when the subcategory allows no amount. No `dir` override: the digit groups are
-// joined by U+202F (a bidi common separator), so Arabic reads "1 500 درهم" in its own order.
+// "Prix à discuter" when the subcategory allows no amount ("Salaire à convenir" on a job offer).
+// No `dir` override: the digit groups are joined by U+202F (a bidi common separator), so Arabic
+// reads "1 500 درهم" in its own order.
 
 export interface PriceTagProps {
   price: number | null;
@@ -14,6 +15,8 @@ export interface PriceTagProps {
   negotiable?: boolean;
   /** Vacation rentals (night), rentals (month), equipment hire (day): from the subcategory. */
   unit?: PriceUnit;
+  /** "salary" (a job offer): a missing amount reads « Salaire à convenir ». */
+  mode?: Subcategory["priceMode"];
   locale: Locale;
   /** Combinations at different prices: `price` is the lowest (« À partir de 450 DH »). */
   from?: boolean;
@@ -24,10 +27,10 @@ export interface PriceTagProps {
   className?: string;
 }
 
-export function PriceTag({ price, isDonation, negotiable = false, unit, locale, from = false, promo = false, before = null, size = "sm", className }: PriceTagProps) {
+export function PriceTag({ price, isDonation, negotiable = false, unit, mode, locale, from = false, promo = false, before = null, size = "sm", className }: PriceTagProps) {
   const t = useTranslations("ListingCard");
   const large = size === "lg";
-  const amount = isDonation ? t("donation") : price === null ? t("toDiscuss") : formatPrice(price, locale);
+  const amount = isDonation ? t("donation") : price === null ? t(mode === "salary" ? "salaryToDiscuss" : "toDiscuss") : formatPrice(price, locale);
   const showExtras = !isDonation && price !== null;
   return (
     <p data-testid="price-tag" className={cn("flex flex-wrap items-baseline gap-x-2 gap-y-1", className)}>

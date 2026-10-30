@@ -12,7 +12,7 @@ import { SearchUnavailableError, type SearchCard } from "@/lib/search/types";
 
 // The home page module (lot L3b, D21; Carte vivante, lot 3): ISR every 5 minutes, the page's
 // heading (the search is the header's pill since lot 1). Without a basemap, the classic list page:
-// the twelve category tiles, À la Une (8) and the 12 newest listings. With one, the living map's
+// the thirteen category tiles, À la Une (8) and the 12 newest listings. With one, the living map's
 // panel: the categories rail, À la Une and the newest listings as rows (pins on the map once
 // hydrated), the car rental entry, the pillars and the legal links. An engine failure leaves the
 // listing sections out and the page still renders. French and Arabic.
@@ -132,7 +132,7 @@ describe("home page", () => {
     expect(html.match(/<form[^>]*>/g)).toHaveLength(1);
     expect(html).toContain('data-testid="home-rent-car"');
     expect(html).toContain('data-testid="home-categories"');
-    expect(CATEGORIES).toHaveLength(12);
+    expect(CATEGORIES).toHaveLength(13);
     for (const category of CATEGORIES) expect(html).toContain(`href="/fr/c/${category.id}"`);
     expect(html).toContain(fr.Home.categories.title);
     expect(html).toContain('data-testid="home-featured"');
@@ -159,7 +159,7 @@ describe("home page", () => {
     expect(html).toContain('data-search-start="half"');
     expect(html).toContain(heading(fr.Home.title));
     expect(html).toContain(fr.Home.subtitle);
-    // The twelve categories as a rail of arches (the header's chip row is left out on this page).
+    // The thirteen categories as a rail of arches (the header's chip row is left out on this page).
     expect(html).toContain('data-testid="home-category-rail"');
     for (const category of CATEGORIES) expect(count(html, `href="/fr/c/${category.id}"`)).toBe(1);
     // À la Une first, with its §8 heading, then the newest listings.

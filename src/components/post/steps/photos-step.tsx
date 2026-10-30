@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { ErrorBanner } from "@/components/feedback/error-banner";
+import { subcategoryById } from "@/config/categories";
 import { photoUrl } from "@/lib/listings/client/photo-url";
 import { useWizard, type PhotoItem } from "@/lib/listings/client/store";
 import { PhotoUploader } from "../photo-uploader";
@@ -10,8 +11,10 @@ import { useValidationMessage } from "../field-messages";
 import { STEP_FORM_ID } from "../wizard-shell";
 
 export function PhotosStep({ onNext }: { onNext: () => void }) {
-  const { photos, maxPhotos, addFiles, cropPhoto, removePhoto, retryPhoto, refreshPhoto, movePhoto, blockers, saveMode, mediaBaseUrl, listingId } = useWizard();
+  const { listing, photos, maxPhotos, addFiles, cropPhoto, removePhoto, retryPhoto, refreshPhoto, movePhoto, blockers, saveMode, mediaBaseUrl, listingId } = useWizard();
   const t = useTranslations("Listing.photos");
+  // Job ads publish without a photo (a logo is welcome): no warning, the last one may go.
+  const optional = Boolean(listing.subcategoryId && subcategoryById(listing.subcategoryId)?.photosOptional);
   const message = useValidationMessage();
   const blocker = blockers.find((issue) => issue.path.startsWith("photos"));
 
@@ -34,7 +37,8 @@ export function PhotosStep({ onNext }: { onNext: () => void }) {
         onRetry={retryPhoto}
         onRefresh={refreshPhoto}
         onMove={movePhoto}
-        keepOne={saveMode === "manual"}
+        keepOne={saveMode === "manual" && !optional}
+        optional={optional}
         onCrop={cropPhoto}
         largeUrlOf={largeUrlOf}
       />
