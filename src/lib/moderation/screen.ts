@@ -1,4 +1,4 @@
-import { criteriaSchema, sanitaryNumber, subcategoryById } from "@/config/categories";
+import { contactMessagingOnly, criteriaSchema, sanitaryNumber, subcategoryById } from "@/config/categories";
 import { isPriceOutlier, priceRange } from "@/config/price-ranges";
 import type { ModerationFlag } from "@/lib/contracts/listings";
 import { findContacts } from "@/lib/moderation/contacts";
@@ -71,11 +71,13 @@ function checkTree(input: ScreenInput, blockers: FieldIssue[]): void {
   // D4: price null only for donations or `priceOptional` subcategories; donation only where allowed.
   if (input.isDonation && !subcategory.donationAllowed) pushIssue(blockers, issue("isDonation", "not_allowed"));
   if (input.price === null && !input.isDonation && !subcategory.priceOptional) pushIssue(blockers, issue("price", "required"));
+  if (input.price !== null && subcategory.priceMode === "none") pushIssue(blockers, issue("price", "not_allowed"));
 }
 
 function checkContact(input: ScreenInput, blockers: FieldIssue[]): void {
-  // Adults-only goods: the buyer's 18+ confirmation is asked at the first message, so no other channel.
-  if (subcategoryById(input.subcategoryId)?.adultsOnly) {
+  // Adults-only goods (the buyer's 18+ confirmation is asked at the first message) and job-seeker
+  // ads (a candidate's number never shows): no other channel than the messaging.
+  if (contactMessagingOnly(subcategoryById(input.subcategoryId))) {
     if (input.contact.showPhone) pushIssue(blockers, issue("contact.showPhone", "messaging_only"));
     if (input.contact.whatsapp) pushIssue(blockers, issue("contact.whatsapp", "messaging_only"));
     return;

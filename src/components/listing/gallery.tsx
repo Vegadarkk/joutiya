@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { ChevronLeft, ChevronRight, Expand, ImageOff, RotateCw } from "lucide-react";
+import { BriefcaseBusiness, ChevronLeft, ChevronRight, Expand, ImageOff, RotateCw } from "lucide-react";
 import { InlineError } from "@/components/feedback/inline-error";
 import { loadWithRetry } from "@/components/layout/chunk-retry";
 import { Button } from "@/components/ui/button";
@@ -70,10 +70,12 @@ export interface GalleryProps {
   title: string;
   photos: PhotoLike[];
   mediaBaseUrl: string | null;
+  /** "jobs": a job ad without a photo (allowed) shows a briefcase, not a missing picture. */
+  placeholder?: "jobs";
   className?: string;
 }
 
-export function Gallery({ listingId, title, photos, mediaBaseUrl, className }: GalleryProps) {
+export function Gallery({ listingId, title, photos, mediaBaseUrl, placeholder, className }: GalleryProps) {
   const t = useNumbersTranslations("ListingPage.gallery");
   const [track, setTrack] = useState<HTMLUListElement | null>(null);
   const count = photos.length;
@@ -98,10 +100,11 @@ export function Gallery({ listingId, title, photos, mediaBaseUrl, className }: G
   }, []);
 
   if (count === 0 || !mediaBaseUrl) {
+    const jobs = placeholder === "jobs" && count === 0;
     return (
-      <div data-testid="gallery" className={cn("flex aspect-[4/3] flex-col items-center justify-center gap-2 bg-surface-muted text-foreground-muted sm:rounded-lg", className)}>
-        <ImageOff className="size-10" aria-hidden="true" strokeWidth={1.25} />
-        <p className="text-sm">{t("empty")}</p>
+      <div data-testid="gallery" data-placeholder={jobs ? "jobs" : undefined} className={cn("flex aspect-[4/3] flex-col items-center justify-center gap-2 bg-surface-muted text-foreground-muted sm:rounded-lg", jobs && "bg-surface-brand text-structure dark:text-gold-300", className)}>
+        {jobs ? <BriefcaseBusiness className="size-14" aria-hidden="true" strokeWidth={1} /> : <ImageOff className="size-10" aria-hidden="true" strokeWidth={1.25} />}
+        <p className={cn("text-sm", jobs && "text-foreground-muted")}>{t(jobs ? "emptyJobs" : "empty")}</p>
       </div>
     );
   }

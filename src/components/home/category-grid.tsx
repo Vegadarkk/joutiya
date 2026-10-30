@@ -1,13 +1,13 @@
-import { Baby, Building2, Car, Dumbbell, Handshake, Package, PawPrint, Shirt, Smartphone, Sofa, Wheat, Wrench, type LucideIcon } from "lucide-react";
+import { Baby, BriefcaseBusiness, Building2, Car, Dumbbell, Handshake, Package, PawPrint, Shirt, Smartphone, Sofa, Wheat, Wrench, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { CATEGORIES } from "@/config/categories";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { RailScroller } from "./rail-scroller";
 
-// The twelve categories on the home page (design D21), each a small doorway of the logo (pointed
+// The thirteen categories on the home page (design D21), each a small doorway of the logo (pointed
 // arch on a gold threshold) linking to its SEO page /c/{category} (L4). One scrolling row on
-// phones, the whole arcade in one line from xl (twelve labels do not fit a 1024 px row). Below xl
+// phones, the whole arcade in one line from xl (thirteen labels do not fit a 1024 px row). Below xl
 // the tiles share the row width so that part of the next tile always shows at the edge (about 3.5
 // tiles on phones, 6.5 on tablets and small laptops): the row reads as scrollable.
 
@@ -24,6 +24,7 @@ const ICONS: Record<string, LucideIcon> = {
   animaux: PawPrint,
   "materiel-pro": Wrench,
   services: Handshake,
+  emploi: BriefcaseBusiness,
   divers: Package,
 };
 
@@ -52,7 +53,7 @@ export function CategoryGrid({ variant = "grid", className }: CategoryGridProps)
         "flex snap-x gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         rail
           ? "scroll-px-2 ps-2 pe-8 pb-1 [mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)] rtl:[mask-image:linear-gradient(to_left,#000_calc(100%-2.5rem),transparent)]"
-          : "-mx-4 scroll-px-4 px-4 pb-2 sm:-mx-6 sm:scroll-px-6 sm:px-6 xl:mx-0 xl:grid xl:grid-cols-12 xl:overflow-visible xl:px-0",
+          : "-mx-4 scroll-px-4 px-4 pb-2 sm:-mx-6 sm:scroll-px-6 sm:px-6 xl:mx-0 xl:grid xl:grid-cols-13 xl:overflow-visible xl:px-0",
       )}
     >
       {CATEGORIES.map((category) => {

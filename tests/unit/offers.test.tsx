@@ -127,7 +127,7 @@ describe("eligibility", () => {
     expect(offerAllowed({ ...base, subcategoryId: "voitures" })).toBe(true);
   });
 
-  it("refuses donations, examples, sold-out, several prices, no price, services and rentals", () => {
+  it("refuses donations, examples, sold-out, several prices, no price, services, job ads and rentals", () => {
     expect(offerAllowed({ ...base, isDonation: true })).toBe(false);
     expect(offerAllowed({ ...base, example: true })).toBe(false);
     expect(offerAllowed({ ...base, soldOut: true })).toBe(false);
@@ -136,6 +136,7 @@ describe("eligibility", () => {
     expect(offerAllowed({ ...base, price: 0 })).toBe(false);
     expect(offerAllowed({ ...base, subcategoryId: "inconnue" })).toBe(false);
     expect(offerAllowed({ ...base, subcategoryId: "cours" })).toBe(false);
+    expect(offerAllowed({ ...base, subcategoryId: "offres-emploi", price: 6000 })).toBe(false);
     expect(offerAllowed({ ...base, subcategoryId: "location-voitures" })).toBe(false);
     expect(offerAllowed({ ...base, subcategoryId: "location" })).toBe(false);
   });

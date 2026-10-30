@@ -71,6 +71,16 @@ describe("PriceInput", () => {
     expect(render({ value: 400, priceUnit: "night" })).toContain(fr.Listing.fields.per.night);
   });
 
+  it("names a job offer's amount a monthly gross salary, to agree on when left empty", () => {
+    const html = render({ priceOptional: true, priceUnit: "month", priceMode: "salary" });
+    expect(html).toContain(fr.Listing.fields.salary);
+    expect(html).toContain(fr.Listing.fields.salaryToDiscuss);
+    expect(html).toContain(fr.Listing.fields.per.month);
+    expect(html).not.toContain(fr.Listing.fields.toDiscuss);
+    expect(html).not.toContain(`>${fr.Listing.fields.price}<`);
+    expect(render({ priceOptional: true, priceUnit: "month", priceMode: "salary" }, "ar")).toContain(ar.Listing.fields.salaryToDiscuss);
+  });
+
   it("offers the switches the subcategory allows", () => {
     const plain = render({});
     expect(plain.match(/role="switch"/g)?.length).toBe(1);

@@ -84,6 +84,44 @@ describe("assessReadiness", () => {
     expect(codes(rental, PRO).has("subcategoryId")).toBe(false);
   });
 
+  it("keeps job ads to their frame: offers by Pros without photo or salary, seeker ads by individuals without amount, messaging only", () => {
+    const offer = ready({
+      sellerType: "pro",
+      title: "Vendeuse en boutique, Casablanca Maarif",
+      description: "Boutique de prêt-à-porter recrute une vendeuse en CDI, caisse et conseil clientèle, expérience en magasin souhaitée.",
+      categoryId: "emploi",
+      subcategoryId: "offres-emploi",
+      attributes: { "job-contract": "cdi", "job-sector": "commerce-vente", "job-experience": "1-3-ans", "job-mode": "sur-place", "job-location": "maroc" },
+      condition: undefined,
+      price: null,
+      photos: [],
+    });
+    expect(assessReadiness(offer, PRO)).toEqual([]);
+    expect(assessReadiness({ ...offer, price: 4500, photos: [photo] }, PRO)).toEqual([]);
+    expect(codes(offer, INDIVIDUAL).get("subcategoryId")).toEqual(["pro_only"]);
+    expect(codes({ ...offer, isDonation: true }, PRO).get("isDonation")).toEqual(["donation_not_allowed"]);
+    expect(codes({ ...offer, attributes: { "job-contract": "cdi", "job-sector": "commerce-vente", "job-experience": "1-3-ans", "job-mode": "sur-place" } }, PRO).get("attributes.job-location")).toEqual(["criterion_required"]);
+
+    const seeker = ready({
+      title: "Vendeuse expérimentée cherche poste à Casablanca",
+      description: "Cinq ans en boutique de prêt-à-porter, caisse et réassort, disponible immédiatement, français et arabe.",
+      categoryId: "emploi",
+      subcategoryId: "demandes-emploi",
+      attributes: { "job-sector": "commerce-vente", "job-experience": "3-5-ans", "job-mobility": "ville" },
+      condition: undefined,
+      price: null,
+      photos: [],
+    });
+    expect(assessReadiness(seeker, INDIVIDUAL)).toEqual([]);
+    expect(codes(seeker, PRO).get("subcategoryId")).toEqual(["individual_only"]);
+    expect(codes({ ...seeker, price: 4000 }).get("price")).toEqual(["price_not_allowed"]);
+    // A candidate's number never shows, even with the verified badge.
+    expect(codes({ ...seeker, contact: { messaging: true, showPhone: true, whatsapp: true } }, VERIFIED).get("contact.showPhone")).toEqual(["messaging_only"]);
+    expect(codes({ ...seeker, contact: { messaging: true, showPhone: true, whatsapp: true } }, VERIFIED).get("contact.whatsapp")).toEqual(["messaging_only"]);
+    // Photos stay required everywhere else.
+    expect(codes(ready({ photos: [] })).get("photos")).toEqual(["photos_required"]);
+  });
+
   it("validates the attributes with the subcategory criteria: required, invalid, unknown", () => {
     const car = ready({ subcategoryId: "voitures", attributes: { "car-brand": "dacia", model: "Logan", year: 2019, mileage: 85000, fuel: "diesel", gearbox: "manuelle" }, price: 95000, condition: undefined });
     expect(assessReadiness(car, INDIVIDUAL)).toEqual([]);

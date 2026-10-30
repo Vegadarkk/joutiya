@@ -1,6 +1,7 @@
 import "server-only";
 import { randomInt } from "node:crypto";
 import { AggregateField, FieldPath, FieldValue, Timestamp, type DocumentSnapshot } from "firebase-admin/firestore";
+import { subcategoryById } from "@/config/categories";
 import type { ListingPhoto } from "@/lib/contracts/media";
 import { db } from "@/lib/firebase/admin";
 import { LISTING_ID_ALPHABET } from "@/lib/listings/ids";
@@ -195,7 +196,8 @@ export async function detachPhoto(
     if (!listing) return { listing: null, changed: false };
     const photos = listing.photos.filter((item) => item.id !== photoId);
     if (photos.length === listing.photos.length) return { listing, changed: false };
-    if (photos.length === 0 && keepOneStatuses.includes(listing.status)) throw new LastPhotoError();
+    // A live listing keeps one photo, unless its subcategory publishes without any (job ads).
+    if (photos.length === 0 && keepOneStatuses.includes(listing.status) && !(listing.subcategoryId && subcategoryById(listing.subcategoryId)?.photosOptional)) throw new LastPhotoError();
     const version = listing.version + 1;
     const patch: ListingFieldPatch = { photos, version, updatedAt: now };
     updateListingTx(tx, listingId, patch);

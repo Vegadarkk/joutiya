@@ -103,6 +103,23 @@ export interface Subcategory {
    * first message. Listings stay public, with an 18+ notice.
    */
   adultsOnly?: boolean;
+  /**
+   * Reserved to individuals (job-seeker ads, Code du travail art. 491: a person's own ad, never a
+   * Pro's service): refused at publish (`individual_only`) when a Pro account posts it.
+   */
+  individualOnly?: boolean;
+  /**
+   * Contact through the messaging only, whatever the seller's badge (a job seeker's number never
+   * shows): `showPhone` and `whatsapp` refused (`messaging_only`). `adultsOnly` implies it.
+   */
+  messagingOnly?: boolean;
+  /**
+   * What the amount is. "salary": a monthly gross salary (null = « Salaire à convenir »; no price
+   * guide, no offers). "none": no amount at all (the price step is skipped, `price` stays null).
+   */
+  priceMode?: "salary" | "none";
+  /** Photos optional (job ads): no `photos_required`, a placeholder on the card and the page. */
+  photosOptional?: boolean;
 }
 
 export interface Category {
@@ -293,6 +310,16 @@ const FIELDS = {
   "date-variety": { id: "date-variety", type: "select", options: ["mejhoul", "boufeggous", "jihel", "aziza", "bouskri", "najda", "autre"] },
   "spice-type": { id: "spice-type", type: "select", options: ["safran", "ras-el-hanout", "cumin", "paprika", "gingembre", "curcuma", "poivre", "cannelle", "herbes-aromatiques", "autre"] },
   "terroir-type": { id: "terroir-type", type: "select", options: ["couscous-pates", "olives", "conserves-confitures", "the-infusions", "farines-semoules", "autre"] },
+  // Emploi (owner decision of 2026-10-30; Phase 6 frame: ads only, Code du travail art. 491). The
+  // fields stay skills and terms (art. 479 spirit): no age, sex, origin or health.
+  "job-contract": { id: "job-contract", type: "select", options: ["cdi", "cdd", "interim", "stage", "alternance", "freelance", "saisonnier"] },
+  "job-sector": { id: "job-sector", type: "select", options: ["commerce-vente", "restauration-hotellerie", "tourisme-evenementiel", "btp-construction", "industrie-production", "transport-logistique", "administration-secretariat", "comptabilite-finance", "informatique-telecom", "marketing-communication", "sante-paramedical", "education-formation", "securite-gardiennage", "services-domicile", "agriculture-peche", "artisanat", "beaute-bien-etre", "immobilier", "juridique-rh", "centres-appels", "autre"] },
+  "job-experience": { id: "job-experience", type: "select", options: ["debutant", "1-3-ans", "3-5-ans", "plus-5-ans"] },
+  "job-education": { id: "job-education", type: "select", options: ["sans-diplome", "bac", "bac-2", "bac-3", "bac-5", "doctorat"] },
+  "job-mode": { id: "job-mode", type: "select", options: ["sur-place", "hybride", "teletravail"] },
+  "job-location": { id: "job-location", type: "select", options: ["maroc", "etranger"] },
+  "job-time": { id: "job-time", type: "select", options: ["temps-plein", "temps-partiel"] },
+  "job-mobility": { id: "job-mobility", type: "select", options: ["ville", "region", "maroc", "etranger"] },
 } as const satisfies Record<string, FieldDef>;
 
 export type CriterionId = keyof typeof FIELDS;
@@ -482,6 +509,17 @@ const TREE: readonly Category[] = [
     ],
   },
   {
+    // Job ads only (Phase 6 frame, 2026-10-30): offers by KYBC-verified Pros, job-seeker ads by
+    // individuals; nothing matched, ranked by profile or charged to a candidate (Code du travail
+    // art. 477, 480 and 491). An offer's amount is a monthly salary; a seeker ad has none.
+    id: "emploi",
+    sharedFilters: ["job-contract", "job-sector", "job-experience", "job-mode"],
+    subcategories: [
+      { id: "offres-emploi", categoryId: "emploi", proOnly: true, priceOptional: true, priceMode: "salary", priceUnit: "month", photosOptional: true, criteria: [required("job-contract"), required("job-sector"), required("job-experience"), optional("job-education"), required("job-mode"), required("job-location"), optional("job-time"), optional("availability")] },
+      { id: "demandes-emploi", categoryId: "emploi", individualOnly: true, messagingOnly: true, priceOptional: true, priceMode: "none", photosOptional: true, criteria: [required("job-sector"), optional("job-contract"), required("job-experience"), optional("job-education"), required("job-mobility"), optional("availability")] },
+    ],
+  },
+  {
     id: "divers",
     subcategories: [
       { id: "autres", categoryId: "divers", condition: "optional", priceOptional: true, donationAllowed: true, criteria: [] },
@@ -523,6 +561,14 @@ export function subcategoryById(id: string): Subcategory | undefined {
  */
 export function subcategoryAllowsAds(id: string | undefined): boolean {
   return !(id && subcategoryById(id)?.adultsOnly);
+}
+
+/**
+ * Whether listings of the subcategory are contacted through the messaging only (adults-only goods,
+ * job-seeker ads): the phone and WhatsApp switches are refused at publish (`messaging_only`).
+ */
+export function contactMessagingOnly(subcategory: Pick<Subcategory, "adultsOnly" | "messagingOnly"> | undefined): boolean {
+  return Boolean(subcategory?.adultsOnly || subcategory?.messagingOnly);
 }
 
 /** False when the criterion depends on another one whose value does not open it. */

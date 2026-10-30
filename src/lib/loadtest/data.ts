@@ -51,9 +51,9 @@ export function loadtestIds(): { firestore: string[]; indexOnly: string[] } {
   };
 }
 
-/** Subcategories open to an individual without moderator review. */
+/** Subcategories open to an individual without moderator review, with a price and photos (no job ads). */
 export function loadtestSubcategories(): Subcategory[] {
-  return CATEGORIES.flatMap((category) => category.subcategories).filter((sub) => !sub.proOnly && !sub.adultsOnly);
+  return CATEGORIES.flatMap((category) => category.subcategories).filter((sub) => !sub.proOnly && !sub.adultsOnly && !sub.priceMode);
 }
 
 export function loadtestCities(): City[] {

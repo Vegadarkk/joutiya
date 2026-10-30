@@ -1,5 +1,5 @@
 import { z } from "@/lib/zod";
-import { CONDITIONS, criteriaSchema, subcategoryById, type Criterion, type Subcategory } from "@/config/categories";
+import { CONDITIONS, contactMessagingOnly, criteriaSchema, subcategoryById, type Criterion, type Subcategory } from "@/config/categories";
 import { cityBySlug } from "@/config/regions";
 import {
   DESCRIPTION_MAX,
@@ -45,13 +45,24 @@ export function isWizardStep(value: string | undefined): value is WizardStep {
   return value !== undefined && (WIZARD_STEPS as readonly string[]).includes(value);
 }
 
-export function nextStep(step: WizardStep): WizardStep | null {
-  return WIZARD_STEPS[stepIndex(step) + 1] ?? null;
+/**
+ * The steps of a draft: all of them, but for the price step where the subcategory carries no
+ * amount (`priceMode: "none"`, a job-seeker ad). Without a draft, every step.
+ */
+export function wizardSteps(draft?: Pick<DraftLike, "subcategoryId">): readonly WizardStep[] {
+  const subcategory = draft?.subcategoryId ? subcategoryById(draft.subcategoryId) : undefined;
+  return subcategory?.priceMode === "none" ? WIZARD_STEPS.filter((step) => step !== "prix") : WIZARD_STEPS;
 }
 
-export function previousStep(step: WizardStep): WizardStep | null {
-  const index = stepIndex(step);
-  return index > 0 ? (WIZARD_STEPS[index - 1] ?? null) : null;
+export function nextStep(step: WizardStep, draft?: Pick<DraftLike, "subcategoryId">): WizardStep | null {
+  const steps = wizardSteps(draft);
+  return steps[steps.indexOf(step) + 1] ?? null;
+}
+
+export function previousStep(step: WizardStep, draft?: Pick<DraftLike, "subcategoryId">): WizardStep | null {
+  const steps = wizardSteps(draft);
+  const index = steps.indexOf(step);
+  return index > 0 ? (steps[index - 1] ?? null) : null;
 }
 
 /** The step a listing field belongs to (FieldIssue.path -> step), for the blocker jump links. */
@@ -116,9 +127,14 @@ export function criteriaStepSchema(subcategoryId: string | null, sellerType: Own
 export const titleStepSchema = z.object({ title: titleSchema });
 export const descriptionStepSchema = z.object({ description: descriptionSchema });
 
-/** At least one photo (the server's `photos_required`), at most the seller's quota. */
-export function photosStepSchema(maxPhotos: number = MAX_PHOTOS_PRO) {
-  return z.object({ photos: z.array(z.string()).min(1).max(maxPhotos) });
+/** At least one photo (the server's `photos_required`; none for a job ad), at most the seller's quota. */
+export function photosStepSchema(maxPhotos: number = MAX_PHOTOS_PRO, minPhotos = 1) {
+  return z.object({ photos: z.array(z.string()).min(minPhotos).max(maxPhotos) });
+}
+
+/** Whether the subcategory of `draft` publishes without a photo (job ads). */
+function photosOptional(draft: Pick<DraftLike, "subcategoryId">): boolean {
+  return Boolean(draft.subcategoryId && subcategoryById(draft.subcategoryId)?.photosOptional);
 }
 
 /** Price rules (D4, server readiness): null only as a donation or "à discuter"; an amount is at least 1 DH. */
@@ -129,6 +145,11 @@ export function priceStepSchema(subcategoryId: string | null) {
     .superRefine((data, ctx) => {
       if (data.isDonation) {
         if (subcategory && !subcategory.donationAllowed) ctx.addIssue({ code: "custom", path: ["isDonation"], message: "donation_not_allowed" });
+        return;
+      }
+      // A job-seeker ad carries no amount (readiness `price_not_allowed`).
+      if (subcategory?.priceMode === "none" && data.price !== null) {
+        ctx.addIssue({ code: "custom", path: ["price"], message: "price_not_allowed" });
         return;
       }
       if (data.price === null) {
@@ -262,7 +283,7 @@ export function stepIssues(step: WizardStep, draft: DraftLike, options: IssueOpt
     case "description":
       return toIssues(descriptionStepSchema.safeParse(values), values);
     case "photos":
-      return toIssues(photosStepSchema(options.maxPhotos).safeParse(values), values);
+      return toIssues(photosStepSchema(options.maxPhotos, photosOptional(draft) ? 0 : 1).safeParse(values), values);
     case "prix":
       return toIssues(priceStepSchema(draft.subcategoryId).safeParse(values), values);
     case "lieu":
@@ -276,8 +297,8 @@ export function stepIssues(step: WizardStep, draft: DraftLike, options: IssueOpt
 
 function phoneIssues(draft: DraftLike, options: IssueOptions): FieldIssue[] {
   const issues: FieldIssue[] = [];
-  // Adults-only goods (screen.ts checkContact): messaging only, whatever the badge.
-  if (draft.subcategoryId && subcategoryById(draft.subcategoryId)?.adultsOnly) {
+  // Adults-only goods and job-seeker ads (screen.ts checkContact): messaging only, whatever the badge.
+  if (draft.subcategoryId && contactMessagingOnly(subcategoryById(draft.subcategoryId))) {
     if (draft.contact.showPhone) issues.push({ path: "contact.showPhone", code: "messaging_only" });
     if (draft.contact.whatsapp) issues.push({ path: "contact.whatsapp", code: "messaging_only" });
     return issues;
@@ -337,12 +358,12 @@ function isStepTouched(step: WizardStep, draft: DraftLike): boolean {
 
 /** Every issue of the listing with the step it belongs to (the review step's checklist). */
 export function allIssues(draft: DraftLike, options: IssueOptions = {}): (FieldIssue & { step: WizardStep })[] {
-  return WIZARD_STEPS.flatMap((step) => stepIssues(step, draft, options).map((issue) => ({ ...issue, step })));
+  return wizardSteps(draft).flatMap((step) => stepIssues(step, draft, options).map((issue) => ({ ...issue, step })));
 }
 
 /** Where to resume: the first step with an issue, else the review step. */
 export function firstIncompleteStep(draft: DraftLike, options: IssueOptions = {}): WizardStep {
-  for (const step of WIZARD_STEPS) {
+  for (const step of wizardSteps(draft)) {
     if (step === "apercu") break;
     if (stepIssues(step, draft, options).length > 0) return step;
   }

@@ -244,6 +244,58 @@ describe("page content", () => {
     expect(html).not.toContain('data-testid="listing-status"');
   });
 
+  it("shows a job offer with its salary wording, the host's notice, the job safety tips and a briefcase where photos would be", async () => {
+    repo.getListing.mockResolvedValue(
+      record("published", {
+        sellerType: "pro",
+        title: "Vendeuse en boutique",
+        categoryId: "emploi",
+        subcategoryId: "offres-emploi",
+        attributes: { "job-contract": "cdi", "job-sector": "commerce-vente", "job-experience": "1-3-ans", "job-mode": "sur-place", "job-location": "etranger" },
+        condition: undefined,
+        price: null,
+        priceNegotiable: false,
+        photos: [],
+      }),
+    );
+    const html = await renderPage();
+    // « Salaire à convenir » stands alone: the « Salaire mensuel brut » label sits above an amount only.
+    expect(html).toContain(fr.ListingCard.salaryToDiscuss);
+    expect(html).not.toContain(fr.ListingPage.salary.label);
+    expect(html).not.toContain(fr.ListingCard.toDiscuss);
+    expect(html).toContain('data-testid="job-notice" data-kind="offer"');
+    expect(html).toContain('data-testid="job-abroad-notice"');
+    expect(html).toContain(fr.ListingPage.safety.tips.noFees);
+    expect(html).not.toContain(fr.ListingPage.safety.tips.noAdvance);
+    expect(html).toContain('data-testid="gallery" data-placeholder="jobs"');
+    expect(html).toContain(fr.ListingPage.gallery.emptyJobs);
+    // The contact bar offers the message only: no visit, test drive, booking or price offer.
+    expect(html).toContain('data-testid="contact-bar"');
+    expect(html).not.toContain('data-testid="contact-bar-action"');
+    expect(html).toContain('href="/fr/c/emploi"');
+  });
+
+  it("shows no amount at all on a job-seeker ad", async () => {
+    repo.getListing.mockResolvedValue(
+      record("published", {
+        title: "Vendeuse expérimentée cherche poste",
+        categoryId: "emploi",
+        subcategoryId: "demandes-emploi",
+        attributes: { "job-sector": "commerce-vente", "job-experience": "3-5-ans", "job-mobility": "ville" },
+        condition: undefined,
+        price: null,
+        priceNegotiable: false,
+        contact: { messaging: true, showPhone: false, whatsapp: false },
+      }),
+    );
+    const html = await renderPage();
+    expect(html).not.toContain('data-testid="price-tag"');
+    expect(html).not.toContain(fr.ListingCard.toDiscuss);
+    expect(html).toContain('data-testid="job-notice" data-kind="seeker"');
+    expect(html).not.toContain('data-testid="job-abroad-notice"');
+    expect(html).toContain(fr.ListingPage.jobs.seeker.contact.replace(/'/g, "&#x27;"));
+  });
+
   it("keeps the description's line breaks as plain, escaped text", async () => {
     repo.getListing.mockResolvedValue(record());
     const html = await renderPage();

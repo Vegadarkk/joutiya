@@ -116,6 +116,37 @@ describe("screenListing: hard blockers", () => {
   });
 });
 
+describe("screenListing: job ads (Phase 6 frame)", () => {
+  const seeker = (overrides: Partial<ScreenInput> = {}) =>
+    cleanListing({
+      title: "Vendeuse expérimentée cherche poste à Casablanca",
+      description: "Cinq ans en boutique de prêt-à-porter, caisse et réassort, disponible immédiatement, français et arabe.",
+      attributes: { "job-sector": "commerce-vente", "job-experience": "3-5-ans", "job-mobility": "ville" },
+      categoryId: "emploi",
+      subcategoryId: "demandes-emploi",
+      price: null,
+      contact: { showPhone: false, whatsapp: false },
+      ...overrides,
+    });
+
+  it("keeps a job-seeker ad to the messaging and without an amount, whatever the badge", () => {
+    expect(codes(seeker())).toEqual([]);
+    expect(codes(seeker({ contact: { showPhone: true, whatsapp: true } }))).toEqual(["contact.showPhone:messaging_only", "contact.whatsapp:messaging_only"]);
+    expect(codes(seeker({ price: 4000 }))).toEqual(["price:not_allowed"]);
+  });
+
+  it("takes a job offer without a salary", () => {
+    const offer = seeker({
+      title: "Vendeuse en boutique, Casablanca Maarif",
+      description: "Boutique de prêt-à-porter recrute une vendeuse, CDI, caisse et conseil clientèle, expérience en magasin souhaitée.",
+      attributes: { "job-contract": "cdi", "job-sector": "commerce-vente", "job-experience": "1-3-ans", "job-mode": "sur-place", "job-location": "maroc" },
+      subcategoryId: "offres-emploi",
+    });
+    expect(codes(offer)).toEqual([]);
+    expect(codes({ ...offer, price: 4000 })).toEqual([]);
+  });
+});
+
 describe("screenListing: adults-only subcategory (decorative koumiyas)", () => {
   const koumiya = (overrides: Partial<ScreenInput> = {}) =>
     cleanListing({

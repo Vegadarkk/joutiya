@@ -1,4 +1,4 @@
-import { criteriaSchema, criterionApplies, subcategoryById, type Subcategory } from "@/config/categories";
+import { contactMessagingOnly, criteriaSchema, criterionApplies, subcategoryById, type Subcategory } from "@/config/categories";
 import { listingQuotas, type Seller } from "@/config/pricing";
 import { cityBySlug } from "@/config/regions";
 import { SOLDES_PATTERN, isVariantCriterion, withVariantAnswers } from "@/lib/contracts/catalog";
@@ -21,6 +21,7 @@ export const READINESS_CODES = [
   "subcategory_required",
   "subcategory_mismatch",
   "pro_only",
+  "individual_only",
   "criterion_pro_only",
   "criterion_required",
   "criterion_invalid",
@@ -28,6 +29,7 @@ export const READINESS_CODES = [
   "condition_required",
   "price_required",
   "price_invalid",
+  "price_not_allowed",
   "deposit_max",
   "rental_rate_max",
   "donation_not_allowed",
@@ -84,6 +86,7 @@ function treeIssues(listing: Candidate, seller: Seller): { issues: FieldIssue[];
   }
   if (listing.categoryId && subcategory.categoryId !== listing.categoryId) issues.push(issue("subcategoryId", "subcategory_mismatch"));
   if (subcategory.proOnly && seller.type !== "pro") issues.push(issue("subcategoryId", "pro_only"));
+  if (subcategory.individualOnly && seller.type === "pro") issues.push(issue("subcategoryId", "individual_only"));
   return { issues, subcategory };
 }
 
@@ -146,6 +149,11 @@ function priceIssues(listing: Candidate, subcategory: Subcategory): FieldIssue[]
     if (listing.price !== null && listing.price !== 0) issues.push(issue("price", "donation_price"));
     return issues;
   }
+  // A job-seeker ad carries no amount at all (never a price on a person, art. 480 spirit).
+  if (subcategory.priceMode === "none" && listing.price !== null) {
+    issues.push(issue("price", "price_not_allowed"));
+    return issues;
+  }
   if (listing.price === null) {
     if (!subcategory.priceOptional) issues.push(issue("price", "price_required"));
   } else if (listing.price < 1) {
@@ -185,10 +193,12 @@ export function assessReadiness(listing: Candidate, facts: SellerFacts): FieldIs
   }
   issues.push(...locationIssues(listing));
   const quotas = listingQuotas(facts.seller);
-  if (listing.photos.length === 0) issues.push(issue("photos", "photos_required"));
-  else if (listing.photos.length > quotas.photosPerListing) issues.push(issue("photos", "photos_max"));
-  if (tree.subcategory?.adultsOnly) {
-    // Adults-only goods: messaging only (the buyer's 18+ confirmation is asked there).
+  // Job ads may go without a photo (a logo is optional); every other listing needs one.
+  if (listing.photos.length === 0) {
+    if (!tree.subcategory?.photosOptional) issues.push(issue("photos", "photos_required"));
+  } else if (listing.photos.length > quotas.photosPerListing) issues.push(issue("photos", "photos_max"));
+  if (contactMessagingOnly(tree.subcategory)) {
+    // Adults-only goods (the buyer's 18+ confirmation is asked there) and job-seeker ads: messaging only.
     if (listing.contact.showPhone) issues.push(issue("contact.showPhone", "messaging_only"));
     if (listing.contact.whatsapp) issues.push(issue("contact.whatsapp", "messaging_only"));
   } else if ((listing.contact.showPhone || listing.contact.whatsapp) && !facts.phoneVerified) {

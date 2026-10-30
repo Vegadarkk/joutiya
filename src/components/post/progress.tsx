@@ -10,6 +10,10 @@ import { useStepLabel } from "./field-messages";
 
 interface StepProgressProps {
   current: WizardStep;
+  /** The steps shown, in order: every step by default (a job-seeker ad has no price step). */
+  steps?: readonly WizardStep[];
+  /** Names overriding the step labels (the price step of a job offer reads "Salaire"). */
+  labels?: Partial<Record<WizardStep, string>>;
   states: Record<WizardStep, StepState>;
   /** Jump to a step (only steps already reached are links). */
   onSelect: (step: WizardStep) => void;
@@ -23,17 +27,18 @@ interface StepProgressProps {
  * the named list (nine 44 px targets do not fit side by side at 360 px); wide screens always show
  * the list.
  */
-export function StepProgress({ current, states, onSelect, reachable }: StepProgressProps) {
+export function StepProgress({ current, steps = WIZARD_STEPS, labels, states, onSelect, reachable }: StepProgressProps) {
   const t = useTranslations("Listing.wizard");
-  const label = useStepLabel();
+  const stepLabel = useStepLabel();
+  const label = (step: WizardStep) => labels?.[step] ?? stepLabel(step);
   const listId = useId();
-  const currentIndex = WIZARD_STEPS.indexOf(current);
+  const currentIndex = steps.indexOf(current);
   // Open for the step it was unfolded on: reaching another step folds it again.
   const [openOn, setOpenOn] = useState<WizardStep | null>(null);
   const open = openOn === current;
   // A step ahead of the current one with nothing missing was prefilled (the contact step from the
   // account's choices): shown as such, not as done, until the person has passed it (UX audit, 16).
-  const prefilled = (step: WizardStep) => states[step] === "complete" && WIZARD_STEPS.indexOf(step) > currentIndex;
+  const prefilled = (step: WizardStep) => states[step] === "complete" && steps.indexOf(step) > currentIndex;
   const status = (step: WizardStep) =>
     step === current ? t("stepCurrent") : prefilled(step) ? t("stepPrefilled") : states[step] === "complete" ? t("stepDone") : states[step] === "incomplete" ? t("stepIncomplete") : t("stepTodo");
 
@@ -47,11 +52,11 @@ export function StepProgress({ current, states, onSelect, reachable }: StepProgr
         className="group -mx-2 flex min-h-11 flex-col justify-center gap-3 rounded-md px-2 py-1.5 text-start lg:hidden"
       >
         <span className="flex w-full items-center justify-between gap-3 text-sm font-medium text-foreground-muted">
-          {t("stepOf", { current: currentIndex + 1, total: WIZARD_STEPS.length })}
+          {t("stepOf", { current: currentIndex + 1, total: steps.length })}
           <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-150 ease-door group-hover:text-foreground", open && "rotate-180")} aria-hidden="true" />
         </span>
         <span className="flex w-full gap-1" aria-hidden="true">
-          {WIZARD_STEPS.map((step, index) => {
+          {steps.map((step, index) => {
             const isCurrent = step === current;
             const state = states[step];
             return (
@@ -69,7 +74,7 @@ export function StepProgress({ current, states, onSelect, reachable }: StepProgr
       </button>
 
       <ol id={listId} className={cn("flex-col gap-1 lg:flex", open ? "flex" : "hidden")}>
-        {WIZARD_STEPS.map((step, index) => {
+        {steps.map((step, index) => {
           const isCurrent = step === current;
           const state = states[step];
           const can = reachable(step) && !isCurrent;

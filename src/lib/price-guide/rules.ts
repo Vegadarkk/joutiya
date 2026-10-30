@@ -36,7 +36,7 @@ export type PriceGuideScope = (typeof PRICE_GUIDE_SCOPES)[number];
  * (sold by weight or volume), wholesale lots and livestock (prices per lot), the catch-all
  * subcategory, holiday rentals (per night) and adults-only goods.
  */
-const EXCLUDED_CATEGORIES: ReadonlySet<string> = new Set(["services", "terroir"]);
+const EXCLUDED_CATEGORIES: ReadonlySet<string> = new Set(["services", "terroir", "emploi"]);
 const EXCLUDED_SUBCATEGORIES: ReadonlySet<string> = new Set(["autres", "stocks-gros", "betail-moutons"]);
 
 /** How a criterion narrows the comparables. */

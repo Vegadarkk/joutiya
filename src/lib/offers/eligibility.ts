@@ -14,14 +14,17 @@ export interface OfferListing {
   severalPrices?: boolean;
 }
 
+/** Categories whose amount is not a price to bargain on: services, job ads (a salary). */
+const NO_OFFER_CATEGORIES: ReadonlySet<string> = new Set(["services", "emploi"]);
+
 /**
  * A listing takes offers: a price, not a donation, not an example, not sold out, one price, and a
- * subcategory of goods (no services, no rental: a price per day, month or night).
+ * subcategory of goods (no services, no job ad, no rental: a price per day, month or night).
  */
 export function offerAllowed(listing: OfferListing): boolean {
   if (listing.isDonation || listing.example || listing.soldOut || listing.severalPrices) return false;
   if (listing.price === null || listing.price <= 0) return false;
   const subcategory = subcategoryById(listing.subcategoryId);
-  if (!subcategory || subcategory.categoryId === "services" || subcategory.priceUnit) return false;
+  if (!subcategory || NO_OFFER_CATEGORIES.has(subcategory.categoryId) || subcategory.priceUnit) return false;
   return true;
 }

@@ -8,6 +8,7 @@ import { Container } from "@/components/layout/container";
 import { AdSlot } from "@/components/ads/ad-slot";
 import { Breadcrumb, landingHref } from "@/components/listing/breadcrumb";
 import { ContactBar } from "@/components/listing/contact-bar";
+import { JobNotice } from "@/components/listing/job-notice";
 import { CriteriaSection } from "@/components/listing/criteria-grid";
 import { PROPERTY_TERM_FIELDS, PropertyTerms } from "@/components/listing/property-terms";
 import { VehicleBuyingGuide } from "@/components/listing/vehicle-buying-guide";
@@ -204,6 +205,10 @@ export default async function ListingPage({ params }: { params: Params }) {
   const published = listing.state === "published";
   // Real estate: the mandate and fees under the price, a visit request, property safety tips.
   const realEstate = listing.categoryId === "immobilier";
+  // Job ads (Phase 6 frame): the host's notice under the criteria, job safety tips, a briefcase
+  // where a photo would be (photos are optional), the salary wording on offers, no amount on a
+  // job-seeker ad.
+  const jobs = listing.categoryId === "emploi";
   // An example listing (src/lib/demo) shows the page of an offer without being one: no contact, no
   // favorite, no Product markup.
   const contactable = published && !listing.example;
@@ -275,7 +280,7 @@ export default async function ListingPage({ params }: { params: Params }) {
             and the body take the left one. On phones the four blocks stack in DOM order. */}
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-x-10 lg:gap-y-6 lg:[grid-template-areas:'gallery_header'_'gallery_aside'_'body_aside'] xl:grid-cols-[minmax(0,1fr)_24rem]">
           <div className="-mx-4 sm:mx-0 lg:[grid-area:gallery]">
-            <Gallery listingId={listing.id} title={listing.title} photos={listing.photos} mediaBaseUrl={media} />
+            <Gallery listingId={listing.id} title={listing.title} photos={listing.photos} mediaBaseUrl={media} placeholder={jobs ? "jobs" : undefined} />
           </div>
 
           <header className="flex min-w-0 flex-col gap-3 lg:[grid-area:header]">
@@ -288,6 +293,7 @@ export default async function ListingPage({ params }: { params: Params }) {
               isDonation={listing.isDonation}
               negotiable={listing.priceNegotiable}
               unit={subcategory?.priceUnit}
+              mode={subcategory?.priceMode}
               locale={locale}
               promo={published ? (listing.catalogue?.promo ?? null) : null}
               renderedAt={renderedAt}
@@ -359,6 +365,7 @@ export default async function ListingPage({ params }: { params: Params }) {
 
           <div className="flex min-w-0 flex-col gap-10 lg:[grid-area:body]">
             <CriteriaSection title={t("criteriaTitle")} subcategoryId={listing.subcategoryId} attributes={listing.attributes} condition={listing.condition} exclude={realEstate ? PROPERTY_TERM_FIELDS : undefined} />
+            {jobs ? <JobNotice subcategoryId={listing.subcategoryId} attributes={listing.attributes} /> : null}
             <VehicleDossier subcategoryId={listing.subcategoryId} attributes={listing.attributes} />
             <RentalTerms subcategoryId={listing.subcategoryId} attributes={listing.attributes} locale={locale} />
             {listing.rental ? <ListingAvailability rental={listing.rental} locale={locale} unit={datedRental(listing.subcategoryId)?.unit} /> : null}
@@ -392,7 +399,7 @@ export default async function ListingPage({ params }: { params: Params }) {
             <div id="signaler" className="scroll-mt-24">
               <ReportButton target={{ type: "listing", id: listing.id }} subject={listing.title} ownerPublicId={listing.seller.publicId} email={legal.dsaContactEmail} url={canonicalUrl} />
             </div>
-            <SafetyTips variant={realEstate ? "realEstate" : "goods"} />
+            <SafetyTips variant={jobs ? "jobs" : realEstate ? "realEstate" : "goods"} />
             <AdSlot placement="listing-bottom" eligible={found.adsEligible} promos={availablePromos(flags)} seed={listing.id} />
           </div>
         </div>

@@ -16,6 +16,7 @@ export async function mapListingLabels(locale: Locale): Promise<MapListingLabels
   return {
     donation: card("donation"),
     toDiscuss: card("toDiscuss"),
+    salaryToDiscuss: card("salaryToDiscuss"),
     today: own("today"),
     per: (unit) => card(`per.${unit}`),
     pinPer: (unit) => units(unit),

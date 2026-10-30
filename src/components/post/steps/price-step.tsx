@@ -43,6 +43,7 @@ export function PriceStep({ onNext }: { onNext: () => void }) {
         donationAllowed={Boolean(subcategory?.donationAllowed)}
         priceOptional={Boolean(subcategory?.priceOptional)}
         priceUnit={subcategory?.priceUnit}
+        priceMode={subcategory?.priceMode}
         error={error}
         onBlur={() => void flush()}
       />

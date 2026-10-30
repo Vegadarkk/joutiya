@@ -1,4 +1,4 @@
-import { HandCoins, ShieldAlert, Store, Users } from "lucide-react";
+import { HandCoins, IdCard, Plane, ShieldAlert, Store, Users } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { textLinkClassName } from "@/components/ui/text-link";
 import { Link } from "@/i18n/navigation";
@@ -20,6 +20,14 @@ const TIPS = {
     { key: "visitFirst", icon: Users },
     { key: "checkTitle", icon: Store },
     { key: "noCodes", icon: ShieldAlert },
+  ],
+  // Job ads (Phase 6 frame, rule 10): the scam is a fee asked from the candidate (dossier,
+  // training, visa), or identity papers collected before any contract.
+  jobs: [
+    { key: "noFees", icon: HandCoins },
+    { key: "checkEmployer", icon: Store },
+    { key: "abroad", icon: Plane },
+    { key: "noDocuments", icon: IdCard },
   ],
 } as const;
 

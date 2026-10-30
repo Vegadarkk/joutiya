@@ -1976,6 +1976,33 @@ export const DEMO_ENTRIES: readonly DemoEntry[] = [
     attributes: {},
     photos: ["9105966"],
   },
+  // ---- Emploi: a Pro's offer and a job seeker's ad (photos optional on both, none here).
+  {
+    key: "job-conseiller-immo",
+    sub: "offres-emploi",
+    seller: "dar-saada",
+    city: "marrakech",
+    days: 2,
+    title: "Conseiller(ère) immobilier, agence de Guéliz",
+    description:
+      "Dar Saâda Immobilier recrute un conseiller ou une conseillère pour son agence de Guéliz : prospection, visites, négociation et suivi des dossiers de vente et de location jusqu'à la signature. Deux ans d'expérience minimum dans l'immobilier ou la vente, permis B, arabe et français courants, anglais apprécié. CDI à temps plein, fixe de 5 000 DH brut par mois plus commissions sur chaque transaction, mutuelle et téléphone fournis. Poste à pourvoir immédiatement.",
+    price: 5000,
+    attributes: { "job-contract": "cdi", "job-sector": "immobilier", "job-experience": "1-3-ans", "job-education": "bac-2", "job-mode": "sur-place", "job-location": "maroc", "job-time": "temps-plein", availability: "immediate" },
+    photos: [],
+  },
+  {
+    key: "job-receptionniste",
+    sub: "demandes-emploi",
+    seller: "imane",
+    city: "agadir",
+    days: 4,
+    title: "Réceptionniste trilingue cherche poste en hôtellerie",
+    description:
+      "Diplômée d'un bac+2 en gestion hôtelière, trois ans d'expérience à la réception d'hôtels quatre étoiles à Agadir et Taghazout : accueil, réservations, facturation et gestion des réclamations. Arabe, français et anglais courants, bases d'allemand. Disponible immédiatement pour un CDI ou une saison, à Agadir ou dans la région.",
+    price: null,
+    attributes: { "job-sector": "restauration-hotellerie", "job-contract": "cdi", "job-experience": "3-5-ans", "job-education": "bac-2", "job-mobility": "region", availability: "immediate" },
+    photos: [],
+  },
   // Brands visitors look for first (owner, 2026-10-28).
   {
     key: "car-tesla3",

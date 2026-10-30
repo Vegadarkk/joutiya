@@ -32,12 +32,12 @@ describe("demo catalog", () => {
     for (const region of REGIONS) expect(regions.has(region.code), region.code).toBe(true);
   });
 
-  it("has unique keys, known sellers, one photo at least, and no contact details in the texts", () => {
+  it("has unique keys, known sellers, one photo at least (a job ad apart), and no contact details in the texts", () => {
     expect(new Set(DEMO_ENTRIES.map((entry) => entry.key)).size).toBe(DEMO_ENTRIES.length);
     const sellers = new Set(DEMO_SELLERS.map((seller) => seller.key));
     for (const entry of DEMO_ENTRIES) {
       expect(sellers.has(entry.seller), entry.key).toBe(true);
-      expect(entry.photos.length, entry.key).toBeGreaterThan(0);
+      if (!subcategoryById(entry.sub)?.photosOptional) expect(entry.photos.length, entry.key).toBeGreaterThan(0);
       expect(`${entry.title} ${entry.description}`, entry.key).not.toMatch(/(?:\+212|\b0[5-7])\d{8}|@|https?:|www\./);
     }
   });
@@ -52,6 +52,8 @@ describe("demo catalog", () => {
       if (entry.price === null) expect(Boolean(sub.priceOptional || (entry.donation && sub.donationAllowed)), entry.key).toBe(true);
       if (entry.donation) expect(sub.donationAllowed, entry.key).toBe(true);
       if (sub.proOnly) expect(pros.has(entry.seller), entry.key).toBe(true);
+      if (sub.individualOnly) expect(pros.has(entry.seller), entry.key).toBe(false);
+      if (sub.priceMode === "none") expect(entry.price, entry.key).toBeNull();
     }
   });
 });

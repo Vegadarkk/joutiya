@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Camera, ImageOff } from "lucide-react";
+import { BriefcaseBusiness, Camera, ImageOff } from "lucide-react";
 import { rentalFragment } from "@/components/rental/rental-day";
 import { BoostBadge } from "@/components/search/boost-badge";
 import type { CardBadge } from "@/components/search/filter-model";
@@ -58,7 +58,11 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
   const t = useNumbersTranslations("ListingCard");
   const Heading = headingLevel;
   const city = listing.citySlug ? cityBySlug(listing.citySlug) : undefined;
-  const unit = listing.subcategoryId ? subcategoryById(listing.subcategoryId)?.priceUnit : undefined;
+  const subcategory = listing.subcategoryId ? subcategoryById(listing.subcategoryId) : undefined;
+  const unit = subcategory?.priceUnit;
+  // A job ad (photos optional) without a photo shows a briefcase, not a missing picture.
+  const jobs = subcategory?.categoryId === "emploi";
+  const NoPhoto = jobs ? BriefcaseBusiness : ImageOff;
   const sources = listing.photo ? photoSources(mediaBaseUrl, listing.id, listing.photo, "s") : null;
   const placeholder = blurhashPlaceholder(listing.photo?.blurhash);
   // Only the facts the messages can say (a category may add one before its wording lands).
@@ -83,17 +87,20 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
           {facts.map((fact) => t(`facts.${fact.id as FactKey}`, { count: fact.value })).join(" · ")}
         </p>
       ) : null}
-      <PriceTag
-        price={promo ? promo.price : listing.price}
-        isDonation={listing.isDonation}
-        negotiable={listing.priceNegotiable}
-        unit={unit}
-        locale={locale}
-        from={listing.priceFrom === true}
-        promo={promo !== undefined}
-        before={promo?.reference ?? null}
-        className={cn(listing.soldOut && "text-foreground-muted")}
-      />
+      {subcategory?.priceMode === "none" ? null : (
+        <PriceTag
+          price={promo ? promo.price : listing.price}
+          isDonation={listing.isDonation}
+          negotiable={listing.priceNegotiable}
+          unit={unit}
+          mode={subcategory?.priceMode}
+          locale={locale}
+          from={listing.priceFrom === true}
+          promo={promo !== undefined}
+          before={promo?.reference ?? null}
+          className={cn(listing.soldOut && "text-foreground-muted")}
+        />
+      )}
       {listing.rental ? (
         <p data-testid="card-rental" className="flex flex-col text-xs tabular-nums">
           {listing.rental.total !== null ? <span className="font-medium">{t(datedRental(listing.subcategoryId)?.unit === "night" ? "rentalTotalNights" : "rentalTotal", { days: listing.rental.days, total: formatPrice(listing.rental.total, locale) })}</span> : null}
@@ -139,8 +146,8 @@ export function ListingCard({ listing, mediaBaseUrl, locale, headingLevel = "h3"
           />
         ) : (
           <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-foreground-muted">
-            <ImageOff className="size-6" aria-hidden="true" strokeWidth={1.5} />
-            <span className="text-xs">{t("noPhoto")}</span>
+            <NoPhoto className={jobs ? "size-8" : "size-6"} aria-hidden="true" strokeWidth={1.5} />
+            {jobs ? null : <span className="text-xs">{t("noPhoto")}</span>}
           </span>
         )}
         {listing.photoCount > 1 ? (

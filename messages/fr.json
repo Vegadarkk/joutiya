@@ -738,6 +738,7 @@
       "description": "Description",
       "photos": "Photos",
       "prix": "Prix",
+      "salaire": "Salaire",
       "lieu": "Lieu",
       "contact": "Contact",
       "apercu": "Aperçu et publication"
@@ -749,6 +750,7 @@
       "description": "Décrivez l'état, l'usage et ce qui est inclus. Plus c'est précis, moins vous recevez de questions.",
       "photos": "Des photos nettes, à la lumière du jour, sous plusieurs angles. La première est la couverture.",
       "prix": "Un prix juste se vend vite. Regardez les annonces similaires pour vous situer.",
+      "salaire": "Indiquez le salaire mensuel brut, ou laissez-le à convenir. Un salaire affiché attire plus de candidatures.",
       "lieu": "Votre ville suffit : votre adresse n'est jamais demandée ni affichée.",
       "contact": "Les acheteurs vous écrivent par la messagerie Aalan. Vous choisissez d'afficher aussi votre numéro.",
       "apercu": "Relisez votre annonce avant de la publier."
@@ -761,6 +763,8 @@
       "proOnly": "Réservé aux comptes Pro",
       "proOnlyBody": "Cette sous-catégorie est réservée aux comptes Pro : une boutique ou une agence vérifiée.",
       "proOnlyLink": "Découvrir l'espace Pro",
+      "individualOnly": "Réservé aux particuliers",
+      "individualOnlyBody": "Une demande d'emploi est publiée par la personne qui cherche un poste, avec un compte particulier. Un compte Pro publie des offres d'emploi.",
       "resetWarning": "Changer de sous-catégorie efface les critères déjà saisis."
     },
     "fields": {
@@ -792,6 +796,11 @@
       "donationHint": "L'annonce affiche « Don » et aucun prix.",
       "toDiscuss": "Prix à discuter",
       "toDiscussHint": "L'annonce affiche « À discuter » au lieu d'un montant.",
+      "salary": "Salaire mensuel brut",
+      "salaryHint": "En dirhams par mois, avant retenues. Facultatif.",
+      "salaryPlaceholder": "4 000",
+      "salaryToDiscuss": "Salaire à convenir",
+      "salaryToDiscussHint": "L'annonce affiche « Salaire à convenir » au lieu d'un montant.",
       "city": "Ville",
       "cityPlaceholder": "Tapez le nom de votre ville",
       "citySearch": "Rechercher une ville",
@@ -816,7 +825,8 @@
       "verifyBody": "Vérifiez votre numéro pour l'afficher sur l'annonce ou proposer WhatsApp. Votre brouillon est conservé.",
       "verifySoon": "Afficher votre numéro ou proposer WhatsApp demande un numéro vérifié. Cette vérification n'est pas encore ouverte : en attendant, les acheteurs vous écrivent par la messagerie Aalan.",
       "revealNote": "Votre numéro n'apparaît jamais en clair sur la page : il faut être connecté et cliquer pour le voir.",
-      "messagingOnly": "Dans cette catégorie réservée aux majeurs, les acheteurs vous contactent uniquement par la messagerie Aalan : le téléphone et WhatsApp ne peuvent pas être affichés."
+      "messagingOnly": "Dans cette catégorie réservée aux majeurs, les acheteurs vous contactent uniquement par la messagerie Aalan : le téléphone et WhatsApp ne peuvent pas être affichés.",
+      "messagingOnlyPrivate": "Dans cette catégorie, les personnes intéressées vous écrivent uniquement par la messagerie Aalan : votre téléphone et WhatsApp ne sont jamais affichés."
     },
     "photos": {
       "add": "Ajouter des photos",
@@ -852,6 +862,7 @@
       "full": "Vous avez atteint le nombre maximal de photos.",
       "reorderHelp": "Faites glisser une photo, ou utilisez les flèches de chaque photo, pour changer l'ordre.",
       "noPhotoWarning": "Ajoutez au moins une photo pour publier : avec plusieurs photos, une annonce reçoit bien plus de contacts.",
+      "optionalHint": "Les photos sont facultatives pour une annonce d'emploi. Un logo ou une photo des locaux rassure les candidats.",
       "photoAlt": "Photo {index}",
       "pending": "Des photos sont encore en cours d'envoi.",
       "list": "Photos de l'annonce",
@@ -901,6 +912,7 @@
       "negotiable": "Négociable",
       "donation": "Don",
       "toDiscuss": "À discuter",
+      "salaryToDiscuss": "Salaire à convenir",
       "declarations": "Avant de publier",
       "acceptRules": "Je confirme que mon annonce respecte les <cgu>conditions générales d'utilisation</cgu> et la liste des <interdits>objets et services interdits</interdits>, et qu'elle ne contient ni coordonnées ni données d'autres personnes.",
       "hostNote": "Aalan héberge les annonces de ses utilisateurs : elle n'est ni vendeur ni acheteur.",
@@ -961,6 +973,7 @@
       "description_max": "La description ne peut pas dépasser {max} caractères.",
       "price_required": "Indiquez un prix, ou cochez « Je donne cet objet ».",
       "price_invalid": "Entrez un prix en dirhams, sans centimes.",
+      "price_not_allowed": "Cette annonce n'affiche pas de montant.",
       "price_max": "Le prix ne peut pas dépasser {max} DH.",
       "city_required": "Choisissez votre ville dans la liste.",
       "district_max": "Le quartier ne peut pas dépasser {max} caractères.",
@@ -976,6 +989,7 @@
       "unknown": "Cette valeur n'est pas valide.",
       "subcategory_mismatch": "Cette sous-catégorie n'appartient pas à la catégorie choisie.",
       "pro_only": "Cette sous-catégorie est réservée aux comptes professionnels.",
+      "individual_only": "Cette sous-catégorie est réservée aux particuliers.",
       "donation_not_allowed": "Le don n'est pas possible dans cette sous-catégorie.",
       "donation_price": "Un don ne peut pas avoir de prix : laissez le prix vide.",
       "region_mismatch": "La ville choisie ne se trouve pas dans cette région.",
@@ -1171,6 +1185,13 @@
         "menage": "Ménage",
         "evenements": "Événements",
         "beaute": "Beauté"
+      }
+    },
+    "emploi": {
+      "name": "Emploi",
+      "sub": {
+        "offres-emploi": "Offres d'emploi",
+        "demandes-emploi": "Demandes d'emploi"
       }
     },
     "divers": {
@@ -2590,6 +2611,95 @@
     },
     "fleet-units": {
       "label": "Véhicules identiques dans la flotte"
+    },
+    "job-contract": {
+      "label": "Type de contrat",
+      "options": {
+        "cdi": "CDI",
+        "cdd": "CDD",
+        "interim": "Intérim",
+        "stage": "Stage",
+        "alternance": "Alternance",
+        "freelance": "Freelance / indépendant",
+        "saisonnier": "Saisonnier"
+      }
+    },
+    "job-sector": {
+      "label": "Secteur",
+      "options": {
+        "commerce-vente": "Commerce, vente",
+        "restauration-hotellerie": "Restauration, hôtellerie",
+        "tourisme-evenementiel": "Tourisme, événementiel",
+        "btp-construction": "BTP, construction",
+        "industrie-production": "Industrie, production",
+        "transport-logistique": "Transport, logistique",
+        "administration-secretariat": "Administration, secrétariat",
+        "comptabilite-finance": "Comptabilité, finance",
+        "informatique-telecom": "Informatique, télécoms",
+        "marketing-communication": "Marketing, communication",
+        "sante-paramedical": "Santé, paramédical",
+        "education-formation": "Éducation, formation",
+        "securite-gardiennage": "Sécurité, gardiennage",
+        "services-domicile": "Services à domicile",
+        "agriculture-peche": "Agriculture, pêche",
+        "artisanat": "Artisanat",
+        "beaute-bien-etre": "Beauté, bien-être",
+        "immobilier": "Immobilier",
+        "juridique-rh": "Juridique, ressources humaines",
+        "centres-appels": "Centres d'appels",
+        "autre": "Autre"
+      }
+    },
+    "job-experience": {
+      "label": "Expérience",
+      "options": {
+        "debutant": "Débutant",
+        "1-3-ans": "1 à 3 ans",
+        "3-5-ans": "3 à 5 ans",
+        "plus-5-ans": "Plus de 5 ans"
+      }
+    },
+    "job-education": {
+      "label": "Niveau d'études",
+      "options": {
+        "sans-diplome": "Sans diplôme",
+        "bac": "Bac",
+        "bac-2": "Bac +2",
+        "bac-3": "Bac +3",
+        "bac-5": "Bac +5",
+        "doctorat": "Doctorat"
+      }
+    },
+    "job-mode": {
+      "label": "Mode de travail",
+      "options": {
+        "sur-place": "Sur place",
+        "hybride": "Hybride",
+        "teletravail": "Télétravail"
+      }
+    },
+    "job-location": {
+      "label": "Poste situé",
+      "options": {
+        "maroc": "Au Maroc",
+        "etranger": "À l'étranger"
+      }
+    },
+    "job-time": {
+      "label": "Temps de travail",
+      "options": {
+        "temps-plein": "Temps plein",
+        "temps-partiel": "Temps partiel"
+      }
+    },
+    "job-mobility": {
+      "label": "Mobilité",
+      "options": {
+        "ville": "Ma ville",
+        "region": "Ma région",
+        "maroc": "Tout le Maroc",
+        "etranger": "Maroc et étranger"
+      }
     }
   },
   "MyListings": {
@@ -2801,6 +2911,7 @@
   "ListingCard": {
     "donation": "Don",
     "toDiscuss": "Prix à discuter",
+    "salaryToDiscuss": "Salaire à convenir",
     "negotiable": "Négociable",
     "per": {
       "night": "par nuit",
@@ -2867,6 +2978,7 @@
       "close": "Fermer",
       "lightboxHint": "Utilisez les flèches du clavier ou faites glisser pour changer de photo, et Échap pour fermer.",
       "empty": "Le vendeur n'a pas encore ajouté de photo.",
+      "emptyJobs": "Annonce sans photo",
       "unavailable": "Le plein écran n'a pas pu se charger. Rechargez la page pour l'afficher.",
       "reload": "Recharger la page"
     },
@@ -3008,7 +3120,11 @@
         "noCodes": "Ne communiquez jamais vos codes bancaires, ni un code reçu par SMS ou WhatsApp.",
         "noDeposit": "Ne versez jamais d'acompte, de caution ni de frais de réservation avant d'avoir visité le bien et signé un contrat.",
         "visitFirst": "Visitez le bien en personne et vérifiez l'identité du propriétaire ou de l'agence.",
-        "checkTitle": "Pour un achat, vérifiez le titre foncier auprès de la Conservation foncière (ANCFCC) et signez chez un notaire ou des adouls."
+        "checkTitle": "Pour un achat, vérifiez le titre foncier auprès de la Conservation foncière (ANCFCC) et signez chez un notaire ou des adouls.",
+        "noFees": "Ne payez jamais pour postuler : ni frais de dossier, ni formation obligatoire, ni caution, ni visa.",
+        "checkEmployer": "Vérifiez l'employeur : nom de la société, adresse, registre de commerce, et rencontrez-le dans ses locaux.",
+        "abroad": "Pour un emploi à l'étranger, le contrat doit porter le visa du ministère chargé du Travail ; les services de l'ANAPEC sont gratuits.",
+        "noDocuments": "Ne transmettez jamais la copie de votre carte d'identité ou de votre passeport avant un contrat signé."
       },
       "report": "Un doute sur cette annonce ? <report>Signalez-la</report> ou <contact>écrivez-nous</contact>.",
       "host": "Aalan héberge les annonces de ses utilisateurs : elle n'est ni vendeur ni acheteur, et n'est partie ni aux transactions ni aux litiges entre eux.",
@@ -3033,6 +3149,26 @@
     "adultsOnly": {
       "title": "Réservé aux personnes majeures.",
       "body": "Objet décoratif d'artisanat, vendu uniquement aux personnes de 18 ans et plus."
+    },
+    "salary": {
+      "label": "Salaire mensuel brut"
+    },
+    "jobs": {
+      "title": "Annonce d'emploi : ce qu'il faut savoir",
+      "offer": {
+        "publisher": "Aalan publie les offres d'emploi de ses utilisateurs : elle n'est ni une agence de recrutement, ni partie à l'embauche.",
+        "moderation": "L'offre est modérée, mais Aalan ne vérifie ni l'employeur ni le poste au-delà de cette modération.",
+        "noFees": "Ne payez jamais pour postuler : frais de dossier, formation obligatoire, caution ou visa sont des signaux d'arnaque."
+      },
+      "seeker": {
+        "publisher": "Cette annonce est publiée par une personne en recherche d'emploi, par ses propres moyens : Aalan n'est ni une agence de placement, ni partie à l'embauche.",
+        "contact": "Contactez-la par la messagerie Aalan. Ne lui demandez jamais d'argent ni de documents d'identité avant un contrat signé."
+      },
+      "abroad": {
+        "title": "Emploi à l'étranger.",
+        "body": "Le contrat de travail doit porter le visa du ministère chargé du Travail avant le départ. Les services de l'ANAPEC sont gratuits : ne payez jamais pour obtenir un emploi ou un visa."
+      },
+      "links": "<rules>Règles des annonces d'emploi</rules> · <report>Signaler cette annonce</report>"
     },
     "dossier": {
       "title": "Dossier du véhicule",
@@ -3583,6 +3719,7 @@
       "radius": "Rayon autour de la ville",
       "district": "Quartier",
       "price": "Prix",
+      "salary": "Salaire",
       "seller": "Vendeur",
       "condition": "État",
       "options": "Options",
@@ -3600,6 +3737,8 @@
     "districtCount": "{district} ({count})",
     "priceMin": "Prix minimum",
     "priceMax": "Prix maximum",
+    "salaryMin": "Salaire minimum",
+    "salaryMax": "Salaire maximum",
     "min": "Minimum",
     "max": "Maximum",
     "sellerAll": "Tous",

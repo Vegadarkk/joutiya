@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { Clock } from "lucide-react";
-import type { PriceUnit } from "@/config/categories";
+import type { PriceUnit, Subcategory } from "@/config/categories";
 import type { Locale } from "@/config/site";
 import { promoRunning, promoSummary, type PromoView } from "@/lib/contracts/catalog-core";
 import { moroccoTimeZone } from "@/lib/i18n/morocco-time";
@@ -27,23 +27,30 @@ export interface ListingPriceProps {
   isDonation: boolean;
   negotiable: boolean;
   unit?: PriceUnit;
+  /** "salary": a job offer's monthly gross salary, said above the amount; "none": nothing shown. */
+  mode?: Subcategory["priceMode"];
   locale: Locale;
   promo: PromoView | null;
   /** Epoch ms of the server render. */
   renderedAt: number;
 }
 
-export function ListingPrice({ price, from, isDonation, negotiable, unit, locale, promo, renderedAt }: ListingPriceProps) {
+export function ListingPrice({ price, from, isDonation, negotiable, unit, mode, locale, promo, renderedAt }: ListingPriceProps) {
+  const t = useTranslations("ListingPage.salary");
   const now = useNow(renderedAt, 15_000, promo !== null);
   const summary = promo && promoRunning(promo, now) ? promoSummary(promo) : null;
+  if (mode === "none") return null;
   return (
-    <div className="flex flex-col gap-2">
+    <div data-testid="listing-price" className="flex flex-col gap-2">
+      {/* The label makes sense above an amount; « Salaire à convenir » says it all. */}
+      {mode === "salary" && price !== null ? <span className="text-sm text-foreground-muted">{t("label")}</span> : null}
       <PriceTag
         price={summary ? summary.price : price}
         from={summary && promo ? new Set(promo.prices.map((entry) => entry.price)).size > 1 : from}
         isDonation={isDonation}
         negotiable={negotiable}
         unit={unit}
+        mode={mode}
         locale={locale}
         promo={summary !== null}
         before={summary?.reference ?? null}

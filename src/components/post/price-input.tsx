@@ -4,7 +4,7 @@ import { useRef, useState, type InputHTMLAttributes, type ReactNode, type Ref } 
 import { useLocale, useTranslations } from "next-intl";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import type { PriceUnit } from "@/config/categories";
+import type { PriceUnit, Subcategory } from "@/config/categories";
 import { isRtl, type Locale } from "@/config/site";
 import { currencyLabel, groupDigits, parsePriceInput } from "@/lib/listings/client/format";
 import { PRICE_MAX } from "@/lib/listings/client/validation";
@@ -13,7 +13,8 @@ import { SwitchField } from "./controls/switch";
 
 // Step 6 (design D4): integer dirhams with thousands grouping as you type, "Négociable",
 // "Je donne" when the subcategory allows donations, "À discuter" when the price is optional, and
-// the unit ("par nuit", "par mois") when the subcategory sets one.
+// the unit ("par nuit", "par mois") when the subcategory sets one. A job offer's amount is a
+// monthly gross salary (`priceMode: "salary"`): same box, its own words.
 
 export interface PriceInputProps {
   value: number | null;
@@ -25,14 +26,17 @@ export interface PriceInputProps {
   donationAllowed: boolean;
   priceOptional: boolean;
   priceUnit?: PriceUnit;
+  /** "salary": the amount is a monthly gross salary (a job offer); the labels say so. */
+  priceMode?: Subcategory["priceMode"];
   error?: string;
   onBlur?: () => void;
   /** Overrides the hook (unit tests render without a provider for the locale). */
   locale?: Locale;
 }
 
-export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonation, onDonation, donationAllowed, priceOptional, priceUnit, error, onBlur, locale: localeProp }: PriceInputProps) {
+export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonation, onDonation, donationAllowed, priceOptional, priceUnit, priceMode, error, onBlur, locale: localeProp }: PriceInputProps) {
   const t = useTranslations("Listing.fields");
+  const salary = priceMode === "salary";
   const hookLocale = useLocale() as Locale;
   const locale = localeProp ?? hookLocale;
   // "À discuter": the person asked for no amount (distinct from "not typed yet").
@@ -49,7 +53,7 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
 
   return (
     <div className="flex flex-col gap-5" onBlur={onBlur}>
-      <Field label={t("price")} hint={disabled ? undefined : t("priceHint")} error={error} required={!priceOptional && !isDonation}>
+      <Field label={t(salary ? "salary" : "price")} hint={disabled ? undefined : t(salary ? "salaryHint" : "priceHint")} error={error} required={!priceOptional && !isDonation}>
         <AmountBox
           inputRef={input}
           suffix={
@@ -61,7 +65,7 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
           type="text"
           inputMode="numeric"
           autoComplete="off"
-          placeholder={disabled ? "" : t("pricePlaceholder")}
+          placeholder={disabled ? "" : t(salary ? "salaryPlaceholder" : "pricePlaceholder")}
           value={isDonation ? "0" : toDiscuss ? "" : text}
           disabled={disabled}
           dir="ltr"
@@ -76,8 +80,8 @@ export function PriceInput({ value, onChange, negotiable, onNegotiable, isDonati
       <div className="flex flex-col divide-y divide-border rounded-lg border border-border px-4">
         {priceOptional ? (
           <SwitchField
-            label={t("toDiscuss")}
-            hint={t("toDiscussHint")}
+            label={t(salary ? "salaryToDiscuss" : "toDiscuss")}
+            hint={t(salary ? "salaryToDiscussHint" : "toDiscussHint")}
             checked={toDiscuss}
             disabled={isDonation}
             onCheckedChange={(checked) => {
