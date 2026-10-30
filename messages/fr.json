@@ -223,7 +223,7 @@
       "title": "Par e-mail",
       "languages": "Langues acceptées",
       "person": "Lu et traité par une personne",
-      "personHint": "L'équipe d'Aalan répond elle-même ; aucun outil automatique ne décide à sa place.",
+      "personHint": "L'équipe d'Aalan lit vos messages et y répond elle-même, sans réponse automatique.",
       "assistant": "Pour une question sur l'utilisation du site, le centre d'aide et son assistant répondent souvent plus vite.",
       "assistantLink": "Ouvrir le centre d'aide"
     },
@@ -236,12 +236,12 @@
       },
       "appeal": {
         "title": "Contester une décision",
-        "body": "Annonce retirée, compte suspendu, signalement classé : chaque décision se conteste depuis votre compte.",
+        "body": "Annonce retirée, compte suspendu, signalement classé : chaque décision se conteste depuis votre espace, ou par le lien reçu avec la décision, même sans compte.",
         "link": "Décisions et recours"
       },
       "data": {
         "title": "Mes données",
-        "body": "Accès, rectification, effacement, opposition : écrivez au délégué à la protection des données.",
+        "body": "Accès, rectification, effacement, opposition : écrivez à notre contact pour les données personnelles.",
         "link": "Vos droits sur vos données"
       },
       "authorities": {
@@ -259,7 +259,7 @@
       "submit": "Signaler",
       "invalid": "Adresse non reconnue : collez l'adresse complète d'une annonce (…/annonce/…) ou d'un profil (…/profil/…), ou la référence de l'annonce."
     },
-    "limits": "Aalan héberge les annonces de ses utilisateurs : elle n'arbitre pas les litiges entre eux et ne reçoit aucun paiement de leur part.",
+    "limits": "Aalan héberge les annonces de ses utilisateurs : elle n'arbitre pas les litiges entre eux et aucun paiement entre utilisateurs ne passe par elle.",
     "limitsLink": "Ce que nous ne traitons pas"
   },
   "Guide": {
