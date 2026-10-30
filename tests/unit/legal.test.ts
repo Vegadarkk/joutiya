@@ -8,6 +8,9 @@ import { legalSource } from "@/lib/legal/sources";
 import { renderTemplate } from "@/lib/legal/template";
 import { legalScope, type LegalSwitches } from "@/lib/legal/values";
 
+// Site pages the legal texts may link to, with their anchors (src/app/[locale]/(public)/aide/contact).
+const SITE_LINKS: Record<string, string[]> = { "/aide/contact": ["email", "signaler"] };
+
 const complete: LegalConfig = {
   ...DEFAULT_LEGAL,
   host: { name: "Oracle France SAS", address: "Paris", phone: "+33 1 00 00 00 00" },
@@ -142,6 +145,10 @@ describe("legal pages", () => {
           continue;
         }
         if (!path.startsWith("/")) continue;
+        if (path in SITE_LINKS) {
+          if (anchor) expect(SITE_LINKS[path], `${language}/${slug}: ${href}`).toContain(anchor);
+          continue;
+        }
         const target = /^\/legal\/([a-z-]+)$/.exec(path);
         expect(target, `${language}/${slug}: ${href}`).not.toBeNull();
         const page = legalPage(target![1]!);
