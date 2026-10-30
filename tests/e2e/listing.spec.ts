@@ -213,7 +213,7 @@ test.beforeAll(async () => {
 });
 
 test.describe("listing page", () => {
-  test("renders the listing under a hash CSP, without violations, with its photos, criteria, seller and map", { tag: "@mobile" }, async ({ page }) => {
+  test("renders the listing under a hash CSP, without violations, with its photos, criteria, seller and map", { tag: "@mobile" }, async ({ page, isMobile }) => {
     const violations = await watchCsp(page);
     const { slugId, title } = fixture.published;
     const response = await page.goto(`/fr/annonce/${slugId}`);
@@ -236,11 +236,14 @@ test.describe("listing page", () => {
     // control within reach of the contact, leading to the dialog below (UX journeys counter-review, 8).
     await expect(page.getByTestId("share-button")).toHaveText(/Partager|Copier le lien/);
     await expect(page.getByRole("complementary", { name: "Vendeur et contact" }).getByRole("link", { name: "Signaler l'annonce" })).toHaveAttribute("href", "#signaler");
-    // The phone bar: the message, the listing's own action (an offer here) and the number as an icon.
-    const bar = page.getByTestId("contact-bar");
-    await expect(bar.getByRole("button", { name: "Message", exact: true })).toBeVisible();
-    await expect(bar.getByTestId("contact-bar-action")).toHaveText("Offre");
-    await expect(bar.locator('button[aria-label="Voir le numéro"]')).toBeVisible();
+    // The phone bar (hidden from lg, so on the phone project only): the message, the listing's own
+    // action (an offer here) and the number as an icon.
+    if (isMobile) {
+      const bar = page.getByTestId("contact-bar");
+      await expect(bar.getByRole("button", { name: "Message", exact: true })).toBeVisible();
+      await expect(bar.getByTestId("contact-bar-action")).toHaveText("Offre");
+      await expect(bar.locator('button[aria-label="Voir le numéro"]')).toBeVisible();
+    }
 
     // Gallery: the first photo is the LCP image and actually loads from the media host. The title is
     // bidi-isolated inside the translated alt text.
