@@ -14,6 +14,7 @@ import { Logo } from "./logo";
 import { ProEntry } from "./pro-entry";
 import { RentEntry } from "./rent-entry";
 import { SellFab } from "./sell-fab";
+import { AssistantBubble } from "@/components/help/assistant-bubble";
 
 // Header of the Carte vivante (lot 1): separate floating pieces on the page ground, never one solid
 // band, so that the map pages of the next lots can lay the same pieces over the map. One sticky row
@@ -69,6 +70,7 @@ export function SiteHeader({ locale }: { locale: string }) {
       </header>
       <CategoryChips items={chips} label={t("categories")} shops={t("shops")} guide={t("guide")} previous={t("previousCategories")} next={t("nextCategories")} />
       <SellFab label={t("post")} text={t("sell")} />
+      <AssistantBubble />
     </>
   );
 }

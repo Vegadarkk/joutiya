@@ -18,6 +18,8 @@ export const PUBLIC_CLIENT_NAMESPACES = [
   // CGU change notice under the header (signed-in members, D11).
   "CguNotice",
   "Auth.menu",
+  // The Assistant Aalan bubble at the bottom end of every public page (owner, 2026-10-30).
+  "Help.assistant",
   "Auth.settings",
   // Listing page islands: gallery, map, contact (the reveal errors and challenge load on demand).
   "ListingPage.gallery",
