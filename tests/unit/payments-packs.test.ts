@@ -14,13 +14,14 @@ vi.mock("@/lib/alert", () => ({ alert: vi.fn(async () => true) }));
 const { alert } = await import("@/lib/alert");
 
 describe("pack grid", () => {
-  it("sells three MAD packs by default, the bigger ones with bonus credits", () => {
+  it("sells four MAD packs by default, the bigger ones with bonus credits", () => {
     expect(DEFAULT_PRICING.packs.map((pack) => [pack.id, pack.priceMinor, pack.paid, pack.bonus])).toEqual([
-      ["mad_50", 5_000, 50, 0],
+      ["mad_30", 3_000, 30, 0],
       ["mad_100", 10_000, 100, 10],
-      ["mad_250", 25_000, 250, 40],
+      ["mad_200", 20_000, 200, 30],
+      ["mad_500", 50_000, 500, 100],
     ]);
-    expect(packByProductId("joutiya_credits_250_mad")?.id).toBe("mad_250");
+    expect(packByProductId("joutiya_credits_200_mad")?.id).toBe("mad_200");
     expect(packByProductId("unknown")).toBeUndefined();
   });
 

@@ -11,6 +11,8 @@ import { alternates } from "@/lib/i18n/metadata";
 import { PRICING_PATH, PRO_LANDING_PATH, PRO_SPACE_PATH } from "@/lib/search/shortcuts";
 import { cn } from "@/lib/utils";
 
+const WALLET_PATH = "/porte-monnaie";
+
 // Public price list (owner, 2026-10-30: the offers must be visible): what an individual and a
 // Pro pay, read from the pricing config (Firestore config/pricing, cached) so the page never
 // drifts from what checkout charges. Packs are in MAD VAT included; Pro plans and the pass are
@@ -66,7 +68,7 @@ export default async function PricingPage({ params }: { params: Params }) {
   const offer = launchOfferOpen(pricing.launchOffer, new Date()) ? pricing.launchOffer : null;
   const { essentiel, business } = pricing.plans;
   const pass = pricing.passes[0] ?? null;
-  const quota = (value: number | null) => (value === null ? t("unlimited") : n("count", { count: value }));
+  const listings = (value: number | null) => (value === null ? t("pros.unlimitedListings") : `${n("count", { count: value })} ${t("pros.activeListings")}`);
   return (
     <Container className="flex flex-col gap-12 py-8 md:py-12">
       <section className="arch threshold flex flex-col gap-3 rounded-b-lg bg-structure px-6 pt-12 pb-8 text-center text-structure-foreground sm:px-10 sm:text-start">
@@ -109,6 +111,12 @@ export default async function PricingPage({ params }: { params: Params }) {
               .map((pack) => (pack.bonus > 0 ? n("individuals.packs.packBonus", { amount: mad(pack.priceMinor), credits: pack.paid, bonus: pack.bonus }) : n("individuals.packs.pack", { amount: mad(pack.priceMinor), credits: pack.paid })))}
           />
         </div>
+        {/* Buying happens in the wallet, behind sign-in (owner, 2026-10-31). */}
+        <div className="flex flex-wrap gap-3">
+          <Link href={WALLET_PATH} prefetch={false} className={buttonVariants({ variant: "primary", size: "md" })}>
+            {t("individuals.packs.cta")}
+          </Link>
+        </div>
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="pricing-pros">
@@ -134,7 +142,7 @@ export default async function PricingPage({ params }: { params: Params }) {
             title={t("pros.essentiel")}
             price={n("perMonth", { amount: mad(essentiel.priceMinor.monthly) })}
             note={n("perYear", { amount: mad(essentiel.priceMinor.yearly) })}
-            items={[quota(pricing.pro.essentiel.activeListings) + " " + t("pros.activeListings"), n("pros.credits", { count: essentiel.credits }), t("pros.storefront")]}
+            items={[listings(pricing.pro.essentiel.activeListings), n("pros.credits", { count: essentiel.credits }), t("pros.storefront")]}
           />
           <Card
             Icon={Sparkles}
@@ -142,9 +150,9 @@ export default async function PricingPage({ params }: { params: Params }) {
             title={t("pros.business")}
             price={n("perMonth", { amount: mad(business.priceMinor.monthly) })}
             note={n("perYear", { amount: mad(business.priceMinor.yearly) })}
-            items={[quota(pricing.pro.business.activeListings) + " " + t("pros.activeListings"), n("pros.credits", { count: business.credits }), n("pros.featured", { count: business.featured }), t("pros.storefront")]}
+            items={[listings(pricing.pro.business.activeListings), n("pros.credits", { count: business.credits }), n("pros.featured", { count: business.featured }), t("pros.storefront")]}
           />
-          <Card Icon={BadgeCheck} title={t("pros.premium")} price={t("pros.onQuote")} items={[t("unlimited") + " " + t("pros.activeListings"), t("pros.premiumSupport"), t("pros.storefront")]} />
+          <Card Icon={BadgeCheck} title={t("pros.premium")} price={t("pros.onQuote")} items={[listings(null), t("pros.premiumSupport"), t("pros.storefront")]} />
         </div>
         <p className="text-sm text-foreground-muted">{t("pros.payAtSeller")}</p>
         <div className="flex flex-wrap gap-3">

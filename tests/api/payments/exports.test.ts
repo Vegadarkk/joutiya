@@ -326,7 +326,7 @@ describe("yearly thresholds", () => {
     expect((await pay("mad_100", 10_000)).status).toBe(200);
     await thresholdsRef().set({ year: new Date().getUTCFullYear(), euB2cEurMinor: 1_000_000, turnoverEurMinor: null, alerted: { euB2c: 1, franchise: 0 }, computedAt: new Date() });
     resetThresholdsCache();
-    expect(await grid()).toEqual(["mad_50", "mad_100", "mad_250"]);
+    expect(await grid()).toEqual(["mad_30", "mad_100", "mad_200", "mad_500"]);
     const refused = await pay("eur_10", 1_000);
     expect(refused.status).toBe(409);
     expect(refused.body.error.code).toBe("price_changed");
@@ -342,6 +342,6 @@ describe("yearly thresholds", () => {
 
     await thresholdsRef().delete();
     resetThresholdsCache();
-    expect(await grid()).toEqual(["mad_50", "mad_100", "mad_250", "eur_10"]);
+    expect(await grid()).toEqual(["mad_30", "mad_100", "mad_200", "mad_500", "eur_10"]);
   });
 });

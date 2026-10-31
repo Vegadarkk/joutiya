@@ -93,7 +93,9 @@
       "shops": "Boutiques des Pros",
       "shopsHint": "Le neuf, les agences et les loueurs vérifiés",
       "guide": "Démarches",
-      "guideHint": "Véhicule, logement, auto-entrepreneur, MRE : les étapes et les papiers"
+      "guideHint": "Véhicule, logement, auto-entrepreneur, MRE : les étapes et les papiers",
+      "pricing": "Tarifs",
+      "pricingHint": "Publier gratuitement, options de visibilité et offres Pro"
     }
   },
   "Welcome": {
@@ -146,7 +148,16 @@
       "interdits": "Objets interdits"
     },
     "guide": "Démarches administratives",
-    "pricing": "Tarifs"
+    "pricing": "Tarifs",
+    "intro": "Avec {site}, trouvez la bonne affaire près de chez vous : des petites annonces de particuliers et de professionnels partout au Maroc. Voitures, immobilier, location de vacances, emploi, téléphones, meubles, produits du terroir… Déposez une annonce gratuitement pour vendre, louer, donner ou proposer vos services, et échangez en toute sécurité par la messagerie.",
+    "categoriesLabel": "Annonces par catégorie",
+    "regionsLabel": "Annonces par région",
+    "prosTitle": "Nos solutions Pros",
+    "questionsTitle": "Des questions ?",
+    "becomePro": "Devenir Pro",
+    "createShop": "Créer ma boutique",
+    "post": "Déposer une annonce",
+    "wallet": "Porte-monnaie"
   },
   "Legal": {
     "provisionalTitle": "Version provisoire",
@@ -5491,7 +5502,14 @@
       "title": "Louer une voiture",
       "body": "Choisissez la ville et vos dates : les agences affichent les véhicules libres sur toute la période.",
       "submit": "Trouver une voiture",
-      "open": "Choisissez la ville et vos dates"
+      "open": "Choisissez la ville et vos dates",
+      "holidayTitle": "Location de vacances",
+      "holidayBody": "Choisissez la ville et vos dates : seuls les logements libres sur tout le séjour s'affichent.",
+      "holidaySubmit": "Trouver un logement",
+      "holidayOpen": "Riads, villas et appartements pour vos séjours",
+      "kind": "Type de location",
+      "tabCar": "Voiture",
+      "tabHoliday": "Vacances"
     },
     "airport": "{city} ({code})"
   },
@@ -5860,7 +5878,8 @@
         "title": "Packs de crédits",
         "note": "TTC, 1 crédit = 1 DH",
         "pack": "{amount, number} DH : {credits, number} crédits",
-        "packBonus": "{amount, number} DH : {credits, number} crédits + {bonus, number} offerts"
+        "packBonus": "{amount, number} DH : {credits, number} crédits + {bonus, number} offerts",
+        "cta": "Acheter des crédits"
       }
     },
     "pros": {
@@ -5883,7 +5902,8 @@
       "premiumSupport": "Accompagnement dédié et import du stock",
       "payAtSeller": "Paiement chez le vendeur : Aalan ne prend aucune commission sur vos ventes.",
       "cta": "Créer ma boutique",
-      "more": "Découvrir l'offre Pro"
+      "more": "Découvrir l'offre Pro",
+      "unlimitedListings": "Annonces actives en illimité"
     },
     "footnote": "Les ventes ouvrent avec le lancement du site. Les prix affichés sont ceux prévus à l'ouverture."
   }

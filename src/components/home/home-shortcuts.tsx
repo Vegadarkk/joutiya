@@ -1,15 +1,16 @@
-import { CarFront, ScrollText, ShoppingBag, TreePalm } from "lucide-react";
+import { CarFront, ScrollText, ShoppingBag, Tag, TreePalm } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { RENTAL_SUBCATEGORY } from "@/config/categories";
 import { Link } from "@/i18n/navigation";
 import { canonicalSearchParams, searchPath } from "@/lib/search/params";
-import { DIRECTORY_PATH } from "@/lib/search/shortcuts";
+import { DIRECTORY_PATH, PRICING_PATH } from "@/lib/search/shortcuts";
 import { cn } from "@/lib/utils";
 
 // The home page's own doors to what the category row carries on the other pages (the home shows
 // its categories itself, in its arcade or its rail, and has no row): the directory of verified
 // shops (« Boutiques des Pros », the new and the agencies beside the second-hand of the listings)
-// and the guide of the administrative procedures (« Démarches »), owner's request of 30 Oct 2026.
+// and the guide of the administrative procedures (« Démarches »), owner's request of 30 Oct 2026,
+// and the price list (« Tarifs », 31 Oct 2026), the three across the row.
 // In the home map's panel on phones, first, the two rental searches (UX audit option B, owner
 // 29 Oct 2026: rentals were only reached by scrolling under the listings; from md the header's
 // « Louer » menu carries them).
@@ -43,7 +44,7 @@ export function HomeShortcuts({ compact = false, className }: HomeShortcutsProps
     </Link>
   );
   return (
-    <nav aria-label={t("label")} data-testid="home-shortcuts" className={cn("grid grid-cols-2 gap-2", compact ? "px-2" : "sm:gap-3 lg:max-w-3xl", className)}>
+    <nav aria-label={t("label")} data-testid="home-shortcuts" className={cn("grid grid-cols-2 gap-2", compact ? "px-2" : "sm:grid-cols-3 sm:gap-3", className)}>
       {compact ? (
         <>
           <Link href={RENT_CAR} prefetch={false} className={cn(TILE, "md:hidden")}>
@@ -62,6 +63,8 @@ export function HomeShortcuts({ compact = false, className }: HomeShortcutsProps
       ) : null}
       {door(DIRECTORY_PATH, ShoppingBag, t("shops"), t("shopsHint"), "home-shops")}
       {door("/demarches", ScrollText, t("guide"), t("guideHint"), "home-guide")}
+      {/* The price list, full row width with the two others (owner, 2026-10-31); not in the map panel's tighter grid. */}
+      {compact ? null : <div className="col-span-2 sm:col-span-1">{door(PRICING_PATH, Tag, t("pricing"), t("pricingHint"), "home-pricing")}</div>}
     </nav>
   );
 }
