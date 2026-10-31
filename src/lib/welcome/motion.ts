@@ -12,10 +12,17 @@ export const DOOR_VIEWBOX = { x: 136, y: 56, width: 240, height: 386 } as const;
 /** Rectangular part of the doorway: under the arch's springing line, down to the threshold. */
 export const DOORWAY = { left: 202.24, right: 309.76, top: 255.85, bottom: 414.16 } as const;
 /**
- * Where the camera pushes: the doorway's axis, at eye level. Same point as the transform-origin of
- * .welcome-door in globals.css (50% 70.98%).
+ * Where the camera pushes: the doorway's axis, in the upper middle of the opening, under the arch
+ * (owner, 2026-10-31: a push towards the bottom of the door did not feel natural). The door's
+ * transform-origin follows it (door-scene.tsx).
  */
-export const PUSH_POINT = { x: 256, y: 330 } as const;
+export const PUSH_POINT = { x: 256, y: 235 } as const;
+/**
+ * Top of the opening the push must fill above PUSH_POINT: inside the horseshoe arch (circle centre
+ * y 217.7, radius 76.34), where it is still ~120 wide, far more than the few units around the
+ * axis that stay on screen at the push's scale.
+ */
+const PUSH_TOP = 170;
 /** The push always goes at least this far (design: ~16), further when the viewport needs it. */
 export const MIN_PUSH_SCALE = 16;
 const MAX_PUSH_SCALE = 64;
@@ -137,7 +144,7 @@ export function pushScale(door: Box, viewport: { width: number; height: number }
   const needed = Math.max(
     ox / (ox - x(DOORWAY.left)),
     (viewport.width - ox) / (x(DOORWAY.right) - ox),
-    oy / (oy - y(DOORWAY.top)),
+    oy / (oy - y(PUSH_TOP)),
     (viewport.height - oy) / (y(DOORWAY.bottom) - oy),
   );
   // 10% beyond the edges: the light reaches the corners before the ground fades.
