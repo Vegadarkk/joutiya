@@ -180,9 +180,11 @@ export const DEFAULT_PRICING: PricingConfig = {
   launchOffer: { active: true, plan: "essentiel", noticeDays: 30, endsAt: null },
   options: { bump: { standard: 10, premiumCat: 20 }, featured7: { standard: 29, premiumCat: 59 }, featured30: { standard: 79, premiumCat: 149 } },
   packs: [
-    { id: "mad_50", currency: "MAD", priceMinor: 5_000, paid: 50, bonus: 0, productId: "joutiya_credits_50_mad", packageId: "credits_50_mad" },
+    // 30 / 100 / 200 / 500 MAD, bonus 0 / 10 / 15 / 20 % (owner, 2026-10-31; was 50 / 100 / 250).
+    { id: "mad_30", currency: "MAD", priceMinor: 3_000, paid: 30, bonus: 0, productId: "joutiya_credits_30_mad", packageId: "credits_30_mad" },
     { id: "mad_100", currency: "MAD", priceMinor: 10_000, paid: 100, bonus: 10, productId: "joutiya_credits_100_mad", packageId: "credits_100_mad" },
-    { id: "mad_250", currency: "MAD", priceMinor: 25_000, paid: 250, bonus: 40, productId: "joutiya_credits_250_mad", packageId: "credits_250_mad" },
+    { id: "mad_200", currency: "MAD", priceMinor: 20_000, paid: 200, bonus: 30, productId: "joutiya_credits_200_mad", packageId: "credits_200_mad" },
+    { id: "mad_500", currency: "MAD", priceMinor: 50_000, paid: 500, bonus: 100, productId: "joutiya_credits_500_mad", packageId: "credits_500_mad" },
   ],
   plans: {
     essentiel: { priceMinor: { monthly: 24_900, yearly: 249_000 }, credits: 30, featured: 0, entitlement: "essentiel", stripePrices: {} },

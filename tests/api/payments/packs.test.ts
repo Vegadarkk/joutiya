@@ -103,9 +103,10 @@ describe("pack checkout", () => {
     expect(view.status).toBe(200);
     expect(view.body).toMatchObject({ salesOpen: true, available: true, account: "personal", consentVersion: "2026-10" });
     expect(view.body.packs.map((pack) => [pack.id, pack.priceMinor, pack.credits])).toEqual([
-      ["mad_50", 5_000, 50],
+      ["mad_30", 3_000, 30],
       ["mad_100", 10_000, 110],
-      ["mad_250", 25_000, 290],
+      ["mad_200", 20_000, 230],
+      ["mad_500", 50_000, 600],
     ]);
 
     const result = await pay(buyer, order());
@@ -119,7 +120,7 @@ describe("pack checkout", () => {
     expect(url.pathname.endsWith(account?.rcAppUserId as string)).toBe(true);
 
     // A second checkout keeps the same RevenueCat customer.
-    expect(await checkoutOf(buyer, "mad_50", 5_000)).toBe(account?.rcAppUserId);
+    expect(await checkoutOf(buyer, "mad_30", 3_000)).toBe(account?.rcAppUserId);
   });
 
   it("refuses a closed shop, a changed price, a missing consent, a failed challenge and a missing CSRF token", async () => {
