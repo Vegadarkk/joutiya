@@ -55,7 +55,7 @@ export function CategoryGrid({ variant = "grid", className }: CategoryGridProps)
         "flex snap-x gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         rail
           ? "scroll-px-2 ps-2 pe-8 pb-1 [mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)] rtl:[mask-image:linear-gradient(to_left,#000_calc(100%-2.5rem),transparent)]"
-          : "-mx-4 scroll-px-4 px-4 pb-2 sm:-mx-6 sm:scroll-px-6 sm:px-6 xl:mx-0 xl:grid xl:grid-cols-13 xl:overflow-visible xl:px-0",
+          : "-mx-4 scroll-px-4 px-4 pb-2 sm:-mx-6 sm:scroll-px-6 sm:px-6 xl:mx-0 xl:flex-wrap xl:justify-center xl:gap-y-2 xl:overflow-visible xl:px-0",
       )}
     >
       {CATEGORIES.map((category) => {
@@ -65,7 +65,7 @@ export function CategoryGrid({ variant = "grid", className }: CategoryGridProps)
             key={category.id}
             className={cn(
               "shrink-0 snap-start",
-              rail ? "w-[4.75rem]" : "w-[max(5.75rem,calc((100%_-_0.75rem)/3.5))] sm:w-[max(5.75rem,calc((100%_-_1.5rem)/6.5))] xl:w-auto",
+              rail ? "w-[4.75rem]" : "w-[max(5.75rem,calc((100%_-_0.75rem)/3.5))] sm:w-[max(5.75rem,calc((100%_-_1.5rem)/6.5))] xl:w-[calc((100%_-_1.75rem)/8)]",
             )}
           >
             <Link

@@ -156,6 +156,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                       <Link href={SEARCH_PATH}>{t("recent.all")}</Link>
                     </Button>
                     <RentCarLink className="mx-2" />
+                    {/* The holiday rentals beside the cars (owner, 2026-10-31). */}
+                    <RentCarLink kind="holiday" className="mx-2" />
                     <HomePillars compact className="px-2 pb-2" />
                   </RowsArea>
                 ) : null}

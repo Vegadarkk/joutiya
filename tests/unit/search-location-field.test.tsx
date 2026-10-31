@@ -137,7 +137,7 @@ describe("CategoryGrid", () => {
     const tile = classOf(html, /<li[^>]*class="([^"]*)"/);
     expect(tile).toContain("w-[max(5.75rem,calc((100%_-_0.75rem)/3.5))]");
     expect(tile).toContain("sm:w-[max(5.75rem,calc((100%_-_1.5rem)/6.5))]");
-    expect(tile).toContain("xl:w-auto");
+    expect(tile).toContain("xl:w-[calc((100%_-_1.75rem)/8)]");
     expect(classOf(html, /<ul[^>]*class="([^"]*)"/)).toEqual(expect.arrayContaining(["scroll-px-4", "sm:scroll-px-6"]));
   });
 });

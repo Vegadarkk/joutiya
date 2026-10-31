@@ -182,7 +182,7 @@ describe("pass checkout", () => {
     const proId = await shop(owner);
     const before = await page(owner);
     expect(before).toMatchObject({ planSource: "none", passEndsAt: null, passConsentVersion: "2026-10" });
-    expect(before.passes).toEqual([{ id: "boutique30", plan: "essentiel", days: 30, priceMinor: 24_900, credits: 30, activeListings: 50, available: true, withinLimit: true, otherPlan: false }]);
+    expect(before.passes).toEqual([{ id: "boutique30", plan: "essentiel", days: 30, priceMinor: 29_900, credits: 30, activeListings: 50, available: true, withinLimit: true, otherPlan: false }]);
 
     const opened = await buyPass(owner);
     expect(opened.status).toBe(200);

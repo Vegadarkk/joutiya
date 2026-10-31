@@ -29,7 +29,8 @@ describe("HomeShortcuts", () => {
     expect(html).toContain(fr.Home.shortcuts.guideHint);
     // No rental tile here: the list view has its car rental module.
     expect(html).not.toContain("location-voitures");
-    expect(html.match(/<a /g)).toHaveLength(2);
+    expect(html.match(/<a /g)).toHaveLength(3);
+    expect(html).toMatch(/<a data-testid="home-pricing" class="[^"]*" href="\/fr\/tarifs">/);
   });
 
   it("puts the two rental searches first in the compact map panel, phones only, without hints", () => {

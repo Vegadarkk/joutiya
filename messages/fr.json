@@ -93,7 +93,9 @@
       "shops": "Boutiques des Pros",
       "shopsHint": "Le neuf, les agences et les loueurs vérifiés",
       "guide": "Démarches",
-      "guideHint": "Véhicule, logement, auto-entrepreneur, MRE : les étapes et les papiers"
+      "guideHint": "Véhicule, logement, auto-entrepreneur, MRE : les étapes et les papiers",
+      "pricing": "Tarifs",
+      "pricingHint": "Publier gratuitement, options de visibilité et offres Pro"
     }
   },
   "Welcome": {
@@ -5491,7 +5493,14 @@
       "title": "Louer une voiture",
       "body": "Choisissez la ville et vos dates : les agences affichent les véhicules libres sur toute la période.",
       "submit": "Trouver une voiture",
-      "open": "Choisissez la ville et vos dates"
+      "open": "Choisissez la ville et vos dates",
+      "holidayTitle": "Location de vacances",
+      "holidayBody": "Choisissez la ville et vos dates : seuls les logements libres sur tout le séjour s'affichent.",
+      "holidaySubmit": "Trouver un logement",
+      "holidayOpen": "Riads, villas et appartements pour vos séjours",
+      "kind": "Type de location",
+      "tabCar": "Voiture",
+      "tabHoliday": "Vacances"
     },
     "airport": "{city} ({code})"
   },

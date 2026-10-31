@@ -190,8 +190,8 @@ describe("Pass Boutique", () => {
     expect(storefrontShown("active", "essentiel")).toBe(true);
   });
 
-  it("sells a 30-day Essentiel pass at 249 MAD HT by default and refuses a pass longer than its limit", () => {
-    expect(DEFAULT_PRICING.passes).toEqual([{ id: "boutique30", plan: "essentiel", days: 30, priceMinor: 24_900, credits: 30, maxAheadDays: 90 }]);
+  it("sells a 30-day Essentiel pass at 299 MAD HT by default and refuses a pass longer than its limit", () => {
+    expect(DEFAULT_PRICING.passes).toEqual([{ id: "boutique30", plan: "essentiel", days: 30, priceMinor: 29_900, credits: 30, maxAheadDays: 90 }]);
     expect(resolvePricingConfig({ passes: [{ ...DEFAULT_PRICING.passes[0], days: 120, maxAheadDays: 90 }] }).errors.length).toBeGreaterThan(0);
     expect(resolvePricingConfig({ passes: [DEFAULT_PRICING.passes[0], DEFAULT_PRICING.passes[0]] }).errors.length).toBeGreaterThan(0);
     expect(resolvePricingConfig({ passes: [{ ...DEFAULT_PRICING.passes[0], stripePrice: "prod_1" }] }).errors.length).toBeGreaterThan(0);

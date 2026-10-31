@@ -188,8 +188,9 @@ export const DEFAULT_PRICING: PricingConfig = {
     essentiel: { priceMinor: { monthly: 24_900, yearly: 249_000 }, credits: 30, featured: 0, entitlement: "essentiel", stripePrices: {} },
     business: { priceMinor: { monthly: 59_000, yearly: 590_000 }, credits: 100, featured: 4, entitlement: "business", stripePrices: {} },
   },
-  // 249 MAD HT for 30 days, as a month of Essentiel (owner, 2026-10-28).
-  passes: [{ id: "boutique30", plan: "essentiel", days: 30, priceMinor: 24_900, credits: 30, maxAheadDays: 90 }],
+  // 299 MAD HT for 30 days, above a month of Essentiel (249) so the subscription stays the better
+  // deal (owner, 2026-10-31; was 249 since 2026-10-28).
+  passes: [{ id: "boutique30", plan: "essentiel", days: 30, priceMinor: 29_900, credits: 30, maxAheadDays: 90 }],
 };
 
 /** The pass sold as `id`, if the config lists it. */
