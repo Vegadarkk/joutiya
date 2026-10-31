@@ -148,7 +148,16 @@
       "interdits": "Objets interdits"
     },
     "guide": "Démarches administratives",
-    "pricing": "Tarifs"
+    "pricing": "Tarifs",
+    "intro": "Avec {site}, trouvez la bonne affaire près de chez vous : des petites annonces de particuliers et de professionnels partout au Maroc. Voitures, immobilier, location de vacances, emploi, téléphones, meubles, produits du terroir… Déposez une annonce gratuitement pour vendre, louer, donner ou proposer vos services, et échangez en toute sécurité par la messagerie.",
+    "categoriesLabel": "Annonces par catégorie",
+    "regionsLabel": "Annonces par région",
+    "prosTitle": "Nos solutions Pros",
+    "questionsTitle": "Des questions ?",
+    "becomePro": "Devenir Pro",
+    "createShop": "Créer ma boutique",
+    "post": "Déposer une annonce",
+    "wallet": "Porte-monnaie"
   },
   "Legal": {
     "provisionalTitle": "Version provisoire",
