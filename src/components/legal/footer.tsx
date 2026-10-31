@@ -66,7 +66,7 @@ export function Footer({ publisher }: { publisher: string }) {
           >
             {CATEGORIES.map((category) => (
               <div key={category.id} className="mb-7 break-inside-avoid">
-                <h3 className={directoryTitle}>
+                <p className={directoryTitle}>
                   <Link
                     href={`/c/${category.id}`}
                     prefetch={false}
@@ -74,7 +74,7 @@ export function Footer({ publisher }: { publisher: string }) {
                   >
                     {names(`${category.id}.name` as CategoryKey)}
                   </Link>
-                </h3>
+                </p>
                 <ul className="flex flex-col gap-1.5 text-sm">
                   {category.subcategories.map((sub) => (
                     <li key={sub.id}>
@@ -100,7 +100,7 @@ export function Footer({ publisher }: { publisher: string }) {
           >
             {REGIONS.map((region) => (
               <div key={region.code} className="mb-7 break-inside-avoid">
-                <h3 className={directoryTitle}>
+                <p className={directoryTitle}>
                   <Link
                     href={searchPath({ region: region.code })}
                     prefetch={false}
@@ -108,7 +108,7 @@ export function Footer({ publisher }: { publisher: string }) {
                   >
                     {regionName(region, locale)}
                   </Link>
-                </h3>
+                </p>
                 <ul className="flex flex-col gap-1.5 text-sm">
                   {[...citiesOfRegion(region.code)]
                     .sort((a, b) => b.population - a.population)
