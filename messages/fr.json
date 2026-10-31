@@ -5869,7 +5869,8 @@
         "title": "Packs de crédits",
         "note": "TTC, 1 crédit = 1 DH",
         "pack": "{amount, number} DH : {credits, number} crédits",
-        "packBonus": "{amount, number} DH : {credits, number} crédits + {bonus, number} offerts"
+        "packBonus": "{amount, number} DH : {credits, number} crédits + {bonus, number} offerts",
+        "cta": "Acheter des crédits"
       }
     },
     "pros": {
@@ -5892,7 +5893,8 @@
       "premiumSupport": "Accompagnement dédié et import du stock",
       "payAtSeller": "Paiement chez le vendeur : Aalan ne prend aucune commission sur vos ventes.",
       "cta": "Créer ma boutique",
-      "more": "Découvrir l'offre Pro"
+      "more": "Découvrir l'offre Pro",
+      "unlimitedListings": "Annonces actives en illimité"
     },
     "footnote": "Les ventes ouvrent avec le lancement du site. Les prix affichés sont ceux prévus à l'ouverture."
   }

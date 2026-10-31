@@ -5859,7 +5859,8 @@
         "title": "باقات الأرصدة",
         "note": "شاملة للرسوم، رصيد واحد = درهم واحد",
         "pack": "{amount, number} درهم: {credits, number} رصيد",
-        "packBonus": "{amount, number} درهم: {credits, number} رصيد + {bonus, number} هدية"
+        "packBonus": "{amount, number} درهم: {credits, number} رصيد + {bonus, number} هدية",
+        "cta": "شراء الرصيد"
       }
     },
     "pros": {
@@ -5882,7 +5883,8 @@
       "premiumSupport": "مرافقة خاصة واستيراد المخزون",
       "payAtSeller": "الأداء عند البائع: علان لا يأخذ أي عمولة على مبيعاتكم.",
       "cta": "إنشاء متجري",
-      "more": "اكتشاف عرض المهنيين"
+      "more": "اكتشاف عرض المهنيين",
+      "unlimitedListings": "إعلانات نشطة غير محدودة"
     },
     "footnote": "تنطلق المبيعات مع إطلاق الموقع. الأثمنة المعروضة هي المقررة عند الافتتاح."
   }
